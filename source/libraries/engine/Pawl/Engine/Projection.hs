@@ -588,6 +588,7 @@ viewOfCard face =
           Filter.attackedThisTurn = False,
           Filter.attachedToCreature = False,
           Filter.attachedToPermanent = False,
+          Filter.attachedTo = Nothing,
           -- CR 701.3a: only Pawl.Engine.Resolve's AttachTarget arm fills this field, and
           -- its candidates are battlefield permanents, so a card in a library or a
           -- hand is never asked whether an attach could land on it.
@@ -798,6 +799,13 @@ viewOfCharacteristics oid pc controller counters gs =
       Filter.attachedToPermanent = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
         Nothing -> False
         Just host -> Set.member host (GameState.battlefield gs),
+      -- CR 701.3a / 301.5a: the same attachment a third time, kept as the HOST'S ID
+      -- rather than collapsed to a Bool -- IsAttachedToSource compares it against
+      -- the match's source, which this builder does not know. Deliberately NOT
+      -- narrowed to a host on the battlefield the way `attachedToPermanent` above
+      -- is: an id is answered or it is not, and the atom's own comparison against a
+      -- source already rules out a host that has left.
+      Filter.attachedTo = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf,
       -- CR 701.3a: filled only by Resolve's AttachTarget arm, the one place that
       -- knows what is being moved. "Could the subject be attached here" is not a
       -- question about the candidate alone.
@@ -2460,6 +2468,9 @@ filterReads f = case f of
   -- writes that field -- CR 701.3's attach is a keyword action performed by a
   -- resolution.
   Filter.Type.IsAttachedToPermanent -> Set.empty
+  -- Reads nothing, for IsAttachedToPermanent's reason: it stops at
+  -- Object.attachedTo and compares an id, and no Modification writes that field.
+  Filter.Type.IsAttachedToSource -> Set.empty
   -- Over-declared deliberately: the characteristics behind this atom are the
   -- candidate's (CR 301.5) and the subject's (CR 702.5a), and Aspect cannot say
   -- "another object's". Declaring everything is the conservative direction, and no

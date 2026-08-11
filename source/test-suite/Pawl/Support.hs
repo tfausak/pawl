@@ -1647,6 +1647,7 @@ stubView table oid =
                 Filter.attackedThisTurn = False,
                 Filter.attachedToCreature = False,
                 Filter.attachedToPermanent = False,
+                Filter.attachedTo = Nothing,
                 Filter.canHostSubject = False,
                 Filter.token = False,
                 Filter.tapped = False,

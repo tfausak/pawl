@@ -677,6 +677,15 @@ withFear oid gs =
 withLands :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
 withLands lands gs = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs lands
 
+-- Put `printing` onto bob's battlefield already attached to `host` -- CR 301.5a
+-- for an Equipment, CR 303.4b for an Aura. A STATE fixture, as S.attach's own
+-- comment says: no equip ability is activated, so the timing of CR 702.6a plays no
+-- part in what the CR 509.1a arity below reads.
+withAttachment :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withAttachment printing host gs =
+  let (oid, gs1) = S.addCreature printing S.bob gs
+   in S.attach oid host gs1
+
 evasionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 evasionSpec s registry = Spec.describe s "Evasion" $ do
   Spec.it s "CR 702.9b a declaration in which a ground creature blocks a flier is illegal" $ do
@@ -1563,6 +1572,67 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           )
           (True, False, False, True)
       _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
+  Spec.it s "CR 301.5a Kemba's Legion's arity is the Equipment attached to IT" $ do
+    -- Kemba's Legion {5}{W}{W} 4/6, "This creature can block an additional creature
+    -- each combat for each Equipment attached to this creature" -- the pool's one
+    -- COUNTED permission. Bonesplitter and Vectis Gloves say nothing about
+    -- blocking, so every number below is the Legion's own sentence.
+    --
+    -- FOUR attackers, which is what separates the three readings a smaller board
+    -- collapses: with two Equipment the count is three, so "any number" would take
+    -- the fourth and a fixed "an additional" would refuse the third.
+    legion <- S.printingOf s registry "Kemba's Legion"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    gloves <- S.printingOf s registry "Vectis Gloves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker, piker, piker] [legion, piker]
+    case (mine, theirs) of
+      ([first, second, third, fourth], [kemba, _]) -> do
+        let blocks n = Map.singleton kemba (Set.fromList (take n [first, second, third, fourth]))
+            legal n = Combat.legalBlockDeclaration S.bob (blocks n)
+            one = withAttachment bonesplitter kemba gs
+            two = withAttachment gloves kemba one
+        Spec.assertEqWith
+          s
+          "bare one, one Equipment two, two Equipment three -- and never one more"
+          ( legal 1 gs,
+            legal 2 gs,
+            legal 2 one,
+            legal 3 one,
+            legal 3 two,
+            legal 4 two
+          )
+          (True, False, True, False, True, False)
+      _ -> Spec.assertFailure s "fixture should have four attackers and two blockers"
+  Spec.it s "CR 301.5a the Legion counts neither another creature's Equipment nor its own Aura" $ do
+    -- The pair that makes the two conjuncts of "Equipment attached to this
+    -- creature" observable, each board ONE attachment away from the same
+    -- one-Equipment board: a second Equipment on the OTHER blocker (the
+    -- IsAttachedToSource half) and an Aura on the Legion itself (the HasSubtype
+    -- half). Both must leave the arity at two.
+    legion <- S.printingOf s registry "Kemba's Legion"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    gloves <- S.printingOf s registry "Vectis Gloves"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker, piker, piker] [legion, piker]
+    case (mine, theirs) of
+      ([first, second, third, _], [kemba, plain]) -> do
+        let blocks n = Map.singleton kemba (Set.fromList (take n [first, second, third]))
+            legal n = Combat.legalBlockDeclaration S.bob (blocks n)
+            one = withAttachment bonesplitter kemba gs
+            elsewhere = withAttachment gloves plain one
+            aura = withAttachment unholyStrength kemba one
+        Spec.assertEqWith
+          s
+          "an Equipment on the Piker and an Aura on the Legion both leave the count at two"
+          ( legal 2 elsewhere,
+            legal 3 elsewhere,
+            legal 2 aura,
+            legal 3 aura
+          )
+          (True, False, True, False)
+      _ -> Spec.assertFailure s "fixture should have four attackers and two blockers"
   Spec.it s "CR 509.1b the restrictions are checked against EACH attacker blocked" $ do
     -- A Brigade has neither flying nor reach, so CR 702.9b refuses it the Bird
     -- Maiden however many creatures it may block. The pair is the whole point:

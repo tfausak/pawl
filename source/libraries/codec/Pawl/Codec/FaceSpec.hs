@@ -208,7 +208,7 @@ populatedFace =
       Face.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility,
       Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.CantCastSpells],
       Face.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached],
-      Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just 1) Nothing],
+      Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing],
       Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached],
       Face.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
@@ -241,7 +241,7 @@ populatedFaceJson =
     <> "\"modal\":{\"modes\":[{}]}}}],"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
-    <> "\"blockPermissions\":[{\"affected\":{\"type\":\"Attached\"},\"additional\":1}],"
+    <> "\"blockPermissions\":[{\"affected\":{\"type\":\"Attached\"},\"additional\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
     <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
@@ -386,8 +386,8 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just 1) Nothing]}
-        (init baseFaceJson <> ",\"blockPermissions\":[{\"affected\":{\"type\":\"Attached\"},\"additional\":1}]}")
+        baseFace {Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing]}
+        (init baseFaceJson <> ",\"blockPermissions\":[{\"affected\":{\"type\":\"Attached\"},\"additional\":{\"type\":\"Literal\",\"value\":1}}]}")
     Spec.it s "attackRequirements" $
       Common.assertJsonCodec
         s

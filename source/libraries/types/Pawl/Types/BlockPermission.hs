@@ -1,13 +1,14 @@
 module Pawl.Types.BlockPermission where
 
-import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Quantity as Quantity
 
 -- | CR 509.1a: one printed BLOCKING PERMISSION -- an effect saying a creature
 -- can block more creatures than the rule's one. Foriysian Brigade and Lairwatch
 -- Giant print it about themselves, High Ground about a whole team, Palace Guard
--- with no number at all.
+-- with no number at all, Kemba's Legion with a number it counts off the
+-- battlefield.
 --
 -- The SEVENTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
@@ -29,10 +30,6 @@ import qualified Pawl.Types.Condition as Condition
 -- granted. CR 509.1b's note that an evasion ability gained after a legal block
 -- does not affect that block is the rules saying the same of the other side.
 --
--- One printed shape does not fit and is not carried: a COUNTED permission
--- (Kemba's Legion's "for each Equipment attached to this creature") would need a
--- Quantity where `additional` holds a literal (#1153).
---
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.BlockPermission is the only module that reads it, and it hands
 -- Pawl.Engine.Combat a NUMBER per creature and never a card.
@@ -42,8 +39,16 @@ data BlockPermission = MkBlockPermission
     -- two ways -- a creature's own text is Affected.Matching Filter.IsSource
     -- (Foriysian Brigade), an Equipment's is Affected.Attached (Echo Circlet).
     affected :: Affected.Affected,
-    -- | How many creatures BEYOND CR 509.1a's one this permission adds. One for
-    -- "an additional creature", seven for Watcher in the Web.
+    -- | How many creatures BEYOND CR 509.1a's one this permission adds --
+    -- Quantity.Literal 1 for "an additional creature", 7 for Watcher in the Web.
+    --
+    -- A QUANTITY and not a literal, because Kemba's Legion counts its own
+    -- Equipment: "an additional creature each combat for each Equipment attached
+    -- to this creature" is a Quantity.Count over the battlefield, re-read on every
+    -- look like every other field here, so an Equipment moving away lowers the
+    -- arity at once. Evaluated against the permission's SOURCE, which is the "this
+    -- creature" every counted printing in the pool means and the same object CR
+    -- 109.5 fixes `while`'s "you" by.
     --
     -- NOTHING is "any number of creatures" (Palace Guard) -- no bound at all,
     -- which is Pawl.Engine.CombatRestriction.blockLimit's spelling of the same
@@ -51,7 +56,7 @@ data BlockPermission = MkBlockPermission
     -- may block any number still may after a second permission adds one.
     -- Deliberately not a huge literal, which would be a number the card does not
     -- print and would still refuse the board that exceeded it.
-    additional :: Maybe Natural.Natural,
+    additional :: Maybe Quantity.Quantity,
     -- | CR 604.2's "as long as" clause -- Entourage of Trest's "as long as
     -- you're the monarch". Nothing is the ungated permission (Foriysian
     -- Brigade).
