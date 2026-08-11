@@ -16,6 +16,7 @@ import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Codec.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 
@@ -36,7 +37,7 @@ toJson re = case re of
   ReplacementEffect.TurnUpR p r ->
     Common.tagged "TurnUpR" . Just . Common.array $ [Filter.toJson Keyword.toJson p, TurnUpRewrite.toJson r]
   ReplacementEffect.PhaseR p ->
-    Common.tagged "PhaseR" . Just $ PhasePattern.toJson p
+    Common.tagged "PhaseR" . Just $ Codec.encode PhasePattern.codec p
 
 fromJson :: Value.Value -> Either Text.Text ReplacementEffect.ReplacementEffect
 fromJson value = do
@@ -67,5 +68,5 @@ fromJson value = do
       pattern_ <- Filter.fromJson Keyword.fromJson p
       rewrite <- TurnUpRewrite.fromJson r
       pure (ReplacementEffect.TurnUpR pattern_ rewrite)
-    ("PhaseR", Just v) -> ReplacementEffect.PhaseR <$> PhasePattern.fromJson v
+    ("PhaseR", Just v) -> ReplacementEffect.PhaseR <$> Codec.decode PhasePattern.codec v
     _ -> Left . Text.pack $ "unknown ReplacementEffect: " <> t
