@@ -34,10 +34,12 @@ import Pawl.Types.PlayerId (PlayerId)
 -- defending player controls, so while the planeswalker is attacked its controller
 -- IS that player. Once CR 506.4 removes it from combat the rule's second sentence
 -- wants the controller it had "before it was removed from combat", which is the
--- same seat; reading the object instead answers the wrong player once it is gone,
--- and Pawl.CombatSpec's LastKnownDefendingPlayer group is a Confiscate board where
--- the two are different seats. CR 702.19e is what settles that a creature attacking
--- a removed planeswalker still HAS a defending player: it assigns damage to one.
+-- same seat; reading the object instead answers NOBODY once CR 704.5i has buried
+-- it, since the burial leaves no object to read a controller off, and answers the
+-- owner on any board where the two seats differ. Pawl.CombatSpec's
+-- LastKnownDefendingPlayer group is that board, built with a Confiscate. CR 702.19e
+-- is what settles that a creature attacking a removed planeswalker still HAS a
+-- defending player: it assigns damage to one.
 --
 -- CR 802's attack-multiple-players option is what would break the identity, since
 -- several defending players make the record's one player the wrong answer for some
