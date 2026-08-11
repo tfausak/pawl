@@ -445,9 +445,9 @@ data Object = MkObject
     -- A Bool for the three designations' reason above, and stored for it too:
     -- nothing a CR 613 layer computes may move it, since it records a choice
     -- rather than a characteristic. Unlike them it is a fact about a SPELL, so the
-    -- field is False for every permanent -- and CR 702.33e's payoff on a permanent
-    -- card is read while the spell is still on the stack (an entry replacement),
-    -- never off the permanent.
+    -- field is False for every permanent: rule 702.33e's payoff on a permanent card
+    -- is a CR 614.1c entry replacement, which reads the SPELL on the stack and not
+    -- the permanent it becomes (Monstrous War-Leech, #610).
     --
     -- Per-incarnation, which CR 400.7 makes the whole of rule 702.33d's duration:
     -- the designation belongs to the spell, and the permanent or the card in a

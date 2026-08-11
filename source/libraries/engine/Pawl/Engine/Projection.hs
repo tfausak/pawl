@@ -794,8 +794,10 @@ viewOfCharacteristics oid pc controller counters gs =
       -- CR 701.60b: `monstrous` above in every respect.
       Filter.suspected = maybe False Object.suspected (Game.lookupObject oid gs),
       -- CR 702.33d: `suspected` above in every respect -- read live off the object,
-      -- and False for the CR 608.2h path, which is right for a different reason: a
-      -- spell that has left the stack is not kicked, it is gone (CR 400.7).
+      -- so the CR 608.2h path answers False for a spell that has left the stack.
+      -- Nothing asks it there: the only reader is the kicked spell's own clause
+      -- condition, gated while it is still on the stack
+      -- (Pawl.Engine.Resolve.gateHolds).
       Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs)
     }
 

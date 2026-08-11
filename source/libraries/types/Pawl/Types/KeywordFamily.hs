@@ -32,11 +32,10 @@ module Pawl.Types.KeywordFamily where
 -- THE CONSTRUCTORS BELOW are this pool's, not Magic's. Rule 702 runs to 702.194,
 -- roughly a third of those keywords written with a cost or an N; the ones here are
 -- those of them Pawl.Types.Keyword models. The set grows with that type -- ward N
--- and the remaining alternative-cost keywords all land here eventually -- so a
--- constructor is
--- owed whenever a payload-carrying Keyword constructor is added, not whenever a
--- card first asks for one. Pawl.Engine.Keyword.familyOf is exhaustive and takes
--- no wildcard, so the compiler asks for the decision.
+-- and the remaining cost-bearing keywords all land here eventually -- so a
+-- constructor is owed whenever a payload-carrying Keyword constructor is added,
+-- not whenever a card first asks for one. Pawl.Engine.Keyword.familyOf is
+-- exhaustive and takes no wildcard, so the compiler asks for the decision.
 data KeywordFamily
   = -- | CR 702.11d: hexproof from [quality].
     Hexproof

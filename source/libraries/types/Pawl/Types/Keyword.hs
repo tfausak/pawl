@@ -24,7 +24,7 @@ import qualified Pawl.Types.MorphVariant as MorphVariant
 --
 -- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
 -- Filter has a HasKeyword arm and this type carries a Filter (702.11d, 702.14c,
--- 702.29e) and a Cost (702.29a/702.34a/702.42a) whose components carry one too, so the
+-- 702.29e) and a Cost (702.29a/702.33a/702.34a/702.42a) whose components carry one too, so the
 -- three would be a module cycle if any were concrete. They are parametric and
 -- this one is not, which makes `Filter Keyword` and `Cost Keyword` the only
 -- instantiations anywhere.

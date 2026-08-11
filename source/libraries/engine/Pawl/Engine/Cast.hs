@@ -952,10 +952,10 @@ castProposed pid sid face castFrom candidates before = do
       -- choosing); one payable candidate is forced and unprompted.
       -- Reject-not-repair: an answer outside the offered set rewinds the cast.
       --
-      -- CR 601.2f: an announced entwine is added to every candidate BEFORE the
-      -- payability filter, so the routes offered are the ones that can actually
-      -- pay it -- and CR 118.9d is what makes it apply to an alternative cost as
-      -- readily as to the printed one.
+      -- CR 601.2f: an announced entwine -- and the kicker announced below it -- is
+      -- added to every candidate BEFORE the payability filter, so the routes
+      -- offered are the ones that can actually pay it -- and CR 118.9d is what
+      -- makes it apply to an alternative cost as readily as to the printed one.
       let withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
           entwinedCandidates = fmap withEntwine candidates
       -- CR 702.33a: kicker, asked HERE -- after the modes and before the cost, the
@@ -987,7 +987,8 @@ castProposed pid sid face castFrom candidates before = do
       -- payment. A cast that fails after this point rewinds to `before`, which
       -- takes the stamp with it along with the spell.
       Monad.when (Maybe.isJust kicked) (State.modify' (stampKicked sid))
-      let payable = filter (payableCost pid sid gs) (fmap (\candidate -> maybe candidate (Cost.plus candidate) kicked) entwinedCandidates)
+      let withKicker candidate = maybe candidate (Cost.plus candidate) kicked
+          payable = filter (payableCost pid sid gs) (fmap withKicker entwinedCandidates)
       if null payable
         then reject
         else do
