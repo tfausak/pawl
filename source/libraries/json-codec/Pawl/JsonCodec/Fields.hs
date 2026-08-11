@@ -12,6 +12,12 @@
 -- deliberate and load-bearing: with @ApplicativeDo@, a field whose value
 -- depends on an earlier one fails to compile rather than quietly desugaring
 -- through a bind the encoder could not honour.
+--
+-- What a 'Monad' would add on top is a bind between fields; 'objectWith'
+-- adds something else, a check on the whole assembled record after every
+-- field has already decoded. It cannot see individual fields to make one
+-- depend on another -- only the finished @o@ -- and it runs on the decode
+-- side only, since encoding cannot fail.
 module Pawl.JsonCodec.Fields where
 
 import qualified Data.Text as Text
@@ -87,15 +93,25 @@ defaulted key d c get =
         pure ([Value.pair key (Schema.unwrap (Schema.withDefault (Codec.encode c d) s))], [])
     }
 
--- | Takes no name: @o@ is fixed by the return type, so 'Name.typeName' supplies
--- one. A field's KEY is still a string, because a JSON key is not a Haskell
--- name.
-object :: forall o. (Typeable.Typeable o) => Fields o o -> Codec.Codec o
-object fields =
+-- | Like 'object', but runs a check against the assembled record after
+-- 'decodeFields' succeeds, rejecting it on 'Left' -- e.g. 'TypeLine' rejecting
+-- an empty @types@ set per CR 205.1. Encoding cannot fail, so the check never
+-- runs there, and the schema is unaffected by it: JSON Schema could express
+-- some such rules (@minItems@ for a non-empty set), but the rule being
+-- enforced is a rule of Magic, not a property of the wire format, so it has
+-- no schema representation.
+objectWith :: forall o. (Typeable.Typeable o) => (o -> Either Text.Text o) -> Fields o o -> Codec.Codec o
+objectWith check fields =
   Codec.MkCodec
     { Codec.encode = Value.object . encode fields,
-      Codec.decode = \v -> Common.asObject v >>= decode fields,
+      Codec.decode = \v -> Common.asObject v >>= decode fields >>= check,
       Codec.schema = Define.define (Name.typeName (Typeable.Proxy :: Typeable.Proxy o)) $ do
         (properties, req) <- schema fields
         pure (Schema.object properties req)
     }
+
+-- | Takes no name: @o@ is fixed by the return type, so 'Name.typeName' supplies
+-- one. A field's KEY is still a string, because a JSON key is not a Haskell
+-- name.
+object :: forall o. (Typeable.Typeable o) => Fields o o -> Codec.Codec o
+object = objectWith pure
