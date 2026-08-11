@@ -10,37 +10,34 @@ import qualified Pawl.Types.CombatStep as CombatStep
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CombatStep" $ do
   Spec.it s "BeginningOfCombat" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CombatStep.toJson
-      CombatStep.fromJson
+      CombatStep.codec
       CombatStep.BeginningOfCombat
       """ {"type":"BeginningOfCombat"} """
   Spec.it s "DeclareAttackers" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CombatStep.toJson
-      CombatStep.fromJson
+      CombatStep.codec
       CombatStep.DeclareAttackers
       """ {"type":"DeclareAttackers"} """
   Spec.it s "DeclareBlockers" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CombatStep.toJson
-      CombatStep.fromJson
+      CombatStep.codec
       CombatStep.DeclareBlockers
       """ {"type":"DeclareBlockers"} """
   Spec.it s "CombatDamage" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CombatStep.toJson
-      CombatStep.fromJson
+      CombatStep.codec
       CombatStep.CombatDamage
       """ {"type":"CombatDamage"} """
   Spec.it s "EndOfCombat" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CombatStep.toJson
-      CombatStep.fromJson
+      CombatStep.codec
       CombatStep.EndOfCombat
       """ {"type":"EndOfCombat"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s CombatStep.codec

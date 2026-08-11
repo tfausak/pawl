@@ -1,25 +1,24 @@
 module Pawl.Codec.CombatStep where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CombatStep as CombatStep
 
-toJson :: CombatStep.CombatStep -> Value.Value
-toJson s = Common.nullary $ case s of
-  CombatStep.BeginningOfCombat -> "BeginningOfCombat"
-  CombatStep.DeclareAttackers -> "DeclareAttackers"
-  CombatStep.DeclareBlockers -> "DeclareBlockers"
-  CombatStep.CombatDamage -> "CombatDamage"
-  CombatStep.EndOfCombat -> "EndOfCombat"
-
-fromJson :: Value.Value -> Either Text.Text CombatStep.CombatStep
-fromJson =
-  Common.decodeNullary
-    "CombatStep"
-    [ ("BeginningOfCombat", CombatStep.BeginningOfCombat),
-      ("DeclareAttackers", CombatStep.DeclareAttackers),
-      ("DeclareBlockers", CombatStep.DeclareBlockers),
-      ("CombatDamage", CombatStep.CombatDamage),
-      ("EndOfCombat", CombatStep.EndOfCombat)
+codec :: Codec.Codec CombatStep.CombatStep
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "BeginningOfCombat" CombatStep.BeginningOfCombat,
+      Arm.nullary "DeclareAttackers" CombatStep.DeclareAttackers,
+      Arm.nullary "DeclareBlockers" CombatStep.DeclareBlockers,
+      Arm.nullary "CombatDamage" CombatStep.CombatDamage,
+      Arm.nullary "EndOfCombat" CombatStep.EndOfCombat
     ]
+  where
+    encode s = Common.nullary $ case s of
+      CombatStep.BeginningOfCombat -> "BeginningOfCombat"
+      CombatStep.DeclareAttackers -> "DeclareAttackers"
+      CombatStep.DeclareBlockers -> "DeclareBlockers"
+      CombatStep.CombatDamage -> "CombatDamage"
+      CombatStep.EndOfCombat -> "EndOfCombat"
