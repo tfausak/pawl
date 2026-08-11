@@ -2659,8 +2659,13 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- effect's controller (CR 111.2), through the single funnel -- so CR
             -- 614's token replacements (Doubling Season) get their opportunity.
             -- CR 110.5b: the funnel is handed the entry's tap state, so a token
-            -- the effect says is tapped is never untapped for an instant.
-            minted <- Event.createTokens controller (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry)
+            -- the effect says is tapped is never untapped for an instant. CR
+            -- 122.6a's counters ride along for the same reason -- incubate's token
+            -- is never on the battlefield without them (CR 701.53a) -- and the
+            -- funnel places them through CR 122.6's own door, so a counter
+            -- replacement reaches them (Pawl.ReplacementSpec's Eyes of Gitaxias
+            -- group is the proof).
+            minted <- Event.createTokens controller (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry) (EntryRiders.counters entry)
             -- CR 508.4: "if a creature is put onto the battlefield attacking, its
             -- controller chooses which defending player ... it's attacking". The
             -- rules for that live in Pawl.Engine.Combat, which is also what keeps this
@@ -2733,7 +2738,12 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     let sources = objectRefObjects legal resolving controller source gs ref
     Monad.forM_ sources $ \src ->
       Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
-        Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) 1 TapState.Untapped)
+        -- No riders: CR 707.2 copies no counters, and Effect.CreateCopy carries
+        -- nothing for an effect to add any with.
+        --
+        -- Not implemented: a copy token an effect says enters with counters on it
+        -- (Ochre Jelly, Littjara Mirrorlake) arrives bare (#1255).
+        Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) 1 TapState.Untapped Map.empty)
   Effect.ArmDelayedTrigger name onset duration -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and NOT belt and braces: the source can

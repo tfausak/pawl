@@ -52,23 +52,37 @@ import qualified Pawl.Types.TapState as TapState
 -- `counters` is CR 122.6a's "enters the battlefield with counters on it", said by
 -- the EFFECT rather than by the permanent -- undying's and persist's "return it
 -- to the battlefield ... with a +1/+1 counter on it" (CR 702.93a, CR 702.79a).
+-- The same rider one opcode over is incubate's "create an Incubator token that
+-- enters the battlefield with N +1/+1 counters on it" (CR 701.53a).
 -- A rider and not an Effect.PutCounters after the move, because the permanent
 -- must never exist on the battlefield without them: Pawl.Engine.Event places them
--- inside the CR 400.7 funnel, before the entry loop and before the Moved event.
--- Through Event.putCounters there, CR 122.6's funnel, so CR 614.16 applies and
--- Doubling Season sees them -- the posture EntryRewrite.WithCounters takes for
--- the counters a permanent's OWN text asks for.
+-- inside the CR 400.7 funnel, before the entry loop and before the Moved event --
+-- and, for a batch of tokens, before any of their entry loops, so CR 614.12's
+-- reading of the batch sees them. Through Event.putCounters there, CR 122.6's funnel, so CR
+-- 614.16 applies and Doubling Season sees them -- the posture
+-- EntryRewrite.WithCounters takes for the counters a permanent's OWN text asks
+-- for.
+--
+-- READ BY BOTH opcodes, unlike `transformed` below: a Create hands it to
+-- Event.createTokens and a MoveToZone to Event.changeZoneEntering.
+-- Pawl.ReplacementSpec's Eyes of Gitaxias group proves the Create road, where a
+-- token created with three +1/+1 counters on it takes six from Vorinclex.
 --
 -- A Map by kind, Object.counters' shape, rather than WithCounters' one kind and
 -- one count: nothing in CR 122.6a limits an effect to a single kind, and empty is
 -- the default every other move carries.
 --
+-- A literal count per kind rather than a Quantity, which is what bounds the
+-- wordings this can carry: every card that prints incubate prints a number, and
+-- undying and persist mint a one.
+--
 -- CR 122.6a's "may specify which player puts those counters on it" is not
 -- carried. No effect in the pool names one, and the rule's own default -- the
 -- object's controller -- is what putCounters already uses.
 --
--- Not implemented: an Effect.Create does not read this field, so a token minted
--- with counters on it would arrive bare (#1189).
+-- Not implemented: a count that is not a literal, so Printlifter Ooze's "the token
+-- enters with X +1/+1 counters on it, where X is the number of other creatures you
+-- control" is unsayable (#1256).
 --
 -- `underOwner` is CR 110.2a's "unless the effect states otherwise". Undying and
 -- persist return the permanent "under its OWNER's control", where CR 110.2a
