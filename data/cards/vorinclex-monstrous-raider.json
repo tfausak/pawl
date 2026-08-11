@@ -1,0 +1,110 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Haste"
+        },
+        {
+          "type": "Trample"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Vorinclex, Monstrous Raider",
+      "power": {
+        "type": "Literal",
+        "value": 6
+      },
+      "replacementEffects": [
+        {
+          "type": "CounterR",
+          "value": [
+            {
+              "byWhom": {
+                "type": "Yours"
+              },
+              "onWhat": {
+                "type": "And",
+                "value": []
+              },
+              "onWho": {
+                "type": "Anyones"
+              }
+            },
+            {
+              "type": "Multiply",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "type": "CounterR",
+          "value": [
+            {
+              "byWhom": {
+                "type": "Opponents"
+              },
+              "onWhat": {
+                "type": "And",
+                "value": []
+              },
+              "onWho": {
+                "type": "Anyones"
+              }
+            },
+            {
+              "type": "Halve"
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 6
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Phyrexian"
+          },
+          {
+            "type": "Praetor"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

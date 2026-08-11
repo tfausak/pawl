@@ -141,8 +141,10 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ( ReplacementEffect.CounterR
           CounterPattern.MkCounterPattern
             { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
+              CounterPattern.byWhom = Nothing,
               CounterPattern.whose = ControllerRelation.Yours,
-              CounterPattern.onWhat = Filter.HasCardType CardType.Creature
+              CounterPattern.onWhat = Filter.HasCardType CardType.Creature,
+              CounterPattern.onWho = Nothing
             }
           (Scaling.AddMore 1)
       )
@@ -158,8 +160,10 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ( ReplacementEffect.CounterR
           CounterPattern.MkCounterPattern
             { CounterPattern.whichKind = Nothing,
+              CounterPattern.byWhom = Nothing,
               CounterPattern.whose = ControllerRelation.Yours,
-              CounterPattern.onWhat = Filter.And []
+              CounterPattern.onWhat = Filter.And [],
+              CounterPattern.onWho = Nothing
             }
           (Scaling.Multiply 2)
       )

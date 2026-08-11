@@ -2,11 +2,13 @@ module Pawl.Types.ProposedEvent where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -40,7 +42,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- time it raises this -- so every property a CR 614.1e replacement can modify is
 -- read off, and written to, the object.
 --
--- Eight arms, not every replaceable event class the rules define: each of the
+-- Nine arms, not every replaceable event class the rules define: each of the
 -- rest is one more arm plus the funnel that raises it.
 data ProposedEvent
   = WouldChangeZone ZoneChange.ZoneChange
@@ -51,7 +53,21 @@ data ProposedEvent
     -- regeneration shield may be applied to THIS destruction, which is where
     -- Terror's "It can't be regenerated" lives.
     WouldBeDestroyed ObjectId.ObjectId Regenerability.Regenerability
-  | WouldPutCounters ObjectId.ObjectId (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
+  | -- | CR 122.6: counters would be put on a PERMANENT. The CounterCause is who
+    -- is putting them and whether an effect is doing it -- what CR 614.16 and
+    -- Vorinclex, Monstrous Raider narrow by, and the one ProposedEvent field that
+    -- is about the event's PROVENANCE rather than its content. It rides the event
+    -- rather than being consumed before the loop because the two clauses disagree
+    -- about which causes they reach, so only a row can decide.
+    WouldPutCounters CounterCause.CounterCause ObjectId.ObjectId (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
+  | -- | CR 122.1 / 122.6: counters would be put on a PLAYER.
+    --
+    -- A separate arm from WouldPutCounters rather than one arm over a recipient
+    -- sum, because the two recipients take disjoint kinds: CR 122.1's object
+    -- kinds and its player ones share no constructor, which is why
+    -- Pawl.Types.PlayerCounterKind is its own type. One arm would have to admit
+    -- a +1/+1 counter on a player.
+    WouldPutPlayerCounters CounterCause.CounterCause PlayerId.PlayerId PlayerCounterKind.PlayerCounterKind Natural.Natural
   | WouldCreateTokens PlayerId.PlayerId Card.Card Natural.Natural
   | -- | CR 500.11 / 614.10: a step or phase would begin, on this player's turn.
     -- Raised by Engine.runStep before anything about the step is observable, so
