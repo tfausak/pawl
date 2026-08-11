@@ -253,3 +253,13 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.AbilityTriggered (ObjectId.MkObjectId 7) (PlayerId.MkPlayerId 1) (TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You))
       """ {"type":"AbilityTriggered","value":[7,1,{"type":"SagaFinalChapterTriggers","value":{"type":"You"}}]} """
+  -- The permanent, then the player control LEFT, then the player it went to. The
+  -- order matters and distinct ids prove it: "when YOU lose control" reads the
+  -- middle field, and a swap would make it read the gainer.
+  Spec.it s "ControlChanged" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.ControlChanged (ObjectId.MkObjectId 8) (PlayerId.MkPlayerId 2) (PlayerId.MkPlayerId 3))
+      """ {"type":"ControlChanged","value":[8,2,3]} """

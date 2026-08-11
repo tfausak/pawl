@@ -3536,8 +3536,10 @@ snatch victim p = case p of
 -- until end of turn. That creature gains haste until end of turn." Act of Treason
 -- has the same three effects and cannot reach this window at all, because it is a
 -- sorcery -- which is why this clause was worked card-driven rather than built
--- speculatively. Ray of Command's remaining sentence, the delayed trigger that
--- taps the creature when its controller loses it, is not implemented (#287).
+-- speculatively. Ray of Command's third sentence, the delayed trigger that taps the
+-- creature when its controller loses it, does not reach these legs: every one of
+-- them stops at the end of combat step, well before the CR 514.2 sweep that ends
+-- the control effect. Pawl.TriggerSpec's "RayOfCommand" group is what proves it.
 --
 -- Every leg runs whole steps through Engine.runStep, so the combat record under
 -- test is the engine's own and the removal is observed where a player would see

@@ -1445,6 +1445,7 @@ oneMountainState mountain ph =
           GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
           GameState.controlWhenTriggered = Map.empty,
+          GameState.controlSample = Map.empty,
           GameState.damageScannedThrough = 0,
           GameState.delayedTriggers = Seq.empty,
           GameState.continuousEffects = [],

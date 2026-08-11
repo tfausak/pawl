@@ -640,6 +640,7 @@ castOf event = case event of
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
 
 -- The discarding player an event describes, if it is a discard (CR 701.9a).
 --
@@ -680,3 +681,4 @@ discardOf event = case event of
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing

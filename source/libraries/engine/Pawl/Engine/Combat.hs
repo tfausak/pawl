@@ -1144,13 +1144,19 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 
 -- CR 506.4's two clauses whose trigger is DERIVED state -- a combatant's
 -- controller changing, and an attacking or blocking creature stopping being a
--- creature -- which is why this is a sampler and not a hook. Neither has an event
--- to hang a removal on: a control-granting static ability is re-read live by the
--- projection, and even a stored SetController is installed by a resolution that
--- never announces a control change (#198); creature-ness is a CR 613 layer-4
+-- creature -- which is why this is a sampler and not a hook. Neither is announced
+-- by the resolution that causes it: a control-granting static ability is re-read
+-- live by the projection, and even a stored SetController is installed without a
+-- word about who used to control what; creature-ness is a CR 613 layer-4
 -- answer that changes the moment the effect producing it appears or ends. The
 -- same shape as Engine.checkControlContinuity's CR 302.6 scan, and
 -- settleForPriority runs both at every point the board can change.
+--
+-- Engine.sampleControl does mint a GameEvent.ControlChanged off the control half of
+-- the same difference, and this deliberately stays a sampler rather than reading
+-- it: the two are diffs of the same two boards in the same settle, so consuming
+-- the log would only add an ordering dependency, and this one must also answer the
+-- CARD TYPE clause, which has no event at all.
 --
 -- The TIMING that costs: the rules remove the permanent the instant the
 -- characteristic changes, and this notices at the next settle. Nothing can see

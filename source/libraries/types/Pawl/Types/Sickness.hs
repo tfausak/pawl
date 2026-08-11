@@ -16,9 +16,11 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- Two writers, both moments CR 302.6 names: Engine.settleAll writes
 -- `Settled pid` at pid's untap step for everything pid controls; and
 -- Engine.checkControlContinuity DROPS a `Settled p` whose object p no longer
--- controls. Control is DERIVED, so a change has no event to hook and the check
--- samples wherever the board can change. It only ever clears, never grants, so a
--- stolen creature stays sick after the Aura leaves and control returns.
+-- controls. Control is DERIVED, so nothing announces a change and the check
+-- samples wherever the board can change -- the same diff Engine.sampleControl
+-- takes for CR 603.2, taken again rather than read off the event log, for the
+-- reason checkControlContinuity's own comment gives. It only ever clears, never
+-- grants, so a stolen creature stays sick after the Aura leaves and control returns.
 --
 -- Everything else writes `Sick`, CR 400.7 making a zone change or a new token a
 -- new object no player has controlled for any time. The exception is an object

@@ -49,6 +49,8 @@ toJson e = case e of
   GameEvent.PermanentSacrificed pid oid -> Common.tagged "PermanentSacrificed" . Just . Common.array $ [PlayerId.toJson pid, ObjectId.toJson oid]
   GameEvent.AbilityTriggered oid pid cond ->
     Common.tagged "AbilityTriggered" . Just . Common.array $ [ObjectId.toJson oid, PlayerId.toJson pid, TriggerCondition.toJson cond]
+  GameEvent.ControlChanged oid before after ->
+    Common.tagged "ControlChanged" . Just . Common.array $ [ObjectId.toJson oid, PlayerId.toJson before, PlayerId.toJson after]
 
 fromJson :: Value.Value -> Either Text.Text GameEvent.GameEvent
 fromJson value = do
@@ -82,4 +84,6 @@ fromJson value = do
     ("PermanentSacrificed", Just (Value.Array (Array.MkArray [pid, oid]))) -> GameEvent.PermanentSacrificed <$> PlayerId.fromJson pid <*> ObjectId.fromJson oid
     ("AbilityTriggered", Just (Value.Array (Array.MkArray [oid, pid, cond]))) ->
       GameEvent.AbilityTriggered <$> ObjectId.fromJson oid <*> PlayerId.fromJson pid <*> TriggerCondition.fromJson cond
+    ("ControlChanged", Just (Value.Array (Array.MkArray [oid, before, after]))) ->
+      GameEvent.ControlChanged <$> ObjectId.fromJson oid <*> PlayerId.fromJson before <*> PlayerId.fromJson after
     _ -> Left . Text.pack $ "unknown GameEvent: " <> t

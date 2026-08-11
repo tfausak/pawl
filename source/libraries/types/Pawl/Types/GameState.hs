@@ -160,6 +160,26 @@ data GameState = MkGameState
     -- stays on the battlefield, so an absent id is answered live and gets the
     -- same answer.
     controlWhenTriggered :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
+    -- | Who controlled each permanent on the battlefield the last time
+    -- Pawl.Engine.Engine.sampleControl looked. The OBSERVATION POINT for a control
+    -- change: control is derived (CR 613.1b layer 2), so nothing announces a
+    -- change, and comparing this snapshot against the live projection is what
+    -- turns one into the GameEvent.ControlChanged that CR 603.2 needs.
+    --
+    -- The WHOLE battlefield and not overrides only, unlike controlWhenTriggered
+    -- above: a diff has to distinguish "controlled by their default controller"
+    -- from "not observed yet", and an overrides-only map collapses the two, so an
+    -- until-end-of-turn effect ending would read as an object that had never been
+    -- looked at.
+    --
+    -- REBUILT from the battlefield at every sample rather than updated in place,
+    -- which is what prunes it: a permanent that left has no entry to go stale, and
+    -- one that comes back is a new object by CR 400.7 with an id this never saw.
+    -- An id absent from the snapshot is therefore first-sighted, and a first
+    -- sighting is not a change -- which is what keeps a permanent ENTERING under
+    -- a player who is not its owner (CR 110.2's Object.enteredUnder) from reading
+    -- as a control change it never was.
+    controlSample :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     -- | How far the STATE-BASED ACTION check has consumed the event log --
     -- "since the last state-based action check", the boundary CR 704.5h names.
     --

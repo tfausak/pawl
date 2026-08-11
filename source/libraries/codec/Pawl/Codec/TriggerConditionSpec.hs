@@ -17,6 +17,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -479,3 +480,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent)
       """ {"type":"PlayerBecomesMonarch","value":{"type":"Opponent"}} """
+  -- CR 603.7's slot-named condition. The slot is a bare string, as every other
+  -- SlotName in card data is, and it is the whole payload: a codec that dropped it
+  -- would leave the condition asking about no creature at all.
+  Spec.it s "LoseControlOfBound round-trips its slot" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")))
+      """ {"type":"LoseControlOfBound","value":"target"} """

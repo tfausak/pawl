@@ -8,6 +8,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TurnScope as TurnScope
 
@@ -872,4 +873,32 @@ data TriggerCondition
     --
     -- CR 725.4's departure reassignment does not reach this yet (#1052).
     PlayerBecomesMonarch PlayerRelation.PlayerRelation
+  | -- | CR 603.7: "when you lose control of the creature" -- Ray of Command's third
+    -- sentence. Fires when the permanent BOUND IN THE NAMED SLOT stops being
+    -- controlled by "you", matched against GameEvent.ControlChanged.
+    --
+    -- The only condition that names a SLOT, because it is the only one whose
+    -- subject is a particular object chosen earlier rather than the bearer or a
+    -- class of objects. A delayed ability's source is the SPELL that armed it (CR
+    -- 603.7d), so a Self- condition would ask about Ray of Command on the stack
+    -- and never about the creature; and a Filter would ask about "a creature",
+    -- which is a different sentence -- the printed one is about THE creature, the
+    -- one the spell untapped. CR 603.7c's captured environment is what remembers
+    -- which, so the condition reads the same binding the ability's own effect does.
+    --
+    -- "You" is the ability's controller: the player who controlled the spell as it
+    -- resolved (CR 603.7d), matched against the player the event says control LEFT.
+    -- Where it went is not read, because the printed sentence does not ask.
+    --
+    -- An empty slot, or a slot holding something that is not a permanent, never
+    -- matches. That is CR 608.2b's fizzle already having happened rather than a
+    -- guard: a spell whose only target became illegal does not resolve, so it arms
+    -- nothing.
+    --
+    -- A permanent LEAVING the battlefield is not a match, because
+    -- GameEvent.ControlChanged is sampled on the battlefield only. You do lose
+    -- control of a creature that dies, so the entry stays armed instead of
+    -- spending CR 603.7b's one shot -- unobservable, since the ability could only
+    -- act on an object CR 400.7 has already replaced with a new one.
+    LoseControlOfBound SlotName.SlotName
   deriving (Eq, Ord, Show)

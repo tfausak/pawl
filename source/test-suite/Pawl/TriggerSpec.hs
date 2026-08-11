@@ -6799,6 +6799,12 @@ representativeEvents cond =
         -- 109.5's "you" instead of the crowned player would still agree with
         -- eventBindingSlots here if the two coincided.
         TriggerCondition.PlayerBecomesMonarch _ -> one (GameEvent.BecameMonarch S.bob)
+        -- CR 603.7's own event, and the only shape of it: Engine.sampleControl mints
+        -- a ControlChanged only where the two players differ, so there is no
+        -- same-player shape for the floor to come apart on. The ids and seats are
+        -- arbitrary -- this condition binds nothing from the log, which is what
+        -- Event.eventBindingSlots claims for it.
+        TriggerCondition.LoseControlOfBound _ -> one (GameEvent.ControlChanged departed S.alice S.bob)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -6863,7 +6869,8 @@ everyTriggerCondition =
     -- the Opponent form is the one no card in the pool bears yet (#1051), which
     -- is exactly the inhabitant a hand-kept list is most likely to drop.
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.You,
-    TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent
+    TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent,
+    TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target"))
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -9322,6 +9329,94 @@ monarchTriggerSpec s registry =
           Spec.assertEqWith s "CR 104.2a two survivors, so the game is still going" (GameState.result after) Nothing
           Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
 
+-- CR 603.7: Ray of Command's THIRD sentence -- "When you lose control of the
+-- creature, tap it." A delayed triggered ability whose event is a CONTROL CHANGE,
+-- which is the observation point Engine.sampleControl exists to provide: control is
+-- derived (CR 613.1b layer 2), so the CR 514.2 sweep that ends the spell's
+-- until-end-of-turn control effect announces nothing, and the diff against
+-- GameState.controlSample is what mints the GameEvent.ControlChanged the condition
+-- matches. CR 514.3a is what then gives the trigger its round: a triggered ability
+-- waiting during the cleanup step gets put on the stack and the active player gets
+-- priority.
+--
+-- THREE SEATS, because the condition reads ONE of them. "You" is the ability's
+-- controller (CR 603.7d, alice), the creature's owner and the player control
+-- returns to is bob, and carol holds a creature alice steals with a card that has no
+-- third sentence. On a two-player board "you", "the creature's owner" and "an
+-- opponent" collapse, and a condition matching the wrong one of the three would
+-- still pass.
+--
+-- ACT OF TREASON is the negative leg, and the two legs run on ONE board: the same
+-- mana, the same seats, two identical tapped Goblin Pikers, the same cleanup step.
+-- The single difference is which card did the stealing -- Act of Treason ({2}{R}
+-- Sorcery, "Gain control of target creature until end of turn. Untap that creature.
+-- It gains haste until end of turn.") prints the same three effects and NOT the tap
+-- sentence, so carol's creature coming home untapped is what shows the tap is Ray of
+-- Command's own ability rather than anything the cleanup machinery does to a
+-- returning permanent.
+--
+-- Both victims start TAPPED and are untapped by the first sentence of whichever card
+-- steals them, so the board makes a ROUND TRIP: tapped, untapped by the spell, tapped
+-- again by the trigger. `Tapped` at the end therefore cannot be state left standing,
+-- and the untapped reading in the middle is what rules that out.
+rayOfCommandSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
+  Spec.it s "CR 603.7 Ray of Command whole card: the borrowed creature is TAPPED when control reverts at cleanup, and Act of Treason's is not" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rayOfCommand <- S.printingOf s registry "Ray of Command"
+    actOfTreason <- S.printingOf s registry "Act of Treason"
+    let addN n printing pid g = if n <= (0 :: Int) then g else addN (n - 1) printing pid (snd (S.addCreature printing pid g))
+        lands = addN 3 mountain S.alice (addN 4 island S.alice S.threePlayerGame)
+        (bobPiker, g1) = S.addCreature piker S.bob lands
+        (carolPiker, g2) = S.addCreature piker S.carol g1
+        (rayId, g3) = S.addHandCard rayOfCommand S.alice g2
+        (actId, g4) = S.addHandCard actOfTreason S.alice g3
+        -- Both victims start TAPPED, so the first sentence of each card (CR 701.26b)
+        -- has something to do and `Tapped` at the end cannot be state left standing.
+        staged = S.tapObject carolPiker (S.tapObject bobPiker g4)
+        resolveOne victim spellId g =
+          S.settleSba (S.runPure (aimAtVictim victim) (S.runPure (aimAtVictim victim) g (S.cast S.alice spellId)) Stack.resolveTop)
+        stolen = resolveOne carolPiker actId (resolveOne bobPiker rayId staged)
+        scheduled = stolen {GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]}
+        afterMain = S.runPure S.identityAnswer scheduled Engine.runStep
+        afterEnd = S.runPure S.identityAnswer afterMain Engine.runStep
+        afterCleanup = S.runPure S.identityAnswer afterEnd Engine.runStep
+        tapStateOf oid g = fmap Object.tapped (Game.lookupObject oid g)
+    -- The theft really happened, and left both creatures untapped. Without these the
+    -- tap assertion below could pass on a board where nothing was stolen at all.
+    Spec.assertEqWith s "Ray of Command gave alice control of bob's Piker" (Projection.controllerOf bobPiker stolen) (Just S.alice)
+    Spec.assertEqWith s "Act of Treason gave her carol's" (Projection.controllerOf carolPiker stolen) (Just S.alice)
+    Spec.assertEqWith s "CR 701.26b and both were untapped by the first sentence of each" (fmap (\oid -> tapStateOf oid stolen) [bobPiker, carolPiker]) [Just TapState.Untapped, Just TapState.Untapped]
+    -- CR 514.2 ran, so the control effects ended and control reverted.
+    Spec.assertEqWith s "the cleanup step really ran" (GameState.phase afterEnd) (Phase.Ending EndingStep.Cleanup)
+    Spec.assertEqWith s "CR 514.2 bob has his Piker back" (Projection.controllerOf bobPiker afterCleanup) (Just S.bob)
+    Spec.assertEqWith s "and carol hers" (Projection.controllerOf carolPiker afterCleanup) (Just S.carol)
+    -- The sentence under test, asserted FIRST of the three claims about the finished
+    -- board: a mutation that stops the trigger firing must go red HERE rather than on
+    -- the event record below, which the turn handoff would also have cleared.
+    Spec.assertEqWith s "CR 603.7 Ray of Command's third sentence tapped it" (tapStateOf bobPiker afterCleanup) (Just TapState.Tapped)
+    Spec.assertEqWith s "Act of Treason prints no such sentence, so carol's comes home untapped" (tapStateOf carolPiker afterCleanup) (Just TapState.Untapped)
+    Spec.assertEqWith s "CR 603.7b the entry is spent, so nothing is still armed" (GameState.delayedTriggers afterCleanup) Seq.empty
+    Spec.assertEqWith s "and the stack is empty" (GameState.stack afterCleanup) []
+    -- CR 514.3a: the trigger got its round INSIDE this turn -- the rule's last sentence
+    -- begins another cleanup step rather than passing the turn. That is also what keeps
+    -- the event record below readable, since Engine.beginTurnOf clears the log at the
+    -- handoff.
+    Spec.assertEqWith s "CR 514.3a the turn has not handed off" (GameState.turnNumber afterCleanup) (GameState.turnNumber scheduled)
+    -- The observation point fired at all.
+    Spec.assertBool s (elem (GameEvent.ControlChanged bobPiker S.alice S.bob) (S.eventsOf afterCleanup)) "Engine.sampleControl minted CR 603.2's event for the reversion"
+  where
+    -- Narrows every target slot to one object, `aimedCast`'s filter without its cast
+    -- pinning: the board holds two stealable creatures on purpose, so the engine's
+    -- first offer is not the one either leg means. Filtering the OFFERED set rather
+    -- than naming a Recipient keeps the answer in whatever shape the slot offered.
+    aimAtVictim :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+    aimAtVictim oid p = case p of
+      Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just oid) . Recipient.objectOf) legal) sets
+      _ -> S.identityAnswer p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -9404,3 +9499,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   brinebornCutthroatSpec s registry
   handOfThePraetorsSpec s registry
   monarchTriggerSpec s registry
+  rayOfCommandSpec s registry

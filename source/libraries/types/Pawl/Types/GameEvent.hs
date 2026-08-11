@@ -529,4 +529,28 @@ data GameEvent
     -- 702.179d's speed increase, CR 728.1's rad counters) and none for a CR 603.7
     -- delayed ability, so nothing can trigger off one of those triggering (#1026).
     AbilityTriggered ObjectId.ObjectId PlayerId.PlayerId TriggerCondition.TriggerCondition
+  | -- | A permanent's CONTROLLER CHANGED: the permanent, the player who controlled
+    -- it when the game last looked, and the player who controls it now. The event
+    -- Ray of Command's "when you lose control of the creature" matches (CR 603.7).
+    --
+    -- Control is DERIVED -- CR 613.1b puts it in layer 2, so the projection
+    -- re-reads it live and no resolution announces the answer changing. This event
+    -- is therefore SAMPLED into being, by Pawl.Engine.Engine.sampleControl
+    -- comparing the live projection against GameState.controlSample, and is the
+    -- one entry in this log minted from a difference between two boards rather
+    -- than from an action. GameEvent.AbilityTriggered is the other engine-minted
+    -- entry, and it is minted for the same reason: so the ordinary CR 603.2
+    -- machinery can match something it otherwise could not see.
+    --
+    -- BOTH players, not just the new one. "When you LOSE control" asks about the
+    -- player control left, which a one-player payload could not answer -- and the
+    -- pair is also what makes the event self-evidently a change rather than a
+    -- restatement, since sampleControl only mints one when they differ.
+    --
+    -- Battlefield-scoped, because that is where the sample is taken: a permanent
+    -- LEAVING the battlefield loses no controller by this event's reckoning, even
+    -- though its controller stops controlling it. CR 400.7 makes what comes back a
+    -- new object with a new id, so nothing can observe the difference through a
+    -- binding taken before the move.
+    ControlChanged ObjectId.ObjectId PlayerId.PlayerId PlayerId.PlayerId
   deriving (Eq, Ord, Show)
