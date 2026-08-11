@@ -11,10 +11,11 @@ You do not hold the build. Another agent does, and it is building right now.
 - **Do not run `cabal build`, `cabal test`, `cabal configure`, or any
   compiler.** Reading source, grepping, `curl` and `gh` are fine.
 - **Do not create a branch, edit a file, or open a PR.**
-- **Do not comment on, label, or close an issue.** Report findings; the
-  dispatcher acts on them. Two agents editing the tracker race each other, and
-  the dispatcher needs to verify a claim before it becomes a comment other
-  people plan against.
+- **Do not comment on, label, or close an issue** unless the brief says the
+  comments *are* the deliverable, as a stale-rejection sweep's do. Otherwise
+  report findings and let the dispatcher act on them: two agents editing the
+  tracker race each other, and the dispatcher needs to verify a claim before it
+  becomes a comment other people plan against. Never label or close either way.
 
 ## Tools that behave unexpectedly here
 
