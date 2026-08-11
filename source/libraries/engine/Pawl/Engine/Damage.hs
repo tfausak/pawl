@@ -23,6 +23,7 @@ import Pawl.Types.AttackTarget (AttackTarget)
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -533,9 +534,12 @@ damagedCardTypes gs recipient =
       damageable = Set.fromList [CardType.Battle, CardType.Creature, CardType.Planeswalker]
    in Set.union tagged projected
 
--- CR 120.3e / 120.3a: mark damage on creatures, drain life from players -- AND
--- record each event into GameState.events. The change-and-emit funnel for
--- combat's two waves and resolving effects alike.
+-- CR 120.3: carry out a batch of damage events' results -- mark damage on
+-- creatures (CR 120.3e), drain life from players (CR 120.3a), take loyalty and
+-- defense counters off (CR 120.3c, CR 120.3h), place the counters infect, wither
+-- and toxic cause (CR 120.3b, CR 120.3d, CR 120.3g) -- AND record each event into
+-- GameState.events. The change-and-emit funnel for combat's two waves and
+-- resolving effects alike.
 --
 -- CR 615 / 616: EACH event in the batch runs its OWN CR 616.1 loop, and the
 -- survivors are applied together. Simultaneity is preserved as a SCHEDULING
@@ -563,19 +567,22 @@ damagedCardTypes gs recipient =
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events
-  let -- CR 120.3d / 702.90c / 702.80a and CR 120.3e: the creature result.
-      --
-      -- Not implemented: the counters are added directly rather than through
-      -- Event.putCounters, so no CR 614 loop runs on the placement (#1231).
+  -- The state the whole batch is read against: recipients are classified off it
+  -- (damagedCardTypes), the commander tally is asked of it, and `counterResults`
+  -- reads each source's controller out of it. CR 510.2's simultaneity, which no
+  -- event in the batch may disturb for the next.
+  board <- State.get
+  let -- CR 120.3e: mark the damage. CR 120.3d's alternative -- the -1/-1 counters
+      -- a wither and/or infect source's damage causes instead -- is in
+      -- `counterResults` below rather than here, since it goes through
+      -- Event.putCounters, CR 122.6's funnel, and this fold is pure.
       --
       -- The disjunction is CR 120.3d's "wither and/or infect" verbatim, and its
       -- scope is this creature arm ALONE: CR 120.3a's life-loss exception names
       -- infect and not wither, so markOne's ToPlayer arm below stays infect-only.
       markCreature ev oid g =
         if DamageEvent.dealtByInfect ev || DamageEvent.dealtByWither ev
-          then
-            let addMinus obj = obj {Object.counters = Map.insertWith (+) CounterKind.MinusOneMinusOne (DamageEvent.amount ev) (Object.counters obj)}
-             in g {GameState.objects = Map.adjust addMinus oid (GameState.objects g)}
+          then g
           else
             let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
              in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
@@ -610,16 +617,20 @@ applyDamage events = do
       -- so every event in one CR 120.4b batch classifies its recipient off the same
       -- board -- CR 510.2's simultaneity, which an earlier event in the fold must
       -- not disturb.
-      onPermanent board ev oid g =
-        let types = damagedCardTypes board (DamageEvent.target ev)
-            results =
+      onPermanent ev oid g =
+        let results =
               [ (CardType.Creature, markCreature ev oid),
                 (CardType.Planeswalker, removeCounters CounterKind.Loyalty ev oid),
                 (CardType.Battle, removeCounters CounterKind.Defense ev oid)
               ]
-            apply h (cardType, result) = if Set.member cardType types then result h else h
+            apply h (cardType, result) = if Set.member cardType (damagedTypesOf ev) then result h else h
          in List.foldl' apply g results
-      markOne board g ev = case DamageEvent.target ev of
+      -- onPermanent's classification, hoisted so `counterResults` below shares it:
+      -- CR 120.3d's counters go to a CREATURE recipient, the same card type CR
+      -- 120.3e's mark answers to, so the two readings of "is this a creature" must
+      -- be one reading.
+      damagedTypesOf ev = damagedCardTypes board (DamageEvent.target ev)
+      markOne g ev = case DamageEvent.target ev of
         -- Every object-shaped recipient goes through one arm, INCLUDING
         -- Recipient.ToObject: CR 120.1a's three card types are what decide the
         -- results, and onPermanent asks the projection for them rather than
@@ -628,42 +639,26 @@ applyDamage events = do
         -- can -- Resolve's DealDamage arm, naming a permanent generically -- runs
         -- every recipient through damageRecipient above first, so this arm is
         -- defensive; what it must not be is a silent drop.
-        Recipient.ToCreature oid -> onPermanent board ev oid g
-        Recipient.ToPlaneswalker oid -> onPermanent board ev oid g
-        Recipient.ToBattle oid -> onPermanent board ev oid g
-        Recipient.ToObject oid -> onPermanent board ev oid g
+        Recipient.ToCreature oid -> onPermanent ev oid g
+        Recipient.ToPlaneswalker oid -> onPermanent ev oid g
+        Recipient.ToBattle oid -> onPermanent ev oid g
+        Recipient.ToObject oid -> onPermanent ev oid g
         Recipient.ToPlayer pid ->
-          -- The two poison diversions are different shapes and BOTH apply. CR
-          -- 120.3b / 702.90b: infect REPLACES the damage's result with poison
-          -- counters, so no life is lost. CR 120.3g / 702.164c: toxic gives the
-          -- damaged player the source's total toxic value in poison in addition
-          -- to the damage's other results -- on top of the life loss, or on top
-          -- of infect's poison when a source has both.
-          --
-          -- The damaged PLAYER gets the counters, not the source's controller,
-          -- who merely performs it (CR 120.3b/120.3g). And toxic is scoped to
-          -- COMBAT damage, so a noncombat event's captured value is ignored.
-          --
-          -- Not implemented: the counters are written straight onto the player
-          -- rather than through Event.putPlayerCounters, so no CR 614 loop runs on
-          -- the placement (#1231).
+          -- CR 120.3a: the life loss, and only it. Both poison diversions -- CR
+          -- 120.3b / 702.90b's infect, which replaces the life loss, and CR 120.3g
+          -- / 702.164c's toxic, which adds poison alongside it -- are in
+          -- `counterResults` below, since they go through
+          -- Event.putPlayerCounters, CR 122.6's player funnel. What stays here is
+          -- WHETHER life is lost, which is the half infect replaces.
           --
           -- WITHER IS ABSENT ON PURPOSE. CR 120.3d pairs it with infect for a
           -- creature recipient only; CR 120.3a's exception names infect alone, so
           -- a wither source drains a player's life like any other.
-          let toxic = case DamageEvent.kind ev of
-                DamageKind.Combat -> DamageEvent.dealtByToxic ev
-                DamageKind.Noncombat -> 0
-              givePoison n player =
-                if n == 0
-                  then player
-                  else player {Player.counters = Map.insertWith (+) PlayerCounterKind.Poison n (Player.counters player)}
-              drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
-              hit player =
-                if DamageEvent.dealtByInfect ev
-                  then givePoison (DamageEvent.amount ev + toxic) player
-                  else givePoison toxic (drain player)
-           in g {GameState.players = Map.adjust hit pid (GameState.players g)}
+          if DamageEvent.dealtByInfect ev
+            then g
+            else
+              let drain player = player {Player.life = Player.life player - toInteger (DamageEvent.amount ev)}
+               in g {GameState.players = Map.adjust drain pid (GameState.players g)}
       -- CR 120.3f: lifelink damage gains its source's controller that much life,
       -- IN ADDITION to the damage's other results. A second pass over the same
       -- survivors, deliberately not a branch inside markOne: "in addition" is
@@ -707,7 +702,7 @@ applyDamage events = do
       -- Players only, so this is a walk of its own rather than a row in
       -- onPermanent's `results` list: that list is keyed by CardType and a player
       -- has none (damagedCardTypes answers empty for one).
-      tallyOne board g ev = case DamageEvent.target ev of
+      tallyOne g ev = case DamageEvent.target ev of
         Recipient.ToPlayer pid
           | DamageEvent.kind ev == DamageKind.Combat ->
               case Commander.commanderOwnerOf (DamageEvent.source ev) board of
@@ -794,6 +789,77 @@ applyDamage events = do
          in [GameEvent.CountersRemoved oid CounterKind.Defense was now | was > now]
       removalsBetween before after =
         concatMap (removalOn before after) (List.nub (Maybe.mapMaybe battleHit survivors))
+      -- CR 120.3b / 702.90b, CR 120.3d / 702.90c / 702.80a and CR 120.3g /
+      -- 702.164c: the counters a damage event CAUSES, placed through
+      -- Event.putCounters and Event.putPlayerCounters -- CR 122.6's two funnels --
+      -- so each placement runs its own CR 616.1 loop and a counter replacement
+      -- reaches it (Vorinclex, Monstrous Raider).
+      --
+      -- A monadic pass of its own rather than an arm of markOne, because those
+      -- funnels are Game actions and the fold above is pure. That is the whole
+      -- reason for the split: the three rules are as much "the damage's results"
+      -- as the mark and the life loss are.
+      --
+      -- The PUTTER is the damage source's CONTROLLER, which all three rules name
+      -- outright -- "causes that source's controller to give/put". Read through
+      -- controllerWithLastKnown, the reader damageEvent's riders use, since CR
+      -- 608.2h's last known information is all that is left of a source that
+      -- killed itself to deal the damage (Ghitu Fire-Eater); Nothing survives only
+      -- for an id nothing was ever filed under, which no producer builds.
+      --
+      -- CounterCause.ByRule and not ByEffect: rule 120.3's results are dictated by
+      -- the rules, not by "the effect of a resolving spell or ability" nor by
+      -- "another replacement or prevention effect", which are CR 614.16's two
+      -- admitted causes. So a clause naming a player (Vorinclex) reaches these,
+      -- and rule 614.16's own subject (Doubling Season) does not -- the same split
+      -- CR 714.3c's lore counter falls on.
+      --
+      -- Read against `board` for both the putter and the recipient's card types,
+      -- so every event in the batch answers CR 510.2's questions off one state.
+      counterResults ev =
+        let poison =
+              -- CR 120.3b's poison REPLACES the life loss and CR 120.3g's is IN
+              -- ADDITION to the damage's other results, so a source with both
+              -- gives the sum. Toxic is scoped to COMBAT damage, so a noncombat
+              -- event's captured value is ignored.
+              --
+              -- ONE placement and not two, because CR 122.6 knows only how many
+              -- counters of a kind are being put: two calls would run two CR 616.1
+              -- loops over one player's poison and let a one-shot replacement be
+              -- spent twice. No printing has both keywords anyway (DamageSpec
+              -- hand-builds the event).
+              (if DamageEvent.dealtByInfect ev then DamageEvent.amount ev else 0)
+                + case DamageEvent.kind ev of
+                  DamageKind.Combat -> DamageEvent.dealtByToxic ev
+                  DamageKind.Noncombat -> 0
+            -- CR 120.3d's "wither and/or infect", the same disjunction markCreature
+            -- reads, and gated on the recipient being a CREATURE by the same
+            -- classification -- damage to a planeswalker by an infect source is CR
+            -- 120.3c's business and nothing else's.
+            minusOnes =
+              if (DamageEvent.dealtByInfect ev || DamageEvent.dealtByWither ev)
+                && Set.member CardType.Creature (damagedTypesOf ev)
+                then DamageEvent.amount ev
+                else 0
+            -- Nothing proposed for nothing to put on. CR 122.6 has no zero
+            -- placement to replace, and raising one would let a Uses.Once counter
+            -- replacement be spent on an event that never happened.
+            place n go = Monad.when (n > 0) (Monad.void (go n))
+         in case Projection.controllerWithLastKnown (DamageEvent.source ev) board of
+              Nothing -> pure ()
+              Just putter ->
+                let cause = CounterCause.ByRule putter
+                    onObject oid = place minusOnes (Event.putCounters cause oid CounterKind.MinusOneMinusOne)
+                 in case DamageEvent.target ev of
+                      -- markOne's arms, one for one: every object-shaped recipient
+                      -- routes through onObject, whose own gate is the card types.
+                      -- Written out rather than left to a wildcard, so a sixth
+                      -- Recipient cannot join the object arms by default.
+                      Recipient.ToCreature oid -> onObject oid
+                      Recipient.ToPlaneswalker oid -> onObject oid
+                      Recipient.ToBattle oid -> onObject oid
+                      Recipient.ToObject oid -> onObject oid
+                      Recipient.ToPlayer pid -> place poison (Event.putPlayerCounters cause pid PlayerCounterKind.Poison)
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
   --
@@ -805,9 +871,9 @@ applyDamage events = do
   -- the canonical order the prompt indexes into.
   State.modify'
     ( \gs ->
-        let marked = List.foldl' (markOne gs) gs survivors
+        let marked = List.foldl' markOne gs survivors
             gained = List.foldl' gainOne marked survivors
-            tallied = List.foldl' (tallyOne gs) gained survivors
+            tallied = List.foldl' tallyOne gained survivors
             noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) tallied prevented
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
          in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
@@ -830,8 +896,17 @@ applyDamage events = do
             List.foldl'
               (flip Event.recordEvent)
               dealt
-              (concatMap (\ev -> lifeLostBy ev <> lifeGainedBy ev) survivors <> removalsBetween gs marked)
+              (concatMap (\ev -> lifeLostBy ev <> lifeGainedBy ev) survivors <> removalsBetween board marked)
     )
+  -- CR 120.3's counter results, run AFTER the records above for `lifeLostBy`'s
+  -- reason: putCounters records CR 122.6's own CountersPut, and a cause reads
+  -- before its consequence. Both land inside one CR 117.5 boundary, so what this
+  -- settles is the canonical order and not which triggers are gathered.
+  --
+  -- The placements are simultaneous with the damage under CR 120.3, so nothing may
+  -- observe the board between the fold above and this pass -- which is why it
+  -- reads `board` rather than the state it is running against.
+  Monad.mapM_ counterResults survivors
   -- CR 615.5: "the rest of the effect takes place immediately afterward". This
   -- module cannot run it -- Pawl.Engine.Resolve depends on this one -- so the
   -- applications that carry an additional effect are QUEUED and Resolve drains
