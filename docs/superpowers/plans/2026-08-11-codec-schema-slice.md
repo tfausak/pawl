@@ -1161,7 +1161,7 @@ git commit -m "Derive a record's schema from its fields"
 **Interfaces:**
 - Consumes: `Codec.Codec`, `Codec.MkCodec`, `Codec.encode`, `Codec.decode`, `Codec.schema` (Task 6); `Common.tagged`, `Common.nullary`, `Common.asTagged`, `Common.withValue`, `Common.pair`, `Common.integer`, `Common.asInteger`, `Common.scalar`, `Common.assertCodec`, `Common.assertHasSchema` (Tasks 5, 6); `Schema.object`, `Schema.oneOf`, `Schema.constant`, `Schema.unwrap`, `Schema.integer` (Task 3); `Define.define` (Task 4); `Name.typeName`, `Name.unwrap` (Task 2).
 - Produces, all in `Pawl.JsonCodec.Arm`:
-  - `Arm a` — a GADT with `MkNullary :: String -> a -> Arm a` and `MkPayload :: String -> Codec.Codec b -> (b -> a) -> Arm a`
+  - `Arm a` — a GADT with `Nullary :: String -> a -> Arm a` and `Payload :: String -> Codec.Codec b -> (b -> a) -> Arm a`
   - `nullary :: String -> a -> Arm a`
   - `payload :: String -> Codec.Codec b -> (b -> a) -> Arm a`
   - `tagged :: (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a`
@@ -1263,19 +1263,19 @@ import qualified Pawl.JsonSchema.Name as Name
 import qualified Pawl.JsonSchema.Schema as Schema
 
 data Arm a where
-  MkNullary :: String -> a -> Arm a
-  MkPayload :: String -> Codec.Codec b -> (b -> a) -> Arm a
+  Nullary :: String -> a -> Arm a
+  Payload :: String -> Codec.Codec b -> (b -> a) -> Arm a
 
 nullary :: String -> a -> Arm a
-nullary = MkNullary
+nullary = Nullary
 
 payload :: String -> Codec.Codec b -> (b -> a) -> Arm a
-payload = MkPayload
+payload = Payload
 
 tag :: Arm a -> String
 tag arm = case arm of
-  MkNullary t _ -> t
-  MkPayload t _ _ -> t
+  Nullary t _ -> t
+  Payload t _ _ -> t
 
 tagged :: forall a. (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a
 tagged enc arms =
@@ -1285,8 +1285,8 @@ tagged enc arms =
         (t, mv) <- Common.asTagged value
         case List.find ((== t) . tag) arms of
           Nothing -> Left . Text.pack $ "unknown " <> name <> ": " <> t
-          Just (MkNullary _ x) -> Right x
-          Just (MkPayload _ c inject) -> fmap inject (Common.withValue mv (Codec.decode c)),
+          Just (Nullary _ x) -> Right x
+          Just (Payload _ c inject) -> fmap inject (Common.withValue mv (Codec.decode c)),
       Codec.schema = Define.define (Name.typeName proxy) $ do
         schemas <- traverse armSchema arms
         pure (Schema.oneOf schemas)
@@ -1297,8 +1297,8 @@ tagged enc arms =
 
 armSchema :: Arm a -> Define.SchemaM Schema.Schema
 armSchema arm = case arm of
-  MkNullary t _ -> pure (armObject t Nothing)
-  MkPayload t c _ -> fmap (armObject t . Just) (Codec.schema c)
+  Nullary t _ -> pure (armObject t Nothing)
+  Payload t c _ -> fmap (armObject t . Just) (Codec.schema c)
 
 -- | No @additionalProperties: false@: 'Common.asTagged' ignores unknown keys,
 -- and a nullary arm ignores a @value@ outright, so forbidding them would reject

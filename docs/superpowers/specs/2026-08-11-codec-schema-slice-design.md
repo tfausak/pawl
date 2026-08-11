@@ -282,8 +282,8 @@ relies on is checked, not assumed.
 ``` hs
 -- Pawl.JsonCodec.Arm
 data Arm a where
-  MkNullary :: String -> a -> Arm a
-  MkPayload :: String -> Codec.Codec b -> (b -> a) -> Arm a
+  Nullary :: String -> a -> Arm a
+  Payload :: String -> Codec.Codec b -> (b -> a) -> Arm a
 
 tagged :: (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a
 ```
@@ -300,7 +300,7 @@ worth more than collapsing a table that is already written twice. CLAUDE.md's
 that check before. The tag stays written twice, exactly as today; the schema is
 the thing gained.
 
-The existential in `MkPayload` uses GADT syntax, which `.hlint.yaml` already
+The existential in `Payload` uses GADT syntax, which `.hlint.yaml` already
 allows.
 
 ## Wire shapes
