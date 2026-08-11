@@ -46,6 +46,7 @@ import qualified Pawl.Json.Object as Object
 import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
@@ -1510,7 +1511,7 @@ reservedBindings = Set.intersection reservedSlots . boundSlots
 -- something this lint would reject.
 tokenNameOffends :: Face.Face Card.Type.Card -> Bool
 tokenNameOffends token =
-  case traverse (fmap (Text.pack . fst) . Common.asTagged . Subtype.toJson) (Set.toList (TypeLine.subtypes (Face.typeLine token))) of
+  case traverse (fmap (Text.pack . fst) . Common.asTagged . Codec.encode Subtype.codec) (Set.toList (TypeLine.subtypes (Face.typeLine token))) of
     Left _ -> True
     Right subtypes ->
       notElem

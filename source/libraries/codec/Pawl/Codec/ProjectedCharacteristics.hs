@@ -35,7 +35,7 @@ toJson pc =
       Common.optionalPair "defense" Nothing (Common.encodeMaybe Defense.toJson) (PC.defense pc),
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (\(p, t) -> Value.array [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc),
       Common.requiredPair "cardTypes" (Common.encodeSet (Codec.encode CardType.codec)) (PC.cardTypes pc),
-      Common.optionalPair "subtypes" Set.empty (Common.encodeSet Subtype.toJson) (PC.subtypes pc),
+      Common.optionalPair "subtypes" Set.empty (Common.encodeSet (Codec.encode Subtype.codec)) (PC.subtypes pc),
       Common.optionalPair "activatedAbilities" [] (Common.encodeList (ActivatedAbility.toJson Card.toJson)) (PC.activatedAbilities pc),
       Common.optionalPair "replacementEffects" [] (Common.encodeList ReplacementEffect.toJson) (PC.replacementEffects pc),
       Common.optionalPair "triggeredAbilities" [] (Common.encodeList (TriggeredAbility.toJson Card.toJson)) (PC.triggeredAbilities pc)
@@ -55,7 +55,7 @@ fromJson value = do
   def_ <- Common.defaultedField "defense" Nothing (Common.decodeMaybe Defense.fromJson) ps
   cda <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe Quantity.fromJsonPair) ps
   cts <- Common.field "cardTypes" ps >>= Common.decodeSet (Codec.decode CardType.codec)
-  subs <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet Subtype.fromJson) ps
+  subs <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet (Codec.decode Subtype.codec)) ps
   acts <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (ActivatedAbility.fromJson Card.fromJson)) ps
   reps <- Common.defaultedField "replacementEffects" [] (Common.decodeList ReplacementEffect.fromJson) ps
   trigs <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (TriggeredAbility.fromJson Card.fromJson)) ps

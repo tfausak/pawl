@@ -16,7 +16,7 @@ toJson tl =
   Value.object . concat $
     [ Common.optionalPair "supertypes" Set.empty (Common.encodeSet (Codec.encode Supertype.codec)) (TypeLine.supertypes tl),
       Common.requiredPair "types" (Common.encodeSet (Codec.encode CardType.codec)) (TypeLine.types tl),
-      Common.optionalPair "subtypes" Set.empty (Common.encodeSet Subtype.toJson) (TypeLine.subtypes tl)
+      Common.optionalPair "subtypes" Set.empty (Common.encodeSet (Codec.encode Subtype.codec)) (TypeLine.subtypes tl)
     ]
 
 fromJson :: Value.Value -> Either Text.Text TypeLine.TypeLine
@@ -28,5 +28,5 @@ fromJson value = do
   -- subtypes and supertypes, so an empty set is a malformed file rather than a
   -- card with no types.
   Monad.when (Set.null tys) . Left $ Text.pack "typeLine has no types"
-  sub <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet Subtype.fromJson) ps
+  sub <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet (Codec.decode Subtype.codec)) ps
   pure (TypeLine.MkTypeLine sup tys sub)

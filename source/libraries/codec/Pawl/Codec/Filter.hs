@@ -35,7 +35,7 @@ toJson encode filter_ = case filter_ of
   Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ Codec.encode CardType.codec t
   Filter.HasSupertype sup -> Common.tagged "HasSupertype" . Just $ Codec.encode Supertype.codec sup
   Filter.HasColor c -> Common.tagged "HasColor" . Just $ Codec.encode Color.codec c
-  Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Subtype.toJson sub
+  Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Codec.encode Subtype.codec sub
   Filter.HasKeyword k -> Common.tagged "HasKeyword" . Just $ encode k
   Filter.HasKeywordFamily f -> Common.tagged "HasKeywordFamily" . Just $ Codec.encode KeywordFamily.codec f
   Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Value.integer n
@@ -72,7 +72,7 @@ fromJson decode value = do
     ("HasCardType", Just v) -> Filter.HasCardType <$> Codec.decode CardType.codec v
     ("HasSupertype", Just v) -> Filter.HasSupertype <$> Codec.decode Supertype.codec v
     ("HasColor", Just v) -> Filter.HasColor <$> Codec.decode Color.codec v
-    ("HasSubtype", Just v) -> Filter.HasSubtype <$> Subtype.fromJson v
+    ("HasSubtype", Just v) -> Filter.HasSubtype <$> Codec.decode Subtype.codec v
     ("HasKeyword", Just v) -> Filter.HasKeyword <$> decode v
     ("HasKeywordFamily", Just v) -> Filter.HasKeywordFamily <$> Codec.decode KeywordFamily.codec v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Common.asInteger v

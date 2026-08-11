@@ -58,7 +58,7 @@ toJson codec e = case e of
   Effect.ModifyTarget d m r -> Common.tagged "ModifyTarget" (Just (Value.array [Duration.toJson d, Modification.toJson m, ObjectRef.toJson r]))
   Effect.ChangeText family forbidden s ->
     Common.tagged "ChangeText" . Just . Value.array $
-      [SubtypeFamily.toJson family, Common.encodeSet Subtype.toJson forbidden, SlotName.toJson s]
+      [SubtypeFamily.toJson family, Common.encodeSet (Codec.encode Subtype.codec) forbidden, SlotName.toJson s]
   Effect.AddMana production -> Common.tagged "AddMana" (Just (ManaProduction.toJson production))
   Effect.Search f d -> Common.tagged "Search" (Just (Value.array [Filter.toJson Keyword.toJson f, SearchDestination.toJson d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
@@ -238,7 +238,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "ModifyTarget expects [duration, modification, objectRef]"
     "ChangeText" -> case mv of
       Just (Value.Array (Array.MkArray [fv, xv, sv])) ->
-        Effect.ChangeText <$> SubtypeFamily.fromJson fv <*> Common.decodeSet Subtype.fromJson xv <*> SlotName.fromJson sv
+        Effect.ChangeText <$> SubtypeFamily.fromJson fv <*> Common.decodeSet (Codec.decode Subtype.codec) xv <*> SlotName.fromJson sv
       _ -> Left . Text.pack $ "ChangeText expects [subtypeFamily, forbiddenSubtypes, slot]"
     "AddMana" -> Common.withValue mv (fmap Effect.AddMana . ManaProduction.fromJson)
     "Search" -> case mv of
