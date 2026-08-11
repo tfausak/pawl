@@ -717,8 +717,9 @@ castableWhileSearching pid gs =
 -- `castable`'s conjuncts require.
 castableWhenOffered :: PlayerId -> ObjectId -> CardName.CardName -> [Cost Keyword] -> GameState -> Bool
 castableWhenOffered pid oid name candidates proposed =
-  -- CR 601.3's prohibit half, asked with the half's own name: a quality-bearing
-  -- prohibition stops one card without stopping any other candidate.
+  -- CR 601.3's prohibit half, asked with the half's own name and its object: a
+  -- quality-bearing prohibition stops one card without stopping any other
+  -- candidate.
   not (PlayerEffect.prohibitsCasting pid oid name proposed)
     -- CR 702.61a stays too, for CR 601.3's own reason above: an offered cast is
     -- still a cast. Reachable because CR 702.61b keeps triggered abilities going

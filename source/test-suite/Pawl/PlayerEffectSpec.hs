@@ -154,8 +154,9 @@ anySpell = CardName.MkCardName (Text.pack "any spell")
 -- characteristics must not be handed a real card, or the assertion would suggest
 -- a dependence the rule does not have. Nothing dereferences it -- only
 -- PlayerEffect.CantCastMatching reads the object, and no board below carries one
--- -- so an id no fixture mints is the honest argument. Damping Engine's arm hands
--- in a real proposal, in Pawl.CardSpec's gameplay case.
+-- -- so an id no fixture mints is the honest argument. That arm is asked about a
+-- real proposal instead, through Cast.castable, in Pawl.SpecialActionSpec's
+-- Damping Engine cases.
 anySpellId :: ObjectId.ObjectId
 anySpellId = ObjectId.MkObjectId 999999
 
