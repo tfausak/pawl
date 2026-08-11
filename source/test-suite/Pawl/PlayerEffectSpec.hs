@@ -75,6 +75,8 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
@@ -100,6 +102,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- Rule of Law {2}{W} Enchantment: "Each player can't cast more than one spell
 -- each turn." alice has nine untapped Plains (mana is never the reason a cast is
@@ -3160,6 +3163,133 @@ prowlingSerpopardSpec s registry =
             Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace cat)) Counterability.CantBeCountered
             Spec.assertEqWith s "and the spell is still on the stack" (GameState.stack (cancelRun victimId cancelId gs)) [victimId]
 
+-- Jared Carthalion, True Heir {R}{G}{W} Legendary Creature -- Human Warrior 3/3
+-- (Commander Legends, 281): "When Jared Carthalion enters, target opponent
+-- becomes the monarch. You can't become the monarch this turn." One trigger
+-- carrying both sentences, which is how the card prints them.
+--
+-- The card is in the pool for the second sentence, and it is the ONLY printing
+-- that restricts who may be crowned -- which makes it the sole producer of CR
+-- 725.4's "the next player in turn order who can become the monarch". CR 725.1
+-- and CR 725.3 gate nobody, so on the ordinary route it is CR 101.2 that makes
+-- the "can't" win.
+--
+-- Its third sentence -- "If damage would be dealt to Jared Carthalion while
+-- you're the monarch, prevent that damage and put that many +1/+1 counters on
+-- it" -- is omitted from data/cards/jared-carthalion-true-heir.json: a STATIC
+-- prevention ability cannot carry CR 615.5's rider (#1105). The omission takes
+-- both a shield and its counters away from Jared's own controller, so pawl's card
+-- is strictly weaker than the printed one.
+--
+-- Two seats and no departure, which is all the primary observable needs. Every
+-- case runs on one board -- alice's Jared, her Palace Jailer and her Goblin Piker
+-- on the battlefield, nobody crowned -- and differs only in which enters-the-
+-- battlefield event is fed to the trigger gatherer. That is what makes each
+-- negative a statement about the restriction rather than about a board that could
+-- not crown anyone anyway.
+--
+-- Palace Jailer ("When Palace Jailer enters, you become the monarch") is the
+-- second route on purpose: MonarchTarget.TheController, where Jared's own first
+-- clause is MonarchTarget.InSlot and CR 725.2's steal is ControllerOfSource. All
+-- three read one gate, so no case here passes through an ungated route.
+jaredBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+jaredBoard jared jailer piker =
+  let (jaredId, gs1) = S.addCreature jared S.alice (Setup.emptyGame S.bothPlayers)
+      (jailerId, gs2) = S.addCreature jailer S.alice gs1
+      (pikerId, gs3) = S.addCreature piker S.alice gs2
+   in (jaredId, jailerId, pikerId, gs3)
+
+-- One permanent's CR 603.6 entry, gathered and resolved. The permanent is already
+-- on the battlefield, so this feeds the event alone -- the same staging
+-- ExpirySpec's monarch group uses.
+jaredEntered :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+jaredEntered oid gs =
+  let entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+      withEvent = S.withEvents [GameEvent.Moved entered (Projection.project oid gs)] gs
+   in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
+
+-- CR 725.2's crown steal, as the event it triggers off: `attacker` deals combat
+-- damage to bob, who must be the monarch for the inherent ability to match.
+jaredStealsFrom :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+jaredStealsFrom attacker gs =
+  let dmg = DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat
+      withEvent = S.withEvents [GameEvent.DamageDealt dmg] gs
+   in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
+
+jaredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jaredSpec s registry =
+  let board = do
+        jared <- S.printingOf s registry "Jared Carthalion, True Heir"
+        jailer <- S.printingOf s registry "Palace Jailer"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (jaredBoard jared jailer piker)
+   in Spec.describe s "JaredCarthalionTrueHeir" $ do
+        -- The card's own first clause, which is also what puts a monarch on the
+        -- board for everything below: CR 601.2c's target slot, re-read at
+        -- resolution, crowning the ONLY opponent two seats offer.
+        Spec.it s "CR 725.1 his enters trigger crowns the targeted opponent, and stores the restriction on his controller" $ do
+          (jaredId, _, _, gs) <- board
+          let after = jaredEntered jaredId gs
+          Spec.assertEqWith s "bob is the monarch" (GameState.monarch after) (Just S.bob)
+          Spec.assertEqWith s "one stored CR 611.2c effect" (fmap ActivePlayerEffect.effect (GameState.playerEffects after)) [PlayerEffect.Type.CantBecomeMonarch]
+          Spec.assertEqWith s "scoped to its controller" (fmap ActivePlayerEffect.scope (GameState.playerEffects after)) [PlayerScope.You]
+          Spec.assertEqWith s "who is alice" (fmap ActivePlayerEffect.controller (GameState.playerEffects after)) [S.alice]
+          Spec.assertBool s (PlayerEffect.prohibitsBecomingMonarch S.alice after) "so alice can't become the monarch"
+          Spec.assertBool s (not (PlayerEffect.prohibitsBecomingMonarch S.bob after)) "and bob still can"
+
+        -- THE CONTROL for the case below, on the same board: with Jared's trigger
+        -- never fed, the Jailer's "you become the monarch" crowns alice. Without
+        -- this, the refusal below could be a Jailer whose ETB never resolved.
+        Spec.it s "CR 725.1 with no restriction standing, Palace Jailer's enters trigger crowns alice" $ do
+          (_, jailerId, _, gs) <- board
+          Spec.assertEqWith s "alice takes the crown" (GameState.monarch (jaredEntered jailerId gs)) (Just S.alice)
+
+        -- THE PRIMARY OBSERVABLE. Two seats, no departure: an
+        -- Effect.BecomeMonarch aimed at a restricted player does nothing, and CR
+        -- 725.3's "the current monarch ceases to be the monarch" never fires
+        -- either -- bob keeps the crown rather than the game losing it.
+        Spec.it s "CR 101.2 / 725.1 the restriction stops Palace Jailer's TheController crowning outright" $ do
+          (jaredId, jailerId, _, gs) <- board
+          let restricted = jaredEntered jaredId gs
+              after = jaredEntered jailerId restricted
+          Spec.assertEqWith s "bob keeps the crown" (GameState.monarch after) (Just S.bob)
+          Spec.assertEqWith s "and no crowning of alice was recorded" (filter (== GameEvent.BecameMonarch S.alice) (S.eventsOf after)) []
+
+        -- CR 611.2a/514.2: the duration is the stored carrier's expiry and
+        -- nothing else, so the SAME Jailer trigger crowns alice once the turn has
+        -- ended. This is what says the restriction is "this turn" rather than
+        -- permanent.
+        Spec.it s "CR 514.2 the restriction ends at cleanup, and then the same crowning lands" $ do
+          (jaredId, jailerId, _, gs) <- board
+          let restricted = jaredEntered jaredId gs
+              ended = S.runPure S.identityAnswer restricted (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+          Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
+          Spec.assertBool s (not (PlayerEffect.prohibitsBecomingMonarch S.alice ended)) "alice may be crowned again"
+          Spec.assertEqWith s "so the Jailer's ETB now crowns her" (GameState.monarch (jaredEntered jailerId ended)) (Just S.alice)
+
+        -- THE CONTROL for CR 725.2's route, with bob crowned by the fixture
+        -- instead of by Jared's trigger: an unrestricted alice takes the crown off
+        -- a creature's combat damage.
+        Spec.it s "CR 725.2 with no restriction standing, combat damage to the monarch hands alice the crown" $ do
+          (_, _, pikerId, gs) <- board
+          Spec.assertEqWith s "alice steals it" (GameState.monarch (jaredStealsFrom pikerId (S.withMonarch S.bob gs))) (Just S.alice)
+
+        -- The vacuity trap this issue was filed with: CR 725.2's inherent ability
+        -- is SOURCELESS and reaches the crown through MonarchTarget
+        -- .ControllerOfSource, a different arm from the case above. The gate is
+        -- read at the one place all three arms meet, so the steal is stopped too
+        -- -- and the ability still triggers and still resolves, it just crowns
+        -- nobody.
+        Spec.it s "CR 101.2 / 725.2 the restriction stops the sourceless crown steal as well" $ do
+          (jaredId, _, pikerId, gs) <- board
+          let restricted = jaredEntered jaredId gs
+          Spec.assertEqWith s "bob was crowned by Jared's own trigger" (GameState.monarch restricted) (Just S.bob)
+          Spec.assertEqWith s "and keeps the crown through alice's combat damage" (GameState.monarch (jaredStealsFrom pikerId restricted)) (Just S.bob)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -3183,3 +3313,4 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   vedalkenOrrerySpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
+  jaredSpec s registry
