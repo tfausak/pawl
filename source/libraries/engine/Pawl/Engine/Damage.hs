@@ -800,10 +800,11 @@ applyDamage events = do
       -- reason for the split: the three rules are as much "the damage's results"
       -- as the mark and the life loss are.
       --
-      -- The PUTTER is the damage source's CONTROLLER, which all three rules name
-      -- outright -- "causes that source's controller to give/put". Read through
-      -- controllerWithLastKnown, the reader damageEvent's riders use, since CR
-      -- 608.2h's last known information is all that is left of a source that
+      -- The PUTTER is the damage SOURCE's controller, which all three rules name
+      -- outright: "that source's controller" in CR 120.3b and CR 120.3d, "that
+      -- creature's controller" in CR 120.3g, whose source is that creature. Read
+      -- through controllerWithLastKnown, the reader damageEvent's riders use, since
+      -- CR 608.2h's last known information is all that is left of a source that
       -- killed itself to deal the damage (Ghitu Fire-Eater); Nothing survives only
       -- for an id nothing was ever filed under, which no producer builds.
       --
@@ -816,6 +817,10 @@ applyDamage events = do
       --
       -- Read against `board` for both the putter and the recipient's card types,
       -- so every event in the batch answers CR 510.2's questions off one state.
+      --
+      -- Pawl.ReplacementSpec's "Counters damage causes" group is the proof, on both
+      -- axes: that a replacement reaches these at all, and that it is the SOURCE's
+      -- controller and not the recipient who is putting them.
       counterResults ev =
         let poison =
               -- CR 120.3b's poison REPLACES the life loss and CR 120.3g's is IN
@@ -843,7 +848,9 @@ applyDamage events = do
                 else 0
             -- Nothing proposed for nothing to put on. CR 122.6 has no zero
             -- placement to replace, and raising one would let a Uses.Once counter
-            -- replacement be spent on an event that never happened.
+            -- replacement be spent on an event that never happened -- a fence
+            -- rather than an observable, no printing in the pool having a one-shot
+            -- counter replacement to spend.
             place n go = Monad.when (n > 0) (Monad.void (go n))
          in case Projection.controllerWithLastKnown (DamageEvent.source ev) board of
               Nothing -> pure ()
