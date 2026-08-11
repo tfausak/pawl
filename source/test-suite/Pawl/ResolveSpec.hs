@@ -6375,6 +6375,9 @@ resolveOne answer gs spellId =
 -- CR 701.41 support, which is card DATA and no opcode: "support N" is written out
 -- as the counters it means, over a CR 601.2c slot of 0 to N.
 --
+-- N is a LITERAL range here. A count that reads X -- The Crowd Goes Wild's
+-- "Support X" -- is not expressible (#1271).
+--
 -- Lead by Example {1}{G} Instant (data/cards/lead-by-example.json): "Support 2.",
 -- and nothing else -- CR 701.41a's INSTANT reading, which has no "other" in it.
 --
@@ -6385,8 +6388,8 @@ resolveOne answer gs spellId =
 -- Three readings of "up to two target creatures" a careless board cannot tell
 -- apart -- two of three, one of three, and none -- so each case names a different
 -- number of targets on the same board and the creature nobody named is asserted
--- untouched. Three candidates for two slots, because a prompt offered exactly as
--- many candidates as it needs is never asked.
+-- untouched. Three candidates for a slot that takes two, because a prompt offered
+-- exactly as many candidates as it needs is never asked.
 supportSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 supportSpec s registry = Spec.describe s "Support" $ do
   Spec.it s "CR 701.41a support 2 counters each of the two creatures it named" $ do
@@ -6428,11 +6431,11 @@ supportSpec s registry = Spec.describe s "Support" $ do
     Spec.assertEqWith s "1 * 2 on the Piker" (plusCountersOn pikerId seasonedAfter) (Just 2)
     Spec.assertEqWith s "1 * 2 on the Wall too" (plusCountersOn wallId seasonedAfter) (Just 2)
     Spec.assertEqWith s "and one each without the enchantment" (plusCountersOn barePiker bareAfter, plusCountersOn bareWall bareAfter) (Just 1, Just 1)
-  -- The same funnel from the other side, and the reading a doubled board cannot
-  -- separate from an unreplaced one: half of one counter, rounded down, is none.
-  -- Vorinclex reads who is PUTTING them (CR 122.6a), so bob's praetor halves what
-  -- alice's spell places on bob's own creatures. Zero, one and two are three
-  -- distinct answers on the same board.
+  -- The same funnel from the other side: half of one counter, rounded down, is
+  -- none, so zero, one and two are three distinct answers to the same board.
+  -- Vorinclex reads who is PUTTING the counters (CR 122.6a), and the targets here
+  -- are alice's own permanents -- which is what separates it from Doubling Season's
+  -- recipient reading, since bob's praetor halves them anyway.
   Spec.it s "CR 122.6a an opponent's Vorinclex halves support's counters away" $ do
     (pikerId, wallId, _, watched, watchedSpell) <- leadBoard s registry [("Vorinclex, Monstrous Raider", S.bob)]
     (barePiker, bareWall, _, bare, bareSpell) <- leadBoard s registry []
