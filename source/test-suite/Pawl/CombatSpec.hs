@@ -4358,6 +4358,118 @@ trampleOverPlaneswalkersSpec s registry = Spec.describe s "TrampleOverPlaneswalk
       (S.lifeOf S.bob (S.runCombat attackThePlaneswalker control))
       (Just 20)
 
+-- Aim a spell's every target slot at one object, whatever Recipient arm names it.
+-- The filter rather than a built Recipient, so the answer is drawn from what the
+-- engine offered.
+aimedAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap (\(_, candidates) -> Set.filter (\r -> Recipient.objectOf r == Just oid) candidates) sets
+  _ -> S.identityAnswer p
+
+-- THREE seats and a stolen planeswalker: alice attacks with Bog Wraith, bob is
+-- the defending player and controls carol's Jace Beleren through a Confiscate,
+-- and each of the two holds one land. With `bolted`, alice burns Jace off the
+-- battlefield after the declaration, which is CR 506.4's "leaves the
+-- battlefield" -- so the Wraith is attacking nothing and CR 508.5's second
+-- sentence is what names its defending player.
+--
+-- Three seats and Confiscate together are what make the readings of that sentence
+-- distinguishable. Jace's OWNER is carol and its CONTROLLER is bob, so the
+-- last-known defending player (bob) and the seat any object-reading answer lands on
+-- (carol, CR 108.3's owner, since the buried planeswalker leaves nothing to read a
+-- controller off) hold different lands. On a board without the Aura the two
+-- coincide and only liveness is proved.
+stolenJaceLandwalkBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  String ->
+  String ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+stolenJaceLandwalkBoard s registry bolted defendersLand ownersLand = do
+  bogWraith <- S.printingOf s registry "Bog Wraith"
+  piker <- S.printingOf s registry "Goblin Piker"
+  mountain <- S.printingOf s registry "Mountain"
+  confiscate <- S.printingOf s registry "Confiscate"
+  jace <- S.printingOf s registry "Jace Beleren"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  bobs <- S.printingOf s registry defendersLand
+  carols <- S.printingOf s registry ownersLand
+  let (gs0, ours, yours, hers) = S.threePlayerCombat [bogWraith, mountain] [piker, bobs] [jace, carols]
+  case (ours, yours, hers) of
+    (wraith : _, blocker : _, jaceId : _) -> do
+      let (confiscateId, gs1) = S.addCreature confiscate S.bob gs0
+          (boltId, gs2) = S.addHandCard bolt S.alice gs1
+          gs3 = S.addCounter CounterKind.Loyalty 3 jaceId (S.attachTo confiscateId (Recipient.ToObject jaceId) gs2)
+          board =
+            gs3
+              { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                GameState.priority = Just S.alice,
+                -- CR 506.2a / CR 507.1's choice, stated rather than run: bob
+                -- defends, which is what puts carol's Jace among the attackable
+                -- planeswalkers (CR 306.6 reads the CONTROLLER).
+                GameState.combat = (GameState.combat gs3) {Combat.Type.defender = Just S.bob}
+              }
+          declared = snd (Engine.runGamePure attackThePlaneswalker board (Combat.declareAttackers S.alice))
+          burned = S.runPure (aimedAtObject jaceId) declared (do S.cast S.alice boltId; Stack.resolveTop)
+      pure (if bolted then S.settleSba burned else declared, wraith, blocker, jaceId)
+    _ -> Spec.assertFailure s "fixture should have a Wraith, a blocker and a Jace"
+
+-- CR 508.5's second sentence: once a creature is no longer attacking anything,
+-- the defending player its abilities refer to is the controller of the
+-- planeswalker it WAS attacking before that planeswalker was removed from combat
+-- -- last known information. CR 702.19e is what settles that such a creature
+-- still HAS a defending player at all: it assigns its damage to one.
+--
+-- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so CR
+-- 702.14c is exactly an ability of an attacking creature that refers to a
+-- defending player and no other text is in play. Each pair of cases differs in one
+-- thing -- which of the two seats holds the Swamp -- and the removed pair differs
+-- from the still-attacked pair in one more, whether the Bolt was cast, so no case
+-- can pass because of the board rather than the rule.
+lastKnownDefendingPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastKnownDefendingPlayerSpec s registry = Spec.describe s "LastKnownDefendingPlayer" $ do
+  let blocks blocker wraith = Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton wraith))
+  Spec.it s "CR 702.14c the premise: the stolen planeswalker's CONTROLLER is the defending player while it is attacked" $ do
+    (gs, wraith, blocker, jaceId) <- stolenJaceLandwalkBoard s registry False "Swamp" "Island"
+    Spec.assertBool s (S.onBattlefield jaceId gs) "Jace is still on the battlefield"
+    Spec.assertEqWith s "and bob controls him through the Confiscate" (Projection.controllerOf jaceId gs) (Just S.bob)
+    Spec.assertEqWith
+      s
+      "the Wraith really is attacking him"
+      (Map.lookup wraith (Combat.Type.attackers (GameState.combat gs)))
+      (Just (AttackTarget.OfPlaneswalker jaceId))
+    Spec.assertBool s (not (blocks blocker wraith gs)) "bob's Swamp stops the block"
+  Spec.it s "CR 508.5 the same block stays illegal once the planeswalker has left combat" $ do
+    -- THE CASE. Jace is gone, so the Wraith attacks nothing (CR 506.4c) and its
+    -- swampwalk reads the player it was attacking through -- bob, who holds the
+    -- Swamp. Reading the planeswalker itself finds no object at all once the CR
+    -- 704.5i burial has run, so a live read answers no defending player and calls
+    -- this block legal; reading the owner answers carol, whose land is an Island,
+    -- and calls it legal too.
+    (gs, wraith, blocker, jaceId) <- stolenJaceLandwalkBoard s registry True "Swamp" "Island"
+    Spec.assertBool s (not (S.onBattlefield jaceId gs)) "CR 704.5i: the Bolt's 3 took all of Jace's loyalty"
+    Spec.assertBool s (Map.member wraith (Combat.Type.attackers (GameState.combat gs))) "CR 506.4c: still an attacking creature"
+    Spec.assertBool s (not (blocks blocker wraith gs)) "bob's Swamp still stops the block"
+  Spec.it s "CR 508.5 the gone planeswalker's OWNER is not the seat that is read" $ do
+    -- THE FALSIFIER, and the same board with the two lands swapped: carol owns
+    -- the Jace and holds the Swamp, bob defends and holds the Island. An engine
+    -- that reads the buried planeswalker's owner calls this block illegal.
+    (gs, wraith, blocker, jaceId) <- stolenJaceLandwalkBoard s registry True "Island" "Swamp"
+    Spec.assertBool s (not (S.onBattlefield jaceId gs)) "Jace is gone here too"
+    Spec.assertBool s (blocks blocker wraith gs) "no Swamp on bob's side, so the block is legal"
+  Spec.it s "CR 508.5 nor is it the seat that is read while the planeswalker is still attacked" $ do
+    -- The pair above with Jace ALIVE, which is what makes the two falsifiers a
+    -- reading of CR 508.5 rather than of "the planeswalker is gone": carol owns
+    -- him and holds the Swamp, bob controls him and holds the Island, and CR
+    -- 508.5's first sentence names the CONTROLLER. An engine reading the owner
+    -- calls this block illegal, and calls the premise case legal.
+    (gs, wraith, blocker, jaceId) <- stolenJaceLandwalkBoard s registry False "Island" "Swamp"
+    Spec.assertBool s (S.onBattlefield jaceId gs) "Jace is still on the battlefield"
+    Spec.assertBool s (blocks blocker wraith gs) "the owner's Swamp is not bob's, so the block is legal"
+
 -- CR 508.4 / CR 508.3a / CR 508.8, through the one card in the pool that puts a
 -- creature onto the battlefield attacking WITHOUT anything having been declared.
 --
@@ -4803,4 +4915,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   towershellSpec s registry
   planeswalkerAttackSpec s registry
   trampleOverPlaneswalkersSpec s registry
+  lastKnownDefendingPlayerSpec s registry
   attackCostSpec s registry

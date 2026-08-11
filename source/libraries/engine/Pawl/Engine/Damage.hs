@@ -196,11 +196,11 @@ damageEvent gs kind source target amount =
 -- CR 506.4c's record is untouched.
 --
 -- The defending player is read off the combat record (Combat.defender) and not
--- re-derived from the planeswalker, which is gone. Pawl's combat has ONE
--- defending player (see Pawl.Types.Combat), and an attack on a planeswalker is
--- declared against that player's planeswalkers (CR 508.1b), so the record's
--- player is CR 508.5's answer for this attacker without the last known
--- information CR 508.5's second sentence would otherwise want (#537).
+-- re-derived from the planeswalker, which is gone -- CR 508.5's second sentence,
+-- the same reading Defender.playerOf now takes for every caller: pawl's combat has
+-- ONE defending player (see Pawl.Types.Combat) and an attack on a planeswalker is
+-- declared against that player's planeswalkers (CR 508.1b), so the record's player
+-- is the controller it had before it was removed from combat.
 --
 -- Read at ASSIGNMENT and at every place assignment can name a recipient (the
 -- unblocked/trample-through event and the CR 702.19b threshold map the prompt
@@ -258,7 +258,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
             -- CR 508.5 / CR 310.8d, shared with the landwalk reading in
             -- Defender.playerOf so the two cannot drift. Read once, for CR
             -- 702.19c's third recipient below and for CR 702.22j's chooser.
-            defending = Defender.playerOf (Projection.controlGrants gs) target gs
+            defending = Defender.playerOf target gs
             -- CR 702.19b: the trample-through recipient is whatever the creature
             -- is attacking, at threshold 0 -- there is no minimum to assign to it.
             --
@@ -349,11 +349,11 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                 -- rather than skipping the assignment. Unreachable: an attacker
                 -- with no target at all assigns nothing and never gets here, and
                 -- CR 702.19e's attacker -- which does get here, with its
-                -- planeswalker off the battlefield -- still reads that
-                -- planeswalker's controller out of the graveyard, since
-                -- Defender.playerOf asks the object and not the combat
-                -- record. Answering with the CR 510.1c default is the
-                -- conservative reading either way.
+                -- planeswalker off the battlefield -- reads the combat record's
+                -- defending player, which CR 508.5's second sentence says is that
+                -- planeswalker's controller. A battle that has left is the one
+                -- shape that could reach the fallback (#1248); answering with the
+                -- CR 510.1c default is the conservative reading there.
                 let banded = any (\b -> Projection.hasKeyword Keyword.Banding b gs) blockers
                     chooser = if banded then Maybe.fromMaybe pid defending else pid
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
