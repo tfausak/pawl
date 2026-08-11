@@ -22,7 +22,7 @@ import qualified Pawl.Types.BlockPermission as BlockPermission
 -- Pawl.Codec.CombatRestriction spells "unless".
 toJson :: BlockPermission.BlockPermission -> Value.Value
 toJson bp =
-  Common.object
+  Value.object
     ( Common.requiredPair "affected" Affected.toJson (BlockPermission.affected bp)
         <> Common.requiredPair "additional" (Common.encodeMaybe Quantity.toJson) (BlockPermission.additional bp)
         <> Common.optionalPair "while" Nothing (Common.encodeMaybe Condition.toJson) (BlockPermission.while bp)

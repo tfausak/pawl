@@ -235,11 +235,14 @@ Pick the sublibrary by what the module *is*, not by who calls it. Each is
 - `slug`:
   slugifying text
 
+- `uri`:
+  URI components, and the encoding each of them takes
+
 - `json`:
   RFC-compliant JSON types and codecs
 
 - `json-pointer`:
-  RFC 6901 JSON pointers, and the URI fragment form a `$ref` takes
+  RFC 6901 JSON pointers
 
 - `json-schema`:
   JSON Schema documents, modelled as plain JSON values

@@ -7,6 +7,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.ModeSelection as ModeSelection
+import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -26,7 +27,7 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- 'Modal.toJson'/'Modal.fromJson' reach it only through the supplied Mode
 -- codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
-cardToJson = Common.text
+cardToJson = Value.text
 
 cardFromJson :: Value.Value -> Either Text.Text Text.Text
 cardFromJson = Common.asText
@@ -73,6 +74,6 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
       ( either
           (const True)
           (const False)
-          (fromJson (Common.object [Common.pair "modes" (Common.array []), Common.pair "selection" (ModeSelection.toJson (ModeSelection.ChooseExactly 1))]))
+          (fromJson (Value.object [Pair.fromString "modes" (Value.array []), Pair.fromString "selection" (ModeSelection.toJson (ModeSelection.ChooseExactly 1))]))
       )
       "left"

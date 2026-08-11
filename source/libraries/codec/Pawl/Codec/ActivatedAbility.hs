@@ -12,7 +12,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 
 toJson :: (Eq card) => (card -> Value.Value) -> ActivatedAbility.ActivatedAbility card -> Value.Value
 toJson codec aa =
-  Common.object
+  Value.object
     ( Common.requiredPair "cost" (Cost.toJson Keyword.toJson) (ActivatedAbility.cost aa)
         <> Common.requiredPair "modal" (Modal.toJson codec) (ActivatedAbility.modal aa)
         -- CR 602.5: emitted only for a restricted ability, so the absence of the

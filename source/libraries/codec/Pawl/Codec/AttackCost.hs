@@ -14,7 +14,7 @@ import qualified Pawl.Types.AttackCost as AttackCost
 -- each" repeats it per taxed attacker before CR 508.1h totals the declaration.
 toJson :: AttackCost.AttackCost -> Value.Value
 toJson ac =
-  Common.object
+  Value.object
     ( Common.requiredPair "subject" Affected.toJson (AttackCost.subject ac)
         <> Common.requiredPair "perAttacker" ManaCost.toJson (AttackCost.perAttacker ac)
     )

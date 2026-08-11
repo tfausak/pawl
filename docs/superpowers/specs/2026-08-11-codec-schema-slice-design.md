@@ -34,12 +34,13 @@ retire*, because it is the thing most likely to be misread as proven.
 
 ## The libraries
 
-Two new sublibraries, inserted between `json` and `codec`:
+Three new sublibraries, inserted between `json` and `codec`:
 
 ```
 spec
+  uri              Fragment, encode
   json             Value, encode, decode
-    json-pointer   Pointer, Token, encode, encodeFragment
+    json-pointer   Pointer, Token, encode
       json-schema  Schema, Name, SchemaM, define, run
         json-codec Common, Codec, Fields, Arm
           codec    CardName, PhasePattern, ... and nothing else
@@ -54,7 +55,7 @@ should build it. Like its neighbour it is an RFC-adjacent format over
 `pawl:codec` is left holding codecs for `pawl:types` types, one module each,
 which is what its name has always claimed.
 
-Both stanzas need their scope comment in `pawl.cabal` and their row in
+Each stanza needs its scope comment in `pawl.cabal` and its row in
 `CLAUDE.md`'s table.
 
 ### `Pawl.Codec.Common` moves
@@ -126,10 +127,10 @@ A definition's name comes from `Typeable`, never from a string literal. GHC has
 auto-derived `Typeable` for every type since 7.10, so this costs `pawl:types`
 nothing -- no `deriving` clause, no edit.
 
-`typeName` renders the `TypeRep` structurally -- `tyConName`, then arguments
-joined with `_` -- rather than `show`ing it. `show` writes an application with a
-space, `Face Card`, and a `$ref` is a URI-reference where that would have to be
-percent-encoded. Structural rendering gives `Face_Card`.
+`typeName` `show`s the `TypeRep`. `show` writes an application with a space,
+`Face Card`, and parenthesizes a nested one; a `$ref` is a URI-reference, so the
+space is percent-encoded there. Substituting a legal character for the space
+instead would render `Face Bar` and `Face_Bar` as one name.
 
 Names are unqualified. `Pawl.Types` is one type per module with the module named
 for the type, so base names are unique by construction, and qualification would
@@ -158,7 +159,7 @@ So the two positions are written differently, and `Define` keeps them apart:
   ``` hs
   reference :: Name.Name -> Schema.Schema
   reference name =
-    schemaOf . Pointer.encodeFragment . Pointer.MkPointer $
+    schemaOf . mappend "#" . Fragment.encode . Pointer.encode . Pointer.MkPointer $
       [Token.MkToken (Text.pack "$defs"), Token.MkToken (Name.unwrap name)]
   ```
 
@@ -168,21 +169,23 @@ So the two positions are written differently, and `Define` keeps them apart:
   written, documented and tested in `pawl:json-pointer`, and this is what that
   library is for.
 
-`Face Card` reaches none of it: `typeName` joins arguments with `_` first. The
-`_` is a rendering choice; the escaping is correctness.
+`Face Card` reaches the same machinery: `typeName` shows the `TypeRep`, space and
+all, and the space is percent-encoded on the way into the fragment. Nothing
+substitutes a character for another, so two types cannot collide on one name.
 
-### One addition to `pawl:json-pointer`
+### The new `pawl:uri`
 
-`encodeFragment` is new. RFC 6901 section 6 defines a second representation of a
-pointer -- the URI fragment identifier -- which prefixes `#` and percent-encodes
-what RFC 3986 forbids in a fragment: `#`, `%`, `<`, `>`, `\`, `^` and `|`, every
-one a legal Haskell operator character. `$ref` takes that form, not the plain
-one.
+RFC 6901 section 6 defines a second representation of a pointer -- the URI
+fragment identifier -- which prefixes `#` and percent-encodes what RFC 3986
+forbids in a fragment: `#`, `%`, `<`, `>`, `\`, `^` and `|`, every one a legal
+Haskell operator character, plus the space in `Face Card`. `$ref` takes that
+form, not the plain one.
 
-It belongs in `json-pointer`, not here. The library claims RFC 6901, section 6 is
-part of RFC 6901, and a schema library has no business knowing about URIs. It is
-a short function beside `encode`, with its own case in `PointerSpec`, and it
-leaves `json-pointer` covering the whole RFC rather than most of it.
+The percent-encoding is URI work rather than JSON Pointer work, so it is
+`Pawl.Uri.Fragment.encode` in a `pawl:uri` of its own, over octets rather than
+over a `Pointer`. `Define` composes the two and writes the `#`. Neither escape
+undoes the other: `~` and `/` are both legal fragment octets, so `Pointer.encode`'s
+`~0` and `~1` pass through untouched.
 
 `Pawl.JsonSchema.Schema` exports generic constructors only: `string`, `integer`,
 `natural`, `object`, `oneOf`, `constant`, `nullable`, `withDefault`. Pawl's
@@ -300,8 +303,9 @@ worth more than collapsing a table that is already written twice. CLAUDE.md's
 that check before. The tag stays written twice, exactly as today; the schema is
 the thing gained.
 
-The existential in `Payload` uses GADT syntax, which `.hlint.yaml` already
-allows.
+`Payload` needs no existential: it stores the element codec's decoder and schema
+rather than the codec itself, so `Arm` is an ordinary sum. `Nullary` is not a
+special case of it -- a nullary arm's schema carries no `value` property at all.
 
 ## Wire shapes
 
@@ -394,10 +398,10 @@ seven rendered.
 synthetic self-referential `define`, asserting the cycle breaks into a `$ref`
 instead of diverging. That tests the machinery, not any type's schema.
 `Pawl.JsonSchema.NameSpec` pins the rendering rule the same way: a bare type
-gives `PhasePattern`, an applied one `Face_Card` rather than a name with a space
-in it. Escaping itself is `pawl:json-pointer`'s, already covered by `TokenSpec`,
-and is not re-tested here; `encodeFragment` gets its own case in `PointerSpec`
-beside `encode`. What `DefineSpec` adds is that the two are composed correctly --
+gives `PhasePattern`, an applied one `Face Card`, and a nested one parentheses.
+Escaping itself is `pawl:json-pointer`'s, already covered by `TokenSpec`, and is
+not re-tested here; percent-encoding is `pawl:uri`'s, covered by
+`Pawl.Uri.FragmentSpec`. What `DefineSpec` adds is that the two are composed correctly --
 a `MkName ":~/"` giving the `$defs` key `:~/` and the `$ref` `#/$defs/:~0~1`.
 That uses a hand-built `Name` rather than a real operator-named type: that a
 `TypeRep` renders its operator verbatim is GHC's contract, and asserting it would

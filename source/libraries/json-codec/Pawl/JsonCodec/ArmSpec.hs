@@ -7,7 +7,6 @@ import qualified Data.Text as Text
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
-import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Spec as Spec
 
 data Example
@@ -16,7 +15,7 @@ data Example
   deriving (Eq, Show)
 
 size :: Codec.Codec Integer
-size = Common.scalar Schema.integer Common.integer Common.asInteger
+size = Common.integer
 
 codec :: Codec.Codec Example
 codec =

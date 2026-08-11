@@ -12,7 +12,7 @@ import qualified Pawl.Types.UnlessPaid as UnlessPaid
 -- no cost offers nothing, so neither has a default an absent key could mean.
 toJson :: UnlessPaid.UnlessPaid -> Value.Value
 toJson u =
-  Common.object
+  Value.object
     ( Common.requiredPair "payer" SlotName.toJson (UnlessPaid.payer u)
         <> Common.requiredPair "cost" (Cost.toJson Keyword.toJson) (UnlessPaid.cost u)
     )

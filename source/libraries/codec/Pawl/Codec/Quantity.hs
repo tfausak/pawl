@@ -19,13 +19,13 @@ import qualified Pawl.Types.Quantity as Quantity
 -- dispatching type, which is this one.
 toJson :: Quantity.Quantity -> Value.Value
 toJson q = case q of
-  Quantity.Literal n -> Common.tagged "Literal" . Just $ Common.integer n
+  Quantity.Literal n -> Common.tagged "Literal" . Just $ Value.integer n
   Quantity.ManaValue -> Common.nullary "ManaValue"
   Quantity.Power -> Common.nullary "Power"
   Quantity.Toughness -> Common.nullary "Toughness"
   Quantity.InSlot s -> Common.tagged "InSlot" . Just $ SlotName.toJson s
   Quantity.Star -> Common.nullary "Star"
-  Quantity.Plus a b -> Common.tagged "Plus" . Just . Common.array $ [toJson a, toJson b]
+  Quantity.Plus a b -> Common.tagged "Plus" . Just . Value.array $ [toJson a, toJson b]
   Quantity.Count c -> Common.tagged "Count" . Just $ Count.toJson toJson c
   Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ ManaCount.toJson c
   Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ PlayerRef.toJson p
@@ -33,7 +33,7 @@ toJson q = case q of
   -- CR 725.1's designation, with only a PlayerRef on the wire: the answer is a
   -- 0/1 rather than a stored number, so there is nothing beside the reference.
   Quantity.IsMonarch p -> Common.tagged "IsMonarch" . Just $ PlayerRef.toJson p
-  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Common.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
+  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Value.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
   -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
   -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
   Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ CounterKind.toJson Keyword.toJson k
@@ -56,7 +56,7 @@ toJson q = case q of
   Quantity.BlockersBeyondFirst -> Common.nullary "BlockersBeyondFirst"
   -- A slot and a whole Quantity, in that order: which object to aim at, then what
   -- to read off it.
-  Quantity.AgainstSlot s q_ -> Common.tagged "AgainstSlot" . Just . Common.array $ [SlotName.toJson s, toJson q_]
+  Quantity.AgainstSlot s q_ -> Common.tagged "AgainstSlot" . Just . Value.array $ [SlotName.toJson s, toJson q_]
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do

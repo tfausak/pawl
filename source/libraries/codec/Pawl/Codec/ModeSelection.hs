@@ -1,6 +1,7 @@
 module Pawl.Codec.ModeSelection where
 
 import qualified Data.Text as Text
+import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -11,9 +12,9 @@ toJson m = case m of
   ModeSelection.ChooseExactlyWithRepeats n -> Common.tagged "ChooseExactlyWithRepeats" . Just $ Common.encodeNatural n
   ModeSelection.ChooseBetween least most ->
     Common.tagged "ChooseBetween" . Just $
-      Common.object
-        [ Common.pair "least" (Common.encodeNatural least),
-          Common.pair "most" (Common.encodeNatural most)
+      Value.object
+        [ Pair.fromString "least" (Common.encodeNatural least),
+          Pair.fromString "most" (Common.encodeNatural most)
         ]
 
 fromJson :: Value.Value -> Either Text.Text ModeSelection.ModeSelection

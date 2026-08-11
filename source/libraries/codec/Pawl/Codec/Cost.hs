@@ -11,7 +11,7 @@ import qualified Pawl.Types.Cost as Cost
 -- constraint is only for 'Common.optionalPair' on 'components'.
 toJson :: (Eq keyword) => (keyword -> Value.Value) -> Cost.Cost keyword -> Value.Value
 toJson encode c =
-  Common.object
+  Value.object
     ( Common.requiredPair "mana" (Common.encodeMaybe ManaCost.toJson) (Cost.mana c)
         <> Common.optionalPair "components" [] (Common.encodeList (CostComponent.toJson encode)) (Cost.components c)
     )

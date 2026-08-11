@@ -7,12 +7,8 @@
 module Pawl.JsonSchema.Schema where
 
 import qualified Data.Text as Text
-import qualified Pawl.Decimal as Decimal
-import qualified Pawl.Json.Array as Array
-import qualified Pawl.Json.Number as Number
 import qualified Pawl.Json.Object as Object
 import qualified Pawl.Json.Pair as Pair
-import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
 
 newtype Schema = MkSchema
@@ -20,17 +16,8 @@ newtype Schema = MkSchema
   }
   deriving (Eq, Show)
 
-pair :: String -> Value.Value -> Pair.Pair Value.Value
-pair = Pair.MkPair . String.MkString . Text.pack
-
-text :: Text.Text -> Value.Value
-text = Value.String . String.MkString
-
-integerValue :: Integer -> Value.Value
-integerValue = Value.Number . Number.MkNumber . flip Decimal.mkDecimal 0
-
 fromPairs :: [Pair.Pair Value.Value] -> Schema
-fromPairs = MkSchema . Value.Object . Object.MkObject
+fromPairs = MkSchema . Value.object
 
 -- | A schema's keywords, so another can be added to it. Every schema this
 -- module builds is a JSON object -- only the @true@ and @false@ schemas are
@@ -39,40 +26,40 @@ fromPairs = MkSchema . Value.Object . Object.MkObject
 keywords :: Schema -> [Pair.Pair Value.Value]
 keywords s = case unwrap s of
   Value.Object o -> Object.unwrap o
-  v -> [pair "allOf" (Value.Array (Array.MkArray [v]))]
+  v -> [Pair.fromString "allOf" (Value.array [v])]
 
 string :: Schema
-string = fromPairs [pair "type" (text (Text.pack "string"))]
+string = fromPairs [Pair.fromString "type" (Value.text (Text.pack "string"))]
 
 integer :: Schema
-integer = fromPairs [pair "type" (text (Text.pack "integer"))]
+integer = fromPairs [Pair.fromString "type" (Value.text (Text.pack "integer"))]
 
 natural :: Schema
 natural =
   fromPairs
-    [ pair "type" (text (Text.pack "integer")),
-      pair "minimum" (integerValue 0)
+    [ Pair.fromString "type" (Value.text (Text.pack "integer")),
+      Pair.fromString "minimum" (Value.integer 0)
     ]
 
 null :: Schema
-null = fromPairs [pair "type" (text (Text.pack "null"))]
+null = fromPairs [Pair.fromString "type" (Value.text (Text.pack "null"))]
 
 constant :: Text.Text -> Schema
-constant = fromPairs . pure . pair "const" . text
+constant = fromPairs . pure . Pair.fromString "const" . Value.text
 
 object :: [Pair.Pair Value.Value] -> [Text.Text] -> Schema
 object properties required =
   fromPairs
-    [ pair "type" (text (Text.pack "object")),
-      pair "properties" (Value.Object (Object.MkObject properties)),
-      pair "required" (Value.Array (Array.MkArray (fmap text required)))
+    [ Pair.fromString "type" (Value.text (Text.pack "object")),
+      Pair.fromString "properties" (Value.object properties),
+      Pair.fromString "required" (Value.array (fmap Value.text required))
     ]
 
 oneOf :: [Schema] -> Schema
-oneOf = fromPairs . pure . pair "oneOf" . Value.Array . Array.MkArray . fmap unwrap
+oneOf = fromPairs . pure . Pair.fromString "oneOf" . Value.array . fmap unwrap
 
 nullable :: Schema -> Schema
 nullable s = oneOf [s, Pawl.JsonSchema.Schema.null]
 
 withDefault :: Value.Value -> Schema -> Schema
-withDefault v s = fromPairs $ keywords s <> [pair "default" v]
+withDefault v s = fromPairs $ keywords s <> [Pair.fromString "default" v]

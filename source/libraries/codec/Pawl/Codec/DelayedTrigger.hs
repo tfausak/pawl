@@ -16,7 +16,7 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 
 toJson :: DelayedTrigger.DelayedTrigger -> Value.Value
 toJson d =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.requiredPair "ability" (TriggeredAbility.toJson Card.toJson) (DelayedTrigger.ability d),
       Common.requiredPair "source" ObjectId.toJson (DelayedTrigger.source d),
       Common.requiredPair "controller" (Codec.encode PlayerId.codec) (DelayedTrigger.controller d),

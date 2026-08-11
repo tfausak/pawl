@@ -49,14 +49,14 @@ toJson k = case k of
   Keyword.Aftermath -> Common.nullary "Aftermath"
   Keyword.JumpStart -> Common.nullary "JumpStart"
   Keyword.Afflict n -> Common.tagged "Afflict" . Just $ Common.encodeNatural n
-  Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Common.array $ [Cost.toJson toJson cost, Common.encodeMaybe (Filter.toJson toJson) searchFor]
+  Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Value.array $ [Cost.toJson toJson cost, Common.encodeMaybe (Filter.toJson toJson) searchFor]
   Keyword.Kicker cost -> Common.tagged "Kicker" . Just $ Cost.toJson toJson cost
   Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Cost.toJson toJson cost
   Keyword.Fear -> Common.nullary "Fear"
   Keyword.Intimidate -> Common.nullary "Intimidate"
   -- An ARRAY, as Cycling's is, because CR 702.37b's megamorph is the same
   -- keyword with a second field rather than a tag of its own.
-  Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Common.array $ [Cost.toJson toJson cost, MorphVariant.toJson variant]
+  Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Value.array $ [Cost.toJson toJson cost, MorphVariant.toJson variant]
   Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson toJson cost
   Keyword.Modular n -> Common.tagged "Modular" . Just $ Common.encodeNatural n
   Keyword.Bushido n -> Common.tagged "Bushido" . Just $ Common.encodeNatural n
@@ -67,7 +67,7 @@ toJson k = case k of
   Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Common.encodeNatural n
   -- An ARRAY, as Cycling's and Morph's are: CR 702.77a writes both an N and a
   -- cost.
-  Keyword.Reinforce n cost -> Common.tagged "Reinforce" . Just . Common.array $ [Common.encodeNatural n, Cost.toJson toJson cost]
+  Keyword.Reinforce n cost -> Common.tagged "Reinforce" . Just . Value.array $ [Common.encodeNatural n, Cost.toJson toJson cost]
   Keyword.Persist -> Common.nullary "Persist"
   Keyword.Infect -> Common.nullary "Infect"
   Keyword.Wither -> Common.nullary "Wither"

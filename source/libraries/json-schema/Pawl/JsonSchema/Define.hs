@@ -15,6 +15,7 @@ import qualified Pawl.JsonPointer.Pointer as Pointer
 import qualified Pawl.JsonPointer.Token as Token
 import qualified Pawl.JsonSchema.Name as Name
 import qualified Pawl.JsonSchema.Schema as Schema
+import qualified Pawl.Uri.Fragment as Fragment
 
 -- | 'Nothing' marks a definition currently being built, 'Just' a finished one.
 -- The distinction is what 'define' reads to break a cycle, and it holds a
@@ -44,18 +45,22 @@ define name body = do
       pure (reference name)
 
 reference :: Name.Name -> Schema.Schema
-reference name = Schema.fromPairs [Schema.pair "$ref" (Schema.text (fragment name))]
+reference name = Schema.fromPairs [Pair.fromString "$ref" (Value.text (fragment name))]
 
--- | A @$ref@ is a URI-reference holding a JSON Pointer, so it is built as a
--- 'Pointer.Pointer' and rendered by 'Pointer.encodeFragment'. A 'Token.Token'
--- stores unescaped text, so the escaping happens once, there, in the order RFC
--- 6901 requires. The @$defs@ KEY takes the same name unescaped: it is a JSON
--- object key, not a pointer.
+-- | A @$ref@ is a URI-reference holding a JSON Pointer, which is RFC 6901
+-- section 6's fragment form: @#@, then the pointer, percent-encoded for a URI
+-- fragment. Neither escaping is hand-rolled, and neither undoes the other --
+-- @~@ and @\/@ are both legal fragment octets, so 'Pointer.encode'\'s @~0@ and
+-- @~1@ survive 'Fragment.encode'. A 'Token.Token' stores unescaped text, so the
+-- pointer escaping happens once, there. The @$defs@ KEY takes the same name
+-- unescaped: it is a JSON object key, not a pointer.
 fragment :: Name.Name -> Text.Text
 fragment name =
   Text.pack
+    . mappend "#"
     . Builder.toString
-    . Pointer.encodeFragment
+    . Fragment.encode
+    . Pointer.encode
     . Pointer.MkPointer
     $ [Token.MkToken (Text.pack "$defs"), Token.MkToken (Name.unwrap name)]
 
@@ -63,9 +68,9 @@ run :: SchemaM Schema.Schema -> Value.Value
 run m =
   let (root, definitions) = State.runState m Map.empty
    in Value.Object . Object.MkObject $
-        [Schema.pair "$schema" (Schema.text (Text.pack "https://json-schema.org/draft/2020-12/schema"))]
+        [Pair.fromString "$schema" (Value.text (Text.pack "https://json-schema.org/draft/2020-12/schema"))]
           <> Schema.keywords root
-          <> [Schema.pair "$defs" (Value.Object (Object.MkObject (Maybe.mapMaybe definition (Map.toAscList definitions))))]
+          <> [Pair.fromString "$defs" (Value.Object (Object.MkObject (Maybe.mapMaybe definition (Map.toAscList definitions))))]
 
 -- | A 'Nothing' entry -- a definition still in progress -- is dropped rather
 -- than emitted, which would otherwise write a dangling @$ref@ no key answers.

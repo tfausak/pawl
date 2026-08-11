@@ -3,6 +3,7 @@
 module Pawl.Codec.KeywordFamilySpec where
 
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -193,5 +194,5 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
   Spec.it s "the family tag is not the instance's tag" $
     Spec.assertBool
       s
-      (KeywordFamily.toJson KeywordFamily.Toxic /= Common.tagged "Toxic" (Just (Common.integer 2)))
+      (KeywordFamily.toJson KeywordFamily.Toxic /= Common.tagged "Toxic" (Just (Value.integer 2)))
       "the toxic family is not toxic 2"

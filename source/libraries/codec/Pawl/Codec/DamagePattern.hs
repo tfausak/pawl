@@ -22,7 +22,7 @@ defaultWhichSource = SourceRelation.AnySource
 -- `whosePhase`.
 toJson :: DamagePattern.DamagePattern -> Value.Value
 toJson p =
-  Common.object
+  Value.object
     ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe DamageKind.toJson) (DamagePattern.whichKind p)
         <> Common.optionalPair "whichSource" defaultWhichSource SourceRelation.toJson (DamagePattern.whichSource p)
         <> Common.optionalPair "whichRecipient" Nothing (Common.encodeMaybe Recipient.toJson) (DamagePattern.whichRecipient p)

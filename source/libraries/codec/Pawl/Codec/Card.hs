@@ -16,7 +16,7 @@ import qualified Pawl.Types.Layout as Layout
 
 toJson :: Card.Card -> Value.Value
 toJson c =
-  Common.object $
+  Value.object $
     Common.requiredPair "faces" (Common.encodeNonEmpty (Face.toJson toJson)) (Card.faces c)
       -- CR 709-722: Normal is the absence of a card saying otherwise, so it is
       -- a default rather than a required key and 227 single-face files say

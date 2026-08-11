@@ -12,7 +12,7 @@ toJson :: ManaSymbol.ManaSymbol -> Value.Value
 toJson ms = case ms of
   ManaSymbol.Generic n -> Common.tagged "Generic" . Just $ Common.encodeNatural n
   ManaSymbol.OfType mt -> Common.tagged "OfType" . Just $ ManaType.toJson mt
-  ManaSymbol.Hybrid a b -> Common.tagged "Hybrid" . Just . Common.array $ [ManaType.toJson a, ManaType.toJson b]
+  ManaSymbol.Hybrid a b -> Common.tagged "Hybrid" . Just . Value.array $ [ManaType.toJson a, ManaType.toJson b]
   ManaSymbol.MonocoloredHybrid mt -> Common.tagged "MonocoloredHybrid" . Just $ ManaType.toJson mt
   -- A Color, not a ManaType: CR 107.4f's five Phyrexian symbols are all coloured.
   ManaSymbol.Phyrexian c -> Common.tagged "Phyrexian" . Just $ Color.toJson c

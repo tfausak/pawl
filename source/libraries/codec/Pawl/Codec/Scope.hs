@@ -11,7 +11,7 @@ import qualified Pawl.Types.Scope as Scope
 
 toJson :: Scope.Scope -> Value.Value
 toJson s = case s of
-  Scope.InZone z r -> Common.tagged "InZone" . Just . Common.array $ [Zone.toJson z, PlayerRef.toJson r]
+  Scope.InZone z r -> Common.tagged "InZone" . Just . Value.array $ [Zone.toJson z, PlayerRef.toJson r]
   Scope.InHistory e -> Common.tagged "InHistory" . Just $ EventShape.toJson e
 
 fromJson :: Value.Value -> Either Text.Text Scope.Scope

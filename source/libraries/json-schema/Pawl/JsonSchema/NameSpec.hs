@@ -13,11 +13,13 @@ spec s = Spec.describe s "Pawl.JsonSchema.Name" $ do
   Spec.it s "uses the bare constructor name" $ do
     Spec.assertEq s (name (Typeable.Proxy :: Typeable.Proxy Bool)) (Text.pack "Bool")
 
-  Spec.it s "joins one argument with an underscore" $ do
-    Spec.assertEq s (name (Typeable.Proxy :: Typeable.Proxy (Maybe Bool))) (Text.pack "Maybe_Bool")
+  Spec.it s "writes an argument as an application" $ do
+    Spec.assertEq s (name (Typeable.Proxy :: Typeable.Proxy (Maybe Bool))) (Text.pack "Maybe Bool")
 
-  Spec.it s "joins two arguments with underscores" $ do
-    Spec.assertEq s (name (Typeable.Proxy :: Typeable.Proxy (Either Bool Char))) (Text.pack "Either_Bool_Char")
+  Spec.it s "writes two arguments as one application" $ do
+    Spec.assertEq s (name (Typeable.Proxy :: Typeable.Proxy (Either Bool Char))) (Text.pack "Either Bool Char")
 
-  Spec.it s "recurses into nested arguments" $ do
-    Spec.assertEq s (name (Typeable.Proxy :: Typeable.Proxy (Maybe (Maybe Bool)))) (Text.pack "Maybe_Maybe_Bool")
+  -- Which is why the name is not built by joining arguments: flattening would
+  -- give @Maybe (Maybe Bool)@ and @(Maybe Maybe) Bool@ the same name.
+  Spec.it s "parenthesizes a nested argument" $ do
+    Spec.assertEq s (name (Typeable.Proxy :: Typeable.Proxy (Maybe (Maybe Bool)))) (Text.pack "Maybe (Maybe Bool)")

@@ -25,7 +25,7 @@ import qualified Pawl.Types.UnlessPaid as UnlessPaid
 -- 'Pawl.Codec.ModeSpec''s reason: the codec reaches it only through the supplied
 -- Effect codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
-cardToJson = Common.text
+cardToJson = Value.text
 
 cardFromJson :: Value.Value -> Either Text.Text Text.Text
 cardFromJson = Common.asText

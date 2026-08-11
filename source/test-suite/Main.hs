@@ -212,6 +212,7 @@ import qualified Pawl.TargetSpec
 import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
+import qualified Pawl.Uri.FragmentSpec
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -473,3 +474,4 @@ spec s registry = do
   Pawl.TransformSpec.spec s registry
   Pawl.TriggerSpec.spec s registry
   Pawl.TurnSpec.spec s registry
+  Pawl.Uri.FragmentSpec.spec s

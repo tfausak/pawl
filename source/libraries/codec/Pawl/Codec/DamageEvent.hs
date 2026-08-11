@@ -12,13 +12,13 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 
 toJson :: DamageEvent.DamageEvent -> Value.Value
 toJson ev =
-  Common.object
+  Value.object
     ( Common.requiredPair "source" ObjectId.toJson (DamageEvent.source ev)
         <> Common.requiredPair "target" Recipient.toJson (DamageEvent.target ev)
         <> Common.requiredPair "amount" Common.encodeNatural (DamageEvent.amount ev)
-        <> Common.optionalPair "dealtByDeathtouch" False Common.boolean (DamageEvent.dealtByDeathtouch ev)
-        <> Common.optionalPair "dealtByInfect" False Common.boolean (DamageEvent.dealtByInfect ev)
-        <> Common.optionalPair "dealtByWither" False Common.boolean (DamageEvent.dealtByWither ev)
+        <> Common.optionalPair "dealtByDeathtouch" False Value.boolean (DamageEvent.dealtByDeathtouch ev)
+        <> Common.optionalPair "dealtByInfect" False Value.boolean (DamageEvent.dealtByInfect ev)
+        <> Common.optionalPair "dealtByWither" False Value.boolean (DamageEvent.dealtByWither ev)
         <> Common.optionalPair "dealtByToxic" 0 Common.encodeNatural (DamageEvent.dealtByToxic ev)
         -- CR 702.15b's answer is a player or nobody, so Nothing (no lifelink at
         -- deal time) is what an absent key means.

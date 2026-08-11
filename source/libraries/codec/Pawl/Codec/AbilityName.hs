@@ -9,4 +9,4 @@ fromJson :: Value.Value -> Either Text.Text AbilityName.AbilityName
 fromJson = fmap AbilityName.MkAbilityName . Common.asText
 
 toJson :: AbilityName.AbilityName -> Value.Value
-toJson = Common.text . AbilityName.unwrap
+toJson = Value.text . AbilityName.unwrap

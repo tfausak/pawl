@@ -13,7 +13,7 @@ import qualified Pawl.Types.Optionality as Optionality
 
 toJson :: (Eq card) => (card -> Value.Value) -> Clause.Clause card -> Value.Value
 toJson codec c =
-  Common.object . concat $
+  Value.object . concat $
     [ -- R2 again: CR 701.46a's "if" is the marked case, and stating no gate is
       -- what every other card in the corpus does.
       Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (Clause.condition c),

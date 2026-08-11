@@ -20,12 +20,12 @@ import qualified Pawl.Types.Condition as Condition
 toJson :: Condition.Condition -> Value.Value
 toJson condition = case condition of
   Condition.Compares m c t ->
-    Common.object . concat $
+    Value.object . concat $
       [ Common.requiredPair "measured" Quantity.toJson m,
         Common.requiredPair "comparison" Comparison.toJson c,
         Common.requiredPair "threshold" Quantity.toJson t
       ]
-  Condition.Any cs -> Common.object (Common.requiredPair "any" (Common.array . fmap toJson) cs)
+  Condition.Any cs -> Value.object (Common.requiredPair "any" (Value.array . fmap toJson) cs)
 
 fromJson :: Value.Value -> Either Text.Text Condition.Condition
 fromJson value = do

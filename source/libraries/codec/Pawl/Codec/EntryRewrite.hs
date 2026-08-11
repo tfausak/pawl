@@ -14,7 +14,7 @@ toJson :: EntryRewrite.EntryRewrite -> Value.Value
 toJson r = case r of
   EntryRewrite.AsCopy -> Common.nullary "AsCopy"
   EntryRewrite.ChoiceOf options -> Common.tagged "ChoiceOf" . Just $ Common.encodeList EntryOption.toJson options
-  EntryRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Common.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
+  EntryRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Value.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
   EntryRewrite.ChooseColor -> Common.nullary "ChooseColor"
   EntryRewrite.ChooseBasicLandType -> Common.nullary "ChooseBasicLandType"
   EntryRewrite.ChooseCardNames f -> Common.tagged "ChooseCardNames" . Just $ Filter.toJson Keyword.toJson f
@@ -23,7 +23,7 @@ toJson r = case r of
   EntryRewrite.Unleash -> Common.nullary "Unleash"
   EntryRewrite.Tapped -> Common.nullary "Tapped"
   EntryRewrite.PayLifeOrTapped n -> Common.tagged "PayLifeOrTapped" . Just $ Common.encodeNatural n
-  EntryRewrite.SacrificeAnyNumber f kind -> Common.tagged "SacrificeAnyNumber" . Just . Common.array $ [Filter.toJson Keyword.toJson f, Common.encodeMaybe (CounterKind.toJson Keyword.toJson) kind]
+  EntryRewrite.SacrificeAnyNumber f kind -> Common.tagged "SacrificeAnyNumber" . Just . Value.array $ [Filter.toJson Keyword.toJson f, Common.encodeMaybe (CounterKind.toJson Keyword.toJson) kind]
 
 fromJson :: Value.Value -> Either Text.Text EntryRewrite.EntryRewrite
 fromJson value = do

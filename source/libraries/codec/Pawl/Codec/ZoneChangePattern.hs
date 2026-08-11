@@ -26,7 +26,7 @@ defaultWhoseObject = ControllerRelation.Anyones
 
 toJson :: ZoneChangePattern.ZoneChangePattern -> Value.Value
 toJson p =
-  Common.object
+  Value.object
     ( Common.requiredPair "whenDestination" Zone.toJson (ZoneChangePattern.whenDestination p)
         <> Common.optionalPair "whatObject" defaultWhatObject (Filter.toJson Keyword.toJson) (ZoneChangePattern.whatObject p)
         <> Common.optionalPair "whoseObject" defaultWhoseObject ControllerRelation.toJson (ZoneChangePattern.whoseObject p)

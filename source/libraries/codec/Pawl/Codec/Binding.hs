@@ -7,6 +7,7 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Binding as Binding
@@ -16,7 +17,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- transitive closure of what the game state carries.
 toJson :: Binding.Binding -> Value.Value
 toJson b =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.optionalPair "targets" Nothing (Common.encodeMaybe (Common.encodeSet Recipient.toJson)) (Binding.targets b),
       Common.optionalPair "amount" Nothing (Common.encodeMaybe Common.encodeNatural) (Binding.amount b),
       Common.optionalPair "modes" Nothing (Common.encodeMaybe (Common.encodeSeq ModeIndex.toJson)) (Binding.modes b),
@@ -46,7 +47,7 @@ fromJson value = do
 toJsonMap :: Map.Map SlotName.SlotName Binding.Binding -> Value.Value
 toJsonMap m =
   Common.encodeList
-    (\(k, v) -> Common.object [Common.pair "slot" (SlotName.toJson k), Common.pair "binding" (toJson v)])
+    (\(k, v) -> Value.object [Pair.fromString "slot" (SlotName.toJson k), Pair.fromString "binding" (toJson v)])
     (Map.toAscList m)
 
 fromJsonMap :: Value.Value -> Either Text.Text (Map.Map SlotName.SlotName Binding.Binding)

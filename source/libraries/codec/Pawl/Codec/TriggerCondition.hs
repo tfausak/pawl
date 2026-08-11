@@ -22,7 +22,7 @@ toJson :: TriggerCondition.TriggerCondition -> Value.Value
 toJson c = case c of
   TriggerCondition.SelfEnters -> Common.nullary "SelfEnters"
   TriggerCondition.PermanentEnters f -> Common.tagged "PermanentEnters" . Just $ Filter.toJson Keyword.toJson f
-  TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Common.array $ [Codec.encode Phase.codec p, TurnScope.toJson s]
+  TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Value.array $ [Codec.encode Phase.codec p, TurnScope.toJson s]
   TriggerCondition.StateIs c2 -> Common.tagged "StateIs" . Just $ Condition.toJson c2
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Common.nullary "SelfDealsCombatDamageToPlayer"
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> Common.tagged "PermanentDealsCombatDamageToPlayer" . Just $ Filter.toJson Keyword.toJson f
@@ -50,18 +50,18 @@ toJson c = case c of
   TriggerCondition.DamageToPlayerPrevented r -> Common.tagged "DamageToPlayerPrevented" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerGainsLife r -> Common.tagged "PlayerGainsLife" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerLosesLife r -> Common.tagged "PlayerLosesLife" . Just $ PlayerRelation.toJson r
-  TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Common.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
+  TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Value.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
   TriggerCondition.SelfLastCounterRemoved kind -> Common.tagged "SelfLastCounterRemoved" . Just $ CounterKind.toJson Keyword.toJson kind
-  TriggerCondition.SpellCast f s -> Common.tagged "SpellCast" . Just . Common.array $ [Filter.toJson Keyword.toJson f, TurnScope.toJson s]
+  TriggerCondition.SpellCast f s -> Common.tagged "SpellCast" . Just . Value.array $ [Filter.toJson Keyword.toJson f, TurnScope.toJson s]
   TriggerCondition.SelfCast -> Common.nullary "SelfCast"
   TriggerCondition.SelfHalfUnlocked n -> Common.tagged "SelfHalfUnlocked" . Just $ CardName.toJson n
   TriggerCondition.RoomFullyUnlocked r -> Common.tagged "RoomFullyUnlocked" . Just $ PlayerRelation.toJson r
   -- RECURSIVE, and the only condition that is: an AnyOf holds conditions, so both
   -- directions of this codec call themselves.
-  TriggerCondition.AnyOf cs -> Common.tagged "AnyOf" . Just . Common.array $ fmap toJson cs
+  TriggerCondition.AnyOf cs -> Common.tagged "AnyOf" . Just . Value.array $ fmap toJson cs
   TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
   TriggerCondition.PermanentTurnedFaceUp f -> Common.tagged "PermanentTurnedFaceUp" . Just $ Filter.toJson Keyword.toJson f
-  TriggerCondition.PermanentBecomesDesignated d f -> Common.tagged "PermanentBecomesDesignated" . Just . Common.array $ [Designation.toJson d, Filter.toJson Keyword.toJson f]
+  TriggerCondition.PermanentBecomesDesignated d f -> Common.tagged "PermanentBecomesDesignated" . Just . Value.array $ [Designation.toJson d, Filter.toJson Keyword.toJson f]
   TriggerCondition.SelfEvolves -> Common.nullary "SelfEvolves"
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
   TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ PlayerRelation.toJson r

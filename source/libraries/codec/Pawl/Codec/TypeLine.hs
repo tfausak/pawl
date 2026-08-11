@@ -12,7 +12,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 
 toJson :: TypeLine.TypeLine -> Value.Value
 toJson tl =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.optionalPair "supertypes" Set.empty (Common.encodeSet Supertype.toJson) (TypeLine.supertypes tl),
       Common.requiredPair "types" (Common.encodeSet CardType.toJson) (TypeLine.types tl),
       Common.optionalPair "subtypes" Set.empty (Common.encodeSet Subtype.toJson) (TypeLine.subtypes tl)

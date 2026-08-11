@@ -81,34 +81,3 @@ spec s = Spec.describe s "Pawl.JsonPointer.Pointer" $ do
 
     Spec.it s "handles multiple empty tokens" $ do
       Spec.assertEq s (Builder.toString . Pointer.encode $ pointer ["", "", ""]) "///"
-
-  Spec.describe s "encodeFragment" $ do
-    Spec.it s "works with empty pointer (root)" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer []) "#"
-
-    Spec.it s "works with /foo" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer ["foo"]) "#/foo"
-
-    Spec.it s "keeps RFC 6901 escaping for /" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer ["a/b"]) "#/a~1b"
-
-    Spec.it s "keeps RFC 6901 escaping for ~" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer ["m~n"]) "#/m~0n"
-
-    Spec.it s "percent encodes percent" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer ["c%d"]) "#/c%25d"
-
-    Spec.it s "percent encodes caret" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer ["e^f"]) "#/e%5Ef"
-
-    Spec.it s "percent encodes pipe" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer ["g|h"]) "#/g%7Ch"
-
-    Spec.it s "percent encodes backslash" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer ["i\\j"]) "#/i%5Cj"
-
-    Spec.it s "percent encodes space" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer [" "]) "#/%20"
-
-    Spec.it s "percent encodes non-ASCII as UTF-8 octets" $ do
-      Spec.assertEq s (Builder.toString . Pointer.encodeFragment $ pointer ["é"]) "#/%C3%A9"

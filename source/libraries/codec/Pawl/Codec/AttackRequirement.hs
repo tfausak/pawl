@@ -11,7 +11,7 @@ import qualified Pawl.Types.AttackRequirement as AttackRequirement
 -- blocked. Same shape, opposite axis (Pawl.Types.AttackRequirement).
 toJson :: AttackRequirement.AttackRequirement -> Value.Value
 toJson ar =
-  Common.object (Common.requiredPair "subject" Affected.toJson (AttackRequirement.subject ar))
+  Value.object (Common.requiredPair "subject" Affected.toJson (AttackRequirement.subject ar))
 
 fromJson :: Value.Value -> Either Text.Text AttackRequirement.AttackRequirement
 fromJson value = do

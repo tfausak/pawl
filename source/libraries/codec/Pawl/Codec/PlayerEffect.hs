@@ -18,9 +18,9 @@ toJson e = case e of
   PlayerEffect.CantCastMoreThan n -> Common.tagged "CantCastMoreThan" . Just $ Common.encodeNatural n
   PlayerEffect.CantCastChosenName -> Common.nullary "CantCastChosenName"
   PlayerEffect.CantPlayLandChosenName -> Common.nullary "CantPlayLandChosenName"
-  PlayerEffect.IncreaseSpellCost c n -> Common.tagged "IncreaseSpellCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, Common.encodeNatural n]
-  PlayerEffect.ReduceSpellCost c m -> Common.tagged "ReduceSpellCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, ManaCost.toJson m]
-  PlayerEffect.ReduceActivationCost c m n -> Common.tagged "ReduceActivationCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, ManaCost.toJson m, Common.encodeNatural n]
+  PlayerEffect.IncreaseSpellCost c n -> Common.tagged "IncreaseSpellCost" . Just . Value.array $ [Filter.toJson Keyword.toJson c, Common.encodeNatural n]
+  PlayerEffect.ReduceSpellCost c m -> Common.tagged "ReduceSpellCost" . Just . Value.array $ [Filter.toJson Keyword.toJson c, ManaCost.toJson m]
+  PlayerEffect.ReduceActivationCost c m n -> Common.tagged "ReduceActivationCost" . Just . Value.array $ [Filter.toJson Keyword.toJson c, ManaCost.toJson m, Common.encodeNatural n]
   PlayerEffect.PlayAdditionalLands n -> Common.tagged "PlayAdditionalLands" . Just $ Common.encodeNatural n
   PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
   PlayerEffect.SetMaximumHandSize n -> Common.tagged "SetMaximumHandSize" . Just $ Common.encodeNatural n

@@ -17,7 +17,7 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 -- opinion about what a Cost looks like.
 toJson :: AlternativeCost.AlternativeCost -> Value.Value
 toJson a =
-  Common.object
+  Value.object
     ( Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (AlternativeCost.condition a)
         <> Common.requiredPair "cost" (Cost.toJson Keyword.toJson) (AlternativeCost.cost a)
     )

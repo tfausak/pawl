@@ -37,12 +37,12 @@ toJson encode filter_ = case filter_ of
   Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Subtype.toJson sub
   Filter.HasKeyword k -> Common.tagged "HasKeyword" . Just $ encode k
   Filter.HasKeywordFamily f -> Common.tagged "HasKeywordFamily" . Just $ KeywordFamily.toJson f
-  Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Common.integer n
-  Filter.PowerAtMost n -> Common.tagged "PowerAtMost" . Just $ Common.integer n
+  Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Value.integer n
+  Filter.PowerAtMost n -> Common.tagged "PowerAtMost" . Just $ Value.integer n
   Filter.PowerLessThanSource -> Common.nullary "PowerLessThanSource"
   Filter.PowerGreaterThanSource -> Common.nullary "PowerGreaterThanSource"
   Filter.ControlledByDefendingPlayer -> Common.nullary "ControlledByDefendingPlayer"
-  Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Common.integer n
+  Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Value.integer n
   Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ PlayerRelation.toJson r
   Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ PlayerRelation.toJson r
   Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ PlayerRelation.toJson r
@@ -59,8 +59,8 @@ toJson encode filter_ = case filter_ of
   Filter.IsRingBearer -> Common.nullary "IsRingBearer"
   Filter.HasDesignation d -> Common.tagged "HasDesignation" . Just $ Designation.toJson d
   Filter.HasCounters k -> Common.tagged "HasCounters" . Just $ CounterKind.toJson encode k
-  Filter.And fs -> Common.tagged "And" . Just . Common.array $ fmap (toJson encode) fs
-  Filter.Or fs -> Common.tagged "Or" . Just . Common.array $ fmap (toJson encode) fs
+  Filter.And fs -> Common.tagged "And" . Just . Value.array $ fmap (toJson encode) fs
+  Filter.Or fs -> Common.tagged "Or" . Just . Value.array $ fmap (toJson encode) fs
   Filter.Not f -> Common.tagged "Not" . Just $ toJson encode f
 
 fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Filter.Filter keyword)

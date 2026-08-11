@@ -14,7 +14,7 @@ defaultWhose = ControllerRelation.Anyones
 
 toJson :: TokenPattern.TokenPattern -> Value.Value
 toJson p =
-  Common.object (Common.optionalPair "whose" defaultWhose ControllerRelation.toJson (TokenPattern.whose p))
+  Value.object (Common.optionalPair "whose" defaultWhose ControllerRelation.toJson (TokenPattern.whose p))
 
 fromJson :: Value.Value -> Either Text.Text TokenPattern.TokenPattern
 fromJson value = do

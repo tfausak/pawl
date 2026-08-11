@@ -17,7 +17,7 @@ defaultWhose = ControllerRelation.Anyones
 
 toJson :: CounterPattern.CounterPattern -> Value.Value
 toJson p =
-  Common.object
+  Value.object
     ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (CounterKind.toJson Keyword.toJson)) (CounterPattern.whichKind p)
         <> Common.optionalPair "byWhom" Nothing (Common.encodeMaybe ControllerRelation.toJson) (CounterPattern.byWhom p)
         <> Common.optionalPair "whose" defaultWhose ControllerRelation.toJson (CounterPattern.whose p)

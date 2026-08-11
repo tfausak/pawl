@@ -23,7 +23,7 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- 'Mode.toJson'/'Mode.fromJson' reach it only through the supplied Effect
 -- codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
-cardToJson = Common.text
+cardToJson = Value.text
 
 cardFromJson :: Value.Value -> Either Text.Text Text.Text
 cardFromJson = Common.asText

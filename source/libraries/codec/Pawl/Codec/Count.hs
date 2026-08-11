@@ -15,7 +15,7 @@ import qualified Pawl.Types.Count as Count
 -- types never share one tag across two levels.
 toJson :: (q -> Value.Value) -> Count.Count q -> Value.Value
 toJson codec count =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.requiredPair "scope" Scope.toJson (Count.scope count),
       Common.requiredPair "filter" (Filter.toJson Keyword.toJson) (Count.filter count),
       Common.requiredPair "aggregation" (Aggregation.toJson codec) (Count.aggregation count)

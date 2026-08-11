@@ -6,6 +6,7 @@ import qualified Data.Either as Either
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -50,7 +51,7 @@ spec s = Spec.describe s "Pawl.Codec.Cost" $ do
   Spec.it s "an omitted mana field is a decode error" $
     Spec.assertBool
       s
-      (Either.isLeft (fromJson (Common.object [Common.pair "components" (Common.array [])])))
+      (Either.isLeft (fromJson (Value.object [Pair.fromString "components" (Value.array [])])))
       "expected a decode failure"
   -- Every field at once: an unpayable cost (CR 118.6) with no components.
   -- 'mana' is required, so Nothing still writes as an explicit null; only the

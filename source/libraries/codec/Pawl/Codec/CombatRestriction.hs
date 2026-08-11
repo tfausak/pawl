@@ -34,7 +34,7 @@ toJson cr = case cr of
 -- spells "the card does not say this".
 payload :: Affected.Type.Affected -> Maybe Condition.Type.Condition -> Value.Value
 payload a c =
-  Common.object
+  Value.object
     ( Common.requiredPair "affected" Affected.toJson a
         <> Common.optionalPair "unless" Nothing (Common.encodeMaybe Condition.toJson) c
     )
@@ -44,7 +44,7 @@ payload a c =
 -- shape it is looking at without consulting the tag.
 boundPayload :: Natural.Natural -> Maybe Condition.Type.Condition -> Value.Value
 boundPayload n c =
-  Common.object
+  Value.object
     ( Common.requiredPair "limit" Common.encodeNatural n
         <> Common.optionalPair "unless" Nothing (Common.encodeMaybe Condition.toJson) c
     )

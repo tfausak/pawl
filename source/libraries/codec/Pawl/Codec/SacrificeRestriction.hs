@@ -16,7 +16,7 @@ import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 -- where a requirement's "subject" is opposed to an object it acts on.
 toJson :: SacrificeRestriction.SacrificeRestriction -> Value.Value
 toJson sr =
-  Common.object (Common.requiredPair "affected" Affected.toJson (SacrificeRestriction.affected sr))
+  Value.object (Common.requiredPair "affected" Affected.toJson (SacrificeRestriction.affected sr))
 
 fromJson :: Value.Value -> Either Text.Text SacrificeRestriction.SacrificeRestriction
 fromJson value = do

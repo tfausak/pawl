@@ -17,7 +17,7 @@ defaultSelection = ModeSelection.ChooseExactly 1
 
 toJson :: (Eq card) => (card -> Value.Value) -> Modal.Modal card -> Value.Value
 toJson codec m =
-  Common.object
+  Value.object
     ( Common.requiredPair "modes" (Common.encodeSeq (Mode.toJson codec)) (Modal.modes m)
         <> Common.optionalPair "selection" defaultSelection ModeSelection.toJson (Modal.selection m)
     )

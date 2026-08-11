@@ -17,15 +17,15 @@ defaultTapped = TapState.Untapped
 
 toJson :: EntryRiders.EntryRiders -> Value.Value
 toJson e =
-  Common.object
+  Value.object
     ( Common.optionalPair "tapped" defaultTapped TapState.toJson (EntryRiders.tapped e)
-        <> Common.optionalPair "attacking" False Common.boolean (EntryRiders.attacking e)
-        <> Common.optionalPair "transformed" False Common.boolean (EntryRiders.transformed e)
+        <> Common.optionalPair "attacking" False Value.boolean (EntryRiders.attacking e)
+        <> Common.optionalPair "transformed" False Value.boolean (EntryRiders.transformed e)
         -- A MULTISET, the shape ProjectedCharacteristics' keywords take: a kind
         -- repeated as many times as there are counters, ascending, so the
         -- encoding is canonical.
         <> Common.optionalPair "counters" Map.empty (Common.encodeMultiset (CounterKind.toJson Keyword.toJson)) (EntryRiders.counters e)
-        <> Common.optionalPair "underOwner" False Common.boolean (EntryRiders.underOwner e)
+        <> Common.optionalPair "underOwner" False Value.boolean (EntryRiders.underOwner e)
     )
 
 fromJson :: Value.Value -> Either Text.Text EntryRiders.EntryRiders

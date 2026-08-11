@@ -12,7 +12,7 @@ import qualified Pawl.Types.ManaCount as ManaCount
 -- written by Pawl.Codec.Quantity's ManaCount arm, this codec's only caller.
 toJson :: ManaCount.ManaCount -> Value.Value
 toJson count =
-  Common.object
+  Value.object
     ( Common.requiredPair "player" PlayerRef.toJson (ManaCount.player count)
         <> Common.requiredPair "filter" ManaFilter.toJson (ManaCount.filter count)
     )

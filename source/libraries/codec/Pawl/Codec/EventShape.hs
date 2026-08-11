@@ -9,7 +9,7 @@ import qualified Pawl.Types.EventShape as EventShape
 
 toJson :: EventShape.EventShape -> Value.Value
 toJson s = case s of
-  EventShape.MovedBetween from to -> Common.tagged "MovedBetween" . Just . Common.array $ [Zone.toJson from, Zone.toJson to]
+  EventShape.MovedBetween from to -> Common.tagged "MovedBetween" . Just . Value.array $ [Zone.toJson from, Zone.toJson to]
   EventShape.SpellCast -> Common.tagged "SpellCast" Nothing
 
 fromJson :: Value.Value -> Either Text.Text EventShape.EventShape

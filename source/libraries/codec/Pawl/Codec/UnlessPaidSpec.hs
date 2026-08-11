@@ -5,6 +5,8 @@ module Pawl.Codec.UnlessPaidSpec where
 import qualified Data.Either as Either
 import qualified Data.Text as Text
 import qualified Pawl.Codec.UnlessPaid as UnlessPaid
+import qualified Pawl.Json.Pair as Pair
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Cost as Cost
@@ -35,10 +37,10 @@ spec s = Spec.describe s "Pawl.Codec.UnlessPaid" $ do
   Spec.it s "an omitted payer field is a decode error" $
     Spec.assertBool
       s
-      (Either.isLeft (UnlessPaid.fromJson (Common.object [Common.pair "cost" (Common.object [Common.pair "mana" (Common.array [])])])))
+      (Either.isLeft (UnlessPaid.fromJson (Value.object [Pair.fromString "cost" (Value.object [Pair.fromString "mana" (Value.array [])])])))
       "expected a decode failure"
   Spec.it s "an omitted cost field is a decode error" $
     Spec.assertBool
       s
-      (Either.isLeft (UnlessPaid.fromJson (Common.object [Common.pair "payer" (Common.text (Text.pack "spell"))])))
+      (Either.isLeft (UnlessPaid.fromJson (Value.object [Pair.fromString "payer" (Value.text (Text.pack "spell"))])))
       "expected a decode failure"

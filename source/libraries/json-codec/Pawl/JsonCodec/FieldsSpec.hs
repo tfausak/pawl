@@ -6,7 +6,6 @@ module Pawl.JsonCodec.FieldsSpec where
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
-import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Spec as Spec
 
 data Example = MkExample
@@ -16,7 +15,7 @@ data Example = MkExample
   deriving (Eq, Show)
 
 size' :: Codec.Codec Integer
-size' = Common.scalar Schema.integer Common.integer Common.asInteger
+size' = Common.integer
 
 codec :: Codec.Codec Example
 codec = Fields.object $ do

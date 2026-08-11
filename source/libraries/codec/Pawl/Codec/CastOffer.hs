@@ -7,9 +7,9 @@ import qualified Pawl.Types.CastOffer as CastOffer
 
 toJson :: CastOffer.CastOffer -> Value.Value
 toJson o =
-  Common.object
-    ( Common.optionalPair "transformed" False Common.boolean (CastOffer.transformed o)
-        <> Common.optionalPair "withoutPayingManaCost" False Common.boolean (CastOffer.withoutPayingManaCost o)
+  Value.object
+    ( Common.optionalPair "transformed" False Value.boolean (CastOffer.transformed o)
+        <> Common.optionalPair "withoutPayingManaCost" False Value.boolean (CastOffer.withoutPayingManaCost o)
     )
 
 fromJson :: Value.Value -> Either Text.Text CastOffer.CastOffer

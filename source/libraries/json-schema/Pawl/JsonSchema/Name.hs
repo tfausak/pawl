@@ -19,15 +19,10 @@ newtype Name = MkName
   }
   deriving (Eq, Ord, Show)
 
+-- | Shown rather than rendered structurally: 'show' already parenthesizes a
+-- nested type application, and the characters it writes that a URI fragment
+-- cannot carry -- the space in @Face Card@ -- are percent-encoded where the
+-- name becomes a @$ref@, in 'Pawl.JsonSchema.Define.fragment'. Substituting
+-- them here instead would map two distinct types onto one name.
 typeName :: (Typeable.Typeable a) => Typeable.Proxy a -> Name
-typeName = fromTypeRep . Typeable.typeRep
-
--- | Renders the representation structurally rather than showing it. 'show'
--- writes a type application with a space, and a space is not a character a URI
--- fragment can carry unencoded; an underscore is.
-fromTypeRep :: Typeable.TypeRep -> Name
-fromTypeRep rep =
-  MkName
-    . Text.intercalate (Text.pack "_")
-    $ Text.pack (Typeable.tyConName (Typeable.typeRepTyCon rep))
-      : fmap (unwrap . fromTypeRep) (Typeable.typeRepArgs rep)
+typeName = MkName . Text.pack . show . Typeable.typeRep

@@ -35,7 +35,7 @@ import qualified Pawl.Types.TurnScope as TurnScope
 -- 'ActivatedAbility.toJson'/'ActivatedAbility.fromJson' reach it only through
 -- the supplied Modal codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
-cardToJson = Common.text
+cardToJson = Value.text
 
 cardFromJson :: Value.Value -> Either Text.Text Text.Text
 cardFromJson = Common.asText

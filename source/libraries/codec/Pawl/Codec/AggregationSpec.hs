@@ -3,6 +3,7 @@
 module Pawl.Codec.AggregationSpec where
 
 import qualified Pawl.Codec.Aggregation as Aggregation
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -15,21 +16,21 @@ spec s = Spec.describe s "Pawl.Codec.Aggregation" $ do
   Spec.it s "Objects" $
     Common.assertJsonCodec
       s
-      (Aggregation.toJson Common.integer)
+      (Aggregation.toJson Value.integer)
       (Aggregation.fromJson Common.asInteger)
       Aggregation.Objects
       """ {"type":"Objects"} """
   Spec.it s "DistinctCardTypes" $
     Common.assertJsonCodec
       s
-      (Aggregation.toJson Common.integer)
+      (Aggregation.toJson Value.integer)
       (Aggregation.fromJson Common.asInteger)
       Aggregation.DistinctCardTypes
       """ {"type":"DistinctCardTypes"} """
   Spec.it s "Greatest" $
     Common.assertJsonCodec
       s
-      (Aggregation.toJson Common.integer)
+      (Aggregation.toJson Value.integer)
       (Aggregation.fromJson Common.asInteger)
       (Aggregation.Greatest 3)
       """ {"type":"Greatest","value":3} """

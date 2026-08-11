@@ -9,4 +9,4 @@ fromJson :: Value.Value -> Either Text.Text CardName.CardName
 fromJson = fmap CardName.MkCardName . Common.asText
 
 toJson :: CardName.CardName -> Value.Value
-toJson = Common.text . CardName.unwrap
+toJson = Value.text . CardName.unwrap

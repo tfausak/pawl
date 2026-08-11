@@ -23,36 +23,36 @@ import qualified Pawl.Types.GameEvent as GameEvent
 
 toJson :: GameEvent.GameEvent -> Value.Value
 toJson e = case e of
-  GameEvent.Moved zc pc -> Common.tagged "Moved" . Just . Common.array $ [ZoneChange.toJson zc, ProjectedCharacteristics.toJson pc]
+  GameEvent.Moved zc pc -> Common.tagged "Moved" . Just . Value.array $ [ZoneChange.toJson zc, ProjectedCharacteristics.toJson pc]
   GameEvent.DamageDealt ev -> Common.tagged "DamageDealt" . Just $ DamageEvent.toJson ev
-  GameEvent.DamagePrevented r n -> Common.tagged "DamagePrevented" . Just . Common.array $ [Recipient.toJson r, Common.encodeNatural n]
-  GameEvent.StepBegan p pid -> Common.tagged "StepBegan" . Just . Common.array $ [Codec.encode Phase.codec p, Codec.encode PlayerId.codec pid]
-  GameEvent.SpellCast pid oid pc -> Common.tagged "SpellCast" . Just . Common.array $ [Codec.encode PlayerId.codec pid, ObjectId.toJson oid, ProjectedCharacteristics.toJson pc]
+  GameEvent.DamagePrevented r n -> Common.tagged "DamagePrevented" . Just . Value.array $ [Recipient.toJson r, Common.encodeNatural n]
+  GameEvent.StepBegan p pid -> Common.tagged "StepBegan" . Just . Value.array $ [Codec.encode Phase.codec p, Codec.encode PlayerId.codec pid]
+  GameEvent.SpellCast pid oid pc -> Common.tagged "SpellCast" . Just . Value.array $ [Codec.encode PlayerId.codec pid, ObjectId.toJson oid, ProjectedCharacteristics.toJson pc]
   GameEvent.BecameMonarch pid -> Common.tagged "BecameMonarch" . Just $ Codec.encode PlayerId.codec pid
   GameEvent.Discarded pid oid cause ->
-    Common.tagged "Discarded" . Just . Common.array $ [Codec.encode PlayerId.codec pid, ObjectId.toJson oid, DiscardCause.toJson cause]
-  GameEvent.Revealed pid pc -> Common.tagged "Revealed" . Just . Common.array $ [Codec.encode PlayerId.codec pid, ProjectedCharacteristics.toJson pc]
-  GameEvent.AttackerDeclared oid pid count -> Common.tagged "AttackerDeclared" . Just . Common.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec pid, Common.encodeNatural count]
-  GameEvent.BlockerDeclared blocker attacker -> Common.tagged "BlockerDeclared" . Just . Common.array $ [ObjectId.toJson blocker, ObjectId.toJson attacker]
-  GameEvent.BlocksDeclared blocker count -> Common.tagged "BlocksDeclared" . Just . Common.array $ [ObjectId.toJson blocker, Common.encodeNatural count]
-  GameEvent.AttackerBlocked oid pid -> Common.tagged "AttackerBlocked" . Just . Common.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec pid]
+    Common.tagged "Discarded" . Just . Value.array $ [Codec.encode PlayerId.codec pid, ObjectId.toJson oid, DiscardCause.toJson cause]
+  GameEvent.Revealed pid pc -> Common.tagged "Revealed" . Just . Value.array $ [Codec.encode PlayerId.codec pid, ProjectedCharacteristics.toJson pc]
+  GameEvent.AttackerDeclared oid pid count -> Common.tagged "AttackerDeclared" . Just . Value.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec pid, Common.encodeNatural count]
+  GameEvent.BlockerDeclared blocker attacker -> Common.tagged "BlockerDeclared" . Just . Value.array $ [ObjectId.toJson blocker, ObjectId.toJson attacker]
+  GameEvent.BlocksDeclared blocker count -> Common.tagged "BlocksDeclared" . Just . Value.array $ [ObjectId.toJson blocker, Common.encodeNatural count]
+  GameEvent.AttackerBlocked oid pid -> Common.tagged "AttackerBlocked" . Just . Value.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec pid]
   GameEvent.SpellCountered c -> Common.tagged "SpellCountered" . Just $ Countering.toJson c
-  GameEvent.LifeLost p n -> Common.tagged "LifeLost" . Just $ Common.array [Codec.encode PlayerId.codec p, Common.encodeNatural n]
-  GameEvent.LifeGained p n -> Common.tagged "LifeGained" . Just $ Common.array [Codec.encode PlayerId.codec p, Common.encodeNatural n]
+  GameEvent.LifeLost p n -> Common.tagged "LifeLost" . Just $ Value.array [Codec.encode PlayerId.codec p, Common.encodeNatural n]
+  GameEvent.LifeGained p n -> Common.tagged "LifeGained" . Just $ Value.array [Codec.encode PlayerId.codec p, Common.encodeNatural n]
   GameEvent.LoyaltyAbilityActivated oid -> Common.tagged "LoyaltyAbilityActivated" . Just $ ObjectId.toJson oid
   GameEvent.CountersPut oid kind before after ->
-    Common.tagged "CountersPut" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
+    Common.tagged "CountersPut" . Just . Value.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.CountersRemoved oid kind before after ->
-    Common.tagged "CountersRemoved" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
-  GameEvent.HalfUnlocked oid name fully -> Common.tagged "HalfUnlocked" . Just . Common.array $ [ObjectId.toJson oid, CardName.toJson name, Common.boolean fully]
+    Common.tagged "CountersRemoved" . Just . Value.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
+  GameEvent.HalfUnlocked oid name fully -> Common.tagged "HalfUnlocked" . Just . Value.array $ [ObjectId.toJson oid, CardName.toJson name, Value.boolean fully]
   GameEvent.TurnedFaceUp oid -> Common.tagged "TurnedFaceUp" . Just $ ObjectId.toJson oid
-  GameEvent.BecameDesignated d oid -> Common.tagged "BecameDesignated" . Just . Common.array $ [Designation.toJson d, ObjectId.toJson oid]
+  GameEvent.BecameDesignated d oid -> Common.tagged "BecameDesignated" . Just . Value.array $ [Designation.toJson d, ObjectId.toJson oid]
   GameEvent.Evolved oid -> Common.tagged "Evolved" . Just $ ObjectId.toJson oid
-  GameEvent.PermanentSacrificed pid oid -> Common.tagged "PermanentSacrificed" . Just . Common.array $ [Codec.encode PlayerId.codec pid, ObjectId.toJson oid]
+  GameEvent.PermanentSacrificed pid oid -> Common.tagged "PermanentSacrificed" . Just . Value.array $ [Codec.encode PlayerId.codec pid, ObjectId.toJson oid]
   GameEvent.AbilityTriggered oid pid cond ->
-    Common.tagged "AbilityTriggered" . Just . Common.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec pid, TriggerCondition.toJson cond]
+    Common.tagged "AbilityTriggered" . Just . Value.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec pid, TriggerCondition.toJson cond]
   GameEvent.ControlChanged oid before after ->
-    Common.tagged "ControlChanged" . Just . Common.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec before, Codec.encode PlayerId.codec after]
+    Common.tagged "ControlChanged" . Just . Value.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec before, Codec.encode PlayerId.codec after]
 
 fromJson :: Value.Value -> Either Text.Text GameEvent.GameEvent
 fromJson value = do

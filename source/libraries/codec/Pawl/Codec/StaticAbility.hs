@@ -20,7 +20,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 -- means the effect ends with its permanent.
 toJson :: StaticAbility.StaticAbility -> Value.Value
 toJson sa =
-  Common.object
+  Value.object
     ( Common.requiredPair "affected" Affected.toJson (StaticAbility.affected sa)
         <> Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (StaticAbility.condition sa)
         <> Common.optionalPair "lingers" Nothing (Common.encodeMaybe Duration.toJson) (StaticAbility.lingers sa)

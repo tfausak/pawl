@@ -27,7 +27,7 @@ import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 toJson :: ActivationRestriction.ActivationRestriction -> Value.Value
 toJson t = case t of
   ActivationRestriction.SorcerySpeed -> Common.nullary "SorcerySpeed"
-  ActivationRestriction.DuringPhase sel sc -> Common.tagged "DuringPhase" . Just . Common.array $ [Codec.encode PhaseSelector.codec sel, TurnScope.toJson sc]
+  ActivationRestriction.DuringPhase sel sc -> Common.tagged "DuringPhase" . Just . Value.array $ [Codec.encode PhaseSelector.codec sel, TurnScope.toJson sc]
   ActivationRestriction.AttackedThisStep -> Common.nullary "AttackedThisStep"
 
 fromJson :: Value.Value -> Either Text.Text ActivationRestriction.ActivationRestriction

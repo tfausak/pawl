@@ -1,4 +1,3 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Building a codec for a tagged sum from its arms.
@@ -14,6 +13,7 @@ module Pawl.JsonCodec.Arm where
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -21,15 +21,20 @@ import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.JsonSchema.Name as Name
 import qualified Pawl.JsonSchema.Schema as Schema
 
-data Arm a where
-  Nullary :: String -> a -> Arm a
-  Payload :: String -> Codec.Codec b -> (b -> a) -> Arm a
+-- | 'Payload' stores the element codec's decoder and schema rather than the
+-- codec itself, so the element type does not escape into an existential and
+-- this stays an ordinary sum. 'Nullary' is not a special case of it: a nullary
+-- arm's schema carries no @value@ property at all, and its decode ignores one
+-- that is present.
+data Arm a
+  = Nullary String a
+  | Payload String (Value.Value -> Either Text.Text a) (Define.SchemaM Schema.Schema)
 
 nullary :: String -> a -> Arm a
 nullary = Nullary
 
 payload :: String -> Codec.Codec b -> (b -> a) -> Arm a
-payload = Payload
+payload t c inject = Payload t (fmap inject . Codec.decode c) (Codec.schema c)
 
 tag :: Arm a -> String
 tag arm = case arm of
@@ -55,7 +60,7 @@ tagged enc arms =
         case List.find ((== t) . tag) arms of
           Nothing -> Left . Text.pack $ "unknown " <> name <> ": " <> t
           Just (Nullary _ x) -> Right x
-          Just (Payload _ c inject) -> fmap inject (Common.withValue mv (Codec.decode c)),
+          Just (Payload _ dec _) -> Common.withValue mv dec,
       Codec.schema = Define.define (Name.typeName proxy) $ do
         schemas <- traverse armSchema arms
         pure (Schema.oneOf schemas)
@@ -67,7 +72,7 @@ tagged enc arms =
 armSchema :: Arm a -> Define.SchemaM Schema.Schema
 armSchema arm = case arm of
   Nullary t _ -> pure (armObject t Nothing)
-  Payload t c _ -> fmap (armObject t . Just) (Codec.schema c)
+  Payload t _ s -> fmap (armObject t . Just) s
 
 -- | No @additionalProperties: false@: 'Common.asTagged' ignores unknown keys,
 -- and a nullary arm ignores a @value@ outright, so forbidding them would reject
@@ -75,10 +80,10 @@ armSchema arm = case arm of
 -- 'Common.withValue' fails without it.
 armObject :: String -> Maybe Schema.Schema -> Schema.Schema
 armObject t ms =
-  let typePair = Common.pair "type" (Schema.unwrap (Schema.constant (Text.pack t)))
+  let typePair = Pair.fromString "type" (Schema.unwrap (Schema.constant (Text.pack t)))
    in case ms of
         Nothing -> Schema.object [typePair] [Text.pack "type"]
         Just s ->
           Schema.object
-            [typePair, Common.pair "value" (Schema.unwrap s)]
+            [typePair, Pair.fromString "value" (Schema.unwrap s)]
             [Text.pack "type", Text.pack "value"]

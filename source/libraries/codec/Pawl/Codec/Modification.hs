@@ -18,8 +18,8 @@ toJson :: Modification.Modification -> Value.Value
 toJson m = case m of
   Modification.GainKeyword k -> Common.tagged "GainKeyword" . Just $ Keyword.toJson k
   Modification.LoseAllAbilities -> Common.nullary "LoseAllAbilities"
-  Modification.SetBasePowerToughness p t -> Common.tagged "SetBasePowerToughness" . Just . Common.array $ [Quantity.toJson p, Quantity.toJson t]
-  Modification.ModifyPowerToughness p t -> Common.tagged "ModifyPowerToughness" . Just . Common.array $ [Quantity.toJson p, Quantity.toJson t]
+  Modification.SetBasePowerToughness p t -> Common.tagged "SetBasePowerToughness" . Just . Value.array $ [Quantity.toJson p, Quantity.toJson t]
+  Modification.ModifyPowerToughness p t -> Common.tagged "ModifyPowerToughness" . Just . Value.array $ [Quantity.toJson p, Quantity.toJson t]
   Modification.SetLandSubtype s -> Common.tagged "SetLandSubtype" . Just $ Subtype.toJson s
   Modification.SetLandSubtypeToChosen -> Common.nullary "SetLandSubtypeToChosen"
   Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Subtype.toJson s
@@ -28,7 +28,7 @@ toJson m = case m of
   Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ CardType.toJson c
   Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Supertype.toJson t
   Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Supertype.toJson t
-  Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Common.array $ [Subtype.toJson a, Subtype.toJson b]
+  Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Value.array $ [Subtype.toJson a, Subtype.toJson b]
   Modification.SetController p -> Common.tagged "SetController" . Just $ Codec.encode PlayerId.codec p
   Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
   Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet Color.toJson cs

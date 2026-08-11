@@ -18,7 +18,7 @@ toJson :: Expiry.Expiry -> Value.Value
 toJson e = case e of
   Expiry.AtCleanup -> Common.nullary "AtCleanup"
   Expiry.Never -> Common.nullary "Never"
-  Expiry.While p c -> Common.tagged "While" . Just . Common.array $ [Codec.encode PlayerId.codec p, Condition.toJson c]
+  Expiry.While p c -> Common.tagged "While" . Just . Value.array $ [Codec.encode PlayerId.codec p, Condition.toJson c]
   Expiry.AtTurnOf p -> Common.tagged "AtTurnOf" . Just $ Codec.encode PlayerId.codec p
   Expiry.AtEndOf sel -> Common.tagged "AtEndOf" . Just $ Codec.encode PhaseSelector.codec sel
 

@@ -23,19 +23,19 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 toJson :: ReplacementEffect.ReplacementEffect -> Value.Value
 toJson re = case re of
   ReplacementEffect.ZoneChangeR p z ->
-    Common.tagged "ZoneChangeR" . Just . Common.array $ [ZoneChangePattern.toJson p, Zone.toJson z]
+    Common.tagged "ZoneChangeR" . Just . Value.array $ [ZoneChangePattern.toJson p, Zone.toJson z]
   ReplacementEffect.EntryR p r ->
-    Common.tagged "EntryR" . Just . Common.array $ [Filter.toJson Keyword.toJson p, EntryRewrite.toJson r]
+    Common.tagged "EntryR" . Just . Value.array $ [Filter.toJson Keyword.toJson p, EntryRewrite.toJson r]
   ReplacementEffect.DamageR p r ->
-    Common.tagged "DamageR" . Just . Common.array $ [DamagePattern.toJson p, DamageRewrite.toJson r]
+    Common.tagged "DamageR" . Just . Value.array $ [DamagePattern.toJson p, DamageRewrite.toJson r]
   ReplacementEffect.DestructionR r ->
     Common.tagged "DestructionR" . Just $ DestructionRewrite.toJson r
   ReplacementEffect.CounterR p sc ->
-    Common.tagged "CounterR" . Just . Common.array $ [CounterPattern.toJson p, Scaling.toJson sc]
+    Common.tagged "CounterR" . Just . Value.array $ [CounterPattern.toJson p, Scaling.toJson sc]
   ReplacementEffect.TokenR p sc ->
-    Common.tagged "TokenR" . Just . Common.array $ [TokenPattern.toJson p, Scaling.toJson sc]
+    Common.tagged "TokenR" . Just . Value.array $ [TokenPattern.toJson p, Scaling.toJson sc]
   ReplacementEffect.TurnUpR p r ->
-    Common.tagged "TurnUpR" . Just . Common.array $ [Filter.toJson Keyword.toJson p, TurnUpRewrite.toJson r]
+    Common.tagged "TurnUpR" . Just . Value.array $ [Filter.toJson Keyword.toJson p, TurnUpRewrite.toJson r]
   ReplacementEffect.PhaseR p ->
     Common.tagged "PhaseR" . Just $ Codec.encode PhasePattern.codec p
 

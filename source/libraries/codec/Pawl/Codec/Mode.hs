@@ -11,7 +11,7 @@ import qualified Pawl.Types.Mode as Mode
 
 toJson :: (Eq card) => (card -> Value.Value) -> Mode.Mode card -> Value.Value
 toJson codec m =
-  Common.object $
+  Value.object $
     Common.optionalPair "clauses" Seq.empty (Common.encodeSeq (Clause.toJson codec)) (Mode.clauses m)
       <> Common.optionalPair "targetSpecs" Map.empty TargetSpec.toJsonMap (Mode.targetSpecs m)
 

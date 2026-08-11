@@ -53,7 +53,7 @@ import qualified Pawl.Types.Face as Face
 -- 'Common.optionalPair' omits a key by comparing its value to the default.
 toJson :: (Eq card) => (card -> Value.Value) -> Face.Face card -> Value.Value
 toJson encodeCard f =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.requiredPair "name" CardName.toJson (Face.name f),
       Common.requiredPair "typeLine" TypeLine.toJson (Face.typeLine f),
       Common.optionalPair "manaCost" Nothing (Common.encodeMaybe ManaCost.toJson) (Face.manaCost f),

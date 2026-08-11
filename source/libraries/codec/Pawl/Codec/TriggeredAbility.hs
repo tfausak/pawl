@@ -6,6 +6,7 @@ import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
+import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -13,7 +14,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 toJson :: (Eq card) => (card -> Value.Value) -> TriggeredAbility.TriggeredAbility card -> Value.Value
 toJson codec ta =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.requiredPair "condition" TriggerCondition.toJson (TriggeredAbility.condition ta),
       Common.requiredPair "modal" (Modal.toJson codec) (TriggeredAbility.modal ta),
       Common.optionalPair "intervening" Nothing (Common.encodeMaybe Condition.toJson) (TriggeredAbility.intervening ta)
@@ -37,7 +38,7 @@ fromJson decode value = do
 toJsonDelayed :: (Eq card) => (card -> Value.Value) -> Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card) -> Value.Value
 toJsonDelayed codec m =
   Common.encodeList
-    (\(k, v) -> Common.object [Common.pair "name" (AbilityName.toJson k), Common.pair "ability" (toJson codec v)])
+    (\(k, v) -> Value.object [Pair.fromString "name" (AbilityName.toJson k), Pair.fromString "ability" (toJson codec v)])
     (Map.toAscList m)
 
 fromJsonDelayed :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card))

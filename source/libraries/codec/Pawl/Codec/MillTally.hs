@@ -13,7 +13,7 @@ import qualified Pawl.Types.MillTally as MillTally
 -- is the only caller, and it is what says the value is a mill's tally.
 toJson :: MillTally.MillTally -> Value.Value
 toJson tally =
-  Common.object
+  Value.object
     ( Common.requiredPair "slot" SlotName.toJson (MillTally.slot tally)
         <> Common.requiredPair "filter" (Filter.toJson Keyword.toJson) (MillTally.filter tally)
     )

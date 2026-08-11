@@ -61,11 +61,11 @@ instance Applicative (Fields o) where
 required :: String -> Codec.Codec a -> (o -> a) -> Fields o a
 required key c get =
   MkFields
-    { encodeFields = \o -> [Common.pair key (Codec.encode c (get o))],
+    { encodeFields = \o -> [Pair.fromString key (Codec.encode c (get o))],
       decodeFields = \ps -> Common.field key ps >>= Codec.decode c,
       schemaFields = do
         s <- Codec.schema c
-        pure ([Common.pair key (Schema.unwrap s)], [Text.pack key])
+        pure ([Pair.fromString key (Schema.unwrap s)], [Text.pack key])
     }
 
 -- | A field written only when it differs from a default, absent from the
@@ -80,11 +80,11 @@ defaulted key d c get =
   MkFields
     { encodeFields = \o ->
         let x = get o
-         in if x == d then [] else [Common.pair key (Codec.encode c x)],
+         in if x == d then [] else [Pair.fromString key (Codec.encode c x)],
       decodeFields = Common.defaultedField key d (Codec.decode c),
       schemaFields = do
         s <- Codec.schema c
-        pure ([Common.pair key (Schema.unwrap (Schema.withDefault (Codec.encode c d) s))], [])
+        pure ([Pair.fromString key (Schema.unwrap (Schema.withDefault (Codec.encode c d) s))], [])
     }
 
 -- | Takes no name: @o@ is fixed by the return type, so 'Name.typeName' supplies
@@ -93,7 +93,7 @@ defaulted key d c get =
 object :: forall o. (Typeable.Typeable o) => Fields o o -> Codec.Codec o
 object fields =
   Codec.MkCodec
-    { Codec.encode = Common.object . encodeFields fields,
+    { Codec.encode = Value.object . encodeFields fields,
       Codec.decode = \v -> Common.asObject v >>= decodeFields fields,
       Codec.schema = Define.define (Name.typeName (Typeable.Proxy :: Typeable.Proxy o)) $ do
         (properties, req) <- schemaFields fields

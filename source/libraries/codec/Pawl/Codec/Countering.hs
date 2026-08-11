@@ -10,7 +10,7 @@ import qualified Pawl.Types.Countering as Countering
 
 toJson :: Countering.Countering -> Value.Value
 toJson c =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.requiredPair "spell" ObjectId.toJson (Countering.spell c),
       Common.requiredPair "source" ObjectId.toJson (Countering.source c),
       Common.requiredPair "controller" (Codec.encode PlayerId.codec) (Countering.controller c)
