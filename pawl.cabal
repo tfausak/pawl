@@ -498,6 +498,8 @@ library json-codec
     Pawl.JsonCodec.Codec
     Pawl.JsonCodec.Common
     Pawl.JsonCodec.CommonSpec
+    Pawl.JsonCodec.Fields
+    Pawl.JsonCodec.FieldsSpec
 
 -- RFC 6901 compliant JSON pointer types and evaluator.
 library json-pointer
