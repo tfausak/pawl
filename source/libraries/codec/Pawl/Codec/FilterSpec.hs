@@ -220,6 +220,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.IsRenowned
       """ {"type":"IsRenowned"} """
+  Spec.it s "IsSuspected" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsSuspected
+      """ {"type":"IsSuspected"} """
   -- CR 122.1's presence read, the one Filter atom with a CounterKind payload.
   Spec.it s "HasCounters" $
     Common.assertJsonCodec

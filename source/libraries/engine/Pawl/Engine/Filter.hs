@@ -199,7 +199,8 @@ data View = MkView
     -- the same way.
     monstrous :: Bool,
     -- CR 701.60b: does this candidate have the SUSPECTED designation? Read off
-    -- Object.suspected, `renowned` above in every respect. Its one reader is
+    -- Object.suspected, `renowned` above in every respect. Read by this module's
+    -- own Filter.IsSuspected arm (Rune-Brand Juggler's sacrifice cost) and by
     -- Pawl.Engine.Quantity's IsSuspected arm, answering Repeat Offender's clause
     -- condition. What CR 701.60c hangs off the designation does NOT come through
     -- here: Pawl.Engine.Projection.designationGathered and
@@ -483,6 +484,12 @@ matches context view predicate = case predicate of
   -- incarnation simply arrives without it. Asks nothing of the perspective,
   -- unlike the arm above -- the designation belongs to no player.
   Filter.IsRenowned -> renowned view
+  -- CR 701.60b's designation, asked of the CANDIDATE. IsRenowned's live read
+  -- above in every respect: CR 701.60a ends the designation when the permanent
+  -- leaves the battlefield, and CR 400.7's new incarnation arrives without it, so
+  -- nothing is stamped on the candidate. NOT the menace or the can't-block CR
+  -- 701.60c hangs off it -- a permanent can have either from somewhere else.
+  Filter.IsSuspected -> suspected view
   -- CR 122.1, asked of the CANDIDATE: has it one or more counters of the kind?
   -- IsRenowned's live read, of counters instead of a designation: CR 400.7's new
   -- incarnation arrives with none, so nothing is stamped on the candidate.
@@ -556,6 +563,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsTapped -> predicate
   Filter.IsRingBearer -> predicate
   Filter.IsRenowned -> predicate
+  Filter.IsSuspected -> predicate
   -- Rewritten THROUGH the kind: CR 122.1b's keyword counter carries a keyword,
   -- and rule 612.1 reaches a word inside one exactly as it does in HasKeyword
   -- above. Every other kind names no word to swap.
