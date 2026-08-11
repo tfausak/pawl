@@ -1908,6 +1908,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- how many lands, never which spells.
   PlayerEffect.PlayAdditionalLands _ -> []
   PlayerEffect.NoMaximumHandSize -> []
+  -- CR 402.2 carries a bare count of cards for the same reason: it names how many
+  -- cards a hand may hold, never which spells.
+  PlayerEffect.SetMaximumHandSize _ -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a player effect names.
   PlayerEffect.DontLoseUnspentMana _ -> []
@@ -1970,6 +1973,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantPlayLandChosenName -> False
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.SetMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -2003,6 +2007,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantPlayLandChosenName -> False
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.SetMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False

@@ -28,10 +28,11 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- 611.2b). Only AtCleanup has a producer; no card arms While or AtTurnOf on this
 -- carrier (#97).
 --
--- `timestamp` is stored even though nothing observes it yet: CR 613.10 and 613.11
--- order by timestamp (CR 613.7), but no two of the current constructors conflict.
--- Stamping at creation is free; retrofitting an order onto stored effects is
--- not (#93).
+-- `timestamp` is CR 613.7b's stamp, taken as the effect began, and it is READ:
+-- Pawl.Engine.PlayerEffect.applying merges these rows into the printed carrier's
+-- by it, so CR 613.10's and CR 613.11's timestamp order holds across the two
+-- carriers rather than within each (Pawl.PlayerEffectSpec's Sea Gate Restoration
+-- against The Ten Rings is the proof).
 --
 -- Runtime-only, like Expiry and ActiveReplacement: no codec, which keeps a stored
 -- value out of a card file and a printed value out of the store.

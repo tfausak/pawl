@@ -31,6 +31,12 @@
 -- static ability discounts is printed text like any other, so a text change moves
 -- the discount off it.
 --
+-- The Ten Rings and Sea Gate Restoration are the CR 613.11 TIMESTAMP pair, and
+-- they are a pair on purpose: a set maximum hand size and a removed one disagree,
+-- so which of them entered later decides the answer -- and one rides each carrier,
+-- which is where pawl's order used to come apart (Reliquary Tower is the third
+-- card in the group, and its ruling is the authority for the reading).
+--
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
@@ -1809,6 +1815,129 @@ reliquaryTowerSpec s registry =
       let board = reliquaryHandOfNine plains [reliquaryTower, bloodMoon]
       Spec.assertEqWith s "seven again" (PlayerEffect.maximumHandSize S.alice board) (Just 7)
 
+-- alice's board with BOTH maximum-hand-size effects live, built in one of the two
+-- orders: `ringsFirst` decides whether The Ten Rings' printed CR 613.7a effect is
+-- older or newer than Sea Gate Restoration's stored CR 613.7b one.
+--
+-- The two CARRIERS are the point, and no board of two permanents can replace them.
+-- A permanent takes a fresh ObjectId every time it arrives (Event.placeObject), so
+-- GameState.battlefield's Set walks two printed carriers in the very order their
+-- timestamps give, and a board of two printed effects cannot tell the readings
+-- apart. Printed against STORED can: the gather concatenates the two lists, so
+-- without the sort every stored effect is read last whatever its stamp.
+--
+-- Five Plains in hand, ten in the library: the sorcery draws hand-plus-one, so
+-- alice ends on eleven cards -- one over The Ten Rings' maximum, which is what
+-- makes the cleanup discard tell the two readings apart. The library is stocked
+-- past the draw so CR 104.3c decks nobody.
+ringsAndRestoration :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+ringsAndRestoration ringsFirst plains island tenRings restoration =
+  let gs0 = Setup.emptyGame S.bothPlayers
+      add printing g _ = snd (S.addCreature printing S.alice g)
+      stockHand g _ = snd (S.addHandCard plains S.alice g)
+      stockLibrary g _ = snd (S.addLibraryCard plains S.alice g)
+      -- Seven Islands, because the sorcery costs {4}{U}{U}{U} and is CAST rather
+      -- than placed on the stack: a modal double-faced card put there by hand has
+      -- no chosen half, and CR 712.11b makes that choice part of casting it.
+      withLands = List.foldl' (add island) gs0 [1 .. 7 :: Int]
+      stocked = List.foldl' stockLibrary (List.foldl' stockHand withLands [1 .. 5 :: Int]) [1 .. 10 :: Int]
+      (spellId, withSpell) = S.addHandCard restoration S.alice stocked
+      ready =
+        withSpell
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      frontName = CardName.MkCardName (Text.pack "Sea Gate Restoration")
+      cast g = S.runPure S.identityAnswer g (Cast.castSpell S.alice spellId frontName Facing.FaceUp)
+      resolve g = S.runPure S.identityAnswer g Stack.resolveTop
+      rings = S.addCreature tenRings S.alice
+   in if ringsFirst
+        then let (ringsId, withRings) = rings ready in (resolve (cast withRings), ringsId)
+        else let (ringsId, withRings) = rings (resolve (cast ready)) in (withRings, ringsId)
+
+-- The Ten Rings, a Legendary Artifact: "Your maximum hand size is ten." Its
+-- end-step draw-to-ten ability is not implemented (#1239).
+--
+-- Sea Gate Restoration, the front face of a modal double-faced card: "Draw cards
+-- equal to the number of cards in your hand plus one. You have no maximum hand
+-- size for the rest of the game." Its back face Sea Gate, Reborn always enters
+-- tapped -- the "you may pay 3 life" that buys it in untapped is not implemented
+-- (#1240).
+--
+-- Together they are the pair CR 613.11's timestamp order decides, one on each
+-- carrier: a SET maximum and a REMOVED one disagree, and Reliquary Tower's own
+-- ruling says the later of the two wins. Both orders are built, so neither answer
+-- can be reached by a fold that ignores the order.
+theTenRingsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+theTenRingsSpec s registry =
+  Spec.describe s "TheTenRings" $ do
+    Spec.it s "CR 402.2 alone it sets the maximum to ten" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      Spec.assertEqWith s "ten" (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [tenRings])) (Just 10)
+
+    -- CR 514.1: nine cards is under the ten it allows, so the cleanup discard
+    -- that trims a default hand of nine to seven trims nothing here.
+    Spec.it s "CR 514.1 nine cards at cleanup discards nothing" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      let after = reliquaryCleanup (reliquaryHandOfNine plains [tenRings])
+      Spec.assertEqWith s "hand keeps nine" (S.handSize S.alice after) 9
+      Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+    -- CR 109.5: the You scope, as for the Tower. bob's hand is still CR 402.2's
+    -- seven.
+    Spec.it s "CR 109.5 the opponent's maximum is untouched" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      Spec.assertEqWith s "seven" (PlayerEffect.maximumHandSize S.bob (reliquaryHandOfNine plains [tenRings])) (Just 7)
+
+    -- The fixture's own claim, asserted rather than assumed: the stored effect
+    -- really is the OLDER of the two on this board, so the gather has to move it
+    -- ahead of the printed one it is concatenated behind. Without this the case
+    -- below could pass on a board where the two orders agreed.
+    Spec.it s "CR 613.7 the stored effect is older than the printed one" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      restoration <- S.printingOf s registry "Sea Gate Restoration"
+      island <- S.printingOf s registry "Island"
+      let (board, ringsId) = ringsAndRestoration False plains island tenRings restoration
+      Spec.assertEqWith s "one stored effect" (fmap ActivePlayerEffect.effect (GameState.playerEffects board)) [PlayerEffect.Type.NoMaximumHandSize]
+      Spec.assertEqWith
+        s
+        "and it began before The Ten Rings entered"
+        (fmap (\stored -> Just (ActivePlayerEffect.timestamp stored) < fmap Object.timestamp (Game.lookupObject ringsId board)) (GameState.playerEffects board))
+        [True]
+
+    Spec.it s "CR 613.11 The Ten Rings entering after Sea Gate Restoration resolved sets the maximum to ten" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      restoration <- S.printingOf s registry "Sea Gate Restoration"
+      island <- S.printingOf s registry "Island"
+      let (board, _) = ringsAndRestoration False plains island tenRings restoration
+      Spec.assertEqWith s "the sorcery drew hand-plus-one" (S.handSize S.alice board) 11
+      Spec.assertEqWith s "ten" (PlayerEffect.maximumHandSize S.alice board) (Just 10)
+      let after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards down to ten" (S.handSize S.alice after) 10
+      -- The resolved sorcery is the graveyard's other card (CR 608.2n).
+      Spec.assertEqWith s "one card discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+
+    -- THE CONTROL, the same board with the two built in the other order and
+    -- nothing else changed: same seats, same five Plains held, same ten stocked,
+    -- same two cards.
+    Spec.it s "CR 613.11 Sea Gate Restoration resolving after The Ten Rings entered removes the maximum" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      restoration <- S.printingOf s registry "Sea Gate Restoration"
+      island <- S.printingOf s registry "Island"
+      let (board, _) = ringsAndRestoration True plains island tenRings restoration
+      Spec.assertEqWith s "the sorcery drew hand-plus-one" (S.handSize S.alice board) 11
+      Spec.assertEqWith s "no maximum" (PlayerEffect.maximumHandSize S.alice board) Nothing
+      let after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards nothing" (S.handSize S.alice after) 11
+      Spec.assertEqWith s "and only the resolved sorcery is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
 -- Seed a stored player effect keyed to a REAL battlefield object, not
 -- S.addPlayerEffect's stand-in id 998 -- so a S.youControlSource condition
 -- check has something to genuinely hold or fail against. Mirrors
@@ -3306,6 +3435,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   hybridDiscountSpec s registry
   textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
+  theTenRingsSpec s registry
   storedSpec s registry
   silenceSpec s registry
   extraLandDropsSpec s registry
