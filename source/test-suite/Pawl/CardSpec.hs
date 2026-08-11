@@ -364,6 +364,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.IsRenowned -> []
   Quantity.Type.IsMonstrous -> []
   Quantity.Type.IsSuspected -> []
+  Quantity.Type.WasKicked -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters _ _ -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
@@ -1549,6 +1550,7 @@ keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
   Keyword.Cycling cost mFilter -> costFilters cost <> Maybe.maybeToList mFilter
   Keyword.Flashback cost -> costFilters cost
+  Keyword.Kicker cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.37a: the morph cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.

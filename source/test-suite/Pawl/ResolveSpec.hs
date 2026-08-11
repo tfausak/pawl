@@ -620,7 +620,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
               Object.monstrous = False,
-              Object.suspected = False
+              Object.suspected = False,
+              Object.kicked = False
             }
         g4 =
           g3
@@ -669,7 +670,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
               Object.monstrous = False,
-              Object.suspected = False
+              Object.suspected = False,
+              Object.kicked = False
             }
         g3 =
           g2
@@ -720,7 +722,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
               Object.monstrous = False,
-              Object.suspected = False
+              Object.suspected = False,
+              Object.kicked = False
             }
         g3 =
           g2
@@ -746,7 +749,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -759,7 +762,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
+        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -785,7 +788,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -809,7 +812,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -856,7 +859,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
               Object.monstrous = False,
-              Object.suspected = False
+              Object.suspected = False,
+              Object.kicked = False
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -922,7 +926,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
               Object.monstrous = False,
-              Object.suspected = False
+              Object.suspected = False,
+              Object.kicked = False
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
         resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
@@ -999,7 +1004,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
               Object.monstrous = False,
-              Object.suspected = False
+              Object.suspected = False,
+              Object.kicked = False
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -1084,7 +1090,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
               Object.monstrous = False,
-              Object.suspected = False
+              Object.suspected = False,
+              Object.kicked = False
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
         after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
@@ -1168,7 +1175,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
               Object.monstrous = False,
-              Object.suspected = False
+              Object.suspected = False,
+              Object.kicked = False
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
         after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
@@ -1380,7 +1388,8 @@ installControlBy mindslaver controller target gs0 =
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
             Object.monstrous = False,
-            Object.suspected = False
+            Object.suspected = False,
+            Object.kicked = False
           }
       gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
    in snd (Engine.runGamePure S.identityAnswer gs4 Stack.resolveTop)
@@ -1462,7 +1471,8 @@ twoBoltState piker mountain lightningBolt =
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
             Object.monstrous = False,
-            Object.suspected = False
+            Object.suspected = False,
+            Object.kicked = False
           }
    in gs2
         { GameState.objects = Map.insert oid2 obj (GameState.objects gs2),
@@ -1486,7 +1496,7 @@ cancelVictim island cancel victim =
 handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handAppend printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
+      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -2684,7 +2694,7 @@ handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
   where
     addOne g =
       let (oid, g1) = Game.freshObjectId g
-          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
+          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
        in g1
             { GameState.objects = Map.insert oid obj (GameState.objects g1),
               GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)

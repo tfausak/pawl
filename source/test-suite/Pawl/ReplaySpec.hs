@@ -40,6 +40,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
@@ -172,6 +173,51 @@ combatReplaySpec s =
                 )
             )
             EntwineDecision.Declines
+        -- CR 702.33d: whether the kicker cost was paid decides what the spell
+        -- does on resolution, so a transcript that lost it would replay a
+        -- different spell. Both answers are checked, for ChooseEntwine's reason.
+        Spec.it s "ChooseKicker records and replays a KickerDecision" $ do
+          let kickerCost =
+                Cost.Type.MkCost
+                  { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
+                    Cost.Type.components = []
+                  }
+              p = Prompt.ChooseKicker decider S.alice oid kickerCost
+          Spec.assertEqWith
+            s
+            "kicking round trips"
+            (Replay.decode p (Replay.encode p KickerDecision.Kicks))
+            (Just KickerDecision.Kicks)
+          Spec.assertEqWith
+            s
+            "declining round trips"
+            (Replay.decode p (Replay.encode p KickerDecision.Declines))
+            (Just KickerDecision.Declines)
+          -- Discriminating: fails if ChooseKicker reuses the entwine
+          -- announcement rather than getting its own constructor.
+          Spec.assertEqWith
+            s
+            "an entwine announcement is not a kicker announcement"
+            (Replay.decode p (Response.AnnouncedEntwine EntwineDecision.Entwines))
+            Nothing
+        Spec.it s "a short transcript declines the kicker" $
+          -- CR 702.33a: declining is always legal and costs nothing, so it is
+          -- the least-eventful fallback when a transcript runs short.
+          Spec.assertEqWith
+            s
+            "declines"
+            ( Replay.defaultAnswer
+                ( Prompt.ChooseKicker
+                    decider
+                    S.alice
+                    oid
+                    Cost.Type.MkCost
+                      { Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]),
+                        Cost.Type.components = []
+                      }
+                )
+            )
+            KickerDecision.Declines
         Spec.it s "ChooseCopyTarget records and replays a Maybe ObjectId" $ do
           let p = Prompt.ChooseCopyTarget decider S.alice oid [ObjectId.MkObjectId 7]
               answer = Just (ObjectId.MkObjectId 7)

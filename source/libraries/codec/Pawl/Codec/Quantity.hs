@@ -42,6 +42,7 @@ toJson q = case q of
   Quantity.IsRenowned -> Common.nullary "IsRenowned"
   Quantity.IsMonstrous -> Common.nullary "IsMonstrous"
   Quantity.IsSuspected -> Common.nullary "IsSuspected"
+  Quantity.WasKicked -> Common.nullary "WasKicked"
   -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted comes
   -- from the combat record rather than from anything the card names.
   Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ PlayerRef.toJson p
@@ -79,6 +80,7 @@ fromJson value = do
     ("IsRenowned", _) -> Right Quantity.IsRenowned
     ("IsMonstrous", _) -> Right Quantity.IsMonstrous
     ("IsSuspected", _) -> Right Quantity.IsSuspected
+    ("WasKicked", _) -> Right Quantity.WasKicked
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
     ("CardsDiscardedThisTurn", Just v) -> Quantity.CardsDiscardedThisTurn <$> PlayerRef.fromJson v
     ("BlockersBeyondFirst", _) -> Right Quantity.BlockersBeyondFirst
