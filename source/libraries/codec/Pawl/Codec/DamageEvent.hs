@@ -6,6 +6,7 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.DamageEvent as DamageEvent
 
@@ -21,7 +22,7 @@ toJson ev =
         <> Common.optionalPair "dealtByToxic" 0 Common.encodeNatural (DamageEvent.dealtByToxic ev)
         -- CR 702.15b's answer is a player or nobody, so Nothing (no lifelink at
         -- deal time) is what an absent key means.
-        <> Common.optionalPair "dealtByLifelink" Nothing (Common.encodeMaybe PlayerId.toJson) (DamageEvent.dealtByLifelink ev)
+        <> Common.optionalPair "dealtByLifelink" Nothing (Common.encodeMaybe (Codec.encode PlayerId.codec)) (DamageEvent.dealtByLifelink ev)
         <> Common.requiredPair "kind" DamageKind.toJson (DamageEvent.kind ev)
     )
 
@@ -35,7 +36,7 @@ fromJson value = do
   i <- Common.defaultedField "dealtByInfect" False Common.asBoolean ps
   w <- Common.defaultedField "dealtByWither" False Common.asBoolean ps
   x <- Common.defaultedField "dealtByToxic" 0 Common.decodeNatural ps
-  l <- Common.defaultedField "dealtByLifelink" Nothing (Common.decodeMaybe PlayerId.fromJson) ps
+  l <- Common.defaultedField "dealtByLifelink" Nothing (Common.decodeMaybe (Codec.decode PlayerId.codec)) ps
   k <- Common.field "kind" ps >>= DamageKind.fromJson
   pure
     DamageEvent.MkDamageEvent

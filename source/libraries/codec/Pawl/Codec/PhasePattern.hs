@@ -18,12 +18,12 @@ toJson :: PhasePattern.PhasePattern -> Value.Value
 toJson p =
   Common.object
     ( Common.requiredPair "whichPhase" (Codec.encode PhaseSelector.codec) (PhasePattern.whichPhase p)
-        <> Common.optionalPair "whosePhase" Nothing (Common.encodeMaybe PlayerId.toJson) (PhasePattern.whosePhase p)
+        <> Common.optionalPair "whosePhase" Nothing (Common.encodeMaybe (Codec.encode PlayerId.codec)) (PhasePattern.whosePhase p)
     )
 
 fromJson :: Value.Value -> Either Text.Text PhasePattern.PhasePattern
 fromJson value = do
   ps <- Common.asObject value
   p <- Common.field "whichPhase" ps >>= Codec.decode PhaseSelector.codec
-  w <- Common.defaultedField "whosePhase" Nothing (Common.decodeMaybe PlayerId.fromJson) ps
+  w <- Common.defaultedField "whosePhase" Nothing (Common.decodeMaybe (Codec.decode PlayerId.codec)) ps
   pure PhasePattern.MkPhasePattern {PhasePattern.whichPhase = p, PhasePattern.whosePhase = w}

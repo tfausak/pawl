@@ -57,6 +57,7 @@ library codec
     containers ^>=0.8,
     pawl:json,
     pawl:json-codec,
+    pawl:json-schema,
     pawl:spec,
     pawl:types,
     text ^>=2.1.3,

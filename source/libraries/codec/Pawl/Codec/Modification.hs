@@ -10,6 +10,7 @@ import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Modification as Modification
 
@@ -28,7 +29,7 @@ toJson m = case m of
   Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Supertype.toJson t
   Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Supertype.toJson t
   Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Common.array $ [Subtype.toJson a, Subtype.toJson b]
-  Modification.SetController p -> Common.tagged "SetController" . Just $ PlayerId.toJson p
+  Modification.SetController p -> Common.tagged "SetController" . Just $ Codec.encode PlayerId.codec p
   Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
   Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet Color.toJson cs
   Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Common.encodeSet Color.toJson cs
@@ -55,7 +56,7 @@ fromJson value = do
     "AddSupertype" -> Common.withValue mv (fmap Modification.AddSupertype . Supertype.fromJson)
     "RemoveSupertype" -> Common.withValue mv (fmap Modification.RemoveSupertype . Supertype.fromJson)
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> Subtype.fromJson x <*> Subtype.fromJson y
-    "SetController" -> Common.withValue mv (fmap Modification.SetController . PlayerId.fromJson)
+    "SetController" -> Common.withValue mv (fmap Modification.SetController . Codec.decode PlayerId.codec)
     "SetControllerToSource" -> Right Modification.SetControllerToSource
     "SetColor" -> Common.withValue mv (fmap Modification.SetColor . Common.decodeSet Color.fromJson)
     "AddColor" -> Common.withValue mv (fmap Modification.AddColor . Common.decodeSet Color.fromJson)

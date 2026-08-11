@@ -10,6 +10,7 @@ import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TurnWindow as TurnWindow
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 
@@ -18,7 +19,7 @@ toJson d =
   Common.object . concat $
     [ Common.requiredPair "ability" (TriggeredAbility.toJson Card.toJson) (DelayedTrigger.ability d),
       Common.requiredPair "source" ObjectId.toJson (DelayedTrigger.source d),
-      Common.requiredPair "controller" PlayerId.toJson (DelayedTrigger.controller d),
+      Common.requiredPair "controller" (Codec.encode PlayerId.codec) (DelayedTrigger.controller d),
       Common.optionalPair "bindings" Map.empty Binding.toJsonMap (DelayedTrigger.bindings d),
       -- CR 603.7a: TurnWindow.AnyTurn for an ability armed with no onset gate.
       -- Always present, unlike the expiry below, because "no restriction" is
@@ -33,7 +34,7 @@ fromJson value = do
   ps <- Common.asObject value
   a <- Common.field "ability" ps >>= TriggeredAbility.fromJson Card.fromJson
   s <- Common.field "source" ps >>= ObjectId.fromJson
-  c <- Common.field "controller" ps >>= PlayerId.fromJson
+  c <- Common.field "controller" ps >>= Codec.decode PlayerId.codec
   b <- Common.defaultedField "bindings" Map.empty Binding.fromJsonMap ps
   w <- Common.field "window" ps >>= TurnWindow.fromJson
   e <- Common.defaultedField "expiry" Nothing (Common.decodeMaybe Expiry.fromJson) ps
