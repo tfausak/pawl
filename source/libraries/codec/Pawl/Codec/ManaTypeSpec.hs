@@ -11,16 +11,16 @@ import qualified Pawl.Types.ManaType as ManaType
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ManaType" $ do
   Spec.it s "Colored" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ManaType.toJson
-      ManaType.fromJson
+      ManaType.codec
       (ManaType.Colored Color.Red)
       """ {"type":"Colored","value":{"type":"Red"}} """
   Spec.it s "Colorless" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ManaType.toJson
-      ManaType.fromJson
+      ManaType.codec
       ManaType.Colorless
       """ {"type":"Colorless"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s ManaType.codec

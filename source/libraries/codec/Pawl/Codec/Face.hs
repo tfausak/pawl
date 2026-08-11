@@ -58,7 +58,7 @@ toJson encodeCard f =
   Value.object . concat $
     [ Common.requiredPair "name" CardName.toJson (Face.name f),
       Common.requiredPair "typeLine" TypeLine.toJson (Face.typeLine f),
-      Common.optionalPair "manaCost" Nothing (Common.encodeMaybe ManaCost.toJson) (Face.manaCost f),
+      Common.optionalPair "manaCost" Nothing (Common.encodeMaybe (Codec.encode ManaCost.codec)) (Face.manaCost f),
       Common.optionalPair "power" Nothing (Common.encodeMaybe Power.toJson) (Face.power f),
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Toughness.toJson) (Face.toughness f),
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe Loyalty.toJson) (Face.loyalty f),
@@ -101,7 +101,7 @@ fromJson decodeCard value = do
   ps <- Common.asObject value
   name <- Common.field "name" ps >>= CardName.fromJson
   typeLine <- Common.field "typeLine" ps >>= TypeLine.fromJson
-  manaCost <- Common.defaultedField "manaCost" Nothing (Common.decodeMaybe ManaCost.fromJson) ps
+  manaCost <- Common.defaultedField "manaCost" Nothing (Common.decodeMaybe (Codec.decode ManaCost.codec)) ps
   power <- Common.defaultedField "power" Nothing (Common.decodeMaybe Power.fromJson) ps
   toughness <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Toughness.fromJson) ps
   loyalty <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe Loyalty.fromJson) ps

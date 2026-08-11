@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Cost as Cost
 
@@ -12,7 +13,7 @@ import qualified Pawl.Types.Cost as Cost
 toJson :: (Eq keyword) => (keyword -> Value.Value) -> Cost.Cost keyword -> Value.Value
 toJson encode c =
   Value.object
-    ( Common.requiredPair "mana" (Common.encodeMaybe ManaCost.toJson) (Cost.mana c)
+    ( Common.requiredPair "mana" (Common.encodeMaybe (Codec.encode ManaCost.codec)) (Cost.mana c)
         <> Common.optionalPair "components" [] (Common.encodeList (CostComponent.toJson encode)) (Cost.components c)
     )
 
@@ -23,6 +24,6 @@ toJson encode c =
 fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Cost.Cost keyword)
 fromJson decode value = do
   ps <- Common.asObject value
-  m <- Common.field "mana" ps >>= Common.decodeMaybe ManaCost.fromJson
+  m <- Common.field "mana" ps >>= Common.decodeMaybe (Codec.decode ManaCost.codec)
   cs <- Common.defaultedField "components" [] (Common.decodeList (CostComponent.fromJson decode)) ps
   pure Cost.MkCost {Cost.mana = m, Cost.components = cs}
