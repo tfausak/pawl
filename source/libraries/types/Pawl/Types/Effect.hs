@@ -758,9 +758,10 @@ data Effect card
     -- A SlotName, a state write rather than a Modification, and idempotent (CR
     -- 701.60d: "a suspected permanent can't become suspected again"), all for
     -- BecomeRenowned's reasons above -- rule 701.60b words the designation the way
-    -- rule 702.112b words renowned. The slot need not be a binding: Rune-Brand
-    -- Juggler's "suspect up to one target creature you control" names a CR 115.6
-    -- target slot, which is why the resolution reads it through legalOne.
+    -- rule 702.112b words renowned. The slot need not be a reserved binding, and
+    -- the resolution's legalOne read covers both: Person of Interest's names
+    -- Binding.triggerSource, while Rune-Brand Juggler's is a CR 115.6 target slot
+    -- and so carries CR 608.2b's legality with it.
     --
     -- What rule 701.60c hangs off the designation -- menace and "this creature
     -- can't block" -- is NOT written here: those are read off Object.suspected

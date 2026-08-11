@@ -6004,10 +6004,10 @@ repeatOffenderSpec s registry = Spec.describe s "RepeatOffender" $ do
 --
 -- The Filter atom rides a CR 701.21a sacrifice cost, so the designation decides
 -- both whether the ability can be activated at all and which permanent pays for
--- it. Boggart Brute is on the board in every case below and is the pair that
--- separates the designation from what CR 701.60c hangs off it: it has PRINTED
--- menace and is never suspected, so a criterion reading the menace grant instead
--- of the designation would offer it.
+-- it. Boggart Brute is on the board in both cases below, and it is what separates
+-- the designation from what CR 701.60c hangs off it: its menace is PRINTED and it
+-- is never suspected, so a criterion reading the menace grant rather than the
+-- designation would offer it as fodder.
 runeBrandJugglerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 runeBrandJugglerSpec s registry = Spec.describe s "RuneBrandJuggler" $ do
   Spec.it s "CR 701.60b the cost takes the suspected creature, and the menace one is not a candidate" $ do
