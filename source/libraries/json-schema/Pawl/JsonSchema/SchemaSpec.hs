@@ -45,3 +45,28 @@ spec s = Spec.describe s "Pawl.JsonSchema.Schema" $ do
     Spec.assertEq s (Schema.unwrap (Schema.withDefault (str "x") Schema.string))
       . obj
       $ [Value.pair "type" (str "string"), Value.pair "default" (str "x")]
+
+  Spec.it s "boolean is a type keyword" $ do
+    Spec.assertEq s (Schema.unwrap Schema.boolean) . obj $ [Value.pair "type" (str "boolean")]
+
+  Spec.it s "array carries an items schema" $ do
+    Spec.assertEq s (Schema.unwrap (Schema.array Schema.string))
+      . obj
+      $ [Value.pair "type" (str "array"), Value.pair "items" (Schema.unwrap Schema.string)]
+
+  Spec.it s "uniqueArray adds uniqueItems to array" $ do
+    Spec.assertEq s (Schema.unwrap (Schema.uniqueArray Schema.string))
+      . obj
+      $ [ Value.pair "type" (str "array"),
+          Value.pair "items" (Schema.unwrap Schema.string),
+          Value.pair "uniqueItems" (Value.boolean True)
+        ]
+
+  Spec.it s "tupleOf pins prefixItems and both bounds" $ do
+    Spec.assertEq s (Schema.unwrap (Schema.tupleOf [Schema.string, Schema.integer]))
+      . obj
+      $ [ Value.pair "type" (str "array"),
+          Value.pair "prefixItems" (arr [Schema.unwrap Schema.string, Schema.unwrap Schema.integer]),
+          Value.pair "minItems" (Value.integer 2),
+          Value.pair "maxItems" (Value.integer 2)
+        ]

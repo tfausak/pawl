@@ -39,6 +39,32 @@ natural =
 null :: Schema
 null = fromPairs [Value.pair "type" $ Value.string "null"]
 
+boolean :: Schema
+boolean = fromPairs [Value.pair "type" $ Value.string "boolean"]
+
+array :: Schema -> Schema
+array s =
+  fromPairs
+    [ Value.pair "type" $ Value.string "array",
+      Value.pair "items" $ unwrap s
+    ]
+
+uniqueArray :: Schema -> Schema
+uniqueArray s =
+  fromPairs $
+    keywords (array s) <> [Value.pair "uniqueItems" $ Value.boolean True]
+
+tupleOf :: [Schema] -> Schema
+tupleOf ss =
+  fromPairs
+    [ Value.pair "type" $ Value.string "array",
+      Value.pair "prefixItems" . Value.array $ fmap unwrap ss,
+      Value.pair "minItems" $ Value.integer count,
+      Value.pair "maxItems" $ Value.integer count
+    ]
+  where
+    count = toInteger $ length ss
+
 constant :: Text.Text -> Schema
 constant = fromPairs . pure . Value.pair "const" . Value.text
 
