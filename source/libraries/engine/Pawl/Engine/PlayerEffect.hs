@@ -16,6 +16,7 @@
 module Pawl.Engine.PlayerEffect where
 
 import qualified Data.Foldable as Foldable
+import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -100,8 +101,28 @@ playersInScope perspective gs scope =
 -- lets a rules-modifying effect reach objects that were not affected when it
 -- began, so no set is ever frozen on this axis.
 --
--- The (source, controller, scope, effect) rows are local: nothing outside this
--- function sees more than the (source, effect) pair it returns.
+-- The (timestamp, source, controller, scope, effect) rows are local: nothing
+-- outside this function sees more than the (source, effect) pair it returns.
+--
+-- Returned in TIMESTAMP ORDER, which is what CR 613.10 and CR 613.11 both
+-- require. Sorted at this one gather rather than at each consumer, so an ordered
+-- reader cannot be written that forgets to sort: the printed carrier's stamp is
+-- its permanent's (CR 613.7a) and the stored carrier's is the one CR 613.7b gave
+-- it as it began, and the two interleave here rather than the whole battlefield
+-- preceding the whole store.
+--
+-- STABLE, which is what settles the one tie pawl's stamps can produce: two player
+-- abilities printed on ONE permanent share that permanent's timestamp, and CR
+-- 613.7's "in timestamp order" says nothing about their relative order because no
+-- rule can distinguish them -- so they keep the order the card wrote them in. No
+-- other tie exists, since Game.freshTimestamp hands out each stamp once.
+--
+-- The order changes no answer for a cost adjustment, and CR 613.11 is why: it
+-- excepts cost effects from timestamp order and defers to CR 601.2f, which
+-- Pawl.Engine.Cost.applyAdjustments implements itself by applying every increase
+-- before any reduction. Every other consumer here folds order-independently -- a
+-- disjunction of prohibitions (CR 101.2) or a sum of grants (CR 305.2) -- which
+-- leaves maximumHandSize below as the axis's one ordered fold.
 --
 -- The SOURCE rides out alongside the effect, and only because CR 601.3a's
 -- quality-bearing prohibitions read it: Null Chamber's "the chosen names" are
@@ -125,9 +146,18 @@ applying pid gs =
           -- The overwhelming majority of permanents: no ability, so no
           -- controller projection and no CR 305.7 check is paid for.
           [] -> []
-          abilities -> case Projection.controllerOf oid gs of
-            Nothing -> []
-            Just controller ->
+          -- CR 613.7a: a permanent's static ability produces its continuous effect
+          -- with the PERMANENT's timestamp, so the row's order comes off the object
+          -- rather than being minted here. Looked up INSIDE this branch and not
+          -- beside the walk: the `[]` case above has already turned away every
+          -- permanent that prints no player ability, so the ordinary board pays for
+          -- no lookup at all. Nothing is unreachable rather than a guess -- faceOf
+          -- above resolved this id -- and is written only because lookupObject's
+          -- type is honest about ids that do not.
+          abilities -> case (Game.lookupObject oid gs, Projection.controllerOf oid gs) of
+            (Nothing, _) -> []
+            (_, Nothing) -> []
+            (Just object, Just controller) ->
               -- TWO ability losses, exactly the pair Projection.gather asks about
               -- for a permanent's static abilities.
               --
@@ -161,7 +191,7 @@ applying pid gs =
                   -- permanent on the battlefield.
                   let changes = Projection.textChangesAffecting oid gs
                       readAs = if null changes then id else rewritePlayerEffect changes
-                   in fmap (\ability -> (Just oid, controller, PlayerStaticAbility.scope ability, readAs (PlayerStaticAbility.effect ability))) abilities
+                   in fmap (\ability -> (Object.timestamp object, Just oid, controller, PlayerStaticAbility.scope ability, readAs (PlayerStaticAbility.effect ability))) abilities
                 else []
       printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
@@ -178,7 +208,8 @@ applying pid gs =
       -- the spell that made it, whose own text a swap reaches while it is still on
       -- the stack (Pawl.Engine.Projection.rewriteEffect).
       storedOne active =
-        ( Nothing,
+        ( ActivePlayerEffect.timestamp active,
+          Nothing,
           ActivePlayerEffect.controller active,
           ActivePlayerEffect.scope active,
           ActivePlayerEffect.effect active
@@ -193,14 +224,15 @@ applying pid gs =
       -- shortcut: CR 116.2d's subject is "effects from static abilities", and a
       -- stored effect came from a resolution instead (Silence). Those arrive
       -- with source Nothing and so match nothing here.
-      keep (source, controller, scope, _) =
+      keep (_, source, controller, scope, _) =
         inScope pid controller scope
           && not (any (ignores source) (GameState.ignoredAbilities gs))
       ignores source ignored =
         IgnoredAbility.player ignored == pid
           && Just (IgnoredAbility.source ignored) == source
-      effectOf (source, _, _, effect) = (source, effect)
-   in fmap effectOf (filter keep (printed <> stored))
+      effectOf (_, source, _, _, effect) = (source, effect)
+      stampOf (timestamp, _, _, _, _) = timestamp
+   in fmap effectOf (List.sortOn stampOf (filter keep (printed <> stored)))
 
 -- CR 612.1's subtype word swap over a PlayerEffect, the CR 613.10/613.11 axis's
 -- answer to Pawl.Engine.Projection.rewriteModification. An Artificial Evolution
@@ -247,6 +279,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantPlayLandChosenName -> effect
   PlayerEffect.PlayAdditionalLands _ -> effect
   PlayerEffect.NoMaximumHandSize -> effect
+  PlayerEffect.SetMaximumHandSize _ -> effect
   PlayerEffect.DontLoseUnspentMana _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
   PlayerEffect.DamageCantBePrevented _ -> effect
@@ -338,6 +371,7 @@ prohibitsCasting pid name gs =
         -- cast (CR 305.1), so this grant reaches nothing here.
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
         -- shroud may cast anything, and Pawl.Engine.Target.targetable is where
@@ -392,6 +426,7 @@ prohibitsPlayingLand pid name gs =
         -- the gate that reads it.
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         -- CR 305.1 again: a land is never cast, so a permission about the timing
@@ -430,6 +465,7 @@ prohibitsSearching pid gs =
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -468,6 +504,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         -- CR 702.18a/702.11c stop a SPELL from choosing this player as a target.
         -- CR 725.1's effect need not target to crown them (Palace Jailer's "you
@@ -549,6 +586,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -568,6 +606,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -616,6 +655,7 @@ activationCostAdjustments pid srcId gs =
         PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
@@ -675,6 +715,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.ReduceSpellCost _ _ -> False
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
@@ -724,6 +765,7 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         -- CR 701.6a grants no targeting immunity: Pawl.Types.Counterability
@@ -777,6 +819,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.ReduceSpellCost _ _ -> Nothing
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -795,28 +838,41 @@ defaultMaximumHandSize = 7
 -- CR 402.2 / 613.11: this player's maximum hand size. Nothing IS "no maximum
 -- hand size" (Reliquary Tower) -- never a sentinel, and never a very large
 -- number.
+--
+-- The axis's ONE ordered fold, and the only reader here that could be: CR 613.11
+-- applies these effects in timestamp order, and a removal and a set DISAGREE, so
+-- the last one applied wins and nothing outvotes it (Reliquary Tower's own ruling
+-- names the pair -- a Tower that entered after The Ten Rings leaves the controller
+-- with no maximum, and the reverse order leaves them with ten). Every other
+-- question in this module folds order-independently, which is why `applying`
+-- sorts once for all of them rather than each sorting for itself.
+--
+-- A left fold from CR 402.2's seven rather than a search for the newest effect:
+-- "applied in timestamp order" is a sequence of edits to one value, and reading
+-- only the last one would be a different rule the moment an arm composes with
+-- what it finds instead of replacing it (a maximum hand size INCREASED by two,
+-- #1238).
 maximumHandSize :: PlayerId -> GameState -> Maybe Natural
 maximumHandSize pid gs =
-  let removes effect = case effect of
-        PlayerEffect.NoMaximumHandSize -> True
-        PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
-        PlayerEffect.IncreaseSpellCost _ _ -> False
-        PlayerEffect.ReduceSpellCost _ _ -> False
-        PlayerEffect.ReduceActivationCost {} -> False
-        PlayerEffect.PlayAdditionalLands _ -> False
-        PlayerEffect.DontLoseUnspentMana _ -> False
-        PlayerEffect.CantBeTargetedBy _ -> False
-        PlayerEffect.CastAsThoughItHadFlash _ -> False
-        PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented _ -> False
-        PlayerEffect.CantSearchLibraries -> False
-        PlayerEffect.CantBecomeMonarch -> False
-   in if any (removes . snd) (applying pid gs)
-        then Nothing
-        else Just defaultMaximumHandSize
+  let apply current effect = case effect of
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize limit -> Just limit
+        PlayerEffect.CantCastSpells -> current
+        PlayerEffect.CantCastMoreThan _ -> current
+        PlayerEffect.CantCastChosenName -> current
+        PlayerEffect.CantPlayLandChosenName -> current
+        PlayerEffect.IncreaseSpellCost _ _ -> current
+        PlayerEffect.ReduceSpellCost _ _ -> current
+        PlayerEffect.ReduceActivationCost {} -> current
+        PlayerEffect.PlayAdditionalLands _ -> current
+        PlayerEffect.DontLoseUnspentMana _ -> current
+        PlayerEffect.CantBeTargetedBy _ -> current
+        PlayerEffect.CastAsThoughItHadFlash _ -> current
+        PlayerEffect.CantBeCountered _ -> current
+        PlayerEffect.DamageCantBePrevented _ -> current
+        PlayerEffect.CantSearchLibraries -> current
+        PlayerEffect.CantBecomeMonarch -> current
+   in List.foldl' (\current row -> apply current (snd row)) (Just defaultMaximumHandSize) (applying pid gs)
 
 -- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
 -- they keep as a step or phase ends (Upwelling, Omnath Locus of Mana)? The typed
@@ -855,6 +911,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
@@ -908,6 +965,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.ReduceActivationCost {} -> False
         PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -975,6 +1033,7 @@ unpreventable gs =
         PlayerEffect.ReduceActivationCost {} -> Nothing
         PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.SetMaximumHandSize _ -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing

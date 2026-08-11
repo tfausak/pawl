@@ -124,6 +124,24 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       PlayerEffect.NoMaximumHandSize
       """ {"type":"NoMaximumHandSize"} """
+  -- CR 402.2 / The Ten Rings. This is the shape data/cards/the-ten-rings.json
+  -- carries.
+  Spec.it s "SetMaximumHandSize, The Ten Rings' ten" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.SetMaximumHandSize 10)
+      """ {"type":"SetMaximumHandSize","value":10} """
+  -- CR 402.2 / Cursed Rack: the OTHER number, so a codec that dropped the payload
+  -- would round-trip one of these and not both.
+  Spec.it s "SetMaximumHandSize, Cursed Rack's four" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.SetMaximumHandSize 4)
+      """ {"type":"SetMaximumHandSize","value":4} """
   -- CR 500.5 / 703.4q / Upwelling: no mana type named.
   Spec.it s "DontLoseUnspentMana, Upwelling's whole pool" $
     Common.assertJsonCodec

@@ -23,6 +23,7 @@ toJson e = case e of
   PlayerEffect.ReduceActivationCost c m n -> Common.tagged "ReduceActivationCost" . Just . Common.array $ [Filter.toJson Keyword.toJson c, ManaCost.toJson m, Common.encodeNatural n]
   PlayerEffect.PlayAdditionalLands n -> Common.tagged "PlayAdditionalLands" . Just $ Common.encodeNatural n
   PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
+  PlayerEffect.SetMaximumHandSize n -> Common.tagged "SetMaximumHandSize" . Just $ Common.encodeNatural n
   PlayerEffect.DontLoseUnspentMana f -> Common.tagged "DontLoseUnspentMana" . Just $ ManaFilter.toJson f
   PlayerEffect.CantBeTargetedBy sc -> Common.tagged "CantBeTargetedBy" . Just $ PlayerScope.toJson sc
   PlayerEffect.CastAsThoughItHadFlash c -> Common.tagged "CastAsThoughItHadFlash" . Just $ Filter.toJson Keyword.toJson c
@@ -44,6 +45,7 @@ fromJson value = do
     ("ReduceActivationCost", Just (Value.Array (Array.MkArray [c, m, n]))) -> PlayerEffect.ReduceActivationCost <$> Filter.fromJson Keyword.fromJson c <*> ManaCost.fromJson m <*> Common.decodeNatural n
     ("PlayAdditionalLands", Just v) -> PlayerEffect.PlayAdditionalLands <$> Common.decodeNatural v
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
+    ("SetMaximumHandSize", Just v) -> PlayerEffect.SetMaximumHandSize <$> Common.decodeNatural v
     ("DontLoseUnspentMana", Just v) -> PlayerEffect.DontLoseUnspentMana <$> ManaFilter.fromJson v
     ("CantBeTargetedBy", Just v) -> PlayerEffect.CantBeTargetedBy <$> PlayerScope.fromJson v
     ("CastAsThoughItHadFlash", Just v) -> PlayerEffect.CastAsThoughItHadFlash <$> Filter.fromJson Keyword.fromJson v
