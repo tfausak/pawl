@@ -30,7 +30,10 @@
                         "type": "Exactly"
                       },
                       "measured": {
-                        "type": "IsSuspected"
+                        "type": "HasDesignation",
+                        "value": {
+                          "type": "Suspected"
+                        }
                       },
                       "threshold": {
                         "type": "Literal",
@@ -59,7 +62,10 @@
                         "type": "Exactly"
                       },
                       "measured": {
-                        "type": "IsSuspected"
+                        "type": "HasDesignation",
+                        "value": {
+                          "type": "Suspected"
+                        }
                       },
                       "threshold": {
                         "type": "Literal",
@@ -68,8 +74,13 @@
                     },
                     "effects": [
                       {
-                        "type": "Suspect",
-                        "value": "self"
+                        "type": "Designate",
+                        "value": [
+                          {
+                            "type": "Suspected"
+                          },
+                          "self"
+                        ]
                       }
                     ]
                   }

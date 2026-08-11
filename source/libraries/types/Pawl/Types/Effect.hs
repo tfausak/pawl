@@ -8,6 +8,7 @@ import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
@@ -720,67 +721,52 @@ data Effect card
     -- monarch" -- a target slot, which is the one arm that makes this opcode
     -- target. Emits GameEvent.BecameMonarch.
     BecomeMonarch MonarchTarget.MonarchTarget
-  | -- | CR 702.112b: the permanent in the slot GAINS THE RENOWNED DESIGNATION --
-    -- rule 702.112a's "and it becomes renowned", the second half of the ability
-    -- Pawl.Engine.Keyword.renown mints.
+  | -- | The permanent in the slot GAINS THIS DESIGNATION -- rule 702.112a's "and it
+    -- becomes renowned", the second half of the ability Pawl.Engine.Keyword.renown
+    -- mints; CR 701.37a's "and it becomes monstrous", authored beside a PutCounters
+    -- in one clause whose condition is that rule's "if this permanent isn't
+    -- monstrous"; and CR 701.60a's suspect instruction, Person of Interest's "when
+    -- this creature enters, suspect it".
+    --
+    -- ONE opcode over Pawl.Types.Designation and not three, because the three rules
+    -- word the write identically -- see that module. Casing on the designation is
+    -- not casing on an effect's identity: it is one payload of one opcode, the way
+    -- ItBecomes below carries a Daytime.
     --
     -- A SlotName and not an ObjectRef, so that it names the same permanent the
     -- PutCounters beside it in the clause does: both read Binding.triggerSource,
-    -- and rule 702.112a's "it" is one object mentioned twice.
+    -- and rule 702.112a's "it" is one object mentioned twice. The slot need not be a
+    -- reserved binding, and the resolution's legalOne read covers both: Person of
+    -- Interest's names Binding.triggerSource, while Rune-Brand Juggler's is a CR
+    -- 115.6 target slot and so carries CR 608.2b's legality with it.
     --
-    -- Writes Object.renowned, which is a DESIGNATION rather than a characteristic
-    -- (rule 702.112b), so this is a state write and not a
-    -- ModifyTarget/Modification -- nothing in CR 613 could carry it.
+    -- Writes Object.designations, which holds DESIGNATIONS rather than
+    -- characteristics, so this is a state write and not a
+    -- ModifyTarget/Modification -- nothing in CR 613 could carry it. What CR 701.60c
+    -- hangs off `Suspected` -- menace and "this creature can't block" -- is NOT
+    -- written here: those are read off the designation wherever they are asked.
     --
-    -- Idempotent by construction: a permanent already renowned stays renowned, and
-    -- CR 702.112c leans on that -- the second renown ability to resolve "will have
-    -- no effect", which its intervening "if" already stops before reaching here.
-    BecomeRenowned SlotName.SlotName
-  | -- | CR 701.37b: the permanent in the slot GAINS THE MONSTROUS DESIGNATION --
-    -- the second half of CR 701.37a's "put N +1/+1 counters on it and it becomes
-    -- monstrous", authored beside a PutCounters in one clause whose condition is
-    -- rule 701.37a's "if this permanent isn't monstrous".
-    --
-    -- A SlotName, a state write rather than a Modification, and idempotent, all
-    -- for BecomeRenowned's reasons above -- rule 701.37b words the designation
-    -- the way rule 702.112b words renowned, down to "neither an ability nor part
-    -- of the permanent's copiable values".
-    --
-    -- A SECOND designation opcode rather than one parameterised over which
-    -- designation; Suspect below is the third, and consolidating all three is
-    -- still open (#1193). Emits no event, so nothing can trigger on it (#1194).
-    BecomeMonstrous SlotName.SlotName
-  | -- | CR 701.60a: the permanent in the slot BECOMES SUSPECTED -- "certain spells
-    -- and abilities instruct a player to suspect a creature". Person of Interest's
-    -- "when this creature enters, suspect it".
-    --
-    -- A SlotName, a state write rather than a Modification, and idempotent (CR
-    -- 701.60d: "a suspected permanent can't become suspected again"), all for
-    -- BecomeRenowned's reasons above -- rule 701.60b words the designation the way
-    -- rule 702.112b words renowned. The slot need not be a reserved binding, and
-    -- the resolution's legalOne read covers both: Person of Interest's names
-    -- Binding.triggerSource, while Rune-Brand Juggler's is a CR 115.6 target slot
-    -- and so carries CR 608.2b's legality with it.
-    --
-    -- What rule 701.60c hangs off the designation -- menace and "this creature
-    -- can't block" -- is NOT written here: those are read off Object.suspected
-    -- wherever they are asked. Emits no event, so nothing can trigger on it
-    -- (#1215).
-    Suspect SlotName.SlotName
+    -- Idempotent by construction, which each rule leans on: CR 702.112c's second
+    -- renown ability to resolve "will have no effect" (its intervening "if" already
+    -- stops it before reaching here) and CR 701.60d's "a suspected permanent can't
+    -- become suspected again". Emits GameEvent.BecameDesignated, once, only when the
+    -- designation was not already there.
+    Designate Designation.Designation SlotName.SlotName
   | -- | CR 701.60a's other ending: the named permanents are NO LONGER SUSPECTED --
     -- Eliminate the Impossible's "if any of them are suspected, they're no longer
     -- suspected". Rule 701.60a's "until it leaves the battlefield" needs no opcode,
     -- Object.newIncarnation already dropping the designation.
     --
-    -- An ObjectRef where Suspect above takes a SlotName, because the pool prints
+    -- An ObjectRef where Designate above takes a SlotName, because the pool prints
     -- unsuspect over a SET as well as over one permanent -- this card's sweep and
     -- Absolving Lammasu's "all suspected creatures" against Deadly Complication's
     -- single target -- while every printed suspect names one permanent. Only the
     -- set form has a producer in the tree today.
     --
-    -- Not a second write on Suspect nor a designation parameter, which is #1193's
-    -- question; a separate opcode keeps the static analyses (Resolve.slotsOf,
-    -- Projection.rewriteEffect) reading one shape apiece.
+    -- NOT a designation-parameterised inverse of Designate above, because no rule
+    -- takes renowned or monstrous away: CR 701.60a's ending belongs to `Suspected`
+    -- alone, so the opcode names it rather than carrying a payload that would let a
+    -- card say "no longer renowned".
     Unsuspect ObjectRef.ObjectRef
   | -- | CR 702.100a and CR 702.100b together: put a +1/+1 counter on the slot's
     -- permanent, and if one or more actually land, that permanent EVOLVES --
@@ -796,7 +782,7 @@ data Effect card
     -- the second would fire on a placement CR 614.16 had replaced away to nothing.
     --
     -- The counter's kind and count are the rule's, not the card's, so neither is a
-    -- payload. A SlotName for BecomeRenowned's reason: rule 702.100a's "this
+    -- payload. A SlotName for Designate's reason: rule 702.100a's "this
     -- creature" is Binding.triggerSource, one object.
     Evolve SlotName.SlotName
   | -- | CR 731.1: "it becomes day" / "it becomes night" -- the GAME gains that

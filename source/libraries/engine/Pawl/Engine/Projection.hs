@@ -33,6 +33,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Defense as Defense
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
@@ -609,12 +610,10 @@ viewOfCard face =
           -- distinction either: CR 701.54a designates a creature its controller
           -- controls, so only a battlefield permanent ever carries one.
           Filter.ringBearerFor = Nothing,
-          -- CR 702.112b: the designation rides an OBJECT (Object.renowned), and
-          -- this builder describes a printed face. Not a lost distinction either:
-          -- rule 702.112b gives one only to a permanent.
-          Filter.renowned = False,
-          Filter.monstrous = False,
-          Filter.suspected = False,
+          -- The designations ride an OBJECT (Object.designations), and this builder
+          -- describes a printed face. Not a lost distinction either: each of those
+          -- rules gives its designation only to a permanent.
+          Filter.designations = Set.empty,
           Filter.kicked = False
         }
 
@@ -821,17 +820,13 @@ viewOfCharacteristics oid pc controller counters gs =
       -- viewWithLastKnown's CR 608.2h path hands this function: a designation dies
       -- with the permanent (CR 400.7), and no last-known record keeps one.
       Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor,
-      -- CR 702.112b: a designation rather than a characteristic, so it comes off
-      -- Object.renowned -- ringBearerFor's posture just above, including for the
-      -- CR 608.2h path: an id naming no object answers False, a designation dying
-      -- with the permanent (CR 400.7) and no last-known record keeping one.
-      Filter.renowned = maybe False Object.renowned (Game.lookupObject oid gs),
-      -- CR 701.37b: `renowned` above in every respect, the two rules wording
-      -- their designations the same way.
-      Filter.monstrous = maybe False Object.monstrous (Game.lookupObject oid gs),
-      -- CR 701.60b: `monstrous` above in every respect.
-      Filter.suspected = maybe False Object.suspected (Game.lookupObject oid gs),
-      -- CR 702.33d: `suspected` above in every respect -- read live off the object,
+      -- Designations rather than characteristics, so they come off
+      -- Object.designations -- ringBearerFor's posture just above, including for the
+      -- CR 608.2h path: an id naming no object answers with the empty set, a
+      -- designation dying with the permanent (CR 400.7) and no last-known record
+      -- keeping one.
+      Filter.designations = maybe Set.empty Object.designations (Game.lookupObject oid gs),
+      -- CR 702.33d: `designations` above in every respect -- read live off the object,
       -- so the CR 608.2h path answers False for a spell that has left the stack.
       -- Nothing asks it there: the only reader is the kicked spell's own clause
       -- condition, gated while it is still on the stack
@@ -1507,9 +1502,7 @@ rewriteEffect pairs effect = case effect of
   -- is its abilities, which nothing here walks (#643).
   Effect.CreateEmblem {} -> effect
   Effect.BecomeMonarch {} -> effect
-  Effect.BecomeRenowned _ -> effect
-  Effect.BecomeMonstrous _ -> effect
-  Effect.Suspect _ -> effect
+  Effect.Designate _ _ -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.Evolve _ -> effect
   Effect.ItBecomes _ -> effect
@@ -1741,7 +1734,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentTurnedFaceUp f -> TriggerCondition.PermanentTurnedFaceUp (Filter.rewrite pairs f)
   -- The same, one condition over: Valeron Wardens' "a creature you control" is a
   -- Filter, so CR 612.1 reaches it too.
-  TriggerCondition.PermanentBecomesRenowned f -> TriggerCondition.PermanentBecomesRenowned (Filter.rewrite pairs f)
+  TriggerCondition.PermanentBecomesDesignated d f -> TriggerCondition.PermanentBecomesDesignated d (Filter.rewrite pairs f)
   TriggerCondition.SelfEvolves -> condition
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
@@ -1794,9 +1787,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.LifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.IsMonarch _ -> quantity
-  Quantity.Type.IsRenowned -> quantity
-  Quantity.Type.IsMonstrous -> quantity
-  Quantity.Type.IsSuspected -> quantity
+  Quantity.Type.HasDesignation _ -> quantity
   Quantity.Type.WasKicked -> quantity
   Quantity.Type.PlayerCounters _ _ -> quantity
   -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
@@ -2333,7 +2324,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- its reasons -- rule 701.60c is rulebook text rather than a card's ability, as
 -- CR 122.1b's keyword counter is, and neither is a case on an effect's identity.
 --
--- Read off Object.suspected on every projection rather than stamped when the
+-- Read off Object.designations on every projection rather than stamped when the
 -- designation is set, which IS rule 701.60c's "for as long as it's suspected": a
 -- permanent that stops being suspected loses the keyword with nothing to unwind.
 -- Rule 701.60c's other half, "this creature can't block", is a combat restriction
@@ -2348,7 +2339,7 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
     fromObject oid = case Game.lookupObject oid gs of
       Nothing -> []
       Just obj
-        | Object.suspected obj ->
+        | Set.member Designation.Suspected (Object.designations obj) ->
             [ MkGathered
                 { gEffect = Nothing,
                   gSource = oid,
@@ -2490,17 +2481,13 @@ filterReads f = case f of
   -- Pawl.Engine.Ring.theRingIsLegendary pairs it with ControlledBy, which reads
   -- Controller, so the emblem's set moves with CR 613.1b's layer 2 as it should.
   Filter.Type.IsRingBearer -> Set.empty
-  -- Reads nothing for that atom's reason, restated by rule 702.112b itself:
-  -- renowned is "neither an ability nor part of the permanent's copiable values",
-  -- so no Modification writes Object.renowned and no CR 613 layer can move a set
-  -- this atom selects.
-  Filter.Type.IsRenowned -> Set.empty
-  -- Reads nothing for IsRenowned's reason, restated by rule 701.60b itself:
-  -- suspected is "neither an ability nor part of the permanent's copiable values",
-  -- so no Modification writes Object.suspected. What CR 701.60c hangs off the
-  -- designation IS in layer 6 (designationGathered's menace grant), but that is
-  -- what the designation WRITES rather than what this atom reads.
-  Filter.Type.IsSuspected -> Set.empty
+  -- Reads nothing for that atom's reason, restated by each designation's own rule:
+  -- the mark is "neither an ability nor part of the permanent's copiable values", so
+  -- no Modification writes Object.designations and no CR 613 layer can move a set
+  -- this atom selects. What CR 701.60c hangs off `Suspected` IS in layer 6
+  -- (designationGathered's menace grant), but that is what the designation WRITES
+  -- rather than what this atom reads.
+  Filter.Type.HasDesignation _ -> Set.empty
   -- Reads nothing: CR 109.3's characteristics do not include counters, so no
   -- Modification writes Object.counters and no CR 613 layer can move a set this
   -- atom selects. The P/T a +1/+1 counter grants is CR 613.4c's, applied over the

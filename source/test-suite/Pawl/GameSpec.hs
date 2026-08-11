@@ -180,9 +180,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
       )
@@ -1689,9 +1687,7 @@ handBobBolt lightningBolt gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
@@ -1990,9 +1986,7 @@ restartOnStack mountain =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in g4

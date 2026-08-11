@@ -659,9 +659,7 @@ handInPlay printing board =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( g2

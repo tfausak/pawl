@@ -66,6 +66,11 @@
 -- `provokeSpec`. CR 702.112 renown, the first minted
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
 -- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
+-- 701.37b's designation watched the same way -- the shared
+-- TriggerCondition.PermanentBecomesDesignated with the other member of
+-- Pawl.Types.Designation in it -- with Arbor Colossus, plus that designation read
+-- back by CR 701.37a's own clause condition on a permanent Rune-Brand Juggler has
+-- also suspected -- `arborColossusSpec`. CR
 -- 702.63 vanishing, the first keyword whose rule text spans
 -- BOTH mints -- one CR 614.1c entry replacement and two triggers, one of them
 -- watching the counter removal the other performs -- with Waning Wurm --
@@ -216,6 +221,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -4309,7 +4315,7 @@ renownSpec s registry =
       -- leave empty while reading the same 6/6.
       countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
       -- CR 702.112b's designation itself, which no characteristic reports.
-      renownedness oid gs = fmap Object.renowned (Game.lookupObject oid gs)
+      renownedness oid gs = fmap (Set.member Designation.Renowned . Object.designations) (Game.lookupObject oid gs)
       -- CR 104.3c: a draw case needs a library to draw from, and more of one than
       -- it draws, so an extra draw is visible rather than fatal.
       stock printing n pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
@@ -4391,8 +4397,8 @@ renownSpec s registry =
             [maulers] -> case Game.lookupObject maulers (S.runCombat S.aggressiveAnswer gs) of
               Nothing -> Spec.assertFailure s "expected to find the Maulers"
               Just obj -> do
-                Spec.assertEqWith s "the control: this incarnation is renowned" (Object.renowned obj) True
-                Spec.assertEqWith s "the next one is not" (Object.renowned (Object.newIncarnation obj)) False
+                Spec.assertEqWith s "the control: this incarnation is renowned" (Set.member Designation.Renowned (Object.designations obj)) True
+                Spec.assertEqWith s "the next one is not" (Set.member Designation.Renowned (Object.designations (Object.newIncarnation obj))) False
             _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
         -- CR 702.112b's designation read by a WATCHER, which is what the rule
         -- calls it a marker FOR: Valeron Wardens {2}{G} Creature -- Human Monk
@@ -4455,6 +4461,128 @@ renownSpec s registry =
         Spec.it s "CR 702.112c each instance of renown is its own ability" $ do
           Spec.assertEqWith s "renown 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 2) 2)) [Keyword.renown 2, Keyword.renown 2]
           Spec.assertEqWith s "and renown 6 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 6) 1)) [Keyword.renown 6]
+
+-- CR 701.37b's designation watched from outside the monstrosity action that sets
+-- it: "monstrous is a designation ... that the monstrosity action and OTHER SPELLS
+-- AND ABILITIES can identify", read through
+-- TriggerCondition.PermanentBecomesDesignated -- the same condition Valeron
+-- Wardens uses for renowned, with the other designation as its payload.
+--
+-- Arbor Colossus {2}{G}{G}{G} Creature -- Giant 6/6, "Reach. {3}{G}{G}{G}:
+-- Monstrosity 3. When this creature becomes monstrous, destroy target creature
+-- with flying an opponent controls."
+--
+-- bob holds Bird Maiden 1/2 flying and Goblin Piker 2/1: the Piker is the
+-- falsifier for a target spec that dropped "with flying", and both are his, so no
+-- assertion here turns on the seat.
+--
+-- TWELVE Forests, not six: the second-monstrosity case has to be able to PAY for
+-- its activation, or it would prove nothing but an unpayable cost.
+--
+-- The DESIGNATION is what the last case turns on. Valeron Wardens watches the same
+-- condition with Renowned, so a matcher that compared only the event's SHAPE would
+-- draw alice a card when her Colossus became monstrous.
+arborColossusSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+arborColossusSpec s registry =
+  let monstrousness oid gs = fmap (Set.member Designation.Monstrous . Object.designations) (Game.lookupObject oid gs)
+      plusOnes = S.counterOf CounterKind.PlusOnePlusOne
+      -- The trigger TARGETS (CR 603.3d), so the answerer has to aim it; `victim`
+      -- pins the choice rather than searching for a legal one, which is what lets
+      -- the Piker case below fail rather than repair itself.
+      aimed victim p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
+        _ -> S.identityAnswer p
+      -- One activation of the one monstrosity ability, its trigger settled onto
+      -- the stack and resolved, with `victim` aimed at.
+      monstrosity colossus victim gs = case Activate.abilitiesFor colossus gs of
+        [ability]
+          -- CR 701.37a's condition is the CLAUSE's, not an activation
+          -- restriction, so a monstrous permanent's ability stays activatable --
+          -- which is what makes the second case below a real activation rather
+          -- than an unpaid one.
+          | Activate.activatable S.alice colossus ability gs ->
+              Right . snd . Engine.runGamePure (aimed victim) gs $ do
+                Activate.activateAbility S.alice colossus ability
+                Stack.resolveTop
+                Engine.settleForPriority
+                Engine.priorityLoop
+        [_] -> Left 0
+        other -> Left (length other)
+      board extra = do
+        colossusPrinting <- S.printingOf s registry "Arbor Colossus"
+        forest <- S.printingOf s registry "Forest"
+        maidenPrinting <- S.printingOf s registry "Bird Maiden"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        base <- extra (S.landsInPlay forest 12)
+        let (colossus, g1) = S.addCreature colossusPrinting S.alice base
+            (maiden, g2) = S.addCreature maidenPrinting S.bob g1
+            (piker, g3) = S.addCreature pikerPrinting S.bob g2
+        pure (colossus, maiden, piker, g3)
+   in Spec.describe s "Arbor Colossus" $ do
+        -- The proving test. CR 701.37a's counters and designation, and then rule
+        -- 701.37b's marker read by an ability of the same permanent: the flier dies.
+        Spec.it s "CR 701.37b whole card: monstrosity 3 marks the Colossus and its trigger destroys the flier" $ do
+          (colossus, maiden, piker, gs) <- board pure
+          case monstrosity colossus maiden gs of
+            Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
+            Right after -> do
+              Spec.assertEqWith s "not monstrous to begin with" (monstrousness colossus gs) (Just False)
+              Spec.assertEqWith s "three counters, not one" (plusOnes colossus after) 3
+              Spec.assertEqWith s "so it is a 9/9" (S.powerToughnessOf colossus after) (Just (9, 9))
+              Spec.assertEqWith s "and it is monstrous" (monstrousness colossus after) (Just True)
+              Spec.assertBool s (not (S.onBattlefield maiden after)) "the targeted flier was destroyed"
+              Spec.assertBool s (S.onBattlefield piker after) "and the ground creature was not"
+        -- CR 701.37a's "if this permanent isn't monstrous": the SECOND activation
+        -- on the same board does nothing, so the trigger never fires and bob's
+        -- second flier lives. The same mana, the same seats, the same creatures --
+        -- the one difference is that the Colossus is already monstrous.
+        Spec.it s "CR 701.37a a second monstrosity marks nothing, so nothing triggers" $ do
+          (colossus, maiden, _, gs) <- board pure
+          maidenPrinting <- S.printingOf s registry "Bird Maiden"
+          case monstrosity colossus maiden gs of
+            Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
+            Right once -> do
+              let (second, withSecond) = S.addCreature maidenPrinting S.bob once
+              case monstrosity colossus second withSecond of
+                Left n -> Spec.assertFailure s ("expected the monstrous Colossus to stay activatable, got " <> show n)
+                Right twice -> do
+                  Spec.assertEqWith s "still three counters, not six" (plusOnes colossus twice) 3
+                  Spec.assertBool s (S.onBattlefield second twice) "the second flier survived, nothing having become monstrous"
+        -- The designation is LOAD-BEARING in the CLAUSE CONDITION too, and one board
+        -- can carry two designations at once: Rune-Brand Juggler {2}{B}{R} 3/3,
+        -- "When this creature enters, suspect up to one target creature you control",
+        -- aimed at the Colossus. CR 701.60b's mark is not CR 701.37b's, so CR
+        -- 701.37a's "if this permanent isn't monstrous" still holds and monstrosity
+        -- still does its whole job. A Quantity arm that read "has SOME designation"
+        -- would fail the condition and put nothing on the Colossus at all.
+        Spec.it s "CR 701.37a a suspected Colossus is still not monstrous" $ do
+          jugglerPrinting <- S.printingOf s registry "Rune-Brand Juggler"
+          (colossus, maiden, _, gs) <- board pure
+          let (_, entering) = S.entersWithTrigger jugglerPrinting S.alice gs
+              suspected = snd (Engine.runGamePure (aimed colossus) entering Engine.priorityLoop)
+          Spec.assertBool s (Set.member Designation.Suspected (maybe Set.empty Object.designations (Game.lookupObject colossus suspected))) "the Juggler suspected the Colossus"
+          Spec.assertEqWith s "which leaves it not monstrous" (monstrousness colossus suspected) (Just False)
+          case monstrosity colossus maiden suspected of
+            Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
+            Right after -> do
+              Spec.assertEqWith s "so monstrosity still places its three counters" (plusOnes colossus after) 3
+              Spec.assertEqWith s "and still marks it monstrous" (monstrousness colossus after) (Just True)
+              Spec.assertBool s (not (S.onBattlefield maiden after)) "and its trigger still fired"
+        -- The designation is LOAD-BEARING in the match, not just the event's shape.
+        -- Valeron Wardens {2}{G} 1/3 watches "whenever a creature you control
+        -- becomes renowned" -- the same TriggerCondition constructor with Renowned
+        -- in it -- and the Colossus becoming monstrous is not that. alice's library
+        -- is stocked, so a spurious draw is visible rather than fatal (CR 104.3c).
+        Spec.it s "CR 701.37b a creature becoming monstrous is not a creature becoming renowned" $ do
+          wardensPrinting <- S.printingOf s registry "Valeron Wardens"
+          piker <- S.printingOf s registry "Goblin Piker"
+          (colossus, maiden, _, gs) <- board (\base -> pure (snd (S.addLibraryCard piker S.alice (snd (S.addCreature wardensPrinting S.alice base)))))
+          case monstrosity colossus maiden gs of
+            Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
+            Right after -> do
+              Spec.assertEqWith s "the Colossus is monstrous" (monstrousness colossus after) (Just True)
+              Spec.assertBool s (not (S.onBattlefield maiden after)) "so its own trigger did fire"
+              Spec.assertEqWith s "and the Wardens drew nothing" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
 
 -- CR 702.63 vanishing, which rule 702 states as triggered
 -- abilities -- and the first whose rule text spans BOTH mints, since rule
@@ -4814,7 +4942,7 @@ tovolarSpec s registry =
 -- Three capabilities meet here, and each has a way to fail that the counts below
 -- tell apart: the slot naming the damager (aim it at the source and Aragorn takes
 -- the counters), Quantity.AgainstSlot reading the damager's counters (read the
--- source's and the number is 0), and Filter.IsRenowned rejecting a candidate that
+-- source's and the number is 0), and Filter.HasDesignation rejecting a candidate that
 -- is not renowned yet (drop it and the Piker doubles too).
 --
 -- Aurelia, the Warleader supplies the second combat phase, as she does in
@@ -4838,7 +4966,7 @@ aragornSpec s registry =
         Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
         _ -> S.aggressiveAnswer p
       countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
-      renownedness oid gs = fmap Object.renowned (Game.lookupObject oid gs)
+      renownedness oid gs = fmap (Set.member Designation.Renowned . Object.designations) (Game.lookupObject oid gs)
    in Spec.describe s "Doubling a damager's counters" $ do
         -- The proving test. 2 -> 4 rather than 2 -> 3, which is what separates
         -- "double" from "add one", and 4 rather than 2, which is what separates
@@ -6945,7 +7073,7 @@ representativeEvents cond =
         TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp departed)
         -- CR 702.112b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
-        TriggerCondition.PermanentBecomesRenowned _ -> one (GameEvent.BecameRenowned departed)
+        TriggerCondition.PermanentBecomesDesignated d _ -> one (GameEvent.BecameDesignated d departed)
         -- CR 702.100b's own event, and the only one this condition admits. The
         -- pair does NOT match -- the condition is self-scoped and `departed` is
         -- not the bearer -- which pins the floor for a matching pair too, since
@@ -7031,7 +7159,7 @@ everyTriggerCondition =
     TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
     TriggerCondition.SelfTurnedFaceUp,
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
-    TriggerCondition.PermanentBecomesRenowned (Filter.Type.And []),
+    TriggerCondition.PermanentBecomesDesignated Designation.Renowned (Filter.Type.And []),
     TriggerCondition.SelfEvolves,
     TriggerCondition.PermanentSacrificed,
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
@@ -9628,6 +9756,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   evolveSpec s registry
   krasisSpec s registry
   renownSpec s registry
+  arborColossusSpec s registry
   vanishingSpec s registry
   modularSpec s registry
   tovolarSpec s registry

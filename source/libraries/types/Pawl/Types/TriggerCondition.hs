@@ -4,6 +4,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
@@ -57,7 +58,7 @@ data TriggerCondition
     -- CR 608.2h's last known information for a trampler that died to its blocker
     -- in the same event. SelfTurnedFaceUp beside PermanentTurnedFaceUp is the
     -- standing pair for that; Filter.IsSource would collapse the two here as it
-    -- does for PermanentBecomesRenowned, and buys a minted keyword nothing.
+    -- does for PermanentBecomesDesignated, and buys a minted keyword nothing.
     --
     -- Binds CR 510.2's damager under Pawl.Engine.Binding.combatDamager, which the
     -- self form needs no slot for -- there the damager is the bearer. The damaged
@@ -815,26 +816,31 @@ data TriggerCondition
     -- all -- a face-down permanent is a 2/2 with no subtypes (CR 708.2a), so
     -- reading it before would answer every narrowed form wrong.
     PermanentTurnedFaceUp (Filter.Filter Keyword.Keyword)
-  | -- | CR 702.112b: a permanent the Filter admits BECAME RENOWNED -- Valeron
-    -- Wardens' "whenever a creature you control becomes renowned". The designation
-    -- CR 702.112b calls "a marker that the renown ability and other spells and
-    -- abilities can identify", read at the moment it is given.
+  | -- | A permanent the Filter admits GAINED THIS DESIGNATION -- Valeron Wardens'
+    -- "whenever a creature you control becomes renowned" (CR 702.112b) and Arbor
+    -- Colossus' "when this creature becomes monstrous" (CR 701.37b). Read at the
+    -- moment the marker is given, matched against GameEvent.BecameDesignated.
+    --
+    -- The designation is a PAYLOAD beside the Filter, for Pawl.Types.Designation's
+    -- reason, and it is what keeps the two readings apart: Valeron Wardens must not
+    -- draw when a creature you control becomes monstrous.
     --
     -- PermanentTurnedFaceUp's shape exactly, and for its reasons: one FILTERED
     -- constructor rather than a self-scoped pair, the bearer entering only as the
     -- Filter.Context's source and CR 109.5's "you". Relic Seeker's "when THIS
-    -- creature becomes renowned" is this condition with Filter.IsSource, so the
-    -- self form needs no constructor of its own.
+    -- creature becomes renowned" and Arbor Colossus' monstrous trigger are this
+    -- condition with Filter.IsSource, so the self form needs no constructor of its
+    -- own.
     --
     -- A LIVE read of the permanent, PermanentTurnedFaceUp's posture: nothing here
     -- is a zone change, so CR 603.10a's look-back does not reach it and the
     -- designation is written while the permanent is still on the battlefield.
-    PermanentBecomesRenowned (Filter.Filter Keyword.Keyword)
+    PermanentBecomesDesignated Designation.Designation (Filter.Filter Keyword.Keyword)
   | -- | CR 702.100b: the BEARER evolved -- Renegade Krasis' "whenever this
     -- creature evolves". Matched against GameEvent.Evolved by an id comparison,
     -- SelfEnters' shape.
     --
-    -- Self-scoped and NOT PermanentBecomesRenowned's filtered shape, and the pool
+    -- Self-scoped and NOT PermanentBecomesDesignated's filtered shape, and the pool
     -- is why: both printings that read rule 702.100b's marker say "this creature",
     -- where renown has Valeron Wardens printing the filtered form. A Filter
     -- payload here would be a width no card asks for; the card that prints

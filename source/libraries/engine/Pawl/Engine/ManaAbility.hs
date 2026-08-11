@@ -77,9 +77,7 @@ manaProduced effect = case effect of
   Effect.RequireBlock {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
-  Effect.BecomeRenowned _ -> Nothing
-  Effect.BecomeMonstrous _ -> Nothing
-  Effect.Suspect _ -> Nothing
+  Effect.Designate _ _ -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.ItBecomes _ -> Nothing

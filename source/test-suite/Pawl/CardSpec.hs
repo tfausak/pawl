@@ -361,9 +361,7 @@ quantityCounts quantity = case quantity of
   -- CR 725.1's game-wide player designation, read as a 0/1: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.IsMonarch _ -> []
-  Quantity.Type.IsRenowned -> []
-  Quantity.Type.IsMonstrous -> []
-  Quantity.Type.IsSuspected -> []
+  Quantity.Type.HasDesignation _ -> []
   Quantity.Type.WasKicked -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters _ _ -> []
@@ -474,7 +472,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- PermanentEnters' reason.
   TriggerCondition.PermanentTurnedFaceUp _ -> []
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
-  TriggerCondition.PermanentBecomesRenowned _ -> []
+  TriggerCondition.PermanentBecomesDesignated _ _ -> []
   TriggerCondition.SelfEvolves -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
   TriggerCondition.PermanentSacrificed -> []
@@ -594,9 +592,7 @@ effectCounts effect = case effect of
   Effect.RequireBlock duration _ _ -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
-  Effect.BecomeRenowned _ -> []
-  Effect.BecomeMonstrous _ -> []
-  Effect.Suspect _ -> []
+  Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
@@ -858,9 +854,7 @@ effectReplacements effect = case effect of
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
-  Effect.BecomeRenowned _ -> []
-  Effect.BecomeMonstrous _ -> []
-  Effect.Suspect _ -> []
+  Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
@@ -1342,9 +1336,7 @@ effectMintedFaces effect = case effect of
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
-  Effect.BecomeRenowned _ -> []
-  Effect.BecomeMonstrous _ -> []
-  Effect.Suspect _ -> []
+  Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
@@ -1558,8 +1550,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
   Filter.Type.IsRingBearer -> 0
-  Filter.Type.IsRenowned -> 0
-  Filter.Type.IsSuspected -> 0
+  Filter.Type.HasDesignation _ -> 0
 
 -- Every Filter a keyword carries: CR 702.29e's typecycling predicate, CR
 -- 702.14c's landwalk criterion, plus the components of any Cost a keyword names
@@ -1871,7 +1862,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
   TriggerCondition.PermanentTurnedFaceUp f -> [f]
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
-  TriggerCondition.PermanentBecomesRenowned f -> [f]
+  TriggerCondition.PermanentBecomesDesignated _ f -> [f]
   TriggerCondition.SelfEvolves -> []
   -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
   -- PermanentDies below there is no Filter to sweep.
@@ -2291,9 +2282,7 @@ effectFilters effect = case effect of
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
-  Effect.BecomeRenowned _ -> []
-  Effect.BecomeMonstrous _ -> []
-  Effect.Suspect _ -> []
+  Effect.Designate _ _ -> []
   Effect.Unsuspect ref -> unframed (objectRefFilters ref)
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []

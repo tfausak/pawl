@@ -281,7 +281,7 @@ movedOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameRenowned _ -> Nothing
+  GameEvent.BecameDesignated _ _ -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -310,7 +310,7 @@ damageOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameRenowned _ -> Nothing
+  GameEvent.BecameDesignated _ _ -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -339,7 +339,7 @@ revealOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameRenowned _ -> Nothing
+  GameEvent.BecameDesignated _ _ -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -435,9 +435,7 @@ createEmblem pid card =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
@@ -2562,9 +2560,7 @@ createTokens controller card copy n tapped entering = do
                     Object.ringBearerFor = Nothing,
                     Object.protector = Nothing,
                     Object.unlockedHalves = Set.empty,
-                    Object.renowned = False,
-                    Object.monstrous = False,
-                    Object.suspected = False,
+                    Object.designations = Set.empty,
                     Object.kicked = False
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
@@ -2712,7 +2708,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2765,7 +2761,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2793,7 +2789,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2827,7 +2823,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2873,7 +2869,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2914,7 +2910,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -2959,7 +2955,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3001,7 +2997,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3042,7 +3038,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3095,7 +3091,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3137,7 +3133,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3184,7 +3180,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3225,7 +3221,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3259,7 +3255,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3291,7 +3287,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3339,7 +3335,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3375,7 +3371,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3418,7 +3414,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3457,7 +3453,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3493,7 +3489,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3532,7 +3528,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3571,7 +3567,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3623,7 +3619,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3665,7 +3661,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3706,7 +3702,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AttackerBlocked _ _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3758,7 +3754,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3806,7 +3802,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3860,7 +3856,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3904,7 +3900,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3938,7 +3934,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -3983,7 +3979,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           && Filter.matches (Filter.contextFor (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4032,7 +4028,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4053,7 +4049,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfHalfUnlocked half -> case event of
     GameEvent.HalfUnlocked oid name _ -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4091,7 +4087,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 708.8's last sentence fall out rather than needing a clause.
   TriggerCondition.SelfTurnedFaceUp -> case event of
     GameEvent.TurnedFaceUp oid -> oid == bearer
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4148,7 +4144,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp oid -> case Projection.viewWithLastKnown oid gs oid of
       Nothing -> False
       Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4183,7 +4179,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- has since left: the marker is about an event, not about the object now.
   TriggerCondition.SelfEvolves -> case event of
     GameEvent.Evolved oid -> oid == bearer
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4207,10 +4203,14 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
-  TriggerCondition.PermanentBecomesRenowned f -> case event of
-    GameEvent.BecameRenowned oid -> case Projection.viewWithLastKnown oid gs oid of
-      Nothing -> False
-      Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+  TriggerCondition.PermanentBecomesDesignated wanted f -> case event of
+    -- The designations must MATCH, not merely both be present: Valeron Wardens'
+    -- renown trigger must not fire when a creature you control becomes monstrous.
+    GameEvent.BecameDesignated got oid
+      | got /= wanted -> False
+      | otherwise -> case Projection.viewWithLastKnown oid gs oid of
+          Nothing -> False
+          Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.Evolved _ -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -4261,7 +4261,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           PlayerRelation.You -> controller == you
           PlayerRelation.Opponent -> controller /= you
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4297,7 +4297,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.PermanentSacrificed {} -> True
     GameEvent.AbilityTriggered {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
@@ -4370,7 +4370,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
            )
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
@@ -4419,7 +4419,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameRenowned _ -> False
+    GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
@@ -4515,7 +4515,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
-  TriggerCondition.PermanentBecomesRenowned _ -> False
+  TriggerCondition.PermanentBecomesDesignated _ _ -> False
   TriggerCondition.SelfEvolves -> False
   TriggerCondition.PermanentSacrificed -> False
 
@@ -4993,7 +4993,7 @@ eventBindingSlots cond = case cond of
   -- Another deliberate empty: Valeron Wardens draws a card and names no "it", so
   -- there is no subject to claim a slot for. The arm above says what a card
   -- reading the renowned permanent would have to settle first.
-  TriggerCondition.PermanentBecomesRenowned _ -> Set.empty
+  TriggerCondition.PermanentBecomesDesignated _ _ -> Set.empty
   -- Empty too: rule 702.100b's event names the creature that evolved, and that is
   -- the bearer -- Renegade Krasis says "this creature", so there is no "it" to
   -- bind that Binding.triggerSource does not already answer.
@@ -5112,7 +5112,7 @@ looksBack condition = case condition of
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   -- CR 702.112b's designation is given to a permanent that stays where it is, so
   -- there is no departure here either.
-  TriggerCondition.PermanentBecomesRenowned _ -> False
+  TriggerCondition.PermanentBecomesDesignated _ _ -> False
   -- Nor here: rule 702.100b's counters are put on a permanent on the battlefield.
   TriggerCondition.SelfEvolves -> False
   -- Entries, not departures (CR 603.6a). The rule's own CR 603.6a checks "all
@@ -5349,7 +5349,7 @@ eventTriggers events gs =
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.BecameRenowned _ -> Map.empty
+        GameEvent.BecameDesignated _ _ -> Map.empty
         GameEvent.Evolved _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -5463,7 +5463,7 @@ eventTriggers events gs =
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.BecameRenowned _ -> Map.empty
+        GameEvent.BecameDesignated _ _ -> Map.empty
         GameEvent.Evolved _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -5536,7 +5536,7 @@ eventTriggers events gs =
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.BecameRenowned _ -> Map.empty
+        GameEvent.BecameDesignated _ _ -> Map.empty
         GameEvent.Evolved _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
@@ -5668,7 +5668,7 @@ zoneTriggeredFrom cond = case cond of
   TriggerCondition.PermanentTurnedFaceUp _ -> Nothing
   -- The same default: CR 702.112b's "only permanents can be or become renowned"
   -- keeps the subject on the battlefield, and Valeron Wardens watches from it.
-  TriggerCondition.PermanentBecomesRenowned _ -> Nothing
+  TriggerCondition.PermanentBecomesDesignated _ _ -> Nothing
   -- The same default again: rule 702.100b's marker goes to a creature, and
   -- Renegade Krasis is the creature watching itself.
   TriggerCondition.SelfEvolves -> Nothing
@@ -5822,7 +5822,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   -- CR 702.112a's ability fires on combat damage to a player, which any player's
   -- turn can carry, and the watcher's turn is not asked about at all.
-  TriggerCondition.PermanentBecomesRenowned _ -> False
+  TriggerCondition.PermanentBecomesDesignated _ _ -> False
   -- Rule 702.100b names no turn either: a creature can evolve on anyone's.
   TriggerCondition.SelfEvolves -> False
   -- CR 701.21a says nothing about whose turn it is, and neither does the printed
@@ -6017,7 +6017,7 @@ stateTriggers gs
               TriggerCondition.PermanentTurnedFaceUp _ -> False
               -- CR 702.112b's designation is exactly that shape once more: the
               -- permanent keeps it, so a state read would fire every settle.
-              TriggerCondition.PermanentBecomesRenowned _ -> False
+              TriggerCondition.PermanentBecomesDesignated _ _ -> False
               -- CR 702.100b is an EVENT trigger and leaves no state at all behind:
               -- the counters it put are indistinguishable from any others.
               TriggerCondition.SelfEvolves -> False

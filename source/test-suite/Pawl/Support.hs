@@ -361,9 +361,7 @@ addCreature printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( oid,
@@ -574,9 +572,7 @@ addToken card pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( oid,
@@ -615,9 +611,7 @@ addLibraryCard printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( oid,
@@ -660,9 +654,7 @@ addGraveyardCard printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( oid,
@@ -708,9 +700,7 @@ addExiledCard printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( oid,
@@ -763,9 +753,7 @@ addHandCard printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( oid,
@@ -821,9 +809,7 @@ landsInPlay land n =
                   Object.ringBearerFor = Nothing,
                   Object.protector = Nothing,
                   Object.unlockedHalves = Set.empty,
-                  Object.renowned = False,
-                  Object.monstrous = False,
-                  Object.suspected = False,
+                  Object.designations = Set.empty,
                   Object.kicked = False
                 }
          in gs2
@@ -861,9 +847,7 @@ handOne printing base =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( gs2
@@ -907,9 +891,7 @@ pikerInHand land piker n ph =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
       gs3 =
@@ -1421,9 +1403,7 @@ oneMountainState mountain ph =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in GameState.MkGameState
@@ -1580,9 +1560,7 @@ spellOnStack printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in ( oid,
@@ -1653,9 +1631,7 @@ stubView table oid =
                 Filter.tapped = False,
                 Filter.counters = Map.empty,
                 Filter.ringBearerFor = Nothing,
-                Filter.renowned = False,
-                Filter.monstrous = False,
-                Filter.suspected = False,
+                Filter.designations = Set.empty,
                 Filter.kicked = False
               }
         [] -> Nothing

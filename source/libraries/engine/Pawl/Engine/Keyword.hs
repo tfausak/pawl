@@ -36,6 +36,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -2106,7 +2107,7 @@ provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 -- would check only on resolution and let the trigger onto the stack regardless,
 -- which rule 603.4 forbids.
 --
--- Quantity.IsRenowned AtMost 0 is "isn't renowned": the designation read as a 0/1
+-- Quantity.HasDesignation Renowned AtMost 0 is "isn't renowned": the designation read as a 0/1
 -- off the object the condition is evaluated against, which for a triggered ability
 -- is CR 113.7a's source (Pawl.Engine.Stack's OfTrigger arm).
 --
@@ -2126,11 +2127,11 @@ renown n =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
-        Just (Condition.Compares Quantity.IsRenowned Comparison.AtMost (Quantity.Literal 0))
+        Just (Condition.Compares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0))
     }
   where
     grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource)
-    designate = Effect.BecomeRenowned Binding.triggerSource
+    designate = Effect.Designate Designation.Renowned Binding.triggerSource
 
 -- CR 702.105a: whenever this creature attacks the player with the most life or
 -- tied for most life, put a +1/+1 counter on it. Rule 702 states it as a

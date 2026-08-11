@@ -99,7 +99,10 @@
                   }
                 },
                 {
-                  "type": "IsRenowned"
+                  "type": "HasDesignation",
+                  "value": {
+                    "type": "Renowned"
+                  }
                 },
                 {
                   "type": "ControlledBy",

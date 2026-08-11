@@ -3,6 +3,7 @@ module Pawl.Types.Filter where
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Subtype as Subtype
@@ -337,46 +338,33 @@ data Filter keyword
     -- it is uncharacteristic AND unwritable by any CR 613 layer, which is what
     -- lets Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsRingBearer
-  | -- | CR 702.112b: does the CANDIDATE have the renowned designation? Aragorn,
-    -- Hornburg Hero's "whenever a renowned creature you control deals combat
-    -- damage to a player".
+  | -- | Does the CANDIDATE have this designation? Aragorn, Hornburg Hero's
+    -- "whenever a renowned creature you control deals combat damage to a player"
+    -- and Rune-Brand Juggler's "sacrifice a suspected creature".
     --
-    -- IsRingBearer's shape, and for the same rule-shaped reason: rule 702.112b
-    -- makes renowned "a designation that has no rules meaning other than to act as
-    -- a marker that ... other spells and abilities can identify", which is what a
-    -- Filter atom is for. Unlike that one it asks nothing of the perspective --
-    -- rule 702.112b's designation belongs to no player, so "you control" is a
-    -- ControlledBy conjunct beside this atom rather than something inside it.
+    -- IsRingBearer's shape, and for the same rule-shaped reason: the rules behind
+    -- Pawl.Types.Designation make each mark "a designation that has no rules
+    -- meaning other than to act as a marker that ... other spells and abilities can
+    -- identify", which is what a Filter atom is for. Unlike that one it asks
+    -- nothing of the perspective -- none of those designations belongs to a player,
+    -- so "you control" is a ControlledBy conjunct beside this atom rather than
+    -- something inside it.
     --
-    -- NOT Pawl.Types.Quantity.IsRenowned, which asks the same designation of the
-    -- object an evaluation is AIMED at (Power's position) for rule 702.112a's
+    -- NOT Pawl.Types.Quantity.HasDesignation, which asks the same designation of
+    -- the object an evaluation is AIMED at (Power's position) for rule 702.112a's
     -- intervening "if". Two readings of one designation, kept apart the way CR
     -- 701.54b's is: a candidate side and a self side.
     --
-    -- Uncharacteristic, for IsRingBearer's reason: rule 702.112b says renowned is
-    -- "neither an ability nor part of the permanent's copiable values", so no CR
-    -- 613 layer writes it and Pawl.Engine.Projection.filterReads declares it as
-    -- reading nothing.
-    IsRenowned
-  | -- | CR 701.60b: does the CANDIDATE have the suspected designation? Rune-Brand
-    -- Juggler's "sacrifice a suspected creature".
+    -- NOT what CR 701.60c hangs off `Suspected` either: menace and "this creature
+    -- can't block" are read off the designation by Pawl.Engine.Projection and
+    -- Pawl.Engine.CombatRestriction, and a filter asking for either of those would
+    -- match a permanent that got it elsewhere.
     --
-    -- IsRenowned's shape in every respect, and for its reason: rule 701.60b words
-    -- the designation the way rule 702.112b words renowned, down to "neither an
-    -- ability nor part of the permanent's copiable values" -- so no CR 613 layer
-    -- writes it, Pawl.Engine.Projection.filterReads declares it as reading
-    -- nothing, and "you control" beside it is a ControlledBy conjunct rather than
-    -- something inside it.
-    --
-    -- NOT Pawl.Types.Quantity.IsSuspected, which asks the same designation of the
-    -- object an evaluation is AIMED at for Repeat Offender's clause condition --
-    -- the candidate side and the self side, kept apart as IsRenowned's pair is.
-    --
-    -- NOT what CR 701.60c hangs off the designation either: menace and "this
-    -- creature can't block" are read off the designation by
-    -- Pawl.Engine.Projection and Pawl.Engine.CombatRestriction, and a filter
-    -- asking for either of those would match a permanent that got it elsewhere.
-    IsSuspected
+    -- Uncharacteristic, for IsRingBearer's reason: each of those rules says the
+    -- designation is "neither an ability nor part of the permanent's copiable
+    -- values", so no CR 613 layer writes it and
+    -- Pawl.Engine.Projection.filterReads declares this atom as reading nothing.
+    HasDesignation Designation.Designation
   | -- | CR 122.1: does the CANDIDATE have one or more counters of this kind on it?
     -- Renegade Krasis' "each other creature you control with a +1/+1 counter on
     -- it".
@@ -385,7 +373,7 @@ data Filter keyword
     -- a threshold would have to say which comparison it meant. The KIND is a
     -- payload because CR 122.1 makes each kind its own marker.
     --
-    -- Uncharacteristic, for IsRenowned's reason: CR 109.3's list has no counters
+    -- Uncharacteristic, for HasDesignation's reason: CR 109.3's list has no counters
     -- in it, so no CR 613 layer writes them and
     -- Pawl.Engine.Projection.filterReads declares this as reading nothing. The P/T
     -- a +1/+1 counter grants is CR 613.4c's, which the projection applies over the
