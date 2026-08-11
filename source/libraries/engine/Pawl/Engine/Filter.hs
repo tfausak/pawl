@@ -126,6 +126,16 @@ data View = MkView
     -- `attachedToCreature` this reads no second projection, so it needs no
     -- laziness argument.
     attachedToPermanent :: Bool,
+    -- CR 701.3a / 301.5a: WHICH object this candidate is attached to, for
+    -- IsAttachedToSource to compare against Context.source -- the id and not a
+    -- Bool, because the atom's answer depends on the match's source and this
+    -- record is built once per candidate.
+    --
+    -- Nothing where Object.attachedTo is, and also where it names a PLAYER (CR
+    -- 303.4's other destination), which is Recipient.objectOf's Nothing. Reads no
+    -- second projection, so unlike `attachedToCreature` it needs no laziness
+    -- argument -- an ObjectId is not a characteristic.
+    attachedTo :: Maybe ObjectId.ObjectId,
     -- CR 701.3a: could the SUBJECT of the attach now being performed -- the
     -- permanent an Effect.AttachTarget is moving -- legally be attached to this
     -- candidate?
@@ -254,6 +264,9 @@ playerView pid =
       attachedToCreature = False,
       -- CR 303.4 again, for the same reason.
       attachedToPermanent = False,
+      -- CR 303.4 a third time: a player is attached to nothing, so there is no
+      -- host id for IsAttachedToSource to compare.
+      attachedTo = Nothing,
       -- CR 701.3a's question can be asked about a player (CR 702.5d), but not
       -- here: the only site that fills this field is Pawl.Engine.Resolve's
       -- AttachTarget arm, whose candidates are battlefield permanents.
@@ -459,6 +472,14 @@ matches context view predicate = case predicate of
   -- stops matching because it stops being attached, never because a stamp was
   -- cleared.
   Filter.IsAttachedToPermanent -> attachedToPermanent view
+  -- CR 701.3a / 301.5a: IsSource's comparison in the other direction -- the
+  -- candidate's HOST against the match's source, rather than the candidate itself.
+  -- A live read of Object.attachedTo, so an Equipment unequipped by CR 704.5n
+  -- stops matching at once. Vacuously False where the candidate is attached to
+  -- nothing or to a player, and where no source frames the match.
+  Filter.IsAttachedToSource -> case (attachedTo view, source context) of
+    (Just host, Just src) -> host == src
+    _ -> False
   -- CR 701.3a: a live read of the legality of the attach this match is framing,
   -- computed by the caller that knows what is moving. Vacuously False outside one.
   Filter.CanHostSubject -> canHostSubject view
@@ -558,6 +579,7 @@ rewrite pairs predicate = case predicate of
   Filter.AttackedThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
   Filter.IsAttachedToPermanent -> predicate
+  Filter.IsAttachedToSource -> predicate
   Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate

@@ -252,6 +252,24 @@ data Filter keyword
     -- being attached to a permanent is a question about the ATTACHMENT, not about
     -- the host's characteristics, so it reads no second projection at all.
     IsAttachedToPermanent
+  | -- | CR 701.3a / 301.5a: the candidate is attached to the evaluation's SOURCE -- Kemba's
+    -- Legion's "for each Equipment attached to this creature", where the Equipment
+    -- is the candidate and the creature is the source. "Equipment attached to it"
+    -- is `And [HasSubtype Equipment, IsAttachedToSource]`; the subtype conjunct is
+    -- the card's word and is not implied here.
+    --
+    -- Context-relative like IsSource, and the same comparison in the other
+    -- direction: IsSource asks whether the candidate IS the source, this whether
+    -- its host is. Vacuously False where the candidate is attached to nothing or
+    -- to a player (CR 303.4's other destination), and where no source frames the
+    -- match.
+    --
+    -- Nullary rather than an arm of #356's general `AttachedTo Filter`, and NOT a
+    -- third instalment of the two atoms above: host IDENTITY is not a host
+    -- QUALITY, so this reads no second projection and needs neither the recursive
+    -- Pawl.Engine.Filter.View that issue is about nor the laziness
+    -- `attachedToCreature` needs.
+    IsAttachedToSource
   | -- | CR 701.3a's last sentence: the candidate is one the SUBJECT of the
     -- surrounding attach -- the permanent being moved -- could legally be attached
     -- to. Aura Graft's "another permanent IT CAN ENCHANT".

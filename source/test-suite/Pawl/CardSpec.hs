@@ -673,10 +673,13 @@ combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionCounts condition
 
--- Every Count reachable from a blocking permission: only CR 604.2's "as long as"
--- gate carries one, the subject beside it being an Affected.
+-- Every Count reachable from a blocking permission: CR 604.2's "as long as" gate,
+-- and the counted arity beside it (Kemba's Legion). The subject is an Affected,
+-- which holds a Filter but no Count.
 blockPermissionCounts :: BlockPermission.BlockPermission -> [Count.Type.Count Quantity.Type.Quantity]
-blockPermissionCounts = foldMap conditionCounts . BlockPermission.while
+blockPermissionCounts permission =
+  foldMap quantityCounts (BlockPermission.additional permission)
+    <> foldMap conditionCounts (BlockPermission.while permission)
 
 -- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
 -- must be added here too.
@@ -1551,6 +1554,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.AttackedThisTurn -> 0
   Filter.Type.IsAttachedToCreature -> 0
   Filter.Type.IsAttachedToPermanent -> 0
+  Filter.Type.IsAttachedToSource -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
   Filter.Type.IsRingBearer -> 0
@@ -2177,11 +2181,13 @@ combatRestrictionFilters restriction = case restriction of
   CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionFilters condition
 
--- Both of a blocking permission's Filter positions: the subject it names and CR
--- 604.2's "as long as" gate beside it (Entourage of Trest).
+-- All three of a blocking permission's Filter positions: the subject it names, CR
+-- 604.2's "as long as" gate beside it (Entourage of Trest), and the counted arity
+-- (Kemba's Legion).
 blockPermissionFilters :: BlockPermission.BlockPermission -> [Filter.Type.Filter Keyword.Keyword]
 blockPermissionFilters permission =
   affectedFilters (BlockPermission.affected permission)
+    <> foldMap quantityFilters (BlockPermission.additional permission)
     <> foldMap conditionFilters (BlockPermission.while permission)
 
 -- Tag a Filter position as UNFRAMED -- one no attach supplies a subject for,

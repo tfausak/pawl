@@ -16,6 +16,8 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
@@ -54,15 +56,40 @@ additionalBlocks candidates gs =
       -- its "unless" and with the opposite polarity: a permission whose gate does
       -- NOT hold grants nothing. Asked once per permission and not per candidate,
       -- because CR 109.5 fixes the "you" inside it as the SOURCE's controller.
+      -- One reading of the source, shared by the gate and the amount below: CR
+      -- 109.5's "you" and Filter.IsSource both mean the permanent printing the
+      -- sentence, so both ask through the same Context.
+      contextOf source = Filter.contextFor (Projection.controllerOf source gs) (Just source)
       granted source changes permission = case BlockPermission.while permission of
         Nothing -> True
         Just condition ->
           Condition.holds
             (Projection.fullView gs)
-            (Filter.contextFor (Projection.controllerOf source gs) (Just source))
+            (contextOf source)
             gs
             source
             (if null changes then condition else Projection.rewriteCondition changes condition)
+      -- CR 509.1a's number, which the card may COUNT rather than print (Kemba's
+      -- Legion). Nothing stays "any number of creatures" untouched; a quantity is
+      -- evaluated against the SOURCE, which is the "this creature" a counted
+      -- printing names, and re-evaluated on every call so an Equipment moving away
+      -- lowers the arity at once.
+      --
+      -- An UNANSWERABLE quantity grants nothing rather than an unbounded arity: 0
+      -- is the strict direction, and Nothing here would read as Palace Guard's
+      -- sentence. CR 107.1b supplies the other clamp -- a calculation yielding a
+      -- negative number uses zero instead -- which is Integer.toNaturalSaturating.
+      amount source changes permission = case BlockPermission.additional permission of
+        Nothing -> Nothing
+        Just quantity ->
+          Just
+            . maybe 0 Integer.toNaturalSaturating
+            . Quantity.evaluate
+              (Projection.fullView gs)
+              (contextOf source)
+              gs
+              source
+            $ if null changes then quantity else Projection.rewriteQuantity changes quantity
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
         Just face -> case Face.blockPermissions face of
@@ -79,9 +106,13 @@ additionalBlocks candidates gs =
                 -- empty case above already turned away every permanent that
                 -- prints no permission.
                 let changes = Projection.textChangesAffecting source gs
-                 in [ (creature, BlockPermission.additional permission)
+                 in [ (creature, extra)
                     | permission <- permissions,
                       granted source changes permission,
+                      -- Bound here rather than in the pair, so a counted
+                      -- permission folds the battlefield once per permission and
+                      -- not once per candidate.
+                      let extra = amount source changes permission,
                       let affected = BlockPermission.affected permission,
                       creature <- candidates,
                       named source (if null changes then affected else Projection.rewriteAffected changes affected) creature

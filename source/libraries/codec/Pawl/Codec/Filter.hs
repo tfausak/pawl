@@ -51,6 +51,7 @@ toJson encode filter_ = case filter_ of
   Filter.AttackedThisTurn -> Common.nullary "AttackedThisTurn"
   Filter.IsAttachedToCreature -> Common.nullary "IsAttachedToCreature"
   Filter.IsAttachedToPermanent -> Common.nullary "IsAttachedToPermanent"
+  Filter.IsAttachedToSource -> Common.nullary "IsAttachedToSource"
   Filter.CanHostSubject -> Common.nullary "CanHostSubject"
   Filter.IsToken -> Common.nullary "IsToken"
   Filter.IsTapped -> Common.nullary "IsTapped"
@@ -87,6 +88,7 @@ fromJson decode value = do
     ("AttackedThisTurn", _) -> Right Filter.AttackedThisTurn
     ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
     ("IsAttachedToPermanent", _) -> Right Filter.IsAttachedToPermanent
+    ("IsAttachedToSource", _) -> Right Filter.IsAttachedToSource
     ("CanHostSubject", _) -> Right Filter.CanHostSubject
     ("IsToken", _) -> Right Filter.IsToken
     ("IsTapped", _) -> Right Filter.IsTapped
