@@ -175,6 +175,7 @@ import qualified Pawl.Json.ValueSpec
 import qualified Pawl.JsonPointer.EvaluateSpec
 import qualified Pawl.JsonPointer.PointerSpec
 import qualified Pawl.JsonPointer.TokenSpec
+import qualified Pawl.JsonSchema.NameSpec
 import qualified Pawl.ManaSpec
 import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
@@ -432,6 +433,7 @@ spec s registry = do
   Pawl.JsonPointer.EvaluateSpec.spec s
   Pawl.JsonPointer.PointerSpec.spec s
   Pawl.JsonPointer.TokenSpec.spec s
+  Pawl.JsonSchema.NameSpec.spec s
   Pawl.ManaSpec.spec s registry
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
