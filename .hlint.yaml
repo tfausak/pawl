@@ -38,6 +38,10 @@
 # rule is the opposite: prefer explicit over point-free.
 - ignore: {name: "Avoid lambda"}
 
+# Same rule again: HLint wants `\x -> f x >>= g` eta-reduced to `f >=> g`. The
+# project style rule is still explicit over point-free.
+- ignore: {name: "Use >=>"}
+
 # HLint rewrites `if c then [] else [x]` into `[x | not c]`. The project style
 # rule bans list comprehensions outright, so this can never be applied.
 - ignore: {name: "Use list comprehension"}

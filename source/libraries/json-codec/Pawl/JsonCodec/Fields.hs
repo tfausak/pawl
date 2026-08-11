@@ -11,7 +11,6 @@
 -- honour.
 module Pawl.JsonCodec.Fields where
 
-import Control.Monad ((>=>))
 import qualified Data.Text as Text
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Json.Pair as Pair
@@ -55,7 +54,7 @@ required :: String -> Codec.Codec a -> (o -> a) -> Fields o a
 required key c get =
   MkFields
     { encodeFields = \o -> [Common.pair key (Codec.encode c (get o))],
-      decodeFields = Common.field key >=> Codec.decode c,
+      decodeFields = \ps -> Common.field key ps >>= Codec.decode c,
       schemaFields = do
         s <- Codec.schema c
         pure ([Common.pair key (Schema.unwrap s)], [Text.pack key])
@@ -87,7 +86,7 @@ object :: forall o. (Typeable.Typeable o) => Fields o o -> Codec.Codec o
 object fields =
   Codec.MkCodec
     { Codec.encode = Common.object . encodeFields fields,
-      Codec.decode = Common.asObject >=> decodeFields fields,
+      Codec.decode = \v -> Common.asObject v >>= decodeFields fields,
       Codec.schema = Define.define (Name.typeName (Typeable.Proxy :: Typeable.Proxy o)) $ do
         (properties, req) <- schemaFields fields
         pure (Schema.object properties req)
