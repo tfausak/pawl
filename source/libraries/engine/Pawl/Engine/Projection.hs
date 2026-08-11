@@ -1459,6 +1459,10 @@ rewriteEffect pairs effect = case effect of
   -- CR 612.2a: a token-creating spell defines the token's creature types and its
   -- name with the same words, so a text change reaches both. Those words live in
   -- the token's defining card, which this arm hands to rewriteCard.
+  --
+  -- Not implemented: the riders go through unchanged, so a CR 122.1b keyword
+  -- counter named among them keeps its printed keyword (#1190) -- the MoveToZone
+  -- arm above and this one now both read that field.
   Effect.Create quantity card riders slot -> Effect.Create quantity (rewriteCard pairs card) riders slot
   -- The ObjectRef alone, exactly as Tap above: an EachMatching's Filter is a
   -- word a CR 612.1 swap reaches. What the token BECOMES is not text on this

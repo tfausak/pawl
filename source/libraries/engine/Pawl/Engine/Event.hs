@@ -2506,8 +2506,16 @@ sacrifice pid oid = do
 -- through this one funnel rather than a second so that CR 614.16's count
 -- replacement, CR 800.4b's departed-player guard and each token's own CR 614.12
 -- entry loop are the same code for both kinds.
-createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Game [ObjectId]
-createTokens controller card copy n tapped = do
+--
+-- `entering` is CR 122.6a's counters the effect says each token enters the
+-- battlefield with -- CR 701.53a's incubate -- and it is passed beside `tapped`
+-- rather than as a whole EntryRiders for the reason changeZoneAttaching keeps them
+-- apart too: the record's other riders are answered elsewhere or are inert here
+-- (CR 111.2 for `underOwner`, CR 508.4 for `attacking`, CR 712.14a's card-only
+-- scope for `transformed`), and handing this funnel the record would read as
+-- though it applied them.
+createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Game [ObjectId]
+createTokens controller card copy n tapped entering = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
     then pure []
@@ -2560,6 +2568,20 @@ createTokens controller card copy n tapped = do
                     Object.kicked = False
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
+          -- CR 122.6a: the counters the EFFECT says these tokens enter with, placed
+          -- through putCounters -- CR 122.6's funnel, so CR 614.16 applies and
+          -- Vorinclex sees them -- exactly as changeZoneEntering's door does for the
+          -- move that carries the same rider.
+          --
+          -- The WHOLE BATCH is dressed before any token runs its entry loop, rather
+          -- than each token being dressed and then entered: CR 614.12 checks "the
+          -- characteristics of the permanent as it would exist on the battlefield",
+          -- and every sibling of this batch is already there by then, so the counters
+          -- they entered with belong to that reading too. No card observes the
+          -- difference -- no entry replacement in the pool reads a counter the
+          -- entering object already has -- so this buys the ordering rather than a
+          -- passing test.
+          Monad.mapM_ (\oid -> Monad.mapM_ (\(kind, many) -> Monad.void (putOwnCounters oid kind many)) (Map.toAscList entering)) ids
           Monad.mapM_ (runEntry (Set.fromList ids)) ids
           -- No prior incarnation to snapshot, so a token's last known information
           -- IS what it is now (CR 111.3). Recorded after every entry loop, so the

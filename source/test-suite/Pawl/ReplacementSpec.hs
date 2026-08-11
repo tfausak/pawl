@@ -2355,6 +2355,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   coldsteelHeartSpec s registry
   vorinclexSpec s registry
   damageCountersSpec s registry
+  entryCountersSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -3910,3 +3911,90 @@ damageCountersSpec s registry = Spec.describe s "Counters damage causes (CR 120.
         Spec.assertEqWith s "two, not four" (shrunk wall watched) 2
         Spec.assertEqWith s "the same two the bare board shows" (shrunk bare once) 2
       _ -> Spec.assertFailure s "fixture did not build both boards"
+
+-- CR 122.6a with CR 701.53a: the counters an EFFECT says a token enters the
+-- battlefield with. "To incubate N, create an Incubator token that enters the
+-- battlefield with N +1/+1 counters on it" (CR 701.53a) is the pool's only
+-- wording that writes Pawl.Types.EntryRiders' `counters` onto an Effect.Create --
+-- undying and persist write it onto a MoveToZone -- and Eyes of Gitaxias
+-- ({2}{U} Sorcery, "Incubate 3. Draw a card.") is the producer picked for it: its
+-- other sentence asks for no choice, and its THREE is the count that tells the
+-- readings apart.
+--
+-- Six doubled, one halved and three unreplaced are three different numbers, which
+-- is what a board with one or two counters could not say.
+--
+-- The token is CR 111.10i's predefined Incubator token: a colorless Incubator
+-- artifact with "{2}: Transform this token", whose back face is a 0/0 colorless
+-- Phyrexian artifact creature named Phyrexian Token. The transform case is what
+-- makes the count matter rather than merely be readable: a 0/0 wearing these
+-- counters is the P/T the rest of the game sees.
+--
+-- Every assertion reads a permanent on the BATTLEFIELD: a token that left it
+-- would cease to exist (CR 111.7) and take the assertion with it.
+entryCountersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+entryCountersSpec s registry = Spec.describe s "The counters a Create says its token enters with (CR 122.6a)" $ do
+  let incubatorName = CardName.MkCardName (Text.pack "Incubator Token")
+      phyrexianName = CardName.MkCardName (Text.pack "Phyrexian Token")
+      -- BOTH seats hold five untapped Islands, so `caster` moves who is paying and
+      -- nothing else; `watcher` seats one printing under one player, and Nothing is
+      -- the control board. Five rather than three, because the transform case below
+      -- pays {2} after the {2}{U}.
+      --
+      -- The caster's library is stocked because the sorcery's second sentence draws
+      -- (CR 104.3c).
+      board caster watcher = do
+        island <- S.printingOf s registry "Island"
+        eyes <- S.printingOf s registry "Eyes of Gitaxias"
+        seat <- Monad.mapM (\(name, _) -> S.printingOf s registry name) watcher
+        let bothSeated = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) (S.landsInPlay island 5) [1 .. 5 :: Int]
+            seated = case (seat, watcher) of
+              (Just printing, Just (_, pid)) -> snd (S.addCreature printing pid bothSeated)
+              _ -> bothSeated
+            (held, g1) = S.addHandCard eyes caster seated
+            (_, g2) = S.addLibraryCard island caster g1
+            after = S.runPure S.identityAnswer g2 (S.cast caster held >> Stack.resolveTop)
+        pure (newestNamed incubatorName after, after)
+      plusOnes = countersOn CounterKind.PlusOnePlusOne
+      -- The token's own "{2}: Transform this token" (CR 111.10i), activated by the
+      -- player who created it -- CR 111.2 makes that its controller -- and resolved.
+      flipToken pid oid gs = case Game.faceOf oid gs >>= Maybe.listToMaybe . Face.activatedAbilities of
+        Nothing -> gs
+        Just ability -> S.runPure S.identityAnswer gs (Activate.activateAbility pid oid ability >> Stack.resolveTop)
+  -- CR 614.16 reaches the placement at all, which is the whole of what the rider
+  -- being routed through Event.putCounters buys: without it the token arrives with
+  -- the three the effect asked for and no praetor can move them.
+  Spec.it s "CR 122.6a alice's praetor doubles the three counters her Incubator token enters with" $ do
+    (doubledToken, doubled) <- board S.alice (Just ("Vorinclex, Monstrous Raider", S.alice))
+    (plainToken, plain) <- board S.alice Nothing
+    case (doubledToken, plainToken) of
+      (Just twice, Just once) -> do
+        Spec.assertEqWith s "twice that many" (plusOnes twice doubled) 6
+        Spec.assertEqWith s "and three without the praetor" (plusOnes once plain) 3
+      _ -> Spec.assertFailure s "the token did not reach the battlefield"
+  -- CR 122.6a's default putter: "if the effect doesn't specify a player, the
+  -- object's controller puts those counters on it", and CR 111.2 makes that bob.
+  -- So ALICE's praetor halves them, which is the direction a putter read off the
+  -- praetor's own controller gets backwards -- it would double these instead.
+  Spec.it s "CR 107.1a alice's praetor halves the counters on bob's Incubator token" $ do
+    (halvedToken, halved) <- board S.bob (Just ("Vorinclex, Monstrous Raider", S.alice))
+    (plainToken, plain) <- board S.bob Nothing
+    case (halvedToken, plainToken) of
+      (Just half, Just once) -> do
+        Spec.assertEqWith s "half of three, rounded down" (plusOnes half halved) 1
+        Spec.assertEqWith s "and three without the praetor" (plusOnes once plain) 3
+      _ -> Spec.assertFailure s "the token did not reach the battlefield"
+  -- What the counters are FOR: CR 111.10i's back face is a 0/0, so the count the
+  -- funnel settled is the creature's power and toughness once the token turns over
+  -- (CR 613.4c). Six and three, from the same pair of boards as the first case.
+  Spec.it s "CR 701.53a the doubled counters are the transformed token's power and toughness" $ do
+    (doubledToken, doubled) <- board S.alice (Just ("Vorinclex, Monstrous Raider", S.alice))
+    (plainToken, plain) <- board S.alice Nothing
+    case (doubledToken, plainToken) of
+      (Just twice, Just once) -> do
+        let flipped = flipToken S.alice twice doubled
+            bare = flipToken S.alice once plain
+        Spec.assertEqWith s "the token turned over" (fmap Face.name (Game.faceOf twice flipped)) (Just phyrexianName)
+        Spec.assertEqWith s "0/0 plus six counters" (S.powerToughnessOf twice flipped) (Just (6, 6))
+        Spec.assertEqWith s "and 0/0 plus three without the praetor" (S.powerToughnessOf once bare) (Just (3, 3))
+      _ -> Spec.assertFailure s "the token did not reach the battlefield"
