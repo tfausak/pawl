@@ -40,6 +40,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
@@ -223,7 +224,7 @@ payableCost = payableCostAt 0
 -- was entitled to.
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x pid oid gs cost =
-  Cost.canPaySomeCompletion pid oid (Cost.totalManas pid oid gs) (Cost.substituteX x cost) gs
+  Cost.canPaySomeCompletion pid oid (Cost.totalManas (Cost.spellAdjustments pid oid gs)) (Cost.substituteX x cost) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -233,7 +234,8 @@ payableCostAt x pid oid gs cost =
 -- this is legal (CR 601.2b) and what it costs the player (#741).
 --
 -- The SEARCH is Cost.greatestPayableX, shared with Activate.affordableX; the
--- PREDICATE is not, since an activation cost skips CR 601.2f's totalling (#90).
+-- PREDICATE is not, since an activation cost totals against its own adjustments
+-- (Cost.activationAdjustments).
 -- This haddock discharges that search's monotonicity requirement for the spell's
 -- predicate.
 --
@@ -292,6 +294,50 @@ entwineOffer pid oid candidates gs = case Game.faceOf oid gs of
     Monad.guard (Natural.length legal == Modal.modeCount modal)
     Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
+
+-- CR 702.33a: the ADDITIONAL cost this player may pay as they cast this spell, or
+-- Nothing when kicking is not on offer at all.
+--
+-- Two conditions where entwineOffer above has three, and each is entwineOffer's:
+--
+--   1. The card HAS kicker, read off the printed keywords of the half being cast
+--      for that function's reason -- rule 702.33a is a static ability of the spell
+--      itself (CR 702.33a: "functions while the spell with kicker is on the
+--      stack").
+--   2. Some candidate cost plus this one is payable -- CR 601.2f's "plus all
+--      additional costs", at CR 601.2b's X=0 floor and with the same payableCost
+--      predicate castability was gated on. An option the player cannot take is not
+--      offered.
+--
+-- What it does NOT test is rule 700.2a's mode legality, which is the third of
+-- entwine's: kicker widens no mode choice, so a spell with a kicker cost is
+-- offered it whatever its modes are.
+--
+-- Neither condition is a choice being made for the player: an option the card does
+-- not have, or that CR 118.3 says cannot be paid, is not an option. WHICH candidate
+-- will carry the cost is not decided here -- castProposed narrows the candidates
+-- once the answer is in -- and `candidates` is handed in for entwineOffer's reason.
+kickerOffer :: PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Maybe (Cost Keyword)
+kickerOffer pid oid candidates gs = case Game.faceOf oid gs of
+  Nothing -> Nothing
+  Just face -> do
+    cost <- Keyword.kickerCost (Face.keywords face)
+    Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) candidates)
+    pure cost
+
+-- CR 702.33d's designation, written onto the spell's own stack incarnation: "that
+-- spell has been kicked". Read back by Quantity.WasKicked through the CR 613
+-- projection, which is how the card's own CR 702.33e ability sees it.
+--
+-- An idempotent write of a field no layer computes, and one direction only: rule
+-- 702.33d gives no way to unkick a spell, and CR 400.7 ends the designation with
+-- the incarnation (Object.newIncarnation), so nothing has to clear it.
+stampKicked :: ObjectId -> GameState -> GameState
+stampKicked sid gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.kicked = True}) sid (GameState.objects gs)
+    }
 
 -- CR 601.3: the zones a spell can be cast from at all, in the engine's
 -- canonical order -- what castableSpells scans, and the list castableZones
@@ -907,12 +953,43 @@ castProposed pid sid face castFrom candidates before = do
       -- choosing); one payable candidate is forced and unprompted.
       -- Reject-not-repair: an answer outside the offered set rewinds the cast.
       --
-      -- CR 601.2f: an announced entwine is added to every candidate BEFORE the
-      -- payability filter, so the routes offered are the ones that can actually
-      -- pay it -- and CR 118.9d is what makes it apply to an alternative cost as
-      -- readily as to the printed one.
+      -- CR 601.2f: an announced entwine -- and the kicker announced below it -- is
+      -- added to every candidate BEFORE the payability filter, so the routes
+      -- offered are the ones that can actually pay it -- and CR 118.9d is what
+      -- makes it apply to an alternative cost as readily as to the printed one.
       let withEntwine candidate = maybe candidate (Cost.plus candidate) entwined
-          payable = filter (payableCost pid sid gs) (fmap withEntwine candidates)
+          entwinedCandidates = fmap withEntwine candidates
+      -- CR 702.33a: kicker, asked HERE -- after the modes and before the cost, the
+      -- variable and the targets -- because that is where CR 601.2b puts the
+      -- announcement of an additional cost, and rule 702.33a bundles nothing else
+      -- into the question the way rule 702.42a bundles a mode choice.
+      --
+      -- The choice is never made for them: kickerOffer answers Nothing only where
+      -- there is no option to offer -- no kicker, or no payable route -- and where
+      -- there IS one, both answers go to the player.
+      --
+      -- Offered against the ENTWINED candidates, so a player who has already
+      -- announced one additional cost is asked about this one only if the two
+      -- together are payable (CR 601.2f's one total). No card carries both, and the
+      -- composition is the rule rather than a guess about the pool.
+      --
+      -- Carried as the additional Cost itself rather than as a flag, for entwine's
+      -- reason: the candidate costs below and the CR 702.33d stamp read one value.
+      kicked <- case kickerOffer pid sid entwinedCandidates gs of
+        Nothing -> pure Nothing
+        Just extra -> do
+          decision <- Game.choose (Prompt.ChooseKicker decider pid sid extra)
+          pure $ case decision of
+            KickerDecision.Kicks -> Just extra
+            KickerDecision.Declines -> Nothing
+      -- CR 702.33d: "if a spell's controller declares the intention to pay any of
+      -- that spell's kicker costs, that spell has been kicked" -- the DECLARATION
+      -- is what designates it, so the stamp lands here and not at CR 601.2h's
+      -- payment. A cast that fails after this point rewinds to `before`, which
+      -- takes the stamp with it along with the spell.
+      Monad.when (Maybe.isJust kicked) (State.modify' (stampKicked sid))
+      let withKicker candidate = maybe candidate (Cost.plus candidate) kicked
+          payable = filter (payableCost pid sid gs) (fmap withKicker entwinedCandidates)
       if null payable
         then reject
         else do
@@ -968,7 +1045,7 @@ castProposed pid sid face castFrom candidates before = do
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
                   -- payableCost gated this cast on, read from the same `gs` the
                   -- total below is.
-                  announcedCost <- Cost.announce pid sid (Cost.totalManas pid sid gs) announcedAtX
+                  announcedCost <- Cost.announce pid sid (Cost.totalManas (Cost.spellAdjustments pid sid gs)) announcedAtX
                   -- CR 601.2c, and the spell is on the stack for it: `sets` above
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in
@@ -995,7 +1072,7 @@ castProposed pid sid face castFrom candidates before = do
                       -- worse one -- CR 118.7e attaches no condition to the
                       -- choice, and CR 601.2h's failed payment is what `reject`
                       -- below answers with.
-                      adjustments <- Cost.announceReductions pid sid gs
+                      adjustments <- Cost.announceReductions pid sid gs (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
                       payment <- Cost.pay pid sid paidCost
                       case payment of
@@ -1003,8 +1080,10 @@ castProposed pid sid face castFrom candidates before = do
                         -- and CR 601.2 returns the game to before it was proposed
                         -- -- which is what takes the spell back off the stack.
                         Payment.Unpaid -> reject
-                        -- Which of the candidate costs was paid is not recorded
-                        -- past this point (#101).
+                        -- WHICH of the candidate costs was paid is not recorded
+                        -- past this point (#101). CR 702.33d's kicker designation
+                        -- is not that record: it says an additional cost was
+                        -- announced, never which candidate carried it.
                         Payment.Paid -> do
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement

@@ -323,31 +323,31 @@ payableCostGiven grants pcs = payableCostAtGiven grants pcs 0
 -- The same question asked at some OTHER value of X -- `payableCost` is this at
 -- the floor and `affordableX` is this climbed.
 --
--- NO CR 601.2f TOTALLING, which is the one place this parts company with the
--- spell's version: an activation cost is deliberately not routed through
--- Cost.total anywhere (#90), so the printed cost is what is measured and what
--- will be paid. When #90 lands, the `pure` below becomes Cost.totalManas and this
--- site is done.
+-- CR 601.2f's TOTALLING against the ACTIVATION adjustments (CR 602.2b routes an
+-- activation cost through rule 601.2b-i), which is Heartstone and Training
+-- Grounds reaching an ability's cost (#90). Not the spell's adjustments and not
+-- Cost.total: those gather the constructors whose sentences say "spells", so
+-- Thalia's tax cannot arrive here however her Filter reads
+-- (Pawl.Engine.PlayerEffect.activationCostAdjustments).
 --
 -- Cost.canPaySomeCompletion and not Cost.canPay so that the two gates ask ONE
--- predicate, in the same shape Cost.announce's `total` parameter already gives
--- the two offers. A NO-OP today rather than a behaviour change: with `pure` for the
--- totalling, asking whether some completion of the cost is payable is the same
--- question Mana.canPayCommitting already answers by expanding CR 107.4e's and CR
--- 107.4f's ways itself. What it buys is that a reduction reaching an activation
--- cost cannot arrive at a gate that still measures the printed {2/X}.
+-- predicate, in the same shape Cost.announce's `total` parameter gives the two
+-- offers: CR 601.2b's completion comes before CR 601.2f's totalling, so a {2/R}
+-- totalled while still spelled {2/R} would hide the generic reduction the
+-- announcement exposes.
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x pid srcId gs cost = Cost.canPaySomeCompletion pid srcId pure (Cost.substituteX x cost) gs
+payableCostAt x pid srcId gs cost = Cost.canPaySomeCompletion pid srcId (Cost.totalManas (Cost.activationAdjustments pid srcId gs)) (Cost.substituteX x cost) gs
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAtGiven grants pcs x pid srcId gs cost = Cost.canPaySomeCompletionGiven grants pcs pid srcId pure (Cost.substituteX x cost) gs
+payableCostAtGiven grants pcs x pid srcId gs cost = Cost.canPaySomeCompletionGiven grants pcs pid srcId (Cost.totalManas (Cost.activationAdjustments pid srcId gs)) (Cost.substituteX x cost) gs
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
 -- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,
--- shared with Cast.affordableX; only the predicate differs, and only by CR
--- 601.2f's totalling (#90). Advisory, never a clamp -- see Prompt.ChooseX.
+-- shared with Cast.affordableX; only the predicate differs, and only by WHICH
+-- adjustments CR 601.2f's totalling reads. Advisory, never a clamp -- see
+-- Prompt.ChooseX.
 affordableX :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
 affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid srcId gs cost) cost
 
@@ -355,8 +355,8 @@ affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid
 -- (abilitiesFor), it is not a mana ability, the whole activation cost is payable
 -- at CR 601.2b's X=0 floor (CR 118.3), the {T} sickness gate holds, the
 -- ability's timing rider permits it now (CR 307.5), and enough modes are
--- fillable to satisfy the selection (CR 700.2a/602.2b). The cost is the PRINTED
--- one (#90).
+-- fillable to satisfy the selection (CR 700.2a/602.2b). The cost is CR 601.2f's
+-- total of the printed one (payableCostAt).
 --
 -- The mana-ability conjunct is about the STACK and not about permission: CR
 -- 605.3b keeps such an ability off it, so an Action.Activate has nothing to do
@@ -484,7 +484,8 @@ activateAbility pid srcId ability = do
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
             Object.monstrous = False,
-            Object.suspected = False
+            Object.suspected = False,
+            Object.kicked = False
           }
       onStack =
         gs2
@@ -520,9 +521,10 @@ activateAbility pid srcId ability = do
       -- nothing (Mana.waysOf), so the engine was announcing 0 on the player's
       -- behalf (#544).
       --
-      -- The bound rides the PRINTED cost, which for an activation is the cost
-      -- `activatable` gated on and the cost that will be paid (#90); nothing
-      -- filters the answer against it (see Prompt.ChooseX).
+      -- The bound rides the PRINTED cost, which is what `activatable` gated on:
+      -- both go through payableCostAt, so CR 601.2f's totalling is applied by the
+      -- predicate rather than baked into the cost handed to it. Nothing filters
+      -- the answer against the bound (see Prompt.ChooseX).
       let printedCost = ActivatedAbility.cost ability
       mAmount <-
         if Cost.hasVariable printedCost
@@ -557,15 +559,15 @@ activateAbility pid srcId ability = do
           -- clauses -- a cost paid during a resolution, or for a special action --
           -- are still unreached (#373).
           --
-          -- `pure` rather than Cost.totalManas, and that is #90 rather than an
-          -- oversight: an activation cost is not routed through Cost.total
-          -- anywhere, so measuring the announcement through anything else would
-          -- offer routes against a total this engine never computes.
+          -- Measured through the SAME totalling payableCost gated on, off the
+          -- same adjustments -- against the printed cost instead, a reduction
+          -- could hide a route and Mana.announce would elide the prompt and pay
+          -- life on the player's behalf (#416, for the spell that named it).
           --
           -- Run on the cost carrying the ANNOUNCED value, which is CR 601.2b's own
           -- order (the value of X precedes the hybrid and Phyrexian
           -- announcements).
-          announcedCost <- Cost.announce pid srcId pure announcedAtX
+          announcedCost <- Cost.announce pid srcId (Cost.totalManas (Cost.activationAdjustments pid srcId gs)) announcedAtX
           let specs = Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)
               sets = Target.legalSets (Just pid) srcId specs gs
           chosen <- Target.chooseTargets decider pid abilId specs sets
@@ -593,6 +595,19 @@ activateAbility pid srcId ability = do
               -- triggered, an ability exists on the stack independently of its
               -- source."
               State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou pid (Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes))}) abilId (GameState.objects g)})
+              -- CR 601.2f, at the position CR 602.2b gives it and in Cast.castSpell's
+              -- own order: the reductions that apply to this activation are announced
+              -- (CR 118.7e's choice of half) and then applied to the announced cost.
+              -- The record announced is the record applied, so the cost paid is the
+              -- cost the gates measured -- one reduction cannot be gathered twice
+              -- from two states.
+              --
+              -- CR 118.7e asks nothing today: every activation-cost reducer in the
+              -- pool reduces by generic mana (Heartstone's {1}), which has no halves
+              -- to choose between. The seam is here rather than skipped so that the
+              -- one that does cannot arrive at a path that never asks.
+              adjustments <- Cost.announceReductions pid srcId gs (Cost.activationAdjustments pid srcId gs)
+              let paidCost = Cost.totalWith adjustments announcedCost
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
               -- components. The gates above prove SOME sequence of choices pays for
               -- this ability -- but Unpaid is reachable all the same, because the
@@ -600,7 +615,7 @@ activateAbility pid srcId ability = do
               -- mis-tapped colour is a choice the engine must honour (Cost.payMana).
               -- Reject-not-repair restores the whole activation, including the
               -- ability object this function put on the stack.
-              payment <- Cost.pay pid srcId announcedCost
+              payment <- Cost.pay pid srcId paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

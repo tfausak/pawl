@@ -181,6 +181,21 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
         -- Three, not four. A doubled turn-based action would land on four and take
         -- the Saga straight past its final chapter.
         Spec.assertEqWith s "and the turn-based action adds ONE, not two" (S.counterOf CounterKind.Lore oid advanced) 3
+  -- The OTHER side of the same distinction, and why the cause reaches the rows
+  -- rather than the funnel's door (#847): Vorinclex, Monstrous Raider says "if YOU
+  -- would put one or more counters on a permanent", and CR 714.3c has "that
+  -- player" put the turn-based lore counter -- so this clause reaches it where
+  -- Doubling Season's "if an effect would" does not.
+  Spec.it s "CR 714.3c Vorinclex DOES double the turn-based lore counter" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        (_, withPraetor) = S.addCreature vorinclex S.alice base
+        gs = precombatMainOf S.alice withPraetor
+        after = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
+        bare = S.runPure S.identityAnswer (precombatMainOf S.alice base) (Engine.runTurnBasedActions Phase.PrecombatMain)
+    Spec.assertEqWith s "two lore counters, not one" (S.counterOf CounterKind.Lore oid after) 2
+    Spec.assertEqWith s "and one without the praetor" (S.counterOf CounterKind.Lore oid bare) 1
   Spec.it s "CR 714.3c a Saga its controller does not control the turn of stays put" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     let (oid, base) = S.addCreature benalia S.bob (Setup.emptyGame S.bothPlayers)

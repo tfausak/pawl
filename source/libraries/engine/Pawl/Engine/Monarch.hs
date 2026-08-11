@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
@@ -185,7 +186,8 @@ placeInherent pending = do
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
             Object.monstrous = False,
-            Object.suspected = False
+            Object.suspected = False,
+            Object.kicked = False
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
 
@@ -268,8 +270,15 @@ returnExiledForMonarch = do
 -- in turn order" counts from the active player's seat, the only position the
 -- rule gives.
 --
--- "Who can become the monarch" is read as "is still in the game": no card in
--- the pool prevents a player from becoming the monarch (#178).
+-- "Who can become the monarch" is CR 725.4's own words, and the eligibility half
+-- of it is Pawl.Engine.PlayerEffect's question (Jared Carthalion, True Heir).
+-- Applied to the ACTIVE player too, though the rule's first sentence states no
+-- gate: the third sentence's "if no player still in the game can become the
+-- monarch" only means anything if the eligibility test covers every seat the rule
+-- might crown, and CR 101.2 would stop the first sentence's crowning anyway. The
+-- rejected reading is the literal one, where an ineligible active player blocks
+-- sentence 1, fails sentence 2's departure condition and leaves the crown
+-- unmoved -- which makes sentence 3 unreachable.
 --
 -- The write and the CR 725.1 event record are ONE step, for the reason
 -- Departure.depart gives for keeping this call inside itself: a crowning that
@@ -287,9 +296,10 @@ reassignOnDeparture leaving playing gs =
           walk = case List.break (== active) (GameState.turnOrder gs) of
             (before, _ : after) -> after <> before
             (before, []) -> before
-          next = List.find (\pid -> List.elem pid playing) walk
+          eligible pid = List.elem pid playing && not (PlayerEffect.prohibitsBecomingMonarch pid gs)
+          next = List.find eligible walk
           crowned =
-            if List.elem active playing
+            if eligible active
               then Just active
               else next
           moved = gs {GameState.monarch = crowned}

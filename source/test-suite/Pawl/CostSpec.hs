@@ -6,10 +6,11 @@
 -- adds. CR 118: what a cost IS, what it takes to pay one, and the alternative
 -- and additional costs that change the answer.
 --
--- The four gate cards: Greed (an amount-bearing component), Village Rites (a
+-- The five gate cards: Greed (an amount-bearing component), Village Rites (a
 -- mandatory spell-side additional cost), Headless Skaab (an additional cost paid
--- out of a zone that is not the battlefield) and Fireblast (an alternative cost
--- with no mana in it at all).
+-- out of a zone that is not the battlefield), Fireblast (an alternative cost
+-- with no mana in it at all) and Asmoranomardicadaistinaculdacar (an alternative
+-- cost applied to an unpayable one, CR 118.6a).
 module Pawl.CostSpec where
 
 import qualified Control.Monad as Monad
@@ -43,6 +44,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure
+import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -160,12 +162,15 @@ doorSpec s registry =
           skeletons = ActivatedAbility.cost (theAbility drudgeSkeletons)
       Spec.assertBool s (Cost.requiresSicknessCheck elves) "Llanowar Elves' {T} cost requires the tap symbol"
       Spec.assertBool s (not (Cost.requiresSicknessCheck skeletons)) "Drudge Skeletons' {B} regenerate cost does not"
-    -- Departure 1: Pawl.Engine.Activate does NOT route an ability cost through
-    -- Cost.total. PlayerEffect.matchesSpell classifies an OBJECT, not a spell,
-    -- so a noncreature PERMANENT matches Thalia's Not (HasCardType Creature)
-    -- filter -- and Thalia taxes noncreature SPELLS, never abilities. Four Mountains
-    -- must still afford Mindslaver's printed {4}; a fifth would be needed if
-    -- the tax wrongly reached the activation (#90).
+    -- Departure 1: an activation cost is totalled against the ACTIVATION
+    -- adjustments (Cost.activationAdjustments) and never the spell's, which is
+    -- the whole of the discriminator #90 landed. PlayerEffect.matchesObject
+    -- classifies an OBJECT, not a spell, so a noncreature PERMANENT matches
+    -- Thalia's Not (HasCardType Creature) filter as readily as a noncreature
+    -- spell does -- and Thalia taxes noncreature SPELLS, never abilities. Four
+    -- Mountains must still afford Mindslaver's {4}; a fifth would be needed if
+    -- the tax reached the activation. Pawl.ActivateSpec's Heartstone group is the
+    -- other side of the same board: a reduction that DOES reach it.
     Spec.it s "CR 613.11 Thalia does not tax a noncreature permanent's activated ability" $ do
       mountain <- S.printingOf s registry "Mountain"
       mindslaver <- S.printingOf s registry "Mindslaver"
@@ -667,6 +672,106 @@ fireblastSpec s registry =
       let (fireblast, gs) = fireblastBoard mountain fireblastPrinting 1 True
       Spec.assertBool s (not (S.castable S.alice fireblast gs)) "not castable"
 
+-- alice controls one untapped Swamp -- the {B} half of Asmoranomardicadaistinaculdacar's
+-- {B/R} -- and holds the card itself plus a Circling Vultures, with priority in
+-- her own precombat main phase and an empty stack, which is where CR 302.1 lets a
+-- creature spell be cast.
+--
+-- The Vultures are the DISCARD: their CR 116.2e special action is the only way a
+-- card in the pool puts a card into a graveyard from a hand at no mana cost, so
+-- the same board serves the discarded and the undiscarded case without changing
+-- the mana available to pay with (see asmorSpec's own note).
+asmorBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+asmorBoard swamp asmorPrinting vultures =
+  let base = S.landsInPlay swamp 1
+      (asmor, gs1) = S.addHandCard asmorPrinting S.alice base
+      (vulturesId, gs2) = S.addHandCard vultures S.alice gs1
+   in ( asmor,
+        vulturesId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Asmoranomardicadaistinaculdacar (MH2 186), a Legendary Creature -- Human Wizard
+-- with NO mana cost: "As long as you've discarded a card this turn, you may pay
+-- {B/R} to cast this spell." Its own rulings say the rest outright -- "it cannot
+-- be cast normally. You'll need an alternative cost" and "Asmoranomardicadaistinaculdacar
+-- doesn't allow you to discard cards" -- which together are CR 118.6a's second
+-- sentence and nothing else.
+--
+-- Not implemented: the enters-the-battlefield tutor, which needs a Filter that
+-- names a card by name (#1228), and "Sacrifice two Foods: Target creature deals 6
+-- damage to itself", which needs the damage's source to be an object the effect
+-- names rather than the ability's own source (#1229). Both are abilities that
+-- would only ever help the controller, so pawl's card is stricter than the
+-- printing rather than weaker.
+asmorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+asmorSpec s registry =
+  Spec.describe s "Asmoranomardicadaistinaculdacar" $ do
+    -- The headline test, and CR 118.6a's second sentence: the printed cost is
+    -- absent and so unpayable (CR 118.6, CR 202.1), and the alternative cost is
+    -- what makes the card castable at all.
+    --
+    -- FOUR boards over one fixture, differing in one thing each, because a
+    -- negative cast assertion is worthless otherwise. `discarded` and `binned`
+    -- move the SAME card to the SAME zone and differ only in whether the move was
+    -- a discard (CR 701.1, CR 701.9a); `nextTurn` is `discarded` with the event log cleared
+    -- at the handoff and the same window restored, so only "this turn" separates
+    -- them; and `poor` has discarded and cannot pay, which is what proves the
+    -- {B/R} is demanded rather than the condition alone being enough.
+    Spec.it s "CR 118.6a the alternative cost is what makes an unpayable card castable" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+      vultures <- S.printingOf s registry "Circling Vultures"
+      let (asmor, vulturesId, gs) = asmorBoard swamp asmorPrinting vultures
+          discarded = S.runPure S.identityAnswer gs (Event.discard DiscardCause.Ordinary S.alice vulturesId)
+          binned = S.runPure S.identityAnswer gs (Event.changeZone vulturesId Zone.Graveyard)
+          nextTurn =
+            (Engine.beginTurnOf S.alice discarded)
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.priority = Just S.alice
+              }
+          poor = List.foldl' (flip S.tapObject) discarded (Set.toList (GameState.battlefield discarded))
+      Spec.assertBool s (not (S.castable S.alice asmor gs)) "no discard: not castable"
+      Spec.assertBool s (S.castable S.alice asmor discarded) "discarded a card this turn: castable"
+      Spec.assertBool s (not (S.castable S.alice asmor binned)) "CR 701.9a the same card put into the graveyard without being discarded does not count"
+      Spec.assertBool s (not (S.castable S.alice asmor nextTurn)) "CR 608.2i the discard was last turn, so it does not count"
+      Spec.assertBool s (not (S.castable S.alice asmor poor)) "and with the Swamp tapped the {B/R} cannot be paid"
+    -- CR 118.9a's candidate list on the card CR 118.6 makes interesting: the
+    -- printed cost is offered first and its mana part is Nothing -- an UNPAYABLE
+    -- cost rather than {0} -- and the alternative appears beside it only while its
+    -- CR 604.2 condition holds.
+    Spec.it s "CR 118.9a costsFor offers the unpayable printed cost, and the alternative only once the condition holds" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+      vultures <- S.printingOf s registry "Circling Vultures"
+      let (asmor, vulturesId, gs) = asmorBoard swamp asmorPrinting vultures
+          discarded = S.runPure S.identityAnswer gs (Event.discard DiscardCause.Ordinary S.alice vulturesId)
+          manaOf state = fmap Cost.Type.mana (Cost.costsFor (S.printingName asmorPrinting) asmor state)
+          blackRed = ManaSymbol.Hybrid (ManaType.Colored Color.Black) (ManaType.Colored Color.Red)
+      Spec.assertEqWith s "undiscarded: the printed cost alone, unpayable" (manaOf gs) [Nothing]
+      Spec.assertEqWith s "discarded: the printed cost first, then the {B/R}" (manaOf discarded) [Nothing, Just (ManaCost.MkManaCost [blackRed])]
+    -- The cast itself, at gameplay level: the spell reaches the stack and the
+    -- Swamp is tapped for it, so the alternative cost was really paid. Resolved
+    -- too, since a 3/3 on the battlefield is what a caster is after.
+    Spec.it s "CR 118.9 paying the alternative puts the spell on the stack, and it resolves as a 3/3" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+      vultures <- S.printingOf s registry "Circling Vultures"
+      let (asmor, vulturesId, gs) = asmorBoard swamp asmorPrinting vultures
+          discarded = S.runPure S.identityAnswer gs (Event.discard DiscardCause.Ordinary S.alice vulturesId)
+          cast = S.runPure S.identityAnswer discarded (S.cast S.alice asmor)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+          -- CR 400.7 mints a new id on each move, so the permanent is the
+          -- battlefield's one new member rather than the hand id.
+          entered = Set.lookupMin (Set.difference (GameState.battlefield resolved) (GameState.battlefield gs))
+      Spec.assertEqWith s "one spell on the stack" (length (GameState.stack cast)) 1
+      Spec.assertEqWith s "the Swamp paid for it" (S.tappedCount S.alice cast) 1
+      Spec.assertEqWith s "and it resolved as a 3/3" (entered >>= \oid -> S.powerToughnessOf oid resolved) (Just (3, 3))
+
 -- The two cross-checks: Fireblast's alternative cost against the projection
 -- (Blood Moon, CR 613 layer 4) and against P7's cost modification (Thalia, CR
 -- 118.9d).
@@ -878,6 +983,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   catharticReunionSpec s registry
   safeholdSentrySpec s registry
   fireblastSpec s registry
+  asmorSpec s registry
   crossCheckSpec s registry
   longtuskCubSpec s registry
 

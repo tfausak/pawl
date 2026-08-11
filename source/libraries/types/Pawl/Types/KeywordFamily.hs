@@ -29,14 +29,13 @@ module Pawl.Types.KeywordFamily where
 -- parameter that CR 702.14c's landwalk filter and CR 702.37a's morph cost force
 -- on it. A family type that named Keyword instead would reopen that cycle.
 --
--- TWENTY is this pool's count, not Magic's. Rule 702 runs to 702.194 and so
--- states 193 keywords past its own general 702.1, roughly a third of them written
--- with a cost or an N; of the keywords Pawl.Types.Keyword models, these twenty
--- carry a payload. The set grows with that type -- ward N and
--- the alternative-cost keywords all land here eventually -- so a constructor is
--- owed whenever a payload-carrying Keyword constructor is added, not whenever a
--- card first asks for one. Pawl.Engine.Keyword.familyOf is exhaustive and takes
--- no wildcard, so the compiler asks for the decision.
+-- THE CONSTRUCTORS BELOW are this pool's, not Magic's. Rule 702 runs to 702.194,
+-- roughly a third of those keywords written with a cost or an N; the ones here are
+-- those of them Pawl.Types.Keyword models. The set grows with that type -- ward N
+-- and the remaining cost-bearing keywords all land here eventually -- so a
+-- constructor is owed whenever a payload-carrying Keyword constructor is added,
+-- not whenever a card first asks for one. Pawl.Engine.Keyword.familyOf is
+-- exhaustive and takes no wildcard, so the compiler asks for the decision.
 data KeywordFamily
   = -- | CR 702.11d: hexproof from [quality].
     Hexproof
@@ -46,6 +45,9 @@ data KeywordFamily
     Rampage
   | -- | CR 702.29a: cycling [cost], and CR 702.29e's typecycling.
     Cycling
+  | -- | CR 702.33a: kicker [cost], which CR 702.33c's multikicker is a variant of
+    -- ("a multikicker cost is a kicker cost"), so one family covers both.
+    Kicker
   | -- | CR 702.34a: flashback [cost].
     Flashback
   | -- | CR 702.37a: morph [cost]. CR 702.37e writes this family in the CR's own

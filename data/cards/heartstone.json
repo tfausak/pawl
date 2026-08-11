@@ -1,0 +1,45 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "name": "Heartstone",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceActivationCost",
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              },
+              [
+                {
+                  "type": "Generic",
+                  "value": 1
+                }
+              ],
+              1
+            ]
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

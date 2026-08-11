@@ -54,6 +54,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -363,6 +364,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.IsRenowned -> []
   Quantity.Type.IsMonstrous -> []
   Quantity.Type.IsSuspected -> []
+  Quantity.Type.WasKicked -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters _ _ -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
@@ -371,6 +373,9 @@ quantityCounts quantity = case quantity of
   -- CR 508.3b's combat record, read as a tally of players: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.OpponentsAttacked _ -> []
+  -- CR 701.9a's tally of logged discards: a PlayerRef and nothing else, so no
+  -- Count and no Filter here either.
+  Quantity.Type.CardsDiscardedThisTurn _ -> []
   -- CR 509.1h's declaration, read against the object the quantity is evaluated
   -- against: a nullary leaf, so no Count and no Filter here either.
   Quantity.Type.BlockersBeyondFirst -> []
@@ -687,6 +692,7 @@ cardCounts card =
     <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AlternativeCost.condition) (Face.alternativeCosts card)
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
     <> concatMap blockPermissionCounts (Face.blockPermissions card)
 
@@ -1544,6 +1550,7 @@ keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
   Keyword.Cycling cost mFilter -> costFilters cost <> Maybe.maybeToList mFilter
   Keyword.Flashback cost -> costFilters cost
+  Keyword.Kicker cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.37a: the morph cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
@@ -1695,6 +1702,13 @@ keywordFilters keyword = case keyword of
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 costFilters = concatMap costComponentFilters . Cost.Type.components
+
+-- CR 118.9: an alternative cost reaches a Filter through its components, as any
+-- Cost does, and through the Condition CR 604.2 may gate it with.
+alternativeCostFilters :: AlternativeCost.AlternativeCost -> [Filter.Type.Filter Keyword.Keyword]
+alternativeCostFilters alternative =
+  costFilters (AlternativeCost.cost alternative)
+    <> concatMap conditionFilters (Maybe.maybeToList (AlternativeCost.condition alternative))
 
 -- CR 116.2: which spells a printed special action names -- only through the cost
 -- CR 116.2d's ignore carries.
@@ -1879,13 +1893,16 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- "This spell" names the bearer and needs no Filter to say so.
   TriggerCondition.SelfCast -> []
 
--- CR 613.11: which spells a player effect names -- a cost modifier's (CR
+-- CR 613.11: which objects a player effect names -- a cost modifier's (CR
 -- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR
 -- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost f _ -> [f]
   PlayerEffect.ReduceSpellCost f _ -> [f]
+  -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
+  -- PERMANENT rather than a spell, and is authored the same way.
+  PlayerEffect.ReduceActivationCost f _ _ -> [f]
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantCastMoreThan _ -> []
   -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
@@ -1896,6 +1913,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- how many lands, never which spells.
   PlayerEffect.PlayAdditionalLands _ -> []
   PlayerEffect.NoMaximumHandSize -> []
+  -- CR 402.2 carries a bare count of cards for the same reason: it names how many
+  -- cards a hand may hold, never which spells.
+  PlayerEffect.SetMaximumHandSize _ -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a player effect names.
   PlayerEffect.DontLoseUnspentMana _ -> []
@@ -1916,6 +1936,9 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented _ -> []
   -- CR 701.23 names no quality of the libraries it stops being searched.
   PlayerEffect.CantSearchLibraries -> []
+  -- CR 725 names no quality either: the designation has no parts (Jared
+  -- Carthalion, True Heir).
+  PlayerEffect.CantBecomeMonarch -> []
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
@@ -1942,18 +1965,21 @@ unpreventableScopeOffends :: PlayerScope.PlayerScope -> PlayerEffect.PlayerEffec
 unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented _ -> scope /= PlayerScope.EachPlayer
   PlayerEffect.CantSearchLibraries -> False
+  PlayerEffect.CantBecomeMonarch -> False
   -- Every other arm IS asked about a player, so its scope is read exactly as
   -- written and any of the three is legitimate: Rule of Law and Thalia say
   -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
   -- Serpopard says You.
   PlayerEffect.IncreaseSpellCost _ _ -> False
   PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False
   PlayerEffect.CantPlayLandChosenName -> False
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.SetMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -1978,14 +2004,17 @@ unpreventablePatternOffends :: PlayerEffect.PlayerEffect -> Bool
 unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_)
   PlayerEffect.CantSearchLibraries -> False
+  PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.IncreaseSpellCost _ _ -> False
   PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False
   PlayerEffect.CantPlayLandChosenName -> False
   PlayerEffect.PlayAdditionalLands _ -> False
   PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.SetMaximumHandSize _ -> False
   PlayerEffect.DontLoseUnspentMana _ -> False
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -2267,7 +2296,9 @@ activatedAbilityFilters ability =
 --     and the layer-6/7 modifications' own keywords and Counts.
 --   * `replacementEffects` -- CR 614.1's counter-placement pattern.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSpec.
---   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
+--   * `additionalCosts` -- CR 601.2f's sacrifice component.
+--   * `alternativeCosts` -- that same component, plus CR 604.2's "as long as"
+--     condition gating one.
 --   * `specialActions` -- CR 116.2d's ignore cost, a Cost like the two above.
 --   * `playerAbilities` -- CR 613.11's cost modifiers and CR 601.3b's timing
 --     permission.
@@ -2307,7 +2338,7 @@ cardFilters card =
         <> concatMap replacementEffectFilters (Face.replacementEffects card)
         <> concatMap targetSpecFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
-        <> concatMap costFilters (Face.alternativeCosts card)
+        <> concatMap alternativeCostFilters (Face.alternativeCosts card)
         <> concatMap specialActionFilters (Face.specialActions card)
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap (affectedFilters . BlockRequirement.attacker) (Face.blockRequirements card)
@@ -3888,7 +3919,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 614.1's counter-placement pattern",
               base
                 { Face.replacementEffects =
-                    [ReplacementEffect.CounterR (CounterPattern.MkCounterPattern Nothing ControllerRelation.Yours buried) (Scaling.AddMore 1)]
+                    [ReplacementEffect.CounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)]
                 }
             ),
             ( "a created token's own static ability",

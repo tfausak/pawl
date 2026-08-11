@@ -46,6 +46,7 @@ import qualified Pawl.Types.CandidateId as CandidateId
 import Pawl.Types.Card (Card)
 import Pawl.Types.ControllerRelation (ControllerRelation)
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -66,6 +67,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import Pawl.Types.PhaseSelector (PhaseSelector)
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Prevention as Prevention
@@ -100,6 +102,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
@@ -262,23 +265,26 @@ applies gs event candidate =
         -- card pool is self-regeneration (CR 701.19a).
         (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid regenerability) ->
           src == oid && admits regenerability rewrite
-        (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutCounters oid kind _) ->
+        (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutCounters cause oid kind _) ->
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.
           maybe True (== kind) (CounterPattern.whichKind pat)
+            && matchesPutter gs src (CounterPattern.byWhom pat) cause
             && matchesController gs src (CounterPattern.whose pat) oid
             && matchesPermanent gs Nothing (CounterPattern.onWhat pat) oid
+        -- CR 122.1 / 614.1: the same pattern against a PLAYER recipient. A
+        -- pattern naming a kind admits none of these: `whichKind` is the object
+        -- kinds, and a player can hold no counter of one (see
+        -- Pawl.Types.CounterPattern), so Hardened Scales stays off a poison
+        -- counter without saying so.
+        (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutPlayerCounters cause pid _ _) ->
+          Maybe.isNothing (CounterPattern.whichKind pat)
+            && matchesPutter gs src (CounterPattern.byWhom pat) cause
+            && maybe False (\rel -> matchesPlayer gs src rel pid) (CounterPattern.onWho pat)
+        -- CR 109.5: "under YOUR control" -- the tokens' controller against the
+        -- effect source's controller. CR 102.2's Opponents has no producer today.
         (ReplacementEffect.TokenR pat _, ProposedEvent.WouldCreateTokens pid _ _) ->
-          case TokenPattern.whose pat of
-            ControllerRelation.Anyones -> True
-            -- CR 109.5: "under YOUR control" -- the tokens' controller is the
-            -- effect source's controller.
-            ControllerRelation.Yours -> Projection.controllerOf src gs == Just pid
-            -- CR 102.2: no producer today -- tokens created under an opponent's
-            -- control.
-            ControllerRelation.Opponents -> case Projection.controllerOf src gs of
-              Just you -> pid /= you
-              Nothing -> False
+          matchesPlayer gs src (TokenPattern.whose pat) pid
         -- CR 614.1b / 500.11: a skip intercepts a step or phase BEGINNING, and
         -- names exactly which one -- and, for a player-scoped skip, whose.
         --
@@ -325,6 +331,43 @@ applies gs event candidate =
         (ReplacementEffect.TokenR _ _, _) -> False
         (ReplacementEffect.TurnUpR _ _, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
+
+-- CR 614.16 versus CR 614.1: does this placement's PROVENANCE satisfy the
+-- pattern's subject?
+--
+-- Nothing is rule 614.16's own subject, "if an EFFECT would put one or more
+-- counters" -- so it admits exactly that rule's two causes and no others. CR 609.1
+-- makes CR 714.3c's turn-based action neither, which is what keeps Doubling Season
+-- off a Saga's advancing lore counter.
+--
+-- Just a relation is a clause naming a PLAYER instead (Vorinclex, Monstrous
+-- Raider's "if you would put", "if an opponent would put"). Rule 714.3c has "that
+-- player" put the lore counter, so such a clause reaches it: the two subjects
+-- disagree about exactly this case, which is why the cause rides the event to here
+-- rather than being spent at the funnel's door (#847).
+matchesPutter :: GameState -> ObjectId -> Maybe ControllerRelation -> CounterCause.CounterCause -> Bool
+matchesPutter gs src subject cause = case (subject, cause) of
+  (Nothing, CounterCause.ByEffect _) -> True
+  (Nothing, CounterCause.ByRule _) -> False
+  -- The two causes coincide here on purpose, and the pair is written out rather
+  -- than collapsed: a player clause asks WHO, and both causes name a player.
+  (Just rel, CounterCause.ByEffect pid) -> matchesPlayer gs src rel pid
+  (Just rel, CounterCause.ByRule pid) -> matchesPlayer gs src rel pid
+
+-- CR 109.5 / 614.1: does this PLAYER satisfy a pattern's relation, read against
+-- the controller of the effect's SOURCE? Anyones always does; a source with no
+-- controller has no "you" and no opponents, so it admits neither.
+--
+-- matchesController's sibling for the players a pattern names outright rather
+-- than through an object -- the token's controller (CR 111.2), the player putting
+-- counters (CR 122.6a) and the player receiving them (CR 122.1).
+matchesPlayer :: GameState -> ObjectId -> ControllerRelation -> PlayerId -> Bool
+matchesPlayer gs src rel pid = case rel of
+  ControllerRelation.Anyones -> True
+  ControllerRelation.Yours -> Projection.controllerOf src gs == Just pid
+  ControllerRelation.Opponents -> case Projection.controllerOf src gs of
+    Just you -> pid /= you
+    Nothing -> False
 
 -- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
 -- against the controller of the effect's SOURCE? Anyones always does.
@@ -502,6 +545,9 @@ scale :: Scaling.Scaling -> Natural -> Natural
 scale s n = case s of
   Scaling.Multiply m -> n * m
   Scaling.AddMore m -> n + m
+  -- CR 107.1a: "half that many . . . rounded down", which `div` on Natural
+  -- already is. One is what makes this the only scaling that can answer zero.
+  Scaling.Halve -> n `div` 2
 
 -- CR 616.1a-e: take the HIGHEST non-empty bucket. Ord on ReplacementBucket is
 -- ascending in the CR's own order, so that is the minimum present; the fold seeds
@@ -798,7 +844,10 @@ chooserOf gs event = case event of
     Recipient.ToBattle oid -> Projection.controllerOf oid gs
     Recipient.ToObject oid -> Projection.controllerOf oid gs
   ProposedEvent.WouldBeDestroyed oid _ -> Projection.controllerOf oid gs
-  ProposedEvent.WouldPutCounters oid _ _ -> Projection.controllerOf oid gs
+  ProposedEvent.WouldPutCounters _ oid _ _ -> Projection.controllerOf oid gs
+  -- CR 616.1's affected player is the one the event happens to, which for a
+  -- counter put on a PLAYER is that player -- not the one putting it.
+  ProposedEvent.WouldPutPlayerCounters _ pid _ _ -> Just pid
   ProposedEvent.WouldCreateTokens pid _ _ -> Just pid
   -- CR 616.1's "affected player": a step or phase beginning affects no object,
   -- so the player whose turn it is chooses among applicable skips.
@@ -1237,6 +1286,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
@@ -1248,17 +1298,34 @@ asDestruction event = case event of
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
 
 asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural)
 asCounters event = case event of
-  ProposedEvent.WouldPutCounters oid kind n -> Just (oid, kind, n)
+  ProposedEvent.WouldPutCounters _ oid kind n -> Just (oid, kind, n)
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
+  ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
+
+-- asCounters' player half. The CAUSE is dropped by both, for the same reason: what
+-- the funnel needs back is the placement to carry out, and the provenance has
+-- already been read by every row that could apply.
+asPlayerCounters :: ProposedEvent -> Maybe (PlayerId, PlayerCounterKind.PlayerCounterKind, Natural)
+asPlayerCounters event = case event of
+  ProposedEvent.WouldPutPlayerCounters _ pid kind n -> Just (pid, kind, n)
+  ProposedEvent.WouldChangeZone _ -> Nothing
+  ProposedEvent.WouldEnter _ -> Nothing
+  ProposedEvent.WouldDealDamage _ -> Nothing
+  ProposedEvent.WouldBeDestroyed {} -> Nothing
+  ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
@@ -1271,6 +1338,7 @@ asTokens event = case event of
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
 
@@ -1341,5 +1409,6 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldDealDamage _ -> Nothing
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
+  ProposedEvent.WouldPutPlayerCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing

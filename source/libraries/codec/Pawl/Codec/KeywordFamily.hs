@@ -16,6 +16,7 @@ toJson f = Common.nullary $ case f of
   KeywordFamily.Landwalk -> "Landwalk"
   KeywordFamily.Rampage -> "Rampage"
   KeywordFamily.Cycling -> "Cycling"
+  KeywordFamily.Kicker -> "Kicker"
   KeywordFamily.Flashback -> "Flashback"
   KeywordFamily.Morph -> "Morph"
   KeywordFamily.Entwine -> "Entwine"
@@ -42,6 +43,7 @@ fromJson =
       ("Landwalk", KeywordFamily.Landwalk),
       ("Rampage", KeywordFamily.Rampage),
       ("Cycling", KeywordFamily.Cycling),
+      ("Kicker", KeywordFamily.Kicker),
       ("Flashback", KeywordFamily.Flashback),
       ("Morph", KeywordFamily.Morph),
       ("Entwine", KeywordFamily.Entwine),

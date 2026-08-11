@@ -16,6 +16,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -25,7 +26,6 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
-import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Defense as Defense
@@ -208,22 +208,19 @@ data Face card = MkFace
     -- is what makes Pawl.Engine.Cost.costsFor's list a list of CANDIDATES the
     -- caster picks from. Each carries its OWN mana part, which is how CR 118.6a's
     -- second sentence falls out of the shape -- Fireblast's is Just [], a real,
-    -- taxable {0}, not Nothing.
-    --
-    -- That second sentence is UNEXERCISED, though: it speaks of an alternative
-    -- cost applied to an UNPAYABLE one, and Fireblast is the only card in the pool
-    -- with an alternative cost at all -- it has a printed mana cost, so no card
-    -- reaches the case (#109).
+    -- taxable {0}, not Nothing, and Asmoranomardicadaistinaculdacar pays a {B/R}
+    -- for a printed cost that is Nothing.
     --
     -- Printed-only: an effect that GRANTS an alternative cost has no carrier here
     -- (#103). CR 118.9 is about SPELLS, so this lives on a face and never on
     -- ActivatedAbility -- a rules fact, not an elision.
     --
-    -- UNCONDITIONED, which is why rule 702.34a's flashback cost is deliberately
-    -- NOT one of these: a cost here is payable wherever the card can be cast from,
-    -- and flashback's only from the graveyard. It rides its keyword instead, and
+    -- CONDITIONED only where the card states a condition (CR 604.2), which is
+    -- Pawl.Types.AlternativeCost's own field. Rule 702.34a's flashback cost is
+    -- still deliberately NOT one of these: its gate is a ZONE rather than a
+    -- condition over game state, so it rides its keyword and
     -- Pawl.Engine.Cost.costsFor offers it by zone.
-    alternativeCosts :: [Cost.Cost Keyword.Keyword],
+    alternativeCosts :: [AlternativeCost.AlternativeCost],
     -- | CR 604.1/604.2 / 611.1: this face's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary Tower).
     -- The sibling of staticAbilities on the axis CR 613.10/613.11 put OUTSIDE the

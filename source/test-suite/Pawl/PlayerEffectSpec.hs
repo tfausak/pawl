@@ -31,6 +31,12 @@
 -- static ability discounts is printed text like any other, so a text change moves
 -- the discount off it.
 --
+-- The Ten Rings and Sea Gate Restoration are the CR 613.11 TIMESTAMP pair, and
+-- they are a pair on purpose: a set maximum hand size and a removed one disagree,
+-- so which of them entered later decides the answer -- and one rides each carrier,
+-- which is where pawl's order used to come apart (Reliquary Tower is the third
+-- card in the group, and its ruling is the authority for the reading).
+--
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
@@ -74,7 +80,10 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
@@ -100,6 +109,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- Rule of Law {2}{W} Enchantment: "Each player can't cast more than one spell
 -- each turn." alice has nine untapped Plains (mana is never the reason a cast is
@@ -281,6 +291,18 @@ green = ManaSymbol.OfType (ManaType.Colored Color.Green)
 phyrexianGreen :: ManaSymbol.ManaSymbol
 phyrexianGreen = ManaSymbol.Phyrexian Color.Green
 
+-- CR 601.2f's adjustments as this suite's assertions state them: the increases,
+-- the reductions, and no floor -- Pawl.Types.CostAdjustments.minimumMana is
+-- Heartstone's sentence, and no spell-cost reducer states it (the activation side
+-- is proved against the card in Pawl.ActivateSpec).
+adjustments :: [Natural] -> [ManaCost.ManaCost] -> CostAdjustments.CostAdjustments
+adjustments increases reductions =
+  CostAdjustments.MkCostAdjustments
+    { CostAdjustments.increases = increases,
+      CostAdjustments.reductions = reductions,
+      CostAdjustments.minimumMana = 0
+    }
+
 -- A reduction by an amount of GENERIC mana (CR 118.7a) -- the Medallion's shape,
 -- and the only shape a reduction had before Edgewalker.
 generic :: Natural -> ManaCost.ManaCost
@@ -288,7 +310,7 @@ generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
 
 -- Cost.total via a bare ManaCost, component-free -- this suite predates P8's
 -- Cost/CostComponent generalization and exercises only the mana half
--- (costAdjustments), so the wrap-and-unwrap stays local here instead of
+-- (spellCostAdjustments), so the wrap-and-unwrap stays local here instead of
 -- rewriting every assertion below to a full Cost.Type.MkCost literal.
 totalManaCost :: PlayerId.PlayerId -> ObjectId.ObjectId -> ManaCost.ManaCost -> GameState.GameState -> Maybe ManaCost.ManaCost
 totalManaCost pid oid manaCost gs = Cost.Type.mana (Cost.total pid oid (Cost.Type.MkCost (Just manaCost) []) gs)
@@ -300,14 +322,14 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "unchanged"
-        (Cost.applyAdjustments ([], []) (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+        (Cost.applyAdjustments (adjustments [] []) (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
 
     Spec.it s "CR 601.2f an increase adds generic mana" $
       Spec.assertEqWith
         s
         "{R} taxed by {1} is {1}{R}"
-        (Cost.applyAdjustments ([1], []) (ManaCost.MkManaCost [red]))
+        (Cost.applyAdjustments (adjustments [1] []) (ManaCost.MkManaCost [red]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
 
     -- CR 118.7a: "Effects that reduce a cost by an amount of generic mana
@@ -317,21 +339,21 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{U} reduced by {1} is still {U}"
-        (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [blue]))
+        (Cost.applyAdjustments (adjustments [] [generic 1]) (ManaCost.MkManaCost [blue]))
         (ManaCost.MkManaCost [blue])
 
     Spec.it s "CR 118.7a a reduction takes only the generic component" $
       Spec.assertEqWith
         s
         "{2}{U} reduced by {1} is {1}{U}"
-        (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+        (Cost.applyAdjustments (adjustments [] [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
 
     Spec.it s "CR 601.2f the total can't be reduced below {0}" $
       Spec.assertEqWith
         s
         "{1} reduced by {3} is {0}"
-        (Cost.applyAdjustments ([], [generic 3]) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+        (Cost.applyAdjustments (adjustments [] [generic 3]) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
         (ManaCost.MkManaCost [])
 
     -- THE ORDER TEST, in the small. Increase first gives {1}{U}, which the
@@ -341,7 +363,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{U} +{1} -{1} is {U}"
-        (Cost.applyAdjustments ([1], [generic 1]) (ManaCost.MkManaCost [blue]))
+        (Cost.applyAdjustments (adjustments [1] [generic 1]) (ManaCost.MkManaCost [blue]))
         (ManaCost.MkManaCost [blue])
 
     -- CR 118.7's typed half, which CR 118.7a's generic half above cannot
@@ -350,14 +372,14 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{W}{B} reduced by {W}{B} is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     Spec.it s "CR 118.7 one reducing symbol takes exactly one matching symbol" $
       Spec.assertEqWith
         s
         "{W}{W} reduced by {W} is {W}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [white, white]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [white, white]))
         (ManaCost.MkManaCost [white])
 
     -- THE HEADLINE FALSIFIER for the typed half, and the one place pawl
@@ -369,7 +391,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{W} reduced by {W}{B} is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     -- Ruling: "If you have more than one of these on the battlefield, the cost
@@ -379,7 +401,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{W}{B} reduced by {W}{B} twice is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     -- CR 118.7f, in the small: the two SIDES of the cancellation read a
@@ -391,14 +413,14 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{G} reduced by {G/P} is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [phyrexianGreen]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [phyrexianGreen]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     Spec.it s "a Phyrexian symbol in the COST is not what a reduction of its colour takes" $
       Spec.assertEqWith
         s
         "{G/P} reduced by {G} is still {G/P}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [green]]) (ManaCost.MkManaCost [phyrexianGreen]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [green]]) (ManaCost.MkManaCost [phyrexianGreen]))
         (ManaCost.MkManaCost [phyrexianGreen])
 
     -- CR 118.7e, in the small: WHICH TWO THINGS the payer is choosing between.
@@ -451,12 +473,12 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{W}{B} reduced by the white half is {1}{B}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, black])
       Spec.assertEqWith
         s
         "{1}{W}{B} reduced by the black half is {1}{W}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, white])
 
     -- CR 118.7g, in the small, and the other arm where the two sides part
@@ -466,7 +488,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{2}{U} reduced by {S} is {1}{U}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [ManaSymbol.Snow]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [ManaSymbol.Snow]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
 
     -- CR 107.4h's half of the same split: "Effects that reduce the amount of
@@ -481,7 +503,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{S} reduced by {1} is {S}"
-        (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.Snow]))
+        (Cost.applyAdjustments (adjustments [] [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.Snow]))
         (ManaCost.MkManaCost [ManaSymbol.Snow])
 
     -- The two halves of ONE reduction, on the two halves of one cost: CR
@@ -491,7 +513,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{2}{U} reduced by {1}{U} is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
 -- alice controls Thalia and `n` untapped Mountains; her hand holds one
@@ -1806,6 +1828,129 @@ reliquaryTowerSpec s registry =
       let board = reliquaryHandOfNine plains [reliquaryTower, bloodMoon]
       Spec.assertEqWith s "seven again" (PlayerEffect.maximumHandSize S.alice board) (Just 7)
 
+-- alice's board with BOTH maximum-hand-size effects live, built in one of the two
+-- orders: `ringsFirst` decides whether The Ten Rings' printed CR 613.7a effect is
+-- older or newer than Sea Gate Restoration's stored CR 613.7b one.
+--
+-- The two CARRIERS are the point, and no board of two permanents can replace them.
+-- A permanent takes a fresh ObjectId every time it arrives (Event.placeObject), so
+-- GameState.battlefield's Set walks two printed carriers in the very order their
+-- timestamps give, and a board of two printed effects cannot tell the readings
+-- apart. Printed against STORED can: the gather concatenates the two lists, so
+-- without the sort every stored effect is read last whatever its stamp.
+--
+-- Five Plains in hand, ten in the library: the sorcery draws hand-plus-one, so
+-- alice ends on eleven cards -- one over The Ten Rings' maximum, which is what
+-- makes the cleanup discard tell the two readings apart. The library is stocked
+-- past the draw so CR 104.3c decks nobody.
+ringsAndRestoration :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+ringsAndRestoration ringsFirst plains island tenRings restoration =
+  let gs0 = Setup.emptyGame S.bothPlayers
+      add printing g _ = snd (S.addCreature printing S.alice g)
+      stockHand g _ = snd (S.addHandCard plains S.alice g)
+      stockLibrary g _ = snd (S.addLibraryCard plains S.alice g)
+      -- Seven Islands, because the sorcery costs {4}{U}{U}{U} and is CAST rather
+      -- than placed on the stack: a modal double-faced card put there by hand has
+      -- no chosen half, and CR 712.11b makes that choice part of casting it.
+      withLands = List.foldl' (add island) gs0 [1 .. 7 :: Int]
+      stocked = List.foldl' stockLibrary (List.foldl' stockHand withLands [1 .. 5 :: Int]) [1 .. 10 :: Int]
+      (spellId, withSpell) = S.addHandCard restoration S.alice stocked
+      ready =
+        withSpell
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      frontName = CardName.MkCardName (Text.pack "Sea Gate Restoration")
+      cast g = S.runPure S.identityAnswer g (Cast.castSpell S.alice spellId frontName Facing.FaceUp)
+      resolve g = S.runPure S.identityAnswer g Stack.resolveTop
+      rings = S.addCreature tenRings S.alice
+   in if ringsFirst
+        then let (ringsId, withRings) = rings ready in (resolve (cast withRings), ringsId)
+        else let (ringsId, withRings) = rings (resolve (cast ready)) in (withRings, ringsId)
+
+-- The Ten Rings, a Legendary Artifact: "Your maximum hand size is ten." Its
+-- end-step draw-to-ten ability is not implemented (#1239).
+--
+-- Sea Gate Restoration, the front face of a modal double-faced card: "Draw cards
+-- equal to the number of cards in your hand plus one. You have no maximum hand
+-- size for the rest of the game." Its back face Sea Gate, Reborn always enters
+-- tapped -- the "you may pay 3 life" that buys it in untapped is not implemented
+-- (#1240).
+--
+-- Together they are the pair CR 613.11's timestamp order decides, one on each
+-- carrier: a SET maximum and a REMOVED one disagree, and Reliquary Tower's own
+-- ruling says the later of the two wins. Both orders are built, so neither answer
+-- can be reached by a fold that ignores the order.
+theTenRingsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+theTenRingsSpec s registry =
+  Spec.describe s "TheTenRings" $ do
+    Spec.it s "CR 402.2 alone it sets the maximum to ten" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      Spec.assertEqWith s "ten" (PlayerEffect.maximumHandSize S.alice (reliquaryHandOfNine plains [tenRings])) (Just 10)
+
+    -- CR 514.1: nine cards is under the ten it allows, so the cleanup discard
+    -- that trims a default hand of nine to seven trims nothing here.
+    Spec.it s "CR 514.1 nine cards at cleanup discards nothing" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      let after = reliquaryCleanup (reliquaryHandOfNine plains [tenRings])
+      Spec.assertEqWith s "hand keeps nine" (S.handSize S.alice after) 9
+      Spec.assertEqWith s "nothing discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+    -- CR 109.5: the You scope, as for the Tower. bob's hand is still CR 402.2's
+    -- seven.
+    Spec.it s "CR 109.5 the opponent's maximum is untouched" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      Spec.assertEqWith s "seven" (PlayerEffect.maximumHandSize S.bob (reliquaryHandOfNine plains [tenRings])) (Just 7)
+
+    -- The fixture's own claim, asserted rather than assumed: the stored effect
+    -- really is the OLDER of the two on this board, so the gather has to move it
+    -- ahead of the printed one it is concatenated behind. Without this the case
+    -- below could pass on a board where the two orders agreed.
+    Spec.it s "CR 613.7 the stored effect is older than the printed one" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      restoration <- S.printingOf s registry "Sea Gate Restoration"
+      island <- S.printingOf s registry "Island"
+      let (board, ringsId) = ringsAndRestoration False plains island tenRings restoration
+      Spec.assertEqWith s "one stored effect" (fmap ActivePlayerEffect.effect (GameState.playerEffects board)) [PlayerEffect.Type.NoMaximumHandSize]
+      Spec.assertEqWith
+        s
+        "and it began before The Ten Rings entered"
+        (fmap (\stored -> Just (ActivePlayerEffect.timestamp stored) < fmap Object.timestamp (Game.lookupObject ringsId board)) (GameState.playerEffects board))
+        [True]
+
+    Spec.it s "CR 613.11 The Ten Rings entering after Sea Gate Restoration resolved sets the maximum to ten" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      restoration <- S.printingOf s registry "Sea Gate Restoration"
+      island <- S.printingOf s registry "Island"
+      let (board, _) = ringsAndRestoration False plains island tenRings restoration
+      Spec.assertEqWith s "the sorcery drew hand-plus-one" (S.handSize S.alice board) 11
+      Spec.assertEqWith s "ten" (PlayerEffect.maximumHandSize S.alice board) (Just 10)
+      let after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards down to ten" (S.handSize S.alice after) 10
+      -- The resolved sorcery is the graveyard's other card (CR 608.2n).
+      Spec.assertEqWith s "one card discarded" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+
+    -- THE CONTROL, the same board with the two built in the other order and
+    -- nothing else changed: same seats, same five Plains held, same ten stocked,
+    -- same two cards.
+    Spec.it s "CR 613.11 Sea Gate Restoration resolving after The Ten Rings entered removes the maximum" $ do
+      plains <- S.printingOf s registry "Plains"
+      tenRings <- S.printingOf s registry "The Ten Rings"
+      restoration <- S.printingOf s registry "Sea Gate Restoration"
+      island <- S.printingOf s registry "Island"
+      let (board, _) = ringsAndRestoration True plains island tenRings restoration
+      Spec.assertEqWith s "the sorcery drew hand-plus-one" (S.handSize S.alice board) 11
+      Spec.assertEqWith s "no maximum" (PlayerEffect.maximumHandSize S.alice board) Nothing
+      let after = reliquaryCleanup board
+      Spec.assertEqWith s "CR 514.1 discards nothing" (S.handSize S.alice after) 11
+      Spec.assertEqWith s "and only the resolved sorcery is in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
 -- Seed a stored player effect keyed to a REAL battlefield object, not
 -- S.addPlayerEffect's stand-in id 998 -- so a S.youControlSource condition
 -- check has something to genuinely hold or fail against. Mirrors
@@ -2106,8 +2251,8 @@ silenceSpec s registry =
 
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).
-matchesSpellBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-matchesSpellBoard lightningBolt piker =
+matchesObjectBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+matchesObjectBoard lightningBolt piker =
   let base = Setup.emptyGame S.bothPlayers
       (bolt, withBolt) = S.spellOnStack lightningBolt S.alice base
       (pikerId, gs) = S.spellOnStack piker S.alice withBolt
@@ -2117,34 +2262,34 @@ matchesSpellBoard lightningBolt piker =
 -- over the PROJECTED view (CR 613.1d layer 4 for a card type, CR 613.1e layer 5
 -- for a colour) rather than the retired SpellCriterion. A noncreature spell is
 -- Filter.Not (Filter.HasCardType Creature); a coloured spell is Filter.HasColor.
-matchesSpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-matchesSpellSpec s registry =
-  Spec.describe s "matchesSpell" $ do
+matchesObjectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+matchesObjectSpec s registry =
+  Spec.describe s "matchesObject" $ do
     let noncreature = Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
 
     Spec.it s "CR 613.1d Thalia's noncreature criterion admits an instant" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
-      Spec.assertBool s (PlayerEffect.matchesSpell noncreature bolt gs) "Lightning Bolt is a noncreature spell"
+      let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
+      Spec.assertBool s (PlayerEffect.matchesObject noncreature bolt gs) "Lightning Bolt is a noncreature spell"
 
     Spec.it s "CR 613.1d a creature spell fails the noncreature criterion" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (_, pikerId, gs) = matchesSpellBoard lightningBolt piker
-      Spec.assertBool s (not (PlayerEffect.matchesSpell noncreature pikerId gs)) "Goblin Piker is a creature spell"
+      let (_, pikerId, gs) = matchesObjectBoard lightningBolt piker
+      Spec.assertBool s (not (PlayerEffect.matchesObject noncreature pikerId gs)) "Goblin Piker is a creature spell"
 
     Spec.it s "CR 613.1e a colour criterion admits a matching-colour spell" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
-      Spec.assertBool s (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
+      let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
+      Spec.assertBool s (PlayerEffect.matchesObject (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
 
     Spec.it s "CR 613.1e a colour criterion rejects a non-matching colour" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
-      Spec.assertBool s (not (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
+      let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
+      Spec.assertBool s (not (PlayerEffect.matchesObject (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
 
 -- Null Chamber {3}{W} World Enchantment: "As this enchantment enters, you and an
 -- opponent each choose a card name other than a basic land card name. Spells
@@ -3160,6 +3305,133 @@ prowlingSerpopardSpec s registry =
             Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace cat)) Counterability.CantBeCountered
             Spec.assertEqWith s "and the spell is still on the stack" (GameState.stack (cancelRun victimId cancelId gs)) [victimId]
 
+-- Jared Carthalion, True Heir {R}{G}{W} Legendary Creature -- Human Warrior 3/3
+-- (Commander Legends, 281): "When Jared Carthalion enters, target opponent
+-- becomes the monarch. You can't become the monarch this turn." One trigger
+-- carrying both sentences, which is how the card prints them.
+--
+-- The card is in the pool for the second sentence, and it is the ONLY printing
+-- that restricts who may be crowned -- which makes it the sole producer of CR
+-- 725.4's "the next player in turn order who can become the monarch". CR 725.1
+-- and CR 725.3 gate nobody, so on the ordinary route it is CR 101.2 that makes
+-- the "can't" win.
+--
+-- Its third sentence -- "If damage would be dealt to Jared Carthalion while
+-- you're the monarch, prevent that damage and put that many +1/+1 counters on
+-- it" -- is omitted from data/cards/jared-carthalion-true-heir.json: a STATIC
+-- prevention ability cannot carry CR 615.5's rider (#1105). The omission takes
+-- both a shield and its counters away from Jared's own controller, so pawl's card
+-- is strictly weaker than the printed one.
+--
+-- Two seats and no departure, which is all the primary observable needs. Every
+-- case runs on one board -- alice's Jared, her Palace Jailer and her Goblin Piker
+-- on the battlefield, nobody crowned -- and differs only in which enters-the-
+-- battlefield event is fed to the trigger gatherer. That is what makes each
+-- negative a statement about the restriction rather than about a board that could
+-- not crown anyone anyway.
+--
+-- Palace Jailer ("When Palace Jailer enters, you become the monarch") is the
+-- second route on purpose: MonarchTarget.TheController, where Jared's own first
+-- clause is MonarchTarget.InSlot and CR 725.2's steal is ControllerOfSource. All
+-- three read one gate, so no case here passes through an ungated route.
+jaredBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+jaredBoard jared jailer piker =
+  let (jaredId, gs1) = S.addCreature jared S.alice (Setup.emptyGame S.bothPlayers)
+      (jailerId, gs2) = S.addCreature jailer S.alice gs1
+      (pikerId, gs3) = S.addCreature piker S.alice gs2
+   in (jaredId, jailerId, pikerId, gs3)
+
+-- One permanent's CR 603.6a entry, gathered and resolved. The permanent is already
+-- on the battlefield, so this feeds the event alone -- the same staging
+-- ExpirySpec's monarch group uses.
+etbResolved :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+etbResolved oid gs =
+  let entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+      withEvent = S.withEvents [GameEvent.Moved entered (Projection.project oid gs)] gs
+   in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
+
+-- CR 725.2's crown steal, as the event it triggers off: `attacker` deals combat
+-- damage to bob, who must be the monarch for the inherent ability to match.
+damageToTheMonarch :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+damageToTheMonarch attacker gs =
+  let dmg = DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat
+      withEvent = S.withEvents [GameEvent.DamageDealt dmg] gs
+   in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
+
+jaredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jaredSpec s registry =
+  let board = do
+        jared <- S.printingOf s registry "Jared Carthalion, True Heir"
+        jailer <- S.printingOf s registry "Palace Jailer"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (jaredBoard jared jailer piker)
+   in Spec.describe s "JaredCarthalionTrueHeir" $ do
+        -- The card's own first clause, which is also what puts a monarch on the
+        -- board for everything below: CR 601.2c's target slot, re-read at
+        -- resolution, crowning the ONLY opponent two seats offer.
+        Spec.it s "CR 725.1 his enters trigger crowns the targeted opponent, and stores the restriction on his controller" $ do
+          (jaredId, _, _, gs) <- board
+          let after = etbResolved jaredId gs
+          Spec.assertEqWith s "bob is the monarch" (GameState.monarch after) (Just S.bob)
+          Spec.assertEqWith s "one stored CR 611.2c effect" (fmap ActivePlayerEffect.effect (GameState.playerEffects after)) [PlayerEffect.Type.CantBecomeMonarch]
+          Spec.assertEqWith s "scoped to its controller" (fmap ActivePlayerEffect.scope (GameState.playerEffects after)) [PlayerScope.You]
+          Spec.assertEqWith s "who is alice" (fmap ActivePlayerEffect.controller (GameState.playerEffects after)) [S.alice]
+          Spec.assertBool s (PlayerEffect.prohibitsBecomingMonarch S.alice after) "so alice can't become the monarch"
+          Spec.assertBool s (not (PlayerEffect.prohibitsBecomingMonarch S.bob after)) "and bob still can"
+
+        -- THE CONTROL for the case below, on the same board: with Jared's trigger
+        -- never fed, the Jailer's "you become the monarch" crowns alice. Without
+        -- this, the refusal below could be a Jailer whose ETB never resolved.
+        Spec.it s "CR 725.1 with no restriction standing, Palace Jailer's enters trigger crowns alice" $ do
+          (_, jailerId, _, gs) <- board
+          Spec.assertEqWith s "alice takes the crown" (GameState.monarch (etbResolved jailerId gs)) (Just S.alice)
+
+        -- THE PRIMARY OBSERVABLE. Two seats, no departure: an
+        -- Effect.BecomeMonarch aimed at a restricted player does nothing, and CR
+        -- 725.3's "the current monarch ceases to be the monarch" never fires
+        -- either -- bob keeps the crown rather than the game losing it.
+        Spec.it s "CR 101.2 / 725.1 the restriction stops Palace Jailer's TheController crowning outright" $ do
+          (jaredId, jailerId, _, gs) <- board
+          let restricted = etbResolved jaredId gs
+              after = etbResolved jailerId restricted
+          Spec.assertEqWith s "bob keeps the crown" (GameState.monarch after) (Just S.bob)
+          Spec.assertEqWith s "and no crowning of alice was recorded" (filter (== GameEvent.BecameMonarch S.alice) (S.eventsOf after)) []
+
+        -- CR 611.2a/514.2: the duration is the stored carrier's expiry and
+        -- nothing else, so the SAME Jailer trigger crowns alice once the turn has
+        -- ended. This is what says the restriction is "this turn" rather than
+        -- permanent.
+        Spec.it s "CR 514.2 the restriction ends at cleanup, and then the same crowning lands" $ do
+          (jaredId, jailerId, _, gs) <- board
+          let restricted = etbResolved jaredId gs
+              ended = S.runPure S.identityAnswer restricted (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+          Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
+          Spec.assertBool s (not (PlayerEffect.prohibitsBecomingMonarch S.alice ended)) "alice may be crowned again"
+          Spec.assertEqWith s "so the Jailer's ETB now crowns her" (GameState.monarch (etbResolved jailerId ended)) (Just S.alice)
+
+        -- THE CONTROL for CR 725.2's route, with bob crowned by the fixture
+        -- instead of by Jared's trigger: an unrestricted alice takes the crown off
+        -- a creature's combat damage.
+        Spec.it s "CR 725.2 with no restriction standing, combat damage to the monarch hands alice the crown" $ do
+          (_, _, pikerId, gs) <- board
+          Spec.assertEqWith s "alice steals it" (GameState.monarch (damageToTheMonarch pikerId (S.withMonarch S.bob gs))) (Just S.alice)
+
+        -- The vacuity trap this issue was filed with: CR 725.2's inherent ability
+        -- is SOURCELESS and reaches the crown through MonarchTarget
+        -- .ControllerOfSource, a different arm from the case above. The gate is
+        -- read at the one place all three arms meet, so the steal is stopped too
+        -- -- and the ability still triggers and still resolves, it just crowns
+        -- nobody.
+        Spec.it s "CR 101.2 / 725.2 the restriction stops the sourceless crown steal as well" $ do
+          (jaredId, _, pikerId, gs) <- board
+          let restricted = etbResolved jaredId gs
+          Spec.assertEqWith s "bob was crowned by Jared's own trigger" (GameState.monarch restricted) (Just S.bob)
+          Spec.assertEqWith s "and keeps the crown through alice's combat damage" (GameState.monarch (damageToTheMonarch pikerId restricted)) (Just S.bob)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -3176,10 +3448,12 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   hybridDiscountSpec s registry
   textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
+  theTenRingsSpec s registry
   storedSpec s registry
   silenceSpec s registry
   extraLandDropsSpec s registry
-  matchesSpellSpec s registry
+  matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
+  jaredSpec s registry

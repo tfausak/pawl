@@ -49,6 +49,14 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Morph
       """ {"type":"Morph"} """
 
+  Spec.it s "Kicker" $
+    Common.assertJsonCodec
+      s
+      KeywordFamily.toJson
+      KeywordFamily.fromJson
+      KeywordFamily.Kicker
+      """ {"type":"Kicker"} """
+
   Spec.it s "Entwine" $
     Common.assertJsonCodec
       s

@@ -206,7 +206,16 @@ data View = MkView
     -- here: Pawl.Engine.Projection.designationGathered and
     -- Pawl.Engine.CombatRestriction.inForce hold no view and read the field
     -- directly.
-    suspected :: Bool
+    suspected :: Bool,
+    -- CR 702.33d: has this candidate been kicked? Read off Object.kicked, and
+    -- False where there is no object to read it off, both for `renowned` above's
+    -- reasons. Its one reader is Pawl.Engine.Quantity's WasKicked arm, answering
+    -- Burst Lightning's clause conditions.
+    --
+    -- Not a designation of a PERMANENT as the three above are -- rule 702.33d
+    -- designates the SPELL -- but it comes through the view for the same reason
+    -- they do: the reader holds a view and not a board.
+    kicked :: Bool
   }
   deriving (Eq, Show)
 
@@ -264,7 +273,8 @@ playerView pid =
       -- not one.
       renowned = False,
       monstrous = False,
-      suspected = False
+      suspected = False,
+      kicked = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
@@ -635,8 +645,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Trample -> keyword
   Keyword.Type.TrampleOverPlaneswalkers -> keyword
   Keyword.Type.Vigilance -> keyword
-  -- CR 702.34a, CR 702.37a and CR 702.42a: each states a cost as part of the
-  -- keyword, so rewriteCost carries CR 612.1 into it.
+  -- CR 702.33a, CR 702.34a, CR 702.37a and CR 702.42a: each states a cost as part
+  -- of the keyword, so rewriteCost carries CR 612.1 into it.
+  Keyword.Type.Kicker cost -> Keyword.Type.Kicker (rewriteCost pairs cost)
   Keyword.Type.Flashback cost -> Keyword.Type.Flashback (rewriteCost pairs cost)
   Keyword.Type.Fear -> keyword
   Keyword.Type.Intimidate -> keyword

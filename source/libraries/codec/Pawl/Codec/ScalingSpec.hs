@@ -23,3 +23,10 @@ spec s = Spec.describe s "Pawl.Codec.Scaling" $ do
       Scaling.fromJson
       (Scaling.AddMore 1)
       """ {"type":"AddMore","value":1} """
+  Spec.it s "Halve" $
+    Common.assertJsonCodec
+      s
+      Scaling.toJson
+      Scaling.fromJson
+      Scaling.Halve
+      """ {"type":"Halve"} """

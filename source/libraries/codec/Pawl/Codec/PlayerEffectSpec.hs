@@ -81,6 +81,24 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
           (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)])
       )
       """ {"type":"ReduceSpellCost","value":[{"type":"HasSubtype","value":{"type":"Cleric"}},[{"type":"OfType","value":{"type":"Colored","value":{"type":"White"}}},{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}]]} """
+  -- CR 613.11 / 601.2f / Heartstone, floor and all.
+  Spec.it s "ReduceActivationCost" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.ReduceActivationCost (Filter.HasCardType CardType.Creature) (ManaCost.MkManaCost [ManaSymbol.Generic 1]) 1)
+      """ {"type":"ReduceActivationCost","value":[{"type":"HasCardType","value":{"type":"Creature"}},[{"type":"Generic","value":1}],1]} """
+  -- Training Grounds' amount and floor, which differ from each other -- a codec
+  -- that swapped the two payloads would round-trip Heartstone's above and not
+  -- this one.
+  Spec.it s "ReduceActivationCost, Training Grounds' two" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.ReduceActivationCost (Filter.HasCardType CardType.Creature) (ManaCost.MkManaCost [ManaSymbol.Generic 2]) 1)
+      """ {"type":"ReduceActivationCost","value":[{"type":"HasCardType","value":{"type":"Creature"}},[{"type":"Generic","value":2}],1]} """
   -- CR 305.2 / Exploration.
   Spec.it s "PlayAdditionalLands, Exploration's one" $
     Common.assertJsonCodec
@@ -106,6 +124,24 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       PlayerEffect.NoMaximumHandSize
       """ {"type":"NoMaximumHandSize"} """
+  -- CR 402.2 / The Ten Rings. This is the shape data/cards/the-ten-rings.json
+  -- carries.
+  Spec.it s "SetMaximumHandSize, The Ten Rings' ten" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.SetMaximumHandSize 10)
+      """ {"type":"SetMaximumHandSize","value":10} """
+  -- CR 402.2 / Cursed Rack: the OTHER number, so a codec that dropped the payload
+  -- would round-trip one of these and not both.
+  Spec.it s "SetMaximumHandSize, Cursed Rack's four" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.SetMaximumHandSize 4)
+      """ {"type":"SetMaximumHandSize","value":4} """
   -- CR 500.5 / 703.4q / Upwelling: no mana type named.
   Spec.it s "DontLoseUnspentMana, Upwelling's whole pool" $
     Common.assertJsonCodec
@@ -205,3 +241,11 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       PlayerEffect.CantSearchLibraries
       """ {"type":"CantSearchLibraries"} """
+  -- CR 725 / Jared Carthalion, True Heir.
+  Spec.it s "CantBecomeMonarch" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.CantBecomeMonarch
+      """ {"type":"CantBecomeMonarch"} """

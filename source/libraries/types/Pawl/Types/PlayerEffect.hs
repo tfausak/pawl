@@ -73,6 +73,38 @@ data PlayerEffect
     -- component, which is Edgewalker's "This effect reduces only the amount of
     -- colored mana you pay" and not CR 118.7b-d (#309).
     ReduceSpellCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost
+  | -- | CR 613.11 / 601.2f / Heartstone, Training Grounds: the activated abilities
+    -- of matching permanents cost this much less to activate, and this effect may
+    -- not reduce the mana left in such a cost below the Natural.
+    --
+    -- A SEPARATE constructor from ReduceSpellCost, and that separation is the
+    -- whole of pawl's spell-vs-ability discriminator: the Filter these arms carry
+    -- classifies an OBJECT (Pawl.Engine.PlayerEffect.matchesObject reads a
+    -- projection), so nothing in a Filter can say "and it is a spell". Thalia's
+    -- IncreaseSpellCost narrows by `Not (HasCardType Creature)`, which a
+    -- noncreature PERMANENT matches -- so were one constructor asked at both
+    -- moments, Thalia would tax Mindslaver's activation. Which MOMENT an arm is
+    -- asked at is therefore the constructor's to say, and each of the two is
+    -- gathered by its own function (Pawl.Engine.PlayerEffect.spellCostAdjustments,
+    -- activationCostAdjustments).
+    --
+    -- The Filter is matched against the ability's SOURCE PERMANENT and not
+    -- against the ability, which is what both printings name: Heartstone says
+    -- "activated abilities of creatures" and Training Grounds "of creatures you
+    -- control" (HasCardType Creature, with the possessive riding the carrier's
+    -- PlayerScope as every other arm's does).
+    --
+    -- The FLOOR is carried rather than assumed, because it is card text (CR
+    -- 101.1) and not a rule: both printings say "This effect can't reduce the
+    -- mana in that cost to less than one mana" and so carry 1, while an
+    -- activation-cost reducer that does not say it (Hero of Iroas) carries 0.
+    -- See Pawl.Types.CostAdjustments.minimumMana for what zero means and why the
+    -- clamp never raises a cost.
+    --
+    -- Not implemented: nothing INCREASES an activation cost (Suppression Field),
+    -- which would be this arm's sibling and needs the "unless they're mana
+    -- abilities" rider besides (#1242).
+    ReduceActivationCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost Natural.Natural
   | -- | CR 305.2 / Exploration, Azusa Lost but Seeking: this player may play this
     -- many lands each turn OVER the one CR 305.2 normally allows.
     --
@@ -96,6 +128,25 @@ data PlayerEffect
     PlayAdditionalLands Natural.Natural
   | -- | CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
+  | -- | CR 402.2 / The Ten Rings: this player's maximum hand size IS this number.
+    --
+    -- A SEPARATE constructor from NoMaximumHandSize above, and the pair is the one
+    -- place on this axis where CR 613.11's timestamp order decides an answer: a
+    -- set and a removal disagree, and the later one wins (Reliquary Tower's own
+    -- ruling names the pair). Every other arm here folds order-independently, which
+    -- is why Pawl.Engine.PlayerEffect.maximumHandSize is the axis's only ordered
+    -- fold.
+    --
+    -- The number is CARRIED for CantCastMoreThan's reason: The Ten Rings says ten,
+    -- Cursed Rack says four and Null Profusion says two, and a card that says
+    -- another number must not need a sibling constructor.
+    --
+    -- A SET, not an adjustment. "Your maximum hand size is increased by two"
+    -- (Trusted Advisor) and "reduced by three" (Thought Eater) are a third shape
+    -- again -- they compose with whatever the current number is instead of
+    -- replacing it, and CR 613.11 orders them against this arm -- and no
+    -- constructor here can express one (#1238).
+    SetMaximumHandSize Natural.Natural
   | -- | CR 500.5 / 703.4q / Upwelling, Omnath Locus of Mana: this player does not
     -- lose the mana the filter names, out of the unspent mana in their mana pool,
     -- as a step or phase ends.
@@ -271,4 +322,30 @@ data PlayerEffect
     -- WHOSE searching is the carrier's PlayerScope, as for every arm here:
     -- Leonin Arbiter says "players" with no possessive, so EachPlayer.
     CantSearchLibraries
+  | -- | CR 725 / 101.2 / Jared Carthalion, True Heir: this player can't become the
+    -- monarch.
+    --
+    -- CR 611.1's third clause once more, and here in the same shape
+    -- CantSearchLibraries takes: CR 725.1 makes the monarch a DESIGNATION a
+    -- player has rather than a characteristic of any object, so nothing in the CR
+    -- 613.1 layers computes it and a restriction on taking it belongs on CR
+    -- 613.11's rules axis.
+    --
+    -- CR 101.2 is what makes it bite, because neither CR 725.1 nor CR 725.3 gates
+    -- WHO may be crowned: an effect instructing this player to become the monarch
+    -- is allowed by the rules and stopped by this "can't". CR 725.4's "the next
+    -- player in turn order who can become the monarch" is the one place the
+    -- rulebook asks the question itself.
+    --
+    -- WHOSE crown is the carrier's PlayerScope, as for every arm here. Jared's
+    -- "You can't become the monarch this turn" writes PlayerScope.You on the
+    -- stored CR 611.2c carrier, whose expiry is the duration -- exactly the shape
+    -- Silence takes, and the reason no duration is carried here.
+    --
+    -- NULLARY, and rule 725 is why: the designation has no parts, so there is
+    -- nothing for a payload to narrow. Not "can't become the monarch from a
+    -- particular source" either -- CR 725.1 leaves the naming to the card and the
+    -- restriction is on the PLAYER, so every route is stopped at once (the
+    -- ordinary effect, and CR 725.2's sourceless steal).
+    CantBecomeMonarch
   deriving (Eq, Ord, Show)

@@ -1,6 +1,7 @@
 module Pawl.Engine.Quantity where
 
 import Control.Applicative ((<|>))
+import qualified Data.Foldable as Foldable
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
@@ -268,6 +269,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.IsMonstrous -> fmap (\view -> if Filter.monstrous view then 1 else 0) mView
   -- CR 701.60b's designation as a 0/1, IsRenowned's arm in every respect.
   Quantity.IsSuspected -> fmap (\view -> if Filter.suspected view then 1 else 0) mView
+  -- CR 702.33d's designation as a 0/1, IsRenowned's arm in every respect. The
+  -- object it reads is the RESOLVING SPELL, which is still on the stack while its
+  -- own clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
+  Quantity.WasKicked -> fmap (\view -> if Filter.kicked view then 1 else 0) mView
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
   -- through the same Count.playersFor, and Nothing for a reference naming
@@ -289,6 +294,25 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- says the same thing. What is unanswered is only the reference.
   Quantity.OpponentsAttacked ref -> case Count.playersFor context gs ref of
     Just [pid] -> Just (toInteger (length (filter (attackedOpponent pid) (Set.toList (Combat.declaredAttacked (GameState.combat gs))))))
+    _ -> Nothing
+  -- CR 701.9a / 608.2i: how many cards that player has discarded this turn.
+  -- OpponentsAttacked's arm in shape -- live, one player only, resolved through the
+  -- same Count.playersFor, and Nothing for a reference naming anything but exactly
+  -- one player, since "whose discards?" has no sum.
+  --
+  -- A fold over GameState.events, which is cleared at turn handoff
+  -- (Engine.beginTurnOf) -- so the log's extent IS "this turn" and nothing here
+  -- names a window. Game.discardOf and not the Moved event the same discard also
+  -- files; see that function for why the zone change is the wrong record.
+  --
+  -- BOTH DiscardCause values count, CR 702.29a making a cycled card a discarded
+  -- one.
+  --
+  -- An EMPTY log answers 0 rather than Nothing, as OpponentsAttacked's empty
+  -- record does: nobody having discarded is an answered question. What is
+  -- unanswered is only the reference.
+  Quantity.CardsDiscardedThisTurn ref -> case Count.playersFor context gs ref of
+    Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . snd) (Foldable.toList (GameState.events gs)))))
     _ -> Nothing
   -- CR 509.1h's declaration, counted beyond the first: how many creatures are
   -- blocking the object this evaluation is aimed at, less one, floored at 0 for
@@ -368,7 +392,9 @@ substituteStar star quantity = case quantity of
   Quantity.IsRenowned -> quantity
   Quantity.IsMonstrous -> quantity
   Quantity.IsSuspected -> quantity
+  Quantity.WasKicked -> quantity
   Quantity.OpponentsAttacked _ -> quantity
+  Quantity.CardsDiscardedThisTurn _ -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
   -- ability with no resolution and so no slots, and Pawl.CardSpec's
@@ -422,9 +448,12 @@ slots quantity = case quantity of
   Quantity.IsRenowned -> Set.empty
   Quantity.IsMonstrous -> Set.empty
   Quantity.IsSuspected -> Set.empty
+  Quantity.WasKicked -> Set.empty
   -- And a seventh PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
+  -- And an eighth, CR 701.9a's tally having nothing beside its PlayerRef either.
+  Quantity.CardsDiscardedThisTurn _ -> Set.empty
   -- And a nullary arm, which names nothing at all: CR 509.1h's declaration is
   -- read against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.BlockersBeyondFirst -> Set.empty
@@ -467,7 +496,9 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.IsRenowned -> True
   Quantity.IsMonstrous -> True
   Quantity.IsSuspected -> True
+  Quantity.WasKicked -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
+  Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
   Quantity.BlockersBeyondFirst -> True
   -- True because `slots` above DOES report this arm's slot, unlike the nested
   -- PlayerRefs -- so the reported set is the whole of what evaluating it reads.
@@ -529,7 +560,9 @@ readsX quantity = case quantity of
   Quantity.IsRenowned -> False
   Quantity.IsMonstrous -> False
   Quantity.IsSuspected -> False
+  Quantity.WasKicked -> False
   Quantity.OpponentsAttacked _ -> False
+  Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.BlockersBeyondFirst -> False
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion
   -- Plus above needs. Its own SlotName names a target rather than an amount, and X

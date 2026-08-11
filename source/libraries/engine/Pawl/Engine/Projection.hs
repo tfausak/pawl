@@ -583,7 +583,8 @@ viewOfCard face =
           -- rule 702.112b gives one only to a permanent.
           Filter.renowned = False,
           Filter.monstrous = False,
-          Filter.suspected = False
+          Filter.suspected = False,
+          Filter.kicked = False
         }
 
 -- viewOfCard for a card that IS an object in some zone, so a
@@ -791,7 +792,13 @@ viewOfCharacteristics oid pc controller counters gs =
       -- their designations the same way.
       Filter.monstrous = maybe False Object.monstrous (Game.lookupObject oid gs),
       -- CR 701.60b: `monstrous` above in every respect.
-      Filter.suspected = maybe False Object.suspected (Game.lookupObject oid gs)
+      Filter.suspected = maybe False Object.suspected (Game.lookupObject oid gs),
+      -- CR 702.33d: `suspected` above in every respect -- read live off the object,
+      -- so the CR 608.2h path answers False for a spell that has left the stack.
+      -- Nothing asks it there: the only reader is the kicked spell's own clause
+      -- condition, gated while it is still on the stack
+      -- (Pawl.Engine.Resolve.gateHolds).
+      Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs)
     }
 
 -- CR 122.1: the counters on an object right now, and none for an id that names
@@ -1733,6 +1740,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.IsRenowned -> quantity
   Quantity.Type.IsMonstrous -> quantity
   Quantity.Type.IsSuspected -> quantity
+  Quantity.Type.WasKicked -> quantity
   Quantity.Type.PlayerCounters _ _ -> quantity
   -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
   -- name no subtype word, not even the CR 122.1b keyword one.
@@ -1740,6 +1748,9 @@ rewriteQuantity pairs quantity = case quantity of
   -- And a leaf: CR 508.3b's record holds attack targets, which name players and
   -- object ids rather than any word CR 612.1 could swap.
   Quantity.Type.OpponentsAttacked _ -> quantity
+  -- And a leaf: CR 701.9a's tally holds logged events, which name players and
+  -- object ids rather than any word CR 612.1 could swap.
+  Quantity.Type.CardsDiscardedThisTurn _ -> quantity
   -- And a leaf: CR 509.1h's declaration names object ids, not a word CR 612.1
   -- could swap.
   Quantity.Type.BlockersBeyondFirst -> quantity
