@@ -2,12 +2,11 @@
 
 module Pawl.JsonPointer.Pointer where
 
-import qualified Data.Bits as Bits
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as ByteString
 import qualified Data.Char as Char
-import qualified Data.Maybe as Maybe
 import qualified Data.Word as Word
+import qualified Pawl.Extra.Word8 as Word8
 import qualified Pawl.JsonPointer.Token as Token
 import qualified Text.Parsec as Parsec
 
@@ -58,7 +57,7 @@ encodeOctet w =
 -- percent-encodes a UTF-8 sequence byte by byte.
 isFragmentOctet :: Word.Word8 -> Bool
 isFragmentOctet w =
-  let c = Char.chr (word8ToInt w)
+  let c = Char.chr (Word8.toInt w)
    in Char.isAsciiUpper c
         || Char.isAsciiLower c
         || Char.isDigit c
@@ -69,10 +68,5 @@ hexDigit :: Word.Word8 -> Char
 hexDigit w =
   Char.chr $
     if w < 10
-      then Char.ord '0' + word8ToInt w
-      else Char.ord 'A' + word8ToInt w - 10
-
--- | Converts a 'Word.Word8' into an 'Int'. Always succeeds: every
--- 'Word.Word8' fits an 'Int'.
-word8ToInt :: Word.Word8 -> Int
-word8ToInt w = Maybe.fromMaybe 0 (Bits.toIntegralSized w)
+      then Char.ord '0' + Word8.toInt w
+      else Char.ord 'A' + Word8.toInt w - 10

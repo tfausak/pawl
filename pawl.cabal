@@ -447,6 +447,8 @@ library extra
     Pawl.Extra.ParsecSpec
     Pawl.Extra.Semigroup
     Pawl.Extra.SemigroupSpec
+    Pawl.Extra.Word8
+    Pawl.Extra.Word8Spec
 
 -- RFC 8259 compliant JSON types, encoders, and decoders. Similar to aeson, but
 -- much simpler.

@@ -160,6 +160,7 @@ import qualified Pawl.Extra.NaturalSpec
 import qualified Pawl.Extra.OrdSpec
 import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.Extra.SemigroupSpec
+import qualified Pawl.Extra.Word8Spec
 import qualified Pawl.FaceDownSpec
 import qualified Pawl.FilterSpec
 import qualified Pawl.GameSpec
@@ -416,6 +417,7 @@ spec s registry = do
   Pawl.Extra.OrdSpec.spec s
   Pawl.Extra.ParsecSpec.spec s
   Pawl.Extra.SemigroupSpec.spec s
+  Pawl.Extra.Word8Spec.spec s
   Pawl.FaceDownSpec.spec s registry
   Pawl.FilterSpec.spec s
   Pawl.GameSpec.spec s registry
