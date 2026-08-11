@@ -66,6 +66,11 @@
 -- `provokeSpec`. CR 702.112 renown, the first minted
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
 -- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
+-- 701.37b's designation watched the same way -- the shared
+-- TriggerCondition.PermanentBecomesDesignated with the other member of
+-- Pawl.Types.Designation in it -- with Arbor Colossus, plus that designation read
+-- back by CR 701.37a's own clause condition on a permanent Rune-Brand Juggler has
+-- also suspected -- `arborColossusSpec`. CR
 -- 702.63 vanishing, the first keyword whose rule text spans
 -- BOTH mints -- one CR 614.1c entry replacement and two triggers, one of them
 -- watching the counter removal the other performs -- with Waning Wurm --

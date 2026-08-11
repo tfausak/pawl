@@ -214,11 +214,11 @@ data View = MkView
     -- directly.
     designations :: Set.Set Designation.Designation,
     -- CR 702.33d: has this candidate been kicked? Read off Object.kicked, and
-    -- False where there is no object to read it off, both for `designations` above's
-    -- reasons. Its one reader is Pawl.Engine.Quantity's WasKicked arm, answering
-    -- Burst Lightning's clause conditions.
+    -- False where there is no object to read it off, both for the reasons
+    -- `designations` above gives. Its one reader is Pawl.Engine.Quantity's WasKicked
+    -- arm, answering Burst Lightning's clause conditions.
     --
-    -- Not a designation of a PERMANENT as the field above holds -- rule 702.33d
+    -- Not a designation of a PERMANENT as that field holds -- rule 702.33d
     -- designates the SPELL -- but it comes through the view for the same reason
     -- those do: the reader holds a view and not a board.
     kicked :: Bool
