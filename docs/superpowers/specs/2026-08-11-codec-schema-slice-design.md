@@ -210,9 +210,11 @@ form fails.
 `Pawl.JsonCodec.Codec` holds the type and nothing else. Combinators of both
 shapes live in `Common`, which imports it: `Codec.maybe` wraps the
 `encodeMaybe`/`decodeMaybe` pair rather than reimplementing it, and
-`assertCodec` needs the record to read `encode` and `decode` off. Putting the
-`Codec`-shaped ones beside the type instead would make `Codec` and `Common`
-mutually recursive, or duplicate the element logic.
+`assertCodec` needs the record to read `encode` and `decode` off. Siting the
+`Codec`-shaped ones beside the type instead would work -- the edge would run
+`Codec` to `Common`, one way, not a cycle -- but it inverts the natural reading
+of a type's module as the leaf, and it separates the wrappers from the element
+logic they wrap.
 
 As the full pass proceeds, each function-shaped pair in `Common` collapses into
 its `Codec`-shaped replacement -- `encodeSeq` and `decodeSeq` become one
