@@ -1221,10 +1221,13 @@ setLandSubtypeEffects gs =
 -- This is the INSIDE-THE-FOLD gate, and gather (via permanentParts) is its one
 -- caller. "Applies to" reads BASE characteristics so nothing recurses into the
 -- projection being built. That restriction costs a real case: a permanent that
--- becomes a land only through a layer-4 type change (Ashaya on Thalia) is
--- invisible here while the fold's own arm reaches it, so the two halves of CR
--- 305.7 still disagree there (#391). Every reader OUTSIDE the fold uses
--- liveAfterLayers below, which has no such disagreement.
+-- becomes a land only through a layer-4 type change is invisible here while the
+-- fold's own arm reaches it, so the two halves of CR 305.7 still disagree about
+-- its STATIC abilities -- Lord of Atlantis under Ashaya and Blood Moon goes on
+-- pumping other Merfolk (#391). Every reader OUTSIDE the fold uses
+-- liveAfterLayers below, which has no such disagreement, so a PLAYER ability on
+-- the same board is already right -- Pawl.PlayerEffectSpec's "CR 305.7 Ashaya
+-- animates Thalia into a Mountain, so Blood Moon takes her tax" proves it.
 --
 -- The layer-2 control fold deliberately asks NEITHER gate -- see controlGrants for
 -- the CR 613.1 argument, and for the divergence a gate there caused.
@@ -1248,6 +1251,11 @@ liveGiven setEffs oid gs =
 -- -- does an applied setter's affected set name THIS object? -- moves to the
 -- finished projection, which is what keeps CR 613.8's intra-layer ordering out of
 -- here.
+--
+-- Seven callers share this, and rewriting the body to read base fails exactly one
+-- case: PlayerEffect.applying's, cited above. For the block, attack, cost, combat
+-- and sacrifice readers the projected read is unobserved -- they are right because
+-- the gate is shared, not because a case pins them (#1273).
 liveAfterLayers :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveAfterLayers setEffs oid gs =
   let view = project oid gs
