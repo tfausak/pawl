@@ -57,8 +57,9 @@
 -- CR 702.134 mentor, the first keyword whose
 -- minted ability TARGETS -- a slot chosen under CR 603.3d and narrowed by a power
 -- comparison against its own source -- with Blade Instructor -- `mentorSpec`.
--- CR 702.134c, the first condition that watches another ability
--- RESOLVE and the first read through its bearer's ATTACHMENT, with Aegis of the
+-- CR 702.134c, the same rule's other half -- an ability that
+-- watches a mentor ability resolve -- and the first condition read through its
+-- bearer's ATTACHMENT rather than off the bearer or a Filter, with Aegis of the
 -- Legion -- `mentorsTriggerSpec`.
 -- CR 702.23 rampage, whose bonus multiplies a printed N by a number
 -- read off the declaration, with Wolverine Pack and Horrible Hordes --

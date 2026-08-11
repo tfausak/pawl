@@ -6186,9 +6186,10 @@ stateTriggers gs
               -- CR 702.100b is an EVENT trigger and leaves no state at all behind:
               -- the counters it put are indistinguishable from any others.
               TriggerCondition.SelfEvolves -> False
-              -- CR 702.134c likewise: the shield counter it puts on is a counter
-              -- like any other, so the board afterwards says nothing about which
-              -- creature mentored which.
+              -- CR 702.134c likewise, and one step further removed: what it fires
+              -- on is a resolution, and the counter that resolution put is a
+              -- counter like any other, so the board afterwards says nothing about
+              -- which creature mentored which.
               TriggerCondition.AttachedCreatureMentors -> False
               -- CR 701.21a is a game ACTION, so this is an event trigger too: it
               -- fires on the moment the permanent is sacrificed, and the board

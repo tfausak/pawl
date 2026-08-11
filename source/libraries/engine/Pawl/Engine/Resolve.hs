@@ -3162,10 +3162,11 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- CR 702.134a's counter and CR 702.134c's marker, Evolve's arm above with the
   -- rule's own gate rather than that one's: rule 702.134c fires on the mentor
   -- ability RESOLVING, so the event is recorded however many counters CR 614.16 left
-  -- to place. That ungated emission is a FENCE and not a tested branch -- no pooled
-  -- board reaches this arm with a placement replaced away to nothing, every CR 122.6
-  -- replacement in the pool only increasing one -- so re-gating it on `placed`
-  -- leaves the suite green.
+  -- to place. That ungated emission is a FENCE and not a tested branch: re-gating it
+  -- on `placed` leaves the suite green, because the only pooled replacement that can
+  -- reduce a placement to nothing (an opponent's Vorinclex, Monstrous Raider) halves
+  -- the shield counter this trigger would put on to nothing as well, so no board can
+  -- see the difference.
   --
   -- The pair the event names is the resolving ability's SOURCE and the slot's
   -- creature, in rule 702.134c's order. An illegal slot never arrives here at all
