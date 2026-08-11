@@ -293,7 +293,6 @@ spec s registry = do
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
   Pawl.Codec.CombatStepSpec.spec s
-  Pawl.JsonCodec.CommonSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
@@ -435,6 +434,7 @@ spec s registry = do
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
   Pawl.JsonCodec.ArmSpec.spec s
+  Pawl.JsonCodec.CommonSpec.spec s
   Pawl.JsonCodec.FieldsSpec.spec s
   Pawl.JsonPointer.EvaluateSpec.spec s
   Pawl.JsonPointer.PointerSpec.spec s

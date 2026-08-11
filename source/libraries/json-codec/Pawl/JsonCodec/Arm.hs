@@ -22,19 +22,19 @@ import qualified Pawl.JsonSchema.Name as Name
 import qualified Pawl.JsonSchema.Schema as Schema
 
 data Arm a where
-  MkNullary :: String -> a -> Arm a
-  MkPayload :: String -> Codec.Codec b -> (b -> a) -> Arm a
+  Nullary :: String -> a -> Arm a
+  Payload :: String -> Codec.Codec b -> (b -> a) -> Arm a
 
 nullary :: String -> a -> Arm a
-nullary = MkNullary
+nullary = Nullary
 
 payload :: String -> Codec.Codec b -> (b -> a) -> Arm a
-payload = MkPayload
+payload = Payload
 
 tag :: Arm a -> String
 tag arm = case arm of
-  MkNullary t _ -> t
-  MkPayload t _ _ -> t
+  Nullary t _ -> t
+  Payload t _ _ -> t
 
 -- | Assumes distinct tags across 'arms': 'List.find' takes the first match on
 -- decode, so a duplicate tag is dead code, and 'armSchema' does not dedupe
@@ -54,8 +54,8 @@ tagged enc arms =
         (t, mv) <- Common.asTagged value
         case List.find ((== t) . tag) arms of
           Nothing -> Left . Text.pack $ "unknown " <> name <> ": " <> t
-          Just (MkNullary _ x) -> Right x
-          Just (MkPayload _ c inject) -> fmap inject (Common.withValue mv (Codec.decode c)),
+          Just (Nullary _ x) -> Right x
+          Just (Payload _ c inject) -> fmap inject (Common.withValue mv (Codec.decode c)),
       Codec.schema = Define.define (Name.typeName proxy) $ do
         schemas <- traverse armSchema arms
         pure (Schema.oneOf schemas)
@@ -66,8 +66,8 @@ tagged enc arms =
 
 armSchema :: Arm a -> Define.SchemaM Schema.Schema
 armSchema arm = case arm of
-  MkNullary t _ -> pure (armObject t Nothing)
-  MkPayload t c _ -> fmap (armObject t . Just) (Codec.schema c)
+  Nullary t _ -> pure (armObject t Nothing)
+  Payload t c _ -> fmap (armObject t . Just) (Codec.schema c)
 
 -- | No @additionalProperties: false@: 'Common.asTagged' ignores unknown keys,
 -- and a nullary arm ignores a @value@ outright, so forbidding them would reject
