@@ -508,6 +508,8 @@ library json-pointer
 library json-schema
   import: library
   build-depends:
+    pawl:decimal,
+    pawl:json,
     pawl:spec,
     text ^>=2.1.3,
 
@@ -516,6 +518,8 @@ library json-schema
   exposed-modules:
     Pawl.JsonSchema.Name
     Pawl.JsonSchema.NameSpec
+    Pawl.JsonSchema.Schema
+    Pawl.JsonSchema.SchemaSpec
 
 -- The registry provides a way to load and cache card data from disk.
 library registry
