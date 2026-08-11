@@ -595,6 +595,7 @@ library types
     Pawl.Types.ContinuousEffect
     Pawl.Types.ControllerRelation
     Pawl.Types.Cost
+    Pawl.Types.CostAdjustments
     Pawl.Types.CostComponent
     Pawl.Types.Count
     Pawl.Types.Counterability
