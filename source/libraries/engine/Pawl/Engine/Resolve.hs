@@ -845,7 +845,12 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
             Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           targeted = Map.restrictKeys legality (Map.keysSet specs)
-       in not (Map.null specs) && not (or (Map.elems targeted))
+       in -- Measured on the slots actually FILLED, not on the slots declared: CR
+          -- 115.6 makes a spell that chose zero targets untargeted, so CR 608.2b's
+          -- "all its targets ... are now illegal" has nothing to be true of. For a
+          -- card with no optional slot the two readings agree, every declared slot
+          -- having been filled at CR 601.2c.
+          not (Map.null targeted) && not (or (Map.elems targeted))
 
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if the
 -- spell has slots and ALL are now illegal it fizzles, moving to the graveyard with
@@ -1034,9 +1039,11 @@ resolveModes stackId srcId modes = do
             Just spec -> Target.stillLegal (Just effectController) srcId recipient spec gs
           legality = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
-          -- reserved slots above cannot rescue a spell whose every target is gone.
+          -- reserved slots above cannot rescue an ability whose every target is
+          -- gone. Measured on the slots FILLED rather than declared, for the
+          -- reason targetsAllIllegal above gives (CR 115.6).
           targeted = Map.restrictKeys legality (Map.keysSet specs)
-          fizzles = not (Map.null specs) && not (or (Map.elems targeted))
+          fizzles = not (Map.null targeted) && not (or (Map.elems targeted))
           -- CR 113.8 / 603.3a: an activated ability's controller is who activated
           -- it, a triggered ability's is whoever controlled its source when it
           -- triggered. Both are stamped as Object.owner at the ability's creation

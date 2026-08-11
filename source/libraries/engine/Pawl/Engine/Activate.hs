@@ -566,14 +566,10 @@ activateAbility pid srcId ability = do
           -- order (the value of X precedes the hybrid and Phyrexian
           -- announcements).
           announcedCost <- Cost.announce pid srcId pure announcedAtX
-          let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
-          chosen <-
-            if Map.null sets
-              then pure Map.empty
-              else Game.choose (Prompt.ChooseTargets decider pid abilId sets)
-          let keysAgree = Map.keysSet chosen == Map.keysSet sets
-              eachLegal = and (Map.intersectionWith Set.member chosen sets)
-          if not (keysAgree && eachLegal)
+          let specs = Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)
+              sets = Target.legalSets (Just pid) srcId specs gs
+          chosen <- Target.chooseTargets decider pid abilId specs sets
+          if not (Target.selectionLegal specs sets chosen)
             then State.put before -- reject: the whole activation is a no-op
             else do
               -- CR 113.7: bind the source permanent under the reserved self slot, so

@@ -2269,6 +2269,44 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   printedCastingRestrictionSpec s registry
   flashSpec s registry
   victorManchaSpec s registry
+  upToOneTargetSpec s registry
+
+-- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
+-- to one target creature gets -1/-1 until end of turn. You create a 1/1 black
+-- Rat creature token ...", and Dismember is the falsifier: {1}{B/P}{B/P} "Target
+-- creature gets -5/-5 until end of turn", the same clause with the slot
+-- REQUIRED. One creatureless board tells the two apart, and the same board with
+-- a creature on it is what proves the mana was never the reason.
+upToOneTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+upToOneTargetSpec s registry = Spec.describe s "UpToOneTargetCast" $ do
+  Spec.it s "CR 115.6 a slot that may be left empty does not gate castability" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ratOut <- S.printingOf s registry "Rat Out"
+    dismember <- S.printingOf s registry "Dismember"
+    -- One base board and one card apiece: S.handOne replaces the hand, so the
+    -- two spells cannot sit in it together.
+    let base = S.landsInPlay swamp 3
+        (bareRat, rat) = S.handOne ratOut base
+        (bareCut, cut) = S.handOne dismember base
+        (_, peopledCut) = S.addCreature piker S.bob bareCut
+    Spec.assertBool s (S.castable S.alice rat bareRat) "up to one target: castable with no creature"
+    Spec.assertBool s (not (S.castable S.alice cut bareCut)) "one required target: not castable"
+    Spec.assertBool s (S.castable S.alice cut peopledCut) "and castable once a creature exists, so the mana was fine"
+  -- CR 601.2c's count announcement is a real choice when the slot has a
+  -- candidate, and no question at all when it has none.
+  Spec.it s "CR 601.2c the number of targets is announced only when there is one to choose" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ratOut <- S.printingOf s registry "Rat Out"
+    let (bare, spellId) = S.handOne ratOut (S.landsInPlay swamp 1)
+        (_, peopled) = S.addCreature piker S.bob bare
+        announced gs = any isAnnouncement (snd (Replay.record S.identityAnswer gs (S.cast S.alice spellId)))
+        isAnnouncement r = case r of
+          Response.AnnouncedTargets _ -> True
+          _ -> False
+    Spec.assertBool s (not (announced bare)) "no candidate, no question"
+    Spec.assertBool s (announced peopled) "a candidate, so the caster is asked"
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

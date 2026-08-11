@@ -235,7 +235,24 @@ data Prompt r where
   -- (the ObjectId); the answer fills every slot. Slots agree by NAME, never by
   -- position. Not asked when the spell has no slots: zero slots is no choice
   -- at all, and where the rules leave nothing to ask, don't prompt.
+  --
+  -- The slots offered are the ones that WILL be filled: a CR 115.6 slot the
+  -- caster declined at AnnounceTargets below is not among them.
   ChooseTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName Recipient.Recipient)
+  -- | CR 601.2c's other announcement, made BEFORE ChooseTargets above: "If the
+  -- spell has a variable number of targets, the player announces how many targets
+  -- they will choose before they announce those targets."
+  --
+  -- The Map holds only the slots with a variable number -- CR 115.6's "up to one"
+  -- -- and only those with at least one legal recipient, since zero is the sole
+  -- answer for the rest. Every variable slot today is "up to one", so the count
+  -- is 0 or 1 and the announcement IS the set of slots that will be filled; a
+  -- count above one is a different gap (#1220). Not asked when the map is empty.
+  --
+  -- Carrying the candidate sets rather than the bare names, because the answer is
+  -- a real decision and the player deciding needs to see what they would be
+  -- aiming at.
+  AnnounceTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Prompt (Set.Set SlotName.SlotName)
   -- | CR 612: choose the two basic land types for a text-changing spell's slot.
   --
   -- Asked AS THE EFFECT IS APPLIED, not as the spell is cast: CR 608.2d puts a

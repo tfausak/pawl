@@ -3589,7 +3589,7 @@ mentorSpec s registry =
         Spec.it s "CR 702.134b two instances mint two targeting abilities" $ do
           let abilities = Keyword.abilitiesFor Keyword.Type.Mentor 2
               expectedSpec =
-                TargetSpec.MkTargetSpec
+                TargetSpec.required
                   Pool.Creatures
                   (Just (Filter.Type.And [Filter.Type.IsAttacking, Filter.Type.PowerLessThanSource]))
               specsOf ability = concatMap (Map.elems . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
@@ -3927,7 +3927,7 @@ provokeSpec s registry =
         -- 508.3a's condition, and rule 702.39a's one printed narrowing.
         Spec.it s "CR 702.39b two instances mint two targeting abilities" $ do
           let abilities = Keyword.abilitiesFor Keyword.Type.Provoke 2
-              expectedSpec = TargetSpec.MkTargetSpec Pool.Creatures (Just Filter.Type.ControlledByDefendingPlayer)
+              expectedSpec = TargetSpec.required Pool.Creatures (Just Filter.Type.ControlledByDefendingPlayer)
               specsOf ability = concatMap (Map.elems . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
           Spec.assertEqWith s "two abilities" (length abilities) 2
           Spec.assertEqWith
@@ -8052,7 +8052,7 @@ kindredSpec s registry =
         Map.findWithDefault
           Set.empty
           slot
-          (Target.legalSets (Just S.alice) S.noSource (Map.singleton slot (TargetSpec.MkTargetSpec pool (Just (Filter.Type.HasSubtype Subtype.Faerie)))) gs)
+          (Target.legalSets (Just S.alice) S.noSource (Map.singleton slot (TargetSpec.required pool (Just (Filter.Type.HasSubtype Subtype.Faerie)))) gs)
    in Spec.describe s "Kindred" $ do
         -- The proving test for CR 308. CR 308.2 makes the kindred subtypes
         -- "the same as the set of creature subtypes", so the ENCHANTMENT

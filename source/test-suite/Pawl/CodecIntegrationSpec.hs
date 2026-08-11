@@ -121,7 +121,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
         s
         "target spec"
         (Card.allTargetSpecs card)
-        (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing))
+        (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.required Pool.Spells Nothing))
     -- Stifle beside it, and the pair is the point: ONE Counter opcode, TWO
     -- pools. CR 113.9 -- "activated and triggered abilities on the stack aren't
     -- spells, and therefore can't be countered by anything that counters only
@@ -143,7 +143,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
         s
         "target spec"
         (Card.allTargetSpecs card)
-        (Map.singleton (SlotName.MkSlotName (Text.pack "ability")) (TargetSpec.MkTargetSpec Pool.Abilities Nothing))
+        (Map.singleton (SlotName.MkSlotName (Text.pack "ability")) (TargetSpec.required Pool.Abilities Nothing))
     -- The key is omitted when Counterable, so this pins BOTH directions of
     -- that default: the one card that prints the clause decodes as
     -- CantBeCountered, and a card that says nothing decodes as Counterable

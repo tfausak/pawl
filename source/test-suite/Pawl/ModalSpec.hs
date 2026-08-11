@@ -211,7 +211,7 @@ nonlandPermanentTargetSpec s registry = Spec.describe s "M4h NonlandPermanentTar
     mindslaver <- S.printingOf s registry "Mindslaver"
     mountain <- S.printingOf s registry "Mountain"
     let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
-        got = Target.legalRecipients Nothing S.noSource (TargetSpec.MkTargetSpec Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land)))) gs
+        got = Target.legalRecipients Nothing S.noSource (TargetSpec.required Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land)))) gs
     Spec.assertEqWith
       s
       "two nonland permanents, no land"
@@ -224,7 +224,7 @@ nonlandPermanentTargetSpec s registry = Spec.describe s "M4h NonlandPermanentTar
     mountain <- S.printingOf s registry "Mountain"
     let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
         nonlandOther = Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]
-        specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.Permanents (Just nonlandOther))
+        specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.required Pool.Permanents (Just nonlandOther))
         got = Target.legalSets Nothing (S.creatureId gs) specs gs
     Spec.assertEqWith
       s

@@ -45,6 +45,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetRequirement as TargetRequirement
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
@@ -333,7 +334,7 @@ fallsOff pcs gs oid = case Game.faceOf oid gs of
 -- other shape falls through rather than being read as an object id it is not.
 stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSpec.TargetSpec -> Recipient.Recipient -> Bool
 stillLegalEnchant pcs gs source spec recipient = case (spec, recipient) of
-  (TargetSpec.MkTargetSpec Pool.Creatures Nothing, Recipient.ToCreature target) ->
+  (TargetSpec.MkTargetSpec Pool.Creatures Nothing TargetRequirement.Required, Recipient.ToCreature target) ->
     case Map.lookup target pcs of
       Nothing -> False
       Just pc ->

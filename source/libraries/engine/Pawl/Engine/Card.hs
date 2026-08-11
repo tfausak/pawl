@@ -989,15 +989,16 @@ enchantSpecs face = case enchantSpec face of
 -- taking the first instance is not merely inexact, it is ORDER-DEPENDENT even
 -- where the answer could be written down. No card can reach it: the CardSpec lint
 -- rejects a face whose enchant abilities disagree about their pool, and states
--- the rule (#797).
+-- the rule (#797). A record update over the first spec, so its pool and its CR
+-- 115.6 requirement ride along; CR 702.5a's "Enchant [object or player]" has no
+-- "up to" in it, so an enchant slot is always required.
 enchantSpec :: Face.Face card -> Maybe TargetSpec
 enchantSpec face = case Face.enchant face of
   [] -> Nothing
   spec : specs ->
     Just
-      TargetSpec.MkTargetSpec
-        { TargetSpec.pool = TargetSpec.pool spec,
-          TargetSpec.filter = case Maybe.mapMaybe TargetSpec.filter (spec : specs) of
+      spec
+        { TargetSpec.filter = case Maybe.mapMaybe TargetSpec.filter (spec : specs) of
             [] -> Nothing
             [one] -> Just one
             many -> Just (Filter.And many)

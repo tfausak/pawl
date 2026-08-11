@@ -1154,7 +1154,7 @@ lintMode :: [Effect.Effect Card.Type.Card] -> [SlotName.SlotName] -> Mode.Mode C
 lintMode effects slots =
   Mode.MkMode
     (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects)))
-    (Map.fromList (fmap (\slot -> (slot, TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) slots))
+    (Map.fromList (fmap (\slot -> (slot, TargetSpec.required Pool.AnyTarget Nothing)) slots))
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
 -- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
@@ -2723,7 +2723,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   ( Seq.singleton
                       ( Mode.MkMode
                           (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))))
-                          (Map.singleton Binding.you (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
+                          (Map.singleton Binding.you (TargetSpec.required Pool.AnyTarget Nothing))
                       )
                   )
                   (ModeSelection.ChooseExactly 1),
@@ -2826,7 +2826,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let -- A one-mode, effectless modal declaring exactly one target slot.
         declaring slot =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))))
+            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.required Pool.AnyTarget Nothing))))
             (ModeSelection.ChooseExactly 1)
         withTriggered slot card =
           card
@@ -3691,7 +3691,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- for -- finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerLessThanSource]]
-        slotSpec = TargetSpec.MkTargetSpec Pool.Creatures (Just buried)
+        slotSpec = TargetSpec.required Pool.Creatures (Just buried)
         planted =
           (S.combinedFace piker)
             { Face.spell =
@@ -3705,7 +3705,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           planted
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just buriedGreater)))))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.required Pool.Creatures (Just buriedGreater)))))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
@@ -3722,7 +3722,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- hand-built face carrying the atom in a target spec finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ControlledByDefendingPlayer]]
-        slotSpec = TargetSpec.MkTargetSpec Pool.Creatures (Just buried)
+        slotSpec = TargetSpec.required Pool.Creatures (Just buried)
         planted =
           (S.combinedFace piker)
             { Face.spell =
@@ -3765,10 +3765,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (NonEmpty.singleton (Modification.ModifyPowerToughness quantity (Quantity.Type.Literal 0)))
         planted =
           [ ( "a target spec",
-              base {Face.spell = spellOf [] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just buried)))}
+              base {Face.spell = spellOf [] (Map.singleton slot (TargetSpec.required Pool.Permanents (Just buried)))}
             ),
             ( "CR 303.4a's enchant ability",
-              base {Face.enchant = [TargetSpec.MkTargetSpec Pool.Permanents (Just buried)]}
+              base {Face.enchant = [TargetSpec.required Pool.Permanents (Just buried)]}
             ),
             ( "a static ability's affected set",
               base
@@ -3889,7 +3889,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Aura Graft is accepted"
       (canHostSubjectOffends (S.combinedFace graft), canHostSubjectCounts (S.combinedFace graft))
       (False, (1, 0))
-    let grafted = base {Face.spell = spellOf [Effect.AttachTarget slot buried] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents Nothing))}
+    let grafted = base {Face.spell = spellOf [Effect.AttachTarget slot buried] (Map.singleton slot (TargetSpec.required Pool.Permanents Nothing))}
     Spec.assertEqWith
       s
       "a buried atom in an AttachTarget destination is accepted"

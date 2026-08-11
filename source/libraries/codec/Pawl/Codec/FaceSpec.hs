@@ -218,7 +218,7 @@ populatedFace =
       Face.mulliganActions = [[Effect.ExileHandThenDraw]],
       Face.openingHandActions = [[Effect.ExileHandThenDraw]],
       Face.specialActions = [SpecialAction.DiscardThisAnyTime],
-      Face.enchant = [TargetSpec.MkTargetSpec Pool.Creatures Nothing],
+      Face.enchant = [TargetSpec.required Pool.Creatures Nothing],
       Face.castingRestrictions = [CastingRestriction.AttackedThisStep]
     }
 
@@ -475,7 +475,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.enchant = [TargetSpec.MkTargetSpec Pool.Creatures Nothing]}
+        baseFace {Face.enchant = [TargetSpec.required Pool.Creatures Nothing]}
         (init baseFaceJson <> ",\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}]}")
     Spec.it s "castingRestrictions" $
       Common.assertJsonCodec

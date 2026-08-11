@@ -1,0 +1,97 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Explosive Entry",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Destroy",
+                    "value": [
+                      "artifact",
+                      {
+                        "type": "Regenerable"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "PlusOnePlusOne"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "creature"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "artifact",
+                "spec": {
+                  "filter": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Artifact"
+                    }
+                  },
+                  "pool": {
+                    "type": "Permanents"
+                  },
+                  "requirement": {
+                    "type": "UpToOne"
+                  }
+                }
+              },
+              {
+                "slot": "creature",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  },
+                  "requirement": {
+                    "type": "UpToOne"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

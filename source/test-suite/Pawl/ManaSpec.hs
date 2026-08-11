@@ -357,7 +357,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.modal =
                 singleModeAbility
                   [Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))]
-                  (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)),
+                  (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
@@ -370,7 +370,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.modal =
                 singleModeAbility
                   [Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1)]
-                  (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)),
+                  (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
