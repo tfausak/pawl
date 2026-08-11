@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.MillTally as MillTally
 
@@ -15,14 +16,14 @@ toJson :: MillTally.MillTally -> Value.Value
 toJson tally =
   Value.object
     ( Common.requiredPair "slot" SlotName.toJson (MillTally.slot tally)
-        <> Common.requiredPair "filter" (Filter.toJson Keyword.toJson) (MillTally.filter tally)
+        <> Common.requiredPair "filter" (Codec.encode (Filter.codec Keyword.codec)) (MillTally.filter tally)
     )
 
 fromJson :: Value.Value -> Either Text.Text MillTally.MillTally
 fromJson value = do
   ps <- Common.asObject value
   s <- Common.field "slot" ps >>= SlotName.fromJson
-  f <- Common.field "filter" ps >>= Filter.fromJson Keyword.fromJson
+  f <- Common.field "filter" ps >>= Codec.decode (Filter.codec Keyword.codec)
   pure
     MillTally.MkMillTally
       { MillTally.slot = s,

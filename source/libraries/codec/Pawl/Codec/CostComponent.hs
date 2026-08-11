@@ -1,61 +1,47 @@
 module Pawl.Codec.CostComponent where
 
-import qualified Data.Text as Text
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.Filter as Filter
-import qualified Pawl.Json.Array as Array
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CostComponent as CostComponent
 
--- | Tagged rather than bare-nullary from the start: this family grows
--- payload-carrying constructors (PayLife, Sacrifice), so the decoder is written
--- against Common.asTagged and only gains arms.
---
--- The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
-toJson :: (keyword -> Value.Value) -> CostComponent.CostComponent keyword -> Value.Value
-toJson encode c = case c of
-  CostComponent.TapThis -> Common.nullary "TapThis"
-  CostComponent.UntapThis -> Common.nullary "UntapThis"
-  CostComponent.SacrificeThis -> Common.nullary "SacrificeThis"
-  CostComponent.PayLife n -> Common.tagged "PayLife" . Just $ Common.encodeNatural n
-  CostComponent.Sacrifice n c_ -> Common.tagged "Sacrifice" . Just . Value.array $ [Common.encodeNatural n, Filter.toJson encode c_]
-  CostComponent.TapForTotalPower n c_ -> Common.tagged "TapForTotalPower" . Just . Value.array $ [Common.encodeNatural n, Filter.toJson encode c_]
-  CostComponent.DiscardCards n -> Common.tagged "DiscardCards" . Just $ Common.encodeNatural n
-  CostComponent.DiscardThis -> Common.nullary "DiscardThis"
-  CostComponent.PayEnergy n -> Common.tagged "PayEnergy" . Just $ Common.encodeNatural n
-  CostComponent.AddLoyaltyToThis n -> Common.tagged "AddLoyaltyToThis" . Just $ Common.encodeNatural n
-  CostComponent.RemoveLoyaltyFromThis n -> Common.tagged "RemoveLoyaltyFromThis" . Just $ Common.encodeNatural n
-  CostComponent.PutPlusOneCountersOnThis n -> Common.tagged "PutPlusOneCountersOnThis" . Just $ Common.encodeNatural n
-  CostComponent.ExileThisFromGraveyard -> Common.nullary "ExileThisFromGraveyard"
-  CostComponent.ExileCardsFromGraveyard n c_ -> Common.tagged "ExileCardsFromGraveyard" . Just . Value.array $ [Common.encodeNatural n, Filter.toJson encode c_]
-  CostComponent.ExileTopFromGraveyard c_ -> Common.tagged "ExileTopFromGraveyard" . Just $ Filter.toJson encode c_
-
-fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (CostComponent.CostComponent keyword)
-fromJson decode value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("TapThis", _) -> Right CostComponent.TapThis
-    ("UntapThis", _) -> Right CostComponent.UntapThis
-    ("SacrificeThis", _) -> Right CostComponent.SacrificeThis
-    ("PayLife", Just v) -> CostComponent.PayLife <$> Common.decodeNatural v
-    ("Sacrifice", Just (Value.Array (Array.MkArray [n, c_]))) -> do
-      count <- Common.decodeNatural n
-      filter_ <- Filter.fromJson decode c_
-      pure $ CostComponent.Sacrifice count filter_
-    ("TapForTotalPower", Just (Value.Array (Array.MkArray [n, c_]))) -> do
-      threshold <- Common.decodeNatural n
-      filter_ <- Filter.fromJson decode c_
-      pure $ CostComponent.TapForTotalPower threshold filter_
-    ("DiscardCards", Just v) -> CostComponent.DiscardCards <$> Common.decodeNatural v
-    ("DiscardThis", _) -> Right CostComponent.DiscardThis
-    ("PayEnergy", Just v) -> CostComponent.PayEnergy <$> Common.decodeNatural v
-    ("AddLoyaltyToThis", Just v) -> CostComponent.AddLoyaltyToThis <$> Common.decodeNatural v
-    ("RemoveLoyaltyFromThis", Just v) -> CostComponent.RemoveLoyaltyFromThis <$> Common.decodeNatural v
-    ("PutPlusOneCountersOnThis", Just v) -> CostComponent.PutPlusOneCountersOnThis <$> Common.decodeNatural v
-    ("ExileThisFromGraveyard", _) -> Right CostComponent.ExileThisFromGraveyard
-    ("ExileCardsFromGraveyard", Just (Value.Array (Array.MkArray [n, c_]))) -> do
-      count <- Common.decodeNatural n
-      filter_ <- Filter.fromJson decode c_
-      pure $ CostComponent.ExileCardsFromGraveyard count filter_
-    ("ExileTopFromGraveyard", Just v) -> CostComponent.ExileTopFromGraveyard <$> Filter.fromJson decode v
-    _ -> Left . Text.pack $ "unknown CostComponent: " <> t
+-- | The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
+codec :: (Typeable.Typeable keyword) => Codec.Codec keyword -> Codec.Codec (CostComponent.CostComponent keyword)
+codec keywordCodec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "TapThis" CostComponent.TapThis,
+      Arm.nullary "UntapThis" CostComponent.UntapThis,
+      Arm.nullary "SacrificeThis" CostComponent.SacrificeThis,
+      Arm.payload "PayLife" Common.natural CostComponent.PayLife,
+      Arm.payload "Sacrifice" (Common.tuple Common.natural (Filter.codec keywordCodec)) (uncurry CostComponent.Sacrifice),
+      Arm.payload "TapForTotalPower" (Common.tuple Common.natural (Filter.codec keywordCodec)) (uncurry CostComponent.TapForTotalPower),
+      Arm.payload "DiscardCards" Common.natural CostComponent.DiscardCards,
+      Arm.nullary "DiscardThis" CostComponent.DiscardThis,
+      Arm.payload "PayEnergy" Common.natural CostComponent.PayEnergy,
+      Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis,
+      Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis,
+      Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis,
+      Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
+      Arm.payload "ExileCardsFromGraveyard" (Common.tuple Common.natural (Filter.codec keywordCodec)) (uncurry CostComponent.ExileCardsFromGraveyard),
+      Arm.payload "ExileTopFromGraveyard" (Filter.codec keywordCodec) CostComponent.ExileTopFromGraveyard
+    ]
+  where
+    encode c = case c of
+      CostComponent.TapThis -> Common.nullary "TapThis"
+      CostComponent.UntapThis -> Common.nullary "UntapThis"
+      CostComponent.SacrificeThis -> Common.nullary "SacrificeThis"
+      CostComponent.PayLife n -> Common.tagged "PayLife" . Just $ Common.encodeNatural n
+      CostComponent.Sacrifice n c_ -> Common.tagged "Sacrifice" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Filter.codec keywordCodec) c_]
+      CostComponent.TapForTotalPower n c_ -> Common.tagged "TapForTotalPower" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Filter.codec keywordCodec) c_]
+      CostComponent.DiscardCards n -> Common.tagged "DiscardCards" . Just $ Common.encodeNatural n
+      CostComponent.DiscardThis -> Common.nullary "DiscardThis"
+      CostComponent.PayEnergy n -> Common.tagged "PayEnergy" . Just $ Common.encodeNatural n
+      CostComponent.AddLoyaltyToThis n -> Common.tagged "AddLoyaltyToThis" . Just $ Common.encodeNatural n
+      CostComponent.RemoveLoyaltyFromThis n -> Common.tagged "RemoveLoyaltyFromThis" . Just $ Common.encodeNatural n
+      CostComponent.PutPlusOneCountersOnThis n -> Common.tagged "PutPlusOneCountersOnThis" . Just $ Common.encodeNatural n
+      CostComponent.ExileThisFromGraveyard -> Common.nullary "ExileThisFromGraveyard"
+      CostComponent.ExileCardsFromGraveyard n c_ -> Common.tagged "ExileCardsFromGraveyard" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Filter.codec keywordCodec) c_]
+      CostComponent.ExileTopFromGraveyard c_ -> Common.tagged "ExileTopFromGraveyard" . Just $ Codec.encode (Filter.codec keywordCodec) c_

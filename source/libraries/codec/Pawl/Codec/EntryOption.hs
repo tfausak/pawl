@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.EntryOption as EntryOption
 
@@ -15,7 +16,7 @@ toJson o =
   Value.object . concat $
     [ Common.requiredPair "power" Value.integer (EntryOption.power o),
       Common.requiredPair "toughness" Value.integer (EntryOption.toughness o),
-      Common.optionalPair "keywords" Set.empty (Common.encodeSet Keyword.toJson) (EntryOption.keywords o)
+      Common.optionalPair "keywords" Set.empty (Common.encodeSet (Codec.encode Keyword.codec)) (EntryOption.keywords o)
     ]
 
 fromJson :: Value.Value -> Either Text.Text EntryOption.EntryOption
@@ -23,7 +24,7 @@ fromJson value = do
   ps <- Common.asObject value
   p <- Common.field "power" ps >>= Common.asInteger
   t <- Common.field "toughness" ps >>= Common.asInteger
-  ks <- Common.defaultedField "keywords" Set.empty (Common.decodeSet Keyword.fromJson) ps
+  ks <- Common.defaultedField "keywords" Set.empty (Common.decodeSet (Codec.decode Keyword.codec)) ps
   pure
     EntryOption.MkEntryOption
       { EntryOption.power = p,

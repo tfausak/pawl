@@ -16,7 +16,7 @@ import qualified Pawl.Types.Modification as Modification
 
 toJson :: Modification.Modification -> Value.Value
 toJson m = case m of
-  Modification.GainKeyword k -> Common.tagged "GainKeyword" . Just $ Keyword.toJson k
+  Modification.GainKeyword k -> Common.tagged "GainKeyword" . Just $ Codec.encode Keyword.codec k
   Modification.LoseAllAbilities -> Common.nullary "LoseAllAbilities"
   Modification.SetBasePowerToughness p t -> Common.tagged "SetBasePowerToughness" . Just . Value.array $ [Quantity.toJson p, Quantity.toJson t]
   Modification.ModifyPowerToughness p t -> Common.tagged "ModifyPowerToughness" . Just . Value.array $ [Quantity.toJson p, Quantity.toJson t]
@@ -44,7 +44,7 @@ fromJson value = do
         Just (Value.Array (Array.MkArray [x, y])) -> Right (x, y)
         _ -> Left $ Text.pack "expected a two-element array"
   case t of
-    "GainKeyword" -> Common.withValue mv (fmap Modification.GainKeyword . Keyword.fromJson)
+    "GainKeyword" -> Common.withValue mv (fmap Modification.GainKeyword . Codec.decode Keyword.codec)
     "LoseAllAbilities" -> Right Modification.LoseAllAbilities
     "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
     "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y

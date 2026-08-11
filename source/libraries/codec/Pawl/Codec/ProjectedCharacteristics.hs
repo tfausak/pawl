@@ -26,7 +26,7 @@ toJson pc =
   Value.object . concat $
     [ Common.requiredPair "name" CardName.toJson (PC.name pc),
       Common.optionalPair "supertypes" Set.empty (Common.encodeSet (Codec.encode Supertype.codec)) (PC.supertypes pc),
-      Common.optionalPair "keywords" Map.empty (Common.encodeMultiset Keyword.toJson) (PC.keywords pc),
+      Common.optionalPair "keywords" Map.empty (Common.encodeMultiset (Codec.encode Keyword.codec)) (PC.keywords pc),
       Common.optionalPair "colors" Set.empty (Common.encodeSet (Codec.encode Color.codec)) (PC.colors pc),
       Common.optionalPair "manaValue" Nothing (Common.encodeMaybe Value.integer) (PC.manaValue pc),
       Common.optionalPair "power" Nothing (Common.encodeMaybe Value.integer) (PC.power pc),
@@ -46,7 +46,7 @@ fromJson value = do
   ps <- Common.asObject value
   nm <- Common.field "name" ps >>= CardName.fromJson
   sups <- Common.defaultedField "supertypes" Set.empty (Common.decodeSet (Codec.decode Supertype.codec)) ps
-  kws <- Common.defaultedField "keywords" Map.empty (Common.decodeMultiset Keyword.fromJson) ps
+  kws <- Common.defaultedField "keywords" Map.empty (Common.decodeMultiset (Codec.decode Keyword.codec)) ps
   cols <- Common.defaultedField "colors" Set.empty (Common.decodeSet (Codec.decode Color.codec)) ps
   mv <- Common.defaultedField "manaValue" Nothing (Common.decodeMaybe Common.asInteger) ps
   pow <- Common.defaultedField "power" Nothing (Common.decodeMaybe Common.asInteger) ps

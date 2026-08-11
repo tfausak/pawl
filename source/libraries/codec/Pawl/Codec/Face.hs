@@ -65,7 +65,7 @@ toJson encodeCard f =
       Common.optionalPair "defense" Nothing (Common.encodeMaybe Defense.toJson) (Face.defense f),
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe Quantity.toJson) (Face.characteristicPT f),
       Common.optionalPair "enchant" [] (Common.encodeList TargetSpec.toJson) (Face.enchant f),
-      Common.optionalPair "keywords" Set.empty (Common.encodeSet Keyword.toJson) (Face.keywords f),
+      Common.optionalPair "keywords" Set.empty (Common.encodeSet (Codec.encode Keyword.codec)) (Face.keywords f),
       Common.optionalPair "colorIndicator" Set.empty (Common.encodeSet (Codec.encode Color.codec)) (Face.colorIndicator f),
       Common.optionalPair "spell" Face.defaultSpell (Modal.toJson encodeCard) (Face.spell f),
       Common.optionalPair "staticAbilities" [] (Common.encodeList StaticAbility.toJson) (Face.staticAbilities f),
@@ -83,7 +83,7 @@ toJson encodeCard f =
       Common.optionalPair "sacrificeRestrictions" [] (Common.encodeList SacrificeRestriction.toJson) (Face.sacrificeRestrictions f),
       Common.optionalPair "untapRestrictions" [] (Common.encodeList UntapRestriction.toJson) (Face.untapRestrictions f),
       Common.optionalPair "attackCosts" [] (Common.encodeList AttackCost.toJson) (Face.attackCosts f),
-      Common.optionalPair "additionalCosts" [] (Common.encodeList (CostComponent.toJson Keyword.toJson)) (Face.additionalCosts f),
+      Common.optionalPair "additionalCosts" [] (Common.encodeList (Codec.encode (CostComponent.codec Keyword.codec))) (Face.additionalCosts f),
       Common.optionalPair "alternativeCosts" [] (Common.encodeList AlternativeCost.toJson) (Face.alternativeCosts f),
       -- CR 103.5b / CR 103.6: an array of ACTIONS, each an array of effects, so a
       -- face granting two of them is writable (Pawl.Types.Face).
@@ -106,7 +106,7 @@ fromJson decodeCard value = do
   toughness <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Toughness.fromJson) ps
   loyalty <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe Loyalty.fromJson) ps
   defense <- Common.defaultedField "defense" Nothing (Common.decodeMaybe Defense.fromJson) ps
-  keywords <- Common.defaultedField "keywords" Set.empty (Common.decodeSet Keyword.fromJson) ps
+  keywords <- Common.defaultedField "keywords" Set.empty (Common.decodeSet (Codec.decode Keyword.codec)) ps
   statics <- Common.defaultedField "staticAbilities" [] (Common.decodeList StaticAbility.fromJson) ps
   spell <- Common.defaultedField "spell" Face.defaultSpell (Modal.fromJson decodeCard) ps
   activated <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (ActivatedAbility.fromJson decodeCard)) ps
@@ -125,7 +125,7 @@ fromJson decodeCard value = do
   sacrificeRestrictions <- Common.defaultedField "sacrificeRestrictions" [] (Common.decodeList SacrificeRestriction.fromJson) ps
   untapRestrictions <- Common.defaultedField "untapRestrictions" [] (Common.decodeList UntapRestriction.fromJson) ps
   attackCosts <- Common.defaultedField "attackCosts" [] (Common.decodeList AttackCost.fromJson) ps
-  additionalCosts <- Common.defaultedField "additionalCosts" [] (Common.decodeList (CostComponent.fromJson Keyword.fromJson)) ps
+  additionalCosts <- Common.defaultedField "additionalCosts" [] (Common.decodeList (Codec.decode (CostComponent.codec Keyword.codec))) ps
   alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList AlternativeCost.fromJson) ps
   mulliganActions <- Common.defaultedField "mulliganActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
   openingHandActions <- Common.defaultedField "openingHandActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps

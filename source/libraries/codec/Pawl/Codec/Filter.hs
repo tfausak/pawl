@@ -1,6 +1,6 @@
 module Pawl.Codec.Filter where
 
-import qualified Data.Text as Text
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CounterKind as CounterKind
@@ -9,96 +9,105 @@ import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
-import qualified Pawl.Json.Array as Array
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Types.Filter as Filter
-
--- | CR 702.29e's typecycling filter, absent for plain cycling: null rather than
--- an omitted key, because this rides inside a positional pair.
-optional :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Maybe (Filter.Filter keyword))
-optional decode = Common.decodeMaybe (fromJson decode)
 
 -- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their
 -- operands as a JSON Array, Not as a single nested object, and each atom
 -- delegates to the leaf-enum codec for the characteristic it cases on.
 --
 -- The keyword codec is a PARAMETER: Pawl.Codec.Keyword imports this module for
--- CR 702.29e's typecycling filter, so a direct call to Keyword.toJson here
--- would close a module cycle. Every caller passes Pawl.Codec.Keyword.toJson.
--- Pawl.Codec.KeywordFamily is called DIRECTLY below and needs no parameter,
--- mirroring the types it encodes: a family carries no filter, so that module
--- imports neither this one nor Pawl.Codec.Keyword.
-toJson :: (keyword -> Value.Value) -> Filter.Filter keyword -> Value.Value
-toJson encode filter_ = case filter_ of
-  Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ Codec.encode CardType.codec t
-  Filter.HasSupertype sup -> Common.tagged "HasSupertype" . Just $ Codec.encode Supertype.codec sup
-  Filter.HasColor c -> Common.tagged "HasColor" . Just $ Codec.encode Color.codec c
-  Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Codec.encode Subtype.codec sub
-  Filter.HasKeyword k -> Common.tagged "HasKeyword" . Just $ encode k
-  Filter.HasKeywordFamily f -> Common.tagged "HasKeywordFamily" . Just $ Codec.encode KeywordFamily.codec f
-  Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Value.integer n
-  Filter.PowerAtMost n -> Common.tagged "PowerAtMost" . Just $ Value.integer n
-  Filter.PowerLessThanSource -> Common.nullary "PowerLessThanSource"
-  Filter.PowerGreaterThanSource -> Common.nullary "PowerGreaterThanSource"
-  Filter.ControlledByDefendingPlayer -> Common.nullary "ControlledByDefendingPlayer"
-  Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Value.integer n
-  Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ Codec.encode PlayerRelation.codec r
-  Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ Codec.encode PlayerRelation.codec r
-  Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ Codec.encode PlayerRelation.codec r
-  Filter.IsSource -> Common.nullary "IsSource"
-  Filter.IsAttacking -> Common.nullary "IsAttacking"
-  Filter.IsBlocking -> Common.nullary "IsBlocking"
-  Filter.AttackedThisTurn -> Common.nullary "AttackedThisTurn"
-  Filter.IsAttachedToCreature -> Common.nullary "IsAttachedToCreature"
-  Filter.IsAttachedToPermanent -> Common.nullary "IsAttachedToPermanent"
-  Filter.IsAttachedToSource -> Common.nullary "IsAttachedToSource"
-  Filter.CanHostSubject -> Common.nullary "CanHostSubject"
-  Filter.IsToken -> Common.nullary "IsToken"
-  Filter.IsTapped -> Common.nullary "IsTapped"
-  Filter.IsRingBearer -> Common.nullary "IsRingBearer"
-  Filter.HasDesignation d -> Common.tagged "HasDesignation" . Just $ Designation.toJson d
-  Filter.HasCounters k -> Common.tagged "HasCounters" . Just $ CounterKind.toJson encode k
-  Filter.HasNonManaActivatedAbility -> Common.nullary "HasNonManaActivatedAbility"
-  Filter.And fs -> Common.tagged "And" . Just . Value.array $ fmap (toJson encode) fs
-  Filter.Or fs -> Common.tagged "Or" . Just . Value.array $ fmap (toJson encode) fs
-  Filter.Not f -> Common.tagged "Not" . Just $ toJson encode f
-
-fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Filter.Filter keyword)
-fromJson decode value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("HasCardType", Just v) -> Filter.HasCardType <$> Codec.decode CardType.codec v
-    ("HasSupertype", Just v) -> Filter.HasSupertype <$> Codec.decode Supertype.codec v
-    ("HasColor", Just v) -> Filter.HasColor <$> Codec.decode Color.codec v
-    ("HasSubtype", Just v) -> Filter.HasSubtype <$> Codec.decode Subtype.codec v
-    ("HasKeyword", Just v) -> Filter.HasKeyword <$> decode v
-    ("HasKeywordFamily", Just v) -> Filter.HasKeywordFamily <$> Codec.decode KeywordFamily.codec v
-    ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Common.asInteger v
-    ("PowerAtMost", Just v) -> Filter.PowerAtMost <$> Common.asInteger v
-    ("PowerLessThanSource", _) -> Right Filter.PowerLessThanSource
-    ("PowerGreaterThanSource", _) -> Right Filter.PowerGreaterThanSource
-    ("ControlledByDefendingPlayer", _) -> Right Filter.ControlledByDefendingPlayer
-    ("ManaValueAtMost", Just v) -> Filter.ManaValueAtMost <$> Common.asInteger v
-    ("ControlledBy", Just v) -> Filter.ControlledBy <$> Codec.decode PlayerRelation.codec v
-    ("OwnedBy", Just v) -> Filter.OwnedBy <$> Codec.decode PlayerRelation.codec v
-    ("IsPlayer", Just v) -> Filter.IsPlayer <$> Codec.decode PlayerRelation.codec v
-    ("IsSource", _) -> Right Filter.IsSource
-    ("IsAttacking", _) -> Right Filter.IsAttacking
-    ("IsBlocking", _) -> Right Filter.IsBlocking
-    ("AttackedThisTurn", _) -> Right Filter.AttackedThisTurn
-    ("IsAttachedToCreature", _) -> Right Filter.IsAttachedToCreature
-    ("IsAttachedToPermanent", _) -> Right Filter.IsAttachedToPermanent
-    ("IsAttachedToSource", _) -> Right Filter.IsAttachedToSource
-    ("CanHostSubject", _) -> Right Filter.CanHostSubject
-    ("IsToken", _) -> Right Filter.IsToken
-    ("IsTapped", _) -> Right Filter.IsTapped
-    ("IsRingBearer", _) -> Right Filter.IsRingBearer
-    ("HasDesignation", Just v) -> Filter.HasDesignation <$> Designation.fromJson v
-    ("HasCounters", Just v) -> Filter.HasCounters <$> CounterKind.fromJson decode v
-    ("HasNonManaActivatedAbility", _) -> Right Filter.HasNonManaActivatedAbility
-    ("And", Just (Value.Array (Array.MkArray vs))) -> Filter.And <$> traverse (fromJson decode) vs
-    ("Or", Just (Value.Array (Array.MkArray vs))) -> Filter.Or <$> traverse (fromJson decode) vs
-    ("Not", Just v) -> Filter.Not <$> fromJson decode v
-    _ -> Left . Text.pack $ "unknown Filter: " <> t
+-- CR 702.29e's typecycling filter, so a direct reference to Pawl.Codec.Keyword
+-- here would close a module cycle. Every caller at 'Filter Keyword.Keyword'
+-- passes 'Pawl.Codec.Keyword.codec' -- which is itself defined partly as
+-- 'codec Keyword.codec', tying the knot at the value level; 'Codec.schema'
+-- breaks it at the schema level (Pawl.JsonSchema.Define.define registers the
+-- name before running the body). And/Or/Not recurse on 'codec keywordCodec'
+-- itself for the same reason. Pawl.Codec.KeywordFamily is called DIRECTLY
+-- below and needs no parameter, mirroring the types it encodes: a family
+-- carries no filter, so that module imports neither this one nor
+-- Pawl.Codec.Keyword.
+codec :: (Typeable.Typeable keyword) => Codec.Codec keyword -> Codec.Codec (Filter.Filter keyword)
+codec keywordCodec =
+  Arm.tagged
+    encode
+    [ Arm.payload "HasCardType" CardType.codec Filter.HasCardType,
+      Arm.payload "HasSupertype" Supertype.codec Filter.HasSupertype,
+      Arm.payload "HasColor" Color.codec Filter.HasColor,
+      Arm.payload "HasSubtype" Subtype.codec Filter.HasSubtype,
+      Arm.payload "HasKeyword" keywordCodec Filter.HasKeyword,
+      Arm.payload "HasKeywordFamily" KeywordFamily.codec Filter.HasKeywordFamily,
+      Arm.payload "PowerAtLeast" integerCodec Filter.PowerAtLeast,
+      Arm.payload "PowerAtMost" integerCodec Filter.PowerAtMost,
+      Arm.nullary "PowerLessThanSource" Filter.PowerLessThanSource,
+      Arm.nullary "PowerGreaterThanSource" Filter.PowerGreaterThanSource,
+      Arm.nullary "ControlledByDefendingPlayer" Filter.ControlledByDefendingPlayer,
+      Arm.payload "ManaValueAtMost" integerCodec Filter.ManaValueAtMost,
+      Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy,
+      Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy,
+      Arm.payload "IsPlayer" PlayerRelation.codec Filter.IsPlayer,
+      Arm.nullary "IsSource" Filter.IsSource,
+      Arm.nullary "IsAttacking" Filter.IsAttacking,
+      Arm.nullary "IsBlocking" Filter.IsBlocking,
+      Arm.nullary "AttackedThisTurn" Filter.AttackedThisTurn,
+      Arm.nullary "IsAttachedToCreature" Filter.IsAttachedToCreature,
+      Arm.nullary "IsAttachedToPermanent" Filter.IsAttachedToPermanent,
+      Arm.nullary "IsAttachedToSource" Filter.IsAttachedToSource,
+      Arm.nullary "CanHostSubject" Filter.CanHostSubject,
+      Arm.nullary "IsToken" Filter.IsToken,
+      Arm.nullary "IsTapped" Filter.IsTapped,
+      Arm.nullary "IsRingBearer" Filter.IsRingBearer,
+      Arm.payload "HasDesignation" Designation.codec Filter.HasDesignation,
+      Arm.payload "HasCounters" (CounterKind.codec keywordCodec) Filter.HasCounters,
+      Arm.nullary "HasNonManaActivatedAbility" Filter.HasNonManaActivatedAbility,
+      Arm.payload "And" (Common.list (codec keywordCodec)) Filter.And,
+      Arm.payload "Or" (Common.list (codec keywordCodec)) Filter.Or,
+      Arm.payload "Not" (codec keywordCodec) Filter.Not
+    ]
+  where
+    -- Unnamed, mirroring 'Common.natural': a bare 'Integer' earns no $defs
+    -- entry, and CR 208.1's power/mana-value comparisons are the only atoms
+    -- here that carry one.
+    integerCodec :: Codec.Codec Integer
+    integerCodec =
+      Codec.MkCodec
+        { Codec.encode = Value.integer,
+          Codec.decode = Common.asInteger,
+          Codec.schema = pure Schema.integer
+        }
+    encode filter_ = case filter_ of
+      Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ Codec.encode CardType.codec t
+      Filter.HasSupertype sup -> Common.tagged "HasSupertype" . Just $ Codec.encode Supertype.codec sup
+      Filter.HasColor c -> Common.tagged "HasColor" . Just $ Codec.encode Color.codec c
+      Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Codec.encode Subtype.codec sub
+      Filter.HasKeyword k -> Common.tagged "HasKeyword" . Just $ Codec.encode keywordCodec k
+      Filter.HasKeywordFamily f -> Common.tagged "HasKeywordFamily" . Just $ Codec.encode KeywordFamily.codec f
+      Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Value.integer n
+      Filter.PowerAtMost n -> Common.tagged "PowerAtMost" . Just $ Value.integer n
+      Filter.PowerLessThanSource -> Common.nullary "PowerLessThanSource"
+      Filter.PowerGreaterThanSource -> Common.nullary "PowerGreaterThanSource"
+      Filter.ControlledByDefendingPlayer -> Common.nullary "ControlledByDefendingPlayer"
+      Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Value.integer n
+      Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ Codec.encode PlayerRelation.codec r
+      Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ Codec.encode PlayerRelation.codec r
+      Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ Codec.encode PlayerRelation.codec r
+      Filter.IsSource -> Common.nullary "IsSource"
+      Filter.IsAttacking -> Common.nullary "IsAttacking"
+      Filter.IsBlocking -> Common.nullary "IsBlocking"
+      Filter.AttackedThisTurn -> Common.nullary "AttackedThisTurn"
+      Filter.IsAttachedToCreature -> Common.nullary "IsAttachedToCreature"
+      Filter.IsAttachedToPermanent -> Common.nullary "IsAttachedToPermanent"
+      Filter.IsAttachedToSource -> Common.nullary "IsAttachedToSource"
+      Filter.CanHostSubject -> Common.nullary "CanHostSubject"
+      Filter.IsToken -> Common.nullary "IsToken"
+      Filter.IsTapped -> Common.nullary "IsTapped"
+      Filter.IsRingBearer -> Common.nullary "IsRingBearer"
+      Filter.HasDesignation d -> Common.tagged "HasDesignation" . Just $ Codec.encode Designation.codec d
+      Filter.HasCounters k -> Common.tagged "HasCounters" . Just $ Codec.encode (CounterKind.codec keywordCodec) k
+      Filter.HasNonManaActivatedAbility -> Common.nullary "HasNonManaActivatedAbility"
+      Filter.And fs -> Common.tagged "And" . Just $ Codec.encode (Common.list (codec keywordCodec)) fs
+      Filter.Or fs -> Common.tagged "Or" . Just $ Codec.encode (Common.list (codec keywordCodec)) fs
+      Filter.Not f -> Common.tagged "Not" . Just $ Codec.encode (codec keywordCodec) f
