@@ -846,6 +846,30 @@ data TriggerCondition
     -- payload here would be a width no card asks for; the card that prints
     -- "whenever a creature you control evolves" earns it.
     SelfEvolves
+  | -- | CR 702.134c: the creature the bearer is ATTACHED TO mentored another
+    -- creature -- Aegis of the Legion's "whenever equipped creature mentors a
+    -- creature". Matched against GameEvent.Mentored, whose first id is the mentor
+    -- and whose second Pawl.Engine.Event.eventBindings binds under
+    -- Pawl.Engine.Binding.mentoredCreature for the payload's "that creature".
+    --
+    -- Rule 702.134c's own reading of the event, and nothing is left for this arm to
+    -- check beyond WHO mentored: the rule fires on "a mentor ability whose source is
+    -- the first creature and whose target is the second creature" resolving, so the
+    -- pairing is the event's and not a comparison to redo here.
+    --
+    -- ATTACHMENT-scoped rather than self-scoped or filtered, and the pool is why:
+    -- the one printing that reads rule 702.134c is an Equipment, so its source is
+    -- never the mentoring creature (SelfEvolves' shape would ask about the Aegis)
+    -- and "equipped creature" is not a class of objects a Filter could name (CR
+    -- 301.5f makes it whatever creature this source is attached to). The same
+    -- sentence Affected.Attached states for a static ability, stated for a trigger.
+    -- A card printing "whenever a creature you control mentors" earns the filtered
+    -- form, and one printing "whenever this creature mentors" the self-scoped one.
+    --
+    -- Vacuously False while the source is attached to nothing, or to a player (CR
+    -- 303.4's other destination): an unattached Equipment has no equipped creature,
+    -- so nothing it could watch has mentored.
+    AttachedCreatureMentors
   | -- | CR 603.10a: "whenever a player sacrifices a permanent". One of the four
     -- look-back families that rule names, and the second pawl builds.
     --

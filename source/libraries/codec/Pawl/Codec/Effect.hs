@@ -156,6 +156,7 @@ toJson codec e = case e of
   Effect.Designate d s -> Common.tagged "Designate" (Just (Common.array [Designation.toJson d, SlotName.toJson s]))
   Effect.Unsuspect r -> Common.tagged "Unsuspect" (Just (ObjectRef.toJson r))
   Effect.Evolve s -> Common.tagged "Evolve" (Just (SlotName.toJson s))
+  Effect.Mentor s -> Common.tagged "Mentor" (Just (SlotName.toJson s))
   Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Daytime.toJson d))
   Effect.ExileUntilMonarch s -> Common.tagged "ExileUntilMonarch" (Just (SlotName.toJson s))
   Effect.Attach s -> Common.tagged "Attach" (Just (SlotName.toJson s))
@@ -361,6 +362,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "Designate expects [designation, slot]"
     "Unsuspect" -> Common.withValue mv (fmap Effect.Unsuspect . ObjectRef.fromJson)
     "Evolve" -> Common.withValue mv (fmap Effect.Evolve . SlotName.fromJson)
+    "Mentor" -> Common.withValue mv (fmap Effect.Mentor . SlotName.fromJson)
     "ItBecomes" -> Common.withValue mv (fmap Effect.ItBecomes . Daytime.fromJson)
     "ExileUntilMonarch" -> Common.withValue mv (fmap Effect.ExileUntilMonarch . SlotName.fromJson)
     "Attach" -> Common.withValue mv (fmap Effect.Attach . SlotName.fromJson)

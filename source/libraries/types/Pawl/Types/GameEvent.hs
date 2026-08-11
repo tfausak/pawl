@@ -483,6 +483,29 @@ data GameEvent
     -- says +1/+1 counters arrived, this one says the evolve ability put them.
     -- Renegade Krasis reads the difference.
     Evolved ObjectId.ObjectId
+  | -- | CR 702.134c: a creature MENTORED another -- "a mentor ability whose source
+    -- is the first creature and whose target is the second creature resolves".
+    -- Emitted by Pawl.Engine.Resolve's Effect.Mentor arm, the one place rule
+    -- 702.134a's counter is placed.
+    --
+    -- TWO ids, in the rule's own order: the MENTOR, then the creature it mentored.
+    -- The second is not derivable from the first, rule 702.134a's target being
+    -- chosen (CR 603.3d), so only the resolution knows which creature it landed
+    -- on; Pawl.Engine.Event.eventBindings hands it to the payload as
+    -- Pawl.Engine.Binding.mentoredCreature, Aegis of the Legion's "that creature".
+    --
+    -- Emitted on the ability RESOLVING and gated on nothing else, which is where it
+    -- parts company with Evolved above: rule 702.100b evolves a creature only if
+    -- counters were actually put on it, and rule 702.134c asks only that the mentor
+    -- ability resolve. A CR 122.6 replacement that reduces the placement to nothing
+    -- still mentors. An ability that does NOT resolve emits nothing, which is CR
+    -- 608.2b rather than a gate here: rule 702.134a's one target going illegal
+    -- leaves nothing to resolve.
+    --
+    -- Distinct from the CountersPut event the same placement records, for Evolved's
+    -- reason: that one says +1/+1 counters arrived, this one says a mentor ability
+    -- put them and on whose say-so.
+    Mentored ObjectId.ObjectId ObjectId.ObjectId
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice in the engine
     -- goes through -- a cost payment, Effect.Sacrifice, Effect.PlayerSacrifices

@@ -257,6 +257,7 @@ snapshotView gs shape event = case event of
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.BecameDesignated _ _ -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing

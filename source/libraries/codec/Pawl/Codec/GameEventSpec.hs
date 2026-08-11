@@ -242,6 +242,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.Evolved (ObjectId.MkObjectId 6))
       """ {"type":"Evolved","value":6} """
+  -- CR 702.134c: the mentor first, the creature it mentored second. Distinct ids
+  -- prove the order, which is what "put a shield counter on THAT creature" reads.
+  Spec.it s "Mentored" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.Mentored (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7))
+      """ {"type":"Mentored","value":[6,7]} """
   -- CR 701.21a: the sacrificing player and the permanent, in that order, and the
   -- id is the PRE-MOVE one -- the record is written before the zone change, which
   -- is CR 603.10a's look-back.

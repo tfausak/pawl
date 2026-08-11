@@ -295,6 +295,7 @@ slotsOf effect = case effect of
   -- A READ, Designate's: the slot names the permanent rule 702.100a's
   -- counter goes on.
   Effect.Evolve slot -> oneSlot slot
+  Effect.Mentor slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
   Effect.ExileUntilMonarch slot -> oneSlot slot
   Effect.Attach slot -> oneSlot slot
@@ -448,6 +449,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Designate _ _ -> True
   Effect.Unsuspect _ -> True
   Effect.Evolve _ -> True
+  Effect.Mentor _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
   Effect.Attach _ -> True
@@ -545,6 +547,7 @@ readsX = any effectReadsX
       Effect.Designate _ _ -> False
       Effect.Unsuspect _ -> False
       Effect.Evolve _ -> False
+      Effect.Mentor _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
       Effect.Attach _ -> False
@@ -614,6 +617,7 @@ searchesLibrary effect = case effect of
   Effect.Designate _ _ -> False
   Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
+  Effect.Mentor _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
   Effect.Attach _ -> False
@@ -742,6 +746,7 @@ boundSlots effect = case effect of
   Effect.Designate _ _ -> Set.empty
   Effect.Unsuspect _ -> Set.empty
   Effect.Evolve _ -> Set.empty
+  Effect.Mentor _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
   Effect.Attach _ -> Set.empty
@@ -3153,6 +3158,27 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         Just target -> do
           placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
           Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.Evolved target)))
+      _ -> pure ()
+  -- CR 702.134a's counter and CR 702.134c's marker, Evolve's arm above with the
+  -- rule's own gate rather than that one's: rule 702.134c fires on the mentor
+  -- ability RESOLVING, so the event is recorded however many counters CR 614.16 left
+  -- to place. That ungated emission is a FENCE and not a tested branch: re-gating it
+  -- on `placed` leaves the suite green, because the only pooled replacement that can
+  -- reduce a placement to nothing (an opponent's Vorinclex, Monstrous Raider) halves
+  -- the shield counter this trigger would put on to nothing as well, so no board can
+  -- see the difference.
+  --
+  -- The pair the event names is the resolving ability's SOURCE and the slot's
+  -- creature, in rule 702.134c's order. An illegal slot never arrives here at all
+  -- (CR 608.2b removes the ability), and an id naming no object writes nothing and
+  -- emits nothing, both Evolve's postures.
+  Effect.Mentor slot ->
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target -> do
+          _ <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
+          State.modify' (Event.recordEvent (GameEvent.Mentored source target))
       _ -> pure ()
   -- CR 731.1: the GAME gains the designation. Everything about what that entails
   -- -- CR 731.1's at-most-one, and the CR 702.145c/f transforms it causes

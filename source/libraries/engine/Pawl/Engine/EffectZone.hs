@@ -102,6 +102,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Designate _ _ -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
+  Effect.Mentor _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.Attach _ -> Nothing
