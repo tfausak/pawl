@@ -37,8 +37,13 @@
                   {
                     "effects": [
                       {
-                        "type": "Suspect",
-                        "value": "self"
+                        "type": "Designate",
+                        "value": [
+                          {
+                            "type": "Suspected"
+                          },
+                          "self"
+                        ]
                       },
                       {
                         "type": "Create",

@@ -12,6 +12,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -441,15 +442,26 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PermanentTurnedFaceUp (Filter.ControlledBy PlayerRelation.You))
       """ {"type":"PermanentTurnedFaceUp","value":{"type":"ControlledBy","value":{"type":"You"}}} """
-  -- CR 702.112b's designation, carrying Valeron Wardens' own narrowing: the Filter
-  -- is the whole payload, so it has to survive both directions.
-  Spec.it s "PermanentBecomesRenowned round-trips with its Filter" $
+  -- CR 702.112b's designation, carrying Valeron Wardens' own narrowing: the pair of
+  -- designation and Filter is the whole payload, so both have to survive both
+  -- directions -- a dropped designation would make this condition match Arbor
+  -- Colossus' monstrous event too.
+  Spec.it s "PermanentBecomesDesignated round-trips with its designation and Filter" $
     Common.assertJsonCodec
       s
       TriggerCondition.toJson
       TriggerCondition.fromJson
-      (TriggerCondition.PermanentBecomesRenowned (Filter.ControlledBy PlayerRelation.You))
-      """ {"type":"PermanentBecomesRenowned","value":{"type":"ControlledBy","value":{"type":"You"}}} """
+      (TriggerCondition.PermanentBecomesDesignated Designation.Renowned (Filter.ControlledBy PlayerRelation.You))
+      """ {"type":"PermanentBecomesDesignated","value":[{"type":"Renowned"},{"type":"ControlledBy","value":{"type":"You"}}]} """
+  -- CR 701.37b through the same constructor: Arbor Colossus' "when this creature
+  -- becomes monstrous", which is Filter.IsSource beside the other designation.
+  Spec.it s "PermanentBecomesDesignated carries Monstrous" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PermanentBecomesDesignated Designation.Monstrous Filter.IsSource)
+      """ {"type":"PermanentBecomesDesignated","value":[{"type":"Monstrous"},{"type":"IsSource"}]} """
   -- CR 702.100b's marker, self-scoped, so nullary.
   Spec.it s "SelfEvolves" $
     Common.assertJsonCodec

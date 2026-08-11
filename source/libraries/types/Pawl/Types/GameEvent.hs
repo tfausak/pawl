@@ -5,6 +5,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -446,26 +447,34 @@ data GameEvent
     -- sentence) is the opposite change and would be its own event -- and no
     -- printed card triggers on it, so there would be nothing to feed.
     TurnedFaceUp ObjectId.ObjectId
-  | -- | CR 702.112b: a permanent BECAME RENOWNED -- it was given the renowned
-    -- designation. Emitted by Pawl.Engine.Resolve's Effect.BecomeRenowned arm, the
-    -- one place the designation is written, and only on a TRANSITION: a permanent
-    -- already renowned does not become renowned again. HalfUnlocked's emission
-    -- applies the same gate to its own designation.
+  | -- | A permanent GAINED THIS DESIGNATION -- CR 702.112b's renowned, CR 701.37b's
+    -- monstrous or CR 701.60b's suspected. Emitted by Pawl.Engine.Resolve's
+    -- Effect.Designate arm, the one place any of them is written, and only on a
+    -- TRANSITION: a permanent already renowned does not become renowned again.
+    -- HalfUnlocked's emission applies the same gate to its own designation.
+    --
+    -- The designation as a payload for Pawl.Types.Designation's reason, and one
+    -- event rather than three because one opcode writes all three.
+    -- TriggerCondition.PermanentBecomesDesignated carries the same payload, so
+    -- "when this creature becomes monstrous" (Arbor Colossus) reads this event
+    -- without matching a permanent that became renowned.
     --
     -- The PERMANENT by id and nothing else, for TurnedFaceUp's reasons. No player:
-    -- rule 702.112b names none, and CR 603.3a reads a watcher's controller off its
-    -- own source.
+    -- none of the three rules names one, and CR 603.3a reads a watcher's controller
+    -- off its own source.
     --
-    -- One DIRECTION only, and here the rules make it the only one: rule 702.112b's
-    -- "it stays renowned until it leaves the battlefield" leaves nothing to undo,
-    -- and CR 400.7's new object is not a permanent losing a designation.
-    BecameRenowned ObjectId.ObjectId
+    -- One DIRECTION only. For renowned and monstrous the rules make it the only one:
+    -- "it stays renowned until it leaves the battlefield" leaves nothing to undo, and
+    -- CR 400.7's new object is not a permanent losing a designation. CR 701.60a does
+    -- let suspected end, and Effect.Unsuspect emits nothing -- no printed card
+    -- triggers on a permanent ceasing to be suspected.
+    BecameDesignated Designation.Designation ObjectId.ObjectId
   | -- | CR 702.100b: a creature EVOLVED -- "one or more +1/+1 counters are put on
     -- it as a result of its evolve ability resolving". Emitted by
     -- Pawl.Engine.Resolve's Effect.Evolve arm, the one place that ability's
     -- counters are placed, and only when the placement actually landed some.
     --
-    -- BecameRenowned's shape and its reasons: the permanent by id, no player, one
+    -- BecameDesignated's shape and its reasons: the permanent by id, no player, one
     -- direction. Unlike that one it marks no lasting designation -- rule 702.100b
     -- describes a moment rather than a state, so nothing on Pawl.Types.Object
     -- pairs with it and this event IS the whole record.

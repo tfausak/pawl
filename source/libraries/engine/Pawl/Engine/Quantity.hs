@@ -148,7 +148,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- names, so a payload can read the thing it points at. The CONTEXT rides
   -- through unchanged -- CR 109.5's "you" is still the resolving controller's --
   -- and only the object moves, which is what makes every object-reading arm
-  -- (Power, ManaValue, ObjectCounters, IsRenowned) work under it at once.
+  -- (Power, ManaValue, ObjectCounters, HasDesignation) work under it at once.
   --
   -- `announcedOn` is fixed too, for the Count arm's reason: CR 601.2b's X belongs
   -- to the resolving object however the evaluation is aimed.
@@ -256,20 +256,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- means the VIEW could not describe the object -- it is gone and nothing was
   -- filed under its id.
   Quantity.ObjectCounters kind -> fmap (toInteger . Map.findWithDefault 0 kind . Filter.counters) mView
-  -- CR 702.112b's designation as a 0/1, off the same view ObjectCounters reads --
-  -- so CR 608.2h's last known information answers for an object that is gone,
-  -- which is what rule 702.112a's intervening "if" needs on resolution.
+  -- The designation as a 0/1, off the same view ObjectCounters reads -- so CR
+  -- 608.2h's last known information answers for an object that is gone, which is
+  -- what rule 702.112a's intervening "if" needs on resolution, and what CR 701.37a's
+  -- and Repeat Offender's clause conditions need on theirs.
   --
   -- Nothing only where the view cannot describe the object at all, exactly as
   -- Power and ObjectCounters have it: an object nobody designated is not renowned,
   -- which is an answer.
-  Quantity.IsRenowned -> fmap (\view -> if Filter.renowned view then 1 else 0) mView
-  -- CR 701.37b's designation as a 0/1, IsRenowned's arm in every respect -- the
-  -- same view, the same vacuous reading for an object nobody designated.
-  Quantity.IsMonstrous -> fmap (\view -> if Filter.monstrous view then 1 else 0) mView
-  -- CR 701.60b's designation as a 0/1, IsRenowned's arm in every respect.
-  Quantity.IsSuspected -> fmap (\view -> if Filter.suspected view then 1 else 0) mView
-  -- CR 702.33d's designation as a 0/1, IsRenowned's arm in every respect. The
+  Quantity.HasDesignation d -> fmap (\view -> if Set.member d (Filter.designations view) then 1 else 0) mView
+  -- CR 702.33d's designation as a 0/1, HasDesignation's arm in every respect. The
   -- object it reads is the RESOLVING SPELL, which is still on the stack while its
   -- own clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
   Quantity.WasKicked -> fmap (\view -> if Filter.kicked view then 1 else 0) mView
@@ -389,9 +385,7 @@ substituteStar star quantity = case quantity of
   Quantity.IsMonarch _ -> quantity
   Quantity.PlayerCounters _ _ -> quantity
   Quantity.ObjectCounters _ -> quantity
-  Quantity.IsRenowned -> quantity
-  Quantity.IsMonstrous -> quantity
-  Quantity.IsSuspected -> quantity
+  Quantity.HasDesignation _ -> quantity
   Quantity.WasKicked -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
@@ -443,11 +437,9 @@ slots quantity = case quantity of
   -- A bare CounterKind, which names no slot at all -- this arm carries no
   -- reference of any sort, the object being the one the evaluation is aimed at.
   Quantity.ObjectCounters _ -> Set.empty
-  -- CR 702.112b's designation, which carries no reference either -- ObjectCounters'
-  -- position without even the kind beside it.
-  Quantity.IsRenowned -> Set.empty
-  Quantity.IsMonstrous -> Set.empty
-  Quantity.IsSuspected -> Set.empty
+  -- The designation, which carries no reference either -- ObjectCounters' position,
+  -- with which designation in the kind's place.
+  Quantity.HasDesignation _ -> Set.empty
   Quantity.WasKicked -> Set.empty
   -- And a seventh PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
@@ -493,9 +485,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.IsMonarch ref -> playerRefIsSlotless ref
   Quantity.PlayerCounters ref _ -> playerRefIsSlotless ref
   Quantity.ObjectCounters _ -> True
-  Quantity.IsRenowned -> True
-  Quantity.IsMonstrous -> True
-  Quantity.IsSuspected -> True
+  Quantity.HasDesignation _ -> True
   Quantity.WasKicked -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
@@ -557,9 +547,7 @@ readsX quantity = case quantity of
   Quantity.IsMonarch _ -> False
   Quantity.PlayerCounters _ _ -> False
   Quantity.ObjectCounters _ -> False
-  Quantity.IsRenowned -> False
-  Quantity.IsMonstrous -> False
-  Quantity.IsSuspected -> False
+  Quantity.HasDesignation _ -> False
   Quantity.WasKicked -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False

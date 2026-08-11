@@ -12,6 +12,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -220,13 +221,20 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       """ {"type":"TurnedFaceUp","value":5} """
   -- CR 702.112b. One id, TurnedFaceUp's payload exactly: the designation says only
   -- which permanent got it.
-  Spec.it s "BecameRenowned" $
+  Spec.it s "BecameDesignated Renowned" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.BecameRenowned (ObjectId.MkObjectId 5))
-      """ {"type":"BecameRenowned","value":5} """
+      (GameEvent.BecameDesignated Designation.Renowned (ObjectId.MkObjectId 5))
+      """ {"type":"BecameDesignated","value":[{"type":"Renowned"},5]} """
+  Spec.it s "BecameDesignated Monstrous" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.BecameDesignated Designation.Monstrous (ObjectId.MkObjectId 5))
+      """ {"type":"BecameDesignated","value":[{"type":"Monstrous"},5]} """
   Spec.it s "Evolved" $
     Common.assertJsonCodec
       s

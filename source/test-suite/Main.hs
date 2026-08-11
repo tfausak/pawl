@@ -48,6 +48,7 @@ import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DaytimeSpec
 import qualified Pawl.Codec.DefenseSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
+import qualified Pawl.Codec.DesignationSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DurationSpec
@@ -303,6 +304,7 @@ spec s registry = do
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DaytimeSpec.spec s
+  Pawl.Codec.DesignationSpec.spec s
   Pawl.Codec.DefenseSpec.spec s
   Pawl.Codec.DelayedTriggerSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s

@@ -19,7 +19,10 @@
                         }
                       },
                       {
-                        "type": "IsSuspected"
+                        "type": "HasDesignation",
+                        "value": {
+                          "type": "Suspected"
+                        }
                       }
                     ]
                   }
@@ -138,8 +141,13 @@
                   {
                     "effects": [
                       {
-                        "type": "Suspect",
-                        "value": "target"
+                        "type": "Designate",
+                        "value": [
+                          {
+                            "type": "Suspected"
+                          },
+                          "target"
+                        ]
                       }
                     ]
                   }

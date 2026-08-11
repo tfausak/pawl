@@ -30,7 +30,10 @@
                         "type": "Exactly"
                       },
                       "measured": {
-                        "type": "IsMonstrous"
+                        "type": "HasDesignation",
+                        "value": {
+                          "type": "Monstrous"
+                        }
                       },
                       "threshold": {
                         "type": "Literal",
@@ -52,8 +55,13 @@
                         ]
                       },
                       {
-                        "type": "BecomeMonstrous",
-                        "value": "self"
+                        "type": "Designate",
+                        "value": [
+                          {
+                            "type": "Monstrous"
+                          },
+                          "self"
+                        ]
                       }
                     ]
                   }

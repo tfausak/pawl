@@ -148,6 +148,8 @@ library codec
     Pawl.Codec.DefenseSpec
     Pawl.Codec.DelayedTrigger
     Pawl.Codec.DelayedTriggerSpec
+    Pawl.Codec.Designation
+    Pawl.Codec.DesignationSpec
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.DiscardCause
@@ -614,6 +616,7 @@ library types
     Pawl.Types.Defense
     Pawl.Types.DelayedTrigger
     Pawl.Types.Departure
+    Pawl.Types.Designation
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
     Pawl.Types.DiscardCause
