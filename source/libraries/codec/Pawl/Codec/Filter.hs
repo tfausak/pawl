@@ -11,6 +11,7 @@ import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Filter as Filter
 
@@ -31,21 +32,21 @@ optional decode = Common.decodeMaybe (fromJson decode)
 -- imports neither this one nor Pawl.Codec.Keyword.
 toJson :: (keyword -> Value.Value) -> Filter.Filter keyword -> Value.Value
 toJson encode filter_ = case filter_ of
-  Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ CardType.toJson t
-  Filter.HasSupertype sup -> Common.tagged "HasSupertype" . Just $ Supertype.toJson sup
-  Filter.HasColor c -> Common.tagged "HasColor" . Just $ Color.toJson c
+  Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ Codec.encode CardType.codec t
+  Filter.HasSupertype sup -> Common.tagged "HasSupertype" . Just $ Codec.encode Supertype.codec sup
+  Filter.HasColor c -> Common.tagged "HasColor" . Just $ Codec.encode Color.codec c
   Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Subtype.toJson sub
   Filter.HasKeyword k -> Common.tagged "HasKeyword" . Just $ encode k
-  Filter.HasKeywordFamily f -> Common.tagged "HasKeywordFamily" . Just $ KeywordFamily.toJson f
+  Filter.HasKeywordFamily f -> Common.tagged "HasKeywordFamily" . Just $ Codec.encode KeywordFamily.codec f
   Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Value.integer n
   Filter.PowerAtMost n -> Common.tagged "PowerAtMost" . Just $ Value.integer n
   Filter.PowerLessThanSource -> Common.nullary "PowerLessThanSource"
   Filter.PowerGreaterThanSource -> Common.nullary "PowerGreaterThanSource"
   Filter.ControlledByDefendingPlayer -> Common.nullary "ControlledByDefendingPlayer"
   Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Value.integer n
-  Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ PlayerRelation.toJson r
-  Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ PlayerRelation.toJson r
-  Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ PlayerRelation.toJson r
+  Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ Codec.encode PlayerRelation.codec r
+  Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ Codec.encode PlayerRelation.codec r
+  Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ Codec.encode PlayerRelation.codec r
   Filter.IsSource -> Common.nullary "IsSource"
   Filter.IsAttacking -> Common.nullary "IsAttacking"
   Filter.IsBlocking -> Common.nullary "IsBlocking"
@@ -68,21 +69,21 @@ fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either T
 fromJson decode value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
-    ("HasCardType", Just v) -> Filter.HasCardType <$> CardType.fromJson v
-    ("HasSupertype", Just v) -> Filter.HasSupertype <$> Supertype.fromJson v
-    ("HasColor", Just v) -> Filter.HasColor <$> Color.fromJson v
+    ("HasCardType", Just v) -> Filter.HasCardType <$> Codec.decode CardType.codec v
+    ("HasSupertype", Just v) -> Filter.HasSupertype <$> Codec.decode Supertype.codec v
+    ("HasColor", Just v) -> Filter.HasColor <$> Codec.decode Color.codec v
     ("HasSubtype", Just v) -> Filter.HasSubtype <$> Subtype.fromJson v
     ("HasKeyword", Just v) -> Filter.HasKeyword <$> decode v
-    ("HasKeywordFamily", Just v) -> Filter.HasKeywordFamily <$> KeywordFamily.fromJson v
+    ("HasKeywordFamily", Just v) -> Filter.HasKeywordFamily <$> Codec.decode KeywordFamily.codec v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Common.asInteger v
     ("PowerAtMost", Just v) -> Filter.PowerAtMost <$> Common.asInteger v
     ("PowerLessThanSource", _) -> Right Filter.PowerLessThanSource
     ("PowerGreaterThanSource", _) -> Right Filter.PowerGreaterThanSource
     ("ControlledByDefendingPlayer", _) -> Right Filter.ControlledByDefendingPlayer
     ("ManaValueAtMost", Just v) -> Filter.ManaValueAtMost <$> Common.asInteger v
-    ("ControlledBy", Just v) -> Filter.ControlledBy <$> PlayerRelation.fromJson v
-    ("OwnedBy", Just v) -> Filter.OwnedBy <$> PlayerRelation.fromJson v
-    ("IsPlayer", Just v) -> Filter.IsPlayer <$> PlayerRelation.fromJson v
+    ("ControlledBy", Just v) -> Filter.ControlledBy <$> Codec.decode PlayerRelation.codec v
+    ("OwnedBy", Just v) -> Filter.OwnedBy <$> Codec.decode PlayerRelation.codec v
+    ("IsPlayer", Just v) -> Filter.IsPlayer <$> Codec.decode PlayerRelation.codec v
     ("IsSource", _) -> Right Filter.IsSource
     ("IsAttacking", _) -> Right Filter.IsAttacking
     ("IsBlocking", _) -> Right Filter.IsBlocking

@@ -46,6 +46,7 @@ import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TypeLine as TypeLine
 import qualified Pawl.Codec.UntapRestriction as UntapRestriction
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Face as Face
@@ -65,7 +66,7 @@ toJson encodeCard f =
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe Quantity.toJson) (Face.characteristicPT f),
       Common.optionalPair "enchant" [] (Common.encodeList TargetSpec.toJson) (Face.enchant f),
       Common.optionalPair "keywords" Set.empty (Common.encodeSet Keyword.toJson) (Face.keywords f),
-      Common.optionalPair "colorIndicator" Set.empty (Common.encodeSet Color.toJson) (Face.colorIndicator f),
+      Common.optionalPair "colorIndicator" Set.empty (Common.encodeSet (Codec.encode Color.codec)) (Face.colorIndicator f),
       Common.optionalPair "spell" Face.defaultSpell (Modal.toJson encodeCard) (Face.spell f),
       Common.optionalPair "staticAbilities" [] (Common.encodeList StaticAbility.toJson) (Face.staticAbilities f),
       Common.optionalPair "activatedAbilities" [] (Common.encodeList (ActivatedAbility.toJson encodeCard)) (Face.activatedAbilities f),
@@ -113,7 +114,7 @@ fromJson decodeCard value = do
   triggered <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (TriggeredAbility.fromJson decodeCard)) ps
   permissions <- Common.defaultedField "castingPermissions" [] (Common.decodeList CastingPermission.fromJson) ps
   restrictions <- Common.defaultedField "castingRestrictions" [] (Common.decodeList CastingRestriction.fromJson) ps
-  colorIndicator <- Common.defaultedField "colorIndicator" Set.empty (Common.decodeSet Color.fromJson) ps
+  colorIndicator <- Common.defaultedField "colorIndicator" Set.empty (Common.decodeSet (Codec.decode Color.codec)) ps
   characteristicPT <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe Quantity.fromJson) ps
   delayed <- Common.defaultedField "delayedAbilities" Map.empty (TriggeredAbility.fromJsonDelayed decodeCard) ps
   playerAbilities <- Common.defaultedField "playerAbilities" [] (Common.decodeList PlayerStaticAbility.fromJson) ps

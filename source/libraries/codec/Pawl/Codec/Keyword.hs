@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.MorphVariant as MorphVariant
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Keyword as Keyword
 
@@ -56,7 +57,7 @@ toJson k = case k of
   Keyword.Intimidate -> Common.nullary "Intimidate"
   -- An ARRAY, as Cycling's is, because CR 702.37b's megamorph is the same
   -- keyword with a second field rather than a tag of its own.
-  Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Value.array $ [Cost.toJson toJson cost, MorphVariant.toJson variant]
+  Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Value.array $ [Cost.toJson toJson cost, Codec.encode MorphVariant.codec variant]
   Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson toJson cost
   Keyword.Modular n -> Common.tagged "Modular" . Just $ Common.encodeNatural n
   Keyword.Bushido n -> Common.tagged "Bushido" . Just $ Common.encodeNatural n
@@ -133,7 +134,7 @@ fromJson value = do
     ("Flashback", Just v) -> Keyword.Flashback <$> Cost.fromJson fromJson v
     ("Fear", _) -> Right Keyword.Fear
     ("Intimidate", _) -> Right Keyword.Intimidate
-    ("Morph", Just (Value.Array (Array.MkArray [c, v]))) -> Keyword.Morph <$> Cost.fromJson fromJson c <*> MorphVariant.fromJson v
+    ("Morph", Just (Value.Array (Array.MkArray [c, v]))) -> Keyword.Morph <$> Cost.fromJson fromJson c <*> Codec.decode MorphVariant.codec v
     ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson fromJson v
     ("Modular", Just v) -> Keyword.Modular <$> Common.decodeNatural v
     ("Bushido", Just v) -> Keyword.Bushido <$> Common.decodeNatural v

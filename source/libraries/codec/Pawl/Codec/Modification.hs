@@ -26,14 +26,14 @@ toJson m = case m of
   Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Subtype.toJson s
   Modification.AddCreatureSubtype s -> Common.tagged "AddCreatureSubtype" . Just $ Subtype.toJson s
   Modification.AddEveryCreatureSubtype -> Common.nullary "AddEveryCreatureSubtype"
-  Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ CardType.toJson c
-  Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Supertype.toJson t
-  Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Supertype.toJson t
+  Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ Codec.encode CardType.codec c
+  Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Codec.encode Supertype.codec t
+  Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Codec.encode Supertype.codec t
   Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Value.array $ [Subtype.toJson a, Subtype.toJson b]
   Modification.SetController p -> Common.tagged "SetController" . Just $ Codec.encode PlayerId.codec p
   Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
-  Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet Color.toJson cs
-  Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Common.encodeSet Color.toJson cs
+  Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet (Codec.encode Color.codec) cs
+  Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Common.encodeSet (Codec.encode Color.codec) cs
   Modification.AddChosenColor -> Common.nullary "AddChosenColor"
   Modification.SwitchPowerToughness -> Common.nullary "SwitchPowerToughness"
 
@@ -54,14 +54,14 @@ fromJson value = do
     "SetCreatureSubtype" -> Common.withValue mv (fmap Modification.SetCreatureSubtype . Subtype.fromJson)
     "AddCreatureSubtype" -> Common.withValue mv (fmap Modification.AddCreatureSubtype . Subtype.fromJson)
     "AddEveryCreatureSubtype" -> Right Modification.AddEveryCreatureSubtype
-    "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
-    "AddSupertype" -> Common.withValue mv (fmap Modification.AddSupertype . Supertype.fromJson)
-    "RemoveSupertype" -> Common.withValue mv (fmap Modification.RemoveSupertype . Supertype.fromJson)
+    "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . Codec.decode CardType.codec)
+    "AddSupertype" -> Common.withValue mv (fmap Modification.AddSupertype . Codec.decode Supertype.codec)
+    "RemoveSupertype" -> Common.withValue mv (fmap Modification.RemoveSupertype . Codec.decode Supertype.codec)
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> Subtype.fromJson x <*> Subtype.fromJson y
     "SetController" -> Common.withValue mv (fmap Modification.SetController . Codec.decode PlayerId.codec)
     "SetControllerToSource" -> Right Modification.SetControllerToSource
-    "SetColor" -> Common.withValue mv (fmap Modification.SetColor . Common.decodeSet Color.fromJson)
-    "AddColor" -> Common.withValue mv (fmap Modification.AddColor . Common.decodeSet Color.fromJson)
+    "SetColor" -> Common.withValue mv (fmap Modification.SetColor . Common.decodeSet (Codec.decode Color.codec))
+    "AddColor" -> Common.withValue mv (fmap Modification.AddColor . Common.decodeSet (Codec.decode Color.codec))
     "AddChosenColor" -> Right Modification.AddChosenColor
     "SwitchPowerToughness" -> Right Modification.SwitchPowerToughness
     _ -> Left . Text.pack $ "unknown Modification: " <> t
