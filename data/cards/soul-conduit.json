@@ -7,12 +7,14 @@
             "components": [
               {
                 "type": "TapThis"
-              },
-              {
-                "type": "SacrificeThis"
               }
             ],
-            "mana": []
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 6
+              }
+            ]
           },
           "modal": {
             "modes": [
@@ -23,8 +25,8 @@
                       {
                         "type": "ExchangeLifeTotals",
                         "value": {
-                          "type": "WithController",
-                          "value": "target"
+                          "type": "BetweenTargets",
+                          "value": "players"
                         }
                       }
                     ]
@@ -32,13 +34,11 @@
                 ],
                 "targetSpecs": [
                   {
-                    "slot": "target",
+                    "slot": "players",
                     "spec": {
-                      "filter": {
-                        "type": "IsPlayer",
-                        "value": {
-                          "type": "Opponent"
-                        }
+                      "count": {
+                        "least": 2,
+                        "most": 2
                       },
                       "pool": {
                         "type": "Players"
@@ -48,26 +48,7 @@
                 ]
               }
             ]
-          },
-          "restrictions": [
-            {
-              "type": "DuringPhase",
-              "value": [
-                {
-                  "type": "Step",
-                  "value": {
-                    "type": "Beginning",
-                    "value": {
-                      "type": "Upkeep"
-                    }
-                  }
-                },
-                {
-                  "type": "ControllersTurn"
-                }
-              ]
-            }
-          ]
+          }
         }
       ],
       "manaCost": [
@@ -76,7 +57,7 @@
           "value": 6
         }
       ],
-      "name": "Mirror Universe",
+      "name": "Soul Conduit",
       "typeLine": {
         "types": [
           {

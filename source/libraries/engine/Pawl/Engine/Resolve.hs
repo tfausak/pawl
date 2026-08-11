@@ -64,6 +64,7 @@ import qualified Pawl.Types.Duration as Duration
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
@@ -176,6 +177,15 @@ monarchTargetSlots target = case target of
   MonarchTarget.ControllerOfSource -> Map.empty
   MonarchTarget.InSlot slot -> Map.singleton slot SlotArity.One
 
+-- The slots an ExchangeSides reads, and how many recipients out of each: the
+-- controller's own side comes from nowhere, so WithController reads one target,
+-- while BetweenTargets takes BOTH sides out of one slot (CR 601.2c) and so must
+-- see the whole set.
+exchangeSidesSlots :: ExchangeSides.ExchangeSides -> Map.Map SlotName SlotArity
+exchangeSidesSlots sides = case sides of
+  ExchangeSides.WithController slot -> Map.singleton slot SlotArity.One
+  ExchangeSides.BetweenTargets slot -> Map.singleton slot SlotArity.Many
+
 -- The one legitimate home of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1), and everything else asks classifications.
 -- slotsOf is the read half of the dataflow lint.
@@ -217,7 +227,7 @@ slotsOf effect = case effect of
   Effect.Discard slot quantity -> insertOne slot (quantitySlots quantity)
   Effect.LoseLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.GainLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.ExchangeLifeTotals slot -> oneSlot slot
+  Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
   Effect.IncreaseSpeed ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
@@ -2532,7 +2542,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       _ -> pure ()
   -- CR 701.12c: the two sides reach each other's PREVIOUS total, so both deltas
   -- are read off the same game state before either is written -- a sequential
-  -- "set mine to theirs, then theirs to mine" would leave both on one total.
+  -- "set this one to that one's, then that one to this one's" would leave both on
+  -- one total.
   --
   -- Written as a gain and a loss rather than as two assignments, which is the
   -- rule's own wording ("each player gains or loses the amount of life
@@ -2540,23 +2551,38 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- "whenever you gain life" trigger to read. Equal totals move nobody, and
   -- changeLife's zero case is what keeps the log silent then.
   --
+  -- Which two players are the sides comes from the ExchangeSides: the controller
+  -- and one target (Mirror Universe), or the two players one instance of the word
+  -- "target" named (Soul Conduit, CR 601.2c -- which is also what makes them
+  -- distinct, so nothing here has to check that). Order does not matter, the
+  -- exchange being symmetric, which is why an unordered SET of recipients is
+  -- enough to name both sides.
+  --
   -- Not implemented: CR 701.12c's deferral to CR 119.7-8, under which an
   -- exchange that would raise a player who can't gain life (or lower one who
   -- can't lose life) doesn't happen. Vacuous rather than elided: no effect in
   -- the pool stops a player gaining or losing life, Pawl.Types.PlayerEffect
   -- having no such arm to consult.
-  Effect.ExchangeLifeTotals slot -> do
+  Effect.ExchangeLifeTotals sides -> do
     gs <- State.get
-    case legalOne slot legal of
-      Just (Recipient.ToPlayer other) -> do
+    let twoSides = case sides of
+          ExchangeSides.WithController slot -> case legalOne slot legal of
+            Just (Recipient.ToPlayer other) -> Just (controller, other)
+            _ -> Nothing
+          ExchangeSides.BetweenTargets slot -> case legalMany slot legal of
+            [Recipient.ToPlayer one, Recipient.ToPlayer two] -> Just (one, two)
+            _ -> Nothing
+    case twoSides of
+      Just (this, that) -> do
         let lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
-            mine = lifeOf controller
-            theirs = lifeOf other
-        changeLife controller (theirs - mine)
-        changeLife other (mine - theirs)
-      -- Not a player recipient or an illegal slot (CR 608.2b): no-op, and CR
-      -- 701.12a agrees -- an exchange that cannot be completed does nothing.
-      _ -> pure ()
+            thisLife = lifeOf this
+            thatLife = lifeOf that
+        changeLife this (thatLife - thisLife)
+        changeLife that (thisLife - thatLife)
+      -- Not a player recipient, an illegal slot (CR 608.2b), or a BetweenTargets
+      -- left with anything but its two sides: no-op, and CR 701.12a agrees --
+      -- if the entire exchange can't be completed, no part of it occurs.
+      Nothing -> pure ()
   -- CR 702.179c: each named player's speed increases by this much. Pawl.Engine.
   -- Speed's inherent triggered ability (CR 702.179d) is one producer and card data
   -- is the other, so the PlayerRef is genuinely read rather than known --
