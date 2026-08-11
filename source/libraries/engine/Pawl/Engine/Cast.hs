@@ -558,8 +558,11 @@ castable pid oid name facing gs =
         -- CR 601.3: gated HERE, upstream of Action.legalActions, because the
         -- engine never offers an illegal action and then rejects it. The half's
         -- own name goes with it, since CR 601.3a's prohibitions name a quality of
-        -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half.
-        && not (PlayerEffect.prohibitsCasting pid proposedName proposed)
+        -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half --
+        -- and the OBJECT with it, since a quality can also be a Filter over the
+        -- spell's characteristics (Damping Engine), which is read off the
+        -- `proposed` stamp this call already carries.
+        && not (PlayerEffect.prohibitsCasting pid oid proposedName proposed)
         -- CR 601.3's prohibit half again, from a different CARRIER: a spell on
         -- the stack (CR 702.61a) rather than a continuous effect on a player. It
         -- names neither a player nor a quality of the spell, so it takes no
@@ -716,7 +719,7 @@ castableWhenOffered :: PlayerId -> ObjectId -> CardName.CardName -> [Cost Keywor
 castableWhenOffered pid oid name candidates proposed =
   -- CR 601.3's prohibit half, asked with the half's own name: a quality-bearing
   -- prohibition stops one card without stopping any other candidate.
-  not (PlayerEffect.prohibitsCasting pid name proposed)
+  not (PlayerEffect.prohibitsCasting pid oid name proposed)
     -- CR 702.61a stays too, for CR 601.3's own reason above: an offered cast is
     -- still a cast. Reachable because CR 702.61b keeps triggered abilities going
     -- on the stack, so one can resolve ABOVE the split-second spell and offer a

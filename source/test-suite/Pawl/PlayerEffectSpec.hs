@@ -149,6 +149,16 @@ ruleOfLawAfterFirst plains ruleOfLaw =
 anySpell :: CardName.CardName
 anySpell = CardName.MkCardName (Text.pack "any spell")
 
+-- The object those same assertions pass beside anySpell above, and a made-up one
+-- for that name's own reason: an arm that reads neither the spell's name nor its
+-- characteristics must not be handed a real card, or the assertion would suggest
+-- a dependence the rule does not have. Nothing dereferences it -- only
+-- PlayerEffect.CantCastMatching reads the object, and no board below carries one
+-- -- so an id no fixture mints is the honest argument. Damping Engine's arm hands
+-- in a real proposal, in Pawl.CardSpec's gameplay case.
+anySpellId :: ObjectId.ObjectId
+anySpellId = ObjectId.MkObjectId 999999
+
 ruleOfLawSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 ruleOfLawSpec s registry =
   Spec.describe s "RuleOfLaw" $ do
@@ -156,7 +166,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell board)) "not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell board)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast a (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "a offered"
       Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "b offered"
 
@@ -170,7 +180,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpell afterFirst) "alice is now prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell afterFirst) "alice is now prohibited"
       Spec.assertEqWith
         s
         "no cast is offered at all"
@@ -183,7 +193,7 @@ ruleOfLawSpec s registry =
       plains <- S.printingOf s registry "Plains"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, afterFirst) = ruleOfLawAfterFirst plains ruleOfLaw
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpell afterFirst)) "bob is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell afterFirst)) "bob is not prohibited"
 
     -- Engine.handoffTurn clears the event log at the turn handoff, so
     -- "this turn" (castsThisTurn's fold over the log) is exactly the
@@ -201,7 +211,7 @@ ruleOfLawSpec s registry =
                 GameState.priority = Just S.alice
               }
       Spec.assertEqWith s "alice is active again" (GameState.activePlayer nextOwnTurn) S.alice
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell nextOwnTurn)) "not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell nextOwnTurn)) "not prohibited"
       Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
 
     -- Ruling: "If you cast a spell that was countered, you can't cast
@@ -217,7 +227,7 @@ ruleOfLawSpec s registry =
         top : _ -> do
           let countered = S.runPure S.identityAnswer cast (Event.counter S.noSource S.bob top)
           Spec.assertEqWith s "the stack is empty again" (GameState.stack countered) []
-          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpell countered) "still prohibited"
+          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell countered) "still prohibited"
 
     -- The effect is RE-DERIVED from the battlefield on every read, so there
     -- is no stored state to unwind when its source leaves.
@@ -228,8 +238,8 @@ ruleOfLawSpec s registry =
           (rol, onBoard) = S.addCreature ruleOfLaw S.alice plain
           castOne = S.withEvents [GameEvent.SpellCast S.alice S.noSource S.emptyCharacteristics] onBoard
           gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable [rol])
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpell castOne) "prohibited while it stands"
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell gone)) "not prohibited once it is gone"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell castOne) "prohibited while it stands"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell gone)) "not prohibited once it is gone"
       Spec.assertBool s (elem (Action.Type.Cast z (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice gone)) "and a cast is offered again"
 
     -- CR 601.3's prohibit half applies to EVERY cast, including a
@@ -939,11 +949,11 @@ humilitySpec s registry =
           castOne = S.withEvents [GameEvent.SpellCast S.alice S.noSource S.emptyCharacteristics]
       Spec.assertBool
         s
-        (PlayerEffect.prohibitsCasting S.alice anySpell (castOne withHumility))
+        (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell (castOne withHumility))
         "control: Humility alone does not reach an enchantment"
       Spec.assertBool
         s
-        (not (PlayerEffect.prohibitsCasting S.alice anySpell (castOne withOpalescence)))
+        (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell (castOne withOpalescence)))
         "once animated, Rule of Law loses the ability and the limit lifts"
 
 -- alice controls a Sapphire Medallion and two untapped Islands, with Divination
@@ -2010,15 +2020,15 @@ storedSpec s registry =
 
     Spec.it s "CR 611.1 a stored effect applies through its scope" $
       do
-        Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpell silenced) "bob is prohibited"
-        Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell silenced)) "alice is not"
+        Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell silenced) "bob is prohibited"
+        Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell silenced)) "alice is not"
 
     Spec.it s "CR 514.2 the cleanup sweep drops an AtCleanup player effect" $
       let after = Expiry.dropAtCleanup silenced
        in do
             Spec.assertEqWith s "one stored before" (length (GameState.playerEffects silenced)) 1
             Spec.assertEqWith s "none after" (GameState.playerEffects after) []
-            Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpell after)) "and bob may cast again"
+            Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell after)) "and bob may cast again"
 
     Spec.it s "CR 514.2 the cleanup sweep keeps a Never player effect" $
       let forever = S.addPlayerEffect Expiry.Type.Never PlayerScope.Opponents PlayerEffect.Type.CantCastSpells S.alice base
@@ -2049,10 +2059,10 @@ storedSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, conditional) = storedConditional piker
           (changed, swept) = Engine.runGamePure S.identityAnswer conditional Expiry.sweepConditional
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpell conditional) "still prohibited while the source stands"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell conditional) "still prohibited while the source stands"
       Spec.assertBool s (not changed) "the sweep reports no change"
       Spec.assertEqWith s "still stored" (length (GameState.playerEffects swept)) 1
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpell swept) "still prohibited after a no-op sweep"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell swept) "still prohibited after a no-op sweep"
 
     Spec.it s "CR 611.2b the conditional sweep deletes a player effect whose condition has failed" $ do
       piker <- S.printingOf s registry "Goblin Piker"
@@ -2061,7 +2071,7 @@ storedSpec s registry =
           (changed, swept) = Engine.runGamePure S.identityAnswer gone Expiry.sweepConditional
       Spec.assertBool s changed "the sweep reports a change"
       Spec.assertEqWith s "deleted, not masked" (GameState.playerEffects swept) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpell swept)) "no longer prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell swept)) "no longer prohibited"
 
 -- The board is BOB's turn on purpose: the "only casting is stopped" ruling
 -- names playing a land and activating an ability, and both are only
@@ -2165,7 +2175,7 @@ silenceSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
       Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects after)) 1
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpell after) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell after) "bob is prohibited"
       Spec.assertEqWith
         s
         "and no cast is offered"
@@ -2181,7 +2191,7 @@ silenceSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, silence2Id, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell after)) "alice is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell after)) "alice is not prohibited"
       Spec.assertBool s (S.castable S.alice silence2Id after) "and may cast her second Silence"
 
     -- Ruling: "The only thing Silence stops is casting spells. Your
@@ -2206,7 +2216,7 @@ silenceSpec s registry =
       let (_, _, _, _, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
           ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
       Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpell ended)) "bob may cast again"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell ended)) "bob may cast again"
 
     -- CR 806.1: in a free-for-all the players compete as individuals, so the
     -- card's your-opponents is EVERY other player, not the next seat. This is
@@ -2239,15 +2249,15 @@ silenceSpec s registry =
       -- THE DISCRIMINATOR. carol is the far seat: an Opponents scope resolved as
       -- "the next player in turn order" prohibits bob and leaves carol free, and
       -- that is the reading the doc comments claimed was in here.
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpell resolved) "bob is prohibited"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpell resolved) "carol is prohibited too"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell resolved) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell resolved) "carol is prohibited too"
       Spec.assertEqWith
         s
         "and nothing is offered to either, even on their own main phase"
         (filter isCast (Action.legalActions S.bob resolvedBobsTurn) <> filter isCast (Action.legalActions S.carol resolvedCarolsTurn))
         []
       -- CR 109.5: the scope is resolved off the effect's controller.
-      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell resolved)) "alice is not prohibited"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell resolved)) "alice is not prohibited"
 
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).
@@ -2482,7 +2492,7 @@ nullChamberSpec s registry =
           casts = Action.legalActions S.bob
       Spec.assertBool s (elem (Action.Type.Cast bobsBolt (S.printingName lightningBolt) Facing.FaceUp) (casts before)) "bob may cast his Bolt before the Chamber lands"
       Spec.assertBool s (notElem (Action.Type.Cast bobsBolt (S.printingName lightningBolt) Facing.FaceUp) (casts after)) "and may not once it has"
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob (S.printingName lightningBolt) after) "bob is prohibited by alice's name"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId (S.printingName lightningBolt) after) "bob is prohibited by alice's name"
       Spec.assertBool s (elem (bobsBarrens, Nothing) (Action.playableLands S.bob before)) "bob's land is playable before the Chamber lands"
       Spec.assertBool s (notElem (bobsBarrens, Nothing) (Action.playableLands S.bob after)) "and not once it has"
 
@@ -2521,7 +2531,7 @@ nullChamberSpec s registry =
           picks pid = if pid == S.alice then S.printingName cancel else S.printingName piker
           after = castChamber S.bob picks board oid
           (pikerId, gs) = S.addHandCard piker S.alice after
-      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gs) "alice is prohibited by bob's name"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) gs) "alice is prohibited by bob's name"
       Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gs)) "and no cast is offered"
 
     -- CR 305.1: playing a land is a SPECIAL ACTION that never uses the stack, so
@@ -2572,8 +2582,8 @@ nullChamberSpec s registry =
         Nothing -> Spec.assertFailure s "Null Chamber did not reach the battlefield"
         Just chamber -> do
           let gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [chamber])
-          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gs) "prohibited while it stands"
-          Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gone)) "not prohibited once it is gone"
+          Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) gs) "prohibited while it stands"
+          Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId (S.printingName piker) gone)) "not prohibited once it is gone"
           Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gone)) "and the cast is offered again"
           Spec.assertBool s (elem (barrensId, Nothing) (Action.playableLands S.alice gone)) "and the land may be played again"
 

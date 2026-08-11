@@ -10,6 +10,7 @@ toJson s = Common.nullary $ case s of
   PlayerScope.You -> "You"
   PlayerScope.Opponents -> "Opponents"
   PlayerScope.EachPlayer -> "EachPlayer"
+  PlayerScope.ControllingMostPermanents -> "ControllingMostPermanents"
 
 fromJson :: Value.Value -> Either Text.Text PlayerScope.PlayerScope
 fromJson =
@@ -17,5 +18,6 @@ fromJson =
     "PlayerScope"
     [ ("You", PlayerScope.You),
       ("Opponents", PlayerScope.Opponents),
-      ("EachPlayer", PlayerScope.EachPlayer)
+      ("EachPlayer", PlayerScope.EachPlayer),
+      ("ControllingMostPermanents", PlayerScope.ControllingMostPermanents)
     ]

@@ -157,8 +157,9 @@ legalActions pid gs =
       --
       -- ONE ACTION PER PERMANENT, not per ability: which of a permanent's static
       -- abilities is ignored is not a choice the rules leave open once the
-      -- permanent is chosen, because no printed producer grants the permission
-      -- on more than one (#1139).
+      -- permanent is chosen, because no printed producer grants the permission on
+      -- one of several -- Damping Engine's two abilities come of one sentence, and
+      -- its "this effect" is that sentence (#1267).
       ignores = fmap Action.Ignore (Ignore.ignorable pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's

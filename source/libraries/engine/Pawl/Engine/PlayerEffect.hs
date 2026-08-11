@@ -46,6 +46,7 @@ import Pawl.Types.PlayerScope (PlayerScope)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import Pawl.Types.Subtype (Subtype)
+import Pawl.Types.Timestamp (Timestamp)
 
 -- CR 109.5: "you" on an object is its controller, and for a static ability the
 -- CURRENT controller. `pid` is the player being asked about; `controller` is the
@@ -56,8 +57,13 @@ import Pawl.Types.Subtype (Subtype)
 -- below passes the PROTECTED player, because CR 702.11c's "your opponents" are
 -- the opponents of whoever has hexproof rather than of the effect's controller.
 -- The parameter is named for the common case.
-inScope :: PlayerId -> PlayerId -> PlayerScope -> Bool
-inScope pid controller scope = case scope of
+--
+-- The board comes in because one arm's membership is a fact about it rather than
+-- about the two players: see PlayerScope.ControllingMostPermanents. Every other
+-- arm ignores `gs`, and the leader is computed inside the one arm that asks, so a
+-- scope that never names it pays nothing.
+inScope :: PlayerId -> PlayerId -> GameState -> PlayerScope -> Bool
+inScope pid controller gs scope = case scope of
   PlayerScope.You -> pid == controller
   -- Every other player. Not a two-player shortcut: CR 806.1 has a free-for-all's
   -- players compete as individuals against each other, so every other player is
@@ -68,6 +74,37 @@ inScope pid controller scope = case scope of
   PlayerScope.Opponents -> pid /= controller
   -- Thalia's ruling: "including your own".
   PlayerScope.EachPlayer -> True
+  PlayerScope.ControllingMostPermanents -> permanentLeader gs == Just pid
+
+-- Damping Engine's "a player who controls more permanents than each other
+-- player", as the at-most-one player it names. Nothing when the lead is TIED,
+-- which is the sentence's own answer: "more than each other player" is a strict
+-- comparison, so two players on four permanents each leave the ability affecting
+-- nobody at all.
+--
+-- CR 110.1 is what makes the tally a battlefield fold and nothing more: every
+-- object on the battlefield is a permanent, so no filter is owed. The controller
+-- is the PROJECTED one (CR 613.1b layer 2), so a Mind Control counts the
+-- permanent for its new controller.
+--
+-- A player controlling nothing still has a row, which is what keeps the tie test
+-- honest: on an empty board every player is tied on zero and the answer is
+-- Nothing rather than an arbitrary seat.
+--
+-- One remaining player is VACUOUSLY the leader -- there is no other player to
+-- have fewer than -- and that is the rules answer as well as this fold's. CR
+-- 104.2a has already ended such a game, so nothing observes it.
+permanentLeader :: GameState -> Maybe PlayerId
+permanentLeader gs =
+  let controls pid = length (filter (\oid -> Projection.controllerOf oid gs == Just pid) (Set.toList (GameState.battlefield gs)))
+      tallies = fmap (\pid -> (pid, controls pid)) (Game.stillPlaying gs)
+   in case tallies of
+        [] -> Nothing
+        _ ->
+          let best = maximum (fmap snd tallies)
+           in case filter ((== best) . snd) tallies of
+                [(pid, _)] -> Just pid
+                _ -> Nothing
 
 -- The same scope as a SET rather than as a membership test -- CR 400.1's
 -- per-player zones asked in the direction a zone fold needs it
@@ -83,55 +120,33 @@ inScope pid controller scope = case scope of
 -- -- the vacuous posture every player-referencing Filter atom takes. EachPlayer
 -- is answerable anyway, because it never asks the perspective a question: "target
 -- card in a graveyard" names the whole table whoever is reading it.
+-- ControllingMostPermanents is answerable for that same reason, one arm further
+-- on: its membership is a fact about the board.
 playersInScope :: Maybe PlayerId -> GameState -> PlayerScope -> Maybe [PlayerId]
 playersInScope perspective gs scope =
   let everyone = Game.stillPlaying gs
-      relative = fmap (\you -> filter (\pid -> inScope pid you scope) everyone) perspective
+      relative = fmap (\you -> filter (\pid -> inScope pid you gs scope) everyone) perspective
    in case scope of
         PlayerScope.You -> relative
         PlayerScope.Opponents -> relative
         PlayerScope.EachPlayer -> Just everyone
+        PlayerScope.ControllingMostPermanents -> Just (Maybe.maybeToList (permanentLeader gs))
 
--- CR 604.2: every player effect applying to `pid` right now. Gathered LIVE from
--- the battlefield on every read and never captured, the same posture
--- Projection.gather takes for staticAbilities -- which is why Rule of Law
--- leaving the battlefield lifts its restriction with nothing to unwind.
+-- CR 613.7a: the PRINTED carrier's rows, one per player ability on one
+-- battlefield permanent that still has it, as
+-- (timestamp, source, controller, scope, effect) -- the shape `applying` below
+-- sorts, filters and strips.
 --
--- The scope is resolved DYNAMICALLY (see Pawl.Types.PlayerScope): CR 611.2c
--- lets a rules-modifying effect reach objects that were not affected when it
--- began, so no set is ever frozen on this axis.
+-- Top-level and shared rather than local to that function, because a second
+-- question needs the same walk and needs it read DIFFERENTLY: `applying` drops
+-- the rows CR 116.2d's ignore suppresses, while affectedBy below must not (see
+-- its comment). Sharing the walk is what keeps CR 604.2's two ability losses and
+-- CR 612.1's word swap from being restated in a second place and drifting.
 --
--- The (timestamp, source, controller, scope, effect) rows are local: nothing
--- outside this function sees more than the (source, effect) pair it returns.
---
--- Returned in TIMESTAMP ORDER, which is what CR 613.10 and CR 613.11 both
--- require. Sorted at this one gather rather than at each consumer, so an ordered
--- reader cannot be written that forgets to sort: the printed carrier's stamp is
--- its permanent's (CR 613.7a) and the stored carrier's is the one CR 613.7b gave
--- it as it began, and the two interleave here rather than the whole battlefield
--- preceding the whole store.
---
--- STABLE, which is what settles the one tie pawl's stamps can produce: two player
--- abilities printed on ONE permanent share that permanent's timestamp, and CR
--- 613.7's "in timestamp order" says nothing about their relative order because no
--- rule can distinguish them -- so they keep the order the card wrote them in. No
--- other tie exists, since Game.freshTimestamp hands out each stamp once.
---
--- The order changes no answer for a cost adjustment, and CR 613.11 is why: it
--- excepts cost effects from timestamp order and defers to CR 601.2f, which
--- Pawl.Engine.Cost.applyAdjustments implements itself by applying every increase
--- before any reduction. Every other consumer here folds order-independently -- a
--- disjunction of prohibitions (CR 101.2) or a sum of grants (CR 305.2) -- which
--- leaves maximumHandSize below as the axis's one ordered fold.
---
--- The SOURCE rides out alongside the effect, and only because CR 601.3a's
--- quality-bearing prohibitions read it: Null Chamber's "the chosen names" are
--- Object.chosenNames on the permanent that printed the ability, the same
--- direction Modification.AddChosenColor reads a colour. Nothing for a stored
--- CR 611.2c effect, which came from a resolved spell or ability and has no
--- permanent behind it -- and no such effect names a source-carried quality.
-applying :: PlayerId -> GameState -> [(Maybe ObjectId, PlayerEffect)]
-applying pid gs =
+-- UNSORTED and UNFILTERED. Both are `applying`'s job, and neither reader may
+-- assume the other's.
+printedRows :: GameState -> [(Timestamp, Maybe ObjectId, PlayerId, PlayerScope, PlayerEffect)]
+printedRows gs =
   let -- Hoisted out of the walk exactly as Projection.gather hoists it: an
       -- inlined call would recompute the whole game's SetLandSubtype list once
       -- per permanent.
@@ -193,7 +208,73 @@ applying pid gs =
                       readAs = if null changes then id else rewritePlayerEffect changes
                    in fmap (\ability -> (Object.timestamp object, Just oid, controller, PlayerStaticAbility.scope ability, readAs (PlayerStaticAbility.effect ability))) abilities
                 else []
-      printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+   in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+
+-- CR 116.2d's WHO: is `pid` a player whose game the permanent `oid` is changing
+-- right now? That is the rule's own reading of who may take the special action
+-- to ignore it -- every printed producer offers it to exactly the players its
+-- static ability affects, whether that is "any player" over an EachPlayer scope
+-- (Leonin Arbiter) or the one player a narrower scope reaches (Damping Engine's
+-- "that player").
+--
+-- Asked over printedRows and NOT over `applying`, and the difference is the whole
+-- reason that walk is shared: `applying` has already dropped the rows this
+-- player's own ignore suppresses, so asking it would make the offer disappear the
+-- moment it was taken. CR 116.2d forbids no repeat -- paying again spends the cost
+-- again and changes nothing else -- and Pawl.SpecialActionSpec's answerer relies
+-- on the offer standing.
+--
+-- The SOURCE and not one of its abilities, which is the narrowing
+-- Pawl.Types.SpecialAction carries (#1267): one ability of the permanent
+-- affecting this player is enough to offer the action, and taking it then
+-- suppresses them all.
+affectedBy :: PlayerId -> ObjectId -> GameState -> Bool
+affectedBy pid oid gs =
+  let affects (_, source, controller, scope, _) = source == Just oid && inScope pid controller gs scope
+   in any affects (printedRows gs)
+
+-- CR 604.2: every player effect applying to `pid` right now. Gathered LIVE from
+-- the battlefield on every read and never captured, the same posture
+-- Projection.gather takes for staticAbilities -- which is why Rule of Law
+-- leaving the battlefield lifts its restriction with nothing to unwind.
+--
+-- The scope is resolved DYNAMICALLY (see Pawl.Types.PlayerScope): CR 611.2c
+-- lets a rules-modifying effect reach objects that were not affected when it
+-- began, so no set is ever frozen on this axis.
+--
+-- The (timestamp, source, controller, scope, effect) rows go no further than this
+-- module: no consumer sees more than the (source, effect) pair returned here, and
+-- printedRows above is read by exactly one other question inside it.
+--
+-- Returned in TIMESTAMP ORDER, which is what CR 613.10 and CR 613.11 both
+-- require. Sorted at this one gather rather than at each consumer, so an ordered
+-- reader cannot be written that forgets to sort: the printed carrier's stamp is
+-- its permanent's (CR 613.7a) and the stored carrier's is the one CR 613.7b gave
+-- it as it began, and the two interleave here rather than the whole battlefield
+-- preceding the whole store.
+--
+-- STABLE, which is what settles the one tie pawl's stamps can produce: two player
+-- abilities printed on ONE permanent share that permanent's timestamp, and CR
+-- 613.7's "in timestamp order" says nothing about their relative order because no
+-- rule can distinguish them -- so they keep the order the card wrote them in. No
+-- other tie exists, since Game.freshTimestamp hands out each stamp once.
+--
+-- The order changes no answer for a cost adjustment, and CR 613.11 is why: it
+-- excepts cost effects from timestamp order and defers to CR 601.2f, which
+-- Pawl.Engine.Cost.applyAdjustments implements itself by applying every increase
+-- before any reduction. Every other consumer here folds order-independently -- a
+-- disjunction of prohibitions (CR 101.2) or a sum of grants (CR 305.2) -- which
+-- leaves maximumHandSize below as the axis's one ordered fold.
+--
+-- The SOURCE rides out alongside the effect, and only because CR 601.3a's
+-- quality-bearing prohibitions read it: Null Chamber's "the chosen names" are
+-- Object.chosenNames on the permanent that printed the ability, the same
+-- direction Modification.AddChosenColor reads a colour. Nothing for a stored
+-- CR 611.2c effect, which came from a resolved spell or ability and has no
+-- permanent behind it -- and no such effect names a source-carried quality.
+applying :: PlayerId -> GameState -> [(Maybe ObjectId, PlayerEffect)]
+applying pid gs =
+  let printed = printedRows gs
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
       -- never re-derived -- see Pawl.Types.ActivePlayerEffect -- while its scope is
       -- resolved live, exactly as the printed carrier's is.
@@ -225,7 +306,7 @@ applying pid gs =
       -- stored effect came from a resolution instead (Silence). Those arrive
       -- with source Nothing and so match nothing here.
       keep (_, source, controller, scope, _) =
-        inScope pid controller scope
+        inScope pid controller gs scope
           && not (any (ignores source) (GameState.ignoredAbilities gs))
       ignores source ignored =
         IgnoredAbility.player ignored == pid
@@ -258,16 +339,17 @@ applying pid gs =
 -- therefore leaves Edgewalker's Cleric alone.
 rewritePlayerEffect :: [(Subtype, Subtype)] -> PlayerEffect -> PlayerEffect
 rewritePlayerEffect pairs effect = case effect of
-  -- The five arms carrying a Filter, which is the only place in this type a
-  -- subtype word can hide. Thalia's "noncreature spells", Vedalken Orrery's
-  -- "spells", Prowling Serpopard's "creature spells" and Heartstone's
-  -- "activated abilities of creatures" name none today; Edgewalker's "Cleric
-  -- spells" does.
+  -- The arms carrying a Filter, which is the only place in this type a subtype
+  -- word can hide. Thalia's "noncreature spells", Vedalken Orrery's "spells",
+  -- Prowling Serpopard's "creature spells", Heartstone's "activated abilities of
+  -- creatures" and Damping Engine's "artifact, creature, or enchantment spells"
+  -- name none today; Edgewalker's "Cleric spells" does.
   PlayerEffect.IncreaseSpellCost f n -> PlayerEffect.IncreaseSpellCost (Filter.rewrite pairs f) n
   PlayerEffect.ReduceSpellCost f cost -> PlayerEffect.ReduceSpellCost (Filter.rewrite pairs f) cost
   PlayerEffect.ReduceActivationCost f cost floor_ -> PlayerEffect.ReduceActivationCost (Filter.rewrite pairs f) cost floor_
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
+  PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
   -- The rest name no word a subtype pair could reach. The two chosen-name arms
   -- carry nothing at all -- CR 201.4's names are read off the source's
   -- Object.chosenNames -- and CR 612.2's second sentence says a subtype swap
@@ -285,6 +367,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.DamageCantBePrevented _ -> effect
   PlayerEffect.CantSearchLibraries -> effect
   PlayerEffect.CantBecomeMonarch -> effect
+  PlayerEffect.CantPlayLands -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -311,24 +394,27 @@ castsThisTurn pid gs =
 --
 -- Takes the SPELL, as one half NAMED: CR 709.3a evaluates only the chosen half
 -- to see if it can be cast, so the name compared is that half's own and a split
--- card is asked this question once per half. Two of the three prohibitions are
+-- card is asked this question once per half. Two of the prohibitions are
 -- quality-free -- "can't cast spells", "can't cast more than one spell" -- and
--- so ignore the name entirely; CR 601.3a's quality-bearing shape is what the
--- third needs it for (Null Chamber's "spells with the chosen names").
+-- so ignore both arguments; CR 601.3a's quality-bearing shape is what the rest
+-- need them for (Null Chamber's "spells with the chosen names", Damping Engine's
+-- "artifact, creature, or enchantment spells").
 --
 -- ONE name rather than the set CR 201.2a asks about ("at least one name in
 -- common"). Every spell in this pool has exactly one name at this moment: the
 -- proposal has already fixed the half, and nothing else has several names
 -- (#650).
 --
--- A NAME rather than the spell's object id, because the name is the whole of
--- what the three arms read ABOUT THE SPELL -- the other two read the player's
--- cast count and the source's own choice -- and the caller already has it: it
--- takes the name
--- off the chosen face, which is the only place it could come from, since pawl
--- projects nothing off the battlefield and the card is still in the zone it is
--- cast from (#160). A criterion over more of the spell than its name is what
--- would want the object back (#95).
+-- BOTH the object and the name, because CR 601.3a's qualities come in two kinds
+-- and neither argument answers the other's. A name is compared AS A NAME, and the
+-- caller takes it off the chosen face -- the only place it could come from, since
+-- the card is still in the zone it is cast from (#160) and a face-down proposal
+-- carries CR 708.2a's empty name rather than the card's. Any other quality is a
+-- Filter over the spell's characteristics, which is a question about the OBJECT
+-- and is asked of the proposal's projection through matchesObject, the same
+-- direction spellCostAdjustments reads Thalia's tax. `gs` must therefore be
+-- Cast.asProposed-stamped for the half being asked about, as it already had to be
+-- for the adjustments.
 --
 -- CR 601.3a's LOOKAHEAD is still not implemented: the rule lets a player begin
 -- casting when some choice made during the proposal could move the spell out of
@@ -350,8 +436,8 @@ castsThisTurn pid gs =
 -- morph one". What is still absent is the SEARCH: a player who must be told they
 -- may begin casting because some choice not yet on the menu would escape the
 -- prohibition gets no such offer (#95).
-prohibitsCasting :: PlayerId -> CardName -> GameState -> Bool
-prohibitsCasting pid name gs =
+prohibitsCasting :: PlayerId -> ObjectId -> CardName -> GameState -> Bool
+prohibitsCasting pid oid name gs =
   let cast = castsThisTurn pid gs
       prohibits (source, effect) = case effect of
         PlayerEffect.CantCastSpells -> True
@@ -390,6 +476,15 @@ prohibitsCasting pid name gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
+        -- CR 601.3a's other quality shape: a Filter over the spell's own
+        -- characteristics rather than over its name, read off the proposal's
+        -- projection so Damping Engine's "artifact, creature, or enchantment
+        -- spells" reaches the face a morph proposal actually shows.
+        PlayerEffect.CantCastMatching criterion -> matchesObject criterion oid gs
+        -- CR 305.1 again, exactly as CantPlayLandChosenName above: a land is
+        -- played and never cast, so the unrestricted play-side prohibition stops
+        -- nothing here either.
+        PlayerEffect.CantPlayLands -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -403,11 +498,20 @@ prohibitsCasting pid name gs =
 -- this name comes from. A land with several names would want the set CR 201.2a
 -- asks about (#650), and none exists.
 --
+-- And takes NO object, where prohibitsCasting above does: the two prohibitions
+-- read here narrow by a name or by nothing at all, and no printed sentence
+-- narrows a land play by a quality a Filter would state ("can't play nonbasic
+-- lands"). One that did would want the object, for the reason the cast side wants
+-- it.
+--
 -- A DISJUNCTION for CR 101.2's reason.
 prohibitsPlayingLand :: PlayerId -> CardName -> GameState -> Bool
 prohibitsPlayingLand pid name gs =
   let prohibits (source, effect) = case effect of
         PlayerEffect.CantPlayLandChosenName -> Set.member name (chosenNamesOf source gs)
+        -- Damping Engine's "can't play lands", which narrows nothing: every land
+        -- this player could play is stopped, so the name goes unread.
+        PlayerEffect.CantPlayLands -> True
         -- CR 305.1 again, in the other direction: a prohibition on CASTING says
         -- nothing about a special action, so Silence and Rule of Law leave a
         -- land play alone. CR 305.2's and CR 305.3's limits are the closed
@@ -438,13 +542,17 @@ prohibitsPlayingLand pid name gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
+        -- CR 305.1 once more: Damping Engine's own cast half stops no land play,
+        -- however its Filter reads -- which is exactly why its one printed
+        -- sentence declares two abilities.
+        PlayerEffect.CantCastMatching _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 701.23: does any effect prohibit `pid` from searching a library?
 --
 -- Takes no library, unlike the two prohibitions above taking a name: no printed
 -- effect narrows WHICH library, and Effect.Search searches only the resolving
--- controller's own (#1139). See Pawl.Types.PlayerEffect.CantSearchLibraries.
+-- controller's own (#1269). See Pawl.Types.PlayerEffect.CantSearchLibraries.
 --
 -- A DISJUNCTION for CR 101.2's reason.
 prohibitsSearching :: PlayerId -> GameState -> Bool
@@ -472,6 +580,8 @@ prohibitsSearching pid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CantPlayLands -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 725 / 101.2: is `pid` forbidden from becoming the monarch? CR 725.4 asks the
@@ -516,6 +626,8 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CantPlayLands -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
@@ -594,6 +706,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -614,6 +728,8 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
       effects = fmap snd (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
@@ -663,6 +779,8 @@ activationCostAdjustments pid srcId gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
       applicable = Maybe.mapMaybe (reductionOf . snd) (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = [],
@@ -722,6 +840,8 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CantPlayLands -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -751,11 +871,15 @@ protectedFromTargeting :: Maybe PlayerId -> PlayerId -> GameState -> Bool
 protectedFromTargeting caster pid gs =
   let stops effect = case effect of
         PlayerEffect.CantBeTargetedBy scope -> case caster of
-          Just who -> inScope who pid scope
+          Just who -> inScope who pid gs scope
           Nothing -> case scope of
             PlayerScope.EachPlayer -> True
             PlayerScope.Opponents -> False
             PlayerScope.You -> False
+            -- Unlike EachPlayer, this one does ask the caster a question -- "is
+            -- the caster the player controlling the most permanents?" -- and a
+            -- sourceless spell or ability is nobody, so it is not that player.
+            PlayerScope.ControllingMostPermanents -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
@@ -775,6 +899,8 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CantPlayLands -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -826,6 +952,8 @@ landPlaysAllowed pid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -872,6 +1000,8 @@ maximumHandSize pid gs =
         PlayerEffect.DamageCantBePrevented _ -> current
         PlayerEffect.CantSearchLibraries -> current
         PlayerEffect.CantBecomeMonarch -> current
+        PlayerEffect.CantCastMatching _ -> current
+        PlayerEffect.CantPlayLands -> current
    in List.foldl' (\current row -> apply current (snd row)) (Just defaultMaximumHandSize) (applying pid gs)
 
 -- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
@@ -918,6 +1048,8 @@ keepsUnspentMana pid gs =
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
@@ -975,6 +1107,8 @@ cantBeCountered pid oid gs =
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantBecomeMonarch -> False
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CantPlayLands -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
@@ -1023,6 +1157,8 @@ unpreventable gs =
         PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
         PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBecomeMonarch -> Nothing
+        PlayerEffect.CantCastMatching _ -> Nothing
+        PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
