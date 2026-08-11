@@ -33,8 +33,10 @@ toJson c = case c of
   TriggerCondition.SelfBlocks -> Common.nullary "SelfBlocks"
   TriggerCondition.SelfBlocksCreature -> Common.nullary "SelfBlocksCreature"
   TriggerCondition.SelfBlocksAtLeast n -> Common.tagged "SelfBlocksAtLeast" . Just $ Common.encodeNatural n
+  TriggerCondition.SelfBlocksOneOrMore f -> Common.tagged "SelfBlocksOneOrMore" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.SelfBecomesBlocked -> Common.nullary "SelfBecomesBlocked"
   TriggerCondition.SelfBecomesBlockedBy f -> Common.tagged "SelfBecomesBlockedBy" . Just $ Filter.toJson Keyword.toJson f
+  TriggerCondition.SelfBecomesBlockedByOneOrMore f -> Common.tagged "SelfBecomesBlockedByOneOrMore" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.SelfCycled -> Common.nullary "SelfCycled"
   TriggerCondition.PlayerDiscards r -> Common.tagged "PlayerDiscards" . Just $ PlayerRelation.toJson r
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Common.nullary "SelfPutIntoGraveyardFromLibrary"
@@ -83,8 +85,10 @@ fromJson value = do
     ("SelfBlocks", _) -> Right TriggerCondition.SelfBlocks
     ("SelfBlocksCreature", _) -> Right TriggerCondition.SelfBlocksCreature
     ("SelfBlocksAtLeast", Just v) -> TriggerCondition.SelfBlocksAtLeast <$> Common.decodeNatural v
+    ("SelfBlocksOneOrMore", Just v) -> TriggerCondition.SelfBlocksOneOrMore <$> Filter.fromJson Keyword.fromJson v
     ("SelfBecomesBlocked", _) -> Right TriggerCondition.SelfBecomesBlocked
     ("SelfBecomesBlockedBy", Just v) -> TriggerCondition.SelfBecomesBlockedBy <$> Filter.fromJson Keyword.fromJson v
+    ("SelfBecomesBlockedByOneOrMore", Just v) -> TriggerCondition.SelfBecomesBlockedByOneOrMore <$> Filter.fromJson Keyword.fromJson v
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
     ("PlayerDiscards", Just v) -> TriggerCondition.PlayerDiscards <$> PlayerRelation.fromJson v
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
