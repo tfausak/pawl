@@ -39,7 +39,7 @@ Two new sublibraries, inserted between `json` and `codec`:
 ```
 spec
   json           Value, encode, decode
-    json-schema  Schema, SchemaM, define, run
+    json-schema  Schema, Name, SchemaM, define, run
       json-codec Common, Codec, Fields, Arm
         codec    CardName, PhasePattern, ... and nothing else
 ```
@@ -82,10 +82,15 @@ scripted edit.
 -- Pawl.JsonSchema.Schema
 newtype Schema = MkSchema { unwrap :: Value.Value }
 
--- Pawl.JsonSchema.Define
-type SchemaM = State.State (Map.Map String (Maybe Schema.Schema))
+-- Pawl.JsonSchema.Name
+newtype Name = MkName { unwrap :: String }
 
-define :: String -> SchemaM Schema.Schema -> SchemaM Schema.Schema
+typeName :: (Typeable.Typeable a) => Proxy.Proxy a -> Name
+
+-- Pawl.JsonSchema.Define
+type SchemaM = State.State (Map.Map Name.Name (Maybe Schema.Schema))
+
+define :: Name.Name -> SchemaM Schema.Schema -> SchemaM Schema.Schema
 run :: SchemaM Schema.Schema -> Value.Value
 ```
 
@@ -112,6 +117,32 @@ Every named `Pawl.Types` type gets a `$defs` entry, including scalars like
 `{"$ref": "#/$defs/PlayerId"}` learns the name of the thing, which inlining
 `{"type": "integer"}` would throw away. Only structural wrappers -- `Maybe`,
 arrays -- inline.
+
+### Names are derived, not written
+
+A definition's name comes from `Typeable`, never from a string literal. GHC has
+auto-derived `Typeable` for every type since 7.10, so this costs `pawl:types`
+nothing -- no `deriving` clause, no edit.
+
+`typeName` renders the `TypeRep` structurally -- `tyConName`, then arguments
+joined with `_` -- rather than `show`ing it. `show` writes an application with a
+space, `Face Card`, and a `$ref` is a URI-reference where that would have to be
+percent-encoded. Structural rendering gives `Face_Card`.
+
+Names are unqualified. `Pawl.Types` is one type per module with the module named
+for the type, so base names are unique by construction, and qualification would
+lengthen every `$ref` in the document to buy nothing. `tyConModule` is there if
+that convention ever breaks.
+
+Two things fall out of deriving rather than writing:
+
+- **RFC 6901 escaping is moot.** A derived name is built from Haskell
+  identifiers and `_`, so it can never contain the `~` or `/` that a JSON
+  Pointer would have to escape. A hand-written string could.
+- **Parameterised types name themselves.** `Face Card` and `Face Token` are
+  distinct `TypeRep`s, so they take distinct `$defs` entries with no further
+  design. The cost is a `(Typeable card)` constraint on the parametric codecs,
+  which the slice does not reach.
 
 `Pawl.JsonSchema.Schema` exports generic constructors only: `string`, `integer`,
 `natural`, `object`, `oneOf`, `constant`, `nullable`, `withDefault`. Pawl's
@@ -153,8 +184,11 @@ data Fields o a = MkFields
 
 required :: String -> Codec.Codec a -> (o -> a) -> Fields o a
 defaulted :: (Eq a) => String -> a -> Codec.Codec a -> (o -> a) -> Fields o a
-object :: String -> Fields o o -> Codec.Codec o
+object :: (Typeable.Typeable o) => Fields o o -> Codec.Codec o
 ```
+
+`object` takes no name: `o` is fixed by its return type, so `typeName` supplies
+one. A field's key is still a string, because a JSON key is not a Haskell name.
 
 `Functor` maps `decodeFields` only; the other two fields are contravariant in
 `o` and untouched. `Applicative` concatenates all three. There is no `Monad`
@@ -163,7 +197,7 @@ instance and there cannot be one, which is load-bearing below.
 ``` hs
 -- Pawl.Codec.PhasePattern
 codec :: Codec.Codec PhasePattern.PhasePattern
-codec = Fields.object "PhasePattern" $ do
+codec = Fields.object $ do
   p <- Fields.required "whichPhase" PhaseSelector.codec PhasePattern.whichPhase
   w <- Fields.defaulted "whosePhase" Nothing (Codec.maybe PlayerId.codec) PhasePattern.whosePhase
   pure
@@ -182,7 +216,9 @@ is `Codec.encode` applied to that same argument, so it cannot disagree either.
 
 `ApplicativeDo` gets the block `docs/style-guide.md` asks for under *Prefer
 monads for building records*, without the `(<$>)`/`(<*>)` that section rejects.
-It needs adding to `.hlint.yaml`'s allowlist with its reason. Because `Fields o`
+It needs adding to `.hlint.yaml`'s allowlist with its reason, alongside
+`ScopedTypeVariables`, which `object` and `tagged` need to reach their own type
+variable for `typeName`. Because `Fields o`
 has no `Monad` instance, a bind that depends on an earlier one fails to compile
 rather than silently desugaring through `join`: the independence the encoder
 relies on is checked, not assumed.
@@ -195,7 +231,7 @@ data Arm a where
   MkNullary :: String -> a -> Arm a
   MkPayload :: String -> Codec.Codec b -> (b -> a) -> Arm a
 
-tagged :: String -> (a -> Value.Value) -> [Arm a] -> Codec.Codec a
+tagged :: (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a
 ```
 
 `decode` and `schema` derive from the arm list. `encode` is passed in as a
@@ -293,6 +329,9 @@ the PR body, which carries all seven rendered.
 `Pawl.JsonSchema.DefineSpec` is the one place a literal is cheap and stable: a
 synthetic self-referential `define`, asserting the cycle breaks into a `$ref`
 instead of diverging. That tests the machinery, not any type's schema.
+`Pawl.JsonSchema.NameSpec` pins the rendering rule the same way: a bare type
+gives `PhasePattern`, an applied one `Face_Card` rather than a name with a space
+in it.
 
 Golden schemas per type and a schema validator were both considered and
 rejected for now -- see *Alternatives rejected*.
@@ -314,15 +353,17 @@ rejected for now -- see *Alternatives rejected*.
 
 ## What this does not retire
 
-Two risks survive the slice, and the PR says so rather than implying coverage:
+One risk survives the slice, and the PR says so rather than implying coverage:
+**parametric codecs are untouched.** `Face`, `Mode` and `Cost` take a `card`
+encoder today and would become `Codec card -> Codec (Face card)` under a
+`(Typeable card)` constraint. Naming them is handled -- `typeName` keys each
+instantiation separately -- but nothing in the slice exercises one, so that the
+rest of the shape survives the extra parameter is argued, not shown.
 
-- **Recursion is built but unexercised.** `Card`/`Face`, `Filter` and `Effect`
-  are the recursive knots, and none is in the slice. `define` breaking a real
-  cycle is proven only by `DefineSpec`'s synthetic case.
-- **Parametric codecs are untouched.** `Face`, `Mode` and `Cost` take a `card`
-  encoder today and would become `Codec card -> Codec (Face card)`. Their
-  `define` name would have to vary with the parameter, or collide. Nothing in
-  the slice says how.
+Recursion is not on that list. `define` registers its name before evaluating its
+body, so a re-entrant call returns a `$ref` against an in-progress entry and the
+cycle terminates structurally, whatever the type. `DefineSpec`'s synthetic case
+covers it.
 
 ## Deferred, each with an issue
 
@@ -352,3 +393,11 @@ Two risks survive the slice, and the PR says so rather than implying coverage:
 - **Splitting `Common` rather than moving it.** Nearly every codec module uses
   helpers from both halves, so most would import both modules: a larger diff and
   a worse resting place.
+- **Hand-written definition names.** A string per `define` is a second place the
+  type's name lives, free to drift when the type is renamed, and it leaves
+  parameterised types with no answer. `Typeable` costs one extension and removes
+  the argument entirely.
+- **Fully qualified names.** Collision-proof without leaning on one-type-per-
+  module, but `#/$defs/Pawl.Types.PhasePattern.PhasePattern` in every reference,
+  with the module name repeating the type name, for a collision the convention
+  already prevents.
