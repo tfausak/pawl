@@ -96,7 +96,7 @@ reimplementing it; each is the `Codec`-shaped half of a pair that #1263 will
 eventually delete. `set` emits `uniqueItems`; the others do not, because only
 `Set` guarantees it.
 
-`tuple` is arity 2 and that is deliberate: all nine multi-payload arms in this
+`tuple` is arity 2 and that is deliberate: all seven multi-payload arms in this
 closure are arity 2. Repo-wide there are 39 at arity 2, 7 at arity 3 and 2 at
 arity 4 -- every one of the higher arities in `Pawl.Codec.GameEvent`, which this
 change does not touch. Building `tuple3` and `tuple4` with no caller here would

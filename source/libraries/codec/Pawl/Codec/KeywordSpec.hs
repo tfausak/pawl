@@ -624,8 +624,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Decayed
       """ {"type":"Decayed"} """
-  -- CR 702.164a's N rides the constructor, so this is the first keyword that is
-  -- not a bare tag.
+  -- CR 702.164a's N rides the constructor.
   Spec.it s "Toxic carries its N" $ do
     Common.assertCodec
       s
