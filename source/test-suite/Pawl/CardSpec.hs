@@ -1551,6 +1551,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsTapped -> 0
   Filter.Type.IsRingBearer -> 0
   Filter.Type.IsRenowned -> 0
+  Filter.Type.IsSuspected -> 0
 
 -- Every Filter a keyword carries: CR 702.29e's typecycling predicate, CR
 -- 702.14c's landwalk criterion, plus the components of any Cost a keyword names

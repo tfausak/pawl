@@ -2474,6 +2474,12 @@ filterReads f = case f of
   -- so no Modification writes Object.renowned and no CR 613 layer can move a set
   -- this atom selects.
   Filter.Type.IsRenowned -> Set.empty
+  -- Reads nothing for IsRenowned's reason, restated by rule 701.60b itself:
+  -- suspected is "neither an ability nor part of the permanent's copiable values",
+  -- so no Modification writes Object.suspected. What CR 701.60c hangs off the
+  -- designation IS in layer 6 (designationGathered's menace grant), but that is
+  -- what the designation WRITES rather than what this atom reads.
+  Filter.Type.IsSuspected -> Set.empty
   -- Reads nothing: CR 109.3's characteristics do not include counters, so no
   -- Modification writes Object.counters and no CR 613 layer can move a set this
   -- atom selects. The P/T a +1/+1 counter grants is CR 613.4c's, applied over the

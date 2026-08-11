@@ -340,6 +340,25 @@ data Filter keyword
     -- 613 layer writes it and Pawl.Engine.Projection.filterReads declares it as
     -- reading nothing.
     IsRenowned
+  | -- | CR 701.60b: does the CANDIDATE have the suspected designation? Rune-Brand
+    -- Juggler's "sacrifice a suspected creature".
+    --
+    -- IsRenowned's shape in every respect, and for its reason: rule 701.60b words
+    -- the designation the way rule 702.112b words renowned, down to "neither an
+    -- ability nor part of the permanent's copiable values" -- so no CR 613 layer
+    -- writes it, Pawl.Engine.Projection.filterReads declares it as reading
+    -- nothing, and "you control" beside it is a ControlledBy conjunct rather than
+    -- something inside it.
+    --
+    -- NOT Pawl.Types.Quantity.IsSuspected, which asks the same designation of the
+    -- object an evaluation is AIMED at for Repeat Offender's clause condition --
+    -- the candidate side and the self side, kept apart as IsRenowned's pair is.
+    --
+    -- NOT what CR 701.60c hangs off the designation either: menace and "this
+    -- creature can't block" are read off the designation by
+    -- Pawl.Engine.Projection and Pawl.Engine.CombatRestriction, and a filter
+    -- asking for either of those would match a permanent that got it elsewhere.
+    IsSuspected
   | -- | CR 122.1: does the CANDIDATE have one or more counters of this kind on it?
     -- Renegade Krasis' "each other creature you control with a +1/+1 counter on
     -- it".

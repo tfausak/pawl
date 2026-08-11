@@ -56,6 +56,7 @@ toJson encode filter_ = case filter_ of
   Filter.IsTapped -> Common.nullary "IsTapped"
   Filter.IsRingBearer -> Common.nullary "IsRingBearer"
   Filter.IsRenowned -> Common.nullary "IsRenowned"
+  Filter.IsSuspected -> Common.nullary "IsSuspected"
   Filter.HasCounters k -> Common.tagged "HasCounters" . Just $ CounterKind.toJson encode k
   Filter.And fs -> Common.tagged "And" . Just . Common.array $ fmap (toJson encode) fs
   Filter.Or fs -> Common.tagged "Or" . Just . Common.array $ fmap (toJson encode) fs
@@ -91,6 +92,7 @@ fromJson decode value = do
     ("IsTapped", _) -> Right Filter.IsTapped
     ("IsRingBearer", _) -> Right Filter.IsRingBearer
     ("IsRenowned", _) -> Right Filter.IsRenowned
+    ("IsSuspected", _) -> Right Filter.IsSuspected
     ("HasCounters", Just v) -> Filter.HasCounters <$> CounterKind.fromJson decode v
     ("And", Just (Value.Array (Array.MkArray vs))) -> Filter.And <$> traverse (fromJson decode) vs
     ("Or", Just (Value.Array (Array.MkArray vs))) -> Filter.Or <$> traverse (fromJson decode) vs

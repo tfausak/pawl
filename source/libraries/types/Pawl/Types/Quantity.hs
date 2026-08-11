@@ -254,9 +254,9 @@ data Quantity
     -- designation the way rule 702.112b does. Reaching another permanent's
     -- designation is AgainstSlot's job, not a second constructor's.
     --
-    -- No Filter atom beside it yet: the cards that ask the candidate question ("a
-    -- suspected creature", Rune-Brand Juggler) are each blocked by an unrelated
-    -- missing capability (#1215).
+    -- NOT Pawl.Types.Filter's own IsSuspected, which asks the same designation of
+    -- a CANDIDATE ("a suspected creature", Rune-Brand Juggler) -- the pair
+    -- IsRenowned's note describes.
     --
     -- A LEAF: it holds no Quantity.
     IsSuspected
