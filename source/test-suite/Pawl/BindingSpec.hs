@@ -43,8 +43,8 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
   Spec.it s "fromChoices projects a slot's chosen target" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
         r = Recipient.ToPlayer S.alice
-        m = Binding.fromChoices (Map.singleton slot r) Nothing Seq.empty
-    Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot r
+        m = Binding.fromChoices (Map.singleton slot (Set.singleton r)) Nothing Seq.empty
+    Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot (Set.singleton r)
 
   Spec.it s "fromChoices stores X under the reserved slot" $ do
     let m = Binding.fromChoices Map.empty (Just 3) Seq.empty
@@ -107,7 +107,7 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
             (Binding.toObject (ObjectId.MkObjectId 1))
             (Binding.toObject (ObjectId.MkObjectId 2))
     Spec.assertEq s (Binding.targetsOf (Map.singleton slotTokens merged)) $
-      Map.singleton slotTokens (Recipient.ToObject (ObjectId.MkObjectId 1))
+      Map.singleton slotTokens (Set.singleton (Recipient.ToObject (ObjectId.MkObjectId 1)))
 
   Spec.it s "a target binding carries no group" $ do
     let slot = SlotName.MkSlotName (Text.pack "tokens")

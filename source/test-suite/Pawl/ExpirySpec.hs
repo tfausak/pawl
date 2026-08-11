@@ -1018,7 +1018,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
 -- Song and the Bonesplitter the Song has itself turned into a creature.
 aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtObject oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
 -- The duration that begins when a permanent LEAVES the battlefield rather than

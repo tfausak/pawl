@@ -151,7 +151,7 @@ counterBoard forest battlegrowth mine theirs =
 raceAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 raceAnswer preferred victim p = case p of
   Prompt.ChooseReplacement _ _ entries -> maybe 0 Int.toNaturalSaturating (List.findIndex ((== preferred) . ReplacementEntry.source) entries)
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   _ -> S.identityAnswer p
 
 -- Aim every target slot at one object. Recipient.ToObject, not ToCreature as
@@ -160,7 +160,7 @@ raceAnswer preferred victim p = case p of
 -- pool is not in the legal set at all.
 aimObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimObject oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
 countersOn :: CounterKind.CounterKind Keyword.Keyword -> ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
@@ -305,7 +305,7 @@ stepSkipSpec s registry = Spec.describe s "Skip" $ do
 -- pool is not in its legal set at all.
 aimPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimPlayer pid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer pid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer pid))) sets
   _ -> S.identityAnswer p
 
 -- Fatigue {1}{U} Sorcery: "Target player skips their next draw step."
@@ -471,7 +471,7 @@ nextTurn answer gs = runUntil ((/= GameState.turnNumber gs) . GameState.turnNumb
 -- is what makes it the control.
 skirmishAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 skirmishAnswer victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer victim)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer victim))) sets
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers {} -> Map.empty
   _ -> S.identityAnswer p
@@ -1434,7 +1434,7 @@ tablesBoard plains lands mine spells =
 -- therefore runs one step per spell, naming one card each time.
 castInOrder :: [String] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 castInOrder names victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   Prompt.ChooseAction _ _ actions ->
     let isNamed n a = case a of
           Action.Cast _ cardName _ -> cardName == CardName.MkCardName (Text.pack n)
@@ -1587,7 +1587,7 @@ settleDamage answer gs batch = S.runPure answer gs (Damage.applyDamage batch)
 -- (CR 115.4), whose creature members are tagged ToCreature.
 aimCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimCreature oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
 -- CR 614.5's applied set is what makes the CR 616.1 loop TERMINATE, not merely
@@ -2246,7 +2246,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         g3 = S.addReplacement (leylineShape src (fst (Game.freshTimestamp g2))) g2
         stolen =
           S.runPure S.identityAnswer g3 $
-            Resolve.applyEffect S.noSource S.noSource S.bob (Map.singleton slot True) (Map.singleton slot (Recipient.ToObject oid)) (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
+            Resolve.applyEffect S.noSource S.noSource S.bob (Map.singleton slot (Set.singleton (Recipient.ToObject oid))) (Map.singleton slot (Set.singleton (Recipient.ToObject oid))) (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
         after = S.runPure S.identityAnswer stolen (Event.changeZone oid Zone.Graveyard)
     Spec.assertEqWith s "bob really did take control of it" (Projection.controllerOf oid stolen) (Just S.bob)
     Spec.assertEqWith s "it reaches its OWNER's graveyard, unexiled" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
@@ -2374,7 +2374,7 @@ metalcraftBoard mountain myr galvanicBlast artifacts others =
 -- distinct answers with no toughness or state-based action in the way.
 atBob :: Prompt.Prompt r -> r
 atBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 -- CR 614.15's self-replacement effects and CR 616.1a's bucket, through the one

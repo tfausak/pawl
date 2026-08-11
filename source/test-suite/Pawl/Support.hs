@@ -242,6 +242,21 @@ optionYielding wanted candidates =
     (NonEmpty.head candidates)
     (List.find ((==) wanted . ManaOption.yield) (NonEmpty.toList candidates))
 
+-- CR 601.2c: answer a Prompt.ChooseTargets offer by taking each slot's announced
+-- number of recipients, the ones the predicate admits first and the smallest of
+-- the rest after -- which is what almost every spec's aiming answerer wants now
+-- that one slot may take several targets.
+preferring ::
+  (Recipient.Recipient -> Bool) ->
+  Map.Map SlotName.SlotName (Natural, Set.Set Recipient.Recipient) ->
+  Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)
+preferring wanted =
+  fmap
+    ( \(n, legal) ->
+        let (yes, no) = List.partition wanted (Set.toAscList legal)
+         in Set.fromList (take (Natural.toIntSaturating n) (yes <> no))
+    )
+
 -- Identity interpreter: shuffle returns ids unchanged; actions never occur here.
 identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of

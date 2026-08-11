@@ -1,11 +1,14 @@
 module Pawl.Engine.Binding where
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import Pawl.Types.Binding (Binding)
@@ -348,7 +351,13 @@ combatDamager = SlotName.MkSlotName (Text.pack "thatDamager")
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
-toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
+toObject oid = toRecipients (Set.singleton (Recipient.ToObject oid))
+
+-- The general form of toObject and toPlayer below: a binding that names these
+-- recipients and nothing else. CR 601.2c's answer for one slot, which is a set
+-- because one instance of the word "target" may take several.
+toRecipients :: Set Recipient -> Binding
+toRecipients rs = Binding.empty {Binding.targets = if Set.null rs then Nothing else Just rs}
 
 -- A binding that names SEVERAL objects and nothing else -- what a Create binds
 -- for a card that refers back to every token it made at once, Thatcher Revolt's
@@ -362,7 +371,7 @@ toObjects oids = Binding.empty {Binding.objects = Just oids}
 -- loser, bound by Pawl.Engine.Resolve's bindLoserSlot. Mirrors toObject, but
 -- the recipient is a player (ToPlayer), not an object.
 toPlayer :: PlayerId -> Binding
-toPlayer pid = Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)}
+toPlayer pid = toRecipients (Set.singleton (Recipient.ToPlayer pid))
 
 -- A binding that names one NUMBER and nothing else -- what a Destroy that
 -- counts what it destroyed binds for a later "for each ... destroyed this way"
@@ -420,9 +429,11 @@ modesOf :: Map SlotName Binding -> Seq ModeIndex
 modesOf m = Maybe.fromMaybe Seq.empty (Binding.modes =<< Map.lookup chosenModes m)
 
 -- Project the chosen targets (CR 601.2c) out of a binding environment, dropping
--- slots with no target.
-targetsOf :: Map SlotName Binding -> Map SlotName Recipient
-targetsOf = Map.mapMaybe Binding.target
+-- slots with no target. An empty set is dropped with them: a slot whose count
+-- was announced as zero (CR 115.6) is not a filled slot, and CR 608.2b's fizzle
+-- measures the filled ones.
+targetsOf :: Map SlotName Binding -> Map SlotName (Set Recipient)
+targetsOf = Map.filter (not . Set.null) . Map.mapMaybe Binding.targets
 
 -- The OBJECTS a binding environment names, one slot at a time: targetsOf with
 -- the player recipients dropped, which is what Pawl.Engine.Filter.Context's
@@ -433,7 +444,17 @@ targetsOf = Map.mapMaybe Binding.target
 -- they aim at is a slot the EVENT bound (Binding.became), which was never chosen
 -- and so was never a target to become illegal.
 objectSlots :: Map SlotName Binding -> Map SlotName ObjectId
-objectSlots = Map.mapMaybe Recipient.objectOf . targetsOf
+objectSlots = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne) . targetsOf
+
+-- The ONE recipient a slot names, or Nothing when it names none or several. What
+-- every reader that can point at one object and no more asks of a slot -- CR
+-- 601.2c lets a slot hold several, and a reader that cannot take them must not
+-- silently take one of them. Which readers those are is Resolve.pluralSlots, and
+-- Pawl.CardSpec rejects a card that aims a multi-target slot at one of them.
+onlyOne :: Set Recipient -> Maybe Recipient
+onlyOne rs = case Set.toList rs of
+  [r] -> Just r
+  _ -> Nothing
 
 -- The amount (X) bound at a slot, if any.
 amountOf :: SlotName -> Map SlotName Binding -> Maybe Natural
@@ -461,12 +482,12 @@ setCopy pc = Map.insert copySource (Binding.empty {Binding.copy = Just pc})
 -- insertWith rather than insert so a future binding kind sharing a slot keeps
 -- both choices instead of clobbering one.
 fromChoices ::
-  Map SlotName Recipient ->
+  Map SlotName (Set Recipient) ->
   Maybe Natural ->
   Seq ModeIndex ->
   Map SlotName Binding
 fromChoices targets mAmount mModes =
-  let fromTargets = fmap (\r -> Binding.empty {Binding.target = Just r}) targets
+  let fromTargets = Map.filter (Maybe.isJust . Binding.targets) (fmap toRecipients targets)
       withX = case mAmount of
         Nothing -> fromTargets
         Just n ->
@@ -481,7 +502,7 @@ fromChoices targets mAmount mModes =
 mergeBinding :: Binding -> Binding -> Binding
 mergeBinding a b =
   Binding.MkBinding
-    { Binding.target = Binding.target a <|> Binding.target b,
+    { Binding.targets = Binding.targets a <|> Binding.targets b,
       Binding.amount = Binding.amount a <|> Binding.amount b,
       Binding.modes = Binding.modes a <|> Binding.modes b,
       Binding.copy = Binding.copy a <|> Binding.copy b,

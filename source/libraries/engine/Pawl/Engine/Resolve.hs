@@ -838,19 +838,21 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
     Just face ->
       let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) face
           chosen = Binding.targetsOf (Object.bindings obj)
-          legalSlot slot recipient = case Map.lookup slot specs of
-            Nothing -> True
+          legalSlot slot recipients = case Map.lookup slot specs of
+            Nothing -> recipients
             -- CR 608.2b's perspective is the SPELL's controller (CR 405.4), read
             -- through the same function resolveSpellWith uses for execution.
-            Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
-          legality = Map.mapWithKey legalSlot chosen
-          targeted = Map.restrictKeys legality (Map.keysSet specs)
-       in -- Measured on the slots actually FILLED, not on the slots declared: CR
+            Just spec -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs) recipients
+          legal = Map.mapWithKey legalSlot chosen
+          targeted = Map.restrictKeys legal (Map.keysSet specs)
+       in -- Measured on the TARGETS actually chosen, not on the slots declared: CR
           -- 115.6 makes a spell that chose zero targets untargeted, so CR 608.2b's
-          -- "all its targets ... are now illegal" has nothing to be true of. For a
-          -- card with no optional slot the two readings agree, every declared slot
-          -- having been filled at CR 601.2c.
-          not (Map.null targeted) && not (or (Map.elems targeted))
+          -- "all its targets, for every instance of the word 'target,' are now
+          -- illegal" has nothing to be true of -- and one surviving target of one
+          -- slot keeps the whole spell resolving. For a card whose every slot takes
+          -- exactly one target the two readings agree, every declared slot having
+          -- been filled at CR 601.2c.
+          not (Map.null targeted) && all Set.null (Map.elems targeted)
 
 -- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if the
 -- spell has slots and ALL are now illegal it fizzles, moving to the graveyard with
@@ -880,12 +882,15 @@ resolveSpellWith runSubgame oid = do
             -- 303.4a's enchant slot -- the one the card itself declares, and so
             -- the one every chosen instance can still read.
             modeSpecs = Modal.modesTargetSpecs chosenSelection (Face.spell face)
-            legalSlot slot recipient = case Map.lookup slot specs of
+            legalSlot slot recipients = case Map.lookup slot specs of
               -- CR 608.2b is about TARGETS. A slot with no target spec is a
               -- RESERVED binding -- a trigger's source, a token this resolution
               -- minted -- and was never targeted.
-              Nothing -> True
-              Just spec -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs
+              Nothing -> recipients
+              -- Per RECIPIENT and not per slot: CR 608.2b's "illegal targets, if
+              -- any, won't be affected" leaves the slot's surviving targets to be
+              -- affected as usual.
+              Just spec -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs) recipients
          in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
@@ -897,13 +902,13 @@ resolveSpellWith runSubgame oid = do
                         -- PlaySubgame may have bound its loser slot.
                         bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                         let chosenNow = Binding.targetsOf bindingsNow
-                            legalityNow = Map.mapWithKey legalSlot chosenNow
+                            legalNow = Map.mapWithKey legalSlot chosenNow
                         applyEffectWith
                           runSubgame
                           oid
                           oid
                           effectController
-                          (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) legalityNow)
+                          (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) legalNow)
                           (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenNow)
                           eff
                   -- CR 608.2e's clause is the unit all three gates cover, so they
@@ -941,7 +946,6 @@ resolveSpellWith runSubgame oid = do
                                 idx
                                 cIdx
                                 (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) (Map.mapWithKey legalSlot chosenAtStart))
-                                (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenAtStart)
                                 clause
                         else pure False
                     Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Clause.effects clause))
@@ -1026,24 +1030,25 @@ resolveModes stackId srcId modes = do
       -- otherwise collapse them.
       let specs = Map.unions (fmap (\(mi, mode) -> Map.mapKeys (Modal.instanceSlot mi) (Mode.targetSpecs mode)) modes)
           chosen = Binding.targetsOf (Object.bindings obj)
-          legalSlot slot recipient = case Map.lookup slot specs of
+          legalSlot slot recipients = case Map.lookup slot specs of
             -- CR 608.2b is about TARGETS. A slot with no target spec is a
             -- RESERVED binding -- the trigger's source (Pawl.Engine.Binding.triggerSource),
             -- a token this resolution minted -- and was never targeted, so it can
             -- never have become an illegal target.
-            Nothing -> True
+            Nothing -> recipients
             -- CR 608.2b: the perspective is the ABILITY's controller, the
             -- `effectController` bound below. `srcId` stays the source (CR 113.7)
             -- and may well be gone -- exactly the case this rule is about, and why
-            -- the perspective is not read from it.
-            Just spec -> Target.stillLegal (Just effectController) srcId recipient spec gs
-          legality = Map.mapWithKey legalSlot chosen
+            -- the perspective is not read from it. Judged per RECIPIENT, the spell
+            -- path's reason.
+            Just spec -> Set.filter (\recipient -> Target.stillLegal (Just effectController) srcId recipient spec gs) recipients
+          legal = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
           -- reserved slots above cannot rescue an ability whose every target is
           -- gone. Measured on the slots FILLED rather than declared, for the
           -- reason targetsAllIllegal above gives (CR 115.6).
-          targeted = Map.restrictKeys legality (Map.keysSet specs)
-          fizzles = not (Map.null targeted) && not (or (Map.elems targeted))
+          targeted = Map.restrictKeys legal (Map.keysSet specs)
+          fizzles = not (Map.null targeted) && all Set.null (Map.elems targeted)
           -- CR 113.8 / 603.3a: an activated ability's controller is who activated
           -- it, a triggered ability's is whoever controlled its source when it
           -- triggered. Both are stamped as Object.owner at the ability's creation
@@ -1067,8 +1072,8 @@ resolveModes stackId srcId modes = do
                   -- bindings it just gained.
                   bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
                   let chosenNow = Binding.targetsOf bindingsNow
-                      legalityNow = Map.mapWithKey legalSlot chosenNow
-                  applyEffect stackId srcId effectController (instanceView legalityNow) (instanceView chosenNow) eff
+                      legalNow = Map.mapWithKey legalSlot chosenNow
+                  applyEffect stackId srcId effectController (instanceView legalNow) (instanceView chosenNow) eff
              in -- CR 608.2e's clause is what each gate covers, so all three are
                 -- asked once per clause. Run only when `fizzles` is False, so no
                 -- question is asked about an ability that never resolves.
@@ -1085,7 +1090,7 @@ resolveModes stackId srcId modes = do
                   -- START-of-resolution slots -- the spell path's own note says
                   -- why it follows the "may", and why the gate is asked before
                   -- this clause's effects have defined anything.
-                  gatePaid <- if taken then paid stackId srcId idx cIdx (instanceView legality) (instanceView chosen) clause else pure False
+                  gatePaid <- if taken then paid stackId srcId idx cIdx (instanceView legal) clause else pure False
                   Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Clause.effects clause))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
@@ -1185,13 +1190,13 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 --
 -- CR 118.13b's announcement -- how a symbol payable in multiple ways is being
 -- paid, chosen immediately before this payment -- is not made (#702).
-paid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Clause.Clause Card.Type.Card -> Game Bool
-paid resolving source idx cIdx legality chosen clause = case Clause.unlessPaid clause of
+paid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
+paid resolving source idx cIdx legal clause = case Clause.unlessPaid clause of
   Nothing -> pure False
   Just gate -> do
     gs <- State.get
     let cost = UnlessPaid.cost gate
-    case payerOf (UnlessPaid.payer gate) legality chosen gs of
+    case payerOf (UnlessPaid.payer gate) legal gs of
       Nothing -> pure False
       Just payer ->
         if not (Cost.canPay payer source cost gs)
@@ -1215,10 +1220,10 @@ paid resolving source idx cIdx legality chosen clause = case Clause.unlessPaid c
 -- Legality is asked as every other slot read asks it (CR 608.2b): a slot filled
 -- by targeting that has since become illegal names nobody, and a reserved slot
 -- has no target spec, so legalSlot already answered True.
-payerOf :: SlotName -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> GameState -> Maybe PlayerId
-payerOf slot legality chosen gs = case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-  (Just (Recipient.ToPlayer pid), True) -> Just pid
-  (Just recipient, True) -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
+payerOf :: SlotName -> Map.Map SlotName (Set Recipient) -> GameState -> Maybe PlayerId
+payerOf slot legal gs = case legalOne slot legal of
+  Just (Recipient.ToPlayer pid) -> Just pid
+  Just recipient -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
   _ -> Nothing
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
@@ -1310,6 +1315,19 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
       Source.OfEmblem _ -> False
       Source.OfInherentTrigger _ _ -> False
 
+-- CR 608.2b: the ONE recipient still legal in `slot`, for a reader that can take
+-- only one. Nothing when the slot named none, when its target has become illegal,
+-- or when it names SEVERAL -- a reader that cannot take a group must not silently
+-- take one member of one, and Pawl.CardSpec's plural-slot lint is what keeps a
+-- card from aiming a multi-target slot at one of these readers.
+legalOne :: SlotName -> Map.Map SlotName (Set Recipient) -> Maybe Recipient
+legalOne slot legal = Binding.onlyOne (Map.findWithDefault Set.empty slot legal)
+
+-- The same read for a reader that takes them ALL -- "up to two target creatures"
+-- -- with CR 608.2b's illegal ones already dropped.
+legalMany :: SlotName -> Map.Map SlotName (Set Recipient) -> [Recipient]
+legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
+
 -- The players a PlayerRef names DURING a resolution, read from the slots this
 -- resolution filled rather than the source's bindings (which is what
 -- Count.playersFor reads for a static count).
@@ -1327,10 +1345,10 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
 -- `everyone` is in PlayerId order rather than turn order: a PlayerRef names an
 -- unordered SET, and a caller with an ordering rule imposes it on this answer, as
 -- the Draw arm does for CR 121.2c.
-playerRefPlayers :: Map.Map SlotName Recipient -> Map.Map SlotName Bool -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
-playerRefPlayers chosen legality controller gs ref = case ref of
-  PlayerRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-    (Just (Recipient.ToPlayer pid), True) -> [pid]
+playerRefPlayers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
+playerRefPlayers legal controller gs ref = case ref of
+  PlayerRef.InSlot slot -> case legalOne slot legal of
+    Just (Recipient.ToPlayer pid) -> [pid]
     _ -> [] -- an unfilled, illegal, or non-player slot: no-op
   PlayerRef.Relative PlayerRelation.You -> [controller]
   PlayerRef.Relative PlayerRelation.Opponent -> filter (/= controller) everyone
@@ -1386,17 +1404,15 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 -- as CR 608.2f's secondary sentence would have it (#379). The no-controller
 -- fallback is unreachable: Projection.controllerOf answers Nothing only for an
 -- object that does not exist, and every id here came out of the battlefield.
-objectRefObjects :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
-objectRefObjects legality chosen resolving controller source gs ref = case ref of
+objectRefObjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
+objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
     -- The slot names every token a Create bound there ("they"), so all of them
     -- are named at once. Ahead of the target read and not subject to `legality`:
     -- a group binding is a definition, never a target (CR 115.10a), so CR 608.2b
     -- has nothing to re-validate. See slotGroup for why being ahead is safe.
     Just group -> Foldable.toList group
-    Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
-      _ -> []
+    Nothing -> Maybe.mapMaybe Recipient.objectOf (legalMany slot legal)
   ObjectRef.EachMatching filter_ ->
     let context = Filter.contextFor (Just controller) (Just source)
         matching =
@@ -1489,17 +1505,15 @@ settleArrivals zone placement targets = case zone of
 -- EachMatching names permanents, so its members arrive as Recipient.ToObject: CR
 -- 109.2 draws the set from the battlefield with no claim about card types beyond
 -- the Filter's own, and classifying each one is the OPCODE's job.
-objectRefRecipients :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [Recipient]
-objectRefRecipients legality chosen resolving controller source gs ref = case ref of
+objectRefRecipients :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [Recipient]
+objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
     -- A group is objects, so its members arrive as Recipient.ToObject exactly as
     -- EachMatching's do -- the player a slot can hold is the single-target case
     -- below, and CR 111.1's tokens are never players.
     Just group -> fmap Recipient.ToObject (Foldable.toList group)
-    Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> [recipient]
-      _ -> []
-  ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen resolving controller source gs ref)
+    Nothing -> legalMany slot legal
+  ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
 -- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
@@ -1537,12 +1551,12 @@ slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bin
 -- shorter true answer. See bindObjectsSlot's note, and CR 603.7c for why the
 -- binding exists at all.
 --
--- Nothing when the slot is unbound, holds a group, or names a player: a cast
--- offer and a zone move both want one object or none.
+-- Nothing when the slot is unbound, holds a group, names several targets, or
+-- names a player: a cast offer and a zone move both want one object or none.
 slotOne :: SlotName -> ObjectId -> GameState -> Maybe ObjectId
 slotOne slot resolving gs = do
   obj <- Game.lookupObject resolving gs
-  Recipient.objectOf =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+  Recipient.objectOf =<< Binding.onlyOne =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
 
 -- CR 608.2g: make the offer Effect.OfferCast carries, and cast if it is taken.
 --
@@ -1682,11 +1696,11 @@ installDamageRow controller source duration kind rewrite rider g recipient = cas
 -- Both drop out as an absent key, so the quantity is unanswered rather than
 -- answered off the source. Nothing in the pool observes the legality half: a
 -- one-target spell with an illegal target does not resolve at all.
-effectContext :: PlayerId -> ObjectId -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Filter.Context
-effectContext controller source legality chosen =
+effectContext :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Filter.Context
+effectContext controller source legal =
   Filter.contextWithSlots (Just controller) (Just source)
     . Map.mapMaybe Recipient.objectOf
-    $ Map.filterWithKey (\slot _ -> Map.findWithDefault False slot legality) chosen
+    $ Map.mapMaybe Binding.onlyOne legal
 
 -- One effect, applied. The case on the constructor is this module's charter.
 -- `runSubgame` is the injected nested-game runner; only the PlaySubgame arm
@@ -1712,12 +1726,12 @@ effectContext controller source legality chosen =
 -- why every Quantity goes through Quantity.evaluateFor with both ids rather than
 -- Quantity.evaluate with `source` alone: an X-cost ability that sacrifices its
 -- source to pay leaves the announced value only on the ability object (#544).
-applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
-applyEffectWith runSubgame resolving source controller legality chosen effect = case effect of
+applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
+applyEffectWith runSubgame resolving source controller legal chosen effect = case effect of
   Effect.DealDamage ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
+        context = effectContext controller source legal
         -- CR 120.1a: "Damage can't be dealt to an object that's not a battle, a
         -- creature, or a planeswalker." Both arms of the ObjectRef can name
         -- something that is not one of those, so both go through
@@ -1734,7 +1748,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         --
         -- A player recipient survives it untouched: CR 115.4's "any target"
         -- includes one and CR 120.3a is what damage to it does.
-        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
+        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       -- An unevaluable quantity is a no-op, the powerOf posture.
       Nothing -> pure ()
@@ -1761,7 +1775,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- rather than two -- and a modification that cannot land at all (a player
       -- recipient, an illegal slot per CR 608.2b, a set that matched nothing)
       -- arrives as the empty one and stores nothing.
-      case objectRefObjects legality chosen resolving controller source gs ref of
+      case objectRefObjects legal resolving controller source gs ref of
         [] -> gs
         targets -> case Expiry.arm controller source duration gs of
           -- CR 611.2b: the duration never started, so the effect does nothing
@@ -1817,8 +1831,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- cast; the difference is observable, because a countered Magical Hack is then
   -- never asked at all (Pawl.ResolveSpec's MagicalHackTiming group proves both
   -- directions).
-  Effect.ChangeText family forbidden slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-    (Just recipient, True) -> case Recipient.objectOf recipient of
+  Effect.ChangeText family forbidden slot -> case legalOne slot legal of
+    Just recipient -> case Recipient.objectOf recipient of
       Nothing -> pure ()
       Just target -> do
         gs0 <- State.get
@@ -2004,8 +2018,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       Result.Drawn -> pure ()
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just (Recipient.ToPlayer target), True) ->
+      case legalOne slot legal of
+        Just (Recipient.ToPlayer target) ->
           -- CR 723.1: schedule control of `target` by this ability's controller
           -- (CR 723.5). Map.insert overwrites a prior pending control (CR 723.1a).
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
@@ -2024,7 +2038,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- 702.12b gate is judged (Event.destroy) alike. An illegal slot (CR 608.2b),
     -- a non-object recipient, or a set that matched nothing all arrive here as
     -- the empty list and destroy nothing -- one path, not three.
-    destroyed <- Event.destroyReturning regenerability (objectRefObjects legality chosen resolving controller source gs ref)
+    destroyed <- Event.destroyReturning regenerability (objectRefObjects legal resolving controller source gs ref)
     -- CR 701.8b: "destroyed this way" is what the funnel DESTROYED, never what
     -- the sweep named -- an indestructible permanent (CR 702.12b) and one a
     -- regeneration shield saved (CR 701.8c) were both named and neither was
@@ -2057,8 +2071,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     case bound of
       -- One at a time rather than as one event (#757).
       Just victims -> Monad.mapM_ (Event.sacrifice controller) victims
-      Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case Recipient.objectOf recipient of
+      Nothing -> case legalOne slot legal of
+        Just recipient -> case Recipient.objectOf recipient of
           Nothing -> pure () -- a player recipient cannot be sacrificed
           -- CR 701.21: through the single funnel, which is NOT Event.destroy --
           -- CR 701.21a: sacrificing is not destroying. The sacrificing player is
@@ -2070,8 +2084,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         _ -> pure ()
   Effect.TurnFaceDown slot ->
     State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case Recipient.objectOf recipient of
+      case legalOne slot legal of
+        Just recipient -> case Recipient.objectOf recipient of
           Nothing -> gs -- a player is not a permanent and has no face
           -- CR 708.2a: ONE assignment to Object.facing, and that is the whole
           -- effect. The rule fixes what the permanent becomes -- "a 2/2 face-down
@@ -2112,8 +2126,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         _ -> gs
   Effect.RemoveFromCombat slot ->
     State.modify' $ \gs ->
-      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-        (Just recipient, True) -> case Recipient.objectOf recipient of
+      case legalOne slot legal of
+        Just recipient -> case Recipient.objectOf recipient of
           Nothing -> gs -- a player recipient is not in combat
           -- CR 506.4: through Game.removeFromCombat, the one performer of every
           -- clause of that rule -- so this clause takes CR 509.1h's asymmetry
@@ -2243,8 +2257,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
               pure $ case bound of
                 Just oid -> [oid]
-                Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-                  (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
+                Nothing -> case legalOne slot legal of
+                  Just recipient -> Maybe.maybeToList (Recipient.objectOf recipient)
                   -- Illegal slot (CR 608.2b), a non-object recipient, or a slot
                   -- nothing ever bound.
                   _ -> []
@@ -2263,7 +2277,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- 110.2a's control question is asked only of a battlefield destination.
             ObjectRef.EachMatching _ -> do
               gs <- State.get
-              pure (objectRefObjects legality chosen resolving controller source gs ref)
+              pure (objectRefObjects legal resolving controller source gs ref)
           Monad.mapM_ moveOne =<< settleArrivals zone placement targets
   -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
   -- this order and with the owner read before either:
@@ -2290,8 +2304,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- here: Prompt.Shuffle deliberately carries no Decider (randomness is not a
   -- choice), so there is no player for it to be asked of.
   Effect.ShuffleIntoLibrary slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient is not a card to shuffle
         Just target -> do
           gs <- State.get
@@ -2314,7 +2328,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- The same sweep every ObjectRef-taking opcode shares: a player recipient,
       -- an illegal slot (CR 608.2b) and a set that matched nothing all arrive as
       -- the empty list and change nothing.
-      case objectRefObjects legality chosen resolving controller source gs ref of
+      case objectRefObjects legal resolving controller source gs ref of
         [] -> gs
         targets -> case Expiry.arm controller source duration gs of
           -- CR 611.2b: the duration never started, so the effect does nothing and
@@ -2332,12 +2346,12 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.Draw ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
+        context = effectContext controller source legal
         -- Whoever the PlayerRef names draws -- the controller for Divination's
         -- `Relative You`, the targeted player for Ancestral Recall's `InSlot`,
         -- each opponent for Master of the Feast's `Relative Opponent`, the whole
         -- table for Vision Skeins' `EachPlayer`.
-        named = playerRefPlayers chosen legality controller gs ref
+        named = playerRefPlayers legal controller gs ref
         -- CR 121.2c: the active player draws first, then each other player in turn
         -- order. The reorder lives here rather than in playerRefPlayers because
         -- that is a rule about DRAWING, and the helper's other caller has no
@@ -2364,11 +2378,11 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.Mill ref quantity mTally -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
+        context = effectContext controller source legal
         -- An illegal slot (CR 608.2b) or a reference naming nobody arrives here
         -- as the empty list and mills nothing, the posture every PlayerRef arm
         -- takes.
-        millers = playerRefPlayers chosen legality controller gs ref
+        millers = playerRefPlayers legal controller gs ref
         -- CR 701.17/701.17b: top min(n, library) of each miller's library. A
         -- short library mills what there is, which is why the tally below counts
         -- THESE cards rather than the number the quantity asked for.
@@ -2398,9 +2412,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.Discard slot quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just (Recipient.ToPlayer target), True) ->
+        context = effectContext controller source legal
+    case legalOne slot legal of
+      Just (Recipient.ToPlayer target) ->
         case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n
             | n > 0 -> do
@@ -2445,14 +2459,14 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.LoseLife ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
+        context = effectContext controller source legal
         -- Whoever the PlayerRef names loses the life -- the targeted player for
         -- Sign in Blood's `InSlot`, the controller for a `Relative You`
         -- drawback. Unordered, on the footing GainPlayerCounters is on rather
         -- than Draw's: there is no CR 121.2c for life, and CR 704.3 checks
         -- state-based actions only as a player would get priority, so no life
         -- total is observable between one adjustment and the next.
-        losers = playerRefPlayers chosen legality controller gs ref
+        losers = playerRefPlayers legal controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
@@ -2479,8 +2493,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.GainLife ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
-        gainers = playerRefPlayers chosen legality controller gs ref
+        context = effectContext controller source legal
+        gainers = playerRefPlayers legal controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
@@ -2503,8 +2517,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- having no such arm to consult.
   Effect.ExchangeLifeTotals slot -> do
     gs <- State.get
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just (Recipient.ToPlayer other), True) -> do
+    case legalOne slot legal of
+      Just (Recipient.ToPlayer other) -> do
         let lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
             mine = lifeOf controller
             theirs = lifeOf other
@@ -2535,8 +2549,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.IncreaseSpeed ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
-        revving = playerRefPlayers chosen legality controller gs ref
+        context = effectContext controller source legal
+        revving = playerRefPlayers legal controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
@@ -2556,9 +2570,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.PlayerSacrifices slot filter_ quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just (Recipient.ToPlayer victim), True) ->
+        context = effectContext controller source legal
+    case legalOne slot legal of
+      Just (Recipient.ToPlayer victim) ->
         case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Just n
             | n > 0 -> do
@@ -2607,7 +2621,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.Create quantity card entry mSlot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
+        context = effectContext controller source legal
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 -> do
@@ -2686,7 +2700,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- copy of it". The pair has to move together: the card without the snapshot
     -- would mint the printed card rather than the copy, and the snapshot without
     -- the card would mint nothing to stamp it on.
-    let sources = objectRefObjects legality chosen resolving controller source gs ref
+    let sources = objectRefObjects legal resolving controller source gs ref
     Monad.forM_ sources $ \src ->
       Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
         Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) 1 TapState.Untapped)
@@ -2758,7 +2772,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- not viewWithLastKnown: a spell creating a self-replacement is on the
       -- stack and the board is live, unlike CR 603.4's intervening "if" on a
       -- leaves-the-battlefield trigger.
-      let met = maybe True (Condition.holds (Projection.fullView gs) (effectContext controller source legality chosen) gs source) condition
+      let met = maybe True (Condition.holds (Projection.fullView gs) (effectContext controller source legal) gs source) condition
        in case (met, Expiry.arm controller source duration gs) of
             -- The stated condition is false, so the clause creates nothing.
             (False, _) -> gs
@@ -2804,8 +2818,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- either, and a shield installed over it could never match anything.
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
-        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
+        context = effectContext controller source legal
+        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
         -- CR 615.5: the additional effect, BAKED onto the row with the
         -- environment it will need -- this resolution's chosen targets, which is
         -- what lets "that creature" still name something once CR 400.7 has
@@ -2840,7 +2854,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     --
     -- Through Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
     gs <- State.get
-    let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
+    let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
     State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration Nothing DamageRewrite.PreventAll Nothing) g0 recipients
   Effect.RedirectDamage duration kind srcRef destRef -> do
     -- CR 614.9: install a floating redirection effect -- Turn the Tables' "all
@@ -2853,7 +2867,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- 120.1a). The rule's own guard is re-asked at redirect time, in
     -- Event.apply, because the destination may leave between now and then.
     gs <- State.get
-    let recipientsOf ref = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
+    let recipientsOf ref = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
     -- EXACTLY ONE destination: CR 614.9 replaces damage to one thing with the
     -- same damage to ANOTHER one thing, and no printed redirect names more than
     -- one. None means CR 608.2b's target is already gone, so the effect does
@@ -2884,7 +2898,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- phase (CR 500.1) is card data, and only Pawl.Engine.Replacement's comparison and
     -- Pawl.Engine.Engine's boundary question read it.
     gs <- State.get
-    let named = playerRefPlayers chosen legality controller gs ref
+    let named = playerRefPlayers legal controller gs ref
         install pid g =
           let (ts, g1) = Game.freshTimestamp g
               active =
@@ -2947,8 +2961,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
-        let blockers = objectRefObjects legality chosen resolving controller source gs blockerRef
-            attackers = objectRefObjects legality chosen resolving controller source gs attackerRef
+        let blockers = objectRefObjects legal resolving controller source gs blockerRef
+            attackers = objectRefObjects legal resolving controller source gs attackerRef
             (ts, gs1) = Game.freshTimestamp gs
             stored =
               [ ActiveBlockRequirement.MkActiveBlockRequirement
@@ -2976,6 +2990,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           -- creature), read from the reserved trigger-source slot.
           MonarchTarget.ControllerOfSource ->
             Map.lookup Binding.triggerSource chosen
+              >>= Binding.onlyOne
               >>= Recipient.objectOf
               >>= (\o -> Projection.controllerOf o gs)
           -- CR 601.2c's chosen player, re-checked under CR 608.2b: the slot is a
@@ -2985,8 +3000,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           -- tag is matched inline, the way every other player-slot read here does
           -- it.
           MonarchTarget.InSlot slot ->
-            case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-              (Just (Recipient.ToPlayer crowned), True) -> Just crowned
+            case legalOne slot legal of
+              Just (Recipient.ToPlayer crowned) -> Just crowned
               _ -> Nothing
     case newMonarch of
       Nothing -> pure ()
@@ -3014,8 +3029,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- removes rule 702.112a's second ability from the stack (CR 608.2a) -- so the
   -- gate is a fence rather than a tested branch.
   Effect.BecomeRenowned slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
           gs <- State.get
@@ -3033,8 +3048,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- is the clause's own condition (CR 701.37a's "if this permanent isn't
   -- monstrous"), read as Quantity.IsMonstrous before either effect runs.
   Effect.BecomeMonstrous slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target ->
           State.modify'
@@ -3049,8 +3064,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- Pawl.Engine.CombatRestriction, which is rule 701.60c's "for as long as it's
   -- suspected".
   Effect.Suspect slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target ->
           State.modify'
@@ -3071,7 +3086,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       let unsuspect o = o {Object.suspected = False}
        in gs
             { GameState.objects =
-                foldr (Map.adjust unsuspect) (GameState.objects gs) (objectRefObjects legality chosen resolving controller source gs ref)
+                foldr (Map.adjust unsuspect) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
   -- CR 702.100a's counter and CR 702.100b's marker, in that order and in one arm
   -- because the rule ties them: the creature evolves only if the placement
@@ -3084,8 +3099,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- a creature, and every CR 614.16 replacement in the pool only increases a
   -- placement.
   Effect.Evolve slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
           placed <- Event.putCounters CounterCause.ByEffect target CounterKind.PlusOnePlusOne 1
@@ -3107,8 +3122,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- elsewhere. The SOURCE moves here; AttachTarget below is the sibling that
   -- moves the slot's TARGET instead.
   Effect.Attach slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> do
+    case legalOne slot legal of
+      Just recipient -> do
         gs <- State.get
         -- The slot's recipient is a PROPOSED destination; what gets stored is the
         -- recipient the moving permanent's own rules name it by (attachmentFor),
@@ -3136,9 +3151,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- CR 701.3a, in the other direction from Attach above: the SLOT's target is what
   -- moves, and the destination is chosen now rather than targeted.
   Effect.AttachTarget slot filter_ ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    case legalOne slot legal of
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
-      (Just recipient, True) -> case Recipient.objectOf recipient of
+      Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient: nothing on the battlefield moves
         Just subject -> do
           gs <- State.get
@@ -3167,8 +3182,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           Monad.mapM_ (Attach.attach subject . Recipient.ToObject) destination
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
           -- CR 400.7: exile the target through the funnel; register the resulting
@@ -3191,7 +3206,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
       _ -> pure ()
   Effect.Counter slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+    case legalOne slot legal of
       -- CR 701.6a: the slot's target is a spell or an ability on the stack;
       -- counter it through the single funnel, which picks that rule's ending
       -- from the object's own kind (the graveyard for a spell, CR 608.2n's cease
@@ -3204,15 +3219,15 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- Passed rather than left to be re-derived, because by the time the CR
       -- 117.5 trigger scan runs the controller can no longer be asked for
       -- exactly -- see Pawl.Types.Countering, which sets out the two cases.
-      (Just recipient, True) -> mapM_ (Event.counter source controller) $ Recipient.objectOf recipient
+      Just recipient -> mapM_ (Event.counter source controller) $ Recipient.objectOf recipient
       _ -> pure ()
   Effect.PutCounters kind quantity ref -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
+        context = effectContext controller source legal
         -- CR 608.2c: the set is swept as this instruction is reached, and an
         -- illegal slot (CR 608.2b) or a player recipient answers with nobody.
-        targets = objectRefObjects legality chosen resolving controller source gs ref
+        targets = objectRefObjects legal resolving controller source gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
       -- ONE evaluation for the whole set (CR 608.2f), then CR 122.6's single
@@ -3227,9 +3242,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.RemoveCounters kind quantity slot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
+        context = effectContext controller source legal
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient has no object counters
         Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
@@ -3310,8 +3325,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
-        recipients = playerRefPlayers chosen legality controller gs ref
+        context = effectContext controller source legal
+        recipients = playerRefPlayers legal controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
@@ -3334,8 +3349,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.RemovePlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = effectContext controller source legality chosen
-        recipients = playerRefPlayers chosen legality controller gs ref
+        context = effectContext controller source legal
+        recipients = playerRefPlayers legal controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
@@ -3371,7 +3386,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       let tap o = o {Object.tapped = TapState.Tapped}
        in gs
             { GameState.objects =
-                foldr (Map.adjust tap) (GameState.objects gs) (objectRefObjects legality chosen resolving controller source gs ref)
+                foldr (Map.adjust tap) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
   Effect.Untap ref ->
     State.modify' $ \gs ->
@@ -3383,7 +3398,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       let untap o = o {Object.tapped = TapState.Untapped}
        in gs
             { GameState.objects =
-                foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legality chosen resolving controller source gs ref)
+                foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)
             }
   Effect.Transform ref ->
     State.modify' $ \gs ->
@@ -3421,7 +3436,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           pcs = Projection.projectAll g1
        in g1
             { GameState.objects =
-                foldr (turnOver pcs resolving now g1) (GameState.objects g1) (objectRefObjects legality chosen resolving controller source g1 ref)
+                foldr (turnOver pcs resolving now g1) (GameState.objects g1) (objectRefObjects legal resolving controller source g1 ref)
             }
   -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
@@ -3440,7 +3455,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- of Treason's slot and Aura Thief's "all enchantments" arrive as the same
       -- list, and a player recipient, an illegal slot (CR 608.2b) and a set that
       -- matched nothing all arrive as the empty one and change nothing.
-      case objectRefObjects legality chosen resolving controller source gs ref of
+      case objectRefObjects legal resolving controller source gs ref of
         [] -> gs
         targets
           -- CR 800.4b: "If an object would change to the control of a player
@@ -3498,7 +3513,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                       }
   Effect.TakeExtraTurn ref skips -> do
     gs <- State.get
-    let named = playerRefPlayers chosen legality controller gs ref
+    let named = playerRefPlayers legal controller gs ref
         -- CR 500.7: "If multiple players are given extra turns, the extra turns
         -- are added one at a time, in APNAP order (see rule 101.4)." The
         -- intersection is Draw's, for Draw's reasons: apnapOrder supplies the
@@ -3551,7 +3566,7 @@ changeLife pid delta =
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
-applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
+applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
 applyEffect = applyEffectWith noSubgame
 
 -- CR 615.5: run the additional effect of every prevention that has just been
@@ -3607,9 +3622,8 @@ runPreventionRider prevention = case (Prevention.rider prevention, Recipient.obj
     was <- State.gets (\gs -> Map.lookup Binding.eventAmount (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))
     State.modify' (bindAmountSlot oid Binding.eventAmount (Prevention.amount prevention))
     let targets = PreventionRider.targets rider
-        legality = fmap (const True) targets
     Foldable.traverse_
-      (applyEffect oid oid (PreventionRider.controller rider) legality targets)
+      (applyEffect oid oid (PreventionRider.controller rider) targets targets)
       (PreventionRider.effects rider)
     State.modify' $ \gs ->
       let restore obj = obj {Object.bindings = Map.alter (const was) Binding.eventAmount (Object.bindings obj)}
@@ -3642,8 +3656,8 @@ performHandAction source player =
         -- comment, and Engine.placeOne, which binds a trigger's source the same
         -- way). CR 103.6a's "puts that card onto the battlefield" is then just
         -- MoveToZone on this slot.
-        (Map.singleton Binding.triggerSource True)
-        (Map.singleton Binding.triggerSource (Recipient.ToObject source))
+        (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
+        (Map.singleton Binding.triggerSource (Set.singleton (Recipient.ToObject source)))
     )
 
 -- CR 603.7c: bind `target` into `slot` of `holder`'s binding environment, so a

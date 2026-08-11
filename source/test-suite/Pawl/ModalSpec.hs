@@ -5,7 +5,6 @@
 module Pawl.ModalSpec where
 
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -72,7 +71,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 chooseModeAt :: ModeIndex.ModeIndex -> Recipient.Recipient -> Prompt.Prompt r -> r
 chooseModeAt idx recipient p = case p of
   Prompt.ChooseModes {} -> Seq.singleton idx
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const recipient) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton recipient)) sets
   _ -> S.identityAnswer p
 
 -- Rejects a ChooseModes prompt outright -- used to prove a non-modal cast
@@ -453,9 +452,9 @@ chooseTwo idxs picks p = case p of
   Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey pickFor sets
   _ -> S.identityAnswer p
   where
-    pickFor slot legal = case lookup slot picks of
-      Just recipient -> recipient
-      Nothing -> Maybe.fromMaybe (Recipient.ToPlayer S.alice) (Set.lookupMin legal)
+    pickFor slot (_, legal) = case lookup slot picks of
+      Just recipient -> Set.singleton recipient
+      Nothing -> maybe Set.empty Set.singleton (Set.lookupMin legal)
 
 -- alice has four Islands and Cryptic Command in hand ({1}{U}{U}{U}); bob has one
 -- Goblin Piker on the battlefield.
@@ -752,7 +751,7 @@ forcedTwoSpec s registry = Spec.describe s "ForcedTwo (CR 700.2a)" $ do
               else Seq.empty
           Prompt.ChooseTargets _ _ _ sets ->
             Map.mapWithKey
-              (\slot _ -> if slot == creatureSlot then Recipient.ToObject deadPiker else Recipient.ToObject castPiker)
+              (\slot _ -> Set.singleton (if slot == creatureSlot then Recipient.ToObject deadPiker else Recipient.ToObject castPiker))
               sets
           _ -> S.identityAnswer p
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
@@ -839,7 +838,7 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
           Prompt.ChooseModes {} -> Seq.fromList [bounceMode, bounceMode, drawMode]
           Prompt.ChooseTargets _ _ _ sets ->
             Map.mapWithKey
-              (\slot _ -> if slot == creatureSlot then Recipient.ToCreature pikerId else Recipient.ToCreature wallId)
+              (\slot _ -> Set.singleton (if slot == creatureSlot then Recipient.ToCreature pikerId else Recipient.ToCreature wallId))
               sets
           _ -> S.identityAnswer p
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
@@ -874,7 +873,7 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
     let answer :: Prompt.Prompt r -> r
         answer p = case p of
           Prompt.ChooseModes {} -> twiceBounced
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature pikerId))) sets
           _ -> S.identityAnswer p
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
     -- CR 700.2d: "the same player or object may be chosen as the target for each

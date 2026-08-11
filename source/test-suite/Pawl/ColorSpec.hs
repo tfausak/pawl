@@ -134,7 +134,7 @@ choosingBlue p = case p of
 -- Indigo Faerie's "target permanent" (Pool.Permanents) answers with ToObject.
 aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtObject oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
 -- Casts Red Elemental Blast: chooses mode `idx` at CR 700.2's mode prompt and
@@ -148,7 +148,7 @@ aimAtObject oid p = case p of
 blasting :: ModeIndex.ModeIndex -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 blasting idx oid p = case p of
   Prompt.ChooseModes {} -> Seq.singleton idx
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
 -- `blasting`, except that it aims at the SPELL BEING CAST whenever the engine
@@ -165,7 +165,7 @@ blastingSelfIfOffered idx oid p = case p of
   Prompt.ChooseModes {} -> Seq.singleton idx
   Prompt.ChooseTargets _ _ self sets ->
     fmap
-      (\set -> if Set.member (Recipient.ToObject self) set then Recipient.ToObject self else Recipient.ToObject oid)
+      (\(_, set) -> Set.singleton (if Set.member (Recipient.ToObject self) set then Recipient.ToObject self else Recipient.ToObject oid))
       sets
   _ -> S.identityAnswer p
 

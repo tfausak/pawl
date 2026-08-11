@@ -124,7 +124,7 @@ withDynamicEffect aff ts m gs =
 -- forced by construction.
 aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtObject oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
 -- Records every library-search candidate list and every shuffled library, and
@@ -178,7 +178,7 @@ recruiterCandidates s registry buried = do
 -- aimAtObject for a Pool.Creatures slot, whose recipients are ToCreature.
 aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCreature oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
 -- Put Turn to Frog into alice's hand, cast it AT `victimId`, and resolve it.
@@ -2376,7 +2376,7 @@ weathervaneChain s registry landName which = do
 -- interpreter does.
 aimingAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimingAt oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
 -- CR 122.1b: "A keyword counter on a permanent ... causes that object to gain

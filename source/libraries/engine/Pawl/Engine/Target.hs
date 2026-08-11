@@ -12,6 +12,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Card (Card)
 import Pawl.Types.Decider (Decider)
 import qualified Pawl.Types.Filter as Filter.Type
@@ -32,7 +33,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
-import qualified Pawl.Types.TargetRequirement as TargetRequirement
+import qualified Pawl.Types.TargetCount as TargetCount
 import Pawl.Types.TargetSpec (TargetSpec)
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
@@ -583,47 +584,71 @@ legalSets perspective source specs gs = legalSetsGiven (Projection.projectAll gs
 legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
 legalSetsGiven pcs grants perspective source specs gs = fmap (\spec -> legalRecipientsGiven pcs grants perspective source spec gs) specs
 
--- CR 115.6: the slots of this map that MUST be filled. The rest are "up to one
--- target", and a spell that leaves one empty has simply chosen zero targets for
--- it -- not an unanswered question, and not a target that later became illegal.
-requiredSlots :: Map SlotName TargetSpec -> Set SlotName
-requiredSlots = Map.keysSet . Map.filter ((== TargetRequirement.Required) . TargetSpec.requirement)
+-- CR 601.2c: the range of numbers this slot may be answered with on this board
+-- -- the printed count, narrowed by how many legal recipients there actually
+-- are. A caster cannot announce more targets than they can then choose legally,
+-- and a slot whose range has collapsed to a single number is not a variable
+-- number of targets at all ("in some cases, the number of targets will be
+-- defined by the spell's text").
+announcedRange :: TargetSpec -> Set Recipient -> (Natural, Natural)
+announcedRange spec legal =
+  let count = TargetSpec.count spec
+      ceiling_ = min (TargetCount.most count) (Natural.length legal)
+   in (min (TargetCount.least count) ceiling_, ceiling_)
 
 -- CR 601.2c's two announcements over one slot map, in the rule's own order: how
 -- many targets each variable slot gets, then the targets themselves.
 --
--- A variable slot with no legal recipient is not offered, zero being its only
--- answer; a name outside the offer is dropped, which is the same game as
--- declining it. Neither prompt is raised when it has nothing to ask.
+-- A slot whose count the card or the board already fixes is not offered at the
+-- first prompt, there being one legal answer; a count outside the offered range
+-- is clamped back into it, which is the same game as answering its nearest end.
+-- Neither prompt is raised when it has nothing to ask.
 --
 -- The answer is NOT validated here -- `selectionLegal` below is that, asked by
 -- the callers that reverse an announcement (CR 601.2e, CR 602.2).
-chooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName TargetSpec -> Map SlotName (Set Recipient) -> Game (Map SlotName Recipient)
+chooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName TargetSpec -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
 chooseTargets decider pid oid specs sets = do
-  let required = requiredSlots specs
-      offers = Map.filter (not . Set.null) (Map.withoutKeys sets required)
+  let ranges = Map.intersectionWith announcedRange specs sets
+      variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
+      offers = Map.restrictKeys (Map.intersectionWith (\spec legal -> (TargetSpec.count spec, legal)) specs sets) variable
   announced <-
     if Map.null offers
-      then pure Set.empty
+      then pure Map.empty
       else Game.choose (Prompt.AnnounceTargets decider pid oid offers)
-  let asked = Map.restrictKeys sets (Set.union required (Set.intersection announced (Map.keysSet offers)))
+  let counts =
+        Map.filter (> 0) $
+          Map.mapWithKey
+            (\slot (lo, hi) -> max lo (min hi (Map.findWithDefault lo slot announced)))
+            ranges
+      asked = Map.intersectionWith (,) counts sets
   if Map.null asked
     then pure Map.empty
     else Game.choose (Prompt.ChooseTargets decider pid oid asked)
 
--- CR 601.2c: is this answer a legal filling of these slots? Every required slot
--- named, nothing named that was not offered, and each recipient still one its own
--- slot admits. A CR 115.6 slot may be absent -- that is zero targets chosen, and
--- CR 115.6's last clause is what makes it a legal announcement rather than a
--- missing one.
-selectionLegal :: Map SlotName TargetSpec -> Map SlotName (Set Recipient) -> Map SlotName Recipient -> Bool
+-- CR 601.2c: is this answer a legal filling of these slots? Each slot answered
+-- with a number of targets its count allows, nothing named that was not offered,
+-- and each recipient still one its own slot admits. A slot may be absent when
+-- zero is a number it allows -- that is zero targets chosen, and CR 115.6's last
+-- clause is what makes it a legal announcement rather than a missing one.
+--
+-- Measured against the BOARD-NARROWED range, the one chooseTargets offered: a
+-- caster who could not find three legal targets has not announced an illegal
+-- number, they were never offered it.
+selectionLegal :: Map SlotName TargetSpec -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> Bool
 selectionLegal specs sets chosen =
-  Set.isSubsetOf (requiredSlots specs) (Map.keysSet chosen)
-    && Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
-    && and (Map.intersectionWith Set.member chosen sets)
+  Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
+    && and (Map.elems (Map.mapWithKey slotLegal specs))
+  where
+    slotLegal slot spec =
+      let legal = Map.findWithDefault Set.empty slot sets
+          picked = Map.findWithDefault Set.empty slot chosen
+          (lo, hi) = announcedRange spec legal
+          size = Natural.length picked
+       in Set.isSubsetOf picked legal && size >= lo && size <= hi
 
--- CR 700.2a: the mode indices all of whose REQUIRED target slots have a legal recipient
--- (a mode with no slots is trivially fillable). Self-exclusion ("another") is
+-- CR 700.2a: the mode indices every one of whose target slots can be filled --
+-- that is, has at least as many legal recipients as its count demands (a mode
+-- with no slots is trivially fillable). Self-exclusion ("another") is
 -- honored because it lives in the slot's own Filter. Shared by spells (Cast) and
 -- abilities (Activate/Engine).
 --
@@ -644,9 +669,11 @@ fillableModesGiven pcs grants perspective source extra modal gs =
       fillable i m =
         let specs = Map.union extra (Mode.targetSpecs m)
             sets = legalSetsGiven pcs grants perspective source specs gs
-         in -- CR 115.6: only a REQUIRED slot can make a mode unfillable. An "up to
-            -- one" slot with no legal recipient is answered with zero targets.
-            if any Set.null (Map.elems (Map.restrictKeys sets (requiredSlots specs)))
+         in -- CR 115.6 / 601.2c: a slot is unfillable when the board cannot supply
+            -- the MINIMUM its count demands. An "up to one" slot with no legal
+            -- recipient demands none, and is answered with zero targets.
+            if or (Map.elems (Map.intersectionWith short specs sets))
               then Nothing
               else Just (ModeIndex.MkModeIndex i)
+      short spec legal = Natural.length legal < TargetCount.least (TargetSpec.count spec)
    in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Natural ..] ms))

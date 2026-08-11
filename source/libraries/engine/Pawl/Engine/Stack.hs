@@ -225,8 +225,9 @@ resolveTop :: Game ()
 resolveTop = resolveTopWith Resolve.noSubgame
 
 -- The object or player an Aura spell's enchant slot names (CR 303.4 / 303.4a).
--- Nothing when the slot is unbound, which CR 303.4a makes unreachable for a
--- cast Aura -- the slot is a required target.
+-- Nothing when the slot is unbound, which CR 303.4a makes unreachable for a cast
+-- Aura -- the slot is a required target, and rule 702.5a prints no "up to", so
+-- it names exactly one recipient.
 --
 -- The recipient is handed on UNCHANGED, tag and all, so CR 303.4c's re-check
 -- (Sba.stillLegalEnchant) can compare the stored value against the same pool's
@@ -234,4 +235,4 @@ resolveTop = resolveTopWith Resolve.noSubgame
 enchantedBy :: ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
 enchantedBy oid gs = case Game.lookupObject oid gs of
   Nothing -> Nothing
-  Just obj -> Map.lookup Card.enchantSlot (Binding.targetsOf (Object.bindings obj))
+  Just obj -> Binding.onlyOne =<< Map.lookup Card.enchantSlot (Binding.targetsOf (Object.bindings obj))

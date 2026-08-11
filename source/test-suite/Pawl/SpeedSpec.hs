@@ -28,6 +28,7 @@
 module Pawl.SpeedSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
@@ -81,14 +82,14 @@ raceBoard raceway swamp signInBlood filler =
 -- left to whichever player a set happens to offer first.
 atBob :: Prompt.Prompt r -> r
 atBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 -- Aim at Alice instead: the same card, the same life loss, but the loser is the
 -- caster rather than an opponent.
 atAlice :: Prompt.Prompt r -> r
 atAlice p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
   _ -> S.identityAnswer p
 
 -- Cast the spell, resolve it, and settle -- which runs the state-based actions

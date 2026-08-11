@@ -639,7 +639,7 @@ castAtWith ::
 castAtWith fallback battle caster spell gs =
   let answer :: Prompt.Prompt r -> r
       answer p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToBattle battle)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToBattle battle))) sets
         _ -> fallback p
       cast = S.runPure answer gs (S.cast caster spell)
    in S.runPure answer cast Engine.priorityLoop

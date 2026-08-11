@@ -1258,7 +1258,7 @@ castHackAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> Subtype.Subtype -> Subty
 castHackAt hackId target from to gs =
   let answer :: Prompt.Prompt r -> r
       answer p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject target)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject target))) sets
         Prompt.ChooseLandTypeSwap {} -> (from, to)
         _ -> S.identityAnswer p
    in S.runPure answer (gs {GameState.priority = Just S.alice}) (do S.cast S.alice hackId; Stack.resolveTop)
@@ -2630,7 +2630,7 @@ castHackPaying :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId ->
 castHackPaying island hackId target from to gs =
   let answer :: Prompt.Prompt r -> r
       answer p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject target)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject target))) sets
         Prompt.ChooseLandTypeSwap {} -> (from, to)
         Prompt.ChooseManaSource {} -> Just island
         _ -> S.identityAnswer p
@@ -3513,7 +3513,7 @@ rayBoard island piker ray =
 -- behind CR 509.1's routing.
 steal :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 steal homebody victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   Prompt.ChooseAction {} -> S.castAnswer p
   Prompt.DeclareAttackers _ _ ids -> filter (/= homebody) ids
   Prompt.DeclareBlockers {} -> Map.empty
@@ -3523,7 +3523,7 @@ steal homebody victim p = case p of
 -- `victim`. The blocker-side twin of `steal`.
 snatch :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 snatch victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   Prompt.ChooseAction {} -> S.castAnswer p
   _ -> S.aggressiveAnswer p
 
@@ -3687,7 +3687,7 @@ mazeAnswer mazeId ability victim p = case p of
       else do
         State.put True
         pure (A.Activate mazeId ability)
-  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToCreature victim)) sets)
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Set.singleton (Recipient.ToCreature victim))) sets)
   Prompt.ChooseManaSource _ _ candidates ->
     pure (Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (/= mazeId) (NonEmpty.toList candidates))))
   _ -> pure (S.aggressiveAnswer p)
@@ -3831,7 +3831,7 @@ unmakeBoard opalescence livingPlane piker forest swamp doomBlade =
 -- the attacker and hide the question this asks behind CR 509.1's routing.
 unmake :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 unmake land victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   Prompt.ChooseAction {} -> S.castAnswer p
   Prompt.DeclareAttackers _ _ ids -> filter (== land) ids
   Prompt.DeclareBlockers {} -> Map.empty
@@ -3882,7 +3882,7 @@ blockOnly blocker p = case p of
 -- which is a different clause of CR 506.4.
 unblock :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 unblock blocker victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
   Prompt.ChooseAction {} -> S.castAnswer p
   Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
     a : _ -> Map.singleton blocker (Set.singleton a)

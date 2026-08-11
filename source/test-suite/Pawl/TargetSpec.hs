@@ -107,7 +107,7 @@ restrictionBoard restricted piker pid =
 -- lowest id -- no way to say "bob's".
 aimAtCard :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCard oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
 -- aimAtCard, plus a Prompt.Shuffle that REVERSES the library rather than
@@ -222,11 +222,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         -- the damage can land anywhere else.
         prefersBob p = case p of
           Prompt.ChooseTargets _ _ _ sets ->
-            let aim candidates =
-                  if Set.member (Recipient.ToPlayer S.bob) candidates
-                    then Just (Recipient.ToPlayer S.bob)
-                    else Set.lookupMin candidates
-             in Map.mapMaybe aim sets
+            S.preferring (== Recipient.ToPlayer S.bob) sets
           _ -> S.identityAnswer p
         castAt guard =
           let base = S.landsInPlay mountain 1
@@ -1291,7 +1287,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         let legalFor pid = Target.legalRecipients (Just pid) S.noSource theSpec
             aimAtRegent :: Prompt.Prompt r -> r
             aimAtRegent p = case p of
-              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature regentId)) sets
+              Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature regentId))) sets
               _ -> S.identityAnswer p
             bobCast = S.runPure aimAtRegent window (S.cast S.bob bobsBlade)
             killed = S.runPure aimAtRegent bobCast Stack.resolveTop

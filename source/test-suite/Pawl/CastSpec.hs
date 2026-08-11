@@ -392,8 +392,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
             "the Piker is the target, and alice is CR 109.5's you"
             (Binding.targetsOf (Object.bindings obj))
             ( Map.fromList
-                [ (SlotName.MkSlotName (Text.pack "target"), Recipient.ToCreature (S.pikerOf base)),
-                  (Binding.you, Recipient.ToPlayer S.alice)
+                [ (SlotName.MkSlotName (Text.pack "target"), Set.singleton (Recipient.ToCreature (S.pikerOf base))),
+                  (Binding.you, Set.singleton (Recipient.ToPlayer S.alice))
                 ]
             )
   Spec.it s "casting a {X}{R} spell at X=3 stamps amount 3 and pays {3}{R}" $ do
@@ -463,7 +463,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
         liar :: Prompt.Prompt r -> r
         liar p = case p of
           Prompt.ChooseTargets _ _ _ sets ->
-            fmap (const (Recipient.ToCreature (ObjectId.MkObjectId 999))) sets
+            fmap (const (Set.singleton (Recipient.ToCreature (ObjectId.MkObjectId 999)))) sets
           _ -> S.identityAnswer p
         after = snd (Engine.runGamePure liar gs (S.cast S.alice oid))
     Spec.assertEqWith s "nothing on the stack" (length (GameState.stack after)) 0
@@ -586,7 +586,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
 answerXOf :: Natural -> Prompt.Prompt r -> r
 answerXOf n p = case p of
   Prompt.ChooseX {} -> n
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 -- Discards from the BACK of hand. Deliberately unlike every fallback, so the
@@ -716,7 +716,7 @@ answerAtBound p = case p of
   Prompt.ChooseX _ _ _ bound -> do
     State.modify' (\seen -> seen <> [bound])
     pure bound
-  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets)
   _ -> pure (S.identityAnswer p)
 
 -- Announces ONE MORE than the bound -- legal under CR 601.2b and unaffordable by
@@ -724,7 +724,7 @@ answerAtBound p = case p of
 answerAboveBound :: Prompt.Prompt r -> r
 answerAboveBound p = case p of
   Prompt.ChooseX _ _ _ bound -> bound + 1
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 -- answerAtBound and answerAboveBound in one, COUNTING the CR 601.2c target
@@ -737,7 +737,7 @@ answerAtBoundOffsetCounting offset p = case p of
   Prompt.ChooseX _ _ _ bound -> pure (bound + offset)
   Prompt.ChooseTargets _ _ _ sets -> do
     State.modify' (+ 1)
-    pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+    pure (fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets)
   _ -> pure (S.identityAnswer p)
 
 -- Records the object each CR 601.2c target question is asked ABOUT, and aims
@@ -747,7 +747,7 @@ answerRecordingTargetObject :: Prompt.Prompt r -> State.State [ObjectId.ObjectId
 answerRecordingTargetObject p = case p of
   Prompt.ChooseTargets _ _ oid sets -> do
     State.modify' (\seen -> seen <> [oid])
-    pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+    pure (fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets)
   _ -> pure (S.identityAnswer p)
 
 -- How many cards of this name sit in alice's hand (the reject-not-repair no-op
@@ -765,7 +765,7 @@ inHandNamed name gs = length (filter (nameOnStack (CardName.MkCardName $ Text.pa
 -- `you` bound anything or not.
 answerTargetingBob :: Prompt.Prompt r -> r
 answerTargetingBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 charSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1076,7 +1076,7 @@ grips ::
 grips decision toTap toUntap p = case p of
   Prompt.ChooseEntwine {} -> decision
   Prompt.ChooseTargets _ _ _ sets ->
-    Map.mapWithKey (\slot _ -> Recipient.ToObject (if slot == tapSlot then toTap else toUntap)) sets
+    Map.mapWithKey (\slot _ -> Set.singleton (Recipient.ToObject (if slot == tapSlot then toTap else toUntap))) sets
   _ -> S.identityAnswer p
 
 -- Was CR 702.42a's question actually put to the player, and what did they say?

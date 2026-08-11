@@ -22,7 +22,6 @@
 -- up -- and casting the producer again would prove nothing new about that.
 module Pawl.RadSpec where
 
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Engine as Engine
@@ -184,5 +183,5 @@ precombatMainOf pid gs =
 targeting :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 targeting pid p = case p of
   Prompt.ChooseTargets _ _ _ sets ->
-    Map.mapMaybe (Set.lookupMin . Set.filter (== Recipient.ToPlayer pid)) sets
+    fmap (\(_, legal) -> Set.filter (== Recipient.ToPlayer pid) legal) sets
   _ -> S.identityAnswer p
