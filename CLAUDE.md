@@ -238,6 +238,16 @@ Pick the sublibrary by what the module *is*, not by who calls it. Each is
 - `json`:
   RFC-compliant JSON types and codecs
 
+- `json-pointer`:
+  RFC 6901 JSON pointers, and the URI fragment form a `$ref` takes
+
+- `json-schema`:
+  JSON Schema documents, modelled as plain JSON values
+
+- `json-codec`:
+  the shape of a codec, and the generic helpers every codec is written in
+  terms of
+
 - `exceptions`:
   the catalog of exceptions pawl throws
 
@@ -245,7 +255,7 @@ Pick the sublibrary by what the module *is*, not by who calls it. Each is
   type definitions, without behavior
 
 - `codec`:
-  JSON encoders and decoders for pawl's types
+  JSON encoders and decoders for `pawl:types` types
 
 - `registry`:
   answering "what card is this name?", plus a file-backed answer
