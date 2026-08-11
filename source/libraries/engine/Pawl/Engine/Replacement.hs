@@ -52,6 +52,7 @@ import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -216,13 +217,26 @@ applicable asOf gs event =
 -- on the EVENT CLASS -- which the type already rules out for the impossible
 -- pairs -- and the pattern must admit the event's subject.
 --
--- CR 701.19c: may this destruction rewrite be applied to this destruction? Asked
--- here, where a candidate is offered the event, so a shield that is refused is
--- also never CONSUMED. Gates regeneration and nothing else, which is why it
--- reads the rewrite rather than rejecting the whole DestructionR class.
-admits :: Regenerability.Regenerability -> DestructionRewrite.DestructionRewrite -> Bool
-admits regenerability rewrite = case rewrite of
+-- CR 701.19c / 122.1c: may this destruction rewrite be applied to this
+-- destruction? Asked here, where a candidate is offered the event, so a shield
+-- that is refused is also never CONSUMED. Each arm reads the field its own rule
+-- names and ignores the other, which is why this reads the rewrite rather than
+-- rejecting or admitting the whole DestructionR class:
+--
+--   * CR 701.19c bars a REGENERATION shield from a destruction that can't be
+--     regenerated, and says nothing about what caused the destruction --
+--     regeneration replaces CR 704.5g's lethal-damage destruction, which is the
+--     shield's whole point.
+--   * CR 122.1c's replacement watches only for a destruction "as the result of an
+--     EFFECT", and says nothing about regenerability -- "removing a shield counter
+--     in this way isn't the same as regenerating a creature", so Terror's clause
+--     does not touch it. The rule's own reading of that restriction is the ruling
+--     that a shielded creature "may still be destroyed by state-based actions if
+--     it has damage marked on it equal to its toughness".
+admits :: Regenerability.Regenerability -> DestructionCause.DestructionCause -> DestructionRewrite.DestructionRewrite -> Bool
+admits regenerability cause rewrite = case rewrite of
   DestructionRewrite.Regenerate -> regenerability == Regenerability.Regenerable
+  DestructionRewrite.RemoveShieldCounter -> cause == DestructionCause.ByEffect
 
 -- CR 615.7: a spent shield is not an applicable prevention effect at all, and is
 -- refused HERE rather than applied for nothing -- as `admits` refuses a
@@ -237,10 +251,35 @@ unspent :: DamageRewrite.DamageRewrite -> Bool
 unspent rewrite = case rewrite of
   DamageRewrite.PreventNext remaining -> remaining > 0
   DamageRewrite.PreventAll -> True
+  -- CR 122.1c's prevention is spent by the COUNTER going away, not by a number on
+  -- the row: Projection.shieldOf mints it only while a counter is there, so a
+  -- shield spent to nothing is gone from the gathered list rather than present and
+  -- refused here.
+  DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.SetAmount _ -> True
   DamageRewrite.Scale _ -> True
   -- CR 614.9's redirection has nothing to spend: it moves the recipient and
   -- leaves the amount alone, so no application can exhaust it.
+  DamageRewrite.Redirect _ -> True
+
+-- CR 122.1c: does this damage rewrite admit the event's RECIPIENT? The shield's
+-- prevention says "if damage would be dealt to THIS permanent", and that
+-- self-scope is asked here rather than through DamagePattern.whichRecipient for
+-- the reason Projection.shieldOf gives: that field is compared to the event's
+-- Pawl.Types.Recipient tag, which records how the damage reached its recipient
+-- rather than only which permanent it reached.
+--
+-- Every other rewrite answers True, its scope being the pattern's business alone
+-- (Fog shields no one in particular; CR 615.7's row names its recipient in the
+-- pattern). Exhaustive, so a later rewrite with a scope of its own is asked here
+-- rather than silently given every recipient.
+admitsRecipient :: ObjectId -> DamageRewrite.DamageRewrite -> DamageEvent.DamageEvent -> Bool
+admitsRecipient src rewrite de = case rewrite of
+  DamageRewrite.PreventRemovingShieldCounter -> Recipient.objectOf (DamageEvent.target de) == Just src
+  DamageRewrite.PreventAll -> True
+  DamageRewrite.PreventNext _ -> True
+  DamageRewrite.SetAmount _ -> True
+  DamageRewrite.Scale _ -> True
   DamageRewrite.Redirect _ -> True
 
 applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
@@ -258,13 +297,14 @@ applies gs event candidate =
         -- plus the one fact about the ROW rather than the event -- a shield
         -- spent to nothing is no longer a prevention effect.
         (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) ->
-          matchesDamagePattern (Just src) pat de && unspent rewrite
+          matchesDamagePattern (Just src) pat de && unspent rewrite && admitsRecipient src rewrite de
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
-        -- ability's own source, so a destruction replacement is self-only.
-        -- DestructionR carries no pattern because the only producer in the
-        -- card pool is self-regeneration (CR 701.19a).
-        (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid regenerability) ->
-          src == oid && admits regenerability rewrite
+        -- ability's own source, so a destruction replacement is self-only. CR
+        -- 122.1c's "this permanent" is the same self-scope reached from the other
+        -- direction: the effect is minted onto the permanent holding the counters.
+        -- DestructionR carries no pattern because both producers are self-scoped.
+        (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid regenerability cause) ->
+          src == oid && admits regenerability cause rewrite
         (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutCounters cause oid kind _) ->
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.
@@ -843,7 +883,7 @@ chooserOf gs event = case event of
     -- "defending player", which rule 616 nowhere says.
     Recipient.ToBattle oid -> Projection.controllerOf oid gs
     Recipient.ToObject oid -> Projection.controllerOf oid gs
-  ProposedEvent.WouldBeDestroyed oid _ -> Projection.controllerOf oid gs
+  ProposedEvent.WouldBeDestroyed oid _ _ -> Projection.controllerOf oid gs
   ProposedEvent.WouldPutCounters _ oid _ _ -> Projection.controllerOf oid gs
   -- CR 616.1's affected player is the one the event happens to, which for a
   -- counter put on a PLAYER is that player -- not the one putting it.
@@ -953,6 +993,8 @@ prevents :: DamageRewrite.DamageRewrite -> Bool
 prevents rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventAll -> True
+  -- CR 122.1c says "prevent that damage", so CR 615.1a makes this one too.
+  DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   -- CR 614.9's redirection is a rule-614 replacement. Turn the Tables never says
@@ -1207,10 +1249,12 @@ askOne batch (pid, positions) = do
 -- unit is the amount. A shield large enough to cover the lot prevents all of it
 -- whatever the order, so there is nothing to ask.
 --
--- Not implemented: a shield is the only contested resource this asks about, so a
--- limited replacement of any other shape that two of one chooser's simultaneous
--- events could each spend is spent by whichever is settled first, rather than by
--- CR 101.4c's answer from that chooser (#839).
+-- Not implemented: a counted shield is the only contested resource this asks
+-- about, so a limited replacement of any other shape that two of one chooser's
+-- simultaneous events could each spend is spent by whichever is settled first,
+-- rather than by CR 101.4c's answer from that chooser -- CR 122.1c's shield
+-- counters are one such shape, since one counter facing two simultaneous events
+-- covers whichever `byApnap` happens to sort first (#839).
 --
 -- Several shields contribute ONE question per CHOOSER, over the union of what
 -- they contest: the order the batch is settled in is a single fact about the
@@ -1268,6 +1312,12 @@ shieldRemaining re = case re of
     -- Fog is unlimited for its duration, so there is nothing to allocate: it
     -- prevents every event it admits and the order cannot matter.
     DamageRewrite.PreventAll -> Nothing
+    -- CR 122.1c's prevention has no remaining AMOUNT to report: it prevents a
+    -- whole event per counter, so what limits it is a number on the permanent
+    -- rather than on the row. It IS a contested resource when one counter faces
+    -- two simultaneous events, which is the elision `contested` above records
+    -- (#839).
+    DamageRewrite.PreventRemovingShieldCounter -> Nothing
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing
@@ -1293,7 +1343,7 @@ asDamageEvent event = case event of
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
-  ProposedEvent.WouldBeDestroyed target _ -> Just target
+  ProposedEvent.WouldBeDestroyed target _ _ -> Just target
   ProposedEvent.WouldChangeZone _ -> Nothing
   ProposedEvent.WouldEnter _ -> Nothing
   ProposedEvent.WouldDealDamage _ -> Nothing

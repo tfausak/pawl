@@ -65,6 +65,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -618,9 +619,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
         g4 =
@@ -668,9 +667,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
         g3 =
@@ -720,9 +717,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
         g3 =
@@ -749,7 +744,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -762,7 +757,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
+        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -788,7 +783,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -812,7 +807,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -857,9 +852,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
@@ -924,9 +917,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
@@ -1002,9 +993,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
@@ -1088,9 +1077,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
@@ -1173,9 +1160,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False,
-              Object.monstrous = False,
-              Object.suspected = False,
+              Object.designations = Set.empty,
               Object.kicked = False
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
@@ -1386,9 +1371,7 @@ installControlBy mindslaver controller target gs0 =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
       gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
@@ -1469,9 +1452,7 @@ twoBoltState piker mountain lightningBolt =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False,
-            Object.monstrous = False,
-            Object.suspected = False,
+            Object.designations = Set.empty,
             Object.kicked = False
           }
    in gs2
@@ -1496,7 +1477,7 @@ cancelVictim island cancel victim =
 handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handAppend printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
+      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -2694,7 +2675,7 @@ handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
   where
     addOne g =
       let (oid, g1) = Game.freshObjectId g
-          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False False
+          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
        in g1
             { GameState.objects = Map.insert oid obj (GameState.objects g1),
               GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
@@ -3394,6 +3375,45 @@ mirrorBoard mirror aliceLife bobLife carolLife =
           }
       )
 
+-- Soul Conduit (Eldritch Moon) on alice's battlefield over six untapped Islands,
+-- with the three seats at three DIFFERENT life totals: "{6}, {T}: Two target
+-- players exchange life totals."
+--
+-- The same three seats and the same schedule surgery as mirrorBoard, and for the
+-- same reasons -- but here the point of the third seat is that the two sides of
+-- the exchange can BOTH be players other than the controller, which two seats
+-- cannot express.
+soulConduitBoard :: Printing.Printing -> Printing.Printing -> Integer -> Integer -> Integer -> (ObjectId.ObjectId, GameState.GameState)
+soulConduitBoard conduit island aliceLife bobLife carolLife =
+  let withLands = List.foldl' (\gs _ -> snd (S.addCreature island S.alice gs)) S.threePlayerGame [1 .. 6 :: Int]
+      (conduitId, gs1) = S.addCreature conduit S.alice withLands
+      at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+   in ( conduitId,
+        gs1
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.drop 1 (GameState.remaining gs1),
+            GameState.players = at S.alice aliceLife (at S.bob bobLife (at S.carol carolLife (GameState.players gs1)))
+          }
+      )
+
+-- Takes the first activation offered, taps whatever the payment asks for, and
+-- fills the target slot with `sides` -- S.preferring rather than a fixed set, so
+-- the announced count (CR 601.2c) is what decides how many are named.
+conduitAnswer :: [PlayerId.PlayerId] -> Prompt.Prompt r -> r
+conduitAnswer sides p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isActivation options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
+  _ -> S.identityAnswer p
+  where
+    wanted r = case r of
+      Recipient.ToPlayer pid -> elem pid sides
+      _ -> False
+
 -- Takes the first activation offered and aims every target slot at `who`.
 exchangeAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 exchangeAnswer who p = case p of
@@ -3474,6 +3494,60 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
     Spec.assertBool s (not (Set.member mirrorId (GameState.battlefield after))) "and the ability was activated: its sacrifice was paid"
     Spec.assertEqWith s "no gain" (lifeGains after) []
     Spec.assertEqWith s "no loss" (lifeLosses after) []
+
+  -- CR 701.12c's other shape: BOTH sides come out of one instance of the word
+  -- "target" (CR 601.2c), and neither of them need be the controller. bob at 27
+  -- and carol at 13 swap while alice, who activated it, keeps her 4 -- so the
+  -- reading in which the controller is always one side gets a different answer
+  -- for every seat. The four numbers (4, 13, 27 and the 14 that moves) are
+  -- distinct, so no pair of readings coincides.
+  Spec.it s "CR 701.12c Soul Conduit exchanges the totals of two players, neither of them its controller" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    let (conduitId, board) = soulConduitBoard conduit island 4 27 13
+        after = S.runPure (conduitAnswer [S.bob, S.carol]) board Engine.runStep
+    Spec.assertEqWith s "bob took carol's 13" (S.lifeOf S.bob after) (Just 13)
+    Spec.assertEqWith s "carol took bob's 27" (S.lifeOf S.carol after) (Just 27)
+    Spec.assertEqWith s "alice, who activated it, is untouched" (S.lifeOf S.alice after) (Just 4)
+    Spec.assertEqWith s "carol gained 14" (lifeGains after) [(S.carol, 14)]
+    Spec.assertEqWith s "bob lost 14" (lifeLosses after) [(S.bob, 14)]
+    -- The ability was really activated, so an exchange that did nothing cannot
+    -- pass the assertions above by leaving the board alone.
+    Spec.assertEqWith s "and the Conduit paid its own {T}" (fmap Object.tapped (Game.lookupObject conduitId after)) (Just TapState.Tapped)
+
+  -- The same board and the same interpreter, differing only in which two players
+  -- the answer names: the controller is a side when she is TARGETED, and the slot
+  -- is what decides.
+  Spec.it s "CR 601.2c both sides are read from the slot, the controller included when named" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    let (_, board) = soulConduitBoard conduit island 4 27 13
+        after = S.runPure (conduitAnswer [S.alice, S.bob]) board Engine.runStep
+    Spec.assertEqWith s "alice took bob's 27" (S.lifeOf S.alice after) (Just 27)
+    Spec.assertEqWith s "bob took alice's 4" (S.lifeOf S.bob after) (Just 4)
+    Spec.assertEqWith s "carol, whom nobody named, is untouched" (S.lifeOf S.carol after) (Just 13)
+
+  -- CR 701.12a: "if the entire exchange can't be completed, no part of the
+  -- exchange occurs." One of the two targets leaves the game after the ability is
+  -- on the stack, so CR 608.2b drops her (a departed player is no longer in CR
+  -- 115's pool) and the ability resolves with one side and no exchange -- rather
+  -- than falling back on the controller, which is the reading this discriminates.
+  Spec.it s "CR 701.12a an exchange left with one side does nothing at all" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    let (conduitId, board) = soulConduitBoard conduit island 4 27 13
+        answer :: Prompt.Prompt r -> r
+        answer = conduitAnswer [S.bob, S.carol]
+    case Activate.abilitiesFor conduitId board of
+      [ability] -> do
+        let activated = S.runPure answer board (Activate.activateAbility S.alice conduitId ability)
+            gone = S.runPure answer activated (Departure.leaveGame Departure.Type.Conceded S.carol)
+            after = S.runPure answer gone Stack.resolveTop
+        Spec.assertEqWith s "bob, the surviving target, keeps his 27" (S.lifeOf S.bob after) (Just 27)
+        Spec.assertEqWith s "and alice, who is no side of it, keeps her 4" (S.lifeOf S.alice after) (Just 4)
+        Spec.assertEqWith s "no gain" (lifeGains after) []
+        Spec.assertEqWith s "no loss" (lifeLosses after) []
+      other -> Spec.assertFailure s ("expected exactly one activated ability on the Conduit, got " <> show (length other))
 
 -- One with the Machine, the card that proves Aggregation.Greatest (#254):
 -- "Draw cards equal to the greatest mana value among artifacts you control."
@@ -3977,7 +4051,7 @@ sauroformHybridSpec s registry = Spec.describe s "SauroformHybrid" $ do
 -- reason the second one changes nothing.
 nessianAspSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 nessianAspSpec s registry = Spec.describe s "NessianAsp" $ do
-  let monstrousOf oid gs = fmap Object.monstrous (Game.lookupObject oid gs)
+  let monstrousOf oid gs = fmap (Set.member Designation.Monstrous . Object.designations) (Game.lookupObject oid gs)
       countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
   Spec.it s "CR 701.37a whole card: monstrosity 4 marks the Asp, and a second monstrosity does nothing" $ do
     forest <- S.printingOf s registry "Forest"
@@ -4042,7 +4116,7 @@ nessianAspSpec s registry = Spec.describe s "NessianAsp" $ do
               S.cast S.alice spellId
               Stack.resolveTop
             -- Total (no `head`): the Asp is the only card that can be in hand.
-            inHand = fmap (\h -> maybe True Object.monstrous (Game.lookupObject h bounced)) (Game.zoneMembers Zone.Hand S.alice bounced)
+            inHand = fmap (\h -> maybe True (Set.member Designation.Monstrous . Object.designations) (Game.lookupObject h bounced)) (Game.zoneMembers Zone.Hand S.alice bounced)
         Spec.assertEqWith s "monstrous on the battlefield" (monstrousOf aspId once) (Just True)
         Spec.assertEqWith s "the bounced incarnation is not monstrous" inHand [False]
       abilities -> Spec.assertFailure s ("expected one monstrosity ability, got " <> show (length abilities))
@@ -5894,7 +5968,7 @@ personOfInterestSpec s registry = Spec.describe s "PersonOfInterest" $ do
     (gs, poiId, _, _) <- board 0 0 S.alice
     case Game.lookupObject poiId gs of
       Nothing -> Spec.assertFailure s "expected to find the Person"
-      Just obj -> Spec.assertEqWith s "this incarnation is suspected, the next one is not" (Object.suspected obj, Object.suspected (Object.newIncarnation obj)) (True, False)
+      Just obj -> Spec.assertEqWith s "this incarnation is suspected, the next one is not" (isSuspected obj, isSuspected (Object.newIncarnation obj)) (True, False)
   Spec.it s "CR 701.60c a suspected creature has menace, so one blocker cannot block it" $ do
     -- bob's two Pikers are the falsifier for reading rule 701.60c as "can't be
     -- blocked": the very creature that cannot block the Person alone can block it
@@ -5987,7 +6061,7 @@ repeatOffenderSpec s registry = Spec.describe s "RepeatOffender" $ do
         activate gs = case Activate.abilitiesFor offenderId gs of
           [ability] -> Right (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice offenderId ability >> Stack.resolveTop >> Engine.settleForPriority))
           other -> Left (length other)
-        state gs = (fmap Object.suspected (Game.lookupObject offenderId gs), S.counterOf CounterKind.PlusOnePlusOne offenderId gs, S.powerToughnessOf offenderId gs)
+        state gs = (suspectedOf offenderId gs, S.counterOf CounterKind.PlusOnePlusOne offenderId gs, S.powerToughnessOf offenderId gs)
     case activate board of
       Left n -> Spec.assertFailure s ("expected exactly one activated ability, got " <> show n)
       Right once -> do
@@ -6078,7 +6152,11 @@ jugglerBoard s registry = do
 
 -- CR 701.60b's designation, read off the object.
 suspectedOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Bool
-suspectedOf oid gs = fmap Object.suspected (Game.lookupObject oid gs)
+suspectedOf oid gs = fmap isSuspected (Game.lookupObject oid gs)
+
+-- CR 701.60b asked of one object, which is Set membership rather than a field.
+isSuspected :: Object.Object -> Bool
+isSuspected = Set.member Designation.Suspected . Object.designations
 
 -- Aims the ability at `victim` and asks for `fodder` whenever CR 701.21a offers a
 -- sacrifice choice. The fodder is deliberately the permanent the criterion must
@@ -6139,6 +6217,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   baneOfProgressSpec s registry
   upToOneTargetSpec s registry
   multiTargetSpec s registry
+  supportSpec s registry
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.
@@ -6292,6 +6371,130 @@ resolveOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectI
 resolveOne answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
+
+-- CR 701.41 support, which is card DATA and no opcode: "support N" is written out
+-- as the counters it means, over a CR 601.2c slot of 0 to N.
+--
+-- N is a LITERAL range here. A count that reads X -- The Crowd Goes Wild's
+-- "Support X" -- is not expressible (#1271).
+--
+-- Lead by Example {1}{G} Instant (data/cards/lead-by-example.json): "Support 2.",
+-- and nothing else -- CR 701.41a's INSTANT reading, which has no "other" in it.
+--
+-- Joraga Auxiliary {1}{G}{W} 2/3 (data/cards/joraga-auxiliary.json):
+-- "{4}{G}{W}: Support 2.", CR 701.41a's PERMANENT reading, whose "other" is a
+-- Not IsSource on the slot.
+--
+-- Three readings of "up to two target creatures" a careless board cannot tell
+-- apart -- two of three, one of three, and none -- so each case names a different
+-- number of targets on the same board and the creature nobody named is asserted
+-- untouched. Three candidates for a slot that takes two, because a prompt offered
+-- exactly as many candidates as it needs is never asked.
+supportSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+supportSpec s registry = Spec.describe s "Support" $ do
+  Spec.it s "CR 701.41a support 2 counters each of the two creatures it named" $ do
+    (pikerId, wallId, ratsId, gs, spellId) <- leadBoard s registry []
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        after = resolveOne answer gs spellId
+    Spec.assertEqWith s "the Piker took a counter" (plusCountersOn pikerId after) (Just 1)
+    Spec.assertEqWith s "so did the Wall" (plusCountersOn wallId after) (Just 1)
+    Spec.assertEqWith s "the Rats, whom nobody named, took none" (plusCountersOn ratsId after) (Just 0)
+  -- The same board and the same spell, differing only in the announced number:
+  -- "up to two" allows one, and one is not two.
+  Spec.it s "CR 601.2c support 2 announcing one target counters only that one" $ do
+    (pikerId, wallId, ratsId, gs, spellId) <- leadBoard s registry []
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 1 [pikerId, wallId]
+        after = resolveOne answer gs spellId
+    Spec.assertEqWith s "the Piker took a counter" (plusCountersOn pikerId after) (Just 1)
+    Spec.assertEqWith s "and the second creature it could have taken took none" (plusCountersOn wallId after) (Just 0)
+    Spec.assertEqWith s "nor did the Rats" (plusCountersOn ratsId after) (Just 0)
+  -- CR 115.6's zero. Lead by Example has no second clause, so what makes the
+  -- declined case observable is that no counter appears anywhere: an engine that
+  -- chose the targets itself would put two.
+  Spec.it s "CR 115.6 support 2 announcing no targets counters nobody" $ do
+    (pikerId, wallId, ratsId, gs, spellId) <- leadBoard s registry []
+    let after = resolveOne decliningTargets gs spellId
+    Spec.assertEqWith s "the Piker took none" (plusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "nor the Wall" (plusCountersOn wallId after) (Just 0)
+    Spec.assertEqWith s "nor the Rats" (plusCountersOn ratsId after) (Just 0)
+  -- CR 122.6 / 614.16: each of support's placements reaches the funnel on its own,
+  -- so a counter-scaling replacement gets an opportunity against every target
+  -- rather than one against the batch. Doubling Season reads whose PERMANENT it is,
+  -- which is why both targets here are alice's.
+  Spec.it s "CR 122.6 Doubling Season doubles support's counter on each target" $ do
+    (pikerId, wallId, _, seasoned, seasonedSpell) <- leadBoard s registry [("Doubling Season", S.alice)]
+    (barePiker, bareWall, _, bare, bareSpell) <- leadBoard s registry []
+    let seasonedAfter = resolveOne (takingTargets 2 [pikerId, wallId]) seasoned seasonedSpell
+        bareAfter = resolveOne (takingTargets 2 [barePiker, bareWall]) bare bareSpell
+    Spec.assertEqWith s "1 * 2 on the Piker" (plusCountersOn pikerId seasonedAfter) (Just 2)
+    Spec.assertEqWith s "1 * 2 on the Wall too" (plusCountersOn wallId seasonedAfter) (Just 2)
+    Spec.assertEqWith s "and one each without the enchantment" (plusCountersOn barePiker bareAfter, plusCountersOn bareWall bareAfter) (Just 1, Just 1)
+  -- The same funnel from the other side: half of one counter, rounded down, is
+  -- none, so zero, one and two are three distinct answers to the same board.
+  -- Vorinclex reads who is PUTTING the counters (CR 122.6a), and the targets here
+  -- are alice's own permanents -- which is what separates it from Doubling Season's
+  -- recipient reading, since bob's praetor halves them anyway.
+  Spec.it s "CR 122.6a an opponent's Vorinclex halves support's counters away" $ do
+    (pikerId, wallId, _, watched, watchedSpell) <- leadBoard s registry [("Vorinclex, Monstrous Raider", S.bob)]
+    (barePiker, bareWall, _, bare, bareSpell) <- leadBoard s registry []
+    let watchedAfter = resolveOne (takingTargets 2 [pikerId, wallId]) watched watchedSpell
+        bareAfter = resolveOne (takingTargets 2 [barePiker, bareWall]) bare bareSpell
+    Spec.assertEqWith s "half of one on the Piker" (plusCountersOn pikerId watchedAfter) (Just 0)
+    Spec.assertEqWith s "half of one on the Wall" (plusCountersOn wallId watchedAfter) (Just 0)
+    Spec.assertEqWith s "and one each without the praetor" (plusCountersOn barePiker bareAfter, plusCountersOn bareWall bareAfter) (Just 1, Just 1)
+  -- CR 701.41a's "other", which only the PERMANENT reading has. The answerer names
+  -- the Auxiliary FIRST, so a slot that offered it would spend one of its two
+  -- targets on it and leave one of the Rats and the Piker at zero.
+  Spec.it s "CR 701.41a support on a permanent cannot choose that permanent" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    wall <- S.printingOf s registry "Wall of Stone"
+    joraga <- S.printingOf s registry "Joraga Auxiliary"
+    let (_, g0) = S.addCreature plains S.alice (S.landsInPlay forest 5)
+        (auxId, g1) = S.addCreature joraga S.alice g0
+        (pikerId, g2) = S.addCreature piker S.bob g1
+        (ratsId, g3) = S.addCreature rats S.bob g2
+        (wallId, g4) = S.addCreature wall S.bob g3
+        board = g4 {GameState.priority = Just S.alice}
+        answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [auxId, pikerId, ratsId]
+    case Activate.abilitiesFor auxId board of
+      [ability] -> do
+        let after = S.runPure answer board (Activate.activateAbility S.alice auxId ability >> Stack.resolveTop)
+        Spec.assertEqWith s "the Auxiliary itself, which support excludes, took none" (plusCountersOn auxId after) (Just 0)
+        Spec.assertEqWith s "the Piker took one" (plusCountersOn pikerId after) (Just 1)
+        Spec.assertEqWith s "and so did the Rats" (plusCountersOn ratsId after) (Just 1)
+        Spec.assertEqWith s "the Wall, whom nobody named, took none" (plusCountersOn wallId after) (Just 0)
+      abilities -> Spec.assertFailure s ("expected one ability, got " <> show (length abilities))
+
+-- Two Forests for Lead by Example, three creatures with three distinct printed
+-- boxes (2/1, 0/8, 1/1) so which of them took a counter is legible, and the spell
+-- in alice's hand. The first two are alice's, since Doubling Season's clause reads
+-- whose permanent takes the counter; the Rats are bob's. `extra` seats further
+-- printings by name, which is the only difference between a case and its control.
+leadBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [(String, PlayerId.PlayerId)] ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+leadBoard s registry extra = do
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  lead <- S.printingOf s registry "Lead by Example"
+  extras <- mapM (\(name, pid) -> fmap (\p -> (p, pid)) (S.printingOf s registry name)) extra
+  let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay forest 2)
+      (wallId, g2) = S.addCreature wall S.alice g1
+      (ratsId, g3) = S.addCreature rats S.bob g2
+      g4 = List.foldl' (\g (p, pid) -> snd (S.addCreature p pid g)) g3 extras
+      (gs, spellId) = S.handOne lead g4
+  pure (pikerId, wallId, ratsId, gs, spellId)
 
 -- CR 115.6: declines every optional slot, announcing zero targets. Everything
 -- else is S.identityAnswer's answer, which for ChooseTargets fills what it is

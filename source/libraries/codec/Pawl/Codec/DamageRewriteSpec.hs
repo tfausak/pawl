@@ -19,6 +19,16 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.fromJson
       DamageRewrite.PreventAll
       """ {"type":"PreventAll"} """
+  -- CR 122.1c's prevention half. Minted from a permanent's shield counters and
+  -- never authored on a card, so this codec is the only place its wire form is
+  -- pinned.
+  Spec.it s "PreventRemovingShieldCounter" $
+    Common.assertJsonCodec
+      s
+      DamageRewrite.toJson
+      DamageRewrite.fromJson
+      DamageRewrite.PreventRemovingShieldCounter
+      """ {"type":"PreventRemovingShieldCounter"} """
   -- CR 615.7's shield, whose Natural is what REMAINS of it. Baked by Resolve's
   -- PreventNextDamage arm and never authored on a card, so this codec is the
   -- only place the wire form is pinned.

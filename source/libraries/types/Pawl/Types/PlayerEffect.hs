@@ -348,4 +348,32 @@ data PlayerEffect
     -- restriction is on the PLAYER, so every route is stopped at once (the
     -- ordinary effect, and CR 725.2's sourceless steal).
     CantBecomeMonarch
+  | -- | CR 601.3a / Damping Engine: this player can't cast a spell matching the
+    -- Filter ("can't ... cast artifact, creature, or enchantment spells").
+    --
+    -- NOT a widening of CantCastSpells above, and the split is the one CR 601.3
+    -- itself draws in the shape CantCastChosenName already follows: that rule's
+    -- bare "can't cast spells" names no quality of the spell, while CR 601.3a is
+    -- about a prohibition that DOES, and the quality has to be read off the spell
+    -- being proposed. Silence keeps the quality-free arm and asks nothing about
+    -- the card; this one is answered by Pawl.Engine.PlayerEffect.matchesObject
+    -- against the proposal's projection, which is why
+    -- Pawl.Engine.PlayerEffect.prohibitsCasting takes an ObjectId beside the name.
+    --
+    -- Reading the PROJECTION rather than the printed face is what makes CR 708.4
+    -- fall out: a morph proposal is stamped face down before this is asked, so a
+    -- prohibition on creature spells stops the face-up cast of a creature card and
+    -- not its 2/2 face-down one.
+    CantCastMatching (Filter.Filter Keyword.Keyword)
+  | -- | CR 305.1 / Damping Engine: this player can't play lands.
+    --
+    -- The unrestricted twin of CantPlayLandChosenName above, and a separate arm
+    -- for that arm's own reason once more: a land is played and never cast (CR
+    -- 305.1), so CantCastMatching stops no land however its Filter reads. Damping
+    -- Engine's one printed sentence declares both, exactly as Null Chamber's does.
+    --
+    -- NULLARY, where its sibling carries the chosen names: no printed sentence
+    -- narrows WHICH land beyond a name, and a card that said "can't play
+    -- nonbasic lands" would want a Filter here rather than a third arm.
+    CantPlayLands
   deriving (Eq, Ord, Show)

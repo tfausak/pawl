@@ -47,6 +47,7 @@ import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DaytimeSpec
 import qualified Pawl.Codec.DefenseSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
+import qualified Pawl.Codec.DesignationSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DurationSpec
@@ -56,6 +57,7 @@ import qualified Pawl.Codec.EntryOptionSpec
 import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
+import qualified Pawl.Codec.ExchangeSidesSpec
 import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FaceSpec
@@ -308,6 +310,7 @@ spec s registry = do
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DaytimeSpec.spec s
+  Pawl.Codec.DesignationSpec.spec s
   Pawl.Codec.DefenseSpec.spec s
   Pawl.Codec.DelayedTriggerSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
@@ -319,6 +322,7 @@ spec s registry = do
   Pawl.Codec.EntryRewriteSpec.spec s
   Pawl.Codec.EntryRidersSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
+  Pawl.Codec.ExchangeSidesSpec.spec s
   Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FaceSpec.spec s

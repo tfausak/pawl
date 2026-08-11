@@ -1,0 +1,70 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 6
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ExchangeLifeTotals",
+                        "value": {
+                          "type": "BetweenTargets",
+                          "value": "players"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "players",
+                    "spec": {
+                      "count": {
+                        "least": 2,
+                        "most": 2
+                      },
+                      "pool": {
+                        "type": "Players"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 6
+        }
+      ],
+      "name": "Soul Conduit",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -32,10 +32,12 @@ module Pawl.SpecialActionSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -44,6 +46,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -168,10 +171,180 @@ growAndResolve growthId gs =
   let ((_, after), asked) = State.runState (Engine.runGame searching gs (S.cast S.alice growthId >> Stack.resolveTop)) []
    in (after, asked)
 
+-- Is this the offer to play THAT card as a land? Written out rather than reusing
+-- isPlay above, which asks only about the operation.
+playing :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+playing wanted action = case action of
+  Action.Type.Play oid _ -> oid == wanted
+  Action.Type.Pass -> False
+  Action.Type.Cast {} -> False
+  Action.Type.Activate _ _ -> False
+  Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Ignore _ -> False
+  Action.Type.ActivateManaAbility _ -> False
+
+-- Is this the offer to cast THAT card face up?
+casting :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+casting wanted action = case action of
+  Action.Type.Cast oid _ facing -> oid == wanted && facing == Facing.FaceUp
+  Action.Type.Play _ _ -> False
+  Action.Type.Pass -> False
+  Action.Type.Activate _ _ -> False
+  Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Ignore _ -> False
+  Action.Type.ActivateManaAbility _ -> False
+
+-- Pays CR 116.2d's cost by sacrificing the NAMED permanent, and answers every
+-- other prompt as the identity does.
+--
+-- The victim is PINNED, and that is load-bearing rather than tidy. All four of
+-- alice's permanents are legal sacrifices, the Engine among them, so an answerer
+-- that took the first candidate could pay by sacrificing the Engine itself --
+-- which lifts the prohibition through CR 604.2 instead of through CR 116.2d and
+-- leaves every assertion below passing for the wrong reason.
+--
+-- S.identityAnswer DECLINES a sacrifice, so this arm is also what makes the
+-- payment happen at all: without it Cost.pay reports Unpaid and Ignore.ignore
+-- restores the board.
+sacrificing :: ObjectId.ObjectId -> (forall r. Prompt.Prompt r -> r)
+sacrificing victim prompt = case prompt of
+  Prompt.ChooseSacrifices {} -> Set.singleton victim
+  _ -> S.identityAnswer prompt
+
+-- Damping Engine (ULG 124) on a THREE-seat board, which is what makes CR 116.2d's
+-- WHO observable: its "that player" is the one player controlling more permanents
+-- than each other player, and on two seats that player cannot be told apart from
+-- the Engine's own controller, whom Leonin Arbiter's cases already offer it to.
+--
+-- alice controls the Engine and three Forests, bob two Forests, carol one. The
+-- tallies are DISTINCT so no two readings of "more than each other player" land on
+-- the same seat, and every seat controls at least one permanent so every seat can
+-- pay the sacrifice -- which leaves the rule's WHO as the only conjunct that can
+-- separate them.
+--
+-- alice's hand holds a Forest, a Woodland Changeling and a Rampant Growth. The
+-- Growth is the Filter's negative control and shares the Changeling's exact
+-- {1}{G} off the same three Forests: Damping Engine stops artifact, creature and
+-- enchantment spells, so a sorcery must stay castable on every board here.
+dampingBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+dampingBoard engine forest changeling growth =
+  let (engineId, gs1) = S.addCreature engine S.alice S.threePlayerGame
+      (victimId, gs2) = S.addCreature forest S.alice gs1
+      (_, gs3) = S.addCreature forest S.alice gs2
+      (_, gs4) = S.addCreature forest S.alice gs3
+      (_, gs5) = S.addCreature forest S.bob gs4
+      (_, gs6) = S.addCreature forest S.bob gs5
+      (_, gs7) = S.addCreature forest S.carol gs6
+      (forestId, gs8) = S.addHandCard forest S.alice gs7
+      (changelingId, gs9) = S.addHandCard changeling S.alice gs8
+      (growthId, gs10) = S.addHandCard growth S.alice gs9
+   in ( engineId,
+        victimId,
+        forestId,
+        changelingId,
+        growthId,
+        gs10
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The paired board, differing from dampingBoard in exactly one thing: bob now
+-- controls five permanents to alice's four, so the seat the Engine is affecting
+-- moves. Same turn, same phase, same hand, same Engine, same payable cost.
+bobLeading :: Printing.Printing -> GameState.GameState -> GameState.GameState
+bobLeading forest gs =
+  let add g = snd (S.addCreature forest S.bob g)
+   in add (add (add gs))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
+  dampingEngine s registry
   leoninArbiter s registry
+
+-- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
+-- offered to (its own scope is EachPlayer, so every seat is offered it) and what
+-- one payment covers (it prints one player ability, so a permanent-wide ignore
+-- and an ability-wide one agree). Damping Engine (ULG 124) narrows the first and
+-- prints two abilities to observe the second.
+dampingEngine :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dampingEngine s registry = Spec.describe s "CR 116.2d Damping Engine" $ do
+  -- The pair is the whole case: on one board alice is the player the ability
+  -- affects and on the other bob is, and the offer follows the effect rather than
+  -- the table. bob being offered it on the second board is also the cost control
+  -- -- his one sacrifice was payable on the first board too.
+  Spec.it s "the action is offered to the player the ability is affecting, and to no other" $ do
+    engine <- S.printingOf s registry "Damping Engine"
+    forest <- S.printingOf s registry "Forest"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    growth <- S.printingOf s registry "Rampant Growth"
+    let (engineId, _, _, _, _, aliceLeads) = dampingBoard engine forest changeling growth
+        bobLeads = bobLeading forest aliceLeads
+        asked pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
+    Spec.assertBool s (List.elem (Action.Type.Ignore engineId) (asked S.alice aliceLeads)) "alice controls the most permanents, so she may pay to ignore it"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.bob aliceLeads)) "bob is not affected, so there is nothing for him to ignore"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.carol aliceLeads)) "nor carol"
+    Spec.assertBool s (List.elem (Action.Type.Ignore engineId) (asked S.bob bobLeads)) "and bob IS offered it once the lead is his -- so his cost was payable all along"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.alice bobLeads)) "while alice, no longer affected, is offered nothing"
+  -- "More permanents than each other player" is a STRICT comparison, so a tie for
+  -- the lead leaves the ability affecting nobody -- which is the third value this
+  -- scope can take and the one a "whoever has the most" reading would miss.
+  Spec.it s "the comparison is strict, so a tie for the lead affects nobody" $ do
+    engine <- S.printingOf s registry "Damping Engine"
+    forest <- S.printingOf s registry "Forest"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    growth <- S.printingOf s registry "Rampant Growth"
+    let (engineId, _, forestId, _, _, aliceLeads) = dampingBoard engine forest changeling growth
+        tied = snd (S.addCreature forest S.bob (snd (S.addCreature forest S.bob aliceLeads)))
+        asked pid gs = Action.legalActions pid (gs {GameState.priority = Just pid})
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.alice tied)) "alice has no lead to be affected by"
+    Spec.assertBool s (List.notElem (Action.Type.Ignore engineId) (asked S.bob tied)) "and neither does bob"
+    Spec.assertBool s (any (playing forestId) (asked S.alice tied)) "the control: with the ability affecting nobody, alice may play her land"
+  -- CR 305.1 and CR 601.3a, from ONE printed sentence declaring two player
+  -- abilities. The Growth is what makes the Filter discriminating: same {1}{G},
+  -- same three Forests, and a sorcery is not one of the three types named.
+  Spec.it s "CR 305.1 / CR 601.3a the affected player can't play a land or cast a creature spell, and a sorcery is untouched" $ do
+    engine <- S.printingOf s registry "Damping Engine"
+    forest <- S.printingOf s registry "Forest"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    growth <- S.printingOf s registry "Rampant Growth"
+    let (_, _, forestId, changelingId, growthId, aliceLeads) = dampingBoard engine forest changeling growth
+        bobLeads = bobLeading forest aliceLeads
+        actions = Action.legalActions S.alice aliceLeads
+        unaffected = Action.legalActions S.alice bobLeads
+    Spec.assertBool s (not (any (playing forestId) actions)) "no land play is offered"
+    Spec.assertBool s (not (any (casting changelingId) actions)) "nor the creature spell"
+    Spec.assertBool s (any (casting growthId) actions) "but the sorcery of the same cost is still castable"
+    Spec.assertBool s (any (playing forestId) unaffected) "the pair: with bob leading, alice may play the land"
+    Spec.assertBool s (any (casting changelingId) unaffected) "and cast the creature"
+  -- The narrowing Pawl.Types.SpecialAction carries, asserted rather than assumed:
+  -- one payment covers the WHOLE permanent, so both of the Engine's abilities stop
+  -- applying to the player who paid. A per-ability ignore would lift one.
+  Spec.it s "CR 116.2d one payment lifts every one of that permanent's player abilities" $ do
+    engine <- S.printingOf s registry "Damping Engine"
+    forest <- S.printingOf s registry "Forest"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    growth <- S.printingOf s registry "Rampant Growth"
+    let (engineId, victimId, forestId, changelingId, _, aliceLeads) = dampingBoard engine forest changeling growth
+        afterIgnore = S.runPure (sacrificing victimId) aliceLeads (Ignore.ignore S.alice engineId)
+        actions = Action.legalActions S.alice afterIgnore
+    Spec.assertEqWith s "the sacrifice was paid: one of alice's three Forests is gone" (S.countOnBattlefieldByName (S.printingName forest) S.alice afterIgnore) 2
+    Spec.assertBool s (any (playing forestId) actions) "CR 305.1's half is lifted"
+    Spec.assertBool s (any (casting changelingId) actions) "and CR 601.3a's half with it, off the same one payment"
+    -- CR 116.2d forbids no repeat, and Pawl.Engine.PlayerEffect.affectedBy is
+    -- asked over the unfiltered gather so that the offer survives being taken.
+    Spec.assertBool s (List.elem (Action.Type.Ignore engineId) actions) "and the action is still offered, since paying again is legal"
 
 -- CR 116.2d: "some effects from static abilities allow a player to take an
 -- action to ignore the effect from that ability for a duration". Leonin Arbiter
@@ -202,6 +375,20 @@ leoninArbiter s registry = Spec.describe s "CR 116.2d Leonin Arbiter" $ do
     Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId) (Action.legalActions S.alice instantSpeed)) "on another player's turn with a spell on the stack too"
     Spec.assertBool s (List.notElem (Action.Type.Ignore poorId) (Action.legalActions S.alice broke)) "but not with one Forest, which cannot pay {2}"
     Spec.assertBool s (any isPlay (Action.legalActions S.alice broke)) "the control: that same board still offers a land play"
+  -- The WHO conjunct read the other way, and the pair Damping Engine's cases are
+  -- the other half of: Leonin Arbiter's own prohibition is possessive-free
+  -- (EachPlayer), so it affects every seat and every seat is offered the action --
+  -- the Arbiter's controller included. A gate that offered it only to the
+  -- controller, or only to an opponent, fails here while every case above passes.
+  Spec.it s "CR 116.2d an EachPlayer prohibition offers the action to every seat" $ do
+    forest <- S.printingOf s registry "Forest"
+    arbiter <- S.printingOf s registry "Leonin Arbiter"
+    growth <- S.printingOf s registry "Rampant Growth"
+    let (arbiterId, _, gs) = arbiterBoard forest arbiter growth
+        (_, withBobsLands) = S.addCreature forest S.bob (snd (S.addCreature forest S.bob gs))
+        asked pid board_ = Action.legalActions pid (board_ {GameState.priority = Just pid})
+    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId) (asked S.alice withBobsLands)) "the Arbiter's own controller may pay"
+    Spec.assertBool s (List.elem (Action.Type.Ignore arbiterId) (asked S.bob withBobsLands)) "and so may bob, whose two Forests pay the {2}"
   -- CR 101.2: the prohibition wins, so the search does not happen -- and CR
   -- 701.23 describes only how to look, so the card's own "then shuffle" still
   -- does. Without the log both outcomes are indistinguishable from CR 701.23b's

@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
+import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Phase as Phase
@@ -60,7 +61,7 @@ toJson c = case c of
   TriggerCondition.AnyOf cs -> Common.tagged "AnyOf" . Just . Common.array $ fmap toJson cs
   TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
   TriggerCondition.PermanentTurnedFaceUp f -> Common.tagged "PermanentTurnedFaceUp" . Just $ Filter.toJson Keyword.toJson f
-  TriggerCondition.PermanentBecomesRenowned f -> Common.tagged "PermanentBecomesRenowned" . Just $ Filter.toJson Keyword.toJson f
+  TriggerCondition.PermanentBecomesDesignated d f -> Common.tagged "PermanentBecomesDesignated" . Just . Common.array $ [Designation.toJson d, Filter.toJson Keyword.toJson f]
   TriggerCondition.SelfEvolves -> Common.nullary "SelfEvolves"
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
   TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ PlayerRelation.toJson r
@@ -110,7 +111,8 @@ fromJson value = do
     ("AnyOf", Just (Value.Array (Array.MkArray cs))) -> TriggerCondition.AnyOf <$> traverse fromJson cs
     ("SelfTurnedFaceUp", _) -> Right TriggerCondition.SelfTurnedFaceUp
     ("PermanentTurnedFaceUp", Just v) -> TriggerCondition.PermanentTurnedFaceUp <$> Filter.fromJson Keyword.fromJson v
-    ("PermanentBecomesRenowned", Just v) -> TriggerCondition.PermanentBecomesRenowned <$> Filter.fromJson Keyword.fromJson v
+    ("PermanentBecomesDesignated", Just (Value.Array (Array.MkArray [d, f]))) ->
+      TriggerCondition.PermanentBecomesDesignated <$> Designation.fromJson d <*> Filter.fromJson Keyword.fromJson f
     ("SelfEvolves", _) -> Right TriggerCondition.SelfEvolves
     ("PermanentSacrificed", _) -> Right TriggerCondition.PermanentSacrificed
     ("SagaFinalChapterTriggers", Just v) -> TriggerCondition.SagaFinalChapterTriggers <$> PlayerRelation.fromJson v

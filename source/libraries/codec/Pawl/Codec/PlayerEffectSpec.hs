@@ -249,3 +249,19 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       PlayerEffect.CantBecomeMonarch
       """ {"type":"CantBecomeMonarch"} """
+  -- CR 601.3a / Damping Engine's cast half.
+  Spec.it s "CantCastMatching" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.CantCastMatching (Filter.Or [Filter.HasCardType CardType.Artifact, Filter.HasCardType CardType.Creature]))
+      """ {"type":"CantCastMatching","value":{"type":"Or","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"HasCardType","value":{"type":"Creature"}}]}} """
+  -- CR 305.1 / Damping Engine's land half.
+  Spec.it s "CantPlayLands" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.CantPlayLands
+      """ {"type":"CantPlayLands"} """

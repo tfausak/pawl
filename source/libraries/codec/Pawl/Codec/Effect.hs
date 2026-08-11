@@ -9,8 +9,10 @@ import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Daytime as Daytime
+import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -104,7 +106,7 @@ toJson codec e = case e of
   Effect.Discard s q -> Common.tagged "Discard" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
   Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.GainLife r q -> Common.tagged "GainLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
-  Effect.ExchangeLifeTotals s -> Common.tagged "ExchangeLifeTotals" (Just (SlotName.toJson s))
+  Effect.ExchangeLifeTotals sides -> Common.tagged "ExchangeLifeTotals" (Just (ExchangeSides.toJson sides))
   Effect.IncreaseSpeed r q -> Common.tagged "IncreaseSpeed" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   -- Create's payload is positional, and the EntryRiders are ELIDED when they
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
@@ -152,9 +154,7 @@ toJson codec e = case e of
   Effect.RequireBlock d b a -> Common.tagged "RequireBlock" (Just (Common.array [Duration.toJson d, ObjectRef.toJson b, ObjectRef.toJson a]))
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (MonarchTarget.toJson t))
-  Effect.BecomeRenowned s -> Common.tagged "BecomeRenowned" (Just (SlotName.toJson s))
-  Effect.BecomeMonstrous s -> Common.tagged "BecomeMonstrous" (Just (SlotName.toJson s))
-  Effect.Suspect s -> Common.tagged "Suspect" (Just (SlotName.toJson s))
+  Effect.Designate d s -> Common.tagged "Designate" (Just (Common.array [Designation.toJson d, SlotName.toJson s]))
   Effect.Unsuspect r -> Common.tagged "Unsuspect" (Just (ObjectRef.toJson r))
   Effect.Evolve s -> Common.tagged "Evolve" (Just (SlotName.toJson s))
   Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Daytime.toJson d))
@@ -284,7 +284,7 @@ fromJson decode value = do
     "GainLife" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.GainLife <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "GainLife expects [playerRef, quantity]"
-    "ExchangeLifeTotals" -> Common.withValue mv (fmap Effect.ExchangeLifeTotals . SlotName.fromJson)
+    "ExchangeLifeTotals" -> Common.withValue mv (fmap Effect.ExchangeLifeTotals . ExchangeSides.fromJson)
     "IncreaseSpeed" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.IncreaseSpeed <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "IncreaseSpeed expects [playerRef, quantity]"
@@ -357,9 +357,9 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "RequireBlock expects [Duration, ObjectRef, ObjectRef]"
     "CreateEmblem" -> Common.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Common.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)
-    "BecomeRenowned" -> Common.withValue mv (fmap Effect.BecomeRenowned . SlotName.fromJson)
-    "BecomeMonstrous" -> Common.withValue mv (fmap Effect.BecomeMonstrous . SlotName.fromJson)
-    "Suspect" -> Common.withValue mv (fmap Effect.Suspect . SlotName.fromJson)
+    "Designate" -> case mv of
+      Just (Value.Array (Array.MkArray [d, s])) -> Effect.Designate <$> Designation.fromJson d <*> SlotName.fromJson s
+      _ -> Left . Text.pack $ "Designate expects [designation, slot]"
     "Unsuspect" -> Common.withValue mv (fmap Effect.Unsuspect . ObjectRef.fromJson)
     "Evolve" -> Common.withValue mv (fmap Effect.Evolve . SlotName.fromJson)
     "ItBecomes" -> Common.withValue mv (fmap Effect.ItBecomes . Daytime.fromJson)

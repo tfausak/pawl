@@ -5,6 +5,7 @@ import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Countering as Countering
 import qualified Pawl.Codec.DamageEvent as DamageEvent
+import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.DiscardCause as DiscardCause
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
@@ -45,7 +46,7 @@ toJson e = case e of
     Common.tagged "CountersRemoved" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.HalfUnlocked oid name fully -> Common.tagged "HalfUnlocked" . Just . Common.array $ [ObjectId.toJson oid, CardName.toJson name, Common.boolean fully]
   GameEvent.TurnedFaceUp oid -> Common.tagged "TurnedFaceUp" . Just $ ObjectId.toJson oid
-  GameEvent.BecameRenowned oid -> Common.tagged "BecameRenowned" . Just $ ObjectId.toJson oid
+  GameEvent.BecameDesignated d oid -> Common.tagged "BecameDesignated" . Just . Common.array $ [Designation.toJson d, ObjectId.toJson oid]
   GameEvent.Evolved oid -> Common.tagged "Evolved" . Just $ ObjectId.toJson oid
   GameEvent.PermanentSacrificed pid oid -> Common.tagged "PermanentSacrificed" . Just . Common.array $ [Codec.encode PlayerId.codec pid, ObjectId.toJson oid]
   GameEvent.AbilityTriggered oid pid cond ->
@@ -80,7 +81,8 @@ fromJson value = do
       GameEvent.CountersRemoved <$> ObjectId.fromJson oid <*> CounterKind.fromJson Keyword.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     ("HalfUnlocked", Just (Value.Array (Array.MkArray [oid, name, fully]))) -> GameEvent.HalfUnlocked <$> ObjectId.fromJson oid <*> CardName.fromJson name <*> Common.asBoolean fully
     ("TurnedFaceUp", Just v) -> GameEvent.TurnedFaceUp <$> ObjectId.fromJson v
-    ("BecameRenowned", Just v) -> GameEvent.BecameRenowned <$> ObjectId.fromJson v
+    ("BecameDesignated", Just (Value.Array (Array.MkArray [d, oid]))) ->
+      GameEvent.BecameDesignated <$> Designation.fromJson d <*> ObjectId.fromJson oid
     ("Evolved", Just v) -> GameEvent.Evolved <$> ObjectId.fromJson v
     ("PermanentSacrificed", Just (Value.Array (Array.MkArray [pid, oid]))) -> GameEvent.PermanentSacrificed <$> Codec.decode PlayerId.codec pid <*> ObjectId.fromJson oid
     ("AbilityTriggered", Just (Value.Array (Array.MkArray [oid, pid, cond]))) ->

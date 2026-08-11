@@ -32,7 +32,11 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Defense as Defense
+import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
@@ -65,6 +69,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -588,6 +593,7 @@ viewOfCard face =
           Filter.attackedThisTurn = False,
           Filter.attachedToCreature = False,
           Filter.attachedToPermanent = False,
+          Filter.attachedTo = Nothing,
           -- CR 701.3a: only Pawl.Engine.Resolve's AttachTarget arm fills this field, and
           -- its candidates are battlefield permanents, so a card in a library or a
           -- hand is never asked whether an attach could land on it.
@@ -608,12 +614,10 @@ viewOfCard face =
           -- distinction either: CR 701.54a designates a creature its controller
           -- controls, so only a battlefield permanent ever carries one.
           Filter.ringBearerFor = Nothing,
-          -- CR 702.112b: the designation rides an OBJECT (Object.renowned), and
-          -- this builder describes a printed face. Not a lost distinction either:
-          -- rule 702.112b gives one only to a permanent.
-          Filter.renowned = False,
-          Filter.monstrous = False,
-          Filter.suspected = False,
+          -- The designations ride an OBJECT (Object.designations), and this builder
+          -- describes a printed face. Not a lost distinction either: each of those
+          -- rules gives its designation only to a permanent.
+          Filter.designations = Set.empty,
           Filter.kicked = False
         }
 
@@ -798,6 +802,13 @@ viewOfCharacteristics oid pc controller counters gs =
       Filter.attachedToPermanent = case Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf of
         Nothing -> False
         Just host -> Set.member host (GameState.battlefield gs),
+      -- CR 701.3a / 301.5a: the same attachment a third time, kept as the HOST'S ID
+      -- rather than collapsed to a Bool -- IsAttachedToSource compares it against
+      -- the match's source, which this builder does not know. Deliberately NOT
+      -- narrowed to a host on the battlefield the way `attachedToPermanent` above
+      -- is: an id is answered or it is not, and the atom's own comparison against a
+      -- source already rules out a host that has left.
+      Filter.attachedTo = Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf,
       -- CR 701.3a: filled only by Resolve's AttachTarget arm, the one place that
       -- knows what is being moved. "Could the subject be attached here" is not a
       -- question about the candidate alone.
@@ -813,17 +824,13 @@ viewOfCharacteristics oid pc controller counters gs =
       -- viewWithLastKnown's CR 608.2h path hands this function: a designation dies
       -- with the permanent (CR 400.7), and no last-known record keeps one.
       Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor,
-      -- CR 702.112b: a designation rather than a characteristic, so it comes off
-      -- Object.renowned -- ringBearerFor's posture just above, including for the
-      -- CR 608.2h path: an id naming no object answers False, a designation dying
-      -- with the permanent (CR 400.7) and no last-known record keeping one.
-      Filter.renowned = maybe False Object.renowned (Game.lookupObject oid gs),
-      -- CR 701.37b: `renowned` above in every respect, the two rules wording
-      -- their designations the same way.
-      Filter.monstrous = maybe False Object.monstrous (Game.lookupObject oid gs),
-      -- CR 701.60b: `monstrous` above in every respect.
-      Filter.suspected = maybe False Object.suspected (Game.lookupObject oid gs),
-      -- CR 702.33d: `suspected` above in every respect -- read live off the object,
+      -- Designations rather than characteristics, so they come off
+      -- Object.designations -- ringBearerFor's posture just above, including for the
+      -- CR 608.2h path: an id naming no object answers with the empty set, a
+      -- designation dying with the permanent (CR 400.7) and no last-known record
+      -- keeping one.
+      Filter.designations = maybe Set.empty Object.designations (Game.lookupObject oid gs),
+      -- CR 702.33d: `designations` above in every respect -- read live off the object,
       -- so the CR 608.2h path answers False for a spell that has left the stack.
       -- Nothing asks it there: the only reader is the kicked spell's own clause
       -- condition, gated while it is still on the stack
@@ -1218,10 +1225,13 @@ setLandSubtypeEffects gs =
 -- This is the INSIDE-THE-FOLD gate, and gather (via permanentParts) is its one
 -- caller. "Applies to" reads BASE characteristics so nothing recurses into the
 -- projection being built. That restriction costs a real case: a permanent that
--- becomes a land only through a layer-4 type change (Ashaya on Thalia) is
--- invisible here while the fold's own arm reaches it, so the two halves of CR
--- 305.7 still disagree there (#391). Every reader OUTSIDE the fold uses
--- liveAfterLayers below, which has no such disagreement.
+-- becomes a land only through a layer-4 type change is invisible here while the
+-- fold's own arm reaches it, so the two halves of CR 305.7 still disagree about
+-- its STATIC abilities -- Lord of Atlantis under Ashaya and Blood Moon goes on
+-- pumping other Merfolk (#391). Every reader OUTSIDE the fold uses
+-- liveAfterLayers below, which has no such disagreement, so a PLAYER ability on
+-- the same board is already right -- Pawl.PlayerEffectSpec's "CR 305.7 Ashaya
+-- animates Thalia into a Mountain, so Blood Moon takes her tax" proves it.
 --
 -- The layer-2 control fold deliberately asks NEITHER gate -- see controlGrants for
 -- the CR 613.1 argument, and for the divergence a gate there caused.
@@ -1245,6 +1255,13 @@ liveGiven setEffs oid gs =
 -- -- does an applied setter's affected set name THIS object? -- moves to the
 -- finished projection, which is what keeps CR 613.8's intra-layer ordering out of
 -- here.
+--
+-- Every reader after the layers shares this, and each is pinned SEPARATELY, so
+-- re-scoping one of them cannot hide behind the others: Pawl.CombatSpec's
+-- landSubtypeStripSpec has a case per combat reader, Pawl.SacrificeRestrictionSpec
+-- has the prohibition, and Pawl.PlayerEffectSpec's Thalia case, cited above, has
+-- the player ability. Rewriting this body to read base fails all of them; swapping
+-- one caller's call for liveGiven fails that caller's case alone.
 liveAfterLayers :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveAfterLayers setEffs oid gs =
   let view = project oid gs
@@ -1499,9 +1516,7 @@ rewriteEffect pairs effect = case effect of
   -- is its abilities, which nothing here walks (#643).
   Effect.CreateEmblem {} -> effect
   Effect.BecomeMonarch {} -> effect
-  Effect.BecomeRenowned _ -> effect
-  Effect.BecomeMonstrous _ -> effect
-  Effect.Suspect _ -> effect
+  Effect.Designate _ _ -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.Evolve _ -> effect
   Effect.ItBecomes _ -> effect
@@ -1733,7 +1748,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentTurnedFaceUp f -> TriggerCondition.PermanentTurnedFaceUp (Filter.rewrite pairs f)
   -- The same, one condition over: Valeron Wardens' "a creature you control" is a
   -- Filter, so CR 612.1 reaches it too.
-  TriggerCondition.PermanentBecomesRenowned f -> TriggerCondition.PermanentBecomesRenowned (Filter.rewrite pairs f)
+  TriggerCondition.PermanentBecomesDesignated d f -> TriggerCondition.PermanentBecomesDesignated d (Filter.rewrite pairs f)
   TriggerCondition.SelfEvolves -> condition
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
@@ -1786,9 +1801,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.LifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.IsMonarch _ -> quantity
-  Quantity.Type.IsRenowned -> quantity
-  Quantity.Type.IsMonstrous -> quantity
-  Quantity.Type.IsSuspected -> quantity
+  Quantity.Type.HasDesignation _ -> quantity
   Quantity.Type.WasKicked -> quantity
   Quantity.Type.PlayerCounters _ _ -> quantity
   -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
@@ -2318,6 +2331,13 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- Nor a time counter (CR 702.63a): vanishing's three minted
               -- abilities count Object.counters directly, as those three do.
               CounterKind.Time -> []
+              -- Nor a shield counter (CR 122.1c), and that one is worth saying
+              -- twice: "'shield' is not an ability that creatures have and shield
+              -- counters are not keyword counters", so the grant CR 122.1b's arm
+              -- above makes is exactly what this kind must NOT make. What it
+              -- creates instead is a replacement and a prevention effect, minted
+              -- by shieldOf below.
+              CounterKind.Shield -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, so the designation is
@@ -2325,7 +2345,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 -- its reasons -- rule 701.60c is rulebook text rather than a card's ability, as
 -- CR 122.1b's keyword counter is, and neither is a case on an effect's identity.
 --
--- Read off Object.suspected on every projection rather than stamped when the
+-- Read off Object.designations on every projection rather than stamped when the
 -- designation is set, which IS rule 701.60c's "for as long as it's suspected": a
 -- permanent that stops being suspected loses the keyword with nothing to unwind.
 -- Rule 701.60c's other half, "this creature can't block", is a combat restriction
@@ -2340,7 +2360,7 @@ designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield
     fromObject oid = case Game.lookupObject oid gs of
       Nothing -> []
       Just obj
-        | Object.suspected obj ->
+        | Set.member Designation.Suspected (Object.designations obj) ->
             [ MkGathered
                 { gEffect = Nothing,
                   gSource = oid,
@@ -2460,6 +2480,9 @@ filterReads f = case f of
   -- writes that field -- CR 701.3's attach is a keyword action performed by a
   -- resolution.
   Filter.Type.IsAttachedToPermanent -> Set.empty
+  -- Reads nothing, for IsAttachedToPermanent's reason: it stops at
+  -- Object.attachedTo and compares an id, and no Modification writes that field.
+  Filter.Type.IsAttachedToSource -> Set.empty
   -- Over-declared deliberately: the characteristics behind this atom are the
   -- candidate's (CR 301.5) and the subject's (CR 702.5a), and Aspect cannot say
   -- "another object's". Declaring everything is the conservative direction, and no
@@ -2479,17 +2502,13 @@ filterReads f = case f of
   -- Pawl.Engine.Ring.theRingIsLegendary pairs it with ControlledBy, which reads
   -- Controller, so the emblem's set moves with CR 613.1b's layer 2 as it should.
   Filter.Type.IsRingBearer -> Set.empty
-  -- Reads nothing for that atom's reason, restated by rule 702.112b itself:
-  -- renowned is "neither an ability nor part of the permanent's copiable values",
-  -- so no Modification writes Object.renowned and no CR 613 layer can move a set
-  -- this atom selects.
-  Filter.Type.IsRenowned -> Set.empty
-  -- Reads nothing for IsRenowned's reason, restated by rule 701.60b itself:
-  -- suspected is "neither an ability nor part of the permanent's copiable values",
-  -- so no Modification writes Object.suspected. What CR 701.60c hangs off the
-  -- designation IS in layer 6 (designationGathered's menace grant), but that is
-  -- what the designation WRITES rather than what this atom reads.
-  Filter.Type.IsSuspected -> Set.empty
+  -- Reads nothing for that atom's reason, restated by each designation's own rule:
+  -- the mark is "neither an ability nor part of the permanent's copiable values", so
+  -- no Modification writes Object.designations and no CR 613 layer can move a set
+  -- this atom selects. What CR 701.60c hangs off `Suspected` IS in layer 6
+  -- (designationGathered's menace grant), but that is what the designation WRITES
+  -- rather than what this atom reads.
+  Filter.Type.HasDesignation _ -> Set.empty
   -- Reads nothing: CR 109.3's characteristics do not include counters, so no
   -- Modification writes Object.counters and no CR 613 layer can move a set this
   -- atom selects. The P/T a +1/+1 counter grants is CR 613.4c's, applied over the
@@ -3085,11 +3104,62 @@ abilitiesGiven pcs oid gs =
       filter granted (PC.activatedAbilities pc <> Keyword.battlefieldAbilitiesOf (PC.keywords pc))
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
--- the same projection posture as abilitiesOf. A Humility'd creature has none.
+-- the same projection posture as abilitiesOf. A Humility'd creature has none --
+-- except the shield pair, which no layer can reach; see shieldOf.
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect]
 replacementsOf oid gs =
   let pc = project oid gs
-   in PC.replacementEffects pc <> intrinsicReplacementsOf pc
+   in PC.replacementEffects pc <> intrinsicReplacementsOf pc <> shieldOf oid gs
+
+-- CR 122.1c: the pair of effects one or more shield counters create -- "if this
+-- permanent would be destroyed as the result of an effect, instead remove a shield
+-- counter from it" and "if damage would be dealt to this permanent, prevent that
+-- damage and remove a shield counter from it".
+--
+-- ONE of each however many counters are on it, which is the rule's own word
+-- ("create a single replacement effect and a single prevention effect"): the count
+-- is how many times the pair may still be applied, and each application takes one
+-- off. A list keyed on presence rather than on the number is what says that -- two
+-- counters must not offer CR 616.1's choice two interchangeable candidates.
+--
+-- Read off Object.counters rather than off the projection, unlike every arm of
+-- intrinsicReplacementsOf: counters are not a characteristic (CR 122.1's markers
+-- "are not objects and have no characteristics"), and rule 122.1c gives the pair as
+-- a rule rather than as an ability. So the layer system has nothing to remove --
+-- "if a creature with a shield counter loses its abilities, the shield counter will
+-- still protect it as normal" -- which is CR 306.5b's posture reached by a
+-- different route.
+--
+-- Neither effect carries a pattern naming its permanent. The destruction half has
+-- no pattern field at all and is self-only by construction, and the prevention
+-- half's self-scope is read off its SOURCE in Replacement.applies rather than baked
+-- into DamagePattern.whichRecipient, because that field is compared to the event's
+-- Pawl.Types.Recipient TAG -- which says how the damage reached the permanent (CR
+-- 510.1b), not which permanent it reached, so a shield baked as ToCreature would
+-- miss the damage an attacker assigns to the same permanent as a planeswalker.
+shieldOf :: ObjectId -> GameState -> [ReplacementEffect]
+shieldOf oid gs =
+  if shieldCounters oid gs == 0
+    then []
+    else
+      [ ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter,
+        ReplacementEffect.DamageR
+          DamagePattern.MkDamagePattern
+            { DamagePattern.whichKind = Nothing,
+              DamagePattern.whichSource = SourceRelation.AnySource,
+              DamagePattern.whichRecipient = Nothing
+            }
+          DamageRewrite.PreventRemovingShieldCounter
+      ]
+
+-- CR 122.1c: how many shield counters this object has, which is how many more
+-- events its pair may replace. Also the short-circuit's question in
+-- replacementsAffecting below, where a permanent's counters are the one route to a
+-- replacement effect that no base FACE shows.
+shieldCounters :: ObjectId -> GameState -> Natural
+shieldCounters oid gs = case Game.lookupObject oid gs of
+  Nothing -> 0
+  Just obj -> Map.findWithDefault 0 CounterKind.Shield (Object.counters obj)
 
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
 -- replacement effect, CR 310.4b's identically shaped one for a battle's defense,
@@ -3163,9 +3233,10 @@ intrinsicReplacementsOf pc =
 -- does not project the whole board.
 --
 -- The short-circuit reads BASE cards while the result reads the PROJECTION, sound
--- only because the one way to acquire an unprinted replacement effect is
+-- only because the ways to acquire an unprinted replacement effect are
 -- `EntryR AsCopy` -- and a card with that arm is itself a base card with a
--- replacement effect -- or a minting keyword, which the two riot disjuncts cover:
+-- replacement effect -- CR 122.1c's shield counters, whose own disjunct reads the
+-- object rather than a face, or a minting keyword, which the two riot disjuncts cover:
 -- one for a face that PRINTS such a keyword and one for a face whose static
 -- ability GRANTS it (Spider-Punk's "other Spiders you control have riot"). The
 -- granting card is on the battlefield whenever the grant is, which is what makes
@@ -3181,6 +3252,11 @@ intrinsicReplacementsOf pc =
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect)]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
+      -- CR 122.1c's pair is minted from the permanent's COUNTERS, so it is on no
+      -- base face either -- and unlike the three intrinsic disjuncts below it is on
+      -- no projection of the face's own text, which is why it is asked before the
+      -- face is looked up at all.
+      baseHas oid | shieldCounters oid gs > 0 = True
       baseHas oid = case Game.faceOf oid gs of
         Nothing -> False
         -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement inside

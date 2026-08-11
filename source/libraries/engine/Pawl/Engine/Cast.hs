@@ -147,9 +147,10 @@ instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 
 -- CR 601.2c / 700.2a: castable when the fillable modes admit some selection at
 -- all (Modal.selectionPossible) -- ordinarily at least as many fillable modes as
--- the selection demands, and under CR 700.2d's exception a single fillable mode,
--- which may then be chosen as many times as the count asks. For a non-modal card
--- (one mode, count 1) this is identical to "every slot fillable".
+-- the selection demands, under a range as many as its floor demands, and under CR
+-- 700.2d's exception a single fillable mode, which may then be chosen as many
+-- times as the count asks. For a non-modal card (one mode, count 1) this is
+-- identical to "every slot fillable".
 --
 -- CR 109.5 / 601.2a: the perspective a "target creature an opponent controls"
 -- slot is measured against is the player CASTING the spell. Taken as a parameter
@@ -557,8 +558,11 @@ castable pid oid name facing gs =
         -- CR 601.3: gated HERE, upstream of Action.legalActions, because the
         -- engine never offers an illegal action and then rejects it. The half's
         -- own name goes with it, since CR 601.3a's prohibitions name a quality of
-        -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half.
-        && not (PlayerEffect.prohibitsCasting pid proposedName proposed)
+        -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half --
+        -- and the OBJECT with it, since a quality can also be a Filter over the
+        -- spell's characteristics (Damping Engine), which is read off the
+        -- `proposed` stamp this call already carries.
+        && not (PlayerEffect.prohibitsCasting pid oid proposedName proposed)
         -- CR 601.3's prohibit half again, from a different CARRIER: a spell on
         -- the stack (CR 702.61a) rather than a continuous effect on a player. It
         -- names neither a player nor a quality of the spell, so it takes no
@@ -713,9 +717,10 @@ castableWhileSearching pid gs =
 -- `castable`'s conjuncts require.
 castableWhenOffered :: PlayerId -> ObjectId -> CardName.CardName -> [Cost Keyword] -> GameState -> Bool
 castableWhenOffered pid oid name candidates proposed =
-  -- CR 601.3's prohibit half, asked with the half's own name: a quality-bearing
-  -- prohibition stops one card without stopping any other candidate.
-  not (PlayerEffect.prohibitsCasting pid name proposed)
+  -- CR 601.3's prohibit half, asked with the half's own name and its object: a
+  -- quality-bearing prohibition stops one card without stopping any other
+  -- candidate.
+  not (PlayerEffect.prohibitsCasting pid oid name proposed)
     -- CR 702.61a stays too, for CR 601.3's own reason above: an offered cast is
     -- still a cast. Reachable because CR 702.61b keeps triggered abilities going
     -- on the stack, so one can resolve ABOVE the split-second spell and offer a

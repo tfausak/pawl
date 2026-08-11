@@ -25,6 +25,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.GameState as GameState
@@ -252,7 +253,7 @@ dirtied pid object =
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
       Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna")),
-      Object.renowned = True
+      Object.designations = Set.singleton Designation.Renowned
     }
 
 -- CR 400.7: has this object no memory of a previous existence? Applying the

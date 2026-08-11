@@ -12,6 +12,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 -- Aliased Filter.Type, not Type, because the evaluator module Pawl.Engine.Filter
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -46,14 +47,13 @@ blackCreature =
       Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
+      Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
       Filter.token = False,
       Filter.tapped = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
-      Filter.renowned = False,
-      Filter.monstrous = False,
-      Filter.suspected = False,
+      Filter.designations = Set.empty,
       Filter.kicked = False
     }
 
@@ -78,14 +78,13 @@ devoidBigCreature =
       Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
+      Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
       Filter.token = False,
       Filter.tapped = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
-      Filter.renowned = False,
-      Filter.monstrous = False,
-      Filter.suspected = False,
+      Filter.designations = Set.empty,
       Filter.kicked = False
     }
 
@@ -103,7 +102,7 @@ ringBearer = blackCreature {Filter.ringBearerFor = Just (PlayerId.MkPlayerId 0)}
 -- CR 702.112b's designation, which belongs to no player -- so unlike ringBearer
 -- above there is no second view for "somebody else's".
 renownedCreature :: Filter.View
-renownedCreature = blackCreature {Filter.renowned = True}
+renownedCreature = blackCreature {Filter.designations = Set.singleton Designation.Renowned}
 
 -- CR 701.60b's designation, which belongs to no player either. Carries MENACE as
 -- well, because CR 701.60c gives a suspected permanent menace: a view with the
@@ -113,7 +112,7 @@ renownedCreature = blackCreature {Filter.renowned = True}
 suspectedCreature :: Filter.View
 suspectedCreature =
   blackCreature
-    { Filter.suspected = True,
+    { Filter.designations = Set.singleton Designation.Suspected,
       Filter.keywords = Set.singleton Keyword.Menace
     }
 
@@ -600,6 +599,35 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsAttachedToPermanent)) "player"
 
+  Spec.describe s "IsAttachedToSource" $ do
+    -- CR 701.3a / 301.5a: the candidate's HOST against the match's source. Object
+    -- 7 is the source throughout, so the three cases below differ only in what the
+    -- candidate is attached to.
+    let framed = Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))
+    Spec.it s "matches a candidate attached to the source" $ do
+      Spec.assertBool s (Filter.matches framed (blackCreature {Filter.attachedTo = Just (ObjectId.MkObjectId 7)}) Filter.Type.IsAttachedToSource) "on the source"
+
+    -- The discriminating case, and the whole reason the field is an id rather than
+    -- a Bool: an Equipment attached to SOME creature is not one attached to this
+    -- creature, so Kemba's Legion does not count the Bonesplitter on another
+    -- creature.
+    Spec.it s "does not match a candidate attached to another object" $ do
+      let elsewhere = blackCreature {Filter.attachedTo = Just (ObjectId.MkObjectId 8), Filter.attachedToCreature = True, Filter.attachedToPermanent = True}
+      Spec.assertBool s (not (Filter.matches framed elsewhere Filter.Type.IsAttachedToSource)) "on another creature"
+      Spec.assertBool s (Filter.matches framed elsewhere Filter.Type.IsAttachedToCreature) "still attached to a creature"
+
+    Spec.it s "does not match a candidate attached to nothing" $ do
+      Spec.assertBool s (not (Filter.matches framed blackCreature Filter.Type.IsAttachedToSource)) "unattached"
+
+    -- Vacuously False where nothing frames the match, IsSource's own posture.
+    Spec.it s "no source in context is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.attachedTo = Just (ObjectId.MkObjectId 7)}) Filter.Type.IsAttachedToSource)) "no source"
+
+    -- CR 303.4b: a player is enchanted BY an attachment and is attached to
+    -- nothing itself, so there is no host id to compare.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches framed aPlayer Filter.Type.IsAttachedToSource)) "player"
+
   Spec.describe s "CanHostSubject" $ do
     Spec.it s "matches a view the caller marked as a legal destination" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.canHostSubject = True}) Filter.Type.CanHostSubject) "can host"
@@ -666,55 +694,55 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   -- CR 702.112b's designation asked of a CANDIDATE. Perspective-free, unlike the
   -- atom above: rule 702.112b's marker names no player, so `self` and `other`
   -- must answer alike.
-  Spec.describe s "IsRenowned" $ do
+  Spec.describe s "HasDesignation Renowned" $ do
     Spec.it s "matches a renowned permanent" $ do
-      Spec.assertBool s (Filter.matches self renownedCreature Filter.Type.IsRenowned) "renowned"
+      Spec.assertBool s (Filter.matches self renownedCreature (Filter.Type.HasDesignation Designation.Renowned)) "renowned"
 
     Spec.it s "does not match an undesignated permanent" $ do
-      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsRenowned)) "no designation"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.HasDesignation Designation.Renowned))) "no designation"
 
     -- The discriminating pair for "asks nothing of the perspective": an atom
     -- written on IsRingBearer's model would answer False here.
     Spec.it s "answers the same for another player's perspective" $ do
-      Spec.assertBool s (Filter.matches other renownedCreature Filter.Type.IsRenowned) "not yours, still renowned"
+      Spec.assertBool s (Filter.matches other renownedCreature (Filter.Type.HasDesignation Designation.Renowned)) "not yours, still renowned"
 
     Spec.it s "and with no perspective at all" $ do
-      Spec.assertBool s (Filter.matches noPerspective renownedCreature Filter.Type.IsRenowned) "no perspective"
+      Spec.assertBool s (Filter.matches noPerspective renownedCreature (Filter.Type.HasDesignation Designation.Renowned)) "no perspective"
 
     -- CR 702.112b: "only permanents can be or become renowned".
     Spec.it s "a player candidate is vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsRenowned)) "player"
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.HasDesignation Designation.Renowned))) "player"
 
-  -- CR 701.60b's designation asked of a CANDIDATE, IsRenowned's shape above.
-  Spec.describe s "IsSuspected" $ do
+  -- CR 701.60b's designation asked of a CANDIDATE, renowned's shape above.
+  Spec.describe s "HasDesignation Suspected" $ do
     Spec.it s "matches a suspected permanent" $ do
-      Spec.assertBool s (Filter.matches self suspectedCreature Filter.Type.IsSuspected) "suspected"
+      Spec.assertBool s (Filter.matches self suspectedCreature (Filter.Type.HasDesignation Designation.Suspected)) "suspected"
 
     Spec.it s "does not match an undesignated permanent" $ do
-      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsSuspected)) "no designation"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.HasDesignation Designation.Suspected))) "no designation"
 
     -- The pair that separates the designation from what CR 701.60c hangs off it:
-    -- an atom reading the menace grant instead of Object.suspected passes the
+    -- an atom reading the menace grant instead of Object.designations passes the
     -- positive above and this one.
     Spec.it s "does not match a permanent that merely has menace" $ do
-      Spec.assertBool s (not (Filter.matches self (withKeyword Keyword.Menace) Filter.Type.IsSuspected)) "menace is not the designation"
+      Spec.assertBool s (not (Filter.matches self (withKeyword Keyword.Menace) (Filter.Type.HasDesignation Designation.Suspected))) "menace is not the designation"
 
     -- And the pair that separates it from the OTHER designation on the same view
-    -- record, which an arm copied off IsRenowned would read.
+    -- record, which an arm ignoring the designation payload would read.
     Spec.it s "does not match a renowned permanent" $ do
-      Spec.assertBool s (not (Filter.matches self renownedCreature Filter.Type.IsSuspected)) "renowned is a different designation"
+      Spec.assertBool s (not (Filter.matches self renownedCreature (Filter.Type.HasDesignation Designation.Suspected))) "renowned is a different designation"
 
-    -- Perspective-free for IsRenowned's reason: rule 701.60b's marker names no
+    -- Perspective-free for renowned's reason: rule 701.60b's marker names no
     -- player.
     Spec.it s "answers the same for another player's perspective, and for none" $ do
-      Spec.assertBool s (Filter.matches other suspectedCreature Filter.Type.IsSuspected) "not yours, still suspected"
-      Spec.assertBool s (Filter.matches noPerspective suspectedCreature Filter.Type.IsSuspected) "no perspective"
+      Spec.assertBool s (Filter.matches other suspectedCreature (Filter.Type.HasDesignation Designation.Suspected)) "not yours, still suspected"
+      Spec.assertBool s (Filter.matches noPerspective suspectedCreature (Filter.Type.HasDesignation Designation.Suspected)) "no perspective"
 
     -- CR 701.60b: "only permanents can have the suspected designation".
     Spec.it s "a player candidate is vacuously false" $ do
-      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsSuspected)) "player"
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.HasDesignation Designation.Suspected))) "player"
 
-  -- CR 122.1's presence read, per KIND. Perspective-free for IsRenowned's reason:
+  -- CR 122.1's presence read, per KIND. Perspective-free for HasDesignation's reason:
   -- a counter belongs to no player.
   Spec.describe s "HasCounters" $ do
     Spec.it s "matches a permanent bearing that kind" $ do

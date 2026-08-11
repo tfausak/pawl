@@ -24,10 +24,12 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -370,8 +372,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ExchangeLifeTotals (SlotName.MkSlotName (Text.pack "target")))
-      """ {"type":"ExchangeLifeTotals","value":"target"} """
+      (Effect.ExchangeLifeTotals (ExchangeSides.WithController (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"ExchangeLifeTotals","value":{"type":"WithController","value":"target"}} """
+  Spec.it s "ExchangeLifeTotals between two targets" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeLifeTotals (ExchangeSides.BetweenTargets (SlotName.MkSlotName (Text.pack "players"))))
+      """ {"type":"ExchangeLifeTotals","value":{"type":"BetweenTargets","value":"players"}} """
   -- Create's EntryRiders and bound slot are each ELIDED when they are the
   -- default, exactly like MoveToZone above: four emitted forms, the middle two
   -- told apart at decode by JSON TYPE.
@@ -528,8 +537,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.EachMatching Filter.IsRenowned))
-      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},{"type":"IsRenowned"}]} """
+      (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasDesignation Designation.Renowned)))
+      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},{"type":"HasDesignation","value":{"type":"Renowned"}}]} """
   -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
   -- tag would make the two indistinguishable in a card file.
   Spec.it s "RemoveCounters" $
@@ -732,28 +741,28 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.BecomeMonarch MonarchTarget.TheController)
       """ {"type":"BecomeMonarch","value":{"type":"TheController"}} """
-  Spec.it s "BecomeRenowned" $
+  Spec.it s "Designate Renowned" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.BecomeRenowned (SlotName.MkSlotName (Text.pack "self")))
-      """ {"type":"BecomeRenowned","value":"self"} """
-  Spec.it s "BecomeMonstrous" $
+      (Effect.Designate Designation.Renowned (SlotName.MkSlotName (Text.pack "self")))
+      """ {"type":"Designate","value":[{"type":"Renowned"},"self"]} """
+  Spec.it s "Designate Monstrous" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.BecomeMonstrous (SlotName.MkSlotName (Text.pack "self")))
-      """ {"type":"BecomeMonstrous","value":"self"} """
-  Spec.it s "Suspect" $
+      (Effect.Designate Designation.Monstrous (SlotName.MkSlotName (Text.pack "self")))
+      """ {"type":"Designate","value":[{"type":"Monstrous"},"self"]} """
+  Spec.it s "Designate Suspected" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Suspect (SlotName.MkSlotName (Text.pack "self")))
-      """ {"type":"Suspect","value":"self"} """
-  -- CR 701.60a's ending, with an ObjectRef on the wire where Suspect above has a
+      (Effect.Designate Designation.Suspected (SlotName.MkSlotName (Text.pack "self")))
+      """ {"type":"Designate","value":[{"type":"Suspected"},"self"]} """
+  -- CR 701.60a's ending, with an ObjectRef on the wire where Designate above has a
   -- bare slot: Eliminate the Impossible names a set rather than one permanent.
   Spec.it s "Unsuspect" $
     Common.assertJsonCodec

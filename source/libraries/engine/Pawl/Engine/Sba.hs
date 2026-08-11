@@ -27,6 +27,7 @@ import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.DestructionCause as DestructionCause
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -672,7 +673,9 @@ performStateBasedActions = Event.simultaneously $ do
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m oid -> Map.adjust (\o -> o {Object.attachedTo = Nothing}) oid m) (GameState.objects g) detaching})
   -- CR 704.5g/h: destruction through the funnel, Regenerable -- the point rather
   -- than a default, since CR 701.19a's shield exists to replace exactly this
-  -- destruction.
+  -- destruction. ByRule for the mirror-image reason: no effect is destroying
+  -- anything here, so CR 122.1c's shield counter does not save a permanent whose
+  -- marked damage is lethal.
   --
   -- A permanent the legend rule or the world rule already buried is excluded
   -- rather than left to no-op on a dead id: CR 704.5j and CR 704.5k are
@@ -693,7 +696,7 @@ performStateBasedActions = Event.simultaneously $ do
   -- that filter rather than excluded by name here: CR 704.5m's Aura, and CR
   -- 310.10's undefendable battle -- an animated Siege with lethal damage whose
   -- protector has just left is in both `toDestroy` and `undefendable`.
-  Event.destroyInBatch gs Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
+  Event.destroyInBatch gs DestructionCause.ByRule Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
   -- CR 704.5s / 714.4: the Saga's controller SACRIFICES it. Neither a
   -- put-into-graveyard nor a destruction, so it joins neither batch above -- CR
   -- 701.21a is its own game action, ungated by indestructible and offering

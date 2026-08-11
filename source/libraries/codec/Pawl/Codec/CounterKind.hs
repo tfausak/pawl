@@ -19,6 +19,7 @@ toJson encode k = case k of
   CounterKind.Lore -> Common.nullary "Lore"
   CounterKind.Defense -> Common.nullary "Defense"
   CounterKind.Time -> Common.nullary "Time"
+  CounterKind.Shield -> Common.nullary "Shield"
 
 fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (CounterKind.CounterKind keyword)
 fromJson decode value = do
@@ -31,4 +32,5 @@ fromJson decode value = do
     ("Lore", _) -> Right CounterKind.Lore
     ("Defense", _) -> Right CounterKind.Defense
     ("Time", _) -> Right CounterKind.Time
+    ("Shield", _) -> Right CounterKind.Shield
     _ -> Left . Text.pack $ "unknown CounterKind: " <> t

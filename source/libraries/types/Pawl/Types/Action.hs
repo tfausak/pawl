@@ -118,7 +118,9 @@ data Action
     --
     -- Carries only the SOURCE PERMANENT, TurnFaceUp's shape. What it costs is
     -- printed on that permanent, and which of its abilities is ignored is not a
-    -- choice pawl offers -- see Pawl.Types.SpecialAction (#1139). WHO ignores it
-    -- is the player taking the action, which is the priority holder.
+    -- choice pawl offers -- see Pawl.Types.SpecialAction (#1267). WHO ignores it
+    -- is the player taking the action, which is the priority holder; whether it
+    -- is offered to them at all is CR 116.2d's own question, answered by
+    -- Pawl.Engine.Ignore.canIgnore.
     Ignore ObjectId.ObjectId
   deriving (Eq, Ord, Show)

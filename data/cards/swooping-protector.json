@@ -1,0 +1,72 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flash"
+        },
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Swooping Protector",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "replacementEffects": [
+        {
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "WithCounters",
+              "value": [
+                {
+                  "type": "Shield"
+                },
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Bird"
+          },
+          {
+            "type": "Citizen"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

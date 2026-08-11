@@ -2,6 +2,7 @@ module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -214,9 +215,12 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     ObjectCounters (CounterKind.CounterKind Keyword.Keyword)
-  | -- | CR 702.112b: is the OBJECT this quantity is evaluated against renowned? 1
-    -- if so and 0 if not -- rule 702.112a's "if it isn't renowned", which CR 603.4
-    -- makes an intervening "if" and so a Pawl.Types.Condition.
+  | -- | Does the OBJECT this quantity is evaluated against have this designation?
+    -- 1 if so and 0 if not -- rule 702.112a's "if it isn't renowned", which CR
+    -- 603.4 makes an intervening "if" and so a Pawl.Types.Condition; CR 701.37a's
+    -- "if this permanent isn't monstrous" and Repeat Offender's "if this creature
+    -- is suspected", which are the same test carried as an activated ability's
+    -- clause condition rather than as an intervening "if".
     --
     -- IsMonarch's shape with the two sides swapped, and ObjectCounters' position:
     -- a DESIGNATION read as a number, because Condition's vocabulary is numeric,
@@ -224,50 +228,25 @@ data Quantity
     -- at all -- like Power and ObjectCounters it reads the object the evaluation is
     -- aimed at, through the same injected ViewOf, which is what lets CR 608.2h last
     -- known information answer for a creature that is gone when the ability
-    -- resolves.
+    -- resolves. Reaching another permanent's designation is AgainstSlot's job, not
+    -- a second constructor's.
     --
-    -- NOT the Filter atom, which is Pawl.Types.Filter's own IsRenowned: rule
+    -- NOT the Filter atom, which is Pawl.Types.Filter's own HasDesignation: rule
     -- 702.112a asks about the ability's own bearer, which is Power's position and
     -- not a candidate's. "A renowned creature you control" (Aragorn, Hornburg
-    -- Hero) is the candidate reading, and asks the same designation of the other
-    -- side.
+    -- Hero) and "a suspected creature" (Rune-Brand Juggler) are the candidate
+    -- reading, and ask the same designation of the other side.
     --
     -- A LEAF: it holds no Quantity.
-    IsRenowned
-  | -- | CR 701.37b: is the OBJECT this quantity is evaluated against monstrous? 1
-    -- if so and 0 if not -- CR 701.37a's "if this permanent isn't monstrous",
-    -- which a monstrosity ability carries as its clause's condition rather than
-    -- as an intervening "if" (the ability is activated, not triggered).
-    --
-    -- IsRenowned in every structural respect above, for the reason its note
-    -- gives: rule 701.37b words the designation the way rule 702.112b does. No
-    -- Filter atom beside it, because no card in the pool asks the candidate
-    -- question "a monstrous creature" (#1194).
-    --
-    -- A LEAF: it holds no Quantity.
-    IsMonstrous
-  | -- | CR 701.60b: is the OBJECT this quantity is evaluated against suspected? 1
-    -- if so and 0 if not -- Repeat Offender's "if this creature is suspected", a
-    -- clause condition on an activated ability as monstrosity's is.
-    --
-    -- IsRenowned in every structural respect above, rule 701.60b wording the
-    -- designation the way rule 702.112b does. Reaching another permanent's
-    -- designation is AgainstSlot's job, not a second constructor's.
-    --
-    -- NOT Pawl.Types.Filter's own IsSuspected, which asks the same designation of
-    -- a CANDIDATE ("a suspected creature", Rune-Brand Juggler) -- the pair
-    -- IsRenowned's note describes.
-    --
-    -- A LEAF: it holds no Quantity.
-    IsSuspected
+    HasDesignation Designation.Designation
   | -- | CR 702.33d: was the SPELL this quantity is evaluated against kicked? 1 if
     -- so and 0 if not -- Burst Lightning's "if this spell was kicked", the clause
     -- condition rule 702.33e makes an ability of its own.
     --
-    -- IsSuspected in every structural respect above, and a different KIND of fact:
-    -- the three designations above are marks on a permanent, and this is a record
-    -- of a choice its controller made as the spell was cast (CR 601.2b). What makes
-    -- it the same shape is the reader -- one object, one Bool, off the view.
+    -- HasDesignation in every structural respect above, and a different KIND of
+    -- fact: that atom reads a mark on a permanent, and this is a record of a choice
+    -- its controller made as the spell was cast (CR 601.2b). What makes it the same
+    -- shape is the reader -- one object, one Bool, off the view.
     --
     -- No Filter atom beside it: "target spell that was kicked" is text no card in
     -- the pool prints, kicker's payoff always being an ability of the kicked spell
@@ -364,7 +343,7 @@ data Quantity
     -- target's.
     --
     -- The one arm that MOVES the object every other object-reading arm (Power,
-    -- ManaValue, ObjectCounters, IsRenowned, IsMonstrous, BlockersBeyondFirst) is
+    -- ManaValue, ObjectCounters, HasDesignation, BlockersBeyondFirst) is
     -- aimed at.
     -- Those arms deliberately name no object, so this is the only way a card can
     -- say which one; without it a payload can read only its own source.

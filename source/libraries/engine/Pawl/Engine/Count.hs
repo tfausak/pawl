@@ -255,7 +255,7 @@ snapshotView gs shape event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameRenowned _ -> Nothing
+  GameEvent.BecameDesignated _ _ -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
@@ -308,6 +308,7 @@ viewOfSnapshot mController isToken snapshot =
       Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
+      Filter.attachedTo = Nothing,
       Filter.canHostSubject = False,
       -- CR 111.6: "A token isn't a card", which is a fact about the OBJECT and
       -- not a characteristic, so the arm supplies it above.
@@ -327,8 +328,6 @@ viewOfSnapshot mController isToken snapshot =
       -- an object, and "is your Ring-bearer" is a question about a permanent on the
       -- battlefield now (CR 701.54e), not about one at the moment of an event.
       Filter.ringBearerFor = Nothing,
-      Filter.renowned = False,
-      Filter.monstrous = False,
-      Filter.suspected = False,
+      Filter.designations = Set.empty,
       Filter.kicked = False
     }

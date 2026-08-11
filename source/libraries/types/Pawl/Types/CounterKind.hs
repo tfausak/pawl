@@ -5,7 +5,10 @@ module Pawl.Types.CounterKind where
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
 -- loyalty, rule 714 for lore and CR 702.63 for time -- neither of which rule
--- 122.1 lists at all. The rest of CR 122.1c-i are future.
+-- 122.1 lists at all, and CR 122.1c for shield. What rule 122.1 names and this
+-- type does not are CR 122.1d's stun counter and CR 122.1h's finality counter;
+-- 122.1f's poison and 122.1i's rad are a PLAYER's and live in
+-- Pawl.Types.PlayerCounterKind.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 --
 -- PARAMETRIC in the keyword, for the reason Pawl.Types.Filter is and only that
@@ -70,4 +73,17 @@ data CounterKind keyword
     -- readers are vanishing's own three abilities, minted by
     -- Pawl.Engine.Keyword, which count Object.counters directly.
     Time
+  | -- | CR 122.1c: shield counters on a permanent create one replacement effect
+    -- and one prevention effect that protect it. Unlike every kind above, what
+    -- the count does is not read by a rule that counts it: the pair is MINTED
+    -- from the presence of any such counter (Pawl.Engine.Projection.shieldOf),
+    -- and applying either takes one counter off, so the count is how many times
+    -- the pair may still be applied rather than a number any rule reads.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind -- a
+    -- shield counter is not CR 122.1b's indestructible counter and grants no
+    -- keyword. What the rule does with it is replace two events, and CR 614/615
+    -- is where that lives.
+    Shield
   deriving (Eq, Ord, Show)

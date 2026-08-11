@@ -42,4 +42,15 @@ data PlayerScope
   | -- | Every player, the controller included ("including your own", Thalia's own
     -- ruling).
     EachPlayer
+  | -- | Damping Engine's "a player who controls more permanents than each other
+    -- player". At most ONE player, and often none: the comparison is STRICT, so a
+    -- tie for the lead puts nobody in scope.
+    --
+    -- PERSPECTIVE-FREE, like EachPlayer and unlike the two above: the sentence
+    -- names no "you" for a carrier to supply, so
+    -- Pawl.Engine.PlayerEffect.playersInScope answers it with an absent
+    -- perspective. It is the first arm here whose membership is a fact about the
+    -- BOARD rather than about the two players being compared, which is why
+    -- inScope takes a GameState at all.
+    ControllingMostPermanents
   deriving (Eq, Ord, Show)

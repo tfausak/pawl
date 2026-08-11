@@ -30,3 +30,10 @@ spec s = Spec.describe s "Pawl.Codec.PlayerScope" $ do
       PlayerScope.fromJson
       PlayerScope.EachPlayer
       """ {"type":"EachPlayer"} """
+  Spec.it s "ControllingMostPermanents" $
+    Common.assertJsonCodec
+      s
+      PlayerScope.toJson
+      PlayerScope.fromJson
+      PlayerScope.ControllingMostPermanents
+      """ {"type":"ControllingMostPermanents"} """

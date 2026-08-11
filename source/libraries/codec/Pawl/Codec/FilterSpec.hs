@@ -11,6 +11,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -185,6 +186,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.IsAttachedToPermanent
       """ {"type":"IsAttachedToPermanent"} """
+  Spec.it s "IsAttachedToSource" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsAttachedToSource
+      """ {"type":"IsAttachedToSource"} """
   Spec.it s "CanHostSubject" $
     Common.assertJsonCodec
       s
@@ -213,20 +221,27 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.IsRingBearer
       """ {"type":"IsRingBearer"} """
-  Spec.it s "IsRenowned" $
+  Spec.it s "HasDesignation Renowned" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      Filter.IsRenowned
-      """ {"type":"IsRenowned"} """
-  Spec.it s "IsSuspected" $
+      (Filter.HasDesignation Designation.Renowned)
+      """ {"type":"HasDesignation","value":{"type":"Renowned"}} """
+  Spec.it s "HasDesignation Monstrous" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      Filter.IsSuspected
-      """ {"type":"IsSuspected"} """
+      (Filter.HasDesignation Designation.Monstrous)
+      """ {"type":"HasDesignation","value":{"type":"Monstrous"}} """
+  Spec.it s "HasDesignation Suspected" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Filter.HasDesignation Designation.Suspected)
+      """ {"type":"HasDesignation","value":{"type":"Suspected"}} """
   -- CR 122.1's presence read, the one Filter atom with a CounterKind payload.
   Spec.it s "HasCounters" $
     Common.assertJsonCodec

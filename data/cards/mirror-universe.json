@@ -22,7 +22,10 @@
                     "effects": [
                       {
                         "type": "ExchangeLifeTotals",
-                        "value": "target"
+                        "value": {
+                          "type": "WithController",
+                          "value": "target"
+                        }
                       }
                     ]
                   }

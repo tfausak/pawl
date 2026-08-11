@@ -1,0 +1,81 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Damping Engine",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "CantPlayLands"
+          },
+          "scope": {
+            "type": "ControllingMostPermanents"
+          }
+        },
+        {
+          "effect": {
+            "type": "CantCastMatching",
+            "value": {
+              "type": "Or",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Enchantment"
+                  }
+                }
+              ]
+            }
+          },
+          "scope": {
+            "type": "ControllingMostPermanents"
+          }
+        }
+      ],
+      "specialActions": [
+        {
+          "type": "IgnoreThisUntilEndOfTurn",
+          "value": {
+            "components": [
+              {
+                "type": "Sacrifice",
+                "value": [
+                  1,
+                  {
+                    "type": "And",
+                    "value": []
+                  }
+                ]
+              }
+            ],
+            "mana": []
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

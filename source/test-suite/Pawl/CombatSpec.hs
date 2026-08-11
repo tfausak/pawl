@@ -671,11 +671,25 @@ withFear oid gs =
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- CR 702.14c's "the defending player controls at least one land": bob's lands,
--- put onto an already-attacking board. S.addCreature is any-printing rather than
--- creature-only, which is how the CR 509.1a Mountain case below reaches a land
--- too.
+-- put onto an already-attacking board.
 withLands :: [Printing.Printing] -> GameState.GameState -> GameState.GameState
-withLands lands gs = List.foldl' (\g p -> snd (S.addCreature p S.bob g)) gs lands
+withLands = withPermanents S.bob
+
+-- Any printings at all onto `who`'s battlefield, on a board that already exists.
+-- S.addCreature is any-printing rather than creature-only, which is how the CR
+-- 509.1a Mountain case below reaches a land and landSubtypeStripSpec an
+-- enchantment.
+withPermanents :: PlayerId.PlayerId -> [Printing.Printing] -> GameState.GameState -> GameState.GameState
+withPermanents who ps gs = List.foldl' (\g p -> snd (S.addCreature p who g)) gs ps
+
+-- Put `printing` onto bob's battlefield already attached to `host` -- CR 301.5a
+-- for an Equipment, CR 303.4b for an Aura. A STATE fixture, as S.attach's own
+-- comment says: no equip ability is activated, so the timing of CR 702.6a plays no
+-- part in what the CR 509.1a arity below reads.
+withAttachment :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withAttachment printing host gs =
+  let (oid, gs1) = S.addCreature printing S.bob gs
+   in S.attach oid host gs1
 
 evasionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 evasionSpec s registry = Spec.describe s "Evasion" $ do
@@ -1563,6 +1577,67 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           )
           (True, False, False, True)
       _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
+  Spec.it s "CR 301.5a Kemba's Legion's arity is the Equipment attached to IT" $ do
+    -- Kemba's Legion {5}{W}{W} 4/6, "This creature can block an additional creature
+    -- each combat for each Equipment attached to this creature" -- the pool's one
+    -- COUNTED permission. Bonesplitter and Vectis Gloves say nothing about
+    -- blocking, so every number below is the Legion's own sentence.
+    --
+    -- FOUR attackers, which is what separates the three readings a smaller board
+    -- collapses: with two Equipment the count is three, so "any number" would take
+    -- the fourth and a fixed "an additional" would refuse the third.
+    legion <- S.printingOf s registry "Kemba's Legion"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    gloves <- S.printingOf s registry "Vectis Gloves"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker, piker, piker] [legion, piker]
+    case (mine, theirs) of
+      ([first, second, third, fourth], [kemba, _]) -> do
+        let blocks n = Map.singleton kemba (Set.fromList (take n [first, second, third, fourth]))
+            legal n = Combat.legalBlockDeclaration S.bob (blocks n)
+            one = withAttachment bonesplitter kemba gs
+            two = withAttachment gloves kemba one
+        Spec.assertEqWith
+          s
+          "bare one, one Equipment two, two Equipment three -- and never one more"
+          ( legal 1 gs,
+            legal 2 gs,
+            legal 2 one,
+            legal 3 one,
+            legal 3 two,
+            legal 4 two
+          )
+          (True, False, True, False, True, False)
+      _ -> Spec.assertFailure s "fixture should have four attackers and two blockers"
+  Spec.it s "CR 301.5a the Legion counts neither another creature's Equipment nor its own Aura" $ do
+    -- The pair that makes the two conjuncts of "Equipment attached to this
+    -- creature" observable, each board ONE attachment away from the same
+    -- one-Equipment board: a second Equipment on the OTHER blocker (the
+    -- IsAttachedToSource half) and an Aura on the Legion itself (the HasSubtype
+    -- half). Both must leave the arity at two.
+    legion <- S.printingOf s registry "Kemba's Legion"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    gloves <- S.printingOf s registry "Vectis Gloves"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker, piker, piker] [legion, piker]
+    case (mine, theirs) of
+      ([first, second, third, _], [kemba, plain]) -> do
+        let blocks n = Map.singleton kemba (Set.fromList (take n [first, second, third]))
+            legal n = Combat.legalBlockDeclaration S.bob (blocks n)
+            one = withAttachment bonesplitter kemba gs
+            elsewhere = withAttachment gloves plain one
+            aura = withAttachment unholyStrength kemba one
+        Spec.assertEqWith
+          s
+          "an Equipment on the Piker and an Aura on the Legion both leave the count at two"
+          ( legal 2 elsewhere,
+            legal 3 elsewhere,
+            legal 2 aura,
+            legal 3 aura
+          )
+          (True, False, True, False)
+      _ -> Spec.assertFailure s "fixture should have four attackers and two blockers"
   Spec.it s "CR 509.1b the restrictions are checked against EACH attacker blocked" $ do
     -- A Brigade has neither flying nor reach, so CR 702.9b refuses it the Bird
     -- Maiden however many creatures it may block. The pair is the whole point:
@@ -4882,9 +4957,201 @@ attackCostSpec s registry = Spec.describe s "AttackCosts" $ do
     Spec.assertEqWith s "nothing attacked" (S.attackerDeclarationsOf taxedRun) []
     Spec.assertBool s (allUntapped forests taxedRun) "and no mana was spent"
 
+-- CR 305.7 as the FIVE readers in this module read it, which is one shared gate:
+-- Pawl.Engine.Projection.liveAfterLayers. Ashaya, Soul of the Wild makes its
+-- controller's nontoken creatures Forest LANDS at layer 4, and Blood Moon then
+-- depends on that (CR 613.8a) and SETS every nonbasic land's subtype to Mountain,
+-- which by CR 305.7 takes the animated permanent's rules text -- its combat
+-- sentence included.
+--
+-- What each case here discriminates is the gate's READING, not the strip: the gate
+-- has to judge Blood Moon's "nonbasic land" against the FINISHED projection, which
+-- CR 613.10 and CR 613.11 permit because every reader in this module runs after
+-- the layers. Judged against BASE characteristics the animated creature is no land
+-- at all and keeps its sentence, and that is the only difference the boards below
+-- turn on.
+--
+-- FOUR boards a case, differing in nothing but which of the two permanents is
+-- present, and each of the three controls is load-bearing. Ashaya alone ADDS a
+-- land type, and CR 305.7's last sentence keeps the rules text of a land that
+-- gains types in addition to its own; Blood Moon alone names no creature. Only
+-- the conjunction strips.
+--
+-- ONE CASE PER READER, named in the case's own comment, because each reader keeps
+-- its own copy of the `null setEffs || ...` guard: one case for the gate would
+-- leave a change to any single copy regressing silently.
+-- Pawl.Engine.PlayerEffect's share is pinned in Pawl.PlayerEffectSpec and
+-- Pawl.Engine.SacrificeRestriction's in Pawl.SacrificeRestrictionSpec.
+--
+-- A BOARD THAT CANNOT DISCRIMINATE, recorded because it looks like the obvious
+-- one: Glacial Crasher ("this creature can't attack unless you control a
+-- Mountain") is no witness for the restriction reader, since Blood Moon makes
+-- every nonbasic land a Mountain and the gate is satisfied whether or not the
+-- Crasher's own sentence survived.
+landSubtypeStripSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
+  Spec.it s "CR 305.7 an animated Palace Guard set to Mountain blocks only one attacker" $ do
+    -- Pawl.Engine.BlockPermission.additionalBlocks. Palace Guard says nothing but
+    -- "this creature can block any number of creatures", so THREE attackers are
+    -- what separate its unbounded arity from the one CR 509.1a gives every
+    -- creature. Ashaya goes under BOB, whose blocker it has to animate; Blood Moon
+    -- goes there too and its controller never matters, since its sentence names
+    -- lands globally rather than "lands you control".
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, theirs) = attacking [piker, piker, piker] [palaceGuard]
+        with extras = withPermanents S.bob extras base
+    case (mine, theirs) of
+      ([first, second, third], [guard]) -> do
+        let three = Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.fromList [first, second, third]))
+            stripped = with [ashaya, bloodMoon]
+        Spec.assertEqWith
+          s
+          "all three until Ashaya and Blood Moon are both on the battlefield, and then not three"
+          (three base, three (with [ashaya]), three (with [bloodMoon]), three stripped)
+          (True, True, True, False)
+        -- The anti-vacuity leg: the Guard lost its arity, not its ability to
+        -- block. Without this, a strip that made it no legal blocker at all --
+        -- or a fixture that stopped offering it -- would pass the line above.
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.singleton first)) stripped) "and one attacker is still legal"
+      _ -> Spec.assertFailure s "fixture should have three attackers and a Palace Guard"
+  Spec.it s "CR 305.7 an animated Prized Unicorn set to Mountain no longer forces a block" $ do
+    -- Pawl.Engine.BlockRequirement.instances. blockRequirementSpec's Humility case
+    -- with CR 613.1f's layer-6 removal swapped for CR 305.7's layer-4 route:
+    -- Humility reaches the Unicorn's own ability directly, where this reaches it
+    -- only through the animation, which is exactly the difference between reading
+    -- base characteristics and reading the projection.
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    prizedUnicorn <- S.printingOf s registry "Prized Unicorn"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, mine, theirs) = attacking [prizedUnicorn] [piker]
+        with extras = withPermanents S.alice extras base
+    case (mine, theirs) of
+      ([unicorn], [blocker]) -> do
+        let declining = Combat.legalBlockDeclaration S.bob Map.empty
+            stripped = with [ashaya, bloodMoon]
+        Spec.assertEqWith
+          s
+          "declining stays illegal until Ashaya and Blood Moon are both on the battlefield"
+          (declining base, declining (with [ashaya]), declining (with [bloodMoon]), declining stripped)
+          (False, False, False, True)
+        -- The same anti-vacuity leg blockRequirementSpec's Humility case carries:
+        -- the combat is still live under the strip, so declining became legal
+        -- because the requirement went away rather than because there was nothing
+        -- to block.
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton unicorn)) stripped) "and blocking the Unicorn is still legal"
+      _ -> Spec.assertFailure s "fixture should have a Unicorn and a blocker"
+  Spec.it s "CR 305.7 an animated Bonded Construct set to Mountain may attack alone" $ do
+    -- Pawl.Engine.CombatRestriction.inForce, whose `keepsAbilities` holds the gate
+    -- for the rows `restricted` then selects from. The Construct is an ARTIFACT
+    -- creature and Ashaya animates creatures, so the animation reaches it; a Silent
+    -- Arbiter would do as well for the strip and worse for the reading, its
+    -- sentence naming no creature to be judged.
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    let (base, mine, _) = S.combatBoardOf [bondedConstruct] []
+        with extras = withPermanents S.alice extras base
+    case mine of
+      [construct] -> do
+        let alone = Combat.legalAttackDeclaration S.alice [construct]
+            stripped = with [ashaya, bloodMoon]
+        Spec.assertEqWith
+          s
+          "attacking alone stays illegal until Ashaya and Blood Moon are both on the battlefield"
+          (alone base, alone (with [ashaya]), alone (with [bloodMoon]), alone stripped)
+          (False, False, False, True)
+        -- Anchors, so a failure above says which half moved. Both readings of the
+        -- gate agree about these -- they are the layer fold's answer, not the
+        -- gate's -- so they cannot make the line above pass.
+        Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf construct stripped)) "the Construct is a Mountain"
+        Spec.assertBool s (Projection.isCreatureOf construct stripped) "and still a creature (CR 305.7: setting a subtype removes no card type)"
+      _ -> Spec.assertFailure s "fixture should have one Construct"
+  Spec.it s "CR 305.7 animated Berserkers of Blood Ridge set to Mountain need not attack" $ do
+    -- Pawl.Engine.AttackRequirement.instances. Berserkers of Blood Ridge {4}{R}
+    -- 4/4 says nothing but "this creature attacks each combat if able", and it is
+    -- the pool's only attacking requirement printed on a CREATURE: Curse of the
+    -- Nightly Hunt is an Aura, and Ashaya animates nontoken creatures, so the
+    -- Curse can never reach this gate.
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    let (base, mine, _) = S.combatBoardOf [berserkers] []
+        with extras = withPermanents S.alice extras base
+    case mine of
+      [required] -> do
+        let declining = Combat.legalAttackDeclaration S.alice []
+            stripped = with [ashaya, bloodMoon]
+        Spec.assertEqWith
+          s
+          "declining stays illegal until Ashaya and Blood Moon are both on the battlefield"
+          (declining base, declining (with [ashaya]), declining (with [bloodMoon]), declining stripped)
+          (False, False, False, True)
+        -- The anti-vacuity leg: attacking is still legal under the strip, so
+        -- declining became legal because the requirement went away rather than
+        -- because a Mountain creature-land may no longer attack.
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [required] stripped) "and attacking with them is still legal"
+      _ -> Spec.assertFailure s "fixture should have one Berserkers"
+  Spec.it s "CR 305.7 whole cards: the strip unforces the Berserkers' attack in a real declare attackers step" $ do
+    -- The gameplay-level case for the same reader, through Engine.runStep -- the
+    -- priority loop and CR 703.4i's turn-based action -- with an interpreter that
+    -- declines to attack. Both worlds are read off bob's life: unstripped the
+    -- rules force the 4/4 through, stripped the declination stands.
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+    let (base, mine, _) = S.combatBoardOf [berserkers] []
+        stripped = withPermanents S.alice [ashaya, bloodMoon] base
+        declining :: Prompt.Prompt r -> r
+        declining p = case p of
+          Prompt.DeclareAttackers {} -> []
+          _ -> S.aggressiveAnswer p
+        forced = S.runCombat declining base
+        after = S.runCombat declining stripped
+    Spec.assertEqWith s "unstripped, the requirement forces the attack and bob takes four" (S.lifeOf S.bob forced) (Just 16)
+    Spec.assertEqWith s "and they really were declared" (S.attackerDeclarationsOf forced) mine
+    Spec.assertEqWith s "stripped, bob takes nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf after) []
+  Spec.it s "CR 305.7 an animated Windborn Muse set to Mountain taxes nothing" $ do
+    -- Pawl.Engine.AttackCost.costsOn. Windborn Muse {3}{W} 2/3 prints Ghostly
+    -- Prison's sentence on a CREATURE, which is what lets Ashaya animate it -- the
+    -- Prison itself is an enchantment and can never reach this gate. Both go under
+    -- BOB, since by CR 109.5 the cost's "you" is the Muse's own controller and only
+    -- an attack on that player is taxed. alice's Forests are BASIC, so Blood Moon
+    -- leaves the payment's source alone and the tax is the only thing that moves.
+    --
+    -- The tax is read off the board rather than asserted as a number: a Forest
+    -- makes one mana and the tax is {2}, so "were the Forests tapped" is CR
+    -- 508.1j's payment exactly.
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    windbornMuse <- S.printingOf s registry "Windborn Muse"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, mine, _) = S.combatBoardOf [piker] []
+        (forests, base) = addForests forest 2 (snd (S.addCreature windbornMuse S.bob board))
+        with extras = withPermanents S.bob extras base
+        declared b = S.runPure S.aggressiveAnswer b (Combat.declareAttackers S.alice)
+        paid b = allTapped forests (declared b)
+        stripped = with [ashaya, bloodMoon]
+    Spec.assertEqWith
+      s
+      "the {2} is paid until Ashaya and Blood Moon are both on the battlefield"
+      (paid base, paid (with [ashaya]), paid (with [bloodMoon]), paid stripped)
+      (True, True, True, False)
+    -- Two anti-vacuity legs, and the first is the one that matters: nothing was
+    -- paid because nothing was owed, not because the declaration was refused for
+    -- want of mana (CR 508.1's preamble undoes an unpayable declaration whole).
+    Spec.assertEqWith s "the Piker attacked anyway" (S.attackerDeclarationsOf (declared stripped)) mine
+    Spec.assertBool s (allUntapped forests (declared stripped)) "and not one Forest went"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
+  landSubtypeStripSpec s registry
   declareSpec s registry
   combatDamageSpec s registry
   keywordSpec s registry

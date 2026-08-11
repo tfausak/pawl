@@ -8,6 +8,12 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 toJson :: DestructionRewrite.DestructionRewrite -> Value.Value
 toJson r = Common.nullary $ case r of
   DestructionRewrite.Regenerate -> "Regenerate"
+  DestructionRewrite.RemoveShieldCounter -> "RemoveShieldCounter"
 
 fromJson :: Value.Value -> Either Text.Text DestructionRewrite.DestructionRewrite
-fromJson = Common.decodeNullary "DestructionRewrite" [("Regenerate", DestructionRewrite.Regenerate)]
+fromJson =
+  Common.decodeNullary
+    "DestructionRewrite"
+    [ ("Regenerate", DestructionRewrite.Regenerate),
+      ("RemoveShieldCounter", DestructionRewrite.RemoveShieldCounter)
+    ]
