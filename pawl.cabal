@@ -564,6 +564,7 @@ library types
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
     Pawl.Types.ActivationRestriction
+    Pawl.Types.Activations
     Pawl.Types.ActiveBlockRequirement
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
