@@ -55,6 +55,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -660,7 +661,8 @@ handInPlay printing board =
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
             Object.monstrous = False,
-            Object.suspected = False
+            Object.suspected = False,
+            Object.kicked = False
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),
@@ -1178,6 +1180,113 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
         (_, gs) = S.addCreature piker S.bob gs0
     Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer S.alice spellId (Cost.costsFor (S.printingName chaosCharm) spellId gs) gs) Nothing
+
+-- Burst Lightning's one mode is "Burst Lightning deals 2 damage to any target",
+-- slot "target" (CR 702.33 / data/cards/burst-lightning.json), plus "Kicker {4}"
+-- and the CR 702.33e ability that reads it -- "if this spell was kicked, it deals
+-- 4 damage instead", written as two clauses conditioned on Quantity.WasKicked.
+--
+-- The board: alice has `mountains` untapped Mountains, bob has a Hill Giant, and
+-- Burst Lightning is in alice's hand. THREE toughness is what makes the kicked and
+-- unkicked readings distinct: 2 damage marks the Giant and leaves it alive, 4
+-- destroys it (CR 704.5g), so no single board state answers for both.
+kickerBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+kickerBoard mountain burstLightning hillGiant mountains =
+  let (giantId, gs1) = S.addCreature hillGiant S.bob (S.landsInPlay mountain mountains)
+      (gs, spellId) = S.handOne burstLightning gs1
+   in (gs, spellId, giantId)
+
+-- Answers CR 702.33a's kicker question with `decision` and aims the one target
+-- slot at `victim` -- PINNED to that id rather than searched for, so a mutation
+-- cannot be repaired by an answerer that finds another legal target. Everything
+-- else defers to S.identityAnswer.
+bursts ::
+  KickerDecision.KickerDecision ->
+  ObjectId.ObjectId ->
+  Prompt.Prompt r ->
+  r
+bursts decision victim p = case p of
+  Prompt.ChooseKicker {} -> decision
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
+  _ -> S.identityAnswer p
+
+-- Was CR 702.33a's question actually put to the player, and what did they say?
+kickerAnnouncements :: [Response.Response] -> [KickerDecision.KickerDecision]
+kickerAnnouncements responses = [d | Response.AnnouncedKicker d <- responses]
+
+-- CR 702.33: kicker, the first OPTIONAL ADDITIONAL COST whose payoff is read back
+-- during resolution rather than settled while the spell is cast.
+kickerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kickerSpec s registry = Spec.describe s "Kicker" $ do
+  -- CR 702.33a's "you MAY pay": declining is a real answer, and the spell then
+  -- deals its printed 2.
+  Spec.it s "CR 702.33a declining the kicker deals 2: the Hill Giant survives, and one Mountain is tapped" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    burstLightning <- S.printingOf s registry "Burst Lightning"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, spellId, giantId) = kickerBoard mountain burstLightning hillGiant 5
+        (asked, after) = castAndResolve (bursts KickerDecision.Declines giantId) gs spellId
+        settled = S.settleSba after
+    Spec.assertEqWith s "the player was asked, and declined" (kickerAnnouncements asked) [KickerDecision.Declines]
+    Spec.assertEqWith s "2 damage is marked on the Giant" (S.damageOf giantId settled) (Just 2)
+    Spec.assertEqWith s "which is not lethal, so it is still on the battlefield" (S.countOnBattlefieldByName (S.printingName hillGiant) S.bob settled) 1
+    Spec.assertEqWith s "only {R} was paid, so one Mountain is tapped" (S.tappedCount S.alice settled) 1
+  -- CR 702.33d's designation, read back by the card's own CR 702.33e ability: the
+  -- SAME board and the SAME answerer but for the one answer, and the spell deals 4.
+  Spec.it s "CR 702.33d paying the kicker deals 4 instead: the Hill Giant is destroyed, and five Mountains are tapped" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    burstLightning <- S.printingOf s registry "Burst Lightning"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, spellId, giantId) = kickerBoard mountain burstLightning hillGiant 5
+        (asked, after) = castAndResolve (bursts KickerDecision.Kicks giantId) gs spellId
+        settled = S.settleSba after
+    Spec.assertEqWith s "the player was asked, and kicked" (kickerAnnouncements asked) [KickerDecision.Kicks]
+    Spec.assertEqWith s "4 damage is lethal, so CR 704.5g destroyed the Giant" (S.countOnBattlefieldByName (S.printingName hillGiant) S.bob settled) 0
+    Spec.assertEqWith s "and it is gone, so nothing carries its damage" (S.damageOf giantId settled) Nothing
+    Spec.assertEqWith s "{R} plus the kicker {4}: all five Mountains are tapped" (S.tappedCount S.alice settled) 5
+  -- CR 601.2b/601.2f-h: the additional cost is a real cost. With four Mountains
+  -- there is {R} and three more, one short of the kicker, so kicking is not on
+  -- offer at all -- and the ordinary cast still is.
+  Spec.it s "CR 702.33a with four Mountains the kicker is not offered, and the ordinary cast still is" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    burstLightning <- S.printingOf s registry "Burst Lightning"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, spellId, giantId) = kickerBoard mountain burstLightning hillGiant 4
+        -- An interpreter that WOULD kick: it never gets the chance, which is what
+        -- makes this discriminating rather than a restatement of the answerer.
+        (asked, after) = castAndResolve (bursts KickerDecision.Kicks giantId) gs spellId
+        settled = S.settleSba after
+    Spec.assertBool s (S.castable S.alice spellId gs) "the spell is still castable"
+    Spec.assertEqWith s "no kicker question was put" (kickerAnnouncements asked) []
+    Spec.assertEqWith s "so it dealt its printed 2" (S.damageOf giantId settled) (Just 2)
+    Spec.assertEqWith s "and only {R} was paid" (S.tappedCount S.alice settled) 1
+  -- The gate itself, asked directly, so the two arms of "is kicking available" are
+  -- pinned apart from the cast that consumes them.
+  Spec.it s "CR 702.33a Cast.kickerOffer is the {4} with five Mountains and Nothing with four" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    burstLightning <- S.printingOf s registry "Burst Lightning"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (rich, richSpell, _) = kickerBoard mountain burstLightning hillGiant 5
+        (poor, poorSpell, _) = kickerBoard mountain burstLightning hillGiant 4
+    Spec.assertEqWith
+      s
+      "five Mountains: the additional cost is {4}"
+      (Cast.kickerOffer S.alice richSpell (Cost.costsFor (S.printingName burstLightning) richSpell rich) rich)
+      (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]), Cost.Type.components = []}))
+    Spec.assertEqWith s "four Mountains: unaffordable, so not offered" (Cast.kickerOffer S.alice poorSpell (Cost.costsFor (S.printingName burstLightning) poorSpell poor) poor) Nothing
+  -- A card with no kicker is never asked, which is the other half of "where the
+  -- rules leave nothing to ask, don't prompt".
+  Spec.it s "CR 702.33a a spell without kicker (Lightning Bolt) is never offered one" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (gs, spellId, _) = kickerBoard mountain lightningBolt hillGiant 5
+    Spec.assertEqWith s "no kicker cost to offer" (Cast.kickerOffer S.alice spellId (Cost.costsFor (S.printingName lightningBolt) spellId gs) gs) Nothing
 
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
@@ -2261,6 +2370,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   aftermathSpec s registry
   modalCastSpec s registry
   entwineSpec s registry
+  kickerSpec s registry
   auraTargetSpec s registry
   fireboltSpec s registry
   flashbackCardTypeSpec s registry

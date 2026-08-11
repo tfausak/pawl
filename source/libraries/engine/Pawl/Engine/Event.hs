@@ -433,7 +433,8 @@ createEmblem pid card =
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
             Object.monstrous = False,
-            Object.suspected = False
+            Object.suspected = False,
+            Object.kicked = False
           }
    in placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
@@ -2497,7 +2498,8 @@ createTokens controller card copy n tapped = do
                     Object.unlockedHalves = Set.empty,
                     Object.renowned = False,
                     Object.monstrous = False,
-                    Object.suspected = False
+                    Object.suspected = False,
+                    Object.kicked = False
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           Monad.mapM_ (runEntry (Set.fromList ids)) ids

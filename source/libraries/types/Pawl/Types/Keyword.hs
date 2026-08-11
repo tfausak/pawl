@@ -274,6 +274,29 @@ data Keyword
     -- multiple instances redundant -- so its reader takes membership rather than
     -- the per-keyword count the projection carries.
     Horsemanship
+  | -- | 702.33a: "You may pay an additional [cost] as you cast this spell", and CR
+    -- 702.33d's designation for the spell whose controller declares they will --
+    -- that spell has been "kicked".
+    --
+    -- The cost rides the constructor, as Flashback's and Entwine's do, because
+    -- rule 702.33a states it as part of the keyword. It is NOT a
+    -- Face.additionalCosts entry: that list is unconditioned, so a kicker cost
+    -- placed there would be paid by every cast, and declining it is precisely the
+    -- player's choice under CR 601.2b.
+    --
+    -- The PAYOFF is not a field either. Rule 702.33e makes it a separate ability
+    -- of the card ("objects with kicker ... have additional abilities that specify
+    -- what happens if they were kicked"), so it is printed text like any other --
+    -- a clause condition on Quantity.WasKicked, which reads the designation
+    -- Pawl.Engine.Cast stamped.
+    --
+    -- CR 702.33c's multikicker is not this constructor with a variant, the shape
+    -- Morph took for megamorph: "any number of times" turns the announcement into
+    -- a count rather than a yes-or-no, so nothing here is reusable past the cost
+    -- (#1234). CR 702.33b's second kicker cost, CR 702.33f's "kicked with its [A]
+    -- kicker" and CR 702.33h's sticker kicker are unrepresented for the same
+    -- reason -- one designation cannot say WHICH cost was paid (#1235).
+    Kicker (Cost.Cost Keyword)
   | -- | 702.34a: this card may be cast from its owner's graveyard for the given
     -- cost, and is exiled instead of going anywhere else as it leaves the stack.
     --

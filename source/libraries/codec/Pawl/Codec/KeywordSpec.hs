@@ -344,6 +344,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (morphOf MorphVariant.Mega)
       """ {"type":"Morph","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"Mega"}]} """
     Spec.assertBool s (Keyword.toJson (morphOf MorphVariant.Mega) /= Keyword.toJson (morphOf MorphVariant.Plain)) "megamorph {1} is not morph {1}"
+  -- CR 702.33a's payload is a whole Cost too, and it must not share Flashback's
+  -- tag either.
+  Spec.it s "Kicker carries its cost, and is not Flashback" $ do
+    let kicker n = Keyword.Kicker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (kicker 4)
+      """ {"type":"Kicker","value":{"mana":[{"type":"Generic","value":4}]}} """
+    Spec.assertBool s (Keyword.toJson (kicker 4) /= Keyword.toJson (flashbackOf 4)) "kicker {4} is not flashback {4}"
   -- CR 702.42a's payload is a whole Cost too, and it must not share Flashback's
   -- tag.
   Spec.it s "Entwine carries its cost, and is not Flashback" $ do

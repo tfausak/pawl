@@ -326,5 +326,6 @@ viewOfSnapshot mController isToken snapshot =
       Filter.ringBearerFor = Nothing,
       Filter.renowned = False,
       Filter.monstrous = False,
-      Filter.suspected = False
+      Filter.suspected = False,
+      Filter.kicked = False
     }

@@ -260,6 +260,21 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     IsSuspected
+  | -- | CR 702.33d: was the SPELL this quantity is evaluated against kicked? 1 if
+    -- so and 0 if not -- Burst Lightning's "if this spell was kicked", the clause
+    -- condition rule 702.33e makes an ability of its own.
+    --
+    -- IsSuspected in every structural respect above, and a different KIND of fact:
+    -- the three designations above are marks on a permanent, and this is a record
+    -- of a choice its controller made as the spell was cast (CR 601.2b). What makes
+    -- it the same shape is the reader -- one object, one Bool, off the view.
+    --
+    -- No Filter atom beside it: "target spell that was kicked" is text no card in
+    -- the pool prints, kicker's payoff always being an ability of the kicked spell
+    -- itself.
+    --
+    -- A LEAF: it holds no Quantity.
+    WasKicked
   | -- | CR 508.3b: how many of that player's opponents were DECLARED attacked
     -- this combat phase -- rule 702.121a's "for each opponent you attacked with a
     -- creature this combat".

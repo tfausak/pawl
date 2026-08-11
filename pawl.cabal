@@ -641,6 +641,7 @@ library types
     Pawl.Types.IgnoredAbility
     Pawl.Types.Keyword
     Pawl.Types.KeywordFamily
+    Pawl.Types.KickerDecision
     Pawl.Types.LastKnown
     Pawl.Types.Layer
     Pawl.Types.Layout
