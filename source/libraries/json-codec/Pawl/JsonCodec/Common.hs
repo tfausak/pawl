@@ -368,10 +368,13 @@ assertCodec s c = assertJsonCodec s (Codec.encode c) (Codec.decode c)
 -- | Forces a codec's schema and checks only that it is an object. It asserts
 -- nothing about the content, so editing a schema never edits a test -- but a
 -- bottom fails here, and a definition that fails to terminate fails on the
--- suite's timeout.
+-- suite's timeout. 'Define.run' applies 'Value.Object' before its list spine
+-- is demanded, so pattern-matching the value (as 'asObject' alone does) forces
+-- only the outer tag, not the @$defs@ bodies inside it; rendering to text and
+-- parsing it back walks the whole tree, which is what actually forces those.
 assertHasSchema :: (Stack.HasCallStack, Applicative m) => Spec.Spec m n -> Codec.Codec a -> m ()
 assertHasSchema s c =
   Spec.assertBool
     s
-    (Either.isRight (asObject (Define.run (Codec.schema c))))
+    (Either.isRight (asObject =<< parse (render (Define.run (Codec.schema c)))))
     "expected the schema to be an object"
