@@ -5,8 +5,8 @@ module Pawl.Types.Optionality where
 -- resolves.
 --
 -- That timing is why this rides Pawl.Types.Clause and is not a
--- ModeSelection.ChooseUpTo over a one-mode payload. Modes and targets are chosen
--- as the spell is cast (CR 601.2b/601.2c, CR 700.2b, CR 603.3d); a "may" is
+-- ModeSelection.ChooseBetween 0 1 over a one-mode payload. Modes and targets are
+-- chosen as the spell is cast (CR 601.2b/601.2c, CR 700.2b, CR 603.3d); a "may" is
 -- decided strictly later, while the effect is applied (CR 608.2d). As a mode
 -- selection, an ability the player declines would leave the stack with no legal
 -- mode instead of resolving and doing nothing.

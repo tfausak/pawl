@@ -396,9 +396,11 @@ defaultAnswer p = case p of
   -- The first `count` legal modes, deterministically -- and under CR 700.2d's
   -- "You may choose the same mode more than once" the LEAST legal mode that many
   -- times, since there may be fewer legal modes than the count and the answer
-  -- still has to satisfy the instruction.
+  -- still has to satisfy the instruction. `count` is the FEWEST the instruction
+  -- allows, so a range answers with its floor -- the smallest legal answer reaches
+  -- least of the game a transcript ran out of.
   Prompt.ChooseModes _ _ _ legal selection ->
-    let count = Modal.countOf selection
+    let count = Modal.leastOf selection
      in if Modal.allowsRepeatsIn selection
           then maybe Seq.empty (Seq.replicate (Natural.toIntSaturating count)) (Set.lookupMin legal)
           else Seq.fromList (List.genericTake count (Set.toAscList legal))

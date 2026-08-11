@@ -50,8 +50,12 @@ allEffects m = concat (modeEffects m)
 -- 700.2a's "if one of the modes would be illegal ... that mode can't be chosen"
 -- does not narrow the list here; the one caller is Pawl.Engine.Mana, and CR
 -- 605.1a already keeps a targeting ability from being a mana ability at all.
+--
+-- Every size the instruction allows, so a RANGE ("Choose one or both")
+-- contributes the selections of each size -- one mode alone adds less mana than
+-- both together, and both are ways the one activation could go.
 selectionEffects :: Modal.Modal card -> [[Effect card]]
-selectionEffects m = fmap concat (enumerate (selectionCount m) (modeEffects m))
+selectionEffects m = fmap concat (concatMap (\n -> enumerate n (modeEffects m)) (selectionSizes (Modal.selection m)))
   where
     enumerate = if allowsRepeats m then combinationsWithRepeats else combinations
 
@@ -209,25 +213,41 @@ modeTargetSpecs :: ModeIndex.ModeIndex -> Modal.Modal card -> Maybe (Map SlotNam
 modeTargetSpecs (ModeIndex.MkModeIndex n) m =
   fmap Mode.targetSpecs (Seq.lookup (Natural.toIntSaturating n) (Modal.modes m))
 
--- CR 700.2: how many modes the selection demands, whichever half of CR 700.2d
--- the printed instruction is.
-countOf :: ModeSelection.ModeSelection -> Natural
-countOf selection = case selection of
+-- CR 700.2: the FEWEST modes a selection satisfying this instruction may name.
+-- Equal to mostOf for an exact instruction, whichever half of CR 700.2d it is;
+-- a range's lower bound otherwise ("Choose one or both" is 1).
+leastOf :: ModeSelection.ModeSelection -> Natural
+leastOf selection = case selection of
   ModeSelection.ChooseExactly n -> n
   ModeSelection.ChooseExactlyWithRepeats n -> n
+  ModeSelection.ChooseBetween least _ -> least
+
+-- CR 700.2: the MOST modes a selection satisfying this instruction may name --
+-- leastOf's counterpart, and the same number for every exact instruction.
+mostOf :: ModeSelection.ModeSelection -> Natural
+mostOf selection = case selection of
+  ModeSelection.ChooseExactly n -> n
+  ModeSelection.ChooseExactlyWithRepeats n -> n
+  ModeSelection.ChooseBetween _ most -> most
 
 -- CR 700.2d: does this instruction print "You may choose the same mode more than
 -- once"? False is that rule's default -- "that player normally can't choose the
 -- same mode more than once" -- and is what every card in the pool but Mystic
 -- Confluence answers.
+--
+-- True implies leastOf == mostOf: no printing pairs the exception with a range,
+-- which is why Pawl.Types.ModeSelection has no such constructor and why the
+-- repeating arms below read one bound and mean "the count".
 allowsRepeatsIn :: ModeSelection.ModeSelection -> Bool
 allowsRepeatsIn selection = case selection of
   ModeSelection.ChooseExactly _ -> False
   ModeSelection.ChooseExactlyWithRepeats _ -> True
+  ModeSelection.ChooseBetween _ _ -> False
 
--- countOf over the payload's own printed selection.
-selectionCount :: Modal.Modal card -> Natural
-selectionCount = countOf . Modal.selection
+-- Every size a selection satisfying the printed instruction may have, ascending.
+-- One element for an exact instruction, `most - least + 1` for a range.
+selectionSizes :: ModeSelection.ModeSelection -> [Natural]
+selectionSizes selection = [leastOf selection .. mostOf selection]
 
 -- allowsRepeatsIn over the payload's own printed selection.
 allowsRepeats :: Modal.Modal card -> Bool
@@ -247,13 +267,24 @@ allowsRepeats = allowsRepeatsIn . Modal.selection
 -- at all leaves nothing (rejected by the caller as above). Two legal modes and a
 -- count of three is a real choice even though there are fewer modes than the
 -- count, which is exactly the case the default has no analogue of.
+--
+-- A RANGE takes the default's arm, measured against its FLOOR, and that is the
+-- whole of it: "Choose one or both" with one legal mode leaves only that mode (CR
+-- 700.2a makes the other unchoosable), while two legal modes leave one, the other,
+-- or both -- three answers, so the prompt is issued. More generally a selection is
+-- forced only when one size is available and one subset has it, which for `legal`
+-- of size k and bounds least..most is k <= least; every k > least admits at least
+-- two answers.
 forcedSelection :: Set ModeIndex.ModeIndex -> ModeSelection.ModeSelection -> Maybe (Seq.Seq ModeIndex.ModeIndex)
 forcedSelection legal selection
+  -- "Choose zero" names nothing whatever is legal. No printing says it; the arm
+  -- is here so the two below may assume a positive ceiling.
+  | mostOf selection == 0 = Just Seq.empty
   | allowsRepeatsIn selection = case Set.toAscList legal of
       [] -> Just Seq.empty
-      [only] -> Just (Seq.replicate (Natural.toIntSaturating (countOf selection)) only)
-      _ -> if countOf selection == 0 then Just Seq.empty else Nothing
-  | Natural.length legal <= countOf selection = Just (Seq.fromList (Set.toAscList legal))
+      [only] -> Just (Seq.replicate (Natural.toIntSaturating (mostOf selection)) only)
+      _ -> Nothing
+  | Natural.length legal <= leastOf selection = Just (Seq.fromList (Set.toAscList legal))
   | otherwise = Nothing
 
 -- CR 700.2a: is there ANY selection satisfying this instruction, given which
@@ -261,20 +292,26 @@ forcedSelection legal selection
 -- chosen, and CR 700.2d's exception is what stops it being a count comparison: a
 -- single legal mode satisfies "choose three" when the same mode may be chosen
 -- three times, and does not otherwise.
+--
+-- A range asks it of its FLOOR: "Choose one or both" needs one legal mode, not
+-- two, since choosing one is an answer the instruction allows.
 selectionPossible :: Set ModeIndex.ModeIndex -> ModeSelection.ModeSelection -> Bool
 selectionPossible legal selection
-  | countOf selection == 0 = True
+  | mostOf selection == 0 = True
   | allowsRepeatsIn selection = not (Set.null legal)
-  | otherwise = Natural.length legal >= countOf selection
+  | otherwise = Natural.length legal >= leastOf selection
 
 -- CR 601.2b/700.2: does this answer really satisfy the printed instruction? The
--- count matches, every mode named is legal (CR 700.2a), and no mode is named
--- twice unless CR 700.2d's exception is printed. The reject-not-repair gate every
--- announcement path runs before it stamps anything.
+-- size is one the instruction allows -- a single number for an exact instruction,
+-- anything within the bounds for a range -- every mode named is legal (CR 700.2a),
+-- and no mode is named twice unless CR 700.2d's exception is printed. The
+-- reject-not-repair gate every announcement path runs before it stamps anything.
 selectionSatisfiedBy :: Set ModeIndex.ModeIndex -> ModeSelection.ModeSelection -> Seq.Seq ModeIndex.ModeIndex -> Bool
 selectionSatisfiedBy legal selection chosen =
   let distinct = Set.fromList (Foldable.toList chosen)
-   in Natural.length chosen == countOf selection
+      size = Natural.length chosen
+   in size >= leastOf selection
+        && size <= mostOf selection
         && Set.isSubsetOf distinct legal
         && (allowsRepeatsIn selection || Set.size distinct == Seq.length chosen)
 

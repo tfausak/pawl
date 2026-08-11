@@ -4,6 +4,7 @@
 -- resolution.
 module Pawl.ModalSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -249,7 +250,7 @@ modalReaderSpec s = Spec.describe s "M4h Modal reader" $ do
             ModalT.Modal Card.Type.Card
         chosen = Seq.singleton (ModeIndex.MkModeIndex 1)
     Spec.assertEqWith s "only mode 1's effect" (Modal.modesEffects chosen m) [Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)]
-    Spec.assertEqWith s "selectionCount is the ChooseExactly count" (Modal.selectionCount m) 1
+    Spec.assertEqWith s "an exact instruction's two bounds are its count" (fmap ($ ModalT.selection m) [Modal.leastOf, Modal.mostOf]) [1, 1]
 
 -- M4h task 4: CR 602.2b -- the activation path prompts ChooseModes exactly like
 -- Cast.castSpell does, gated by a synthetic modal activated ability (no real one
@@ -479,7 +480,7 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     let (board, spellId, _) = crypticBoard island crypticCommand piker
         (_, gs) = S.spellOnStack slaughterDrone S.bob board
         modal = Face.spell (S.combinedFace crypticCommand)
-    Spec.assertEqWith s "the selection demands two" (Modal.selectionCount modal) 2
+    Spec.assertEqWith s "the selection demands two" (fmap ($ ModalT.selection modal) [Modal.leastOf, Modal.mostOf]) [2, 2]
     Spec.assertEqWith
       s
       "with a spell on the stack and permanents in play, all four modes are fillable"
@@ -905,6 +906,198 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
     Spec.assertEqWith s "no card was drawn: alice's library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 1
     Spec.assertEqWith s "and her graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
 
+-- Vandalize's two modes, in printed order (CR 700.2 / data/cards/vandalize.json),
+-- under "Choose one or both --":
+--   0. destroy target artifact -- slot "artifact"
+--   1. destroy target land     -- slot "land"
+vandalizeModes :: Set.Set ModeIndex.ModeIndex
+vandalizeModes = Set.fromList (fmap ModeIndex.MkModeIndex [0, 1])
+
+artifactSlot, landSlot :: SlotName.SlotName
+artifactSlot = SlotName.MkSlotName (Text.pack "artifact")
+landSlot = SlotName.MkSlotName (Text.pack "land")
+
+destroyArtifact, destroyLand :: ModeIndex.ModeIndex
+destroyArtifact = ModeIndex.MkModeIndex 0
+destroyLand = ModeIndex.MkModeIndex 1
+
+-- alice has five Mountains ({4}{R}) and Vandalize in hand; bob has a Forest, and
+-- each caller adds the Bonesplitter or not, since an artifact on the battlefield is
+-- what makes the artifact mode choosable. Both of bob's permanents are legal targets
+-- and neither is alice's, so each mode's effect is visible as bob losing exactly that
+-- permanent -- and the names are distinct from alice's Mountains, which the land mode
+-- could otherwise be answered with.
+vandalizeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+vandalizeBoard mountain vandalize forest =
+  let (forestId, gs1) = S.addCreature forest S.bob (S.landsInPlay mountain 5)
+      (gs, spellId) = S.handOne vandalize gs1
+   in (gs, spellId, forestId)
+
+bonesplitterCount, forestCount :: GameState.GameState -> Int
+bonesplitterCount = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Bonesplitter")) S.bob
+forestCount = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.bob
+
+-- Answers the mode prompt with `idxs`, but ONLY if it really offers both modes
+-- under the printed range -- anything else answers with the empty selection, which
+-- is below the range's floor, so Cast.castProposed rewinds the whole cast and every
+-- assertion fails. Each slot is aimed at the permanent that slot names, by name
+-- rather than by searching the legal set, so a mutation cannot be repaired here. A
+-- slot named neither of the card's two gets the empty answer, which fails the target
+-- announcement rather than aiming somewhere plausible.
+insistOneOrBoth :: [ModeIndex.ModeIndex] -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+insistOneOrBoth idxs boneId forestId p = case p of
+  Prompt.ChooseModes _ _ _ legal selection ->
+    if legal == vandalizeModes && selection == ModeSelection.ChooseBetween 1 2
+      then Seq.fromList idxs
+      else Seq.empty
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
+  _ -> S.identityAnswer p
+  where
+    aimAt slot _
+      | slot == artifactSlot = Set.singleton (Recipient.ToObject boneId)
+      | slot == landSlot = Set.singleton (Recipient.ToObject forestId)
+      | otherwise = Set.empty
+
+-- CR 700.2's range instruction: "Choose one or both --" (Vandalize), the first
+-- selection in the pool whose size is not fixed by the card. One mode, the other,
+-- or both are three answers, so the prompt is real; fewer than one and a repeat are
+-- not, so the announcement is rejected.
+chooseOneOrBothSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ do
+  Spec.it s "CR 700.2 the instruction states a range, not a count" $ do
+    vandalize <- S.printingOf s registry "Vandalize"
+    let modal = Face.spell (S.combinedFace vandalize)
+    Spec.assertEqWith s "one through both" (ModalT.selection modal) (ModeSelection.ChooseBetween 1 2)
+    Spec.assertEqWith s "the two bounds differ" (fmap ($ ModalT.selection modal) [Modal.leastOf, Modal.mostOf]) [1, 2]
+
+  -- The ceiling, read directly off Modal.selectionSatisfiedBy because no card in the
+  -- pool can observe it: this range ends at the printed mode count, so any answer
+  -- above it repeats a mode and CR 700.2d's default rejects it for that instead. A
+  -- narrower printed range -- "choose one or two" of three modes -- would need this
+  -- conjunct, and until one exists it is a fence rather than a proven behaviour.
+  Spec.it s "CR 700.2 an answer above the range's ceiling does not satisfy it" $ do
+    let both = Seq.fromList [destroyArtifact, destroyLand]
+    Spec.assertBool s (Modal.selectionSatisfiedBy vandalizeModes (ModeSelection.ChooseBetween 1 2) both) "both modes satisfy one-or-both"
+    Spec.assertBool s (not (Modal.selectionSatisfiedBy vandalizeModes (ModeSelection.ChooseBetween 0 1) both)) "two modes do not satisfy a zero-to-one range"
+
+  -- The choice is really offered and really taken: the answer above refuses to name
+  -- a mode unless the prompt carries both modes and the range, and this one names
+  -- only the artifact mode. Bob's Forest surviving is what says the unchosen mode
+  -- did nothing -- an engine that took every legal mode (the exact instruction's
+  -- forced arm) would destroy it too.
+  Spec.it s "CR 601.2b choosing one of the two destroys only that mode's target" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vandalize <- S.printingOf s registry "Vandalize"
+    forest <- S.printingOf s registry "Forest"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (board, spellId, forestId) = vandalizeBoard mountain vandalize forest
+        (boneId, gs) = S.addCreature bonesplitter S.bob board
+        answer :: Prompt.Prompt r -> r
+        answer = insistOneOrBoth [destroyArtifact] boneId forestId
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "Vandalize resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "bob's Bonesplitter was destroyed" (bonesplitterCount after) 0
+    Spec.assertEqWith s "bob's Forest survived: the land mode was not chosen" (forestCount after) 1
+
+  -- The same board and the same mana, differing only in the answer: both modes, which
+  -- is the other size the instruction allows. Two separate slots are filled, and the
+  -- two destructions are separately visible.
+  Spec.it s "CR 700.2 choosing both destroys both targets" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vandalize <- S.printingOf s registry "Vandalize"
+    forest <- S.printingOf s registry "Forest"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (board, spellId, forestId) = vandalizeBoard mountain vandalize forest
+        (boneId, gs) = S.addCreature bonesplitter S.bob board
+        answer :: Prompt.Prompt r -> r
+        answer = insistOneOrBoth [destroyArtifact, destroyLand] boneId forestId
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "Vandalize resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "bob's Bonesplitter was destroyed" (bonesplitterCount after) 0
+    Spec.assertEqWith s "bob's Forest was destroyed too" (forestCount after) 0
+
+  -- The floor, on that same board: "one or both" is not "up to both", so naming no
+  -- mode is not an answer and Cast.castProposed's reject-not-repair rewinds.
+  Spec.it s "CR 700.2 naming no mode does not satisfy 'one or both'" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vandalize <- S.printingOf s registry "Vandalize"
+    forest <- S.printingOf s registry "Forest"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (board, spellId, _) = vandalizeBoard mountain vandalize forest
+        (_, gs) = S.addCreature bonesplitter S.bob board
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes {} -> Seq.empty
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "the cast was rewound: Vandalize is still in alice's hand" (S.handSize S.alice after) 1
+    Spec.assertBool s (null (GameState.stack after)) "nothing reached the stack"
+    Spec.assertEqWith s "bob's Bonesplitter is untouched" (bonesplitterCount after) 1
+    Spec.assertEqWith s "and so is his Forest" (forestCount after) 1
+
+  -- The ceiling is a bound on the SIZE and not a licence to repeat: CR 700.2d's
+  -- default still applies, so "the artifact mode, twice" is rejected even though two
+  -- is a size the range allows.
+  Spec.it s "CR 700.2d a range does not permit the same mode twice" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vandalize <- S.printingOf s registry "Vandalize"
+    forest <- S.printingOf s registry "Forest"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    let (board, spellId, _) = vandalizeBoard mountain vandalize forest
+        (_, gs) = S.addCreature bonesplitter S.bob board
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes {} -> Seq.replicate 2 destroyArtifact
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "the cast was rewound: Vandalize is still in alice's hand" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "bob's Bonesplitter is untouched" (bonesplitterCount after) 1
+
+  -- The floor at the CAST GATE (CR 601.2c/700.2a): a range is castable when its
+  -- MINIMUM can be met, where an exact "choose two" would need both. Two boards
+  -- differing in one thing -- alice pays {4}{R} off five Birds of Paradise either
+  -- way, so there is no land and no artifact to target until bob's Forest arrives,
+  -- and the mana is identical on both sides.
+  Spec.it s "CR 700.2a a range is castable once its minimum can be met" $ do
+    birdsOfParadise <- S.printingOf s registry "Birds of Paradise"
+    vandalize <- S.printingOf s registry "Vandalize"
+    forest <- S.printingOf s registry "Forest"
+    let birds = List.foldl' (\gs _ -> snd (S.addCreature birdsOfParadise S.alice gs)) (Setup.emptyGame S.bothPlayers) [1 .. 5 :: Int]
+        (noModes, spellId) = S.handOne vandalize birds
+        (_, oneMode) = S.addCreature forest S.bob noModes
+    Spec.assertBool s (not (S.castable S.alice spellId noModes)) "no artifact and no land: no mode is choosable, so the spell is uncastable"
+    Spec.assertBool s (S.castable S.alice spellId oneMode) "a land on the battlefield makes one mode choosable, which 'one or both' accepts"
+
+  -- CR 700.2a on the range: with no artifact anywhere the artifact mode can't be
+  -- chosen, which leaves the land mode as the ONE selection satisfying the
+  -- instruction -- so the engine must not ask, and must not treat the spell as
+  -- uncastable either (an exact "choose two" would be). The answerer fails the test
+  -- if a prompt is issued.
+  Spec.it s "CR 700.2a one choosable mode leaves nothing to ask" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    vandalize <- S.printingOf s registry "Vandalize"
+    forest <- S.printingOf s registry "Forest"
+    let (gs, spellId, forestId) = vandalizeBoard mountain vandalize forest
+        modal = Face.spell (S.combinedFace vandalize)
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes {} -> error "ChooseModes prompt issued for a forced selection"
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject forestId))) sets
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith
+      s
+      "with no artifact in play only the land mode is choosable"
+      (Target.fillableModes (Just S.alice) spellId Map.empty modal gs)
+      (Set.singleton destroyLand)
+    Spec.assertEqWith s "Vandalize resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "bob's Forest was destroyed" (forestCount after) 0
+
 -- Modal.combinations' two halves, side by side: the same inputs under CR 700.2d's
 -- default and under its exception. The enumeration Pawl.Engine.Mana reads when a
 -- mana ability has several modes, which no card in the pool prints -- so it is
@@ -937,4 +1130,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   chooseTwoSpec s registry
   forcedTwoSpec s registry
   repeatedModeSpec s registry
+  chooseOneOrBothSpec s registry
   combinationsSpec s

@@ -147,9 +147,10 @@ instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 
 -- CR 601.2c / 700.2a: castable when the fillable modes admit some selection at
 -- all (Modal.selectionPossible) -- ordinarily at least as many fillable modes as
--- the selection demands, and under CR 700.2d's exception a single fillable mode,
--- which may then be chosen as many times as the count asks. For a non-modal card
--- (one mode, count 1) this is identical to "every slot fillable".
+-- the selection demands, under a range as many as its floor demands, and under CR
+-- 700.2d's exception a single fillable mode, which may then be chosen as many
+-- times as the count asks. For a non-modal card (one mode, count 1) this is
+-- identical to "every slot fillable".
 --
 -- CR 109.5 / 601.2a: the perspective a "target creature an opponent controls"
 -- slot is measured against is the player CASTING the spell. Taken as a parameter
