@@ -289,6 +289,33 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and IsMonarch: it holds no Quantity.
     OpponentsAttacked PlayerRef.PlayerRef
+  | -- | CR 701.9a / 608.2i: how many cards that player has DISCARDED this turn --
+    -- what Asmoranomardicadaistinaculdacar's "as long as you've discarded a card
+    -- this turn" asks, compared against 1.
+    --
+    -- LifeTotal's and OpponentsAttacked's sibling in shape: one number attached to
+    -- a player rather than a population in a zone, so it is not a Count -- CR 400.1
+    -- scopes a Count over a zone and the event log is not one.
+    --
+    -- A LOOK-BACK read of the turn-scoped GameEvent log, which CR 608.2i sanctions,
+    -- and "this turn" is the log's own extent rather than a window named here --
+    -- the footing Filter.AttackedThisTurn already stands on. It counts
+    -- GameEvent.Discarded and not a hand-to-graveyard zone change, the two being
+    -- different questions in both directions: CR 701.1 and CR 701.9a make
+    -- discarding the keyword ACTION of moving a card from a hand to a graveyard, so
+    -- a move no effect performed as a discard is not one, and CR 701.9c leaves a
+    -- discarded card a replacement sent elsewhere still discarded.
+    --
+    -- NOT a Scope.InHistory count of GameEvent.Discarded events (#162): that arm
+    -- matches a Filter against the event's characteristic snapshot, and a Discarded
+    -- event carries none -- there would be nothing for the Filter to look at.
+    --
+    -- CR 702.29a's cycling is a discard too, so both DiscardCause values count. An
+    -- EMPTY log answers 0 rather than Nothing, as OpponentsAttacked's empty record
+    -- does: nobody having discarded is a number.
+    --
+    -- A LEAF, like LifeTotal, Speed and OpponentsAttacked: it holds no Quantity.
+    CardsDiscardedThisTurn PlayerRef.PlayerRef
   | -- | CR 509.1h / 702.23a: how many creatures are blocking the object this
     -- quantity is evaluated against, BEYOND THE FIRST -- rampage's "for each
     -- creature blocking it beyond the first".

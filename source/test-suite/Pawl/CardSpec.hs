@@ -54,6 +54,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -371,6 +372,9 @@ quantityCounts quantity = case quantity of
   -- CR 508.3b's combat record, read as a tally of players: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.OpponentsAttacked _ -> []
+  -- CR 701.9a's tally of logged discards: a PlayerRef and nothing else, so no
+  -- Count and no Filter here either.
+  Quantity.Type.CardsDiscardedThisTurn _ -> []
   -- CR 509.1h's declaration, read against the object the quantity is evaluated
   -- against: a nullary leaf, so no Count and no Filter here either.
   Quantity.Type.BlockersBeyondFirst -> []
@@ -687,6 +691,7 @@ cardCounts card =
     <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AlternativeCost.condition) (Face.alternativeCosts card)
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
     <> concatMap blockPermissionCounts (Face.blockPermissions card)
 
@@ -1696,6 +1701,13 @@ keywordFilters keyword = case keyword of
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 costFilters = concatMap costComponentFilters . Cost.Type.components
 
+-- CR 118.9: an alternative cost reaches a Filter through its components, as any
+-- Cost does, and through the Condition CR 604.2 may gate it with.
+alternativeCostFilters :: AlternativeCost.AlternativeCost -> [Filter.Type.Filter Keyword.Keyword]
+alternativeCostFilters alternative =
+  costFilters (AlternativeCost.cost alternative)
+    <> concatMap conditionFilters (Maybe.maybeToList (AlternativeCost.condition alternative))
+
 -- CR 116.2: which spells a printed special action names -- only through the cost
 -- CR 116.2d's ignore carries.
 specialActionFilters :: SpecialAction.SpecialAction -> [Filter.Type.Filter Keyword.Keyword]
@@ -2272,7 +2284,9 @@ activatedAbilityFilters ability =
 --     and the layer-6/7 modifications' own keywords and Counts.
 --   * `replacementEffects` -- CR 614.1's counter-placement pattern.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSpec.
---   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
+--   * `additionalCosts` -- CR 601.2f's sacrifice component.
+--   * `alternativeCosts` -- that same component, plus CR 604.2's "as long as"
+--     condition gating one.
 --   * `specialActions` -- CR 116.2d's ignore cost, a Cost like the two above.
 --   * `playerAbilities` -- CR 613.11's cost modifiers and CR 601.3b's timing
 --     permission.
@@ -2312,7 +2326,7 @@ cardFilters card =
         <> concatMap replacementEffectFilters (Face.replacementEffects card)
         <> concatMap targetSpecFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
-        <> concatMap costFilters (Face.alternativeCosts card)
+        <> concatMap alternativeCostFilters (Face.alternativeCosts card)
         <> concatMap specialActionFilters (Face.specialActions card)
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap (affectedFilters . BlockRequirement.attacker) (Face.blockRequirements card)

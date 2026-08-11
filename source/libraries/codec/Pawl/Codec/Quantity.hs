@@ -45,6 +45,11 @@ toJson q = case q of
   -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted comes
   -- from the combat record rather than from anything the card names.
   Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ PlayerRef.toJson p
+  -- CR 701.9a's tally, with only a PlayerRef on the wire for OpponentsAttacked's
+  -- reason: what is counted comes from the event log rather than from anything the
+  -- card names, and the turn is the log's extent rather than a window a card could
+  -- state.
+  Quantity.CardsDiscardedThisTurn p -> Common.tagged "CardsDiscardedThisTurn" . Just $ PlayerRef.toJson p
   -- CR 509.1h's declaration read against the object the quantity is aimed at, so
   -- there is nothing on the wire at all -- Power's shape rather than
   -- ObjectCounters'.
@@ -75,6 +80,7 @@ fromJson value = do
     ("IsMonstrous", _) -> Right Quantity.IsMonstrous
     ("IsSuspected", _) -> Right Quantity.IsSuspected
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
+    ("CardsDiscardedThisTurn", Just v) -> Quantity.CardsDiscardedThisTurn <$> PlayerRef.fromJson v
     ("BlockersBeyondFirst", _) -> Right Quantity.BlockersBeyondFirst
     ("AgainstSlot", Just (Value.Array (Array.MkArray [s, q]))) -> Quantity.AgainstSlot <$> SlotName.fromJson s <*> fromJson q
     _ -> Left . Text.pack $ "unknown Quantity: " <> t

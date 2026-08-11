@@ -640,3 +640,43 @@ castOf event = case event of
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
+
+-- The discarding player an event describes, if it is a discard (CR 701.9a).
+--
+-- castOf's sibling, and here for its import-graph reason: the caller is
+-- Pawl.Engine.Quantity's CardsDiscardedThisTurn arm, and Pawl.Engine.Event
+-- imports that module's callers rather than the other way about.
+--
+-- The Moved event the same discard files is deliberately not an arm, and the zone
+-- change is the wrong record in both directions: CR 701.1 and CR 701.9a make
+-- discarding the keyword ACTION of moving a card from a hand to a graveyard, so a
+-- move no effect performed as a discard is not one, and CR 701.9c leaves a
+-- redirected discard still discarded though it never reached a graveyard.
+--
+-- The CAUSE is not consulted, CR 702.29a making a cycled card a discarded one.
+discardOf :: GameEvent -> Maybe PlayerId
+discardOf event = case event of
+  GameEvent.Discarded pid _ _ -> Just pid
+  GameEvent.SpellCast {} -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.BecameRenowned _ -> Nothing
+  GameEvent.Evolved _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
+  GameEvent.Moved _ _ -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented _ _ -> Nothing
+  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Revealed _ _ -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
+  GameEvent.BlockerDeclared _ _ -> Nothing
+  GameEvent.BlocksDeclared _ _ -> Nothing
+  GameEvent.AttackerBlocked _ _ -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.LifeLost _ _ -> Nothing
+  GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing

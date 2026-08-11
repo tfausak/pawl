@@ -76,6 +76,8 @@ library codec
     Pawl.Codec.AffectedSpec
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
+    Pawl.Codec.AlternativeCost
+    Pawl.Codec.AlternativeCostSpec
     Pawl.Codec.AttackCost
     Pawl.Codec.AttackCostSpec
     Pawl.Codec.AttackRequirement
@@ -563,6 +565,7 @@ library types
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected
     Pawl.Types.Aggregation
+    Pawl.Types.AlternativeCost
     Pawl.Types.Asked
     Pawl.Types.AttackCost
     Pawl.Types.AttackRequirement

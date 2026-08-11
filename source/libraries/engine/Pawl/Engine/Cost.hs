@@ -26,6 +26,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Commander as Commander
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -38,6 +39,7 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Claim (Claim)
@@ -176,6 +178,30 @@ costsFor name oid gs = case Game.lookupObject oid gs of
           -- same rules, so its cost is wrapped identically.
           withAdditional alternative =
             alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
+          -- CR 604.2: an alternative cost whose "as long as" clause does not hold
+          -- is not offered at all -- Asmoranomardicadaistinaculdacar is uncastable
+          -- until its controller has discarded a card this turn, and its printed
+          -- cost is unpayable (CR 118.6), so the whole card is.
+          --
+          -- CR 109.5's "you" is the OWNER, as Activate.graveyardAbilitiesOf reads it
+          -- for a condition on a card outside the battlefield: pawl has no way to
+          -- cast a card from another player's hand, so the owner and the caster are
+          -- the same player wherever this is asked (#96).
+          --
+          -- Projection.fullView for that function's reason too -- nothing here is
+          -- inside the layer fold, so there is no circularity to bound against --
+          -- and CR 604.7 is satisfied by construction: the card is in a zone, so
+          -- there is no last known information to fall back on.
+          available alternative = case AlternativeCost.condition alternative of
+            Nothing -> True
+            Just cond ->
+              Condition.holds
+                (Projection.fullView gs)
+                (Filter.contextFor (Just (Object.owner obj)) (Just oid))
+                gs
+                oid
+                cond
+          alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
        in case Object.zone obj of
             -- Rule 702.34a's "if the resulting spell is an instant or sorcery
             -- spell" is NOT re-asked here. It gates the PERMISSION
@@ -207,7 +233,7 @@ costsFor name oid gs = case Game.lookupObject oid gs of
                 <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
                    | Keyword.hasJumpStart (Face.keywords face)
                    ]
-            _ -> printed : fmap withAdditional (Face.alternativeCosts face)
+            _ -> printed : alternatives
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []
