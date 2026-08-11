@@ -1198,9 +1198,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Celestial Dawn is the pool's first card of that shape, so it is what proves
   -- the fold no longer consults the gate.
   --
-  -- Bob's Forest is the falsifier for a gate that answered by being eager:
-  -- "every land is a Plains" and "no land is a Plains" both terminate, and only
-  -- a board with a land on each side tells either from the right answer.
+  -- Bob's Forest is the falsifier for an affected-set test that answers by being
+  -- eager: "every land is a Plains" and "no land is a Plains" both terminate, and
+  -- only a board with a land on each side tells either from the right answer.
   Spec.it s "CR 305.7/109.5 Celestial Dawn sets only the lands its own controller controls" $ do
     forest <- S.printingOf s registry "Forest"
     dawn <- S.printingOf s registry "Celestial Dawn"
@@ -1218,7 +1218,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   --
   -- The pair differs in one thing -- whether the Aura is attached -- so a
   -- control fold that skipped the grant, or one that read owners, fails one leg
-  -- while the other still passes.
+  -- while the other still passes. Alice's own Forest is asserted in both legs, so
+  -- the unattached leg cannot pass by Celestial Dawn reaching nothing at all.
   Spec.it s "CR 613.1b Celestial Dawn reads the layer-2 controller, so a stolen land is a Plains" $ do
     forest <- S.printingOf s registry "Forest"
     dawn <- S.printingOf s registry "Celestial Dawn"
@@ -1226,11 +1227,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     controlMagic <- S.printingOf s registry "Control Magic"
     let base = Setup.emptyGame S.bothPlayers
         (bobLand, g1) = S.addCreature forest S.bob base
-        (_, g2) = S.addCreature livingPlane S.bob g1
-        (_, g3) = S.addCreature dawn S.alice g2
-        (aura, unattached) = S.addCreature controlMagic S.alice g3
+        (aliceLand, g2) = S.addCreature forest S.alice g1
+        (_, g3) = S.addCreature livingPlane S.bob g2
+        (_, g4) = S.addCreature dawn S.alice g3
+        (aura, unattached) = S.addCreature controlMagic S.alice g4
         gs = S.attach aura bobLand unattached
     Spec.assertBool s (Projection.isCreatureOf bobLand unattached) "Living Plane animates the land, so the Aura may enchant it"
+    Spec.assertEqWith s "Celestial Dawn is live: alice's own Forest is a Plains" (Projection.subtypesOf aliceLand unattached) (Set.singleton Subtype.Type.Plains)
     Spec.assertEqWith s "unattached: bob controls his Forest" (Projection.controllerOf bobLand unattached) (Just S.bob)
     Spec.assertEqWith s "so Celestial Dawn's set does not reach it" (Projection.subtypesOf bobLand unattached) (Set.singleton Subtype.Type.Forest)
     Spec.assertEqWith s "attached: alice controls it" (Projection.controllerOf bobLand gs) (Just S.alice)

@@ -3305,9 +3305,10 @@ data ControlGrant = MkControlGrant
 -- Matching arm -> controllerOf -> back here diverged rather than answering wrong,
 -- for a subtype-setting effect whose filter asks about control (Celestial Dawn).
 --
--- Hoisted for gather's reason: `controls` calls controllerOf once per battlefield
--- object, so recomputing this list inside it would be quadratic in the
--- battlefield, inside a loop the SBA sweep runs at every priority boundary.
+-- Hoisted like setLandSubtypeEffects and for its reason: `controls` calls
+-- controllerOf once per battlefield object, so recomputing this list inside it
+-- would be quadratic in the battlefield, inside a loop the SBA sweep runs at every
+-- priority boundary.
 --
 -- Removing that gate is what CR 613.1 wanted anyway: control is layer 2
 -- (CR 613.1b), the CR 305.7 land-subtype strip is layer 4 (CR 613.1d) and
@@ -3323,10 +3324,6 @@ data ControlGrant = MkControlGrant
 -- via Pawl.ProjectionSpec's two Celestial Dawn cases. Pawl.ProjectionSpec's "a
 -- layer-6 strip on the Aura does not undo its layer-2 grant" pins the same
 -- direction for layer 6.
---
--- Hoisted for liveGiven's reason: `controls` calls controllerOf once per
--- battlefield object, so recomputing this list inside it would be quadratic in the
--- battlefield, inside a loop the SBA sweep runs at every priority boundary.
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let grantsOf permId = case Game.lookupObject permId gs of
