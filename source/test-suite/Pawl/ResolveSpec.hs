@@ -5876,7 +5876,6 @@ personOfInterestSpec s registry = Spec.describe s "PersonOfInterest" $ do
             (poiId, gs1) = S.entersWithTrigger poi pid gs0
             settled = S.runPure S.identityAnswer gs1 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
         pure (settled, poiId, ours, yours)
-      suspectedOf oid gs = fmap Object.suspected (Game.lookupObject oid gs)
   Spec.it s "CR 701.60a the enters trigger suspects the Person and not the Detective it makes" $ do
     (gs, poiId, _, _) <- board 0 0 S.alice
     case S.tokensOf gs of
@@ -5954,7 +5953,6 @@ eliminateTheImpossibleSpec s registry = Spec.describe s "EliminateTheImpossible"
     case (S.tokensOf declared, attackers) of
       ([detectiveId], [attackerId]) -> do
         let after = S.runPure S.identityAnswer declared (S.cast S.alice spellId >> Stack.resolveTop >> Engine.settleForPriority)
-            suspectedOf oid gs = fmap Object.suspected (Game.lookupObject oid gs)
         -- The before half, on the very board the spell is cast from: without it
         -- every "after" assertion could be passing because the fixture never
         -- suspected anything.
@@ -5999,6 +5997,98 @@ repeatOffenderSpec s registry = Spec.describe s "RepeatOffender" $ do
           Left n -> Spec.assertFailure s ("expected exactly one activated ability, got " <> show n)
           Right twice -> Spec.assertEqWith s "the second finds it suspected and places a counter" (state twice) (Just True, 1, Just (3, 2))
 
+-- CR 701.60b read as a CRITERION, proved by Rune-Brand Juggler {B}{R} Creature --
+-- Human Shaman 2/2 (data/cards/rune-brand-juggler.json): "When this creature
+-- enters, suspect up to one target creature you control. {3}{B}{R}, Sacrifice a
+-- suspected creature: Target creature gets -5/-5 until end of turn."
+--
+-- The Filter atom rides a CR 701.21a sacrifice cost, so the designation decides
+-- both whether the ability can be activated at all and which permanent pays for
+-- it. Boggart Brute is on the board in both cases below, and it is what separates
+-- the designation from what CR 701.60c hangs off it: its menace is PRINTED and it
+-- is never suspected, so a criterion reading the menace grant rather than the
+-- designation would offer it as fodder.
+runeBrandJugglerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+runeBrandJugglerSpec s registry = Spec.describe s "RuneBrandJuggler" $ do
+  Spec.it s "CR 701.60b the cost takes the suspected creature, and the menace one is not a candidate" $ do
+    (jugglerId, pikerId, bruteId, wallId, gs0) <- jugglerBoard s registry
+    let entered = S.runPure (takingTargets 1 [pikerId]) gs0 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+    -- The board the activation happens on: exactly one of alice's three creatures
+    -- is suspected, so every assertion below has a same-board counterexample.
+    Spec.assertEqWith s "the Piker is suspected, the Brute and the Juggler are not" (fmap (`suspectedOf` entered) [pikerId, bruteId, jugglerId]) [Just True, Just False, Just False]
+    Spec.assertEqWith s "and the Brute's menace is printed rather than the designation's" (Projection.hasKeyword Keyword.Menace bruteId entered, suspectedOf bruteId entered) (True, Just False)
+    case Activate.abilitiesFor jugglerId entered of
+      [ability] -> do
+        Spec.assertBool s (Activate.activatable S.alice jugglerId ability entered) "a suspected creature to sacrifice makes it activatable"
+        let after = S.runPure (jugglerAnswer wallId bruteId) entered (Activate.activateAbility S.alice jugglerId ability >> Stack.resolveTop >> Engine.settleForPriority)
+        -- The interpreter asks for the BRUTE whenever a sacrifice is on offer, and
+        -- CR 701.21a's prompt is raised only above one candidate -- so a criterion
+        -- that dropped the designation would sacrifice the Brute here, and a
+        -- criterion that read menace would sacrifice it instead of the Piker.
+        Spec.assertBool s (not (S.onBattlefield pikerId after)) "the suspected creature paid the cost"
+        Spec.assertEqWith s "and reached alice's graveyard (CR 701.21a)" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Graveyard S.alice after)) [CardName.MkCardName $ Text.pack "Goblin Piker"]
+        Spec.assertBool s (S.onBattlefield bruteId after) "the creature with menace and no designation did not"
+        Spec.assertBool s (S.onBattlefield jugglerId after) "and neither did the Juggler"
+        Spec.assertEqWith s "before: the Wall is a 0/8" (S.powerToughnessOf wallId entered) (Just (0, 8))
+        Spec.assertEqWith s "after: the ability resolved for -5/-5" (S.powerToughnessOf wallId after) (Just (-5, 3))
+      other -> Spec.assertFailure s ("expected exactly one activated ability on the Juggler, got " <> show (length other))
+  -- The same board, the same lands and the same three creatures; the one
+  -- difference is CR 115.6's announcement, which leaves nothing suspected.
+  Spec.it s "CR 701.60b with nothing suspected the cost cannot be paid, though the creatures and the mana are the same" $ do
+    (jugglerId, pikerId, bruteId, _, gs0) <- jugglerBoard s registry
+    let entered = S.runPure decliningTargets gs0 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "the ETB was declined, so no creature is suspected" (fmap (`suspectedOf` entered) [pikerId, bruteId, jugglerId]) [Just False, Just False, Just False]
+    case Activate.abilitiesFor jugglerId entered of
+      [ability] -> do
+        -- NOT a mana or a timing failure: the case above answers True for the same
+        -- ability, on the same five lands, with the same three creatures and the
+        -- same target available -- the designation is the only thing that moved.
+        Spec.assertBool s (not (Activate.activatable S.alice jugglerId ability entered)) "three unsuspected creatures are not candidates"
+      other -> Spec.assertFailure s ("expected exactly one activated ability on the Juggler, got " <> show (length other))
+
+-- Rune-Brand Juggler entering under alice, who also controls the Goblin Piker its
+-- trigger will suspect and a Boggart Brute it will not, plus exactly the {3}{B}{R}
+-- the activated ability costs (four Swamps and a Mountain). bob's Wall of Stone is
+-- the ability's target, a 0/8 so that -5/-5 is legible without CR 704.5f taking it
+-- away.
+jugglerBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+jugglerBoard s registry = do
+  swamp <- S.printingOf s registry "Swamp"
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  brute <- S.printingOf s registry "Boggart Brute"
+  wall <- S.printingOf s registry "Wall of Stone"
+  juggler <- S.printingOf s registry "Rune-Brand Juggler"
+  let (_, g1) = S.addCreature mountain S.alice (S.landsInPlay swamp 4)
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (bruteId, g3) = S.addCreature brute S.alice g2
+      (wallId, g4) = S.addCreature wall S.bob g3
+      (jugglerId, g5) = S.entersWithTrigger juggler S.alice g4
+      gs =
+        g5
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+  pure (jugglerId, pikerId, bruteId, wallId, gs)
+
+-- CR 701.60b's designation, read off the object.
+suspectedOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Bool
+suspectedOf oid gs = fmap Object.suspected (Game.lookupObject oid gs)
+
+-- Aims the ability at `victim` and asks for `fodder` whenever CR 701.21a offers a
+-- sacrifice choice. The fodder is deliberately the permanent the criterion must
+-- NOT offer: at one candidate Prompt.ChooseSacrifices is elided, so this half of
+-- the interpreter can only ever fire on a criterion that is too wide.
+jugglerAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+jugglerAnswer victim fodder p = case p of
+  Prompt.ChooseSacrifices {} -> sacrifices fodder p
+  _ -> takingTargets 1 [victim] p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
@@ -6008,6 +6098,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   personOfInterestSpec s registry
   eliminateTheImpossibleSpec s registry
   repeatOffenderSpec s registry
+  runeBrandJugglerSpec s registry
   resolveSpec s registry
   fizzleSpec s registry
   indestructibleSpec s registry
