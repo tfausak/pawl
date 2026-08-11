@@ -61,6 +61,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 -- "a creature", the criterion Village Rites' additional cost and Diabolic Edict's
@@ -82,6 +83,7 @@ spec s registry = Spec.describe s "SacrificeRestriction" $ do
   ownerSpec s registry
   offerSpec s registry
   instructionSpec s registry
+  landSubtypeStripSpec s registry
 
 -- CR 108.3 / 110.2 / 111.2: whose card it is, asked apart from who controls it.
 ownerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -266,6 +268,61 @@ instructionSpec s registry = Spec.describe s "Instruction" $ do
       s
       (elem (GameEvent.PermanentSacrificed S.bob his) (S.eventsOf after))
       "and the sacrifice was recorded"
+
+-- CR 305.7 as Pawl.Engine.SacrificeRestriction reads it, which is the gate
+-- Pawl.Engine.Projection.liveAfterLayers holds for every reader CR 613.10 and CR
+-- 613.11 place after the seven layers. Ashaya, Soul of the Wild makes alice's
+-- nontoken creatures Forest LANDS at layer 4, Blood Moon then depends on that (CR
+-- 613.8a) and SETS every nonbasic land's subtype to Mountain, and CR 305.7 takes
+-- the animated Garland's rules text -- the prohibition with it.
+--
+-- What this discriminates is the gate's READING, not the strip: judged against the
+-- FINISHED projection Garland is a nonbasic land Blood Moon names, judged against
+-- BASE characteristics it is no land at all and keeps the sentence. Its
+-- counterparts for the five combat readers are in Pawl.CombatSpec's
+-- landSubtypeStripSpec, and for the player-ability reader in
+-- Pawl.PlayerEffectSpec.
+landSubtypeStripSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
+  Spec.it s "CR 305.7 an animated Garland set to Mountain prohibits no sacrifice" $ do
+    -- FOUR boards differing in nothing but which of the two permanents is present,
+    -- and each of the two one-card controls is load-bearing. Ashaya alone ADDS a
+    -- land type, and CR 305.7's last sentence keeps the rules text of a land that
+    -- gains types in addition to its own; Blood Moon alone names no creature.
+    garland <- S.printingOf s registry "Garland, Royal Kidnapper"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (garlandId, g0) = S.addCreature garland S.alice (Setup.emptyGame S.bothPlayers)
+        (stolen, g1) = S.addCreature piker S.bob g0
+        base = S.giveControl stolen S.alice g1
+        withAshaya = snd (S.addCreature ashaya S.alice base)
+        withMoon = snd (S.addCreature bloodMoon S.alice base)
+        -- Ashaya first, so Blood Moon's timestamp is the later one; CR 613.8a's
+        -- dependency decides the order either way, and Pawl.ProjectionSpec is
+        -- where that is asserted rather than assumed.
+        stripped = snd (S.addCreature bloodMoon S.alice withAshaya)
+    Spec.assertEqWith
+      s
+      "the stolen Piker can't be sacrificed until Ashaya and Blood Moon are both on the battlefield"
+      ( SacrificeRestriction.prohibited stolen base,
+        SacrificeRestriction.prohibited stolen withAshaya,
+        SacrificeRestriction.prohibited stolen withMoon,
+        SacrificeRestriction.prohibited stolen stripped
+      )
+      (True, True, True, False)
+    -- The anti-vacuity legs: the prohibition lifted because Garland lost its
+    -- sentence, not because the Piker left Garland's affected set. It is still a
+    -- creature (CR 305.7 removes no card type), still alice's, and still bob's
+    -- card -- which is every conjunct of "creatures you control that you don't
+    -- own".
+    Spec.assertBool s (Projection.isCreatureOf stolen stripped) "the Piker is still a creature"
+    Spec.assertEqWith s "still under alice's control" (Projection.controllerOf stolen stripped) (Just S.alice)
+    Spec.assertBool s (elem stolen (offered stripped)) "and it is a sacrifice alice may now make"
+    -- And an anchor on the other half, so a failure above says which moved. Both
+    -- readings of the gate agree about this one -- it is the layer fold's answer,
+    -- not the gate's.
+    Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf garlandId stripped)) "Garland is a Mountain"
 
 -- Can alice activate this permanent's sole activated ability right now? Taken
 -- off the PROJECTION, the route Pawl.Engine.Activate itself reads.
