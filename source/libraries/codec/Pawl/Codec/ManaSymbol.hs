@@ -1,19 +1,17 @@
 module Pawl.Codec.ManaSymbol where
 
-import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.ManaType as ManaType
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
-import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 
 codec :: Codec.Codec ManaSymbol.ManaSymbol
 codec =
   Arm.tagged
     encode
-    [ Arm.payload "Generic" naturalCodec ManaSymbol.Generic,
+    [ Arm.payload "Generic" Common.natural ManaSymbol.Generic,
       Arm.payload "OfType" ManaType.codec ManaSymbol.OfType,
       Arm.payload "Hybrid" (Common.tuple ManaType.codec ManaType.codec) (uncurry ManaSymbol.Hybrid),
       Arm.payload "MonocoloredHybrid" ManaType.codec ManaSymbol.MonocoloredHybrid,
@@ -33,15 +31,3 @@ codec =
       ManaSymbol.Phyrexian c -> Common.tagged "Phyrexian" . Just $ Codec.encode Color.codec c
       ManaSymbol.Snow -> Common.nullary "Snow"
       ManaSymbol.Variable -> Common.nullary "Variable"
-
--- | Unnamed, unlike 'Common.scalar': 'Natural.Natural' is not one of pawl's own
--- types, so it earns no $defs entry of its own. Built from
--- 'Common.decodeNatural'/'Common.encodeNatural' rather than
--- 'toEnum'/'fromIntegral', per the repo-wide ban.
-naturalCodec :: Codec.Codec Natural.Natural
-naturalCodec =
-  Codec.MkCodec
-    { Codec.encode = Common.encodeNatural,
-      Codec.decode = Common.decodeNatural,
-      Codec.schema = pure Schema.natural
-    }

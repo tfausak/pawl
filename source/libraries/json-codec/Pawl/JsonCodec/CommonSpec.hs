@@ -165,6 +165,10 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         (Either.isLeft (Codec.decode (Common.tuple integerCodec integerCodec) =<< Common.parse (Text.pack "[1,2,3]")))
         "expected a decode failure"
 
+  Spec.describe s "natural"
+    . Spec.it s "round trips"
+    $ Common.assertCodec s Common.natural 2 "2"
+
   Spec.describe s "list"
     . Spec.it s "round trips"
     $ Common.assertCodec s (Common.list integerCodec) [1, 2, 3] "[1,2,3]"

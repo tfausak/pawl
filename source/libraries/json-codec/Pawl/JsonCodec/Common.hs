@@ -366,6 +366,18 @@ tuple ca cb =
       Codec.schema = (\a b -> Schema.tupleOf [a, b]) <$> Codec.schema ca <*> Codec.schema cb
     }
 
+-- | Unnamed, unlike 'scalar': 'Natural.Natural' is not one of pawl's own
+-- types, so it earns no $defs entry. Distinct from 'Schema.natural' (a bare
+-- 'Schema.Schema', this module's import of it) despite the shared name --
+-- they live in different modules and this is the 'Codec.Codec' built from it.
+natural :: Codec.Codec Natural.Natural
+natural =
+  Codec.MkCodec
+    { Codec.encode = encodeNatural,
+      Codec.decode = decodeNatural,
+      Codec.schema = pure Schema.natural
+    }
+
 list :: Codec.Codec a -> Codec.Codec [a]
 list c =
   Codec.MkCodec

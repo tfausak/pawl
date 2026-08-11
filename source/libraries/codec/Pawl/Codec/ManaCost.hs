@@ -1,21 +1,32 @@
 module Pawl.Codec.ManaCost where
 
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.ManaSymbol as ManaSymbol
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonSchema.Define as Define
+import qualified Pawl.JsonSchema.Name as Name
+import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Types.ManaCost as ManaCost
 
--- | NOT 'Common.scalar': a ManaCost's wire shape is exactly the array
--- 'Common.list' already produces for @[ManaSymbol.ManaSymbol]@, with no fixed
--- schema of its own to file under "ManaCost" -- filing one would give the same
--- array a second, redundant $defs entry. A plain 'Codec.MkCodec' around
--- 'Common.list' reuses that schema as-is.
+-- | NOT 'Common.scalar': its signature takes a bare 'Schema.Schema', not a
+-- 'Define.SchemaM', so it cannot express a schema built from another codec's
+-- (recursive) 'Codec.schema'. A hand-built 'Codec.MkCodec' instead, but still
+-- NAMED: 'ManaCost' is a domain type a card author sees named in the schema
+-- ("mana" in @Pawl.Codec.Cost@) and should be able to look up, same as
+-- 'PlayerId' gets a $defs entry despite wrapping a bare 'Natural.Natural'. The
+-- distinction 'Common.scalar' vs. inlining is named-domain-type vs.
+-- structural-wrapper, never what the type wraps -- only 'Maybe' and a bare
+-- array (e.g. 'Common.list' itself) inline. 'ManaSymbol''s $defs entry
+-- documents the ELEMENT; this one documents the COLLECTION, so the two are not
+-- redundant with each other.
 codec :: Codec.Codec ManaCost.ManaCost
 codec =
   Codec.MkCodec
     { Codec.encode = Codec.encode listCodec . ManaCost.unwrap,
       Codec.decode = fmap ManaCost.MkManaCost . Codec.decode listCodec,
-      Codec.schema = Codec.schema listCodec
+      Codec.schema = Define.define (Name.typeName proxy) (Schema.array <$> Codec.schema ManaSymbol.codec)
     }
   where
     listCodec = Common.list ManaSymbol.codec
+    proxy = Typeable.Proxy :: Typeable.Proxy ManaCost.ManaCost
