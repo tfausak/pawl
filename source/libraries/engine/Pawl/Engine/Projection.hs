@@ -1252,10 +1252,10 @@ liveGiven setEffs oid gs =
 -- finished projection, which is what keeps CR 613.8's intra-layer ordering out of
 -- here.
 --
--- Seven callers share this, and rewriting the body to read base fails exactly one
--- case: PlayerEffect.applying's, cited above. For the block, attack, cost, combat
--- and sacrifice readers the projected read is unobserved -- they are right because
--- the gate is shared, not because a case pins them (#1273).
+-- Every reader after the layers shares this, and rewriting the body to read base
+-- fails exactly one case: PlayerEffect.applying's, cited above. For the block,
+-- attack, cost, combat and sacrifice readers the projected read is unobserved --
+-- they are right because the gate is shared, not because a case pins them (#1273).
 liveAfterLayers :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveAfterLayers setEffs oid gs =
   let view = project oid gs
