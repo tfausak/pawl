@@ -1893,13 +1893,16 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- "This spell" names the bearer and needs no Filter to say so.
   TriggerCondition.SelfCast -> []
 
--- CR 613.11: which spells a player effect names -- a cost modifier's (CR
+-- CR 613.11: which objects a player effect names -- a cost modifier's (CR
 -- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR
 -- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost f _ -> [f]
   PlayerEffect.ReduceSpellCost f _ -> [f]
+  -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
+  -- PERMANENT rather than a spell, and is authored the same way.
+  PlayerEffect.ReduceActivationCost f _ _ -> [f]
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantCastMoreThan _ -> []
   -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
@@ -1969,6 +1972,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- Serpopard says You.
   PlayerEffect.IncreaseSpellCost _ _ -> False
   PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False
@@ -2003,6 +2007,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.IncreaseSpellCost _ _ -> False
   PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False

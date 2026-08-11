@@ -73,6 +73,38 @@ data PlayerEffect
     -- component, which is Edgewalker's "This effect reduces only the amount of
     -- colored mana you pay" and not CR 118.7b-d (#309).
     ReduceSpellCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost
+  | -- | CR 613.11 / 601.2f / Heartstone, Training Grounds: the activated abilities
+    -- of matching permanents cost this much less to activate, and this effect may
+    -- not reduce the mana left in such a cost below the Natural.
+    --
+    -- A SEPARATE constructor from ReduceSpellCost, and that separation is the
+    -- whole of pawl's spell-vs-ability discriminator: the Filter these arms carry
+    -- classifies an OBJECT (Pawl.Engine.PlayerEffect.matchesObject reads a
+    -- projection), so nothing in a Filter can say "and it is a spell". Thalia's
+    -- IncreaseSpellCost narrows by `Not (HasCardType Creature)`, which a
+    -- noncreature PERMANENT matches -- so were one constructor asked at both
+    -- moments, Thalia would tax Mindslaver's activation. Which MOMENT an arm is
+    -- asked at is therefore the constructor's to say, and each of the two is
+    -- gathered by its own function (Pawl.Engine.PlayerEffect.spellCostAdjustments,
+    -- activationCostAdjustments).
+    --
+    -- The Filter is matched against the ability's SOURCE PERMANENT and not
+    -- against the ability, which is what both printings name: Heartstone says
+    -- "activated abilities of creatures" and Training Grounds "of creatures you
+    -- control" (HasCardType Creature, with the possessive riding the carrier's
+    -- PlayerScope as every other arm's does).
+    --
+    -- The FLOOR is carried rather than assumed, because it is card text (CR
+    -- 101.1) and not a rule: both printings say "This effect can't reduce the
+    -- mana in that cost to less than one mana" and so carry 1, while an
+    -- activation-cost reducer that does not say it (Hero of Iroas) carries 0.
+    -- See Pawl.Types.CostAdjustments.minimumMana for what zero means and why the
+    -- clamp never raises a cost.
+    --
+    -- Not implemented: nothing INCREASES an activation cost (Suppression Field),
+    -- which would be this arm's sibling and needs the "unless they're mana
+    -- abilities" rider besides (#1242).
+    ReduceActivationCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost Natural.Natural
   | -- | CR 305.2 / Exploration, Azusa Lost but Seeking: this player may play this
     -- many lands each turn OVER the one CR 305.2 normally allows.
     --

@@ -162,12 +162,15 @@ doorSpec s registry =
           skeletons = ActivatedAbility.cost (theAbility drudgeSkeletons)
       Spec.assertBool s (Cost.requiresSicknessCheck elves) "Llanowar Elves' {T} cost requires the tap symbol"
       Spec.assertBool s (not (Cost.requiresSicknessCheck skeletons)) "Drudge Skeletons' {B} regenerate cost does not"
-    -- Departure 1: Pawl.Engine.Activate does NOT route an ability cost through
-    -- Cost.total. PlayerEffect.matchesSpell classifies an OBJECT, not a spell,
-    -- so a noncreature PERMANENT matches Thalia's Not (HasCardType Creature)
-    -- filter -- and Thalia taxes noncreature SPELLS, never abilities. Four Mountains
-    -- must still afford Mindslaver's printed {4}; a fifth would be needed if
-    -- the tax wrongly reached the activation (#90).
+    -- Departure 1: an activation cost is totalled against the ACTIVATION
+    -- adjustments (Cost.activationAdjustments) and never the spell's, which is
+    -- the whole of the discriminator #90 landed. PlayerEffect.matchesObject
+    -- classifies an OBJECT, not a spell, so a noncreature PERMANENT matches
+    -- Thalia's Not (HasCardType Creature) filter as readily as a noncreature
+    -- spell does -- and Thalia taxes noncreature SPELLS, never abilities. Four
+    -- Mountains must still afford Mindslaver's {4}; a fifth would be needed if
+    -- the tax reached the activation. Pawl.ActivateSpec's Heartstone group is the
+    -- other side of the same board: a reduction that DOES reach it.
     Spec.it s "CR 613.11 Thalia does not tax a noncreature permanent's activated ability" $ do
       mountain <- S.printingOf s registry "Mountain"
       mindslaver <- S.printingOf s registry "Mindslaver"

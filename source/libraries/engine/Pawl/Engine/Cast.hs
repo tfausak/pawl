@@ -224,7 +224,7 @@ payableCost = payableCostAt 0
 -- was entitled to.
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x pid oid gs cost =
-  Cost.canPaySomeCompletion pid oid (Cost.totalManas pid oid gs) (Cost.substituteX x cost) gs
+  Cost.canPaySomeCompletion pid oid (Cost.totalManas (Cost.spellAdjustments pid oid gs)) (Cost.substituteX x cost) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -234,7 +234,8 @@ payableCostAt x pid oid gs cost =
 -- this is legal (CR 601.2b) and what it costs the player (#741).
 --
 -- The SEARCH is Cost.greatestPayableX, shared with Activate.affordableX; the
--- PREDICATE is not, since an activation cost skips CR 601.2f's totalling (#90).
+-- PREDICATE is not, since an activation cost totals against its own adjustments
+-- (Cost.activationAdjustments).
 -- This haddock discharges that search's monotonicity requirement for the spell's
 -- predicate.
 --
@@ -1044,7 +1045,7 @@ castProposed pid sid face castFrom candidates before = do
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
                   -- payableCost gated this cast on, read from the same `gs` the
                   -- total below is.
-                  announcedCost <- Cost.announce pid sid (Cost.totalManas pid sid gs) announcedAtX
+                  announcedCost <- Cost.announce pid sid (Cost.totalManas (Cost.spellAdjustments pid sid gs)) announcedAtX
                   -- CR 601.2c, and the spell is on the stack for it: `sets` above
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in
@@ -1071,7 +1072,7 @@ castProposed pid sid face castFrom candidates before = do
                       -- worse one -- CR 118.7e attaches no condition to the
                       -- choice, and CR 601.2h's failed payment is what `reject`
                       -- below answers with.
-                      adjustments <- Cost.announceReductions pid sid gs
+                      adjustments <- Cost.announceReductions pid sid gs (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
                       payment <- Cost.pay pid sid paidCost
                       case payment of

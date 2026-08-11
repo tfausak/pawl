@@ -80,6 +80,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -290,6 +291,18 @@ green = ManaSymbol.OfType (ManaType.Colored Color.Green)
 phyrexianGreen :: ManaSymbol.ManaSymbol
 phyrexianGreen = ManaSymbol.Phyrexian Color.Green
 
+-- CR 601.2f's adjustments as this suite's assertions state them: the increases,
+-- the reductions, and no floor -- Pawl.Types.CostAdjustments.minimumMana is
+-- Heartstone's sentence, and no spell-cost reducer states it (the activation side
+-- is proved against the card in Pawl.ActivateSpec).
+adjustments :: [Natural] -> [ManaCost.ManaCost] -> CostAdjustments.CostAdjustments
+adjustments increases reductions =
+  CostAdjustments.MkCostAdjustments
+    { CostAdjustments.increases = increases,
+      CostAdjustments.reductions = reductions,
+      CostAdjustments.minimumMana = 0
+    }
+
 -- A reduction by an amount of GENERIC mana (CR 118.7a) -- the Medallion's shape,
 -- and the only shape a reduction had before Edgewalker.
 generic :: Natural -> ManaCost.ManaCost
@@ -297,7 +310,7 @@ generic n = ManaCost.MkManaCost [ManaSymbol.Generic n]
 
 -- Cost.total via a bare ManaCost, component-free -- this suite predates P8's
 -- Cost/CostComponent generalization and exercises only the mana half
--- (costAdjustments), so the wrap-and-unwrap stays local here instead of
+-- (spellCostAdjustments), so the wrap-and-unwrap stays local here instead of
 -- rewriting every assertion below to a full Cost.Type.MkCost literal.
 totalManaCost :: PlayerId.PlayerId -> ObjectId.ObjectId -> ManaCost.ManaCost -> GameState.GameState -> Maybe ManaCost.ManaCost
 totalManaCost pid oid manaCost gs = Cost.Type.mana (Cost.total pid oid (Cost.Type.MkCost (Just manaCost) []) gs)
@@ -309,14 +322,14 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "unchanged"
-        (Cost.applyAdjustments ([], []) (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+        (Cost.applyAdjustments (adjustments [] []) (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
 
     Spec.it s "CR 601.2f an increase adds generic mana" $
       Spec.assertEqWith
         s
         "{R} taxed by {1} is {1}{R}"
-        (Cost.applyAdjustments ([1], []) (ManaCost.MkManaCost [red]))
+        (Cost.applyAdjustments (adjustments [1] []) (ManaCost.MkManaCost [red]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, red])
 
     -- CR 118.7a: "Effects that reduce a cost by an amount of generic mana
@@ -326,21 +339,21 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{U} reduced by {1} is still {U}"
-        (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [blue]))
+        (Cost.applyAdjustments (adjustments [] [generic 1]) (ManaCost.MkManaCost [blue]))
         (ManaCost.MkManaCost [blue])
 
     Spec.it s "CR 118.7a a reduction takes only the generic component" $
       Spec.assertEqWith
         s
         "{2}{U} reduced by {1} is {1}{U}"
-        (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+        (Cost.applyAdjustments (adjustments [] [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
 
     Spec.it s "CR 601.2f the total can't be reduced below {0}" $
       Spec.assertEqWith
         s
         "{1} reduced by {3} is {0}"
-        (Cost.applyAdjustments ([], [generic 3]) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+        (Cost.applyAdjustments (adjustments [] [generic 3]) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
         (ManaCost.MkManaCost [])
 
     -- THE ORDER TEST, in the small. Increase first gives {1}{U}, which the
@@ -350,7 +363,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{U} +{1} -{1} is {U}"
-        (Cost.applyAdjustments ([1], [generic 1]) (ManaCost.MkManaCost [blue]))
+        (Cost.applyAdjustments (adjustments [1] [generic 1]) (ManaCost.MkManaCost [blue]))
         (ManaCost.MkManaCost [blue])
 
     -- CR 118.7's typed half, which CR 118.7a's generic half above cannot
@@ -359,14 +372,14 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{W}{B} reduced by {W}{B} is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     Spec.it s "CR 118.7 one reducing symbol takes exactly one matching symbol" $
       Spec.assertEqWith
         s
         "{W}{W} reduced by {W} is {W}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [white, white]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [white, white]))
         (ManaCost.MkManaCost [white])
 
     -- THE HEADLINE FALSIFIER for the typed half, and the one place pawl
@@ -378,7 +391,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{W} reduced by {W}{B} is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     -- Ruling: "If you have more than one of these on the battlefield, the cost
@@ -388,7 +401,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{W}{B} reduced by {W}{B} twice is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     -- CR 118.7f, in the small: the two SIDES of the cancellation read a
@@ -400,14 +413,14 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{G} reduced by {G/P} is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [phyrexianGreen]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [phyrexianGreen]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
     Spec.it s "a Phyrexian symbol in the COST is not what a reduction of its colour takes" $
       Spec.assertEqWith
         s
         "{G/P} reduced by {G} is still {G/P}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [green]]) (ManaCost.MkManaCost [phyrexianGreen]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [green]]) (ManaCost.MkManaCost [phyrexianGreen]))
         (ManaCost.MkManaCost [phyrexianGreen])
 
     -- CR 118.7e, in the small: WHICH TWO THINGS the payer is choosing between.
@@ -460,12 +473,12 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{W}{B} reduced by the white half is {1}{B}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, black])
       Spec.assertEqWith
         s
         "{1}{W}{B} reduced by the black half is {1}{W}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, white])
 
     -- CR 118.7g, in the small, and the other arm where the two sides part
@@ -475,7 +488,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{2}{U} reduced by {S} is {1}{U}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [ManaSymbol.Snow]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [ManaSymbol.Snow]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
 
     -- CR 107.4h's half of the same split: "Effects that reduce the amount of
@@ -490,7 +503,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{1}{S} reduced by {1} is {S}"
-        (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.Snow]))
+        (Cost.applyAdjustments (adjustments [] [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.Snow]))
         (ManaCost.MkManaCost [ManaSymbol.Snow])
 
     -- The two halves of ONE reduction, on the two halves of one cost: CR
@@ -500,7 +513,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{2}{U} reduced by {1}{U} is {1}"
-        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+        (Cost.applyAdjustments (adjustments [] [ManaCost.MkManaCost [ManaSymbol.Generic 1, blue]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
 
 -- alice controls Thalia and `n` untapped Mountains; her hand holds one
@@ -2238,8 +2251,8 @@ silenceSpec s registry =
 
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).
-matchesSpellBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-matchesSpellBoard lightningBolt piker =
+matchesObjectBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+matchesObjectBoard lightningBolt piker =
   let base = Setup.emptyGame S.bothPlayers
       (bolt, withBolt) = S.spellOnStack lightningBolt S.alice base
       (pikerId, gs) = S.spellOnStack piker S.alice withBolt
@@ -2249,34 +2262,34 @@ matchesSpellBoard lightningBolt piker =
 -- over the PROJECTED view (CR 613.1d layer 4 for a card type, CR 613.1e layer 5
 -- for a colour) rather than the retired SpellCriterion. A noncreature spell is
 -- Filter.Not (Filter.HasCardType Creature); a coloured spell is Filter.HasColor.
-matchesSpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-matchesSpellSpec s registry =
-  Spec.describe s "matchesSpell" $ do
+matchesObjectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+matchesObjectSpec s registry =
+  Spec.describe s "matchesObject" $ do
     let noncreature = Filter.Type.Not (Filter.Type.HasCardType CardType.Creature)
 
     Spec.it s "CR 613.1d Thalia's noncreature criterion admits an instant" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
-      Spec.assertBool s (PlayerEffect.matchesSpell noncreature bolt gs) "Lightning Bolt is a noncreature spell"
+      let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
+      Spec.assertBool s (PlayerEffect.matchesObject noncreature bolt gs) "Lightning Bolt is a noncreature spell"
 
     Spec.it s "CR 613.1d a creature spell fails the noncreature criterion" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (_, pikerId, gs) = matchesSpellBoard lightningBolt piker
-      Spec.assertBool s (not (PlayerEffect.matchesSpell noncreature pikerId gs)) "Goblin Piker is a creature spell"
+      let (_, pikerId, gs) = matchesObjectBoard lightningBolt piker
+      Spec.assertBool s (not (PlayerEffect.matchesObject noncreature pikerId gs)) "Goblin Piker is a creature spell"
 
     Spec.it s "CR 613.1e a colour criterion admits a matching-colour spell" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
-      Spec.assertBool s (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
+      let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
+      Spec.assertBool s (PlayerEffect.matchesObject (Filter.Type.HasColor Color.Red) bolt gs) "Lightning Bolt is red"
 
     Spec.it s "CR 613.1e a colour criterion rejects a non-matching colour" $ do
       lightningBolt <- S.printingOf s registry "Lightning Bolt"
       piker <- S.printingOf s registry "Goblin Piker"
-      let (bolt, _, gs) = matchesSpellBoard lightningBolt piker
-      Spec.assertBool s (not (PlayerEffect.matchesSpell (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
+      let (bolt, _, gs) = matchesObjectBoard lightningBolt piker
+      Spec.assertBool s (not (PlayerEffect.matchesObject (Filter.Type.HasColor Color.Blue) bolt gs)) "Lightning Bolt is not blue"
 
 -- Null Chamber {3}{W} World Enchantment: "As this enchantment enters, you and an
 -- opponent each choose a card name other than a basic land card name. Spells
@@ -3439,7 +3452,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   storedSpec s registry
   silenceSpec s registry
   extraLandDropsSpec s registry
-  matchesSpellSpec s registry
+  matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
