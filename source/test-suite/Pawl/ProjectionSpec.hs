@@ -1183,6 +1183,59 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "Urborg itself is only an Island now" (Projection.subtypesOf urborgId gs) (Set.singleton Subtype.Type.Island)
     Spec.assertEqWith s "and the Forest is a plain Forest again" (Projection.subtypesOf forestId gs) (Set.singleton Subtype.Type.Forest)
 
+  -- Not implemented, so the card file omits them: Celestial Dawn's colour clause
+  -- for spells you control and nonland cards you own off the battlefield (#160),
+  -- and its mana clause -- "You may spend white mana as though it were mana of any
+  -- color. You may spend other mana only as though it were colorless mana" (#96).
+  -- That clause's permission and restriction go together, so pawl's card is more
+  -- permissive than printed about spending non-white mana; nothing below reads
+  -- mana. Its first two clauses are printed in full.
+  --
+  -- CR 305.7's gate reached by an affected set that asks who CONTROLS the
+  -- candidate, which is the shape that used to make Projection.controllerOf
+  -- diverge: the control fold gated itself on CR 305.7, the gate evaluated
+  -- "lands you control", and CR 109.5's "you" asked the control fold again.
+  -- Celestial Dawn is the pool's first card of that shape, so it is what proves
+  -- the fold no longer consults the gate.
+  --
+  -- Bob's Forest is the falsifier for a gate that answered by being eager:
+  -- "every land is a Plains" and "no land is a Plains" both terminate, and only
+  -- a board with a land on each side tells either from the right answer.
+  Spec.it s "CR 305.7/109.5 Celestial Dawn sets only the lands its own controller controls" $ do
+    forest <- S.printingOf s registry "Forest"
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    let base = Setup.emptyGame S.bothPlayers
+        (aliceLand, g1) = S.addCreature forest S.alice base
+        (bobLand, g2) = S.addCreature forest S.bob g1
+        gs = snd (S.addCreature dawn S.alice g2)
+    Spec.assertEqWith s "alice's Forest is a Plains" (Projection.subtypesOf aliceLand gs) (Set.singleton Subtype.Type.Plains)
+    Spec.assertEqWith s "bob's Forest is untouched" (Projection.subtypesOf bobLand gs) (Set.singleton Subtype.Type.Forest)
+    Spec.assertEqWith s "and asking who controls one answers rather than diverging" (Projection.controllerOf bobLand gs) (Just S.bob)
+
+  -- The other half: the perspective Celestial Dawn's filter reads is the CR
+  -- 613.1b LAYER-2 controller, not the owner. Control Magic can only enchant a
+  -- creature (CR 303.4), so Living Plane animates the land first.
+  --
+  -- The pair differs in one thing -- whether the Aura is attached -- so a
+  -- control fold that skipped the grant, or one that read owners, fails one leg
+  -- while the other still passes.
+  Spec.it s "CR 613.1b Celestial Dawn reads the layer-2 controller, so a stolen land is a Plains" $ do
+    forest <- S.printingOf s registry "Forest"
+    dawn <- S.printingOf s registry "Celestial Dawn"
+    livingPlane <- S.printingOf s registry "Living Plane"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    let base = Setup.emptyGame S.bothPlayers
+        (bobLand, g1) = S.addCreature forest S.bob base
+        (_, g2) = S.addCreature livingPlane S.bob g1
+        (_, g3) = S.addCreature dawn S.alice g2
+        (aura, unattached) = S.addCreature controlMagic S.alice g3
+        gs = S.attach aura bobLand unattached
+    Spec.assertBool s (Projection.isCreatureOf bobLand unattached) "Living Plane animates the land, so the Aura may enchant it"
+    Spec.assertEqWith s "unattached: bob controls his Forest" (Projection.controllerOf bobLand unattached) (Just S.bob)
+    Spec.assertEqWith s "so Celestial Dawn's set does not reach it" (Projection.subtypesOf bobLand unattached) (Set.singleton Subtype.Type.Forest)
+    Spec.assertEqWith s "attached: alice controls it" (Projection.controllerOf bobLand gs) (Just S.alice)
+    Spec.assertEqWith s "so now Celestial Dawn's set does reach it" (Projection.subtypesOf bobLand gs) (Set.singleton Subtype.Type.Plains)
+
   Spec.it s "CR 613.8 Urborg's stripped ability adds no Swamp to a Forest (Blood Moon older)" $ do
     forest <- S.printingOf s registry "Forest"
     urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"

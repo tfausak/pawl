@@ -1886,7 +1886,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- do not.
           --
           -- A second board walk on the same hot path as `snapshot` above
-          -- (controllerOf rebuilds controlGrants and its liveGiven fixpoint).
+          -- (controllerOf rebuilds controlGrants, a walk of the battlefield).
           -- Measured on the tasty-bench suite, this commit's parent vs. this
           -- change (goldfish / casting / fighting / fighting-aura, 2p):
           -- 15.2/133/24.6/569 ms -> 15.5/134/25.2/575 ms -- every move inside

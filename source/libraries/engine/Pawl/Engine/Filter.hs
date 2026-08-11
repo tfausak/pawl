@@ -117,9 +117,8 @@ data View = MkView
     -- Projection.affects while a projection is being computed. Nothing forces
     -- this field unless a Filter actually contains IsAttachedToCreature, and no
     -- affected-set filter in the pool does; one that did would recurse back into
-    -- the projection that is asking. That is the same laziness accident
-    -- Projection.affects records for `perspective` (#197), and it is a fact about
-    -- the pool's card data rather than a guarantee this record enforces.
+    -- the projection that is asking. A fact about the pool's card data rather than
+    -- a guarantee this record enforces (#357).
     attachedToCreature :: Bool,
     -- CR 303.4: is this candidate attached to a PERMANENT right now? Read from
     -- Object.attachedTo alone -- whether the attachment names an object rather
