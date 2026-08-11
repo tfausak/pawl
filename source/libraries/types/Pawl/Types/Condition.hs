@@ -27,7 +27,8 @@ import qualified Pawl.Types.Quantity as Quantity
 -- what lets a condition read the object it is evaluated against rather than a set
 -- swept out of a zone, which CR 603.4's intervening "if" on a
 -- leaves-the-battlefield ability needs: the source is gone, so CR 608.2h answers
--- through Projection.viewWithLastKnown.
+-- through Projection.viewWithLastKnownAnywhere -- which owes the same fallback to
+-- an object the clause names through a SLOT, rule 702.100a's entrant being one.
 --
 -- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
 -- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. An

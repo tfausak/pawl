@@ -413,25 +413,59 @@ fullView gs oid = Just (viewOfObject oid gs)
 -- read from last known information once it no longer exists -- what a resolving
 -- spell wants for anything it reads about its own source.
 --
--- Scoped to `src` alone by design: CR 608.2h's fallback is about a specific
--- object an effect asks after, while an off-battlefield candidate a COUNT sweeps
--- is matched on printed characteristics instead (#160). The trigger is that the
--- id names no object, which per CR 400.7 is exactly CR 608.2h's condition.
+-- Scoped to `src` alone by design, and the scope is a rules decision: the OTHER
+-- object a resolving effect reads is its target, and CR 608.2b answers the same
+-- question the other way there -- an effect needing information about a target
+-- that has left "fails to determine any such information", which is the blank
+-- answer fullView gives. The trigger is that the id names no object, which per CR
+-- 400.7 is exactly CR 608.2h's condition.
 --
--- Nothing when the source is gone and nothing was recorded for it, which lands
--- on the no-op every caller already gives an unevaluable quantity. The
--- controller comes from the same record rather than Nothing, so a ControlledBy
--- filter read against a gone source still names whoever last controlled it, and
--- so do the COUNTERS -- CR 122.2 made them cease to exist with the object, and
--- the record is the only place Quantity.ObjectCounters can still find them.
+-- viewWithLastKnownAnywhere below is the unscoped counterpart, and where the
+-- record read and its no-record answer are accounted for. Picking the wrong one
+-- of the two is not a type error -- both are Count.ViewOf -- so it is a silent
+-- wrong answer for any id but the source's.
 viewWithLastKnown :: ObjectId -> GameState -> Count.ViewOf
 viewWithLastKnown src gs oid =
-  if oid == src && not (Map.member oid (GameState.objects gs))
-    then
+  if oid == src
+    then viewWithLastKnownAnywhere gs oid
+    else fullView gs oid
+
+-- CR 608.2h for EVERY id the reader is aimed at rather than for one named object:
+-- what an intervening "if" wants, because CR 603.4's clause may be about the
+-- object the EVENT named rather than about the source. Rule 702.100a's evolve is
+-- the case -- "that creature's power" is the entrant, reached through
+-- Quantity.AgainstSlot at Binding.became, and an entrant killed while the trigger
+-- waits is still compared at the power and toughness it last had on the
+-- battlefield (rule 702.100a's own rulings say so).
+--
+-- viewWithLastKnown above is this function scoped to one id, and delegates rather
+-- than restating the record read, so the two cannot drift. Widening THAT function
+-- instead of adding this one would be wrong rather than merely broader: its
+-- callers hand it the source of a RESOLVING spell or ability, and the other object
+-- such an effect reads is its TARGET -- for which CR 608.2b says the opposite,
+-- that an effect needing information about a target that has left "fails to
+-- determine any such information". A blank answer is the rule there.
+--
+-- Aiming it at an id no ability named is safe, which is what lets it be a view
+-- rather than a lookup: the ids that reach it are the ones a reference or a slot
+-- names, since a Quantity.Count draws its candidates from zones and a zone holds
+-- no id that names nothing (#160).
+--
+-- Nothing when the object is gone and nothing was filed for it, which lands on
+-- the no-op every caller already gives an unevaluable quantity -- where fullView
+-- would hand back a Just over an empty projection. The controller comes from the
+-- record rather than Nothing, so a ControlledBy filter read against a gone object
+-- still names whoever last controlled it, and so do the COUNTERS: CR 122.2 made
+-- them cease to exist with the object, and the record is the only place
+-- Quantity.ObjectCounters can still find them.
+viewWithLastKnownAnywhere :: GameState -> Count.ViewOf
+viewWithLastKnownAnywhere gs oid =
+  if Map.member oid (GameState.objects gs)
+    then fullView gs oid
+    else
       fmap
         (\lk -> viewOfCharacteristics oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
         (Map.lookup oid (GameState.lastKnown gs))
-    else fullView gs oid
 
 -- CR 608.2h: this object's last known information, and only when the id names
 -- nothing -- Nothing while the object is still there, so a caller falls through
