@@ -501,10 +501,14 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 509.3b names the attacker without counting anything, so no Count either.
   TriggerCondition.SelfBlocksCreature -> []
   TriggerCondition.SelfBlocksAtLeast _ -> []
+  -- CR 509.3e's filtered form spends the number on a quality instead, so its
+  -- Filter holds no Count either.
+  TriggerCondition.SelfBlocksOneOrMore _ -> []
   TriggerCondition.SelfBecomesBlocked -> []
   -- CR 509.3d's Filter is a predicate over the blocker, and holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.SelfBecomesBlockedBy _ -> []
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
   TriggerCondition.SelfCycled -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
@@ -1892,14 +1896,20 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- attacked, so no Filter.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
-  -- CR 509.3b names no quality the attacker must have: every printing of that
-  -- form says "a creature" and stops there.
+  -- CR 509.3b's condition carries no Filter, so there is none to traverse. The
+  -- printings that narrow the attacker are not served yet (#1253).
   TriggerCondition.SelfBlocksCreature -> []
   TriggerCondition.SelfBlocksAtLeast _ -> []
+  -- CR 509.3e's filtered form names a quality the attackers blocked must have,
+  -- so this one DOES carry a Filter.
+  TriggerCondition.SelfBlocksOneOrMore f -> [f]
   TriggerCondition.SelfBecomesBlocked -> []
   -- CR 509.3d names a quality the blocker must have, so this one DOES carry a
   -- Filter -- rule 702.25a's "without flanking".
   TriggerCondition.SelfBecomesBlockedBy f -> [f]
+  -- The same rule's attacking-side form, whose Filter is a predicate over the
+  -- blockers -- Serra Inquisitors' "black".
+  TriggerCondition.SelfBecomesBlockedByOneOrMore f -> [f]
   TriggerCondition.SelfCycled -> []
   TriggerCondition.PlayerDiscards _ -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.

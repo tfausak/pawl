@@ -3301,6 +3301,54 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
+  -- CR 509.3e: the bearer blocked at least one creature the Filter admits. The
+  -- same grouped event SelfBlocks and SelfBlocksAtLeast read, so the printed "one
+  -- or more" fires once for the whole declaration; SelfBlocksCreature's arm above
+  -- is the per-attacker reading, and two admitted attackers tells them apart.
+  --
+  -- The attackers come from Combat.blockers rather than from the event, which
+  -- carries a count and no ids -- the count being unfiltered, and this condition
+  -- asking about a quality. That map is keyed by ATTACKER, so the bearer's own
+  -- entries are the ones whose blocker set holds it. Exact at this moment for
+  -- SelfAttacksWithAnother's reason: CR 509.2a puts these triggers on the stack
+  -- before any player gets priority, so the record still holds the declaration
+  -- that made the event.
+  --
+  -- viewWithLastKnown, and the Filter context framed by the bearer, exactly as
+  -- SelfBecomesBlockedBy's arm below does it.
+  TriggerCondition.SelfBlocksOneOrMore f -> case event of
+    GameEvent.BlocksDeclared blocker _
+      | blocker == bearer ->
+          let admits attacker = maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown attacker gs attacker)
+              blocked = [attacker | (attacker, blockers) <- Map.toList (Combat.blockers (GameState.combat gs)), Set.member bearer blockers]
+           in any admits blocked
+    GameEvent.BlocksDeclared _ _ -> False
+    -- The PAIRWISE event is CR 509.3b's, and matching it here would fire once per
+    -- attacker blocked rather than once for the declaration.
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameRenowned _ -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 509.3c: the bearer BECAME a blocked creature, which CR 509.1h makes the
   -- declaration's other product. SelfBlocks' arm above is the mirror.
   --
@@ -3358,6 +3406,45 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     -- The GROUPED event is CR 509.3c's, and matching it here would collapse two
     -- blockers into one trigger.
     GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameRenowned _ -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+  -- CR 509.3e read from the attacking side: the bearer became blocked, by at
+  -- least one creature the Filter admits. The GROUPED event, which is the printed
+  -- "one or more" -- the arm above fires once per blocker, and two admitted
+  -- blockers tells the two apart.
+  --
+  -- The blockers come from Combat.blockers for SelfBlocksOneOrMore's reason:
+  -- GameEvent.AttackerBlocked names the attacker and CR 508.5's defending player,
+  -- and no blocker at all. The map is keyed by attacker, so the bearer's own entry
+  -- is the whole answer here.
+  TriggerCondition.SelfBecomesBlockedByOneOrMore f -> case event of
+    GameEvent.AttackerBlocked attacker _
+      | attacker == bearer ->
+          let admits blocker = maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown blocker gs blocker)
+           in any admits (Set.toList (Map.findWithDefault Set.empty bearer (Combat.blockers (GameState.combat gs))))
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared _ _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -4402,8 +4489,10 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
+  TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
   TriggerCondition.SelfDies -> False
@@ -4774,6 +4863,7 @@ eventBindingSlots cond = case cond of
   -- names.
   TriggerCondition.SelfBlocks -> Set.empty
   TriggerCondition.SelfBlocksAtLeast _ -> Set.empty
+  TriggerCondition.SelfBlocksOneOrMore _ -> Set.empty
   -- CR 509.3b's form is the one that DOES name the attacker, off the same event.
   -- Guaranteed rather than conditional, as SelfBecomesBlockedBy's is: every
   -- declaration carries both ids, and matchesTrigger has already pinned the
@@ -4793,6 +4883,9 @@ eventBindingSlots cond = case cond of
   -- Guaranteed rather than conditional -- every such event carries both ids, and
   -- matchesTrigger has already pinned the attacker to the bearer.
   TriggerCondition.SelfBecomesBlockedBy _ -> Set.singleton Binding.blockingCreature
+  -- CR 509.3e names a SET of blockers rather than one, and no reader in the
+  -- pool reaches into it: Serra Inquisitors' payload names only itself.
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> Set.empty
   -- CR 113.6k: the bearer of a library-to-graveyard trigger IS the arriving
   -- incarnation, so binding it again under `became` would be a second name for
   -- one object. Narcomoeba reads the source slot instead.
@@ -5043,8 +5136,10 @@ looksBack condition = case condition of
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
+  TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
   TriggerCondition.PlayerGainsLife _ -> False
@@ -5598,8 +5693,10 @@ zoneTriggeredFrom cond = case cond of
   TriggerCondition.SelfBlocks -> Nothing
   TriggerCondition.SelfBlocksCreature -> Nothing
   TriggerCondition.SelfBlocksAtLeast _ -> Nothing
+  TriggerCondition.SelfBlocksOneOrMore _ -> Nothing
   TriggerCondition.SelfBecomesBlocked -> Nothing
   TriggerCondition.SelfBecomesBlockedBy _ -> Nothing
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> Nothing
   -- CR 702.29c: a cycling ability triggers from whatever zone the card winds up
   -- in, the graveyard for every printing in this pool, and a cycled card cannot be
   -- on the battlefield. eventTriggers' `cycledCard` is what actually serves it.
@@ -5747,8 +5844,10 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
+  TriggerCondition.SelfBlocksOneOrMore _ -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
   TriggerCondition.SelfDies -> False
@@ -5874,8 +5973,10 @@ stateTriggers gs
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature -> False
               TriggerCondition.SelfBlocksAtLeast _ -> False
+              TriggerCondition.SelfBlocksOneOrMore _ -> False
               TriggerCondition.SelfBecomesBlocked -> False
               TriggerCondition.SelfBecomesBlockedBy _ -> False
+              TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
               TriggerCondition.SelfCycled -> False
               TriggerCondition.PlayerDiscards _ -> False
               TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False

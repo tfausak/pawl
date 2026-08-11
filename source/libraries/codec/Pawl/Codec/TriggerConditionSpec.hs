@@ -8,6 +8,7 @@ import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -185,6 +186,16 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SelfBlocksAtLeast 2)
       """ {"type":"SelfBlocksAtLeast","value":2} """
+  -- CR 509.3e's filtered form, whose tag must stay distinct from the counted one
+  -- above: the two read the same grouped event and differ only in what they ask
+  -- of it.
+  Spec.it s "SelfBlocksOneOrMore" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfBlocksOneOrMore (Filter.HasColor Color.Black))
+      """ {"type":"SelfBlocksOneOrMore","value":{"type":"HasColor","value":{"type":"Black"}}} """
   -- CR 509.3c, nullary for the same reason, and a distinct tag from the sibling
   -- above: the two name opposite sides of one declaration.
   Spec.it s "SelfBecomesBlocked" $
@@ -203,6 +214,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SelfBecomesBlockedBy (Filter.Not (Filter.HasKeyword Keyword.Flanking)))
       """ {"type":"SelfBecomesBlockedBy","value":{"type":"Not","value":{"type":"HasKeyword","value":{"type":"Flanking"}}}} """
+  -- CR 509.3e read from the attacking side. A distinct tag from the per-blocker
+  -- form above, which carries the same payload and differs only in arity.
+  Spec.it s "SelfBecomesBlockedByOneOrMore" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.HasColor Color.Black))
+      """ {"type":"SelfBecomesBlockedByOneOrMore","value":{"type":"HasColor","value":{"type":"Black"}}} """
   -- CR 113.6k's condition, which names a zone pair rather than the battlefield.
   Spec.it s "SelfPutIntoGraveyardFromLibrary" $
     Common.assertJsonCodec

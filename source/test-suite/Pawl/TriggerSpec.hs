@@ -79,7 +79,9 @@
 -- `aragornSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
--- `selfBlocksAtLeastSpec`. CR
+-- `selfBlocksAtLeastSpec`, and the same rule's FILTERED form on both sides of
+-- the declaration at once, with Serra Inquisitors -- `selfBlocksOneOrMoreSpec`.
+-- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
 -- zone off a triggered ability's EFFECT rather than its condition, with Squee,
@@ -3284,6 +3286,116 @@ selfBlocksCreatureSpec s registry =
                 (fmap (`S.onBattlefield` controlStruck) (otherPikers <> otherSentries))
                 [False, False]
             _ -> Spec.assertFailure s "fixture should give each seat one creature"
+
+-- CR 509.3e's FILTERED forms, both halves of one printed sentence: "whenever
+-- [a creature] blocks or becomes blocked by one or more [black] creatures". The
+-- rule's last sentence covers "at least a certain number", and one is the number
+-- every filtered printing states.
+--
+-- Serra Inquisitors {4}{W} Creature -- Human Cleric 3/3, "Whenever this creature
+-- blocks or becomes blocked by one or more black creatures, this creature gets
+-- +2/+0 until end of turn", is the card, and one CR 603.1b ability with two
+-- conditions rather than two abilities. A creature cannot block and be blocked in
+-- the same combat (CR 509.1a chooses from the DEFENDING player's creatures), so
+-- at most one branch of the AnyOf can fire per combat.
+--
+-- Bog Wraith 3/3 is the black creature and Hill Giant 3/3 the control: same stats
+-- and same seat, differing only in colour, so a leg that stops firing stopped on
+-- the Filter. Every reading is taken at the COMBAT DAMAGE step, before damage is
+-- dealt, so 3 -> 5 is the trigger's and never combat's.
+selfBlocksOneOrMoreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfBlocksOneOrMoreSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- Blocks EVERY attacker with `blocker` alone, which aggressiveAnswer cannot
+      -- express: it puts every blocker on the first attacker.
+      blockEverything :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      blockEverything blocker p = case p of
+        Prompt.DeclareBlockers _ _ _ attackers -> Map.singleton blocker (Set.fromList attackers)
+        _ -> S.aggressiveAnswer p
+      atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
+   in Spec.describe s "SelfBlocksOneOrMore" $ do
+        -- The proving test for the BLOCKING half, and its control: two boards
+        -- differing only in the attacker's colour.
+        Spec.it s "CR 509.3e whole card: blocking a black creature is +2/+0, blocking a nonblack one is nothing" $ do
+          (black, _, mine) <- board ["Bog Wraith"] ["Serra Inquisitors"]
+          (other, _, theirs) <- board ["Hill Giant"] ["Serra Inquisitors"]
+          case (mine, theirs) of
+            ([blocking], [control]) ->
+              Spec.assertEqWith
+                s
+                "5/3 against the Wraith, 3/3 against the Giant"
+                (S.powerToughnessOf blocking (atDamage S.aggressiveAnswer black), S.powerToughnessOf control (atDamage S.aggressiveAnswer other))
+                (Just (5, 3), Just (3, 3))
+            _ -> Spec.assertFailure s "fixture should give bob one Serra Inquisitors on each board"
+        -- Rule 509.3e's "one or more" is ONE trigger however many admitted
+        -- creatures were blocked. A High Ground gives bob the arity, the
+        -- Inquisitors blocks both Wraiths, and the answer is 5/3 rather than 7/3.
+        -- The falsifier is a match on the pairwise GameEvent.BlockerDeclared,
+        -- which is CR 509.3b's arity: that fires twice.
+        Spec.it s "CR 509.3e blocking TWO black creatures is +2/+0 once" $ do
+          (gs, _, theirs) <- board ["Bog Wraith", "Bog Wraith"] ["Serra Inquisitors", "High Ground"]
+          case theirs of
+            [inquisitors, _] ->
+              Spec.assertEqWith
+                s
+                "one pump, not two"
+                (S.powerToughnessOf inquisitors (atDamage (blockEverything inquisitors) gs))
+                (Just (5, 3))
+            _ -> Spec.assertFailure s "fixture should give bob an Inquisitors and a High Ground"
+        -- The ATTACKING half, and its control: the same pair of boards with the
+        -- Inquisitors on alice's side, so the branch that fires is the other one.
+        Spec.it s "CR 509.3e whole card: becoming blocked by a black creature is +2/+0, by a nonblack one is nothing" $ do
+          (black, mine, _) <- board ["Serra Inquisitors"] ["Bog Wraith"]
+          (other, theirs, _) <- board ["Serra Inquisitors"] ["Hill Giant"]
+          case (mine, theirs) of
+            ([attacking], [control]) ->
+              Spec.assertEqWith
+                s
+                "5/3 blocked by the Wraith, 3/3 blocked by the Giant"
+                (S.powerToughnessOf attacking (atDamage S.aggressiveAnswer black), S.powerToughnessOf control (atDamage S.aggressiveAnswer other))
+                (Just (5, 3), Just (3, 3))
+            _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors on each board"
+        -- The attacking half's arity, which is what separates this condition from
+        -- SelfBecomesBlockedBy: two Wraiths block the one Inquisitors, so two
+        -- GameEvent.BlockerDeclared are recorded and exactly one
+        -- GameEvent.AttackerBlocked. The falsifier is a match on the pairwise
+        -- event: that fires twice, for 7/3.
+        Spec.it s "CR 509.3e becoming blocked by TWO black creatures is +2/+0 once" $ do
+          (gs, mine, _) <- board ["Serra Inquisitors"] ["Bog Wraith", "Bog Wraith"]
+          case mine of
+            [inquisitors] ->
+              Spec.assertEqWith s "one pump, not two" (S.powerToughnessOf inquisitors (atDamage S.aggressiveAnswer gs)) (Just (5, 3))
+            _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors"
+        -- "One or more" is a floor over the ADMITTED blockers, not a demand on all
+        -- of them: a Wraith and a Giant block together and the trigger still
+        -- fires. The falsifier is an `all` in place of the `any`, which answers
+        -- 3/3 here while agreeing with every other case in this group.
+        Spec.it s "CR 509.3e one admitted blocker among two is enough" $ do
+          (gs, mine, _) <- board ["Serra Inquisitors"] ["Bog Wraith", "Hill Giant"]
+          case mine of
+            [inquisitors] ->
+              Spec.assertEqWith s "the Wraith alone fires it" (S.powerToughnessOf inquisitors (atDamage S.aggressiveAnswer gs)) (Just (5, 3))
+            _ -> Spec.assertFailure s "fixture should give alice one Serra Inquisitors"
+        -- CR 603.2: the condition is the BEARER's own block. A Goblin Piker blocks
+        -- the Wraith while the Inquisitors stands by, so the declaration records a
+        -- GameEvent.BlocksDeclared naming somebody else. A regression fence rather
+        -- than a proof of one line: the arm's `blocker == bearer` and its
+        -- Combat.blockers read each rule this board out on their own, so no single
+        -- mutation turns it red.
+        Spec.it s "CR 603.2 another creature's block does not pump the Inquisitors" $ do
+          (gs, _, theirs) <- board ["Bog Wraith"] ["Serra Inquisitors", "Goblin Piker"]
+          case theirs of
+            [inquisitors, piker] ->
+              Spec.assertEqWith
+                s
+                "the bystander stays 3/3"
+                (S.powerToughnessOf inquisitors (atDamage (blockEverything piker) gs))
+                (Just (3, 3))
+            _ -> Spec.assertFailure s "fixture should give bob an Inquisitors and a Piker"
 
 -- CR 509.3c: "Whenever [a creature] becomes blocked, . . ." -- the ATTACKING
 -- side of the same declaration selfBlocksSpec reads, matched against
@@ -6750,6 +6862,10 @@ representativeEvents cond =
         TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared departed 1)
         -- The same event with the count read, which is all CR 509.3e adds.
         TriggerCondition.SelfBlocksAtLeast _ -> one (GameEvent.BlocksDeclared departed 2)
+        -- The same grouped event once more, with the count IGNORED: CR 509.3e's
+        -- filtered form reads the attackers off Combat.blockers instead, and
+        -- binds nothing off the log.
+        TriggerCondition.SelfBlocksOneOrMore _ -> one (GameEvent.BlocksDeclared departed 1)
         -- The PAIRWISE event instead: CR 509.3b's bearer is the BLOCKER too, and
         -- the attacker beside it is what this one binds.
         TriggerCondition.SelfBlocksCreature -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
@@ -6760,6 +6876,11 @@ representativeEvents cond =
         -- round: this condition's bearer is the ATTACKER, and the blocker is what
         -- it binds.
         TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BlockerDeclared (ObjectId.MkObjectId 41) departed)
+        -- The GROUPED attacking-side event, which is what makes this one fire
+        -- once where the arm above fires per blocker. carol on SelfBecomesBlocked's
+        -- reasoning -- and this one binds that player nothing, which is the
+        -- difference the pin catches.
+        TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> one (GameEvent.AttackerBlocked departed S.carol)
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         -- Every origin zone is admitted, but the floor is the same for all of
         -- them: the destination is always a graveyard, which CR 400.2 makes
@@ -6879,7 +7000,9 @@ everyTriggerCondition =
     TriggerCondition.SelfBlocksAtLeast 2,
     TriggerCondition.SelfBlocksCreature,
     TriggerCondition.SelfBecomesBlocked,
+    TriggerCondition.SelfBlocksOneOrMore (Filter.Type.And []),
     TriggerCondition.SelfBecomesBlockedBy (Filter.Type.And []),
+    TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.Type.And []),
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
@@ -9492,6 +9615,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   prowessSpec s registry
   selfBlocksSpec s registry
   selfBlocksAtLeastSpec s registry
+  selfBlocksOneOrMoreSpec s registry
   selfBlocksCreatureSpec s registry
   selfBecomesBlockedSpec s registry
   bushidoSpec s registry

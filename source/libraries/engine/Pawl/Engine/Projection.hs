@@ -1692,10 +1692,16 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfBlocks -> condition
   TriggerCondition.SelfBlocksCreature -> condition
   TriggerCondition.SelfBlocksAtLeast _ -> condition
+  -- CR 509.3e's Filter is a predicate over the attackers blocked, so a subtype
+  -- rewrite reaches it too.
+  TriggerCondition.SelfBlocksOneOrMore f -> TriggerCondition.SelfBlocksOneOrMore (Filter.rewrite pairs f)
   TriggerCondition.SelfBecomesBlocked -> condition
   -- CR 509.3d's Filter is a predicate over the blocker, so a subtype rewrite
   -- reaches it exactly as it reaches SpellCast's above.
   TriggerCondition.SelfBecomesBlockedBy f -> TriggerCondition.SelfBecomesBlockedBy (Filter.rewrite pairs f)
+  -- The same rule's attacking-side form, whose Filter is a predicate over the
+  -- blockers.
+  TriggerCondition.SelfBecomesBlockedByOneOrMore f -> TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.rewrite pairs f)
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition
   TriggerCondition.SelfDies -> condition
