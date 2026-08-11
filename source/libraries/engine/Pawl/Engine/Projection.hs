@@ -32,8 +32,11 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
@@ -66,6 +69,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -2327,6 +2331,13 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- Nor a time counter (CR 702.63a): vanishing's three minted
               -- abilities count Object.counters directly, as those three do.
               CounterKind.Time -> []
+              -- Nor a shield counter (CR 122.1c), and that one is worth saying
+              -- twice: "'shield' is not an ability that creatures have and shield
+              -- counters are not keyword counters", so the grant CR 122.1b's arm
+              -- above makes is exactly what this kind must NOT make. What it
+              -- creates instead is a replacement and a prevention effect, minted
+              -- by shieldOf below.
+              CounterKind.Shield -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, so the designation is
@@ -3093,11 +3104,62 @@ abilitiesGiven pcs oid gs =
       filter granted (PC.activatedAbilities pc <> Keyword.battlefieldAbilitiesOf (PC.keywords pc))
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
--- the same projection posture as abilitiesOf. A Humility'd creature has none.
+-- the same projection posture as abilitiesOf. A Humility'd creature has none --
+-- except the shield pair, which no layer can reach; see shieldOf.
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect]
 replacementsOf oid gs =
   let pc = project oid gs
-   in PC.replacementEffects pc <> intrinsicReplacementsOf pc
+   in PC.replacementEffects pc <> intrinsicReplacementsOf pc <> shieldOf oid gs
+
+-- CR 122.1c: the pair of effects one or more shield counters create -- "if this
+-- permanent would be destroyed as the result of an effect, instead remove a shield
+-- counter from it" and "if damage would be dealt to this permanent, prevent that
+-- damage and remove a shield counter from it".
+--
+-- ONE of each however many counters are on it, which is the rule's own word
+-- ("create a single replacement effect and a single prevention effect"): the count
+-- is how many times the pair may still be applied, and each application takes one
+-- off. A list keyed on presence rather than on the number is what says that -- two
+-- counters must not offer CR 616.1's choice two interchangeable candidates.
+--
+-- Read off Object.counters rather than off the projection, unlike every arm of
+-- intrinsicReplacementsOf: counters are not a characteristic (CR 122.1's markers
+-- "are not objects and have no characteristics"), and rule 122.1c gives the pair as
+-- a rule rather than as an ability. So the layer system has nothing to remove --
+-- "if a creature with a shield counter loses its abilities, the shield counter will
+-- still protect it as normal" -- which is CR 306.5b's posture reached by a
+-- different route.
+--
+-- Neither effect carries a pattern naming its permanent. The destruction half has
+-- no pattern field at all and is self-only by construction, and the prevention
+-- half's self-scope is read off its SOURCE in Replacement.applies rather than baked
+-- into DamagePattern.whichRecipient, because that field is compared to the event's
+-- Pawl.Types.Recipient TAG -- which says how the damage reached the permanent (CR
+-- 510.1b), not which permanent it reached, so a shield baked as ToCreature would
+-- miss the damage an attacker assigns to the same permanent as a planeswalker.
+shieldOf :: ObjectId -> GameState -> [ReplacementEffect]
+shieldOf oid gs =
+  if shieldCounters oid gs == 0
+    then []
+    else
+      [ ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter,
+        ReplacementEffect.DamageR
+          DamagePattern.MkDamagePattern
+            { DamagePattern.whichKind = Nothing,
+              DamagePattern.whichSource = SourceRelation.AnySource,
+              DamagePattern.whichRecipient = Nothing
+            }
+          DamageRewrite.PreventRemovingShieldCounter
+      ]
+
+-- CR 122.1c: how many shield counters this object has, which is how many more
+-- events its pair may replace. Also the short-circuit's question in
+-- replacementsAffecting below, where a permanent's counters are the one route to a
+-- replacement effect that no base FACE shows.
+shieldCounters :: ObjectId -> GameState -> Natural
+shieldCounters oid gs = case Game.lookupObject oid gs of
+  Nothing -> 0
+  Just obj -> Map.findWithDefault 0 CounterKind.Shield (Object.counters obj)
 
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
 -- replacement effect, CR 310.4b's identically shaped one for a battle's defense,
@@ -3171,9 +3233,10 @@ intrinsicReplacementsOf pc =
 -- does not project the whole board.
 --
 -- The short-circuit reads BASE cards while the result reads the PROJECTION, sound
--- only because the one way to acquire an unprinted replacement effect is
+-- only because the ways to acquire an unprinted replacement effect are
 -- `EntryR AsCopy` -- and a card with that arm is itself a base card with a
--- replacement effect -- or a minting keyword, which the two riot disjuncts cover:
+-- replacement effect -- CR 122.1c's shield counters, whose own disjunct reads the
+-- object rather than a face, or a minting keyword, which the two riot disjuncts cover:
 -- one for a face that PRINTS such a keyword and one for a face whose static
 -- ability GRANTS it (Spider-Punk's "other Spiders you control have riot"). The
 -- granting card is on the battlefield whenever the grant is, which is what makes
@@ -3189,6 +3252,11 @@ intrinsicReplacementsOf pc =
 replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect)]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
+      -- CR 122.1c's pair is minted from the permanent's COUNTERS, so it is on no
+      -- base face either -- and unlike the three intrinsic disjuncts below it is on
+      -- no projection of the face's own text, which is why it is asked before the
+      -- face is looked up at all.
+      baseHas oid | shieldCounters oid gs > 0 = True
       baseHas oid = case Game.faceOf oid gs of
         Nothing -> False
         -- The planeswalker disjunct keeps CR 306.5b's intrinsic replacement inside

@@ -67,6 +67,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
@@ -581,7 +582,8 @@ loop asOf batch applied prevented event = do
           -- Not implemented: CR 615.12's middle clause, "any additional effects
           -- they have will take place". A row CAN carry one now (CR 615.5), but
           -- this short-circuit runs before `apply`, so `preventionBy` below
-          -- reports nothing and the rider is never queued (#1106).
+          -- reports nothing and the rider is never queued; nor is CR 122.1c's
+          -- shield counter removed, which the same clause requires (#1106).
           outcome <-
             if Replacement.inertPrevention gs candidate event
               then pure (Just event)
@@ -1074,6 +1076,23 @@ apply batch candidate event =
       DamageRewrite.PreventAll -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         pure Nothing
+      -- CR 122.1c: "prevent that damage and remove a shield counter from it". The
+      -- WHOLE event goes, whatever its amount -- "if a permanent that would be
+      -- dealt damage has more than one shield counter on it, that damage is
+      -- prevented and only one shield counter is removed" -- so this is
+      -- PreventAll's arm plus the removal, and never PreventNext's arithmetic.
+      --
+      -- The counter comes off the DAMAGED permanent, which is this candidate's own
+      -- source: Replacement.admitsRecipient admits the event only when the two are
+      -- the same object.
+      --
+      -- NOT `consume`, for the reason `collect` gives: a permanent's candidate has
+      -- no use to spend. The removal is what spends this one instead, since
+      -- Projection.shieldOf mints the pair only while a counter is there and CR
+      -- 616.1f re-collects.
+      DamageRewrite.PreventRemovingShieldCounter -> do
+        removeCounters (ReplacementCandidate.source candidate) CounterKind.Shield 1
+        pure Nothing
       -- CR 615.7's shield covers as much of THIS event as it has left, and
       -- whatever it could not cover survives as a smaller event of the same
       -- source, recipient and riders. Nothing when it covered all of it, which
@@ -1130,17 +1149,31 @@ apply batch candidate event =
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
-    -- CR 701.19a: regeneration removes marked damage, taps the permanent and
-    -- removes it from combat. The DESTRUCTION does not happen, so nothing
-    -- downstream of it (a put-into-graveyard, and therefore Rest in Peace's
-    -- redirect) ever runs.
-    (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid _) -> case rewrite of
+    -- CR 701.19a / 122.1c: under either arm the DESTRUCTION does not happen, so
+    -- nothing downstream of it (a put-into-graveyard, and therefore Rest in Peace's
+    -- redirect) ever runs. What each does INSTEAD is all that separates them, and
+    -- the two do not overlap: regeneration removes marked damage, taps the
+    -- permanent and removes it from combat, where a shield counter's removal does
+    -- none of those.
+    (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid _ _) -> case rewrite of
       DestructionRewrite.Regenerate -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         State.modify' $ \gs ->
           let healTap obj = obj {Object.damage = 0, Object.tapped = TapState.Tapped}
               healed = gs {GameState.objects = Map.adjust healTap oid (GameState.objects gs)}
            in Game.removeFromCombat oid healed
+        pure Nothing
+      -- CR 122.1c: "instead remove a shield counter from it". The destruction does
+      -- not happen, and NONE of regeneration's own work above does either --
+      -- "removing a shield counter in this way isn't the same as regenerating a
+      -- creature", so the permanent keeps its marked damage, its tap state and its
+      -- place in combat.
+      --
+      -- The counter comes off `oid`, which Replacement.applies has already made
+      -- this candidate's own source. `consume` is skipped for the damage arm's
+      -- reason.
+      DestructionRewrite.RemoveShieldCounter -> do
+        removeCounters oid CounterKind.Shield 1
         pure Nothing
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
@@ -1486,9 +1519,9 @@ resolveDamageBatch events = do
 -- 608.2f gives even a single Doom Blade a one-element batch, and when that batch
 -- is itself part of a CR 704.3 pass the board is the pass's rather than the
 -- batch's (Event.destroyInBatch).
-resolveDestruction :: Maybe GameState -> Regenerability.Regenerability -> ObjectId -> Game (Maybe ObjectId)
-resolveDestruction asOf regenerability oid = do
-  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldBeDestroyed oid regenerability)
+resolveDestruction :: Maybe GameState -> DestructionCause.DestructionCause -> Regenerability.Regenerability -> ObjectId -> Game (Maybe ObjectId)
+resolveDestruction asOf cause regenerability oid = do
+  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldBeDestroyed oid regenerability cause)
   pure (outcome >>= Replacement.asDestruction)
 
 -- The single counter-PLACEMENT funnel for an OBJECT recipient (CR 122.6: counters
@@ -2215,8 +2248,13 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
 -- The door for a batch that is a whole event whose caller does not care what died;
 -- destroyReturning is the same door for a caller that does, destroyInBatch for a
 -- batch nested in a larger event, and destroyIn is the shared body.
+--
+-- This door and destroyReturning are the EFFECT's, which is why neither takes a
+-- Pawl.Types.DestructionCause: a caller with a whole event of its own to destroy in
+-- is a resolving spell or ability (CR 609.1), and CR 122.1c's shield reads that.
+-- The rules' own destructions come through destroyInBatch, which asks.
 destroy :: Regenerability.Regenerability -> [ObjectId] -> Game ()
-destroy regenerability oids = Monad.void (destroyIn Nothing regenerability oids)
+destroy regenerability oids = Monad.void (destroyIn Nothing DestructionCause.ByEffect regenerability oids)
 
 -- destroy, answering with the permanents it ACTUALLY destroyed (CR 701.8b), which
 -- is emphatically not the batch it was handed: an indestructible member never
@@ -2230,7 +2268,7 @@ destroy regenerability oids = Monad.void (destroyIn Nothing regenerability oids)
 -- A second door rather than a return type on `destroy`, the changeZoneReturning
 -- posture: only the Destroy opcode's bound-count slot uses the answer.
 destroyReturning :: Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
-destroyReturning = destroyIn Nothing
+destroyReturning = destroyIn Nothing DestructionCause.ByEffect
 
 -- destroy for a batch that is one PART of a larger simultaneous event, whose board
 -- is `asOf`. CR 704.3's state-based-action check is that event, and Sba is the
@@ -2241,8 +2279,12 @@ destroyReturning = destroyIn Nothing
 --
 -- A separate door rather than a parameter on `destroy`, for changeZoneInBatch's
 -- reason: every other caller has no larger event to name.
-destroyInBatch :: GameState -> Regenerability.Regenerability -> [ObjectId] -> Game ()
-destroyInBatch asOf regenerability oids = Monad.void (destroyIn (Just asOf) regenerability oids)
+--
+-- The one door that ASKS for the Pawl.Types.DestructionCause, because it is the one
+-- whose caller may be a rule: CR 704.5g/h destroy with no effect involved, which is
+-- what CR 122.1c's replacement does not reach.
+destroyInBatch :: GameState -> DestructionCause.DestructionCause -> Regenerability.Regenerability -> [ObjectId] -> Game ()
+destroyInBatch asOf cause regenerability oids = Monad.void (destroyIn (Just asOf) cause regenerability oids)
 
 -- The shared body. Three readers of a board, and they do NOT all get the same one:
 --
@@ -2261,11 +2303,11 @@ destroyInBatch asOf regenerability oids = Monad.void (destroyIn (Just asOf) rege
 --      regeneration shield may be offered one. The reachable shape is an Aura
 --      named by CR 704.5m and CR 704.5g in the same pass.
 --
--- Only the graveyard move's loop can observe (1) today: every DestructionR in the
--- pool is a regeneration shield in the floating store rather than a permanent's
--- printed ability, so the frozen board holds nothing for the destruction loop to
--- find. It is passed anyway because the rule, not the pool, says the two loops are
--- one event.
+-- CR 122.1c is the first DestructionR for which (1) is not vacuous: a shield
+-- counter's replacement is minted from the permanent holding the counter
+-- (Projection.shieldOf), so the destruction loop finds it on the FROZEN board rather
+-- than on the live one. Every other DestructionR in the pool is a regeneration
+-- shield in the floating store, which the frozen board does not hold at all.
 --
 -- The whole body is ONE event, which is what `simultaneously` stamps on
 -- everything it records: CR 608.2f makes an action taken on multiple objects
@@ -2274,13 +2316,13 @@ destroyInBatch asOf regenerability oids = Monad.void (destroyIn (Just asOf) rege
 -- against one board, not a sequence -- so the bracket adds no claim they do not.
 -- Day of Judgment's deaths are the case it decides, and CR 603.10a's own Example
 -- is why they must not be a sequence.
-destroyIn :: Maybe GameState -> Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
-destroyIn asOf regenerability oids = simultaneously $ do
+destroyIn :: Maybe GameState -> DestructionCause.DestructionCause -> Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
+destroyIn asOf cause regenerability oids = simultaneously $ do
   live <- State.get
   let gs = Maybe.fromMaybe live asOf
       doomed = filter (\oid -> Maybe.isJust (Game.lookupObject oid live) && not (Projection.hasKeyword Keyword.Type.Indestructible oid gs)) oids
   fmap Maybe.catMaybes . Monad.forM doomed $ \oid -> do
-    settled <- resolveDestruction (Just gs) regenerability oid
+    settled <- resolveDestruction (Just gs) cause regenerability oid
     case settled of
       -- CR 701.8c: a regeneration effect REPLACED the destruction, so nothing was
       -- destroyed here and this member is not in the answer.

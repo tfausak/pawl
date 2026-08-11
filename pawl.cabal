@@ -619,6 +619,7 @@ library types
     Pawl.Types.DelayedTrigger
     Pawl.Types.Departure
     Pawl.Types.Designation
+    Pawl.Types.DestructionCause
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
     Pawl.Types.DiscardCause

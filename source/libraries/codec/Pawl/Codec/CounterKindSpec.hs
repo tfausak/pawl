@@ -63,3 +63,12 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.fromJson Keyword.fromJson)
       CounterKind.Time
       """ {"type":"Time"} """
+  -- CR 122.1c, the kind whose count is how many events its pair may still
+  -- replace.
+  Spec.it s "Shield" $
+    Common.assertJsonCodec
+      s
+      (CounterKind.toJson Keyword.toJson)
+      (CounterKind.fromJson Keyword.fromJson)
+      CounterKind.Shield
+      """ {"type":"Shield"} """

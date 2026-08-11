@@ -5,6 +5,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -52,7 +53,13 @@ data ProposedEvent
     -- the destruction's own, not the permanent's: it says whether a CR 701.19a
     -- regeneration shield may be applied to THIS destruction, which is where
     -- Terror's "It can't be regenerated" lives.
-    WouldBeDestroyed ObjectId.ObjectId Regenerability.Regenerability
+    --
+    -- The DestructionCause beside it is the same shape of fact one rule further
+    -- on: CR 122.1c's replacement reaches a destruction only when an EFFECT is
+    -- what would destroy the permanent, where regeneration reaches CR 704.5g's
+    -- lethal-damage destruction too. Both fields gate which candidates are
+    -- offered the event and neither is a characteristic of the object.
+    WouldBeDestroyed ObjectId.ObjectId Regenerability.Regenerability DestructionCause.DestructionCause
   | -- | CR 122.6: counters would be put on a PERMANENT. The CounterCause is who
     -- is putting them and whether an effect is doing it -- what CR 614.16 and
     -- Vorinclex, Monstrous Raider narrow by, and the one ProposedEvent field that
