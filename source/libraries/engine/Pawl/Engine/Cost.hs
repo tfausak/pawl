@@ -38,7 +38,9 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Summoning as Summoning
+import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -965,55 +967,131 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- ability's mana part is empty -- Cabal Coffers is the card that would make the
 -- difference visible, and `payActivation` defers to the same issue (#1120).
 --
--- And WHAT ONE ACTIVATION TAKES, alongside the count, because the count alone is
+-- And WHAT ONE ACTIVATION SPENDS, alongside the count, because the count alone is
 -- a fact about this source in isolation: two sources whose costs both sacrifice a
--- creature each answer 1 beside one creature, and only the claims say they cannot
--- both have it (#1126). The claims are one activation's, unscaled -- the reader
--- multiplies by however many it takes.
+-- creature each answer 1 beside one creature, and two whose costs each pay 3 life
+-- both answer 2 at 6 life. Only the claims say the first pair cannot both have the
+-- creature (#1126), and only the life says the second pair cannot both have the
+-- life (Mana.payableResolutionsGiven). Both are one activation's, unscaled -- the
+-- reader multiplies by however many it takes.
 --
 -- `pcs` is the pre-projected board CR 302.6's two reads want; Map.empty asks for
 -- a fresh projection, which is what a caller with no sweep in hand passes (#200).
-manaActivations :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> (Natural, [Claim])
+manaActivations :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Activations.Activations
 manaActivations pcs pid oid cost gs =
   if Maybe.isJust (Cost.mana cost)
     && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
     && jointlyPayable pid oid (Cost.components cost) gs
     && sicknessOkGiven pcs pid oid cost gs
-    then (repeatsOf pid oid cost gs, Maybe.mapMaybe (\c -> removalClaim pid oid c gs) (Cost.components cost))
-    else (0, [])
+    then
+      Activations.MkActivations
+        { Activations.times = repeatsOf pid oid cost gs,
+          Activations.claims = claimsOf pid oid (Cost.components cost) gs,
+          Activations.life = lifeOwedBy (Cost.components cost)
+        }
+    else Activations.MkActivations {Activations.times = 0, Activations.claims = [], Activations.life = 0}
 
 -- How many times IN A ROW a cost already known to be payable once could be paid,
 -- which is what makes Ashnod's Altar beside two creatures two mana activations
--- rather than one (#1128).
+-- rather than one (#1128), and Treasonous Ogre ("Pay 3 life: Add {R}") at 20 life
+-- six.
 --
--- Counted off `removalClaim` alone, and answered 1 for anything else. What CR
--- 118.3's "fully" limits a repetition by is the resources it consumes, and the
--- claims are the ones this module knows how to count: a cost every component of
--- which takes objects out of a zone can be paid exactly as many times as those
--- zones hold objects for it. A component that spends something else -- CR 107.5's
--- tap, CR 119.4's life, CR 107.14's energy -- caps the answer at 1 instead of
--- being counted, which is exact for {T} (a tapped permanent cannot pay it again)
--- and an understatement for the rest (#1132). A MANA part does the same, since
--- repeating it would spend mana this walk has not measured (#1120).
+-- The SMALLEST ceiling the cost's resources impose, since CR 118.3's "fully" is
+-- what limits a repetition and every resource limits it at once. Two of them are
+-- counted, each totalled over the WHOLE cost rather than per component:
+--
+--   1. OBJECTS, through Pawl.Engine.Claim.repeats: a cost whose components take
+--      objects out of zones can be paid as many times as those zones hold objects
+--      for it, jointly, so two components drawing on one pool do not each get it.
+--
+--   2. LIFE, through CR 119.4. k repetitions of a cost that pays n life are one
+--      demand for k*n on one life total: each single payment wants the total at n
+--      or more, and a total covering k*n covers all k in turn whatever the order,
+--      so the ceiling is the total divided by n. `lifeOwedBy` is the n, which is
+--      why two PayLife components repeat together and not each.
+--
+-- Anything else caps the answer at 1 (`uncountedCeiling`), and so does a MANA
+-- part, since repeating it would spend mana this walk has not measured (#1120).
+-- Exact for CR 107.5's {T} -- a tapped permanent cannot pay it again -- and an
+-- understatement for the rest.
 --
 -- Understating is the safe direction and the reason the uncounted components cap
 -- rather than divide: a supply short by one refuses a cost the payment loop could
 -- have paid, while a supply too large offers a cast that then cannot be paid --
--- and an offer that changes nothing is offered again forever.
+-- and an offer that changes nothing is offered again forever. It is also why NO
+-- ceiling at all answers 1: a cost that spends nothing this function can see is
+-- limited by something it cannot.
 --
--- Pawl.Engine.Claim.repeats is the arithmetic, and it agrees with
--- Claim.satisfiable by construction: k repetitions ask for k times each claim,
--- and `repeats` is the largest k that Hall's condition still admits. That is what
--- lets Pawl.Engine.Mana take this count as a source's ceiling and then re-ask the
--- joint question across sources without the two disagreeing about one source.
+-- Both ceilings are this source asked ALONE against the untouched board, and
+-- Pawl.Engine.Mana re-asks the joint question across sources afterwards. They
+-- cannot disagree with it, because each is the largest k that question could
+-- admit for one source with nothing else spending: Pawl.Engine.Claim.repeats is
+-- the largest k Hall's condition admits, and k times the life is what
+-- payableResolutionsGiven's CR 119.4 clause totals. Where something else IS
+-- spending -- a second life-paying source, or life the cost itself owes -- the
+-- ceiling here is loose and that clause is what tightens it.
 --
 -- The pool is read ONCE, off the untouched board, which is exact for every
 -- criterion in the pool: taking one creature out of it leaves the rest
 -- creatures.
 repeatsOf :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
-repeatsOf pid oid cost gs = case (Cost.mana cost, traverse (\c -> removalClaim pid oid c gs) (Cost.components cost)) of
-  (Just (ManaCost.MkManaCost []), Just claims) -> Claim.repeats claims
+repeatsOf pid oid cost gs = case Cost.mana cost of
+  Just (ManaCost.MkManaCost []) -> case ceilings of
+    [] -> 1
+    limits -> minimum limits
   _ -> 1
+  where
+    components = Cost.components cost
+    claims = claimsOf pid oid components gs
+    objectCeiling = if null claims then [] else [Claim.repeats claims]
+    lifeCeiling = case lifeOwedBy components of
+      0 -> []
+      owed -> [div (lifeTotalOf pid gs) owed]
+    ceilings = objectCeiling <> lifeCeiling <> Maybe.mapMaybe uncountedCeiling components
+
+-- The ceiling ONE component imposes that `repeatsOf`'s two totals do not already
+-- carry, or Nothing where one of them does.
+--
+-- 1 for every resource this module cannot count, and for two it need not. EXACT
+-- for CR 107.5's {T} and CR 107.6's {Q} -- a permanent already tapped cannot be
+-- tapped again to pay one, nor an untapped one untapped -- and for CR 606.4's
+-- loyalty, since CR 606.3 lets a player activate one loyalty ability of a
+-- permanent per turn whatever the counters allow. An UNDERSTATEMENT for CR
+-- 107.14's energy, for a counter put on the source, and for TapForTotalPower's
+-- other creatures, each of which a player with enough could pay several times
+-- over; `repeatsOf` above argues for understating (#1280).
+--
+-- EXHAUSTIVE with no wildcard, this module's posture for every CostComponent
+-- match: a new component owes an answer about how often it can be paid, and
+-- -Werror is what makes it.
+uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
+uncountedCeiling component = case component of
+  -- Counted by `objectCeiling`: every one of these has a removalClaim.
+  CostComponent.Sacrifice _ _ -> Nothing
+  CostComponent.SacrificeThis -> Nothing
+  CostComponent.DiscardCards _ -> Nothing
+  CostComponent.DiscardThis -> Nothing
+  CostComponent.ExileCardsFromGraveyard _ _ -> Nothing
+  CostComponent.ExileTopFromGraveyard _ -> Nothing
+  CostComponent.ExileThisFromGraveyard -> Nothing
+  -- Counted by `lifeCeiling`, CR 119.4.
+  CostComponent.PayLife _ -> Nothing
+  CostComponent.TapThis -> Just 1
+  CostComponent.UntapThis -> Just 1
+  CostComponent.TapForTotalPower _ _ -> Just 1
+  CostComponent.PayEnergy _ -> Just 1
+  CostComponent.AddLoyaltyToThis _ -> Just 1
+  CostComponent.RemoveLoyaltyFromThis _ -> Just 1
+  CostComponent.PutPlusOneCountersOnThis _ -> Just 1
+
+-- This player's life total as an amount that could be PAID (CR 119.4), which is
+-- to say floored at zero: a player at or below 0 life can pay nothing but CR
+-- 119.4b's zero. A player the state does not hold reads as 0, which is
+-- Event.canPayLife's own refusal.
+lifeTotalOf :: PlayerId -> GameState -> Natural
+lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
+  Nothing -> 0
+  Just player -> Integer.toNaturalSaturating (Player.life player)
 
 -- CR 118.3 asked one step later than `canPay` asks it: is SOME nonhybrid
 -- equivalent of this cost (CR 601.2b) payable, measured at CR 601.2f's total?
@@ -1468,7 +1546,7 @@ tapForMana oid = do
       -- and pays the cost. Falls back to owner in the impossible case
       -- lookupObject just proved oid exists but controllerOf returns Nothing.
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-      case filter (\option -> fst (manaActivations Map.empty controller oid (ManaOption.cost option) gs) > 0) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> Activations.times (manaActivations Map.empty controller oid (ManaOption.cost option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
