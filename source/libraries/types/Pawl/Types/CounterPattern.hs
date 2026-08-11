@@ -29,6 +29,10 @@ data CounterPattern = MkCounterPattern
     -- resolving spell, ability, replacement or prevention effect puts on, where a
     -- clause naming a player also reaches CR 714.3c's turn-based lore counter --
     -- which a player puts. See Pawl.Engine.Replacement.matchesPutter.
+    --
+    -- Not implemented: a PASSIVE wording, which names neither an effect nor a
+    -- player (Hardened Scales, Corpsejack Menace), has no encoding of its own and
+    -- takes Nothing -- narrower than printed (#1232).
     byWhom :: Maybe ControllerRelation.ControllerRelation,
     -- | CR 109.5: whose PERMANENT receives them.
     whose :: ControllerRelation.ControllerRelation,
