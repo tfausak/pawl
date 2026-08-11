@@ -11,10 +11,10 @@ import qualified Pawl.Types.Scaling as Scaling
 -- while Effect.PreventAllDamage bakes one over a named recipient (Selfless
 -- Squire).
 --
--- CR 615.1a is what makes the two Prevent arms below a different KIND of rewrite
--- from the two under them, rather than merely a different amount: an effect that
--- uses the word "prevent" is a prevention effect, so only these two prevent
--- anything, and only these two fire CR 615.13's triggers.
+-- CR 615.1a is what makes the three Prevent arms below a different KIND of
+-- rewrite from the ones under them, rather than merely a different amount: an
+-- effect that uses the word "prevent" is a prevention effect, so only those three
+-- prevent anything, and only they fire CR 615.13's triggers.
 -- Pawl.Engine.Replacement.prevents is that classification.
 --
 -- PreventNext is CR 615.7's shield (Mending Hands), and its Natural is the
@@ -47,6 +47,23 @@ import qualified Pawl.Types.Scaling as Scaling
 -- (#1098).
 data DamageRewrite
   = PreventAll
+  | -- | CR 122.1c: "if damage would be dealt to this permanent, prevent that
+    -- damage and remove a shield counter from it". A prevention (it says
+    -- "prevent", CR 615.1a), so `prevents` admits it and CR 615.13's trigger sees
+    -- it.
+    --
+    -- A separate arm from PreventAll rather than PreventAll plus CR 615.5's
+    -- rider, because the counter removal is not an additional EFFECT: rule 122.1c
+    -- is one sentence of the rulebook, so what it removes is fixed and needs
+    -- neither Pawl.Types.PreventionRider's snapshotted targets nor its
+    -- controller. That also keeps it clear of #1105 -- this pair is minted, not
+    -- printed as a static ability, so it never needed a field on
+    -- Pawl.Types.ReplacementEffect to carry a program in.
+    --
+    -- Prevents the WHOLE event for one counter, whatever its amount: unlike CR
+    -- 615.7's PreventNext below, rule 122.1c counts events rather than damage, so
+    -- one shield counter covers one damage event of any size.
+    PreventRemovingShieldCounter
   | PreventNext Natural.Natural
   | SetAmount Natural.Natural
   | Scale Scaling.Scaling

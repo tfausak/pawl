@@ -10,6 +10,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 toJson :: DamageRewrite.DamageRewrite -> Value.Value
 toJson r = case r of
   DamageRewrite.PreventAll -> Common.nullary "PreventAll"
+  DamageRewrite.PreventRemovingShieldCounter -> Common.nullary "PreventRemovingShieldCounter"
   DamageRewrite.PreventNext n -> Common.tagged "PreventNext" . Just $ Common.encodeNatural n
   DamageRewrite.SetAmount n -> Common.tagged "SetAmount" . Just $ Common.encodeNatural n
   DamageRewrite.Scale s -> Common.tagged "Scale" . Just $ Scaling.toJson s
@@ -20,6 +21,7 @@ fromJson value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
     ("PreventAll", Nothing) -> pure DamageRewrite.PreventAll
+    ("PreventRemovingShieldCounter", Nothing) -> pure DamageRewrite.PreventRemovingShieldCounter
     ("PreventNext", Just v) -> DamageRewrite.PreventNext <$> Common.decodeNatural v
     ("SetAmount", Just v) -> DamageRewrite.SetAmount <$> Common.decodeNatural v
     ("Scale", Just v) -> DamageRewrite.Scale <$> Scaling.fromJson v

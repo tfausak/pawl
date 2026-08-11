@@ -78,6 +78,7 @@ import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -922,26 +923,44 @@ phasePatternOffends replacement = case replacement of
 damagePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
 damagePatternOffends replacement = case replacement of
   ReplacementEffect.DamageR damagePattern rewrite ->
-    Maybe.isJust (DamagePattern.whichRecipient damagePattern) || isShield rewrite
+    Maybe.isJust (DamagePattern.whichRecipient damagePattern) || engineMintedDamage rewrite
+  -- CR 122.1c's destruction half is engine-minted for the same reason its damage
+  -- half is, so the sweep reaches it through this arm rather than through a lint
+  -- of its own.
+  ReplacementEffect.DestructionR rewrite -> engineMintedDestruction rewrite
   ReplacementEffect.PhaseR _ -> False
   ReplacementEffect.CounterR _ _ -> False
   ReplacementEffect.ZoneChangeR _ _ -> False
   ReplacementEffect.EntryR _ _ -> False
-  ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR _ _ -> False
   ReplacementEffect.TurnUpR _ _ -> False
 
--- CR 615.7 versus CR 615.10: a counted shield is generated "by the resolution of
--- a spell or ability", never by the static ability a card prints, so a printed
--- one would be a rule that does not exist.
-isShield :: DamageRewrite.DamageRewrite -> Bool
-isShield rewrite = case rewrite of
+-- Is this damage rewrite one the ENGINE mints and no card may print? Two of them,
+-- for two rules:
+--
+--   * CR 615.7 versus CR 615.10 -- a counted shield is generated "by the resolution
+--     of a spell or ability", never by the static ability a card prints.
+--   * CR 122.1c -- the prevention shield counters create is created by the RULE, off
+--     a permanent's counters (Pawl.Engine.Projection.shieldOf), so a card printing
+--     it would be claiming a static ability the rule does not give it.
+--
+-- A printed one either way would be a rule that does not exist.
+engineMintedDamage :: DamageRewrite.DamageRewrite -> Bool
+engineMintedDamage rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
+  DamageRewrite.PreventRemovingShieldCounter -> True
   DamageRewrite.PreventAll -> False
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
   -- CR 614.9's redirection is neither counted nor a prevention.
   DamageRewrite.Redirect _ -> False
+
+-- The destruction half of the same question. CR 701.19a's regeneration IS printed
+-- (Drudge Skeletons), where CR 122.1c's removal is minted.
+engineMintedDestruction :: DestructionRewrite.DestructionRewrite -> Bool
+engineMintedDestruction rewrite = case rewrite of
+  DestructionRewrite.RemoveShieldCounter -> True
+  DestructionRewrite.Regenerate -> False
 
 -- The non-vacuity half of the same lint: is this the replacement that carries a
 -- PhasePattern at all? A wildcard is right here, where it is not above -- this
@@ -1522,6 +1541,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Lore -> 0
     CounterKind.Defense -> 0
     CounterKind.Time -> 0
+    CounterKind.Shield -> 0
   -- Zero and not a descent, unlike the atom above: a family is payload-free, so
   -- there is no Filter position inside it for a card author to reach.
   Filter.Type.HasKeywordFamily _ -> 0
@@ -1573,6 +1593,7 @@ counterKindFilters kind = case kind of
   CounterKind.Lore -> []
   CounterKind.Defense -> []
   CounterKind.Time -> []
+  CounterKind.Shield -> []
 
 keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
@@ -3538,10 +3559,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         baked = card {Face.replacementEffects = fmap bake (Face.replacementEffects card)}
     Spec.assertBool s (not (any phasePatternOffends (cardReplacementEffects card))) "the real Eon Hub is symmetric and accepted"
     Spec.assertBool s (any phasePatternOffends (cardReplacementEffects baked)) "and the same card naming a seat is rejected"
-  -- The same lint one event class over, for the OTHER pair of fields the codec
-  -- accepts and only the engine writes: CR 615.7's shielded recipient and its
-  -- remaining amount. See damagePatternOffends.
-  Spec.it s "no card authors a recipient-scoped damage pattern or a counted shield" $ do
+  -- The same lint one event class over, for the OTHER fields the codec accepts and
+  -- only the engine writes: CR 615.7's shielded recipient and its remaining amount,
+  -- plus CR 122.1c's minted pair. See damagePatternOffends.
+  Spec.it s "no card authors a recipient-scoped damage pattern or an engine-minted shield" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace (any damagePatternOffends . cardReplacementEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: Fog is the card that prints a DamageR.
@@ -3565,10 +3586,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         bakeShield replacement = case replacement of
           ReplacementEffect.DamageR damagePattern _ -> ReplacementEffect.DamageR damagePattern (DamageRewrite.PreventNext 4)
           other -> other
+        bakeCounterShield replacement = case replacement of
+          ReplacementEffect.DamageR damagePattern _ -> ReplacementEffect.DamageR damagePattern DamageRewrite.PreventRemovingShieldCounter
+          other -> other
     Spec.assertBool s (any isDamageR printed) "setup: Fog prints a damage replacement to bake"
     Spec.assertBool s (not (any damagePatternOffends printed)) "the real Fog names no recipient and counts nothing"
     Spec.assertBool s (any (damagePatternOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
     Spec.assertBool s (any (damagePatternOffends . bakeShield) printed) "and so is one counting a shield down"
+    -- CR 122.1c's prevention, which only Projection.shieldOf may mint.
+    Spec.assertBool s (any (damagePatternOffends . bakeCounterShield) printed) "and so is one removing a shield counter"
+    Spec.assertBool s (damagePatternOffends (ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter)) "and so is CR 122.1c's destruction half"
+    Spec.assertBool s (not (damagePatternOffends (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))) "while CR 701.19a's printed regeneration is accepted"
   -- The same shape one axis over, and the thing that makes
   -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
   -- approximate. See unpreventableScopeOffends.
