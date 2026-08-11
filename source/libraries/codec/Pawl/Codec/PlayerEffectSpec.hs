@@ -81,6 +81,24 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
           (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)])
       )
       """ {"type":"ReduceSpellCost","value":[{"type":"HasSubtype","value":{"type":"Cleric"}},[{"type":"OfType","value":{"type":"Colored","value":{"type":"White"}}},{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}]]} """
+  -- CR 613.11 / 601.2f / Heartstone, floor and all.
+  Spec.it s "ReduceActivationCost" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.ReduceActivationCost (Filter.HasCardType CardType.Creature) (ManaCost.MkManaCost [ManaSymbol.Generic 1]) 1)
+      """ {"type":"ReduceActivationCost","value":[{"type":"HasCardType","value":{"type":"Creature"}},[{"type":"Generic","value":1}],1]} """
+  -- Training Grounds' amount and floor, which differ from each other -- a codec
+  -- that swapped the two payloads would round-trip Heartstone's above and not
+  -- this one.
+  Spec.it s "ReduceActivationCost, Training Grounds' two" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.ReduceActivationCost (Filter.HasCardType CardType.Creature) (ManaCost.MkManaCost [ManaSymbol.Generic 2]) 1)
+      """ {"type":"ReduceActivationCost","value":[{"type":"HasCardType","value":{"type":"Creature"}},[{"type":"Generic","value":2}],1]} """
   -- CR 305.2 / Exploration.
   Spec.it s "PlayAdditionalLands, Exploration's one" $
     Common.assertJsonCodec

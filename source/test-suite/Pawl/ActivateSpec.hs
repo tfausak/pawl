@@ -120,6 +120,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   graveyardEffectZoneSpec s registry
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
+  activationCostReductionSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -2216,3 +2217,124 @@ outlastSpec s registry = Spec.describe s "Outlast" $ do
         gs = g0 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain}
     Spec.assertEqWith s "no ability in a hand" (Activate.abilitiesFor oid gs) []
     Spec.assertEqWith s "and no activation offered" (activationsOf oid (Action.legalActions S.alice gs)) []
+
+-- `owner`'s board: `lands` Mountains and the permanent whose ability is under
+-- test, plus Heartstone under ALICE's control when one is passed. The positive and
+-- the negative differ in that Maybe and in nothing else -- same seats, same mana,
+-- same permanent, same priority -- which is what makes a tapped-land count
+-- attributable to the reduction.
+--
+-- Heartstone sits with alice however `owner` reads, because its sentence is
+-- symmetric ("activated abilities of creatures", PlayerScope.EachPlayer): the
+-- board that proves that is the one where the activating player does not control
+-- it.
+heartstoneBoard ::
+  Printing.Printing ->
+  Int ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  Maybe Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+heartstoneBoard mountain lands source owner mHeartstone =
+  let base = List.foldl' (\g _ -> snd (S.addCreature mountain owner g)) (Setup.emptyGame S.bothPlayers) [1 .. lands]
+      (srcId, g1) = S.addCreature source owner base
+      g2 = maybe g1 (\heartstone -> snd (S.addCreature heartstone S.alice g1)) mHeartstone
+   in (srcId, g2 {GameState.priority = Just owner})
+
+-- CR 601.2f reaching an ACTIVATION cost (#90), which nothing could do before:
+-- Heartstone -- "Activated abilities of creatures cost {1} less to activate. This
+-- effect can't reduce the mana in that cost to less than one mana" (checked
+-- against Scryfall) -- is the first card in the pool that raises or lowers one.
+--
+-- Slivdrazi Monstrosity's "{3}: Create a 1/1 Eldrazi Sliver" is the ability
+-- measured, because {3} and the {2} it reduces to are DIFFERENT NUMBERS of lands:
+-- an assertion on a cost the reduction rounded to the same figure would pass
+-- either way.
+--
+-- THE FALSIFIER for the group is Mindslaver, on the same board as the positive: it
+-- is a noncreature permanent with a {4} activation cost, so Heartstone's criterion
+-- must turn it away -- and the criterion is all that can, since
+-- PlayerEffect.matchesObject reads an OBJECT and a noncreature permanent matches
+-- "noncreature" as readily as a noncreature spell does. That is the same trap
+-- Pawl.CostSpec's Thalia case pins from the increase direction.
+activationCostReductionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+activationCostReductionSpec s registry = Spec.describe s "ActivationCostReduction" $ do
+  -- The gate and the payment, on one pair of boards. Two Mountains cannot pay the
+  -- printed {3} and can pay the reduced {2}, so `activatable` flips; and the
+  -- activation that goes through taps two lands out of three rather than all
+  -- three, which is the reduction being PAID rather than merely measured.
+  Spec.it s "CR 601.2f Heartstone reduces a creature's activation cost by {1}" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    heartstone <- S.printingOf s registry "Heartstone"
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    let ability = theAbility slivdrazi
+        (twoWith, withStone) = heartstoneBoard mountain 2 slivdrazi S.alice (Just heartstone)
+        (twoWithout, withoutStone) = heartstoneBoard mountain 2 slivdrazi S.alice Nothing
+        (threeWith, threeWithStone) = heartstoneBoard mountain 3 slivdrazi S.alice (Just heartstone)
+        (threeWithout, threeWithoutStone) = heartstoneBoard mountain 3 slivdrazi S.alice Nothing
+        paid srcId gs = S.tappedCount S.alice (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId ability))
+    Spec.assertBool s (Activate.activatable S.alice twoWith ability withStone) "two Mountains pay the reduced {2}"
+    Spec.assertBool s (not (Activate.activatable S.alice twoWithout ability withoutStone)) "and cannot pay the printed {3}"
+    Spec.assertEqWith s "two of the three Mountains paid it" (paid threeWith threeWithStone) 2
+    Spec.assertEqWith s "where all three pay the printed cost" (paid threeWithout threeWithoutStone) 3
+    -- The activation's OWN re-check (CR 602.2's "an activation a player cannot
+    -- comply with is illegal") measures the same total: on two Mountains the
+    -- printed {3} is unpayable, so an activation gated on the printed cost would
+    -- be a no-op with nothing tapped rather than a paid ability on the stack.
+    let activated = S.runPure S.identityAnswer withStone (Activate.activateAbility S.alice twoWith ability)
+    Spec.assertEqWith s "both Mountains paid the reduced cost" (S.tappedCount S.alice activated) 2
+    Spec.assertEqWith s "and the ability is on the stack" (length (GameState.stack activated)) 1
+
+  -- Heartstone's own criterion, asserted on the SAME board as a reduction that
+  -- works: three Mountains under Heartstone pay Slivdrazi's reduced {3} and do not
+  -- pay Mindslaver's {4}, which they would if the reduction reached a noncreature
+  -- permanent's ability.
+  Spec.it s "CR 601.2f Heartstone does not reduce a noncreature permanent's activation cost" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    heartstone <- S.printingOf s registry "Heartstone"
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    mindslaver <- S.printingOf s registry "Mindslaver"
+    let (creatureId, board) = heartstoneBoard mountain 3 slivdrazi S.alice (Just heartstone)
+        (slaverId, withSlaver) = S.addCreature mindslaver S.alice board
+    Spec.assertBool s (Activate.activatable S.alice creatureId (theAbility slivdrazi) withSlaver) "the creature's ability is reduced"
+    Spec.assertBool s (not (Activate.activatable S.alice slaverId (theAbility mindslaver) withSlaver)) "and the artifact's {4} is not"
+
+  -- The floor, which is card text (CR 101.1) and not a rule: Withered Wretch's
+  -- "{1}: Exile target card from a graveyard" would be free without it. Nothing to
+  -- exile is not what stops it -- bob's graveyard holds a card, so the target is
+  -- fillable on both boards -- and the two differ only in whether alice has a
+  -- Mountain.
+  Spec.it s "Heartstone can't reduce the mana in that cost to less than one mana" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    heartstone <- S.printingOf s registry "Heartstone"
+    wretch <- S.printingOf s registry "Withered Wretch"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let ability = theAbility wretch
+        stocked lands =
+          let (srcId, gs) = heartstoneBoard mountain lands wretch S.alice (Just heartstone)
+           in (srcId, snd (S.addGraveyardCard piker S.bob gs))
+        (noLandId, noLand) = stocked 0
+        (oneLandId, oneLand) = stocked 1
+    Spec.assertBool s (not (Activate.activatable S.alice noLandId ability noLand)) "the {1} is not reduced to {0}"
+    Spec.assertBool s (Activate.activatable S.alice oneLandId ability oneLand) "and one Mountain still pays it"
+    Spec.assertEqWith
+      s
+      "which is what gets tapped"
+      (S.tappedCount S.alice (S.runPure S.identityAnswer oneLand (Activate.activateAbility S.alice oneLandId ability)))
+      1
+
+  -- CR 613.11 with PlayerScope.EachPlayer: Heartstone reduces the abilities of
+  -- EVERY player's creatures, so the read site has to consult it for an activation
+  -- its controller is not making. bob's three Mountains pay two, alice's Heartstone
+  -- untouched -- and bob's own board is the one that would still cost {3} under
+  -- Training Grounds' "creatures you control".
+  Spec.it s "CR 613.11 Heartstone's reduction is symmetric" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    heartstone <- S.printingOf s registry "Heartstone"
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    let ability = theAbility slivdrazi
+        (srcId, board) = heartstoneBoard mountain 3 slivdrazi S.bob (Just heartstone)
+        after = S.runPure S.identityAnswer board (Activate.activateAbility S.bob srcId ability)
+    Spec.assertBool s (Activate.activatable S.bob srcId ability board) "bob's creature is reduced too"
+    Spec.assertEqWith s "two of bob's three Mountains paid it" (S.tappedCount S.bob after) 2
+    Spec.assertEqWith s "and alice tapped nothing" (S.tappedCount S.alice after) 0

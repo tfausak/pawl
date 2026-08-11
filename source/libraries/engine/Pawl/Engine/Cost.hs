@@ -46,6 +46,7 @@ import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Claim as Claim.Type
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -254,10 +255,11 @@ costsFor name oid gs = case Game.lookupObject oid gs of
 -- CR 118.6a's first sentence needs no special case: fmap over the Maybe leaves
 -- Nothing as Nothing.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
-total pid oid cost gs = totalWith (allAdjustments pid oid gs) cost
+total pid oid cost gs = totalWith (spellAdjustments pid oid gs) cost
 
--- CR 601.2f's increases and reductions: the ones CARDS generate
--- (Pawl.Engine.PlayerEffect) plus the one the RULES do, CR 903.8's commander tax.
+-- CR 601.2f's increases and reductions for a SPELL being cast: the ones CARDS
+-- generate (Pawl.Engine.PlayerEffect) plus the one the RULES do, CR 903.8's
+-- commander tax.
 --
 -- The tax joins the increases rather than being added to the printed mana cost,
 -- because rule 903.8 words it "plus {2} for each previous time" -- an increase
@@ -268,11 +270,30 @@ total pid oid cost gs = totalWith (allAdjustments pid oid gs) cost
 -- Zero for every spell that is not a commander being cast from the command zone,
 -- and Pawl.Engine.Commander.tax short-circuits on that, so an ordinary game pays
 -- nothing to ask.
-allAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [ManaCost.ManaCost])
-allAdjustments pid oid gs =
-  let (increases, reductions) = PlayerEffect.costAdjustments pid oid gs
+spellAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+spellAdjustments pid oid gs =
+  let adjustments = PlayerEffect.spellCostAdjustments pid oid gs
       commanderTax = Commander.tax pid oid gs
-   in (if commanderTax == 0 then increases else commanderTax : increases, reductions)
+   in if commanderTax == 0
+        then adjustments
+        else adjustments {CostAdjustments.increases = commanderTax : CostAdjustments.increases adjustments}
+
+-- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes through
+-- rule 601.2b-i like a spell's. Heartstone and Training Grounds are what reach it
+-- (#90); no commander tax, since CR 903.8 taxes CASTING a commander and an
+-- activation is not a cast.
+--
+-- Not reached by a MANA ability's cost, which pays through manaActivations rather
+-- than through Pawl.Engine.Activate -- and unobservably so, since every mana
+-- ability in the pool has an empty mana part for a reduction to take from (#1120).
+--
+-- `srcId` is the ability's SOURCE PERMANENT, which is what
+-- PlayerEffect.activationCostAdjustments matches the criterion against -- the
+-- same argument position a spell's own object takes above, and deliberately: what
+-- differs between the two moments is the constructor gathered, never the call
+-- site (#90).
+activationAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
+activationAdjustments = PlayerEffect.activationCostAdjustments
 
 -- Every way CR 118.7e's choice could resolve the reductions that apply, one
 -- entry per combination -- `announceReductions` below with the prompt replaced
@@ -286,15 +307,16 @@ allAdjustments pid oid gs =
 -- One entry for adjustments with no hybrid symbol in them, so this is the
 -- identity case for every cost that never had a choice to make, and at most
 -- 2^(hybrid symbols across the reductions) otherwise.
-adjustmentResolutions :: PlayerId -> ObjectId -> GameState -> [([Natural], [ManaCost.ManaCost])]
-adjustmentResolutions pid oid gs =
-  let (increases, reductions) = allAdjustments pid oid gs
-      resolveOne symbol = case reductionHalvesOf symbol of
+adjustmentResolutions :: CostAdjustments.CostAdjustments -> [CostAdjustments.CostAdjustments]
+adjustmentResolutions adjustments =
+  let resolveOne symbol = case reductionHalvesOf symbol of
         Nothing -> [symbol]
         Just [] -> [symbol]
         Just halves -> halves
       resolveAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse resolveOne symbols)
-   in fmap ((,) increases) (traverse resolveAll reductions)
+   in fmap
+        (\reductions -> adjustments {CostAdjustments.reductions = reductions})
+        (traverse resolveAll (CostAdjustments.reductions adjustments))
 
 -- The same totalling over adjustments the CALLER already has, which is what CR
 -- 118.7e's prompt needs: `announceReductions` asks the payer which half of each
@@ -302,7 +324,7 @@ adjustmentResolutions pid oid gs =
 -- applyAdjustments rather than being read out of the game state a second time.
 -- `total` above is this over the adjustments as they stand unannounced, which no
 -- caller in the engine asks for; `totalManas` below is it over every resolution.
-totalWith :: ([Natural], [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+totalWith :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustments) (Cost.mana cost)}
 
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
@@ -319,9 +341,14 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 --
 -- The resolutions are computed ONCE and shared across the candidate costs a
 -- caller measures, which is what the partial application buys.
-totalManas :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [ManaCost.ManaCost]
-totalManas pid oid gs =
-  let resolutions = adjustmentResolutions pid oid gs
+--
+-- Takes the ADJUSTMENTS rather than gathering them, so the two moments CR 601.2f
+-- reaches share one totalling: Pawl.Engine.Cast hands it `spellAdjustments` and
+-- Pawl.Engine.Activate hands it `activationAdjustments` (#90). Nothing about the
+-- arithmetic below knows which it was given.
+totalManas :: CostAdjustments.CostAdjustments -> ManaCost.ManaCost -> [ManaCost.ManaCost]
+totalManas adjustments =
+  let resolutions = adjustmentResolutions adjustments
    in \manaCost -> fmap (`applyAdjustments` manaCost) resolutions
 
 -- CR 601.2f's ADDITIONAL-COSTS clause alone, bolted onto one candidate -- the
@@ -411,12 +438,13 @@ greatestPayableX payableAt cost =
 -- the PayLife appended above is precisely the announcement being measured.
 --
 -- `total` is CR 601.2f's totalling, the CALLER's to supply because the two
--- callers genuinely differ. Pawl.Engine.Cast passes `totalManas`, so a spell's
--- announcement is measured against the same adjusted cost `Cast.payableCost`
--- gated on -- against the printed cost instead, a reduction could hide a route
--- and this function elide the prompt. Pawl.Engine.Activate passes `pure`, because
--- an activation cost is deliberately not routed through `total` at all (#90).
--- When #90 lands both sites change together, which is the point of the parameter.
+-- callers total against different adjustments: Pawl.Engine.Cast passes
+-- `totalManas (spellAdjustments …)` and Pawl.Engine.Activate passes
+-- `totalManas (activationAdjustments …)`. Either way it is the SAME cost the
+-- caller's own payability gate measured -- against the printed cost instead, a
+-- reduction could hide a route and this function elide the prompt, which is the
+-- failure #416 named for spells and #90 kept off the activation path only by
+-- there being no reduction to reach it.
 --
 -- It answers a LIST because CR 118.7e's choice of half is not made until CR
 -- 601.2f, one step after this: a route is offered where SOME resolution of the
@@ -470,13 +498,21 @@ announce pid oid total_ cost = case Cost.mana cost of
 -- takes toward an announced X the player cannot afford, and CR 601.2h's failed
 -- payment is what reverses it.
 --
--- The INCREASES ride through untouched. CR 118.7e is a rule about reductions,
--- and pawl's increases are amounts of generic mana with no symbol to choose
--- halves of.
-announceReductions :: PlayerId -> ObjectId -> GameState -> Game ([Natural], [ManaCost.ManaCost])
-announceReductions pid oid gs =
-  let (increases, reductions) = PlayerEffect.costAdjustments pid oid gs
-      chooseOne symbol = case reductionHalvesOf symbol of
+-- The INCREASES and the FLOOR ride through untouched. CR 118.7e is a rule about
+-- which half of a reduction's symbol applies: pawl's increases are amounts of
+-- generic mana with no symbol to choose halves of, and a floor is a limit on the
+-- result rather than an amount of mana at all.
+--
+-- Takes the ADJUSTMENTS the caller gathered rather than gathering its own, which
+-- is what makes the announced reduction the one that will be applied: the caller
+-- hands the same record to `totalWith` afterwards, and the two moments CR 601.2f
+-- reaches can hand in different ones (#90). A no-op for the SPELL path it used to
+-- gather for itself -- CR 903.8's tax is folded into the candidate before CR
+-- 601.2a's move (Cast.castProposed) and Commander.tax answers 0 for a spell on the
+-- stack, so `spellAdjustments` and the bare player-effect gathering agree here.
+announceReductions :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments -> Game CostAdjustments.CostAdjustments
+announceReductions pid oid gs adjustments =
+  let chooseOne symbol = case reductionHalvesOf symbol of
         -- Not a hybrid symbol, so CR 118.7e has nothing to ask about it.
         Nothing -> pure symbol
         -- Unreachable: reductionHalvesOf answers Just only where it has halves
@@ -494,7 +530,9 @@ announceReductions pid oid gs =
           -- not one of the offered halves falls back to the first.
           pure (if elem answer halves then answer else first)
       chooseAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse chooseOne symbols)
-   in fmap ((,) increases) (traverse chooseAll reductions)
+   in fmap
+        (\reductions -> adjustments {CostAdjustments.reductions = reductions})
+        (traverse chooseAll (CostAdjustments.reductions adjustments))
 
 -- CR 118.7e's "one half of that symbol", written as the reduction each half
 -- would be: "if a colored or colorless half is chosen, the cost is reduced by
@@ -1763,6 +1801,27 @@ payComponent pid oid component = case component of
 --    component for CR 118.7b-c to move the stranded mana onto.
 -- 4. CR 601.2f's floor at {0} needs no special case: ManaCost is a list of
 --    symbols and the empty list IS {0}.
+-- 5. A REDUCING EFFECT'S OWN FLOOR (CostAdjustments.minimumMana) is applied last,
+--    as a clamp on the result: Heartstone's "This effect can't reduce the mana in
+--    that cost to less than one mana" is card text CR 101.1 lets override the
+--    rules, and it is a limit on what the reductions took rather than another
+--    adjustment. The shortfall is made up in GENERIC mana, which is the only mana
+--    a floored reduction in the pool can take (both printings reduce by generic
+--    only, CR 118.7a).
+--
+--    NEVER RAISES a cost that was already below the floor -- Heartstone's own
+--    ruling, "It will not add a {1} to abilities with no generic mana in their
+--    activation cost" -- so the requirement is the floor or the UNREDUCED mana,
+--    whichever is smaller.
+--
+--    A CLAMP ON THE POOLED RESULT rather than per reduction, and exact rather than
+--    an elision while every floor in the pool is one mana: two reductions floored
+--    at one leave one mana between them whichever order they apply in, and a
+--    surviving typed symbol is at least one mana whatever its type. What would
+--    tell a clamp from a fold is a FLOORED reduction beside an UNFLOORED one, and
+--    pawl has no unfloored activation-cost reducer to build that board with
+--    (Hero of Iroas is the printed shape, and no card in the pool prints it)
+--    (#1243).
 --
 -- Reductions are POOLED rather than applied one at a time. CR 601.2f lets the
 -- player apply multiple reductions in any order, which is a prompt in the rules
@@ -1777,9 +1836,10 @@ payComponent pid oid component = case component of
 -- symbols in their original order. Presentation, not semantics -- Mana.spend sums
 -- every generic symbol and matches typed symbols first -- but it is what makes a
 -- total cost comparable.
-applyAdjustments :: ([Natural], [ManaCost.ManaCost]) -> ManaCost.ManaCost -> ManaCost.ManaCost
+applyAdjustments :: CostAdjustments.CostAdjustments -> ManaCost.ManaCost -> ManaCost.ManaCost
 applyAdjustments adjustments cost =
-  let (increases, reductions) = adjustments
+  let increases = CostAdjustments.increases adjustments
+      reductions = CostAdjustments.reductions adjustments
       ManaCost.MkManaCost symbols = cost
       costGenericOf symbol = case symbol of
         ManaSymbol.Generic n -> n
@@ -1939,7 +1999,14 @@ applyAdjustments adjustments cost =
       -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
       -- 601.2f floor is also what keeps this total.
       lowered = if raised >= taken then raised - taken else 0
-      leading = if lowered == 0 then [] else [ManaSymbol.Generic lowered]
+      -- Point 5 above. `survivors` is the typed part the cancellation leaves, and
+      -- every typed symbol is at least one mana (CR 107.4e/107.4f/107.4h), so the
+      -- mana left in the cost is `lowered` plus how many of them there are.
+      survivors = cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) (filter isTyped symbols)
+      typedCount = Natural.length survivors
+      required = min (CostAdjustments.minimumMana adjustments) (raised + Natural.length (filter isTyped symbols))
+      floored = if lowered + typedCount >= required then lowered else required - typedCount
+      leading = if floored == 0 then [] else [ManaSymbol.Generic floored]
       -- Each reducing symbol cancels ONE matching symbol in the cost. Walks the
       -- printed symbols in their printed order, so the survivors keep it;
       -- `unspent` is the bag of reducing types that have not found a match yet,
@@ -1950,4 +2017,4 @@ applyAdjustments adjustments cost =
         symbol : rest -> case costManaTypeOf symbol of
           Just manaType | elem manaType unspent -> cancel (List.delete manaType unspent) rest
           _ -> symbol : cancel unspent rest
-   in ManaCost.MkManaCost (leading <> cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) (filter isTyped symbols))
+   in ManaCost.MkManaCost (leading <> survivors)
