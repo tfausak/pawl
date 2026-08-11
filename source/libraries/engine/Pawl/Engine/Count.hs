@@ -322,5 +322,6 @@ viewOfSnapshot mController isToken snapshot =
       -- battlefield now (CR 701.54e), not about one at the moment of an event.
       Filter.ringBearerFor = Nothing,
       Filter.renowned = False,
-      Filter.monstrous = False
+      Filter.monstrous = False,
+      Filter.suspected = False
     }

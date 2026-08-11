@@ -246,6 +246,20 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     IsMonstrous
+  | -- | CR 701.60b: is the OBJECT this quantity is evaluated against suspected? 1
+    -- if so and 0 if not -- Repeat Offender's "if this creature is suspected", a
+    -- clause condition on an activated ability as monstrosity's is.
+    --
+    -- IsRenowned in every structural respect above, rule 701.60b wording the
+    -- designation the way rule 702.112b does. Reaching another permanent's
+    -- designation is AgainstSlot's job, not a second constructor's.
+    --
+    -- No Filter atom beside it yet: the cards that ask the candidate question ("a
+    -- suspected creature", Rune-Brand Juggler) are each blocked by an unrelated
+    -- missing capability (#1215).
+    --
+    -- A LEAF: it holds no Quantity.
+    IsSuspected
   | -- | CR 508.3b: how many of that player's opponents were DECLARED attacked
     -- this combat phase -- rule 702.121a's "for each opponent you attacked with a
     -- creature this combat".

@@ -1626,7 +1626,8 @@ stubView table oid =
                 Filter.counters = Map.empty,
                 Filter.ringBearerFor = Nothing,
                 Filter.renowned = False,
-                Filter.monstrous = False
+                Filter.monstrous = False,
+                Filter.suspected = False
               }
         [] -> Nothing
 

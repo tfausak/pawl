@@ -198,7 +198,15 @@ data View = MkView
     -- Object.monstrous, and False where there is no object to read it off, both
     -- for `renowned` above's reasons -- the two rules word their designations
     -- the same way.
-    monstrous :: Bool
+    monstrous :: Bool,
+    -- CR 701.60b: does this candidate have the SUSPECTED designation? Read off
+    -- Object.suspected, `renowned` above in every respect. Its one reader is
+    -- Pawl.Engine.Quantity's IsSuspected arm, answering Repeat Offender's clause
+    -- condition. What CR 701.60c hangs off the designation does NOT come through
+    -- here: Pawl.Engine.Projection.designationGathered and
+    -- Pawl.Engine.CombatRestriction.inForce hold no view and read the field
+    -- directly.
+    suspected :: Bool
   }
   deriving (Eq, Show)
 
@@ -255,7 +263,8 @@ playerView pid =
       -- CR 702.112b: "only permanents can be or become renowned", and a player is
       -- not one.
       renowned = False,
-      monstrous = False
+      monstrous = False,
+      suspected = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and

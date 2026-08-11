@@ -753,6 +753,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Suspect (SlotName.MkSlotName (Text.pack "self")))
       """ {"type":"Suspect","value":"self"} """
+  -- CR 701.60a's ending, with an ObjectRef on the wire where Suspect above has a
+  -- bare slot: Eliminate the Impossible names a set rather than one permanent.
+  Spec.it s "Unsuspect" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Unsuspect (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      """ {"type":"Unsuspect","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
   Spec.it s "Evolve" $
     Common.assertJsonCodec
       s

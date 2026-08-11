@@ -266,6 +266,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- CR 701.37b's designation as a 0/1, IsRenowned's arm in every respect -- the
   -- same view, the same vacuous reading for an object nobody designated.
   Quantity.IsMonstrous -> fmap (\view -> if Filter.monstrous view then 1 else 0) mView
+  -- CR 701.60b's designation as a 0/1, IsRenowned's arm in every respect.
+  Quantity.IsSuspected -> fmap (\view -> if Filter.suspected view then 1 else 0) mView
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
   -- through the same Count.playersFor, and Nothing for a reference naming
@@ -365,6 +367,7 @@ substituteStar star quantity = case quantity of
   Quantity.ObjectCounters _ -> quantity
   Quantity.IsRenowned -> quantity
   Quantity.IsMonstrous -> quantity
+  Quantity.IsSuspected -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
@@ -418,6 +421,7 @@ slots quantity = case quantity of
   -- position without even the kind beside it.
   Quantity.IsRenowned -> Set.empty
   Quantity.IsMonstrous -> Set.empty
+  Quantity.IsSuspected -> Set.empty
   -- And a seventh PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
@@ -462,6 +466,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.ObjectCounters _ -> True
   Quantity.IsRenowned -> True
   Quantity.IsMonstrous -> True
+  Quantity.IsSuspected -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.BlockersBeyondFirst -> True
   -- True because `slots` above DOES report this arm's slot, unlike the nested
@@ -523,6 +528,7 @@ readsX quantity = case quantity of
   Quantity.ObjectCounters _ -> False
   Quantity.IsRenowned -> False
   Quantity.IsMonstrous -> False
+  Quantity.IsSuspected -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.BlockersBeyondFirst -> False
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion

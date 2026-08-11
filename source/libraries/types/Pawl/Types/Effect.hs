@@ -765,6 +765,21 @@ data Effect card
     -- wherever they are asked. Emits no event, so nothing can trigger on it
     -- (#1215).
     Suspect SlotName.SlotName
+  | -- | CR 701.60a's other ending: the named permanents are NO LONGER SUSPECTED --
+    -- Eliminate the Impossible's "if any of them are suspected, they're no longer
+    -- suspected". Rule 701.60a's "until it leaves the battlefield" needs no opcode,
+    -- Object.newIncarnation already dropping the designation.
+    --
+    -- An ObjectRef where Suspect above takes a SlotName, because the pool prints
+    -- unsuspect over a SET as well as over one permanent -- this card's sweep and
+    -- Absolving Lammasu's "all suspected creatures" against Deadly Complication's
+    -- single target -- while every printed suspect names one permanent. Only the
+    -- set form has a producer in the tree today.
+    --
+    -- Not a second write on Suspect nor a designation parameter, which is #1193's
+    -- question; a separate opcode keeps the static analyses (Resolve.slotsOf,
+    -- Projection.rewriteEffect) reading one shape apiece.
+    Unsuspect ObjectRef.ObjectRef
   | -- | CR 702.100a and CR 702.100b together: put a +1/+1 counter on the slot's
     -- permanent, and if one or more actually land, that permanent EVOLVES --
     -- rule 702.100b's marker, which Renegade Krasis' "whenever this creature
