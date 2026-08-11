@@ -413,10 +413,12 @@ fullView gs oid = Just (viewOfObject oid gs)
 -- read from last known information once it no longer exists -- what a resolving
 -- spell wants for anything it reads about its own source.
 --
--- Scoped to `src` alone by design: CR 608.2h's fallback is about a specific
--- object an effect asks after, while an off-battlefield candidate a COUNT sweeps
--- is matched on printed characteristics instead (#160). The trigger is that the
--- id names no object, which per CR 400.7 is exactly CR 608.2h's condition.
+-- Scoped to `src` alone by design, and the scope is a rules decision: the OTHER
+-- object a resolving effect reads is its target, and CR 608.2b answers the same
+-- question the other way there -- an effect needing information about a target
+-- that has left "fails to determine any such information", which is the blank
+-- answer fullView gives. The trigger is that the id names no object, which per CR
+-- 400.7 is exactly CR 608.2h's condition.
 --
 -- viewWithLastKnownAnywhere below is the unscoped counterpart, and where the
 -- record read and its no-record answer are accounted for. Picking the wrong one

@@ -129,7 +129,7 @@ resolveTopWith runSubgame = do
           -- CR 608.2a: an intervening "if" is checked AGAIN as the ability
           -- resolves. Object.owner is the ability's controller, which is "you".
           --
-          -- CR 608.2h supplies the view of `srcId`, for the reason
+          -- CR 608.2h supplies the view, for the reason
           -- Event.interveningHolds gives at the gather-time half of this rule:
           -- a leaves-the-battlefield ability's source is gone by construction
           -- (CR 603.10a, CR 400.7), and Projection.fullView would describe it
