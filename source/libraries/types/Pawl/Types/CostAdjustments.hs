@@ -36,9 +36,3 @@ data CostAdjustments = MkCostAdjustments
     minimumMana :: Natural
   }
   deriving (Eq, Ord, Show)
-
--- | The adjustments that adjust nothing. What a cost with no effect on it is
--- totalled by, and the identity `Pawl.Engine.Cost.total` reduces to on an empty
--- board.
-none :: CostAdjustments
-none = MkCostAdjustments {increases = [], reductions = [], minimumMana = 0}

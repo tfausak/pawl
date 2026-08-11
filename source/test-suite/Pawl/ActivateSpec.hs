@@ -2246,8 +2246,9 @@ heartstoneBoard mountain lands source owner mHeartstone =
 -- effect can't reduce the mana in that cost to less than one mana" (checked
 -- against Scryfall) -- is the first card in the pool that raises or lowers one.
 --
--- Slivdrazi Monstrosity's "{3}: Create a 1/1 Eldrazi Sliver" is the ability
--- measured, because {3} and the {2} it reduces to are DIFFERENT NUMBERS of lands:
+-- Slivdrazi Monstrosity's "{3}: Create a 1/1 colorless Eldrazi Sliver creature
+-- token" is the ability measured, because {3} and the {2} it reduces to are
+-- DIFFERENT NUMBERS of lands:
 -- an assertion on a cost the reduction rounded to the same figure would pass
 -- either way.
 --
