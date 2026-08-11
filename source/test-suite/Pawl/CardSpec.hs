@@ -118,12 +118,14 @@ import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -750,8 +752,26 @@ modalSlotsOffend abilityBound modal =
             defined = Resolve.definedSlots effects
             -- The whole MODE's reads, not just its effect list's: CR 118.12a's
             -- "unless [a player] pays" names its payer by slot too.
-            wanted = Resolve.modeSlots mode
+            wanted = Map.keysSet (Resolve.modeSlots mode)
          in Set.difference (Set.difference wanted defined) abilityBound /= Map.keysSet (Mode.targetSpecs mode)
+   in any modeOffends (Modal.modes modal)
+
+-- CR 601.2c's OTHER dataflow question, asked of the same modes: a slot whose
+-- count may exceed one holds a set of recipients, and only a reader that takes a
+-- set can see all of them (Pawl.Types.SlotArity). A card aiming "up to two target
+-- creatures" at an opcode that names one object would affect NEITHER of them --
+-- Pawl.Engine.Binding.onlyOne declines a slot naming several rather than picking
+-- one -- and no compiler catches that, so it is caught here.
+--
+-- Read off the same Resolve.modeSlots the D4 lint reads, whose join keeps the
+-- narrower arity: a slot two effects of one mode read both ways is One.
+modalCountsOffend :: Modal.Modal Card.Type.Card -> Bool
+modalCountsOffend modal =
+  let modeOffends mode =
+        let read_ = Resolve.modeSlots mode
+            plural theSpec = TargetCount.most (TargetSpec.count theSpec) > 1
+            offends slot theSpec = plural theSpec && Map.lookup slot read_ == Just SlotArity.One
+         in or (Map.elems (Map.mapWithKey offends (Mode.targetSpecs mode)))
    in any modeOffends (Modal.modes modal)
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
@@ -2544,7 +2564,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       )
       stems
   Spec.it s "the lint itself catches a dangling reference" $
-    let bad = Set.unions [Resolve.slotsOf (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3))]
+    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3)))
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)) "misauthored card detected"
   -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
   -- announced against the card's own mana cost.
@@ -3053,13 +3073,49 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
-        readsAnySlot ab = not (Set.null (Set.unions (fmap Resolve.slotsOf (Modal.allEffects (ActivatedAbility.modal ab)))))
+        readsAnySlot ab = not (all (Map.null . Resolve.slotsOf) (Modal.allEffects (ActivatedAbility.modal ab)))
     -- Guards the sweep against passing vacuously, in both directions: an empty
     -- pool of abilities, and a pool in which none reads a slot at all (where
     -- every ability would pass on an empty read side whatever the lint said).
     Spec.assertBool s (not (null abilities)) "the pool has activated abilities"
     Spec.assertBool s (any (readsAnySlot . snd) abilities) "and one of them reads a slot"
     Spec.assertEqWith s "no dangling activated-ability slot" (fmap fst (filter (activatedAbilityOffends . snd) abilities)) []
+  -- CR 601.2c's count, over every carrier at once: see modalCountsOffend.
+  Spec.it s "every slot that may take more than one target is read where a set fits" $ do
+    ps <- S.allPrintings s
+    let carriers p =
+          let face = S.combinedFace p
+           in fmap ((,) (Face.name face)) $
+                Face.spell face
+                  : fmap ActivatedAbility.modal (Face.activatedAbilities face)
+                    <> fmap TriggeredAbility.modal (Face.triggeredAbilities face)
+        modals = concatMap carriers ps
+        takesSeveral (_, modal) =
+          any (any ((> 1) . TargetCount.most . TargetSpec.count) . Mode.targetSpecs) (Modal.modes modal)
+    -- The pool must actually contain one, or the sweep says nothing.
+    Spec.assertBool s (any takesSeveral modals) "the pool has a slot that takes more than one target"
+    Spec.assertEqWith s "no multi-target slot is read one at a time" (fmap fst (filter (modalCountsOffend . snd) modals)) []
+  -- The rejecting direction, which the sweep above cannot show: a mode whose slot
+  -- takes two targets and whose only reader is Effect.Sacrifice, a bare SlotName.
+  Spec.it s "the lint itself catches a multi-target slot read one at a time" $ do
+    let slot = SlotName.MkSlotName (Text.pack "creature")
+        modeWith theSpec reader =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton reader))) (Map.singleton slot theSpec)))
+            (ModeSelection.ChooseExactly 1)
+        two = TargetSpec.upTo 2 Pool.Creatures Nothing
+    Spec.assertBool
+      s
+      (modalCountsOffend (modeWith two (Effect.Sacrifice slot)))
+      "a two-target slot read as one object offends"
+    Spec.assertBool
+      s
+      (not (modalCountsOffend (modeWith two (Effect.Tap (ObjectRef.InSlot slot)))))
+      "and the same slot read through an ObjectRef does not"
+    Spec.assertBool
+      s
+      (not (modalCountsOffend (modeWith (TargetSpec.required Pool.Creatures Nothing) (Effect.Sacrifice slot))))
+      "nor does a one-target slot read as one object"
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
   -- proven here instead, against hand-built offenders and against the four real

@@ -2270,6 +2270,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   flashSpec s registry
   victorManchaSpec s registry
   upToOneTargetSpec s registry
+  multiTargetCastSpec s registry
 
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
 -- to one target creature gets -1/-1 until end of turn. You create a 1/1 black
@@ -2307,6 +2308,40 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTargetCast" $ do
           _ -> False
     Spec.assertBool s (not (announced bare)) "no candidate, no question"
     Spec.assertBool s (announced peopled) "a candidate, so the caster is asked"
+
+-- CR 601.2c's count above one, read at cast time. Hearts on Fire {1}{R} Instant
+-- is "One or two target creatures each get +2/+1 until end of turn": the number
+-- is a real question with two creatures to choose between and no question at all
+-- with one, because "in some cases, the number of targets will be defined by the
+-- spell's text" -- and here the board defines it just as firmly.
+multiTargetCastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+multiTargetCastSpec s registry = Spec.describe s "MultiTargetCast" $ do
+  Spec.it s "CR 601.2c one candidate fixes the number, so nothing is announced" $ do
+    (one_, _, spellId) <- heartsBoards s registry
+    Spec.assertEqWith s "nothing asked" (announcedCounts spellId one_) []
+  Spec.it s "CR 601.2c a second candidate makes the number a question" $ do
+    (_, two, spellId) <- heartsBoards s registry
+    Spec.assertEqWith s "asked, and answered here with the maximum" (announcedCounts spellId two) [2]
+
+-- One Hearts on Fire in alice's hand over two Mountains, on two boards that
+-- differ only in whether bob has a second creature.
+heartsBoards :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+heartsBoards s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  hearts <- S.printingOf s registry "Hearts on Fire"
+  let (one_, spellId) = S.handOne hearts (snd (S.addCreature piker S.bob (S.landsInPlay mountain 2)))
+      (_, two) = S.addCreature rats S.bob one_
+  pure (one_, two, spellId)
+
+-- Every number CR 601.2c's announcement carried while casting this spell.
+announcedCounts :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
+announcedCounts spellId gs =
+  [ n
+  | Response.AnnouncedTargets counts <- snd (Replay.record S.identityAnswer gs (S.cast S.alice spellId)),
+    n <- Map.elems counts
+  ]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

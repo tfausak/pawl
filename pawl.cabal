@@ -713,6 +713,7 @@ library types
     Pawl.Types.Scope
     Pawl.Types.SearchDestination
     Pawl.Types.Sickness
+    Pawl.Types.SlotArity
     Pawl.Types.SlotName
     Pawl.Types.Source
     Pawl.Types.SourceRelation

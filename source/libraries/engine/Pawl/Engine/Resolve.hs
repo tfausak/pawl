@@ -113,6 +113,8 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
+import Pawl.Types.SlotArity (SlotArity)
+import qualified Pawl.Types.SlotArity as SlotArity
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
@@ -124,79 +126,101 @@ import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
+-- The read side of the D4 dataflow lint answers WHICH slots and HOW MANY
+-- recipients apiece (Pawl.Types.SlotArity): a slot read through an ObjectRef can
+-- hold CR 601.2c's "up to two", and one read any other way cannot. These four
+-- combinators are the join, which takes the conservative arity wherever two reads
+-- of one card disagree.
+joinTwo :: Map.Map SlotName SlotArity -> Map.Map SlotName SlotArity -> Map.Map SlotName SlotArity
+joinTwo = Map.unionWith min
+
+joinSlots :: [Map.Map SlotName SlotArity] -> Map.Map SlotName SlotArity
+joinSlots = foldr joinTwo Map.empty
+
+oneSlot :: SlotName -> Map.Map SlotName SlotArity
+oneSlot slot = Map.singleton slot SlotArity.One
+
+insertOne :: SlotName -> Map.Map SlotName SlotArity -> Map.Map SlotName SlotArity
+insertOne slot = joinTwo (oneSlot slot)
+
+-- A Quantity reads a slot to evaluate a number against ONE object
+-- (Quantity.AgainstSlot), so every slot it names is read singly.
+quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
+quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
+
 -- The slots a PlayerRef reads. Only InSlot names one; EachPlayer and Relative
 -- are answered from the evaluation context alone. Factored out of slotsOf below
 -- so the recursion into PlayerRef is stated once.
-playerRefSlots :: PlayerRef -> Set SlotName
+playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
-  PlayerRef.EachPlayer -> Set.empty
-  PlayerRef.Relative _ -> Set.empty
-  PlayerRef.InSlot slot -> Set.singleton slot
+  PlayerRef.EachPlayer -> Map.empty
+  PlayerRef.Relative _ -> Map.empty
+  PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
 
 -- The slots an ObjectRef reads. Only InSlot names one; EachMatching is swept from
 -- the battlefield at resolution and names nothing at cast, so a card whose only
 -- object reference is a set declares no target spec and CR 608.2b has nothing to
 -- fizzle (CR 115.10a).
-objectRefSlots :: ObjectRef -> Set SlotName
+objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
-  ObjectRef.InSlot slot -> Set.singleton slot
-  ObjectRef.EachMatching _ -> Set.empty
+  ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
+  ObjectRef.EachMatching _ -> Map.empty
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
 -- three-arm type -- CR 725.2's ControllerOfSource has no PlayerRef spelling.
-monarchTargetSlots :: MonarchTarget.MonarchTarget -> Set SlotName
+monarchTargetSlots :: MonarchTarget.MonarchTarget -> Map.Map SlotName SlotArity
 monarchTargetSlots target = case target of
-  MonarchTarget.TheController -> Set.empty
-  MonarchTarget.ControllerOfSource -> Set.empty
-  MonarchTarget.InSlot slot -> Set.singleton slot
+  MonarchTarget.TheController -> Map.empty
+  MonarchTarget.ControllerOfSource -> Map.empty
+  MonarchTarget.InSlot slot -> Map.singleton slot SlotArity.One
 
 -- The one legitimate home of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1), and everything else asks classifications.
 -- slotsOf is the read half of the dataflow lint.
 --
--- Every arm carrying a Quantity unions Quantity.slots over it, a Quantity.InSlot
+-- Every arm carrying a Quantity joins quantitySlots over it, a Quantity.InSlot
 -- being a slot read like any other. X is not one of those reads; readsX below is
 -- X's own half of the contract.
-slotsOf :: Effect Card.Type.Card -> Set SlotName
+slotsOf :: Effect Card.Type.Card -> Map.Map SlotName SlotArity
 slotsOf effect = case effect of
-  Effect.DealDamage ref quantity -> Set.union (objectRefSlots ref) (Quantity.slots quantity)
+  Effect.DealDamage ref quantity -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
   -- The modification's own quantities read slots too, through
   -- Projection.quantitiesOf. No card in the pool reads a slot there, but a
   -- dangling one would otherwise slip past the lint entirely.
   Effect.ModifyTarget duration modification ref ->
-    Set.unions [objectRefSlots ref, foldMap Quantity.slots (Projection.quantitiesOf modification), durationSlots duration]
-  Effect.ChangeText _ _ slot -> Set.singleton slot
-  Effect.AddMana _ -> Set.empty
-  Effect.Search _ _ -> Set.empty
-  Effect.ExileAllGraveyards -> Set.empty
-  Effect.Proliferate -> Set.empty
-  Effect.TemptWithTheRing -> Set.empty
-  Effect.ExileHandThenDraw -> Set.empty
-  Effect.PlayerSacrifices slot _ quantity -> Set.insert slot (Quantity.slots quantity)
-  Effect.RestartGame -> Set.empty
-  Effect.ControlPlayerNextTurn slot -> Set.singleton slot
+    joinSlots [objectRefSlots ref, foldMap quantitySlots (Projection.quantitiesOf modification), durationSlots duration]
+  Effect.ChangeText _ _ slot -> oneSlot slot
+  Effect.AddMana _ -> Map.empty
+  Effect.Search _ _ -> Map.empty
+  Effect.ExileAllGraveyards -> Map.empty
+  Effect.Proliferate -> Map.empty
+  Effect.TemptWithTheRing -> Map.empty
+  Effect.ExileHandThenDraw -> Map.empty
+  Effect.PlayerSacrifices slot _ quantity -> insertOne slot (quantitySlots quantity)
+  Effect.RestartGame -> Map.empty
+  Effect.ControlPlayerNextTurn slot -> oneSlot slot
   -- The third field is a DEFINITION (how many this sweep destroyed), not a read,
   -- so it belongs to boundSlots below and must not appear here -- Create's and
   -- PlaySubgame's slots take the same posture.
   Effect.Destroy ref _ _ -> objectRefSlots ref
-  Effect.Sacrifice slot -> Set.singleton slot
-  Effect.TurnFaceDown slot -> Set.singleton slot
-  Effect.RemoveFromCombat slot -> Set.singleton slot
+  Effect.Sacrifice slot -> oneSlot slot
+  Effect.TurnFaceDown slot -> oneSlot slot
+  Effect.RemoveFromCombat slot -> oneSlot slot
   Effect.MoveToZone ref _ _ _ _ _ -> objectRefSlots ref
-  Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.Draw ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The tally's slot is a DEFINITION (how many of them counted), not a read, so
   -- it belongs to boundSlots below -- Destroy's third field takes the same
   -- posture, for the same reason.
-  Effect.Mill ref quantity _ -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
-  Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
-  Effect.LoseLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
-  Effect.GainLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
-  Effect.ExchangeLifeTotals slot -> Set.singleton slot
-  Effect.IncreaseSpeed ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.Mill ref quantity _ -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Discard slot quantity -> insertOne slot (quantitySlots quantity)
+  Effect.LoseLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.GainLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.ExchangeLifeTotals slot -> oneSlot slot
+  Effect.IncreaseSpeed ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
-  Effect.Create quantity _ _ _ -> Quantity.slots quantity
+  Effect.Create quantity _ _ _ -> quantitySlots quantity
   -- A READ, unlike Create's slot: the ref names the permanent being copied,
   -- which is a target on Cackling Counterpart and the reserved self slot on
   -- Watchful Radstag. Both are reads; only the first is a target (CR 115.10a).
@@ -204,7 +228,7 @@ slotsOf effect = case effect of
   -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
   -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
   -- one, but a dangling one would slip past the lint as ModifyTarget's would.
-  Effect.Replace duration _ _ condition _ -> Set.union (durationSlots duration) (foldMap conditionSlots condition)
+  Effect.Replace duration _ _ condition _ -> joinTwo (durationSlots duration) (foldMap conditionSlots condition)
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
   -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
@@ -217,78 +241,78 @@ slotsOf effect = case effect of
   -- Pawl.CardSpec sweep that forbids a CARD binding a reserved name reads that
   -- one.
   Effect.PreventNextDamage duration ref quantity rider ->
-    Set.unions
+    joinSlots
       [ durationSlots duration,
         objectRefSlots ref,
-        Quantity.slots quantity,
-        Set.delete Binding.eventAmount (foldMap slotsOf rider)
+        quantitySlots quantity,
+        Map.delete Binding.eventAmount (foldMap slotsOf rider)
       ]
   -- The same two reads, minus the shield size this opcode does not carry.
-  Effect.PreventAllDamage duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
+  Effect.PreventAllDamage duration ref -> joinTwo (durationSlots duration) (objectRefSlots ref)
   -- BOTH ObjectRefs. Turn the Tables reads its target slot through the
   -- DESTINATION ref, so naming only the source side would leave a declared
   -- target unread and pass the reads-equal-declares lint on a card that fizzles.
   Effect.RedirectDamage duration _ srcRef destRef ->
-    Set.unions [durationSlots duration, objectRefSlots srcRef, objectRefSlots destRef]
-  Effect.Counter slot -> Set.singleton slot
-  Effect.PutCounters _ quantity ref -> Set.union (objectRefSlots ref) (Quantity.slots quantity)
-  Effect.RemoveCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
-  Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
-  Effect.RemovePlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+    joinSlots [durationSlots duration, objectRefSlots srcRef, objectRefSlots destRef]
+  Effect.Counter slot -> oneSlot slot
+  Effect.PutCounters _ quantity ref -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
+  Effect.RemoveCounters _ quantity slot -> insertOne slot (quantitySlots quantity)
+  Effect.GainPlayerCounters ref _ quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.RemovePlayerCounters ref _ quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
-  Effect.AddPhases _ -> Set.empty
+  Effect.AddPhases _ -> Map.empty
   Effect.GainControl _ ref -> objectRefSlots ref
-  Effect.ArmDelayedTrigger {} -> Set.empty
-  Effect.AffectPlayers {} -> Set.empty
+  Effect.ArmDelayedTrigger {} -> Map.empty
+  Effect.AffectPlayers {} -> Map.empty
   -- Both refs, for Tap and Untap's reason: either may name a slot.
-  Effect.RequireBlock _ blocker attacker -> Set.union (objectRefSlots blocker) (objectRefSlots attacker)
-  Effect.CreateEmblem {} -> Set.empty
+  Effect.RequireBlock _ blocker attacker -> joinTwo (objectRefSlots blocker) (objectRefSlots attacker)
+  Effect.CreateEmblem {} -> Map.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm (Denethor's
   -- "target player"); the other two derive their player and read nothing.
   Effect.BecomeMonarch target -> monarchTargetSlots target
   -- A READ: the slot names the permanent gaining the designation. Reserved
   -- rather than a target on every producer today (rule 702.112a's "it"), but
   -- the lint's question is which slots the effect names, not which are targets.
-  Effect.BecomeRenowned slot -> Set.singleton slot
+  Effect.BecomeRenowned slot -> oneSlot slot
   -- A READ, BecomeRenowned's: CR 701.37a's "it" is the ability's own bearer.
-  Effect.BecomeMonstrous slot -> Set.singleton slot
+  Effect.BecomeMonstrous slot -> oneSlot slot
   -- A READ, BecomeRenowned's: CR 701.60a's "suspect a creature" names one.
-  Effect.Suspect slot -> Set.singleton slot
+  Effect.Suspect slot -> oneSlot slot
   -- A READ of whatever slot the ref names, Tap's arm: rule 701.60a's ending can
   -- reach a set instead.
   Effect.Unsuspect ref -> objectRefSlots ref
   -- A READ, BecomeRenowned's: the slot names the permanent rule 702.100a's
   -- counter goes on.
-  Effect.Evolve slot -> Set.singleton slot
-  Effect.ItBecomes _ -> Set.empty
-  Effect.ExileUntilMonarch slot -> Set.singleton slot
-  Effect.Attach slot -> Set.singleton slot
-  Effect.AttachTarget slot _ -> Set.singleton slot
+  Effect.Evolve slot -> oneSlot slot
+  Effect.ItBecomes _ -> Map.empty
+  Effect.ExileUntilMonarch slot -> oneSlot slot
+  Effect.Attach slot -> oneSlot slot
+  Effect.AttachTarget slot _ -> oneSlot slot
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
-  Effect.PlaySubgame _ -> Set.empty
+  Effect.PlaySubgame _ -> Map.empty
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
   Effect.TakeExtraTurn ref _ -> playerRefSlots ref
-  Effect.ShuffleIntoLibrary slot -> Set.singleton slot
+  Effect.ShuffleIntoLibrary slot -> oneSlot slot
   -- OfferCast's slot is a READ: it names the object being offered, bound by an
   -- earlier effect of the same list (CR 400.7).
-  Effect.OfferCast slot _ -> Set.singleton slot
+  Effect.OfferCast slot _ -> oneSlot slot
   -- Both a READ: the ObjectRef names the object being permitted, normally bound
   -- by a MoveToZone earlier in the same list (CR 400.7) exactly as OfferCast's
   -- slot is, and the Duration's Condition may read a slot as a Quantity.
-  Effect.GrantPlayFromExile duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
+  Effect.GrantPlayFromExile duration ref -> joinTwo (durationSlots duration) (objectRefSlots ref)
 
 -- CR 611.2b: the only Duration carrying a Quantity is ForAsLongAs, through its
 -- Condition.
-durationSlots :: Duration.Duration -> Set SlotName
+durationSlots :: Duration.Duration -> Map.Map SlotName SlotArity
 durationSlots duration = case duration of
-  Duration.UntilEndOfTurn -> Set.empty
-  Duration.Indefinite -> Set.empty
-  Duration.UntilYourNextTurn -> Set.empty
+  Duration.UntilEndOfTurn -> Map.empty
+  Duration.Indefinite -> Map.empty
+  Duration.UntilYourNextTurn -> Map.empty
   Duration.ForAsLongAs condition -> conditionSlots condition
-  Duration.UntilEndOfCombat -> Set.empty
+  Duration.UntilEndOfCombat -> Map.empty
 
 -- Every slot a whole MODE reads: every clause's effects', plus every payer CR
 -- 118.12a's "unless [a player] pays" names. What the D4 dataflow lint asks,
@@ -296,22 +320,22 @@ durationSlots duration = case duration of
 -- Leak's Counter happens to read the very slot its "unless" names, so the lint's
 -- answer is the same either way for the one card in the pool; a card whose payer
 -- and target differ is what this exists for.
-modeSlots :: Mode.Mode Card.Type.Card -> Set SlotName
+modeSlots :: Mode.Mode Card.Type.Card -> Map.Map SlotName SlotArity
 modeSlots mode =
-  Set.union
-    (foldMap slotsOf (Mode.allEffects mode))
-    (foldMap payerSlot (Mode.clauses mode))
+  joinTwo
+    (joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))))
+    (joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))))
   where
     -- Every clause's payer, not just one: CR 118.12a scopes an "unless" to the
     -- clause it is printed on, so a mode may state more than one and each names
     -- a slot the card owes a declaration for.
-    payerSlot = maybe Set.empty (Set.singleton . UnlessPaid.payer) . Clause.unlessPaid
+    payerSlot = maybe Map.empty (oneSlot . UnlessPaid.payer) . Clause.unlessPaid
 
 -- Both sides of a comparison are a Quantity, and either may read a slot.
-conditionSlots :: Condition.Type.Condition -> Set SlotName
+conditionSlots :: Condition.Type.Condition -> Map.Map SlotName SlotArity
 conditionSlots condition = case condition of
   Condition.Type.Compares measured _ threshold ->
-    Set.union (Quantity.slots measured) (Quantity.slots threshold)
+    joinTwo (quantitySlots measured) (quantitySlots threshold)
   Condition.Type.Any conditions -> foldMap conditionSlots conditions
 
 -- CR 603.3b: is slotsOf's answer for this effect the WHOLE of what APPLYING it
@@ -392,18 +416,18 @@ slotsAreExhaustive effect = case effect of
   Effect.AddPhases _ -> True
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
   Effect.GainControl duration _ ->
-    Set.null (durationSlots duration) && durationSlotsAreExhaustive duration
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- CR 603.7c: the armed ability inherits this object's whole environment, so
   -- what it reads is not stated here at all.
   Effect.ArmDelayedTrigger {} -> False
   -- GainControl's reason for the Duration; the PlayerScope and the PlayerEffect
   -- beside it hold no reference of any sort.
   Effect.AffectPlayers duration _ _ ->
-    Set.null (durationSlots duration) && durationSlotsAreExhaustive duration
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- slotsOf's arm reports both refs but drops the Duration, so the slotless
   -- test is made here -- AffectPlayers' reason.
   Effect.RequireBlock duration _ _ ->
-    Set.null (durationSlots duration) && durationSlotsAreExhaustive duration
+    Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- CR 114.2's emblem is minted with EMPTY bindings (Event.createEmblem), so its
   -- embedded card is literal text for Create's reason.
   Effect.CreateEmblem _ -> True

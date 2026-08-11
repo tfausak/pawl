@@ -883,7 +883,7 @@ orderInert ability =
         && case Foldable.toList (Modal.Type.modes modal) of
           [mode] ->
             Map.null (Mode.targetSpecs mode)
-              && Set.null (Resolve.modeSlots mode)
+              && Map.null (Resolve.modeSlots mode)
               && all Resolve.slotsAreExhaustive (Mode.allEffects mode)
           _ -> False
 

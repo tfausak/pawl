@@ -111,6 +111,7 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
@@ -564,7 +565,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "one card in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
   Spec.it s "CR 612 slotsOf finds a ChangeText slot" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot)) (Set.singleton slot)
+    Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot)) (Map.singleton slot SlotArity.One)
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
@@ -4664,9 +4665,9 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
   -- is a locality convenience, keeping all three answers in one place.
   Spec.it s "CR 725.1 slotsOf reads the targeted monarch's slot, and only that arm's" $ do
     let slot = SlotName.MkSlotName (Text.pack "player")
-    Spec.assertEqWith s "the targeted arm names its slot" (Resolve.slotsOf (Effect.BecomeMonarch (MonarchTarget.InSlot slot))) (Set.singleton slot)
-    Spec.assertEqWith s "the resolving controller names none" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.TheController)) Set.empty
-    Spec.assertEqWith s "and neither does CR 725.2's crown steal" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)) Set.empty
+    Spec.assertEqWith s "the targeted arm names its slot" (Resolve.slotsOf (Effect.BecomeMonarch (MonarchTarget.InSlot slot))) (Map.singleton slot SlotArity.One)
+    Spec.assertEqWith s "the resolving controller names none" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.TheController)) Map.empty
+    Spec.assertEqWith s "and neither does CR 725.2's crown steal" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)) Map.empty
 
 -- Palace Jailer's ruling (Scryfall, 2021-03-19): "If you're not the monarch as
 -- Palace Jailer's second ability resolves, the creature will be exiled until
@@ -6036,6 +6037,160 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   auraThiefSpec s registry
   baneOfProgressSpec s registry
   upToOneTargetSpec s registry
+  multiTargetSpec s registry
+
+-- CR 601.2c's announcement, answered with a stated number for every variable
+-- slot -- where S.identityAnswer announces as many as the board allows.
+announcingCount :: Natural -> Prompt.Prompt r -> r
+announcingCount n p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const n) offers
+  _ -> S.identityAnswer p
+
+-- Announces `n` targets per slot and aims them at `wanted`, in that order of
+-- preference. S.identityAnswer would take the least Recipients instead, which on
+-- these boards is not what the assertions are about.
+takingTargets :: Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+takingTargets n wanted p = case p of
+  Prompt.AnnounceTargets {} -> announcingCount n p
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> maybe False (\oid -> elem oid wanted) (Recipient.objectOf r)) sets
+  _ -> S.identityAnswer p
+
+-- The +1/+1 counters on one permanent.
+plusCountersOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
+plusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+
+-- CR 601.2c's count above one, read at resolution.
+--
+-- Hearts on Fire {1}{R} Instant (data/cards/hearts-on-fire.json): "One or two
+-- target creatures each get +2/+1 until end of turn." A range whose minimum is
+-- neither zero nor its maximum, so it exercises both ends -- castability gates on
+-- the minimum, the announcement chooses between one and two, and CR 608.2b's
+-- per-recipient legality shows on the survivor when the other target goes.
+--
+-- Agent Bishop, Man in Black {2}{W} 1/2 (data/cards/agent-bishop-man-in-black.json):
+-- "At the beginning of combat on your turn, put a +1/+1 counter on each of up to
+-- two target creatures." The same count on a TRIGGERED ability, where
+-- Resolve.resolveModes rather than Resolve.targetsAllIllegal asks CR 608.2b's
+-- question.
+multiTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+multiTargetSpec s registry = Spec.describe s "MultiTarget" $ do
+  -- Three creatures with three different power/toughness boxes, so which two were
+  -- pumped is legible; two targets out of three is what makes the count a choice
+  -- rather than a sweep.
+  Spec.it s "CR 601.2c Hearts on Fire pumps the two creatures it named, and only those" $ do
+    (pikerId, ratsId, wallId, gs, spellId) <- heartsBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        after = resolveOne answer gs spellId
+    Spec.assertEqWith s "the Piker is +2/+1" (S.powerToughnessOf pikerId after) (Just (4, 2))
+    Spec.assertEqWith s "the Wall is +2/+1" (S.powerToughnessOf wallId after) (Just (2, 9))
+    Spec.assertEqWith s "the Rats, whom nobody named, are untouched" (S.powerToughnessOf ratsId after) (Just (1, 1))
+  -- The same board and the same spell, differing only in the announced number.
+  Spec.it s "CR 601.2c announcing one target pumps one creature" $ do
+    (pikerId, _, wallId, gs, spellId) <- heartsBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 1 [pikerId, wallId]
+        after = resolveOne answer gs spellId
+    Spec.assertEqWith s "the Piker is +2/+1" (S.powerToughnessOf pikerId after) (Just (4, 2))
+    Spec.assertEqWith s "and the second creature it would have taken is untouched" (S.powerToughnessOf wallId after) (Just (0, 8))
+  -- CR 608.2b: "Illegal targets, if any, won't be affected by parts of a
+  -- resolving spell's effect for which they're illegal." One target of two leaves
+  -- the battlefield between the announcement and the resolution, which under a
+  -- per-SLOT reading of that rule would take the survivor down with it.
+  Spec.it s "CR 608.2b one of two targets leaving does not stop the other being pumped" $ do
+    (pikerId, _, wallId, gs, spellId) <- heartsBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        gone = snd (Engine.runGamePure answer cast (Event.changeZone wallId Zone.Graveyard))
+        after = snd (Engine.runGamePure answer gone Stack.resolveTop)
+    Spec.assertEqWith s "the surviving target is +2/+1" (S.powerToughnessOf pikerId after) (Just (4, 2))
+    Spec.assertBool s (not (Set.member wallId (GameState.battlefield after))) "and the other one is gone"
+  -- CR 601.2c's minimum, which is castability's question: one legal creature is
+  -- enough for "one or two", and none is not. Both boards hold the same two
+  -- Mountains, so the creature is the only difference between them.
+  Spec.it s "CR 601.2c a minimum above zero gates castability" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hearts <- S.printingOf s registry "Hearts on Fire"
+    let lands = S.landsInPlay mountain 2
+        (_, withCreature) = S.addCreature piker S.bob lands
+        castable board = let (gs, spellId) = S.handOne hearts board in S.castable S.alice spellId gs
+    Spec.assertBool s (castable withCreature) "one creature is enough for one or two targets"
+    Spec.assertBool s (not (castable lands)) "and no creature is not"
+  -- The ability path's own CR 608.2b (Resolve.resolveModes), which the spell path
+  -- above does not reach.
+  Spec.it s "CR 601.2c Agent Bishop's trigger counters the two creatures it named" $ do
+    (bishopId, pikerId, ratsId, wallId, gs) <- bishopBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        after = S.runPure answer (S.runPure answer gs Engine.settleForPriority) Stack.resolveTop
+    Spec.assertEqWith s "the Piker took a counter" (plusCountersOn pikerId after) (Just 1)
+    Spec.assertEqWith s "so did the Wall" (plusCountersOn wallId after) (Just 1)
+    Spec.assertEqWith s "the Rats, whom nobody named, took none" (plusCountersOn ratsId after) (Just 0)
+    Spec.assertEqWith s "and neither did Bishop" (plusCountersOn bishopId after) (Just 0)
+  Spec.it s "CR 608.2b Agent Bishop's trigger still counters the target that survives" $ do
+    (_, pikerId, _, wallId, gs) <- bishopBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        -- The trigger is PLACED (CR 603.3, targets announced) and then one of them
+        -- leaves, so CR 608.2b has something to re-validate when it resolves.
+        placed = S.runPure answer gs Engine.settleForPriority
+        gone = S.runPure answer placed (Event.changeZone wallId Zone.Graveyard)
+        after = S.runPure answer gone Stack.resolveTop
+    Spec.assertEqWith s "the surviving target took its counter" (plusCountersOn pikerId after) (Just 1)
+    Spec.assertBool s (not (Set.member wallId (GameState.battlefield after))) "and the other one is gone"
+
+-- Two Mountains for Hearts on Fire, three of bob's creatures with three distinct
+-- printed boxes (2/1, 1/1, 0/8), and the spell in alice's hand.
+heartsBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+heartsBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  hearts <- S.printingOf s registry "Hearts on Fire"
+  let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay mountain 2)
+      (ratsId, g2) = S.addCreature rats S.bob g1
+      (wallId, g3) = S.addCreature wall S.bob g2
+      (gs, spellId) = S.handOne hearts g3
+  pure (pikerId, ratsId, wallId, gs, spellId)
+
+-- Agent Bishop on alice's battlefield with the same three creatures, at the
+-- beginning of her combat, where its ability triggers.
+bishopBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+bishopBoard s registry = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  bishop <- S.printingOf s registry "Agent Bishop, Man in Black"
+  let (bishopId, g1) = S.addCreature bishop S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g2) = S.addCreature piker S.bob g1
+      (ratsId, g3) = S.addCreature rats S.bob g2
+      (wallId, g4) = S.addCreature wall S.bob g3
+      combat = Phase.Combat CombatStep.BeginningOfCombat
+      gs =
+        Event.recordEvent (GameEvent.StepBegan combat S.alice) $
+          g4
+            { GameState.phase = combat,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+  pure (bishopId, pikerId, ratsId, wallId, gs)
+
+-- Cast a spell from alice's hand and resolve it.
+resolveOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+resolveOne answer gs spellId =
+  let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+   in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
 -- CR 115.6: declines every optional slot, announcing zero targets. Everything
 -- else is S.identityAnswer's answer, which for ChooseTargets fills what it is
