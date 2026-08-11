@@ -362,6 +362,28 @@ infectSpec s registry =
       Spec.assertEqWith s "two -1/-1 counters" (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject victim after)) (Just 2)
       Spec.assertEqWith s "no marked damage" (S.damageOf victim after) (Just 0)
 
+    -- CR 120.3c AND NOT CR 120.3d: rule 120.3d names a CREATURE recipient, so an
+    -- infect source damaging a planeswalker takes loyalty counters off it like any
+    -- other source and gives it no -1/-1 counters. The results are the recipient's
+    -- card types (CR 120.3), never the source's keyword.
+    --
+    -- Jace Beleren is CAST rather than arranged, so his three loyalty counters come
+    -- from CR 306.5b's replacement and the removal has something to take.
+    Spec.it s "CR 120.3c infect damage to a planeswalker takes loyalty, not -1/-1 counters" $ do
+      island <- S.printingOf s registry "Island"
+      jace <- S.printingOf s registry "Jace Beleren"
+      ichorRats <- S.printingOf s registry "Ichor Rats"
+      let (handGs, jaceInHand) = S.handOne jace (S.landsInPlay island 3)
+          board = S.runPure S.identityAnswer handGs (do S.cast S.alice jaceInHand; Stack.resolveTop)
+          walker = permanentNamed "Jace Beleren" board
+          (src, withRats) = S.addCreature ichorRats S.alice board
+          ev = DamageEvent.MkDamageEvent src (Recipient.ToPlaneswalker walker) 2 False True False 0 Nothing DamageKind.Combat
+          after = S.runPure S.identityAnswer withRats (Damage.applyDamage [ev])
+      Spec.assertEqWith s "CR 306.5b: three loyalty counters to start" (S.counterOf CounterKind.Loyalty walker board) 3
+      Spec.assertEqWith s "CR 120.3c: loyalty 3 -> 1" (S.counterOf CounterKind.Loyalty walker after) 1
+      Spec.assertEqWith s "CR 120.3d reaches no planeswalker" (S.counterOf CounterKind.MinusOneMinusOne walker after) 0
+      Spec.assertEqWith s "and CR 120.3e reaches none either" (S.damageOf walker after) (Just 0)
+
     Spec.it s "CR 702.90 Glistener Elf poisons an unblocked player, drains no life" $ do
       glistenerElf <- S.printingOf s registry "Glistener Elf"
       let (gs, _, _) = S.combatBoardOf [glistenerElf] []

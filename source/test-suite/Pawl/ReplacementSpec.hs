@@ -2354,6 +2354,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   brineElementalSpec s registry
   coldsteelHeartSpec s registry
   vorinclexSpec s registry
+  damageCountersSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -3802,3 +3803,110 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
         Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste halvedGoblin halved)) "and no haste: the counter was taken, not declined"
         Spec.assertEqWith s "and one without the praetor" (countersOn CounterKind.PlusOnePlusOne plainGoblin plain) 1
       _ -> Spec.assertFailure s "the goblin did not reach the battlefield"
+
+-- CR 120.3b / 120.3d with CR 122.6: the counters a DAMAGE event causes are put on
+-- through the same two placement funnels every other counter goes through, so a
+-- counter replacement reaches them.
+--
+-- Ichor Rats ({1}{B}{B} Creature -- Phyrexian Rat 2/1, "Infect. When this
+-- creature enters, each player gets a poison counter.") is the source, and its two
+-- power is what keeps the three readings apart: two unreplaced, four doubled, one
+-- halved. One power would make the halved reading zero, which no board can tell
+-- from a placement that never happened.
+--
+-- The praetor's SEAT is the only difference between each pair, and it is the axis
+-- CR 120.3b and CR 120.3d both name: "that source's controller" puts these
+-- counters, so alice's praetor doubles them wherever they land, and bob's halves
+-- the ones he himself receives. A reading that asked whose permanent or player
+-- was AFFECTED would double bob's boards instead.
+--
+-- Three seats, so the praetor's controller can be a third party to the placement
+-- rather than always one of its two ends.
+damageCountersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+damageCountersSpec s registry = Spec.describe s "Counters damage causes (CR 120.3b, CR 120.3d)" $ do
+  let -- alice attacks bob with one Ichor Rats; `watcher` seats that card under that
+      -- player, Nothing being the control board. bob gets one creature per printing
+      -- in `blockers` and blocks with all of them.
+      board watcher blockers = do
+        rats <- S.printingOf s registry "Ichor Rats"
+        seat <- Monad.mapM (\(name, _) -> S.printingOf s registry name) watcher
+        printings <- Monad.mapM (S.printingOf s registry) blockers
+        let (gs0, mine, theirs, _) = S.threePlayerCombat [rats] printings []
+            seated = case (seat, watcher) of
+              (Just printing, Just (_, pid)) -> snd (S.addCreature printing pid gs0)
+              _ -> gs0
+        pure $ case mine of
+          [rat] -> Just (theirs, S.runCombat (fights rat theirs) seated)
+          _ -> Nothing
+      -- ONLY the Rats attack and only bob's `blockers` block, so a hasty praetor on
+      -- either side neither attacks nor blocks and the boards differ in nothing but
+      -- the replacement. With one blocker CR 510.1c forces the whole assignment, so
+      -- no division is asked for.
+      fights rat blockers p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (== rat) ids
+        Prompt.DeclareBlockers _ _ mine _ ->
+          Map.fromList (fmap (\b -> (b, Set.singleton rat)) (filter (\b -> elem b blockers) mine))
+        Prompt.ChooseDefender {} -> S.bob
+        _ -> S.identityAnswer p
+      poisonOn = S.playerCounterOf PlayerCounterKind.Poison
+      shrunk = countersOn CounterKind.MinusOneMinusOne
+  Spec.it s "CR 120.3b alice's praetor doubles the poison her Ichor Rats deals bob" $ do
+    doubled <- board (Just ("Vorinclex, Monstrous Raider", S.alice)) []
+    plain <- board Nothing []
+    case (doubled, plain) of
+      (Just (_, twice), Just (_, once)) -> do
+        Spec.assertEqWith s "twice that many" (poisonOn S.bob twice) 4
+        Spec.assertEqWith s "and two without the praetor" (poisonOn S.bob once) 2
+        Spec.assertEqWith s "CR 120.3b's poison instead of the life loss" (S.lifeOf S.bob twice) (Just 20)
+      _ -> Spec.assertFailure s "fixture did not build both boards"
+  -- The putter axis: bob's own praetor HALVES the poison bob receives, because
+  -- alice is the one putting it. This is the case a recipient-based reading gets
+  -- backwards -- bob is its controller's "you", so it would double instead.
+  Spec.it s "CR 120.3b bob's praetor halves the poison he receives" $ do
+    halved <- board (Just ("Vorinclex, Monstrous Raider", S.bob)) []
+    plain <- board Nothing []
+    case (halved, plain) of
+      (Just (_, half), Just (_, once)) -> do
+        Spec.assertEqWith s "half of two, rounded down" (poisonOn S.bob half) 1
+        Spec.assertEqWith s "and two without the praetor" (poisonOn S.bob once) 2
+      _ -> Spec.assertFailure s "fixture did not build both boards"
+  -- CR 120.3d's creature half, on the same axis. Wall of Stone ({1}{R}{R} Creature
+  -- -- Wall 0/8, defender) is the blocker: it survives every reading, so the count
+  -- is readable rather than gone with the creature, and its zero power assigns no
+  -- damage back for CR 704.5h to act on.
+  Spec.it s "CR 120.3d alice's praetor doubles the -1/-1 counters her Ichor Rats causes" $ do
+    doubled <- board (Just ("Vorinclex, Monstrous Raider", S.alice)) ["Wall of Stone"]
+    plain <- board Nothing ["Wall of Stone"]
+    case (doubled, plain) of
+      (Just ([wall], twice), Just ([bare], once)) -> do
+        Spec.assertEqWith s "twice that many" (shrunk wall twice) 4
+        Spec.assertEqWith s "and two without the praetor" (shrunk bare once) 2
+        Spec.assertEqWith s "CR 120.3d's counters instead of marked damage" (S.damageOf wall twice) (Just 0)
+      _ -> Spec.assertFailure s "fixture did not build both boards"
+  -- The creature half's putter axis, and the pair that settles it: the Wall is
+  -- BOB's permanent, so a recipient-based reading would double these four times
+  -- over. Alice is putting them, so bob's praetor halves them.
+  Spec.it s "CR 120.3d bob's praetor halves the counters put on his own Wall of Stone" $ do
+    halved <- board (Just ("Vorinclex, Monstrous Raider", S.bob)) ["Wall of Stone"]
+    plain <- board Nothing ["Wall of Stone"]
+    case (halved, plain) of
+      (Just ([wall], half), Just ([bare], once)) -> do
+        Spec.assertEqWith s "half of two, rounded down" (shrunk wall half) 1
+        Spec.assertEqWith s "and two without the praetor" (shrunk bare once) 2
+      _ -> Spec.assertFailure s "fixture did not build both boards"
+  -- CR 614.16 versus CR 614.1, which is what CounterCause.ByRule settles here: rule
+  -- 120.3's results are dictated by the rules, so Doubling Season -- "if an EFFECT
+  -- would put one or more counters on a permanent you control" -- does not reach
+  -- them, where the praetor's clauses name a player and do. Bob controls the Season
+  -- and the Wall, so the only thing keeping it off is the cause.
+  --
+  -- Not vacuous: the cases above are the same board with the praetor in the same
+  -- seat, and they move the count in both directions.
+  Spec.it s "CR 614.16 Doubling Season does not reach the counters damage causes" $ do
+    seasoned <- board (Just ("Doubling Season", S.bob)) ["Wall of Stone"]
+    plain <- board Nothing ["Wall of Stone"]
+    case (seasoned, plain) of
+      (Just ([wall], watched), Just ([bare], once)) -> do
+        Spec.assertEqWith s "two, not four" (shrunk wall watched) 2
+        Spec.assertEqWith s "the same two the bare board shows" (shrunk bare once) 2
+      _ -> Spec.assertFailure s "fixture did not build both boards"
