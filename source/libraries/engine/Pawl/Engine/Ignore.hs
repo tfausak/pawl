@@ -1,17 +1,21 @@
 -- CR 116.2d: the special action that lets a player pay to ignore the effect of a
 -- permanent's static ability for a duration. Leonin Arbiter's "any player may
--- pay {2} for that player to ignore this effect until end of turn" is the
--- producer.
+-- pay {2} for that player to ignore this effect until end of turn" is one
+-- producer; Damping Engine, whose sentence narrows both the effect's scope and
+-- therefore the offer, is the other in the pool.
 --
 -- The offer side and the payment side, exactly as Pawl.Engine.Room is for CR
 -- 116.2m: what the ignore then SUPPRESSES is Pawl.Engine.PlayerEffect.applying's
--- question, which this module never asks.
+-- question, which this module never asks. It asks that module only WHO the
+-- ability is affecting, which is the rule's own gate on the offer -- a typed
+-- question, so no PlayerEffect or PlayerScope constructor is visible here.
 module Pawl.Engine.Ignore where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
@@ -41,10 +45,18 @@ ignoreCostOf oid gs = case Game.faceOf oid gs of
     [] -> Nothing
     c : _ -> Just c
 
--- CR 116.2d: may this player ignore this permanent right now? Two conjuncts:
+-- CR 116.2d: may this player ignore this permanent right now? Three conjuncts:
 --
 --   * the permanent grants the permission, which also settles that it is on the
 --     battlefield with a face to read it from;
+--   * the rule's own WHO -- this player is one the permanent's static abilities
+--     are actually affecting, which is what every printed producer's sentence
+--     says. Leonin Arbiter's "any player" is the EachPlayer scope its own
+--     prohibition carries, and Damping Engine's "that player" is the one player
+--     its scope reaches; a seat the ability is not changing the game for is
+--     offered nothing to ignore. Asked as
+--     Pawl.Engine.PlayerEffect.affectedBy, which is the typed question -- this
+--     module sees no PlayerEffect and no PlayerScope constructor.
 --   * the cost is payable. An action the player cannot take is not offered,
 --     which is Pawl.Engine.Action.legalActions' posture throughout.
 --
@@ -54,14 +66,15 @@ ignoreCostOf oid gs = case Game.faceOf oid gs of
 -- neither (#90).
 --
 -- No conjunct for the PRIORITY clause, for the reason CR 116.2a's land play has
--- none: legalActions is asked only of the priority holder. None for WHO either
--- -- Leonin Arbiter says "any player" (#1139) -- and none for having already
--- ignored it, which CR 116.2d does not forbid: paying again is legal, spends the
--- mana again and changes nothing else.
+-- none: legalActions is asked only of the priority holder. And none for having
+-- already ignored it, which CR 116.2d does not forbid: paying again is legal,
+-- spends the cost again and changes nothing else -- which is why affectedBy is
+-- asked over the UNFILTERED gather rather than over
+-- Pawl.Engine.PlayerEffect.applying.
 canIgnore :: PlayerId -> ObjectId -> GameState -> Bool
 canIgnore pid oid gs = case ignoreCostOf oid gs of
   Nothing -> False
-  Just cost -> Cost.canPay pid oid cost gs
+  Just cost -> PlayerEffect.affectedBy pid oid gs && Cost.canPay pid oid cost gs
 
 -- Every permanent this player may pay to ignore right now, in battlefield order
 -- -- what Action.Ignore is built from, the shape Room.unlockable has.

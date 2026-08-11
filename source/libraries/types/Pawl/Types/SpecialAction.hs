@@ -6,7 +6,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- | CR 116.2: a special action a face's printed text grants -- something a
 -- player may do with priority that does not use the stack. WHICH player is the
 -- constructor's own question: CR 116.2e's is the card's holder, CR 116.2d's is
--- anyone.
+-- whoever the ignored ability is affecting.
 --
 -- Named for the OPERATION and never for the card. CR 116.2e is one card by name,
 -- but the engine must not learn that name: Pawl.Engine.Action reads this
@@ -36,18 +36,23 @@ data SpecialAction
     --
     -- WHICH effect is named by the SOURCE PERMANENT and not by an index into
     -- Face.playerAbilities, so taking this ignores every player-axis static
-    -- ability the permanent has. Exact for all four producers, none of which
-    -- grants the permission on more than one ability (#1139).
+    -- ability the permanent has. Exact for every printed producer, none of which
+    -- grants the permission on one of several abilities: Damping Engine's one
+    -- sentence declares two, and its own ignore covers both -- "this effect" is
+    -- the whole sentence. A permanent granting the permission on ONE of two
+    -- unrelated abilities would want a key (#1267).
     --
     -- The DURATION is not carried: all four print "until end of turn", and CR
     -- 116.2d states only "for a duration" rather than fixing one, so a card that
     -- printed another would want a Pawl.Types.Duration here.
     --
-    -- WHO may take it is not carried either, and that is the axis on which the
-    -- other three producers differ from this one: Leonin Arbiter says "any
-    -- player", Volrath's Curse says "that creature's controller" and Damping
-    -- Engine says "that player" of a condition no filter here could state
-    -- (#1139).
+    -- WHO may take it is not carried either, and needs no payload: the rule's own
+    -- answer is the players the ability is AFFECTING, which the carrier's
+    -- PlayerScope already states. Leonin Arbiter's "any player" is its EachPlayer
+    -- scope and Damping Engine's "that player" is its narrower one, so
+    -- Pawl.Engine.Ignore.canIgnore derives both from
+    -- Pawl.Engine.PlayerEffect.affectedBy. The two Auras narrow by a scope on an
+    -- OBJECT-axis effect instead, which that derivation does not reach (#1268).
     --
     -- The COST is carried, since it is what the printed sentence varies most
     -- freely -- {2}, sacrificing a permanent, exiling three cards from a

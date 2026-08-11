@@ -1976,6 +1976,11 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 725 names no quality either: the designation has no parts (Jared
   -- Carthalion, True Heir).
   PlayerEffect.CantBecomeMonarch -> []
+  -- CR 601.3a's Filter half, which is exactly a quality of the spell (Damping
+  -- Engine's "artifact, creature, or enchantment spells").
+  PlayerEffect.CantCastMatching f -> [f]
+  -- CR 305.1's unrestricted prohibition narrows nothing: every land is stopped.
+  PlayerEffect.CantPlayLands -> []
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
@@ -2021,6 +2026,8 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False
+  PlayerEffect.CantCastMatching _ -> False
+  PlayerEffect.CantPlayLands -> False
 
 -- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
 -- DamagePattern: does this card author a field of that pattern the engine bakes?
@@ -2056,6 +2063,8 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False
+  PlayerEffect.CantCastMatching _ -> False
+  PlayerEffect.CantPlayLands -> False
 
 -- The non-vacuity half of both lints above: is this CR 615.12's effect at all?
 -- A wildcard is right here, where it is not above -- this asks "did the sweep
