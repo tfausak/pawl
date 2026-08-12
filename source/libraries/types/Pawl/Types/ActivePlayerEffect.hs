@@ -25,9 +25,12 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- here, and PlayerScope is the same type on both carriers.
 --
 -- `expiry` decides when a Pawl.Engine.Expiry sweep drops it (CR 514.2, 611.2a,
--- 611.2b). AtCleanup has a producer (Silence) and so does Never (Sea Gate
--- Restoration's "for the rest of the game"); no card arms While or AtTurnOf on
--- this carrier (#97).
+-- 611.2b). Every arm the pool reaches has a producer: AtCleanup (Silence),
+-- Never (Sea Gate Restoration's "for the rest of the game"), AtTurnOf
+-- (Blossoming Calm) and While (Synthetic Conditional Silence, which is
+-- synthetic because a "for as long as" player effect is printed as a static on a
+-- permanent and so rides Pawl.Types.PlayerStaticAbility instead).
+-- Pawl.PlayerEffectSpec's groups of those names are the proof.
 --
 -- `timestamp` is CR 613.7b's stamp, taken as the effect began, and it is READ:
 -- Pawl.Engine.PlayerEffect.applying merges these rows into the printed carrier's

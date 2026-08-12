@@ -9,11 +9,15 @@
 -- outside the CR 613 layer system entirely.
 --
 -- The seven gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Four more --
--- Synthetic Phyrexian Discount, Synthetic Snow Discount, Synthetic Monocolored
--- Hybrid Discount and Synthetic Hybrid Discount -- are the file's SYNTHETIC
--- cards, one per reduction CR 118.7e-g describes and no card prints. Khabál
+-- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Synthetic
+-- Phyrexian Discount, Synthetic Snow Discount, Synthetic Monocolored Hybrid
+-- Discount and Synthetic Hybrid Discount are SYNTHETIC, one per reduction CR
+-- 118.7e-g describes and no card prints. Khabál
 -- Ghoul, Withered Wretch and Sol Ring are the costs the last two are aimed at.
+--
+-- Blossoming Calm and Synthetic Conditional Silence are the stored carrier's
+-- other two durations (CR 611.2a's "until your next turn", CR 611.2b's "for as
+-- long as"), the second synthetic for the reason its own group states.
 -- Humility,
 -- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
 -- -- the one place this axis does meet the CR 613 layer system.
@@ -70,6 +74,7 @@ import qualified Pawl.Engine.Projection as Projection
 
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -2009,8 +2014,11 @@ storedConditional piker =
    in (srcId, conditional)
 
 -- The STORED carrier: a player effect that outlives the object that made it.
--- Hand-built here, exactly as ExpirySpec hand-builds a ContinuousEffect, so the
--- carrier and its sweeps are proven before an opcode can produce one.
+-- Hand-built here, exactly as ExpirySpec hand-builds a ContinuousEffect. Every
+-- expiry now has a card driving it end to end (the Silence, Blossoming Calm and
+-- Synthetic Conditional Silence groups); these stay because they discriminate
+-- shapes no single card reaches -- two AtTurnOf entries keyed to two players on
+-- one handoff being the sharpest.
 storedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 storedSpec s registry =
   Spec.describe s "Stored" $ do
@@ -2263,6 +2271,321 @@ silenceSpec s registry =
         []
       -- CR 109.5: the scope is resolved off the effect's controller.
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell resolved)) "alice is not prohibited"
+
+-- CR 611.2a's board: three seats, and the SEAT COUNT is load-bearing twice
+-- over. "Until your next turn" has to pass two other seats before it ends, so a
+-- two-player board cannot tell "the next turn" from "your next turn"; and CR
+-- 702.11c's opponents are two players, not one.
+--
+-- alice has one Plains and Blossoming Calm in hand. bob has one Mountain and a
+-- Lightning Bolt. carol has nothing -- she is a seat to pass and a rival target,
+-- both of which she is by existing. Mana is held EQUAL across every case below,
+-- because each one casts the same Bolt off the same untapped Mountain: the only
+-- thing that ever differs is whether alice's stored effect is still there.
+--
+-- Loaded fresh inside each case that needs it -- equivalent because loading is
+-- deterministic and cached (batch-recipe.md).
+blossomingCalmBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+blossomingCalmBoard plains calm mountain bolt =
+  let gs0 = Setup.emptyGame S.threePlayers
+      (_, gs1) = S.addCreature plains S.alice gs0
+      (calmId, gs2) = S.addHandCard calm S.alice gs1
+      (_, gs3) = S.addCreature mountain S.bob gs2
+      (boltId, gs4) = S.addHandCard bolt S.bob gs3
+   in ( calmId,
+        boltId,
+        gs4
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- alice casts Blossoming Calm and it resolves.
+blossomingCalmAfter :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+blossomingCalmAfter calmId before =
+  S.runPure S.identityAnswer (S.runPure S.identityAnswer before (S.cast S.alice calmId)) Engine.priorityLoop
+
+-- bob casts his Bolt with an answerer that aims at alice whenever the engine
+-- offers her, so "alice was never offered" is the only way the damage can land
+-- anywhere else -- TargetSpec's prefersBob, pointed the other way.
+--
+-- The phase and priority are restated rather than inherited, so a board that has
+-- been handed off two seats is cast on under exactly the conditions the
+-- un-handed-off one was.
+blossomingCalmBolt :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+blossomingCalmBolt boltId gs =
+  let prefersAlice :: Prompt.Prompt r -> r
+      prefersAlice p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.alice) sets
+        _ -> S.identityAnswer p
+      staged = gs {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+   in S.runPure prefersAlice staged (S.cast S.bob boltId >> Stack.resolveTop)
+
+-- CR 611.2a's turn boundary, as Engine.handoffTurn -- the call every "until your
+-- next turn" duration is ended by (Expiry.dropAtTurnOf), and the one a test can
+-- make without running whole turns and decking the fixture (CR 104.3c).
+blossomingCalmHandoff :: GameState.GameState -> GameState.GameState
+blossomingCalmHandoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
+
+-- Blossoming Calm {W} Instant: "You gain hexproof until your next turn. You gain
+-- 2 life." The stored player-effect carrier's turn-relative expiry, end to end:
+-- Pawl.Engine.Resolve stamps Expiry.AtTurnOf off the resolution's controller
+-- (CR 109.5) and Expiry.dropAtTurnOf ends it at alice's seat, two handoffs later.
+--
+-- Not implemented: the card's third line is rebound (CR 702.88), which pawl has
+-- no representation for (#877). The omission runs against the controller -- pawl's
+-- Blossoming Calm is cast once where the printed one is cast twice -- so nothing
+-- here is weaker than printed.
+blossomingCalmSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blossomingCalmSpec s registry =
+  Spec.describe s "Blossoming Calm" $ do
+    -- THE CONTROL TWIN. Same seats, same Mountain, same Bolt, same answerer --
+    -- the only difference from the case below is that alice never cast her
+    -- instant. Without this, "alice took no damage" could mean the Bolt was
+    -- never cast at all.
+    Spec.it s "with no Calm cast, bob's Bolt reaches alice" $ do
+      plains <- S.printingOf s registry "Plains"
+      calm <- S.printingOf s registry "Blossoming Calm"
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (_, boltId, before) = blossomingCalmBoard plains calm mountain bolt
+          burned = blossomingCalmBolt boltId before
+      Spec.assertEqWith s "alice takes the Bolt" (S.lifeOf S.alice burned) (Just 17)
+      Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob burned) (Just 20)
+      Spec.assertEqWith s "and so is carol" (S.lifeOf S.carol burned) (Just 20)
+
+    -- CR 611.1: the resolution stores the effect, and CR 702.11c's player
+    -- hexproof takes alice out of the Bolt's candidate set. The life gain is the
+    -- second clause of the same spell, and it is asserted for its own sake: it is
+    -- what shows the spell RESOLVED rather than fizzling somewhere earlier.
+    Spec.it s "CR 702.11c once it resolves, alice has gained 2 and bob's Bolt cannot reach her" $ do
+      plains <- S.printingOf s registry "Plains"
+      calm <- S.printingOf s registry "Blossoming Calm"
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (calmId, boltId, before) = blossomingCalmBoard plains calm mountain bolt
+          resolved = blossomingCalmAfter calmId before
+          burned = blossomingCalmBolt boltId resolved
+      Spec.assertEqWith s "one stored player effect" (length (GameState.playerEffects resolved)) 1
+      Spec.assertEqWith s "and it ends at alice's next turn" (fmap ActivePlayerEffect.expiry (GameState.playerEffects resolved)) [Expiry.Type.AtTurnOf S.alice]
+      Spec.assertEqWith s "alice gained 2" (S.lifeOf S.alice resolved) (Just 22)
+      Spec.assertEqWith s "and takes nothing from the Bolt" (S.lifeOf S.alice burned) (Just 22)
+      Spec.assertEqWith s "which landed on bob, the lowest candidate left" (S.lifeOf S.bob burned) (Just 17)
+
+    -- HEXPROOF, NOT SHROUD, on the stored carrier: CR 702.11c names only
+    -- opponents, so alice remains a legal target for her own spells and carol
+    -- remains a legal target for everyone. An implementation that read the
+    -- payload as EachPlayer passes the case above and fails this one.
+    Spec.it s "CR 702.11c the stored effect stops alice's opponents and nobody else" $ do
+      plains <- S.printingOf s registry "Plains"
+      calm <- S.printingOf s registry "Blossoming Calm"
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (calmId, _, before) = blossomingCalmBoard plains calm mountain bolt
+          resolved = blossomingCalmAfter calmId before
+      case S.spellTargetSpec bolt of
+        Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
+        Just theSpec -> do
+          let legalFor who = Target.legalRecipients (Just who) S.noSource theSpec
+          Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob before)) "before the Calm, bob may bolt alice"
+          Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob resolved))) "after it, he may not"
+          Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.alice) (legalFor S.carol resolved))) "and neither may carol -- both opponents, not just the next seat"
+          Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.alice resolved)) "but alice may still target herself"
+          Spec.assertBool s (Set.member (Recipient.ToPlayer S.carol) (legalFor S.bob resolved)) "and carol is targetable as ever"
+
+    -- CR 514.2 is the wrong sweep for this duration, and this is where an
+    -- UntilEndOfTurn mis-arming would show: the effect has to outlive the
+    -- cleanup of the very turn it was cast in.
+    Spec.it s "CR 514.2 the hexproof outlives the cleanup of the turn it was cast in" $ do
+      plains <- S.printingOf s registry "Plains"
+      calm <- S.printingOf s registry "Blossoming Calm"
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (calmId, boltId, before) = blossomingCalmBoard plains calm mountain bolt
+          swept = Expiry.dropAtCleanup (blossomingCalmAfter calmId before)
+          burned = blossomingCalmBolt boltId swept
+      Spec.assertEqWith s "still stored" (length (GameState.playerEffects swept)) 1
+      Spec.assertEqWith s "and alice still takes nothing" (S.lifeOf S.alice burned) (Just 22)
+
+    -- THE UNIT'S POINT. Two handoffs pass and the effect survives both; the
+    -- third begins alice's own turn and ends it. A duration keyed to the next
+    -- turn, or to the victim rather than to CR 109.5's "you", would end at the
+    -- first handoff -- which is why the assertion is made at every seat rather
+    -- than only at the last.
+    Spec.it s "CR 611.2a it survives bob's turn and carol's turn, and ends as alice's next turn begins" $ do
+      plains <- S.printingOf s registry "Plains"
+      calm <- S.printingOf s registry "Blossoming Calm"
+      mountain <- S.printingOf s registry "Mountain"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (calmId, boltId, before) = blossomingCalmBoard plains calm mountain bolt
+          resolved = blossomingCalmAfter calmId before
+          bobsTurn = blossomingCalmHandoff resolved
+          carolsTurn = blossomingCalmHandoff bobsTurn
+          alicesTurn = blossomingCalmHandoff carolsTurn
+      Spec.assertEqWith s "bob's turn begins" (GameState.activePlayer bobsTurn) S.bob
+      Spec.assertEqWith s "and the effect is still stored" (length (GameState.playerEffects bobsTurn)) 1
+      Spec.assertEqWith s "alice takes nothing on bob's turn" (S.lifeOf S.alice (blossomingCalmBolt boltId bobsTurn)) (Just 22)
+      Spec.assertEqWith s "carol's turn begins" (GameState.activePlayer carolsTurn) S.carol
+      Spec.assertEqWith s "and the effect is still stored" (length (GameState.playerEffects carolsTurn)) 1
+      Spec.assertEqWith s "alice takes nothing on carol's turn either" (S.lifeOf S.alice (blossomingCalmBolt boltId carolsTurn)) (Just 22)
+      Spec.assertEqWith s "alice's own next turn begins" (GameState.activePlayer alicesTurn) S.alice
+      Spec.assertEqWith s "and the effect is gone" (GameState.playerEffects alicesTurn) []
+      Spec.assertEqWith s "so the same Bolt now reaches her" (S.lifeOf S.alice (blossomingCalmBolt boltId alicesTurn)) (Just 19)
+
+-- CR 611.2b's board, and the SWAMP is the only thing about it that varies. alice
+-- has an Island (which pays for the spell) and, on the holding board, a Swamp
+-- (which the condition counts); bob and carol each have two Mountains and a
+-- Goblin Piker, so both opponents can genuinely cast before the spell resolves.
+--
+-- Paying and gating are deliberately split across two lands: with one land doing
+-- both, "the condition holds" and "she had mana" would be the same fact, and the
+-- never-starts case below could not hold mana equal while removing the Swamp.
+--
+-- The Swamp's id is S.noSource on the board that has no Swamp: the one case built
+-- that way never names it, and there is nothing on the battlefield for it to
+-- collide with.
+--
+-- Loaded fresh inside each case that needs it -- equivalent because loading is
+-- deterministic and cached (batch-recipe.md).
+conditionalSilenceBoard :: Bool -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+conditionalSilenceBoard withSwamp island swamp hush mountain piker =
+  let gs0 = Setup.emptyGame S.threePlayers
+      (_, gs1) = S.addCreature island S.alice gs0
+      (swampId, gs2) =
+        if withSwamp
+          then S.addCreature swamp S.alice gs1
+          else (S.noSource, gs1)
+      (hushId, gs3) = S.addHandCard hush S.alice gs2
+      (_, gs4) = S.addCreature mountain S.bob gs3
+      (_, gs5) = S.addCreature mountain S.bob gs4
+      (bobsPiker, gs6) = S.addHandCard piker S.bob gs5
+      (_, gs7) = S.addCreature mountain S.carol gs6
+      (_, gs8) = S.addCreature mountain S.carol gs7
+      (carolsPiker, gs9) = S.addHandCard piker S.carol gs8
+   in ( hushId,
+        swampId,
+        bobsPiker,
+        carolsPiker,
+        gs9
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- alice casts it and it resolves.
+conditionalSilenceAfter :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+conditionalSilenceAfter hushId before =
+  S.runPure S.identityAnswer (S.runPure S.identityAnswer before (S.cast S.alice hushId)) Engine.priorityLoop
+
+-- Goblin Piker is a creature, so CR 302.1 offers it only to the ACTIVE player.
+-- The board is alice's own main phase, so each opponent's cast is read off a copy
+-- with activePlayer flipped to them and nothing else changed -- threeSeatSilenceBoard's
+-- device.
+conditionalSilenceCasts :: PlayerId.PlayerId -> GameState.GameState -> [Action.Type.Action]
+conditionalSilenceCasts who gs = filter isCast (Action.legalActions who (gs {GameState.activePlayer = who}))
+
+-- SYNTHETIC. "Synthetic Conditional Silence" {U} Instant: "For as long as you
+-- control a Swamp, your opponents can't cast spells." CR 611.2b's duration on the
+-- stored player-effect carrier (Pawl.Types.ActivePlayerEffect), which no printed
+-- card reaches: a "for as long as" effect that changes what a PLAYER may do is
+-- printed as a static ability on a permanent, and that rides the other carrier
+-- (Pawl.Types.PlayerStaticAbility) -- Grand Abolisher, Rule of Law and Damping
+-- Engine are all statics. Every printed spell or ability that stores a
+-- player-axis effect states a TURN-relative duration instead (Silence, Blossoming
+-- Calm, Hope of Ghirapur, Academic Probation). Nothing in CR 611.2b confines the
+-- duration to one carrier, so the card is legitimate and only unprinted.
+conditionalSilenceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+conditionalSilenceSpec s registry =
+  Spec.describe s "Synthetic Conditional Silence" $ do
+    -- THE CONTROL TWIN: both opponents really could cast, so a later empty list
+    -- is the prohibition and not an unaffordable Piker.
+    Spec.it s "before it resolves, both opponents may cast" $ do
+      island <- S.printingOf s registry "Island"
+      swamp <- S.printingOf s registry "Swamp"
+      hush <- S.printingOf s registry "Synthetic Conditional Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (_, _, bobsPiker, carolsPiker, before) = conditionalSilenceBoard True island swamp hush mountain piker
+      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob before)) "bob is offered his Piker"
+      Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.carol before)) "and carol hers"
+
+    -- CR 611.2b: the duration began, so the effect is stored -- keyed to CR
+    -- 109.5's "you", which Expiry.arm bakes in because the sweep that re-reads
+    -- the condition has no resolution left to read a controller off.
+    Spec.it s "CR 611.2b it is stored while the condition holds, and stops both opponents" $ do
+      island <- S.printingOf s registry "Island"
+      swamp <- S.printingOf s registry "Swamp"
+      hush <- S.printingOf s registry "Synthetic Conditional Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (hushId, _, _, _, before) = conditionalSilenceBoard True island swamp hush mountain piker
+          resolved = conditionalSilenceAfter hushId before
+      case fmap ActivePlayerEffect.expiry (GameState.playerEffects resolved) of
+        [Expiry.Type.While who _] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
+        other -> Spec.assertFailure s ("expected one conditional player effect, got " <> show other)
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell resolved) "bob is prohibited"
+      Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell resolved) "carol is prohibited too"
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell resolved)) "alice is not"
+      Spec.assertEqWith s "and nothing is offered to either" (conditionalSilenceCasts S.bob resolved <> conditionalSilenceCasts S.carol resolved) []
+
+    -- THE POSITIVE HALF of the sweep. Without it, "deletes when the condition
+    -- fails" is indistinguishable from "deletes at the first settle".
+    Spec.it s "CR 611.2b a sweep with the Swamp still there changes nothing" $ do
+      island <- S.printingOf s registry "Island"
+      swamp <- S.printingOf s registry "Swamp"
+      hush <- S.printingOf s registry "Synthetic Conditional Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (hushId, _, _, _, before) = conditionalSilenceBoard True island swamp hush mountain piker
+          resolved = conditionalSilenceAfter hushId before
+          (changed, swept) = Engine.runGamePure S.identityAnswer resolved Expiry.sweepConditional
+      Spec.assertBool s (not changed) "the sweep reports no change"
+      Spec.assertEqWith s "still stored" (length (GameState.playerEffects swept)) 1
+      Spec.assertEqWith s "and bob is still stopped" (conditionalSilenceCasts S.bob swept) []
+
+    -- THE NEGATIVE, on the same board with exactly one difference: the Swamp
+    -- changes hands (CR 613.1b), so alice no longer controls one and CR 611.2b's
+    -- period is over. The effect is DELETED, and Engine.settleForPriority is what
+    -- runs the sweep in a live game.
+    Spec.it s "CR 611.2b when the Swamp changes hands the effect is deleted" $ do
+      island <- S.printingOf s registry "Island"
+      swamp <- S.printingOf s registry "Swamp"
+      hush <- S.printingOf s registry "Synthetic Conditional Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (hushId, swampId, bobsPiker, _, before) = conditionalSilenceBoard True island swamp hush mountain piker
+          resolved = conditionalSilenceAfter hushId before
+          stolen = S.giveControl swampId S.bob resolved
+          settled = S.runPure S.identityAnswer stolen Engine.settleForPriority
+      Spec.assertEqWith s "one stored before the Swamp moved" (length (GameState.playerEffects resolved)) 1
+      Spec.assertEqWith s "none after" (GameState.playerEffects settled) []
+      Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell settled)) "bob is no longer prohibited"
+      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob settled)) "and his Piker is offered again"
+
+    -- CR 611.2b's first sentence: a duration that never STARTS means the effect
+    -- does nothing at all. The board differs from the holding one by the Swamp
+    -- alone -- the Island that pays for the spell is on both -- so this is the
+    -- Nothing arm of Expiry.arm and not an unaffordable cast.
+    Spec.it s "CR 611.2b with no Swamp the duration never starts and nothing is stored" $ do
+      island <- S.printingOf s registry "Island"
+      swamp <- S.printingOf s registry "Swamp"
+      hush <- S.printingOf s registry "Synthetic Conditional Silence"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (hushId, _, bobsPiker, _, before) = conditionalSilenceBoard False island swamp hush mountain piker
+          -- Stack.resolveTop and NOT the priority loop the other cases use. A
+          -- settle runs Expiry.sweepConditional, which deletes an effect whose
+          -- condition is already false -- so a loop cannot tell "the duration
+          -- never started" from "it started and was swept an instant later", and
+          -- an arm that stored the effect unconditionally would leave this case
+          -- green. The bare resolution can tell them apart.
+          resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer before (S.cast S.alice hushId)) Stack.resolveTop
+          settled = S.runPure S.identityAnswer resolved Engine.settleForPriority
+      Spec.assertBool s (notElem hushId (GameState.stack resolved)) "the spell really did resolve"
+      Spec.assertEqWith s "nothing stored" (GameState.playerEffects resolved) []
+      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (conditionalSilenceCasts S.bob settled)) "so bob may cast"
 
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).
@@ -3695,6 +4018,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   theTenRingsSpec s registry
   storedSpec s registry
   silenceSpec s registry
+  blossomingCalmSpec s registry
+  conditionalSilenceSpec s registry
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
