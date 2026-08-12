@@ -738,7 +738,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -754,7 +754,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
@@ -777,7 +777,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -801,7 +801,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -871,6 +871,44 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "the Dragon still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Hoarding Dragon") S.alice settled) 1
     Spec.assertEqWith s "exile is empty" (Game.zoneMembers Zone.Exile S.alice settled) []
     Spec.assertEqWith s "both library cards are still there" (Set.fromList (Game.zoneMembers Zone.Library S.alice settled)) (Set.fromList [altarId, pikerId])
+  -- Fertilid's Favor -- "Target player searches their library for a basic land
+  -- card, puts it onto the battlefield tapped, then shuffles. Put two +1/+1
+  -- counters on up to one target artifact or creature." The whole-card proof that
+  -- a search reads the library the effect's PlayerRef names rather than its
+  -- controller's, cast and resolved rather than assembled.
+  --
+  -- THREE seats, because two collapse "the targeted player" onto "the one
+  -- opponent" and a controller-defaulting engine would still be caught only by
+  -- luck. alice casts, carol is targeted, and bob is the seat neither role names.
+  --
+  -- A Mountain in EVERY library, because one library holding the only basic land
+  -- cannot tell "read carol's library" from "read every library": the assertions
+  -- below are which SEAT gained the land and which libraries kept theirs, and
+  -- each of the three answers a different reading of the rule. The Piker in
+  -- carol's library gives the filter a card to reject; it is added second, so
+  -- Support.addLibraryCard makes it the head and a filter that admitted
+  -- everything would fetch it instead.
+  Spec.it s "CR 701.23a whole card: Fertilid's Favor searches the TARGET player's library, not its controller's" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    favor <- S.printingOf s registry "Fertilid's Favor"
+    let withLands = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) S.threePlayerGame [1 .. (4 :: Int)]
+        (aliceCard, g1) = S.addLibraryCard mountain S.alice withLands
+        (bobCard, g2) = S.addLibraryCard mountain S.bob g1
+        (_, g3) = S.addLibraryCard mountain S.carol g2
+        (carolPiker, g4) = S.addLibraryCard piker S.carol g3
+        (gs, spellId) = S.handOne favor g4
+        cast = snd (Engine.runGamePure atCarolFinding gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure atCarolFinding cast Engine.priorityLoop)
+        mountainName = CardName.MkCardName $ Text.pack "Mountain"
+    Spec.assertEqWith s "carol got the basic land" (S.countOnBattlefieldByName mountainName S.carol settled) 1
+    Spec.assertEqWith s "and it entered tapped" (S.tappedCount S.carol settled) 1
+    Spec.assertEqWith s "the spell's controller got nothing -- her own Mountain was no candidate" (S.countOnBattlefieldByName mountainName S.alice settled) 0
+    Spec.assertEqWith s "nor did the third seat" (S.countOnBattlefieldByName mountainName S.bob settled) 0
+    Spec.assertEqWith s "alice's library is untouched" (Game.zoneMembers Zone.Library S.alice settled) [aliceCard]
+    Spec.assertEqWith s "bob's library is untouched" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
+    Spec.assertEqWith s "carol's library kept only the card the filter rejected" (Game.zoneMembers Zone.Library S.carol settled) [carolPiker]
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1477,6 +1515,30 @@ findFirstDeclining p = case p of
 findNothing :: Prompt.Prompt r -> r
 findNothing p = case p of
   Prompt.SearchLibrary {} -> Nothing
+  _ -> S.identityAnswer p
+
+-- Fertilid's Favor's answerer, in three parts. CR 601.2c is announced at its
+-- FLOOR, so the Favor's "up to one target artifact or creature" takes no target
+-- at all and the searching player is the only slot left to fill; what remains is
+-- aimed at carol wherever she is offered (line 4536's idiom, a preference rather
+-- than a filter, so a slot she is no candidate for still gets a legal answer).
+--
+-- The find is PINNED to carol: an engine that asked the spell's controller to
+-- search instead finds nothing at all, rather than helpfully finding a card in
+-- whichever library it was handed.
+atCarolFinding :: Prompt.Prompt r -> r
+atCarolFinding p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (TargetCount.least . fst) offers
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
+      sets
+  Prompt.SearchLibrary _ pid matches ->
+    if pid == S.carol
+      then case matches of
+        m : _ -> Just m
+        [] -> Nothing
+      else Nothing
   _ -> S.identityAnswer p
 
 -- Casts every castable spell (targets via lookupMin: creatures first),

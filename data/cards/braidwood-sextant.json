@@ -29,6 +29,12 @@
                         "type": "Search",
                         "value": [
                           {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
                             "type": "And",
                             "value": [
                               {

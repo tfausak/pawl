@@ -1,0 +1,126 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Fertilid's Favor",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Search",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "player"
+                      },
+                      {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          {
+                            "type": "HasSupertype",
+                            "value": {
+                              "type": "Basic"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "BattlefieldTapped"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "PlusOnePlusOne"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      "permanent"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "permanent",
+                "spec": {
+                  "count": {
+                    "least": 0,
+                    "most": 1
+                  },
+                  "filter": {
+                    "type": "Or",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Artifact"
+                        }
+                      },
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      }
+                    ]
+                  },
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
+              },
+              {
+                "slot": "player",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

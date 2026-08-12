@@ -555,8 +555,9 @@ prohibitsPlayingLand pid names gs =
 -- CR 701.23: does any effect prohibit `pid` from searching a library?
 --
 -- Takes no library, unlike the two prohibitions above taking a name: no printed
--- effect narrows WHICH library, and Effect.Search searches only the resolving
--- controller's own (#1269). See Pawl.Types.PlayerEffect.CantSearchLibraries.
+-- effect narrows WHICH library (#1269), and every Effect.Search is a player
+-- searching their own. Asked of the SEARCHER, who by that shape is also the
+-- library's owner. See Pawl.Types.PlayerEffect.CantSearchLibraries.
 --
 -- A DISJUNCTION for CR 101.2's reason.
 prohibitsSearching :: PlayerId -> GameState -> Bool
