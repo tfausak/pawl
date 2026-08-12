@@ -38,6 +38,16 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.fromJson
       (CombatRestriction.CantBlock Affected.Attached Nothing)
       """ {"type":"CantBlock","value":{"affected":{"type":"Attached"}}} """
+  -- CR 509.1b's PAIRWISE arm, whose payload is the only one with a second Filter
+  -- position: "blockers" beside "affected", never a second "affected", since the
+  -- two describe opposite sides of the block.
+  Spec.it s "CantBeBlockedBy carries its Affected and its blockers" $
+    Common.assertJsonCodec
+      s
+      CombatRestriction.toJson
+      CombatRestriction.fromJson
+      (CombatRestriction.CantBeBlockedBy Affected.Attached Filter.PowerGreaterThanSource Nothing)
+      """ {"type":"CantBeBlockedBy","value":{"affected":{"type":"Attached"},"blockers":{"type":"PowerGreaterThanSource"}}} """
   -- CR 508.1c together with CR 506.5, the SET-SHAPED arm: the same payload as
   -- the two above, so the tag is the only thing that tells a reader this one is
   -- answered against a whole declaration.

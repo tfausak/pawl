@@ -917,15 +917,24 @@ menaceAllowsGiven pcs declaration gs =
 -- each of them to pass 702.36b.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
 pairAllowed candidates attackers blocker attacker gs =
-  pairAllowedGiven (Projection.controlGrants gs) Map.empty candidates attackers blocker attacker gs
+  pairAllowedGiven (Projection.controlGrants gs) Map.empty (CombatRestriction.cantBeBlockedBy candidates attackers gs) candidates attackers blocker attacker gs
 
 -- pairAllowed against a pre-projected board, which is what the callers below
 -- pass: this question is asked once per (blocker, attacker) PAIR, so each evasion
 -- read would otherwise be a fresh gather in a doubly nested loop (#200). The
 -- grant list is threaded on canBlockGiven's terms: an EMPTY pcs is a cache miss
 -- the projection recovers from, but an empty grant list is a wrong answer.
-pairAllowedGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
-pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
+--
+-- `barred` is CR 509.1b's PAIRWISE restrictions stated on the attacker (CR
+-- 701.54c), already decided for every pair by
+-- Pawl.Engine.CombatRestriction.cantBeBlockedBy. Handed in rather than walked
+-- here, unlike the keyword gates below and for the reason given there: a
+-- restriction is a battlefield-and-command-zone walk per read, where a keyword is
+-- a projection lookup. An EMPTY set is a board that states no such restriction,
+-- not a cache miss -- so a caller that forgets it is wrong rather than slow,
+-- which is why pairAllowed above computes one rather than defaulting.
+pairAllowedGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> Set (ObjectId, ObjectId) -> [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
+pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs =
   -- CR 509.1a: the blocker must be one this player could block with at all, and
   -- the attacker must actually be attacking.
   List.elem blocker candidates
@@ -937,6 +946,7 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
     && horsemanshipAllowsGiven pcs blocker attacker gs
     && skulkAllowsGiven pcs blocker attacker gs
     && landwalkAllowsGiven grants pcs attacker gs
+    && not (Set.member (blocker, attacker) barred)
 
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
 -- any are disobeyed the DECLARATION is illegal.
@@ -1057,7 +1067,11 @@ blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedChara
 blockCeilingGiven grants pcs pid gs =
   let attackers = Map.keys (Combat.attackers (GameState.combat gs))
       candidates = legalBlockersGiven grants pcs pid gs
-      able blocker attacker = pairAllowedGiven grants pcs candidates attackers blocker attacker gs
+      -- One walk for the whole search, on the grant list's and the projection's
+      -- terms: CR 509.1b's pairwise restrictions are decided once here and read
+      -- by every pair `able` judges.
+      barred = CombatRestriction.cantBeBlockedBy candidates attackers gs
+      able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
       limit = CombatRestriction.blockLimit gs
       arity = blockArityGiven candidates gs
       requirements = BlockRequirement.instances able candidates attackers gs
@@ -1089,7 +1103,11 @@ legalBlockDeclaration pid declaration gs =
       pcs = Projection.projectAll gs
       attackers = Map.keys (Combat.attackers (GameState.combat gs))
       candidates = legalBlockersGiven grants pcs pid gs
-      able blocker attacker = pairAllowedGiven grants pcs candidates attackers blocker attacker gs
+      -- One walk for the whole search, on the grant list's and the projection's
+      -- terms: CR 509.1b's pairwise restrictions are decided once here and read
+      -- by every pair `able` judges.
+      barred = CombatRestriction.cantBeBlockedBy candidates attackers gs
+      able blocker attacker = pairAllowedGiven grants pcs barred candidates attackers blocker attacker gs
       limit = CombatRestriction.blockLimit gs
       arity = blockArityGiven candidates gs
       (requirements, best) = blockCeilingGiven grants pcs pid gs

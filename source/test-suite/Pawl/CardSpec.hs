@@ -675,6 +675,8 @@ combatRestrictionCounts :: CombatRestriction.CombatRestriction -> [Count.Type.Co
 combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantAttack _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantBlock _ condition -> foldMap conditionCounts condition
+  -- The blocker Filter beside the gate holds no Count either.
+  CombatRestriction.CantBeBlockedBy _ _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantAttackAlone _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionCounts condition
@@ -2241,6 +2243,9 @@ combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.
 combatRestrictionFilters restriction = case restriction of
   CombatRestriction.CantAttack affected condition -> affectedFilters affected <> foldMap conditionFilters condition
   CombatRestriction.CantBlock affected condition -> affectedFilters affected <> foldMap conditionFilters condition
+  -- Three positions on the PAIRWISE arm: the attackers restricted, the blockers
+  -- barred from them, and the gate.
+  CombatRestriction.CantBeBlockedBy affected blockers condition -> affectedFilters affected <> [blockers] <> foldMap conditionFilters condition
   CombatRestriction.CantAttackAlone affected condition -> affectedFilters affected <> foldMap conditionFilters condition
   CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionFilters condition
@@ -3925,11 +3930,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "CR 702.29e landcycling's filter is a position the sweep walks"
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
-  -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a) and by
-  -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's condition, and is Nothing
-  -- everywhere else -- so either atom in a card's affected set, Count filter or
-  -- search filter would be a silent False. Only Pawl.Engine.Keyword's mentor and
-  -- training write them, and this is what keeps that true.
+  -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by
+  -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's condition and by
+  -- Pawl.Engine.CombatRestriction.cantBeBlockedBy for CR 701.54c's blocking
+  -- restriction, and is Nothing everywhere else -- so either atom in a card's
+  -- affected set, Count filter or search filter would be a silent False. Only
+  -- Pawl.Engine.Keyword's mentor and training and Pawl.Engine.Ring's emblem write
+  -- them, and this is what keeps that true.
   Spec.it s "CR 702.134a / CR 702.149a no card writes a source-power comparison" $ do
     ps <- S.allPrintings s
     let atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Face.Codec.toJson Card.toJson c)
