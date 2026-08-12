@@ -610,6 +610,30 @@ combatReplaySpec s =
             "declines"
             (Replay.defaultAnswer (Prompt.ChooseProliferate decider S.alice [ObjectId.MkObjectId 7] [S.bob]))
             (Set.empty, Set.empty)
+        -- CR 701.22a: the ordered partition a scry chose is a decision, so it
+        -- has to survive a transcript like any other.
+        Spec.it s "ChooseScry round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseScry decider S.alice [a, b]
+              split = ([a], [b])
+              swapped = ([], [b, a])
+          Spec.assertEqWith s "a split round trips" (Replay.decode p (Replay.encode p split)) (Just split)
+          -- Discriminating twice over: a response carrying only the bottomed
+          -- cards, or only a set of them, would pass the first leg and lose the
+          -- reordering this one asks for.
+          Spec.assertEqWith s "so does keeping both, reordered" (Replay.decode p (Replay.encode p swapped)) (Just swapped)
+        Spec.it s "a scry choice does not decode as a discard choice" $ do
+          -- Discriminating: this fails if ChooseScry reuses another
+          -- ObjectId-list response instead of getting its own constructor.
+          let p = Prompt.ChooseDiscard decider S.alice [ObjectId.MkObjectId 7] 1
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseScry ([], [ObjectId.MkObjectId 7]))) Nothing
+        Spec.it s "a short transcript leaves the scried cards where they were" $
+          Spec.assertEqWith
+            s
+            "everything back on top, in the order it was looked at"
+            (Replay.defaultAnswer (Prompt.ChooseScry decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 9]))
+            ([], [ObjectId.MkObjectId 7, ObjectId.MkObjectId 9])
         -- CR 704.5j: which legend its controller kept is a decision, so it has to
         -- survive a transcript like any other.
         Spec.it s "ChooseLegend round-trips through the transcript" $ do

@@ -327,6 +327,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Draw (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3))
       """ {"type":"Draw","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":3}]} """
+  -- CR 701.22a: rule 701.22a's "your library" makes every printed scry
+  -- `Relative You`, which is what Crystal Ball writes.
+  Spec.it s "Scry" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Scry (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
+      """ {"type":"Scry","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2}]} """
   Spec.it s "Mill" $
     Common.assertJsonCodec
       s

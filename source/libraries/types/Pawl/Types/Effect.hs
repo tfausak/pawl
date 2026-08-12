@@ -285,6 +285,35 @@ data Effect card
     -- "for each nonland card milled this way". Nothing for a mill nothing looks
     -- back at, which is every mill in the pool but rule 728.1's.
     Mill PlayerRef.PlayerRef Quantity.Quantity (Maybe MillTally.MillTally)
+  | -- | CR 701.22a: the players the PlayerRef names each scry this many -- look at
+    -- the top N of their own library, then put any number of them on the bottom
+    -- in any order and the rest back on top in any order. Crystal Ball's "{1},
+    -- {T}: Scry 2" is `Relative You`, which is every printed scry: rule 701.22a
+    -- says "your library", so the scrying player is always the one the effect
+    -- speaks to. A PlayerRef and not a nullary opcode for the reason Draw's
+    -- comment gives, and because CR 701.22c contemplates several players scrying
+    -- at once -- a nullary spelling would force a sibling at the first card that
+    -- writes "each player scries".
+    --
+    -- The ORDERED PARTITION is the player's, not the engine's:
+    -- Prompt.ChooseScry asks for both ends and both orders, routed through
+    -- Decide.deciderFor. Where the rule leaves nothing to decide it is not asked
+    -- -- CR 701.22b's scry 0, an empty library, and the one card that IS the
+    -- whole library, whose top and bottom are the same position.
+    --
+    -- No zone change and so no CR 400.7 incarnation: rule 701.22a reorders cards
+    -- WITHIN one library, and looking at a card does not move it (CR 701.20b,
+    -- reached by CR 701.20e). Resolve rewrites GameState.library directly rather
+    -- than funnelling through Event.changeZone, which every other library-facing
+    -- opcode does precisely because it crosses a zone boundary.
+    --
+    -- The LOOK is the prompt. CR 701.20e makes looking a reveal shown only to
+    -- the named player, and the prompt is the only thing in pawl that shows a
+    -- hidden zone to exactly one seat -- so no GameEvent is recorded, a public
+    -- GameEvent.Revealed being the wrong event. Not implemented: a standalone
+    -- look-at-the-top-card opcode (#1338), and CR 701.22d's "whenever a player
+    -- scries" trigger (#1339).
+    Scry PlayerRef.PlayerRef Quantity.Quantity
   | -- | CR 701.9: the slot's target player discards this many. The DISCARDING
     -- player chooses which (CR 701.9b) via Prompt.ChooseDiscard, routed through
     -- Decide.deciderFor. A hand smaller than the count discards all of it (CR

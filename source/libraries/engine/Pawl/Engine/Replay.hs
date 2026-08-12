@@ -49,6 +49,7 @@ encode p answer = case p of
   Prompt.ChooseAction {} -> Response.ChoseAction answer
   Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
+  Prompt.ChooseScry {} -> Response.ChoseScry answer
   Prompt.ChooseDefender {} -> Response.ChoseDefender answer
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
   Prompt.ChooseExtraManaSource {} -> Response.ChoseExtraManaSource answer
@@ -132,6 +133,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseDiscard {} -> case response of
     Response.ChoseDiscard ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseScry {} -> case response of
+    Response.ChoseScry split -> Just split
     _ -> Nothing
   Prompt.ChooseDefender {} -> case response of
     Response.ChoseDefender pid -> Just pid
@@ -332,6 +336,10 @@ defaultAnswer p = case p of
   -- replays to the OTHER winner. That is why 'replay' reports the desync.
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
+  -- CR 701.22a: "any number" includes none, so leaving every looked-at card on
+  -- top in the order it was already in is legal -- and it is the one answer that
+  -- leaves the library exactly as it was.
+  Prompt.ChooseScry _ _ looked -> ([], looked)
   -- CR 507.1: the prompt is only asked with candidates, so the head is legal.
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
   -- Any candidate pays, and the cost is still short, so taking one is the least

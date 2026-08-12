@@ -78,6 +78,7 @@ manaProduced effect = case effect of
   Effect.MoveToZone {} -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
+  Effect.Scry {} -> Nothing
   Effect.Discard {} -> Nothing
   Effect.LoseLife {} -> Nothing
   Effect.GainLife {} -> Nothing

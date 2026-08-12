@@ -46,6 +46,10 @@ data Response
   | -- | CR 729.2: the player randomness picked to go first in a subgame.
     DeterminedFirstPlayer PlayerId.PlayerId
   | ChoseDiscard [ObjectId.ObjectId]
+  | -- | CR 701.22a: the ordered partition a scrying player chose -- the cards
+    -- going to the bottom, then the ones staying on top, each in the order the
+    -- player put them there.
+    ChoseScry ([ObjectId.ObjectId], [ObjectId.ObjectId])
   | -- | CR 507.1: the opponent the active player chose to attack.
     ChoseDefender PlayerId.PlayerId
   | -- | CR 601.2g: the mana source the player chose to tap, or Nothing for CR

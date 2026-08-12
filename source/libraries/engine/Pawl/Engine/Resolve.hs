@@ -238,6 +238,7 @@ slotsOf effect = case effect of
   -- it belongs to boundSlots below -- Destroy's third field takes the same
   -- posture, for the same reason.
   Effect.Mill ref quantity _ -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Scry ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Discard slot quantity -> insertOne slot (quantitySlots quantity)
   Effect.LoseLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.GainLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -448,6 +449,7 @@ slotsAreExhaustive effect = case effect of
   Effect.MoveToZone {} -> True
   Effect.Draw _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Mill _ quantity _ -> Quantity.slotsAreExhaustive quantity
+  Effect.Scry _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Discard _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.LoseLife _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife _ quantity -> Quantity.slotsAreExhaustive quantity
@@ -567,6 +569,7 @@ readsX = any effectReadsX
       Effect.MoveToZone {} -> False
       Effect.Draw _ quantity -> Quantity.readsX quantity
       Effect.Mill _ quantity _ -> Quantity.readsX quantity
+      Effect.Scry _ quantity -> Quantity.readsX quantity
       Effect.Discard _ quantity -> Quantity.readsX quantity
       Effect.LoseLife _ quantity -> Quantity.readsX quantity
       Effect.GainLife _ quantity -> Quantity.readsX quantity
@@ -636,6 +639,9 @@ searchesLibrary effect = case effect of
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
   Effect.Mill {} -> False
+  -- CR 701.22a looks at the top N, where CR 701.23a's search looks at ALL of a
+  -- zone; Panglacial Wurm's window is the latter's alone.
+  Effect.Scry {} -> False
   Effect.Discard {} -> False
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
@@ -753,6 +759,7 @@ boundSlots effect = case effect of
   -- How many of the cards this mill put in the graveyard matched the tally's
   -- filter, for CR 728.1's "for each nonland card milled this way" to read.
   Effect.Mill _ _ mTally -> foldMap (Set.singleton . MillTally.slot) mTally
+  Effect.Scry {} -> Set.empty
   Effect.DealDamage {} -> Set.empty
   Effect.ModifyTarget {} -> Set.empty
   Effect.ChangeText {} -> Set.empty
@@ -2633,6 +2640,24 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             Nothing -> False
             Just face -> Filter.matches tallyContext (Projection.viewOfCardIn gs oid face) (MillTally.filter tally)
        in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
+  Effect.Scry ref quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        -- An illegal slot (CR 608.2b) or a reference naming nobody arrives here
+        -- as the empty list and scries nothing, the posture every PlayerRef arm
+        -- takes.
+        named = playerRefPlayers legal controller gs ref
+        -- CR 701.22c: players scrying at once decide in APNAP order. Draw's
+        -- intersection and for that arm's reason -- apnapOrder supplies the
+        -- ORDER, `named` the MEMBERSHIP. Each scryer's cards then move before
+        -- the next is asked, rather than all of them moving together (#1340).
+        scryers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      -- CR 701.22b: scry 0 is not a scry at all, so a quantity of zero reaches
+      -- no player and raises no prompt.
+      Just n | n > 0 -> Monad.forM_ scryers (scryOne n)
+      _ -> pure ()
   Effect.Discard slot quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -4067,3 +4092,44 @@ newestBattlefieldOf _ before after =
 reorderLibrary :: PlayerId -> [ObjectId] -> GameState -> GameState
 reorderLibrary pid order gs =
   gs {GameState.library = Map.insert pid (Seq.fromList order) (GameState.library gs)}
+
+-- CR 701.22a: one player's scry -- look at the top n cards of their library,
+-- then put any number of them on the bottom in any order and the rest back on
+-- top in any order. A short library is looked at as far as it goes; rule 701.22
+-- states no penalty for scrying more than there is, unlike CR 104.3c's draw.
+--
+-- The library is REWRITTEN rather than funnelled through Event.changeZone,
+-- which every other library-facing opcode uses: nothing crosses a zone boundary
+-- here, so CR 400.7 mints no new incarnation and the ids the prompt named are
+-- still the ids that move. Looking mints nothing either (CR 701.20b, reached by
+-- CR 701.20e).
+scryOne :: Integer -> PlayerId -> Game ()
+scryOne n pid = do
+  gs <- State.get
+  let whole = Game.zoneMembers Zone.Library pid gs
+      looked = List.genericTake n whole
+      beneath = List.genericDrop n whole
+      -- The engine never makes the player's choice, but it does not ask a
+      -- question with one answer either. Nothing to LOOK at: an empty library.
+      -- Nothing to DECIDE: a single looked-at card that is the whole library,
+      -- whose top and bottom are the same position. One card with more beneath
+      -- it IS a decision, "any number" reaching both none and all of one.
+      decided = case looked of
+        [] -> False
+        [_] -> not (null beneath)
+        _ -> True
+  Monad.when decided $ do
+    (bottom, top) <- Game.choose (Prompt.ChooseScry (Decide.deciderFor pid gs) pid looked)
+    -- Filtered, deduped and COMPLETED, Effect.Discard's arm's posture and for
+    -- its reasons: an effect has no way to reject an answer, the answer is a
+    -- list rather than a set so it can repeat itself, and every looked-at card
+    -- has to end up somewhere. A card named in neither list stays on top behind
+    -- the ones that were named, which is Replay.defaultAnswer's do-nothing
+    -- reading of "any number" -- and a card named in BOTH is bottomed, the
+    -- first list winning so that one rule settles it.
+    let keep xs = List.nub (filter (\c -> List.elem c looked) xs)
+        toBottom = keep bottom
+        onTop = filter (\c -> List.notElem c toBottom) (keep top)
+        unnamed = filter (\c -> List.notElem c toBottom && List.notElem c onTop) looked
+        rebuilt = Seq.fromList (onTop <> unnamed <> beneath <> toBottom)
+    State.modify' (\g -> g {GameState.library = Map.insert pid rebuilt (GameState.library g)})

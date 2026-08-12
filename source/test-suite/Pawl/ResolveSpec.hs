@@ -4593,6 +4593,181 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
     -- The spell left the hand and one card was drawn, so the hand is level.
     Spec.assertEqWith s "drew a card" (length (Game.zoneMembers Zone.Hand S.alice resolved)) handBefore
 
+-- CR 701.22a: "to 'scry N' means to look at the top N cards of your library,
+-- then put any number of them on the bottom of your library in any order and
+-- the rest on top of your library in any order."
+--
+-- Crystal Ball ({3} Artifact, "{1}, {T}: Scry 2") is the producer, and scry TWO
+-- is what lets this group discriminate at all: scry 1 cannot tell "any number
+-- to the bottom" from all-or-nothing, and neither end's ORDER is a question
+-- when only one card can reach it.
+--
+-- Four DIFFERENT printings in alice's library, top-first [piker, maiden,
+-- mountain, forest]. Interchangeable cards could not tell "put back in the
+-- chosen order" from "put back in the order they were found", which is exactly
+-- the reading a scry that ignored its answer would produce.
+--
+-- `stock` is how many of them to deal, taken from the TOP so a shorter library
+-- keeps the same top cards and the elision pair below differs in one card only.
+scryBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Int ->
+  m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+scryBoard s registry stock = do
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  mountain <- S.printingOf s registry "Mountain"
+  crystalBall <- S.printingOf s registry "Crystal Ball"
+  let (ballId, placed) = S.addCreature crystalBall S.alice (S.landsInPlay forest 4)
+      -- addLibraryCard puts its card ON TOP, so the deepest is stocked first.
+      deck = reverse (take stock [piker, maiden, mountain, forest])
+      deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+      (ids, stocked) = List.foldl' deal ([], placed) deck
+  pure (ids, ballId, stocked {GameState.priority = Just S.alice})
+
+-- Answers Prompt.ChooseScry with a FIXED pair of lists, whatever the engine
+-- offers. Pinned rather than derived from the offered list: an answerer that
+-- searched what it was handed for a legal pick would find the right cards again
+-- after a mutation broke which cards the engine looked at, and this group would
+-- stay green over a broken choice.
+scryAnswer :: ([ObjectId.ObjectId], [ObjectId.ObjectId]) -> Prompt.Prompt r -> r
+scryAnswer split p = case p of
+  Prompt.ChooseScry {} -> split
+  _ -> S.identityAnswer p
+
+-- Activates Crystal Ball's one activated ability and resolves it. A board
+-- offering any other number of abilities activates none, leaving the state
+-- untouched -- which fails every assertion below rather than passing one for a
+-- reason the case did not choose.
+runScry ::
+  (forall r. Prompt.Prompt r -> r) ->
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  GameState.GameState
+runScry answer ballId gs = case Activate.abilitiesFor ballId gs of
+  [ability] -> S.runPure answer gs $ do
+    Activate.activateAbility S.alice ballId ability
+    Stack.resolveTop
+  _ -> gs
+
+scryLibrary :: GameState.GameState -> [ObjectId.ObjectId]
+scryLibrary = Game.zoneMembers Zone.Library S.alice
+
+scrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+scrySpec s registry = Spec.describe s "Scry" $ do
+  -- The SPLIT, which scry 1 cannot reach: one looked-at card goes under and the
+  -- other stays on top, so neither "all of them" nor "none of them" produces
+  -- this library.
+  Spec.it s "CR 701.22a whole card: Crystal Ball's scry 2 bottoms one and keeps one" $ do
+    (ids, ballId, board) <- scryBoard s registry 4
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let after = runScry (scryAnswer ([piker], [maiden])) ballId board
+        Spec.assertEqWith s "the library started top-first piker, maiden, mountain, forest" (scryLibrary board) [piker, maiden, mountain, forest]
+        Spec.assertEqWith s "the kept card is on top and the bottomed one is last" (scryLibrary after) [maiden, mountain, forest, piker]
+        Spec.assertEqWith s "the ability left the stack" (length (GameState.stack after)) 0
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- CR 701.22a's "the rest on top of your library IN ANY ORDER": both cards stay
+  -- on top, swapped. A scry that put them back in the order it found them
+  -- leaves the library untouched, which is the reading this case rules out.
+  Spec.it s "CR 701.22a the kept cards go back in the CHOSEN order, not the order they were in" $ do
+    (ids, ballId, board) <- scryBoard s registry 4
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let after = runScry (scryAnswer ([], [maiden, piker])) ballId board
+        Spec.assertEqWith s "the top two are swapped and the rest is untouched" (scryLibrary after) [maiden, piker, mountain, forest]
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- The other "in any order", on the bottom half: both go under, in an order
+  -- that is not the order they were looked at in.
+  Spec.it s "CR 701.22a the bottomed cards go under in the CHOSEN order too" $ do
+    (ids, ballId, board) <- scryBoard s registry 4
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let after = runScry (scryAnswer ([maiden, piker], [])) ballId board
+        Spec.assertEqWith s "mountain and forest rose, maiden above piker beneath them" (scryLibrary after) [mountain, forest, maiden, piker]
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- A card the answer names in NEITHER list still has to end up somewhere, and
+  -- an effect has no way to reject an answer -- Effect.Discard's completion
+  -- posture. It stays on top, behind the one that was named.
+  Spec.it s "CR 701.22a a looked-at card the answer never names stays on top" $ do
+    (ids, ballId, board) <- scryBoard s registry 4
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let after = runScry (scryAnswer ([], [maiden])) ballId board
+        Spec.assertEqWith s "maiden was named and piker fell in behind it" (scryLibrary after) [maiden, piker, mountain, forest]
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- Rule 701.22 states no penalty for scrying more cards than there are, unlike
+  -- CR 104.3c's draw: a two-card library is looked at whole and still split.
+  Spec.it s "CR 701.22a a library shorter than the count is looked at as far as it goes" $ do
+    (ids, ballId, board) <- scryBoard s registry 2
+    case ids of
+      [piker, maiden] -> do
+        let after = runScry (scryAnswer ([piker], [maiden])) ballId board
+        Spec.assertEqWith s "the whole library was looked at" (scryLibrary board) [piker, maiden]
+        Spec.assertEqWith s "and the answer swapped it" (scryLibrary after) [maiden, piker]
+      _ -> Spec.assertFailure s "expected two library cards"
+
+-- The elision half. Each case counts the scry prompts one activation raises,
+-- and the two-card board is the one-card board's PAIR: same seats, same mana,
+-- same ability, one more card in the library.
+scryPromptSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
+  let counting :: Prompt.Prompt r -> State.State Int r
+      counting p = case p of
+        Prompt.ChooseScry {} -> do
+          State.modify (+ 1)
+          pure (S.identityAnswer p)
+        _ -> pure (S.identityAnswer p)
+      asks ballId gs = case Activate.abilitiesFor ballId gs of
+        [ability] ->
+          State.execState
+            ( Engine.runGame counting gs $ do
+                Activate.activateAbility S.alice ballId ability
+                Stack.resolveTop
+            )
+            0
+        -- Negative, so a board that could not activate at all fails every case
+        -- rather than passing the two that expect no prompt.
+        _ -> -1
+  -- Nothing to LOOK at. CR 701.22a's process has no cards to run on, so there is
+  -- no question to put.
+  Spec.it s "CR 701.22a an empty library raises no scry prompt" $ do
+    (_, ballId, board) <- scryBoard s registry 0
+    Spec.assertEqWith s "not asked" (asks ballId board) 0
+  -- Nothing to DECIDE: one card that IS the whole library. Its top and its
+  -- bottom are the same position, so both answers produce the same library and
+  -- declining to ask takes no choice away from the player.
+  Spec.it s "CR 701.22a one card that is the whole library raises no scry prompt" $ do
+    (ids, ballId, board) <- scryBoard s registry 1
+    let after = runScry (scryAnswer ([], [])) ballId board
+    Spec.assertEqWith s "not asked" (asks ballId board) 0
+    Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
+  -- The pair's other half, one card deeper: with something beneath it the top
+  -- card is a real top-or-bottom question, so it IS asked -- and the answer is
+  -- honoured, which is what separates "asked" from "asked and ignored".
+  Spec.it s "CR 701.22a a second card beneath makes it a real choice, and it is asked" $ do
+    (ids, ballId, board) <- scryBoard s registry 2
+    case ids of
+      [piker, maiden] -> do
+        let after = runScry (scryAnswer ([maiden, piker], [])) ballId board
+        Spec.assertEqWith s "asked once" (asks ballId board) 1
+        Spec.assertEqWith s "and both went under, maiden above piker" (scryLibrary after) [maiden, piker]
+      _ -> Spec.assertFailure s "expected two library cards"
+  -- CR 701.22b: "if a player is instructed to scry 0, no scry event occurs."
+  -- Driven through the opcode rather than a card, no printing scrying zero and
+  -- Crystal Ball's count being fixed at two.
+  Spec.it s "CR 701.22b scry 0 raises no prompt and moves nothing" $ do
+    (ids, ballId, board) <- scryBoard s registry 4
+    let scryZero = Effect.Scry (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 0)
+        zero = Resolve.applyEffect ballId ballId S.alice Map.empty Map.empty scryZero
+        asked = State.execState (Engine.runGame counting board zero) 0
+        after = S.runPure (scryAnswer ([], [])) board zero
+    Spec.assertEqWith s "not asked" asked 0
+    Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
+
 slotTarget :: SlotName.SlotName
 slotTarget = SlotName.MkSlotName (Text.pack "target")
 
@@ -4760,12 +4935,11 @@ answerSlots answers p = case p of
 -- Denethor, Stone Seer -- "{3}{R}, {T}, Sacrifice Denethor: Target player
 -- becomes the monarch. Denethor deals 3 damage to any target."
 --
--- The printed card also has "When Denethor enters, scry 2"; scry is not
--- modelled, so that trigger is omitted from data/cards/denethor-stone-seer.json
--- (#876). The omission runs STRICTER for the card's controller: CR 701.22a's
--- scry is a pure library-ordering benefit with no downside clause, so pawl's
--- Denethor is a strictly worse version of the printed one and no test below can
--- pass because of what is missing.
+-- The printed card also has "When Denethor enters, scry 2", which
+-- data/cards/denethor-stone-seer.json now carries: Effect.Scry landed with
+-- Crystal Ball. It reaches none of the assertions below -- S.addCreature places
+-- the permanent rather than moving it there, so no CR 603.2 entry trigger is
+-- gathered, and the ability under test is the activated one.
 --
 -- Settled under alice, who already holds the crown, with four Mountains to pay
 -- the {3}{R} and priority in hand. The first activated ability of the card is
@@ -6521,6 +6695,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   gainControlSpec s registry
   gainPlayerCountersSpec s registry
   proliferateSpec s registry
+  scrySpec s registry
+  scryPromptSpec s registry
   playerSacrificesSpec s registry
   createEmblemSpec s registry
   becomeMonarchSpec s registry
