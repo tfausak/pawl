@@ -67,7 +67,10 @@
 -- of the declaration for a bigger companion, with Apprentice Sharpshooter --
 -- `trainingSpec`. CR 702.39 provoke, the first whose payload
 -- creates a CR 509.1c blocking requirement, with Goblin Grappler --
--- `provokeSpec`. CR 702.112 renown, the first minted
+-- `provokeSpec`. CR 603.2's "that player" narrowing a TARGET SPEC rather than an
+-- effect's operand -- Filter.ControlledByBound, baked to the player the event
+-- named -- with Trygon Predator at three seats -- `trygonPredatorSpec`. CR
+-- 702.112 renown, the first minted
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
 -- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
 -- 701.37b's designation watched the same way -- the shared
@@ -4066,6 +4069,92 @@ decayedSpec s registry =
               Spec.assertEqWith s "so nothing was armed" (Seq.length (GameState.delayedTriggers after)) 0
               Spec.assertBool s (S.onBattlefield zombie after) "and the token is still there"
             other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+
+-- CR 603.2's "that player" reaching a TARGET SPEC rather than an effect's
+-- operand: Trygon Predator's "whenever this creature deals combat damage to a
+-- player, you may destroy target artifact or enchantment THAT PLAYER controls".
+-- The slot is narrowed by Filter.ControlledByBound, baked to the damaged player
+-- by Pawl.Engine.Filter.bakeBound at both of CR 115's moments -- CR 603.3d's
+-- choosing and CR 608.2b's re-check.
+--
+-- THREE SEATS, and every seat holds the same permanent (Bad Moon), so the board
+-- differs in exactly one thing: who controls it. A filter that read "an
+-- opponent" would admit bob's, and one that dropped the controller conjunct
+-- would admit alice's own; the answerer below takes the LOWEST-numbered legal
+-- target of each slot, and alice's Moon is added before bob's and bob's before
+-- carol's, so either mistake takes a different permanent rather than passing.
+trygonPredatorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+trygonPredatorSpec s registry =
+  let plan :: Prompt.Prompt r -> r
+      plan p = case p of
+        Prompt.ChooseDefender {} -> S.carol
+        -- CR 603.5's printed "may", always exercised: a declined clause would
+        -- destroy nothing, and this group is about which permanent it reaches.
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        Prompt.ChooseTargets _ _ _ asked -> fmap (maybe Set.empty Set.singleton . Set.lookupMin . snd) asked
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      board = do
+        trygon <- S.printingOf s registry "Trygon Predator"
+        badMoon <- S.printingOf s registry "Bad Moon"
+        let (gs0, mine, theirs, others) = S.threePlayerCombat [trygon, badMoon] [badMoon] [badMoon]
+            -- S.threePlayerCombat starts at the beginning of combat, so the
+            -- declarations are run as steps (which is what fills CR 508.5's
+            -- defending player) and only the damage is dealt by hand -- that is
+            -- the seam CR 603.3d's placement needs to be observable in, since a
+            -- whole step would resolve the trigger as well.
+            atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) plan gs0
+            fought = S.runPure plan atDamage Damage.dealCombatDamage
+        pure (mine, theirs, others, S.runPure plan fought Engine.settleForPriority)
+   in Spec.describe s "TrygonPredator" $ do
+        -- THE proving test. CR 603.3d picks the target as the ability is put on
+        -- the stack, and the binding it stamps is read back here rather than
+        -- inferred from what died -- so this says which permanent was OFFERED,
+        -- not merely which one an effect happened to reach.
+        Spec.it s "CR 603.3d the slot admits only the damaged player's permanent" $ do
+          (mine, theirs, others, placed) <- board
+          case (mine, theirs, others, GameState.stack placed) of
+            ([_, alices], [bobs], [carols], [abilityId]) -> do
+              let bindings = maybe Map.empty Object.bindings (Game.lookupObject abilityId placed)
+                  slotOf name = Map.lookup (SlotName.MkSlotName (Text.pack name)) (Binding.targetsOf bindings)
+              Spec.assertEqWith
+                s
+                "carol took the damage, so she is the player the event bound"
+                (slotOf "thatPlayer")
+                (Just (Set.singleton (Recipient.ToPlayer S.carol)))
+              Spec.assertEqWith
+                s
+                "and carol's Bad Moon is the one target the slot admitted"
+                (slotOf "target")
+                (Just (Set.singleton (Recipient.ToObject carols)))
+              Spec.assertBool s (alices /= bobs && bobs /= carols) "the three Moons are distinct objects"
+            _ -> Spec.assertFailure s "fixture should give alice a Predator and a Moon, bob and carol a Moon each, and place one trigger"
+        -- The same board run to the end: the ability resolves and destroys the
+        -- one permanent, leaving both other seats' untouched. The whole card,
+        -- CR 701.8a's destruction included.
+        Spec.it s "CR 608.2c whole card: only carol's Bad Moon is destroyed" $ do
+          (mine, theirs, others, placed) <- board
+          let after = S.runPure plan placed Engine.priorityLoop
+          case (mine, theirs, others) of
+            ([_, alices], [bobs], [carols]) -> do
+              Spec.assertBool s (not (S.onBattlefield carols after)) "carol's Moon is destroyed"
+              Spec.assertBool s (S.onBattlefield bobs after) "bob's Moon is untouched"
+              Spec.assertBool s (S.onBattlefield alices after) "and so is alice's own"
+            _ -> Spec.assertFailure s "fixture should give each seat a Moon"
+        -- CR 608.2b at the OTHER moment: the target changes hands after it was
+        -- chosen, so it is no longer a permanent that player controls and the
+        -- ability's only target is illegal. The pair differs in exactly the
+        -- control change -- same board, same answers, same stack -- which is
+        -- what makes the survival the rule's and not the fixture's.
+        Spec.it s "CR 608.2b a target that changes hands is no longer that player's" $ do
+          (_, _, others, placed) <- board
+          case others of
+            [carols] -> do
+              let stolen = S.runPure plan (S.giveControl carols S.bob placed) Engine.priorityLoop
+                  kept = S.runPure plan placed Engine.priorityLoop
+              Spec.assertBool s (S.onBattlefield carols stolen) "bob controls it now, so the ability fizzles"
+              Spec.assertBool s (not (S.onBattlefield carols kept)) "and without the change it is destroyed"
+            _ -> Spec.assertFailure s "fixture should give carol a Moon"
 
 -- CR 702.39a's provoke, which rule 702 states as a triggered
 -- ability and the FIRST whose payload creates a CR 509.1c blocking REQUIREMENT
@@ -9914,6 +10003,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   trainingSpec s registry
   decayedSpec s registry
   provokeSpec s registry
+  trygonPredatorSpec s registry
   evolveSpec s registry
   krasisSpec s registry
   renownSpec s registry

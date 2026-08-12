@@ -795,3 +795,31 @@ fillableModesGiven pcs grants perspective source extra modal gs =
               else Just (ModeIndex.MkModeIndex i)
       short spec legal = Natural.length legal < TargetCount.least (TargetSpec.count spec)
    in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Natural ..] ms))
+
+-- CR 603.2: every slot's spec with its "that player" atoms baked against this
+-- binding environment (Pawl.Engine.Filter.bakeBound). The whole of what makes
+-- "target creature that player controls" answerable, and it is applied at both
+-- of CR 115's moments -- Pawl.Engine.Engine.placeBorne's CR 603.3d choosing and
+-- Pawl.Engine.Resolve.resolveModes' CR 608.2b re-check -- so the rule re-judges
+-- what the choice was offered against.
+--
+-- A REWRITE rather than a Context field, and no signature here widens: the
+-- bindings are known where these two callers stand and nowhere else, so the spec
+-- reaching this module is already answerable. The order is not CR 601.2c's
+-- simultaneity problem that a slot depending on ANOTHER SLOT is
+-- (Pawl.Types.GraveyardScope's InSlot, two passes in legalSetsGiven): a trigger's
+-- event bindings are fixed before the ability is put on the stack, so nothing
+-- being chosen now can change them.
+bakeSpecs :: Map SlotName PlayerId -> Map SlotName TargetSpec -> Map SlotName TargetSpec
+bakeSpecs players = fmap (bakeSpec players)
+
+bakeSpec :: Map SlotName PlayerId -> TargetSpec -> TargetSpec
+bakeSpec players spec = spec {TargetSpec.filter = fmap (Filter.bakeBound players) (TargetSpec.filter spec)}
+
+-- bakeSpecs over a whole modal payload, for the caller that must bake BEFORE the
+-- modes are chosen: CR 700.2b's mode selection asks which modes are fillable
+-- (fillableModes), and an unbaked slot admits nothing, which would take a
+-- perfectly fillable trigger off the stack under CR 603.3c.
+bakeModal :: Map SlotName PlayerId -> Modal.Modal Card -> Modal.Modal Card
+bakeModal players modal =
+  modal {Modal.modes = fmap (\m -> m {Mode.targetSpecs = bakeSpecs players (Mode.targetSpecs m)}) (Modal.modes modal)}
