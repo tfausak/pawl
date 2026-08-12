@@ -31,6 +31,8 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -52,9 +54,11 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -98,11 +102,11 @@ armGs = Setup.emptyGame S.bothPlayers
 armSpec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()
 armSpec s = Spec.describe s "Arm" $ do
   Spec.it s "CR 514.2 an until-end-of-turn duration arms to AtCleanup" $
-    Spec.assertEqWith s "armed" (Expiry.arm S.alice S.noSource Duration.UntilEndOfTurn armGs) (Just Expiry.Type.AtCleanup)
+    Spec.assertEqWith s "armed" (Expiry.arm Map.empty S.alice S.noSource Duration.UntilEndOfTurn armGs) (Just Expiry.Type.AtCleanup)
   Spec.it s "CR 611.2a an indefinite duration arms to Never" $
-    Spec.assertEqWith s "armed" (Expiry.arm S.alice S.noSource Duration.Indefinite armGs) (Just Expiry.Type.Never)
+    Spec.assertEqWith s "armed" (Expiry.arm Map.empty S.alice S.noSource Duration.Indefinite armGs) (Just Expiry.Type.Never)
   Spec.it s "CR 611.2a / 109.5 'until your next turn' bakes the controller" $
-    Spec.assertEqWith s "armed" (Expiry.arm S.alice S.noSource Duration.UntilYourNextTurn armGs) (Just (Expiry.Type.AtTurnOf S.alice))
+    Spec.assertEqWith s "armed" (Expiry.arm Map.empty S.alice S.noSource Duration.UntilYourNextTurn armGs) (Just (Expiry.Type.AtTurnOf S.alice))
 
 handoffSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 handoffSpec s = Spec.describe s "DropAtTurnOf" $ do
@@ -281,7 +285,7 @@ conditionalSpec s registry = Spec.describe s "Conditional" $ do
     Spec.assertEqWith
       s
       "never starts"
-      (Expiry.arm S.alice srcId (Duration.ForAsLongAs S.youControlSource) gone)
+      (Expiry.arm Map.empty S.alice srcId (Duration.ForAsLongAs S.youControlSource) gone)
       Nothing
   Spec.it s "CR 611.2b arm returns a While when the condition holds now" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -290,7 +294,7 @@ conditionalSpec s registry = Spec.describe s "Conditional" $ do
     Spec.assertEqWith
       s
       "starts"
-      (Expiry.arm S.alice srcId (Duration.ForAsLongAs S.youControlSource) gs)
+      (Expiry.arm Map.empty S.alice srcId (Duration.ForAsLongAs S.youControlSource) gs)
       (Just (Expiry.Type.While S.alice S.youControlSource))
   Spec.it s "CR 611.2b the sweep DELETES the effect once the condition fails" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -604,6 +608,115 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
     Spec.assertEqWith s "and the watch is cleared" (Map.null (GameState.exiledUntilMonarch settled)) True
     Spec.assertEqWith s "CR 104.2a: two survivors, so the game continues" (GameState.result settled) Nothing
 
+-- Take the LOWEST-numbered legal recipient of every slot. Garland's two
+-- abilities each announce one target, and both are decided this way, so a filter
+-- that admitted more than it should would take a DIFFERENT permanent rather than
+-- the same one -- see garlandBoard for the ordering that makes that true.
+garlandPlan :: Prompt.Prompt r -> r
+garlandPlan p = case p of
+  Prompt.ChooseTargets _ _ _ asked -> fmap (maybe Set.empty Set.singleton . Set.lookupMin . snd) asked
+  _ -> S.identityAnswer p
+
+-- alice's Garland enters; bob and carol have a creature each. CAROL'S IS ADDED
+-- FIRST, so it holds the lowest ObjectId of the three creatures on the board:
+-- under garlandPlan above, an ability that dropped the "that player controls"
+-- conjunct would take HERS, and one that read "you control" would take Garland
+-- itself. Only the printed reading takes bob's.
+--
+-- Returns bob's creature, carol's, and the state with Garland's entry recorded
+-- but nothing settled.
+garlandBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+garlandBoard piker garland =
+  let (carols, gs1) = S.addCreature piker S.carol S.threePlayerGame
+      (bobs, gs2) = S.addCreature piker S.bob gs1
+      (entrant, gs3) = S.addCreature garland S.alice gs2
+      entered = ZoneChange.MkZoneChange entrant entrant Zone.Stack Zone.Battlefield
+   in (bobs, carols, S.withEvents [GameEvent.Moved entered (Projection.project entrant gs3)] gs3)
+
+-- The condition Garland's duration stores, AS STORED: CR 725.1's designation
+-- read of one PARTICULAR player, baked out of the `thatPlayer` slot the crowning
+-- bound (Pawl.Engine.Condition.bakeBound). Spelled with bob because bob is who
+-- the fixture crowns.
+garlandCondition :: Condition.Type.Condition
+garlandCondition =
+  Condition.Type.Compares
+    (Quantity.Type.IsMonarch (PlayerRef.Specific S.bob))
+    Comparison.AtLeast
+    (Quantity.Type.Literal 1)
+
+-- Garland, Royal Kidnapper {2}{U}{B} Legendary Creature -- Human Knight 3/4:
+-- "Whenever an opponent becomes the monarch, gain control of target creature
+-- that player controls for as long as they're the monarch." Two rules meet, and
+-- the card is the only printing in the pool that exercises either:
+--
+--   * CR 603.2 binds the newly crowned player (Pawl.Engine.Event.eventBindings),
+--     which is what "that player" and "they" both name; and
+--   * CR 611.2b's duration outlives the resolution that stored it, so the
+--     condition is BAKED to that seat as the duration begins -- an unbaked slot
+--     read would be unresolvable at the very first sweep.
+--
+-- THREE SEATS throughout. On two, the crowned player, the ability's one opponent
+-- and whoever wears the crown at any later moment are one seat, and no assertion
+-- below could tell a right answer from three wrong ones.
+garlandSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+garlandSpec s registry = Spec.describe s "GarlandRoyalKidnapper" $ do
+  -- THE proving test: the crown lands on bob, the ability takes HIS creature,
+  -- and the stored duration names him outright rather than the slot it was
+  -- printed with.
+  Spec.it s "CR 603.2 the crowned opponent's creature changes hands, and the stored duration names him" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    garland <- S.printingOf s registry "Garland, Royal Kidnapper"
+    let (bobs, carols, entering) = garlandBoard piker garland
+        stolen = S.runPure garlandPlan (monarchSettle entering) Engine.priorityLoop
+    Spec.assertEqWith s "CR 725.1: Garland's own entry crowned bob" (GameState.monarch stolen) (Just S.bob)
+    Spec.assertEqWith s "so alice controls bob's creature" (Projection.controllerOf bobs stolen) (Just S.alice)
+    Spec.assertEqWith s "and carol's is untouched" (Projection.controllerOf carols stolen) (Just S.carol)
+    Spec.assertEqWith
+      s
+      "CR 611.2b: the duration reads bob's crown, with no slot left to resolve"
+      (fmap ContinuousEffect.expiry (filter (S.continuousEffectAffects bobs) (GameState.continuousEffects stolen)))
+      [Expiry.Type.While S.alice garlandCondition]
+  -- The other half of a duration: it must not end while its condition holds. A
+  -- duration that never ends passes every assertion in the case above, so this
+  -- and the two below are what separate the two.
+  Spec.it s "CR 611.2b it holds while bob wears the crown, cleanup included" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    garland <- S.printingOf s registry "Garland, Royal Kidnapper"
+    let (bobs, _, entering) = garlandBoard piker garland
+        stolen = S.runPure garlandPlan (monarchSettle entering) Engine.priorityLoop
+        swept = monarchSettle stolen
+        -- CR 514.2's sweep, which an AtCleanup duration would not survive: this
+        -- is what says the stored expiry is a CR 611.2b one and not a turn's.
+        pastCleanup = monarchSettle (Expiry.dropAtCleanup swept)
+    Spec.assertEqWith s "still alice's at the next settle" (Projection.controllerOf bobs swept) (Just S.alice)
+    Spec.assertEqWith s "and after the turn ends" (Projection.controllerOf bobs pastCleanup) (Just S.alice)
+  -- CR 725.3: as carol becomes the monarch, bob ceases to be, so the condition
+  -- the duration named stops holding. THE case a two-player board cannot state:
+  -- there is still a monarch and it is still not alice, so only a duration that
+  -- names BOB ends here.
+  Spec.it s "CR 611.2b it ends when the crown moves to the third player" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    garland <- S.printingOf s registry "Garland, Royal Kidnapper"
+    let (bobs, _, entering) = garlandBoard piker garland
+        stolen = S.runPure garlandPlan (monarchSettle entering) Engine.priorityLoop
+        -- S.withMonarch rather than a second crowning through the rules: it
+        -- records no GameEvent, so Garland's trigger does not fire again and
+        -- this case is about the sweep alone.
+        crowned = monarchSettle (S.withMonarch S.carol stolen)
+    Spec.assertEqWith s "control goes back to bob" (Projection.controllerOf bobs crowned) (Just S.bob)
+    -- CR 611.2b's one continuous period: the effect is deleted, not masked.
+    Spec.assertEqWith s "and the stored effect is gone" (filter (S.continuousEffectAffects bobs) (GameState.continuousEffects crowned)) []
+  -- The same ending with the crown going to Garland's OWN controller, which is
+  -- the reading that would survive if the condition had been baked to CR 109.5's
+  -- "you" instead of to the slot.
+  Spec.it s "CR 611.2b it ends when the crown moves to the ability's controller" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    garland <- S.printingOf s registry "Garland, Royal Kidnapper"
+    let (bobs, _, entering) = garlandBoard piker garland
+        stolen = S.runPure garlandPlan (monarchSettle entering) Engine.priorityLoop
+        crowned = monarchSettle (S.withMonarch S.alice stolen)
+    Spec.assertEqWith s "control goes back to bob" (Projection.controllerOf bobs crowned) (Just S.bob)
+
 hagUpkeep :: Phase.Phase
 hagUpkeep = Phase.Beginning BeginningStep.Upkeep
 
@@ -824,7 +937,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     Spec.assertEqWith
       s
       "armed"
-      (Expiry.arm S.alice S.noSource Duration.UntilEndOfCombat armGs)
+      (Expiry.arm Map.empty S.alice S.noSource Duration.UntilEndOfCombat armGs)
       (Just (Expiry.Type.AtEndOf PhaseSelector.CombatPhase))
   -- The unit-level half of CR 500.5a, and the sharpest statement of it: the end
   -- of combat STEP ending does not reach the effect, and the combat PHASE ending
@@ -1129,5 +1242,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   untilEndOfCombatSpec s registry
   masterThiefSpec s registry
   monarchSpec s registry
+  garlandSpec s registry
   hagSpec s registry
   lingeringSpec s registry

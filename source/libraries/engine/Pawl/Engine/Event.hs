@@ -974,7 +974,9 @@ apply batch candidate event =
                   -- Expiry.Never here, the posture Resolve's storing arms take;
                   -- Indefinite always arms, so the Nothing branch is unreachable
                   -- and is written out only because arm is total over Duration.
-                  case Expiry.arm controller oid Duration.Indefinite gs2 of
+                  -- No bindings: rule 702.136a's riot is a replacement's choice,
+                  -- not a resolution, so its duration can name no slot.
+                  case Expiry.arm Map.empty controller oid Duration.Indefinite gs2 of
                     Nothing -> gs2
                     Just expiry ->
                       let (ts, gs3) = Game.freshTimestamp gs2
@@ -2150,7 +2152,10 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                         }
                     | (n, ts, modification, frozen) <- Projection.frozenStaticParts oid gs,
                       duration <- fmap snd (filter ((== n) . fst) lingering),
-                      expiry <- Maybe.maybeToList (Expiry.arm lastController oid duration gs)
+                      -- No bindings to bake a CR 611.2b condition against: this
+                      -- duration is a PRINTED static ability's, and no resolution
+                      -- chose anything for it.
+                      expiry <- Maybe.maybeToList (Expiry.arm Map.empty lastController oid duration gs)
                     ]
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
@@ -4901,15 +4906,23 @@ eventBindings cond event = case (cond, event) of
   -- promise needs: every GameEvent.Mentored carries both ids.
   (TriggerCondition.AttachedCreatureMentors, GameEvent.Mentored _ mentored) ->
     Binding.setMentoredCreature mentored Map.empty
+  -- CR 725.1's newly crowned player: Garland, Royal Kidnapper's "that player",
+  -- whose creature the trigger then targets and whose crown its duration watches.
+  -- Bound whichever relation matched, for the reason the PlayerLosesLife arm
+  -- gives: eventBindingSlots answers per CONDITION with no relation in hand, so
+  -- the slot has to hold for every relation this condition admits. Under You the
+  -- crowned player is also CR 109.5's "you", which is a redundancy rather than a
+  -- wrong answer.
+  --
+  -- Unconditional given a match: GameEvent.BecameMonarch carries a PlayerId
+  -- outright, and CR 725.3 makes it exactly one.
+  (TriggerCondition.PlayerBecomesMonarch _, GameEvent.BecameMonarch crowned) ->
+    Binding.setTriggerPlayer crowned Map.empty
   -- CR 603.1b's multi-condition ability reaches this fallthrough and stamps
   -- nothing, which agrees with eventBindingSlots' intersection for the pool's one
   -- AnyOf and is pinned by Pawl.TriggerSpec against every event either branch
   -- admits. An AnyOf two of whose branches bind the SAME slot is not handled
   -- (#963).
-  --
-  -- CR 725.1's crowning reaches it too, and deliberately: see
-  -- eventBindingSlots' PlayerBecomesMonarch arm for why the crowned player gets
-  -- no slot (#1051).
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -5193,13 +5206,14 @@ eventBindingSlots cond = case cond of
   -- Angel" reads neither. A card printing "that Saga" or "that player" is what
   -- would earn a slot (#1029).
   TriggerCondition.SagaFinalChapterTriggers _ -> Set.empty
-  -- CR 725.1's newly crowned player gets NO slot: under the one relation a card
-  -- in the pool uses, that player is CR 109.5's "you", whom Binding.setYou
-  -- already names, so a slot would be a second name for one player. Exactly
-  -- PlayerGainsLife's posture above, and empty by decision rather than by
-  -- default -- eventBindings has no arm for this condition either. A card
-  -- watching an OPPONENT be crowned is what would want the slot (#1051).
-  TriggerCondition.PlayerBecomesMonarch _ -> Set.empty
+  -- CR 725.1's newly crowned player -- Garland, Royal Kidnapper watches an
+  -- OPPONENT take the crown, so the seat is one nothing else on the ability
+  -- names. Under the You relation it is also CR 109.5's "you", a second name for
+  -- one player and no wrong answer; a per-CONDITION set cannot depend on the
+  -- relation.
+  --
+  -- Unconditional: GameEvent.BecameMonarch carries a PlayerId outright.
+  TriggerCondition.PlayerBecomesMonarch _ -> Set.singleton Binding.triggerPlayer
   -- Empty by decision: the permanent the event names is the one the condition's own
   -- SLOT already names, and Ray of Command's "tap it" reads that slot rather than
   -- anything the event bound. A slot for the player who GAINED control is what a

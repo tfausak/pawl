@@ -31,10 +31,11 @@ import qualified Pawl.Types.Quantity as Quantity
 -- an object the clause names through a SLOT, rule 702.100a's entrant being one.
 --
 -- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
--- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. An
--- InSlot count stored that way outlives its slot binding: Pawl.Engine.Count.playersFor
--- then yields Nothing, and Pawl.Engine.Condition.holds collapses that to False
--- silently (#159).
+-- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. Such a
+-- reference outlives its slot binding, so Pawl.Engine.Condition.bakeBound
+-- substitutes the seat for the slot as the duration begins; Pawl.ExpirySpec's
+-- Garland, Royal Kidnapper group is what proves the stored condition still
+-- answers once the resolution that stored it is over.
 data Condition
   = -- | One comparison: the first Quantity relates thus to the second.
     Compares Quantity.Quantity Comparison.Comparison Quantity.Quantity

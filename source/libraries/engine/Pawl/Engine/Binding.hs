@@ -104,9 +104,9 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- name it" rule applies here too, under the same sweep. That an effect reading
 -- this slot sits under a condition that binds it is enforced by
 -- Pawl.Engine.Event.eventBindingSlots: only the combat-damage-to-a-player, the
--- CR 701.9a discard, the CR 119.3 life-loss, the CR 601.2i cast and the CR
--- 508.3a attack conditions stamp it, so reading it under any other is a failing
--- test.
+-- CR 701.9a discard, the CR 119.3 life-loss, the CR 601.2i cast, the CR 508.3a
+-- attack and the CR 725.1 crowning conditions stamp it, so reading it under any
+-- other is a failing test.
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
@@ -481,7 +481,15 @@ objectSlots = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne) . targetsOf
 -- the slot this is read for is `triggerPlayer`, which the EVENT bound and which
 -- was never a target to become illegal.
 playerSlots :: Map SlotName Binding -> Map SlotName PlayerId
-playerSlots = Map.mapMaybe (Recipient.playerOf Monad.<=< onlyOne) . targetsOf
+playerSlots = playersIn . targetsOf
+
+-- playerSlots' inner half, over the PROJECTED targets a resolution already holds
+-- rather than over a whole environment. Pawl.Engine.Resolve reads it that way:
+-- its arms carry CR 601.2c's chosen recipients (already filtered by CR 608.2b)
+-- rather than the object's bindings, and that is what a CR 611.2b duration's
+-- condition is baked against at Pawl.Engine.Expiry.arm.
+playersIn :: Map SlotName (Set Recipient) -> Map SlotName PlayerId
+playersIn = Map.mapMaybe (Recipient.playerOf Monad.<=< onlyOne)
 
 -- The ONE recipient a slot names, or Nothing when it names none or several. What
 -- every reader that can point at one object and no more asks of a slot -- CR
