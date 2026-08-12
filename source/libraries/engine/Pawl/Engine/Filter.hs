@@ -315,8 +315,10 @@ data Context = MkContext
     -- against it (PowerLessThanSource, CR 702.134a; PowerGreaterThanSource, CR
     -- 702.149a). Not derivable from `source` here -- this module holds no game
     -- state and cannot project -- so the caller that has the board supplies it:
-    -- Pawl.Engine.Target.admittedGiven for a target slot, and
-    -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's trigger condition.
+    -- Pawl.Engine.Target.admittedGiven for a target slot,
+    -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's trigger condition, and
+    -- Pawl.Engine.CombatRestriction.cantBeBlockedBy for CR 701.54c's blocking
+    -- restriction.
     --
     -- LAZY, and load-bearingly so: filling it costs a projection of the source,
     -- and no filter that omits the atom ever forces it. That is the posture
@@ -347,9 +349,10 @@ data Context = MkContext
   deriving (Eq, Show)
 
 -- A Context for every match whose Filter cannot name a context-relative atom --
--- that is, every match but a target slot's and CR 702.149a's trigger condition.
--- The source-power atoms reach a card only through Pawl.Engine.Keyword's own
--- mentor and training, and CR 702.39a's defending-player atom only through
+-- that is, every match but a target slot's, CR 702.149a's trigger condition and
+-- CR 509.1b's blocking gate. The source-power atoms reach a card only through
+-- Pawl.Engine.Keyword's own mentor and training and through
+-- Pawl.Engine.Ring's emblem, and CR 702.39a's defending-player atom only through
 -- provoke; Pawl.CardSpec's lints keep all three out of card data, so no other
 -- position can read the Nothings this leaves.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
@@ -363,8 +366,9 @@ contextWithSlots p s m = (contextFor p s) {slotObjects = m}
 -- contextFor with the source's power supplied. Kept lazy at the call site, since
 -- the field is: a Filter that never names the atom pays for no projection.
 --
--- The defending player stays Nothing: this is CR 702.149a's TRIGGER match, and
--- rule 702.39a's atom lives only in a target slot.
+-- The defending player stays Nothing on both callers -- CR 702.149a's TRIGGER
+-- match and CR 509.1b's blocking gate -- since rule 702.39a's atom lives only in a
+-- target slot.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
 contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, slotObjects = Map.empty}
 

@@ -3,6 +3,8 @@ module Pawl.Types.CombatRestriction where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 
 -- | CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an effect saying a
 -- creature can't attack, can't attack alone, or can't attack unless some
@@ -22,16 +24,16 @@ import qualified Pawl.Types.Condition as Condition
 -- the reason is the AXIS. CR 508.1d and CR 509.1c each imply a subject and an
 -- object, and the two requirement carriers collapse opposite ones -- a blocking
 -- requirement carries the attacker to be blocked and no subject, an attacking
--- requirement carries the subject and no object. A restriction
--- carries only the SUBJECT, never an object, on every arm that names one at all:
--- Pacifism's two halves are the same Affected twice, so the only thing
+-- requirement carries the subject and no object. A restriction names its SUBJECT
+-- on every arm that names anything, and only CantBeBlockedBy also names an
+-- object: Pacifism's two halves are the same Affected twice, so the only thing
 -- distinguishing THOSE TWO is which declaration they forbid. Splitting them
 -- would copy the requirements' shape without the reason for it. What tells the
 -- later arms from the first is not the declaration -- CantAttackAlone and
 -- CantAttackMoreThan both forbid an attack -- but the shape, which is the next
 -- paragraph.
 --
--- The arms differ in SHAPE rather than in axis, and there are three shapes. The
+-- The arms differ in SHAPE rather than in axis, and there are four shapes. The
 -- first two are answered about ONE CREATURE, so the reader may apply them to CR
 -- 508.1a's and CR 509.1a's candidate list and never look at a declaration.
 -- CantAttackAlone cannot be: it is a fact about the whole set of creatures
@@ -53,6 +55,13 @@ import qualified Pawl.Types.Condition as Condition
 -- subtracts nothing from CR 508.1a's or CR 509.1a's candidate list: every
 -- creature stays a legal candidate and it is the DECLARATION that is refused.
 --
+-- The FOURTH shape is answered about a PAIR, which is CantBeBlockedBy: it names
+-- attackers and describes the blockers that may not block them, so no set of
+-- creatures on either side is the answer, and CR 509.1b's own Example is a
+-- pairwise board. It is the shape that rule's second paragraph is about, though
+-- not always its evasion ABILITY: that paragraph's definition wants the ability
+-- on the attacking creature, and CR 701.54c's is on an emblem.
+--
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The
 -- split is pawl's, not the rules': CantAttack's answer is a SET OF CREATURES that
@@ -64,12 +73,12 @@ import qualified Pawl.Types.Condition as Condition
 -- PAID rather than a fact to be read, and CR 508.1d makes paying it optional, so
 -- it could not be a Condition either.
 --
--- The axis is missing rather than collapsed, and the missing capability is
+-- One axis is still missing rather than collapsed, and the missing capability is
 -- named: an attacking restriction with an object (Crown-Hunter Hireling, Armored
 -- Galleon) is one whose CONDITION is about the player CR 508.1b names per
--- creature, and the condition below cannot name that player (#620). A blocking
--- restriction with an object is what CR 702.9b's evasion keywords already are --
--- carried on the ATTACKER as a keyword, never here.
+-- creature, and the condition below cannot name that player (#620). The blocking
+-- side's object is CantBeBlockedBy, whose own comment says why a keyword on the
+-- attacker could not have carried CR 701.54c's clause.
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.CombatRestriction is the only module that may case on it. Casing
@@ -80,10 +89,11 @@ import qualified Pawl.Types.Condition as Condition
 -- (unleash, CR 702.98a), which is the closed half writing its own rules rather
 -- than a card writing text -- the position Pawl.Types.EntryRewrite.Riot is in.
 --
--- Gathered LIVE from the battlefield on every read and never captured, the
--- posture all five siblings take -- so a Pacifism leaving the battlefield lifts
--- its restriction with nothing to unwind. The gate is re-read on the same
--- schedule: CR 508.1 and CR 509.1 make the declaration a SEQUENCE OF STEPS, of
+-- Gathered LIVE on every read and never captured, the posture all five siblings
+-- take -- from the battlefield, and from the command zone for an emblem, whose
+-- abilities CR 114.4 makes function there -- so a Pacifism leaving the
+-- battlefield lifts its restriction with nothing to unwind. The gate is re-read
+-- on the same schedule: CR 508.1 and CR 509.1 make the declaration a SEQUENCE OF STEPS, of
 -- which CR 508.1c and CR 509.1b are one, so the only moment a gate's answer has
 -- to be right is the moment it is asked, and a gate that stops holding
 -- re-imposes the restriction with nothing to unwind either. CR 509.1b's note
@@ -91,7 +101,7 @@ import qualified Pawl.Types.Condition as Condition
 -- ability gained after a legal block does not affect that block is the rules
 -- saying the same thing.
 --
--- The SECOND field of each arm is that gate: the condition the creature can't
+-- The LAST field of each arm is that gate: the condition the creature can't
 -- attack (or block) UNLESS -- Blind-Spot Giant's "unless you control another
 -- Giant". On the two bound arms it gates the whole sentence rather than a
 -- creature, which is the same clause CR 508.1c describes and the same posture
@@ -118,10 +128,36 @@ data CombatRestriction
   | -- | CR 509.1b: these creatures can't block, unless the gate holds.
     -- Pacifism's second half and Blind-Spot Giant's are the pool's only printed
     -- blocking restrictions, and CR 702.98a's unleash is the one rule 702 mints
-    -- (Pawl.Engine.Keyword.mintedCombatRestrictionsFor); every other one today is
-    -- an evasion keyword on the ATTACKER, which restricts being blocked rather
-    -- than blocking.
+    -- (Pawl.Engine.Keyword.mintedCombatRestrictionsFor); every other one today
+    -- restricts being blocked rather than blocking, as an evasion keyword on the
+    -- ATTACKER or as the arm below.
     CantBlock Affected.Affected (Maybe Condition.Condition)
+  | -- | CR 509.1b's second paragraph: these ATTACKING creatures can't be blocked
+    -- by creatures matching the Filter, unless the gate holds. CR 701.54c's "your
+    -- Ring-bearer ... can't be blocked by creatures with greater power" is the
+    -- pool's one statement of it (Pawl.Engine.Ring.theRingCantBeBlockedByGreaterPower).
+    --
+    -- The one arm carrying an OBJECT as well as a subject, because a pair is the
+    -- smallest thing the sentence is about: the Filter describes a blocker
+    -- RELATIVE TO the attacker it may not block ("with greater power"), so
+    -- neither a set of attackers nor a set of blockers is an answer, and the two
+    -- sides cannot be split into two restrictions.
+    --
+    -- Not a keyword on the attacker, which is where every other evasion ability
+    -- lives (CR 702.9b's flying, CR 702.118b's skulk -- whose text this clause
+    -- otherwise repeats word for word). CR 701.54c prints the sentence on THE
+    -- EMBLEM rather than on the creature: the Ring-bearer is not given skulk and
+    -- does not answer a "creature with skulk" filter, the designation can move to
+    -- another creature between blocks, and nothing on the Ring-bearer's own card
+    -- says any of it. A keyword grant would be observably the wrong reading on
+    -- all three counts.
+    --
+    -- The Filter's context is the ATTACKER's, which is what makes the comparison
+    -- expressible: Filter.PowerGreaterThanSource reads
+    -- Pawl.Engine.Filter.Context's sourcePower, and the power CR 701.54c compares
+    -- against is the blocked creature's, not the emblem's -- CR 114.3 leaves an
+    -- emblem no power at all. See Pawl.Engine.CombatRestriction.cantBeBlockedBy.
+    CantBeBlockedBy Affected.Affected (Filter.Filter Keyword.Keyword) (Maybe Condition.Condition)
   | -- | CR 508.1c together with CR 506.5: these creatures can't be the ONLY
     -- creature declared as an attacker, unless the gate holds. Bonded Construct
     -- ("This creature can't attack alone") is the pool's printing, and CR

@@ -6,8 +6,11 @@
 --
 -- The only module that may CASE on Pawl.Types.CombatRestriction.
 -- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
--- Pawl.Engine.Combat asks for a SET OF IDS, or for a NUMBER, and never learns
--- which card, or which keyword, produced either.
+-- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF PAIRS, or for a NUMBER,
+-- and never learns which card, or which keyword, produced any of them. The pairs
+-- are CR 509.1b's pairwise restrictions (cantBeBlockedBy), which no set of
+-- creatures could state; the Filter that decides them is evaluated here, so no
+-- Filter crosses into Pawl.Engine.Combat.
 module Pawl.Engine.CombatRestriction where
 
 import qualified Data.List as List
@@ -28,8 +31,10 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -77,6 +82,7 @@ attacking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 attacking cr = case cr of
   CombatRestriction.CantAttack a _ -> Just a
   CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantBeBlockedBy {} -> Nothing
   CombatRestriction.CantAttackAlone _ _ -> Nothing
   CombatRestriction.CantAttackMoreThan _ _ -> Nothing
   CombatRestriction.CantBlockMoreThan _ _ -> Nothing
@@ -85,6 +91,10 @@ blocking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 blocking cr = case cr of
   CombatRestriction.CantAttack _ _ -> Nothing
   CombatRestriction.CantBlock a _ -> Just a
+  -- The Affected here names ATTACKERS, never blockers, so this selector must not
+  -- see it: answering Just would take the Ring-bearer off CR 509.1a's candidate
+  -- list, which is the opposite of what CR 701.54c says.
+  CombatRestriction.CantBeBlockedBy {} -> Nothing
   CombatRestriction.CantAttackAlone _ _ -> Nothing
   CombatRestriction.CantAttackMoreThan _ _ -> Nothing
   CombatRestriction.CantBlockMoreThan _ _ -> Nothing
@@ -93,17 +103,32 @@ attackingAlone :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 attackingAlone cr = case cr of
   CombatRestriction.CantAttack _ _ -> Nothing
   CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantBeBlockedBy {} -> Nothing
   CombatRestriction.CantAttackAlone a _ -> Just a
   CombatRestriction.CantAttackMoreThan _ _ -> Nothing
   CombatRestriction.CantBlockMoreThan _ _ -> Nothing
 
--- The bound selectors. A separate pair from the three above rather than a fourth
--- and fifth of them, because what they answer is a NUMBER and no Affected can
+-- The PAIRWISE selector. Its own, and not a fourth of the three above, because
+-- what it answers is an Affected TOGETHER WITH the Filter describing the blockers
+-- barred from it: the two are one sentence, and an Affected alone would say "this
+-- creature can't be blocked" full stop.
+blockedBy :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, Filter.Type.Filter Keyword.Type.Keyword)
+blockedBy cr = case cr of
+  CombatRestriction.CantAttack _ _ -> Nothing
+  CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantBeBlockedBy a f _ -> Just (a, f)
+  CombatRestriction.CantAttackAlone _ _ -> Nothing
+  CombatRestriction.CantAttackMoreThan _ _ -> Nothing
+  CombatRestriction.CantBlockMoreThan _ _ -> Nothing
+
+-- The bound selectors. A separate pair from the four above rather than a fifth
+-- and sixth of them, because what they answer is a NUMBER and no Affected can
 -- stand in for one -- which is the whole reason the arms exist.
 attackingMoreThan :: CombatRestriction.CombatRestriction -> Maybe Natural
 attackingMoreThan cr = case cr of
   CombatRestriction.CantAttack _ _ -> Nothing
   CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantBeBlockedBy {} -> Nothing
   CombatRestriction.CantAttackAlone _ _ -> Nothing
   CombatRestriction.CantAttackMoreThan n _ -> Just n
   CombatRestriction.CantBlockMoreThan _ _ -> Nothing
@@ -112,6 +137,7 @@ blockingMoreThan :: CombatRestriction.CombatRestriction -> Maybe Natural
 blockingMoreThan cr = case cr of
   CombatRestriction.CantAttack _ _ -> Nothing
   CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantBeBlockedBy {} -> Nothing
   CombatRestriction.CantAttackAlone _ _ -> Nothing
   CombatRestriction.CantAttackMoreThan _ _ -> Nothing
   CombatRestriction.CantBlockMoreThan n _ -> Just n
@@ -127,13 +153,15 @@ gate :: CombatRestriction.CombatRestriction -> Maybe Condition.Type.Condition
 gate cr = case cr of
   CombatRestriction.CantAttack _ c -> c
   CombatRestriction.CantBlock _ c -> c
+  CombatRestriction.CantBeBlockedBy _ _ c -> c
   CombatRestriction.CantAttackAlone _ c -> c
   CombatRestriction.CantAttackMoreThan _ c -> c
   CombatRestriction.CantBlockMoreThan _ c -> c
 
--- Every combat restriction some permanent on the battlefield states right now,
--- each paired with its SOURCE and with CR 612.1's word swap over that source's
--- own text. A restriction whose gate HOLDS is not here at all, because CR
+-- Every combat restriction some permanent on the battlefield -- or some object in
+-- the command zone, whose abilities CR 114.4 makes function there -- states right
+-- now, each paired with its SOURCE and with CR 612.1's word swap over that
+-- source's own text. A restriction whose gate HOLDS is not here at all, because CR
 -- 508.1c / CR 509.1b's "unless" lifts it, so both readers below see only
 -- restrictions in force.
 --
@@ -269,7 +297,34 @@ inForce gs =
                         not (lifted source changes restriction)
                       ]
                 else []
+      -- CR 114.4: "abilities of emblems function in the command zone", which is
+      -- what makes CR 701.54c's restriction on the emblem named The Ring do
+      -- anything at all. Pawl.Engine.Projection.gatherGiven walks the same zone
+      -- for the same rule, and this branch takes its posture for the gates: no
+      -- liveness gate, no CR 612.1 text change and no minted rows, since the
+      -- pool's CR 613.1f removers and text changers reach creatures on the
+      -- battlefield and an emblem is not one (CR 114.5). The "unless" gate IS
+      -- asked, because a gated emblem restriction would otherwise be wired open --
+      -- no emblem in the pool prints one.
+      --
+      -- EMBLEMS alone, where that walk takes the whole zone: CR 114.4 is about
+      -- emblems, and CR 113.6 leaves a permanent card's abilities functioning only
+      -- on the battlefield. The difference bites here in a way it does not there,
+      -- because two of this module's questions name no creature at all -- a
+      -- commander whose card printed Silent Arbiter's bound would otherwise cap
+      -- the whole table's attackers from the command zone.
+      isEmblem source = case fmap Object.source (Game.lookupObject source gs) of
+        Just (Source.OfEmblem _) -> True
+        _ -> False
+      fromCommandZone source = case Game.faceOf source gs of
+        Just face
+          | isEmblem source ->
+              fmap
+                (\restriction -> (source, [], restriction))
+                (filter (\restriction -> not (lifted source [] restriction)) (Face.combatRestrictions face))
+        _ -> []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+        <> concatMap fromCommandZone (Set.toList (GameState.command gs))
 
 -- The shared walk behind the three SUBJECT-CARRYING questions above, over the
 -- restrictions `select` keeps.
@@ -311,6 +366,64 @@ restricted select candidates gs =
       fromRestriction (source, changes, restriction) = case select restriction of
         Nothing -> []
         Just affected -> filter (named source (if null changes then affected else Projection.rewriteAffected changes affected)) candidates
+   in Set.fromList (concatMap fromRestriction (inForce gs))
+
+-- CR 509.1b's PAIRWISE restrictions: which (blocker, attacker) pairs an effect in
+-- force right now forbids. CR 701.54c's "can't be blocked by creatures with
+-- greater power" is the pool's one producer.
+--
+-- A set of PAIRS, where the three questions above answer with a set of creatures,
+-- and the shape is forced by the rule rather than chosen: the restriction is
+-- about a blocker RELATIVE TO an attacker, so neither side is a set on its own.
+-- Pawl.Engine.Combat tests membership and learns nothing else --
+-- Pawl.Types.CombatRestriction's Filter is read here and never handed over.
+--
+-- Computed ONCE per declaration pass and handed to every pair check, `restricted`'s
+-- posture and for its reason: the caller asks this at the top of a pass where a
+-- per-pair predicate would walk the battlefield inside
+-- Pawl.Engine.Combat.candidateBlockDeclarations' exponential filter (#200). The
+-- cross product costs |blockers| * |attackers| projections, and only on a board
+-- that actually states such a restriction -- `inForce` yields nothing on every
+-- other board, so the fold never reaches a candidate.
+--
+-- THE FILTER'S CONTEXT IS THE ATTACKER'S: its source is the attacker and its
+-- perspective that attacker's controller, the pairing
+-- Pawl.Engine.Combat.landwalkAllowsGiven gives a keyword-borne Filter. CR 109.5's
+-- "you" would instead be the SOURCE's controller, as it is for the gate in
+-- `inForce` and the affected set in `restricted`, and the two readings are
+-- indistinguishable on the pool's one producer: CR 701.54c's affected set carries
+-- ControlledBy You, so the Ring-bearer's controller IS the emblem's. What is not
+-- a choice is the source POWER, which CR 701.54c compares the blocker against:
+-- the emblem has no power at all (CR 114.3), so only the attacker's makes the
+-- comparison mean anything.
+--
+-- The power is read off the full projection (CR 613), as skulk's is in
+-- Pawl.Engine.Combat.skulkAllowsGiven, and read at the moment the declaration is
+-- checked -- CR 509.1b's second paragraph is what says nothing re-checks it after.
+cantBeBlockedBy :: [ObjectId] -> [ObjectId] -> GameState -> Set (ObjectId, ObjectId)
+cantBeBlockedBy blockers attackers gs =
+  let named source affected creature =
+        Projection.affects
+          source
+          creature
+          affected
+          (Projection.project creature gs)
+          gs
+      -- CR 612.1, on both of the printed sentence's halves: the attackers it
+      -- names and the blockers it describes are words on the SOURCE's card, so
+      -- one text change reaches both or neither -- `restricted`'s rewrite with
+      -- the second position added.
+      fromRestriction (source, changes, restriction) = case blockedBy restriction of
+        Nothing -> []
+        Just (affected, criterion) ->
+          let subject = if null changes then affected else Projection.rewriteAffected changes affected
+              wanted = if null changes then criterion else Filter.rewrite changes criterion
+              -- Lazy in the power, which a filter naming no source-power atom
+              -- never forces.
+              context attacker = Filter.contextComparingPower (Projection.controllerOf attacker gs) attacker (Projection.powerOf attacker gs)
+              matched attacker blocker = Filter.matches (context attacker) (Projection.viewOfObject blocker gs) wanted
+              barred attacker = fmap (\blocker -> (blocker, attacker)) (filter (matched attacker) blockers)
+           in concatMap barred (filter (named source subject) attackers)
    in Set.fromList (concatMap fromRestriction (inForce gs))
 
 -- The shared walk behind the two BOUNDS above, over the restrictions `select`
