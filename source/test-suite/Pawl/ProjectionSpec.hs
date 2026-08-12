@@ -6,8 +6,8 @@
 -- overrides it. Mostly directly-constructed continuous effects, so the engine is
 -- proven independently of any card wiring; the card-level proofs live alongside.
 -- Also Pawl.Engine.Subtype, the CR 205.3i land-type and CR 205.3m creature-type
--- classifications the layer-4 SetLandSubtype, SetCreatureSubtype and
--- AddCreatureSubtype arms fold with.
+-- classifications the layer-4 SetLandSubtype, SetCreatureSubtype,
+-- AddCreatureSubtype and AddEveryCreatureSubtype arms fold with.
 module Pawl.ProjectionSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -181,15 +181,38 @@ aimAtCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
--- Put Turn to Frog into alice's hand, cast it AT `victimId`, and resolve it.
--- `board` must already hold enough untapped lands for {1}{U}. The target is
--- answered rather than forced by construction, because the boards below hold
--- more than one creature.
-turnToFrogAt :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> GameState.GameState
-turnToFrogAt victimId turnToFrog board =
-  let (gs, ttfId) = S.handOne turnToFrog board
-      cast = snd (Engine.runGamePure (aimAtCreature victimId) gs (S.cast S.alice ttfId))
+-- Put a one-target creature spell into alice's hand, cast it AT `victimId`, and
+-- resolve it. `board` must already hold enough untapped lands for the cost. The
+-- target is answered rather than forced by construction, because the boards below
+-- hold more than one creature.
+castAtCreature :: ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> GameState.GameState
+castAtCreature victimId printing board =
+  let (gs, spellId) = S.handOne printing board
+      cast = snd (Engine.runGamePure (aimAtCreature victimId) gs (S.cast S.alice spellId))
    in snd (Engine.runGamePure (aimAtCreature victimId) cast Stack.resolveTop)
+
+-- The board CR 604.3a's two routes for changeling are told apart on. A Goblin
+-- Piker and a Woodland Changeling, each Turn-to-Frogged, and then -- only when
+-- `granted` -- Synthetic Borrowed Shape enchanting the Piker. The Aura enters
+-- AFTER both spells resolve, so CR 613.7a stamps its effects later than theirs;
+-- the pair of boards differs in the Aura and in nothing else.
+borrowedShapeBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+borrowedShapeBoard s registry granted = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  changeling <- S.printingOf s registry "Woodland Changeling"
+  turnToFrog <- S.printingOf s registry "Turn to Frog"
+  aura <- S.printingOf s registry "Synthetic Borrowed Shape"
+  let (changelingId, g1) = S.addCreature changeling S.alice (S.landsInPlay island 4)
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      frogged = castAtCreature pikerId turnToFrog (castAtCreature changelingId turnToFrog g2)
+      gs =
+        if not granted
+          then frogged
+          else
+            let (auraId, g3) = S.addCreature aura S.alice frogged
+             in S.attach auraId pikerId g3
+  pure (pikerId, changelingId, gs)
 
 -- The object timestamp of the (single) Humility on the battlefield.
 humilityTimestamp :: Printing.Printing -> GameState.GameState -> Timestamp.Timestamp
@@ -1003,7 +1026,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     bogWraith <- S.printingOf s registry "Bog Wraith"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
     let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
-        after = turnToFrogAt wraithId turnToFrog board
+        after = castAtCreature wraithId turnToFrog board
     Spec.assertEqWith s "before: Creature -- Wraith" (Projection.subtypesOf wraithId board) (Set.singleton Subtype.Type.Wraith)
     -- CR 205.1b's last sentence: an effect making an object a "[creature type]
     -- artifact creature" lets it keep every prior subtype "other than creature
@@ -1032,7 +1055,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     turnToFrog <- S.printingOf s registry "Turn to Frog"
     let (_, withAshaya) = S.addCreature ashaya S.alice (S.landsInPlay island 3)
         (wraithId, board) = S.addCreature bogWraith S.alice withAshaya
-        after = turnToFrogAt wraithId turnToFrog board
+        after = castAtCreature wraithId turnToFrog board
     Spec.assertEqWith
       s
       "before: animated into a Forest land, still a Wraith"
@@ -1057,7 +1080,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     bogWraith <- S.printingOf s registry "Bog Wraith"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
     let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
-        after = turnToFrogAt wraithId turnToFrog board
+        after = castAtCreature wraithId turnToFrog board
     Spec.assertEqWith s "before: black" (Projection.colorsOf wraithId board) (Set.singleton Color.Black)
     Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Swamp)) wraithId board) "before: swampwalk"
     Spec.assertEqWith s "before: 3/3" (Projection.powerOf wraithId board, Projection.toughnessOf wraithId board) (Just 3, Just 3)
@@ -1070,7 +1093,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     bogWraith <- S.printingOf s registry "Bog Wraith"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
     let (wraithId, board) = S.addCreature bogWraith S.alice (S.landsInPlay island 3)
-        after = turnToFrogAt wraithId turnToFrog board
+        after = castAtCreature wraithId turnToFrog board
         afterCleanup = snd (Engine.runGamePure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
     Spec.assertEqWith s "all four effects dropped" (GameState.continuousEffects afterCleanup) []
     Spec.assertEqWith s "Creature -- Wraith again" (Projection.subtypesOf wraithId afterCleanup) (Set.singleton Subtype.Type.Wraith)
@@ -1377,7 +1400,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     changeling <- S.printingOf s registry "Woodland Changeling"
     turnToFrog <- S.printingOf s registry "Turn to Frog"
     let (oid, board) = S.addCreature changeling S.alice (S.landsInPlay island 3)
-        after = turnToFrogAt oid turnToFrog board
+        after = castAtCreature oid turnToFrog board
     Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf oid board)) "before: a Merfolk among the rest"
     Spec.assertEqWith s "after: Creature -- Frog alone" (Projection.subtypesOf oid after) (Set.singleton Subtype.Type.Frog)
 
@@ -1389,6 +1412,55 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let view = Projection.viewOfCard (S.combinedFace changeling)
     Spec.assertBool s (Set.member Subtype.Type.Merfolk (Filter.subtypes view)) "a Merfolk in a library"
     Spec.assertBool s (not (Set.member Subtype.Type.Island (Filter.subtypes view))) "and still not a land type"
+
+  -- CR 205.1b's add over the whole of CR 205.3m, the layer-4 arm changeling's two
+  -- routes both come down to. Wings of Velis Vel is the card: "target creature has
+  -- base power and toughness 4/4, gains all creature types, and gains flying".
+  -- Lord of Atlantis is the reader -- its affected set is a Filter.HasSubtype
+  -- Merfolk -- so the Piker ends up 4/4 base plus the lord's +1/+1, and the two
+  -- numbers are distinct on purpose: a no-op arm leaves 4.
+  Spec.it s "CR 205.1b Wings of Velis Vel adds every creature type without replacing the Piker's own" $ do
+    island <- S.printingOf s registry "Island"
+    lord <- S.printingOf s registry "Lord of Atlantis"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wings <- S.printingOf s registry "Wings of Velis Vel"
+    let (_, withLord) = S.addCreature lord S.alice (S.landsInPlay island 3)
+        (pikerId, board) = S.addCreature piker S.alice withLord
+        after = castAtCreature pikerId wings board
+        subtypes = Projection.subtypesOf pikerId after
+    Spec.assertEqWith s "base 4/4, and the lord sees a Merfolk" (Projection.powerOf pikerId after) (Just 5)
+    Spec.assertBool s (Set.member Subtype.Type.Merfolk subtypes) "a Merfolk"
+    Spec.assertBool s (Set.member Subtype.Type.Goblin subtypes) "and still the printed Goblin (CR 205.1b: the add keeps the rest)"
+    Spec.assertBool s (not (Set.member Subtype.Type.Island subtypes)) "and not a land type"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying pikerId after) "and flying"
+
+  -- THE TWO ROUTES, ONE BOARD. CR 604.3a(2) gives CDA status only to an ability
+  -- printed on the card it affects (or on a token's creating effect, or acquired
+  -- by copy or text change), so a changeling another object's static ability
+  -- GRANTS is an ordinary timestamped layer-4 effect (CR 613.1d) where a printed
+  -- one is applied at the START of layer 4 (CR 613.3). An OLDER Turn to Frog is
+  -- what tells them apart, and both creatures on this board have one: it beats the
+  -- CDA and loses to the grant.
+  --
+  -- Synthetic Borrowed Shape ("enchanted creature has changeling") is the granter.
+  -- No printing grants the keyword: every card that hands changeling to an object
+  -- does it as a copy-effect exception (Moritte of the Frost, Omni-Changeling),
+  -- which CR 604.3a(2) makes a CDA, and the rest write the subtype sentence.
+  Spec.it s "CR 613.7a a granted changeling beats an OLDER Turn to Frog, where a printed one loses to it" $ do
+    board <- borrowedShapeBoard s registry True
+    let (pikerId, changelingId, gs) = board
+    Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf pikerId gs)) "the granted changeling is newer, so every creature type is back"
+    Spec.assertBool s (Projection.hasKeyword Keyword.Changeling pikerId gs) "and the keyword itself is there (CR 613.1f layer 6)"
+    -- The other route on the same board, under the same older Turn to Frog.
+    Spec.assertEqWith s "the PRINTED changeling is a Frog and nothing else" (Projection.subtypesOf changelingId gs) (Set.singleton Subtype.Type.Frog)
+
+  -- The negative: the same board with the Aura left off, so the only difference is
+  -- the grant. Without it the Piker is what Turn to Frog made it.
+  Spec.it s "CR 613.7a without the grant the same Piker is a Frog and nothing else" $ do
+    board <- borrowedShapeBoard s registry False
+    let (pikerId, _, gs) = board
+    Spec.assertEqWith s "Creature -- Frog alone" (Projection.subtypesOf pikerId gs) (Set.singleton Subtype.Type.Frog)
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Changeling pikerId gs)) "and no changeling"
 
   -- CR 613.8b's loop clause reached by two PRINTED cards, and the proving pair
   -- for deciding CR 613.8a over the whole board rather than per projected object.

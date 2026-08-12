@@ -96,6 +96,7 @@ layer m = case m of
   Modification.AddLandSubtype _ -> Layer.Type
   Modification.SetCreatureSubtype _ -> Layer.Type
   Modification.AddCreatureSubtype _ -> Layer.Type
+  Modification.AddEveryCreatureSubtype -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.AddSupertype _ -> Layer.Type
   Modification.RemoveSupertype _ -> Layer.Type
@@ -170,6 +171,13 @@ applyModification lyr src cands gs oid m pc =
         -- the one line separating this arm from the set above.
         Modification.AddCreatureSubtype s ->
           pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+        -- The same add over CR 205.3m's whole list. Identical to what
+        -- applySubtypeDefining writes at the start of this layer, and deliberately
+        -- so: rule 702.73a says one thing, and the two sites differ only in WHEN
+        -- they run -- the CDA first (CR 613.3), this in timestamp order (CR
+        -- 613.7).
+        Modification.AddEveryCreatureSubtype ->
+          pc {PC.subtypes = Set.union Subtype.everyCreatureType (PC.subtypes pc)}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 205.4b: a gain is an INSERT into the supertype set, so every other
@@ -1015,7 +1023,7 @@ definesEveryCreatureType = Set.member Keyword.Type.Changeling
 -- Humility cannot remove it either, LoseAllAbilities being layer 6.
 --
 -- A devoid GRANTED by another object's static ability deliberately never reaches
--- here: CR 604.3a denies it CDA status, so grantedDevoidParts routes it into layer
+-- here: CR 604.3a denies it CDA status, so grantedDefiningParts routes it into layer
 -- 5 as a timestamped colour effect instead. Pawl.ColorSpec's "CR 613.7a a granted
 -- devoid clears an OLDER 'in addition' colour" is what holds the two routes apart:
 -- widening this fold to reach a granted instance answers that case blue.
@@ -1039,11 +1047,13 @@ applyColorDefining pc =
 -- folds after this. Humility cannot undo it either, LoseAllAbilities being
 -- layer 6.
 --
--- Not implemented: changeling GRANTED by another object's static ability, which
--- CR 604.3a denies CDA status and which would need devoid's second route
--- (grantedDevoidParts). No card in the pool grants it -- Maskwood Nexus and
--- Amoeboid Changeling write the SUBTYPE sentence rather than the keyword
--- (#1200).
+-- A changeling GRANTED by another object's static ability deliberately never
+-- reaches here, devoid's posture above verbatim: CR 604.3a denies it CDA status,
+-- so grantedDefiningParts routes it into layer 4 as a timestamped
+-- AddEveryCreatureSubtype instead. Pawl.ProjectionSpec's "CR 613.7a a granted
+-- changeling beats an OLDER Turn to Frog, where a printed one loses to it" is
+-- what holds the two routes apart: widening this fold to reach a granted instance
+-- answers that case Frog.
 applySubtypeDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applySubtypeDefining pc =
   if definesEveryCreatureType (Map.keysSet (PC.keywords pc))
@@ -1138,6 +1148,7 @@ freezeQuantities gs oid you m =
         Modification.AddLandSubtype _ -> Just m
         Modification.SetCreatureSubtype _ -> Just m
         Modification.AddCreatureSubtype _ -> Just m
+        Modification.AddEveryCreatureSubtype -> Just m
         Modification.AddCardType _ -> Just m
         Modification.AddSupertype _ -> Just m
         Modification.RemoveSupertype _ -> Just m
@@ -1163,6 +1174,7 @@ quantitiesOf m = case m of
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCreatureSubtype _ -> []
+  Modification.AddEveryCreatureSubtype -> []
   Modification.AddCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
@@ -1198,6 +1210,7 @@ setLandSubtypeEffects gs =
         -- CR 205.1a/205.1b's creature-type set carries no such clause.
         Modification.SetCreatureSubtype _ -> False
         Modification.AddCreatureSubtype _ -> False
+        Modification.AddEveryCreatureSubtype -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
@@ -1397,6 +1410,11 @@ rewriteModification pairs m =
         -- on the stack, so the spell resolves making its target the new type.
         Modification.SetCreatureSubtype s -> Modification.SetCreatureSubtype (swap Subtype.isCreatureType from to s)
         Modification.AddCreatureSubtype s -> Modification.AddCreatureSubtype (swap Subtype.isCreatureType from to s)
+        -- Holds no word to swap: it names CR 205.3m's list, not a member of it.
+        -- CR 612.2 changes which types a word MEANS, and a text change that
+        -- rewrote one creature type into another would leave this add covering
+        -- the same list either way.
+        Modification.AddEveryCreatureSubtype -> acc
         -- CR 702.14a: "[type]walk" holds a land-type word, so a hacked Lord of
         -- Atlantis grants swampwalk rather than the printed islandwalk. The
         -- GRANTER's text is what this reads -- gatherStatic calls it with the
@@ -2175,6 +2193,7 @@ removesAbilities m = case m of
   -- strip belongs to the land arm above.
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
+  Modification.AddEveryCreatureSubtype -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False
   Modification.SwitchPowerToughness -> False
@@ -2253,39 +2272,47 @@ abilitiesRemoved cands gs oid =
          in any removes cs
    in any removesAt (Map.toList byLowest)
 
--- CR 702.114a: devoid is the static ability "This object is colorless". PRINTED,
--- it is a characteristic-defining ability and applyColorDefining folds it at the
--- start of layer 5 (CR 613.3). GRANTED by another object's static ability, it is
--- not one: CR 604.3a's clause (2) limits CDA status to an ability printed on the
--- card it affects, granted to a token by the effect that created the token, or
--- acquired by a copy or text-changing effect, and clauses (3) and (4) exclude an
--- ability that directly affects other objects and one an object grants to itself.
--- So the granted instance's colourless is an ORDINARY colour-changing effect,
--- applied in layer 5 (CR 613.1e) in timestamp order -- and "this object is
--- colorless" is exactly SetColor with no colours (CR 105.3).
+-- The two keywords rule 702 states as a characteristic-defining ability, expanded
+-- for the case where CR 604.3a denies them that status. CR 604.3a's clause (2)
+-- limits CDA status to an ability printed on the card it affects, granted to a
+-- token by the effect that created the token, or acquired by a copy or
+-- text-changing effect, and clauses (3) and (4) exclude an ability that directly
+-- affects other objects and one an object grants to itself. So an instance
+-- another object's static ability GRANTS is an ordinary continuous effect,
+-- applied in its own layer in timestamp order rather than at the start of it (CR
+-- 613.3).
+--
+--   * CR 702.114a, devoid: "this object is colorless" is exactly SetColor with no
+--     colours (CR 105.3), layer 5 (CR 613.1e). applyColorDefining is the printed
+--     instance's route.
+--   * CR 702.73a, changeling: "this object is every creature type" is exactly
+--     AddEveryCreatureSubtype, CR 205.1b's add, layer 4 (CR 613.1d).
+--     applySubtypeDefining is the printed instance's route.
 --
 -- Emitted as a second PART of the granting ability rather than as an effect of its
 -- own, which is what CR 613.6 and CR 613.7a ask for: one ability, so one affected
 -- set decided once, and one timestamp -- the granting permanent's. An effect of its
 -- own would have neither, since there is no second ability to hang them on.
 --
--- The colour half is not the last word on the object's colour. It applies in
--- timestamp order like any other layer-5 effect, so a NEWER colour-changing effect
--- lands on top of it and the object ends up with the devoid keyword and a colour.
--- That is CR 613.7, not a leak.
+-- Neither minted part is the last word on the characteristic. Each applies in
+-- timestamp order like any other effect in its layer, so a NEWER colour-changing
+-- or type-changing effect lands on top of it and the object ends up with the
+-- keyword and a colour, or with the keyword and one creature type. That is CR
+-- 613.7, not a leak.
 --
 -- Casing on a KEYWORD, which rule 702 makes part of the rulebook -- the same act
 -- as reading Keyword.Type.StartYourEngines off a projection. It is not a case on an
--- effect's identity: the caller still routes by `layer`, and the modification this
--- produces is the one Moonlace already stores.
+-- effect's identity: the caller still routes by `layer`, and the modifications this
+-- produces are the ones Moonlace and Wings of Velis Vel already store.
 --
 -- Only a static ability's grant is expanded. A devoid granted by the resolution of
--- a spell or ability is not (#793). counterGathered's grants need no arm at all:
--- CR 122.1b enumerates the keywords a keyword counter can be and devoid is not
--- among them, so no board can put one there.
-grantedDevoidParts :: Modification -> NonEmpty.NonEmpty Modification
-grantedDevoidParts m = case m of
+-- a spell or ability is not (#793), nor a changeling so granted (#1288).
+-- counterGathered's grants need no arm at all: CR 122.1b enumerates the keywords a
+-- keyword counter can be and neither is among them, so no board can put one there.
+grantedDefiningParts :: Modification -> NonEmpty.NonEmpty Modification
+grantedDefiningParts m = case m of
   Modification.GainKeyword Keyword.Type.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]
+  Modification.GainKeyword Keyword.Type.Changeling -> m NonEmpty.:| [Modification.AddEveryCreatureSubtype]
   _ -> m NonEmpty.:| []
 
 -- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the ability's
@@ -2315,10 +2342,10 @@ grantedDevoidParts m = case m of
 -- the effect start to apply at all.
 gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
 gatherStatic functioning src ts changes stripped n sa =
-  let -- CR 612 rewrites each printed modification, and grantedDevoidParts then
+  let -- CR 612 rewrites each printed modification, and grantedDefiningParts then
       -- expands what the rewrite produced -- in that order, since the expansion
       -- emits an engine-minted part that is not card text for CR 612 to reach.
-      ms = StaticAbility.modifications sa >>= grantedDevoidParts . rewriteModification changes
+      ms = StaticAbility.modifications sa >>= grantedDefiningParts . rewriteModification changes
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
         _ -> Nothing
@@ -2632,6 +2659,7 @@ modificationWrites m = case m of
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
+  Modification.AddEveryCreatureSubtype -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord _ _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
   Modification.AddSupertype _ -> Set.singleton Supertypes
@@ -3411,6 +3439,7 @@ grantsKeywordWhere p m = case m of
   Modification.AddLandSubtype _ -> False
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
+  Modification.AddEveryCreatureSubtype -> False
   Modification.AddCardType _ -> False
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False
