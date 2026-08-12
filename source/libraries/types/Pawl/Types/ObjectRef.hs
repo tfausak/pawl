@@ -1,5 +1,6 @@
 module Pawl.Types.ObjectRef where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -19,9 +20,10 @@ data ObjectRef
     -- single Recipient, subject to CR 608.2b's illegal-target check when the slot
     -- was a target.
     --
-    -- But a slot a Create bound to a whole minted GROUP names every one of them
-    -- -- Salt Road Skirmish's "they gain haste until end of turn" over the two
-    -- tokens the sentence before it made. A group is a definition and never a
+    -- But a slot bound to a whole GROUP names every one of them -- Salt Road
+    -- Skirmish's "they gain haste until end of turn" over the two tokens the
+    -- sentence before it made, and Act on Impulse's "those cards" over the three
+    -- its own move exiled. A group is a definition and never a
     -- target (CR 115.10a), so it owes CR 608.2b nothing; the arm still reads at
     -- most one object per slot for every OTHER kind of binding, which is why
     -- "target creature" cannot become two.
@@ -84,20 +86,30 @@ data ObjectRef
     -- flying and each player") has to be written as two DealDamage
     -- instructions, so its one CR 608.2f batch becomes two (#1285).
     EachPlayer
-  | -- | The ONE card on top of a library -- Count on Luck's "exile the top card of
-    -- your library". A library is a per-player zone (CR 400.1) kept as an ordered
-    -- pile (CR 401.2), so "the top card" is a position rather than a property, and
-    -- that is what no Filter can say: EachMatching sweeps the battlefield (CR
-    -- 109.2) and a Filter matches characteristics, neither of which can pick the
-    -- head of a hidden pile (CR 400.2).
+  | -- | The cards on top of a library, deepest named last -- Count on Luck's "the
+    -- top card of your library" and Act on Impulse's "the top three cards of your
+    -- library". A library is a per-player zone (CR 400.1) kept as an ordered pile
+    -- (CR 401.2), so "the top card" is a position rather than a property, and that
+    -- is what no Filter can say: EachMatching sweeps the battlefield (CR 109.2) and
+    -- a Filter matches characteristics, neither of which can pick the head of a
+    -- hidden pile (CR 400.2).
     --
     -- The PlayerRef is WHOSE library, so "the top card of target player's library"
-    -- is the same arm through its InSlot. One card per library named and no depth:
-    -- a printing wanting the top THREE has no spelling here (#1299).
+    -- is the same arm through its InSlot. The Natural is HOW MANY off the top of
+    -- EACH library it names, so a depth of three over "each player" is three per
+    -- seat rather than three in total -- which is what "exile the top three cards
+    -- of each player's library" would say. A library holding fewer cards than the
+    -- depth gives up what it has (CR 609.3), and an empty one gives nothing.
+    --
+    -- A Natural rather than a Pawl.Types.Quantity, the choice
+    -- Pawl.Types.DamageRewrite made for the same reason: every printed depth in
+    -- the pool is a literal number. Not implemented: a card whose depth is X
+    -- (Monastery Raid's "exile the top X cards of your library instead") has no
+    -- spelling here (#1375).
     --
     -- Not a target and never one (CR 115.10a) -- the player may be targeted, the
-    -- card is not -- so CR 608.2b has nothing to fizzle. Read when the effect
+    -- cards are not -- so CR 608.2b has nothing to fizzle. Read when the effect
     -- executes (CR 608.2c), which is what makes an empty library a no-op rather
     -- than an error: there is no top card, so the arm names nothing.
-    TopOfLibrary PlayerRef.PlayerRef
+    TopOfLibrary PlayerRef.PlayerRef Natural.Natural
   deriving (Eq, Ord, Show)

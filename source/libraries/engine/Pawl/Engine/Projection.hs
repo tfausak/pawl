@@ -1614,7 +1614,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
   ObjectRef.EachCardInGraveyard s f -> ObjectRef.EachCardInGraveyard s (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
-  ObjectRef.TopOfLibrary _ -> ref
+  ObjectRef.TopOfLibrary _ _ -> ref
 
 -- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --

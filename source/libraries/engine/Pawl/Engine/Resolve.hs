@@ -180,7 +180,7 @@ objectRefSlots ref = case ref of
   ObjectRef.EachMatching _ -> Map.empty
   ObjectRef.EachCardInGraveyard _ _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
-  ObjectRef.TopOfLibrary player -> playerRefSlots player
+  ObjectRef.TopOfLibrary player _ -> playerRefSlots player
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -1502,9 +1502,9 @@ playerRefPlayers legal controller gs ref = case ref of
 -- InSlot takes every recipient CR 608.2b left legal -- one for "target
 -- creature", up to the announced count for "up to two target creatures" (CR
 -- 601.2c) -- and a player recipient among them names no object. It asks that of a
--- TARGET; a slot a Create bound to
--- a group of minted tokens is answered before the question is put, since a group
--- is a definition rather than a target (CR 115.10a) and CR 608.2b has nothing to
+-- TARGET; a slot bound to a GROUP -- a Create's minted tokens, a MoveToZone's
+-- arrivals -- is answered before the question is put, since a group is a
+-- definition rather than a target (CR 115.10a) and CR 608.2b has nothing to
 -- re-validate about one.
 --
 -- EachMatching folds the battlefield (CR 109.2: a description with a card type
@@ -1548,8 +1548,9 @@ playerRefPlayers legal controller gs ref = case ref of
 objectRefObjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
 objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
-    -- The slot names every token a Create bound there ("they"), so all of them
-    -- are named at once. Ahead of the target read and not subject to `legal`:
+    -- The slot names every object bound there as a group -- a Create's tokens
+    -- ("they"), a MoveToZone's arrivals ("those cards") -- so all of them are
+    -- named at once. Ahead of the target read and not subject to `legal`:
     -- a group binding is a definition, never a target (CR 115.10a), so CR 608.2b
     -- has nothing to re-validate. See slotGroup for why being ahead is safe.
     Just group -> Foldable.toList group
@@ -1602,20 +1603,21 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- empty answer is what a slot holding a player already gives them.
   ObjectRef.EachPlayer -> []
   -- CR 401.2's ordered pile, whose head Pawl.Engine.Game.insertIntoZone and
-  -- Pawl.Engine.Event.drawCard both already treat as the top (CR 121.1). At most
-  -- one card per library named, and NONE from an empty one -- `take 1` of an
-  -- empty list -- which is what makes "exile the top card of your library" with
-  -- nothing to exile a no-op rather than a failure.
+  -- Pawl.Engine.Event.drawCard both already treat as the top (CR 121.1). The
+  -- depth is taken from EACH named library, top first, and a library holding
+  -- fewer cards than that gives up what it has -- CR 609.3's "does only as much
+  -- as possible", which `genericTake` is: it is also what makes "exile the top
+  -- card of your library" with an empty library a no-op rather than a failure.
   --
   -- Restricted to the players still in the turn order, and delivered in it, for
   -- the reason the EachMatching arm sorts: CR 608.2f processes the batch at once
   -- and CR 101.4 fixes the order any per-object question is then asked in. That
   -- also drops a player CR 800.4 has taken out of the game, whose library
   -- playerRefPlayers would otherwise still be able to name.
-  ObjectRef.TopOfLibrary player ->
+  ObjectRef.TopOfLibrary player depth ->
     let named = playerRefPlayers legal controller gs player
      in concatMap
-          (\pid -> take 1 (Game.zoneMembers Zone.Library pid gs))
+          (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
           (filter (`elem` named) (Game.apnapOrder gs))
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
@@ -1712,7 +1714,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInGraveyard _ _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- A card, so it arrives as Recipient.ToObject for EachMatching's reason: what
   -- kind of object a library's top card is, is the OPCODE's question.
-  ObjectRef.TopOfLibrary _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.TopOfLibrary _ _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient, and this is the arm
   -- objectRefObjects has nothing to say about. APNAP (CR 608.2f) for
   -- objectRefObjects' reason, and Game.apnapOrder is the turn order rotated to
@@ -2454,41 +2456,53 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         -- player controls neither -- CR 800.4d keeps their triggered ability off
         -- the stack and Departure.nonCardStackObjectsCease removes one already
         -- on it, while clause 1 of CR 800.4a took their spells out of the game.
+        -- Answers the incarnation CR 400.7 minted, or Nothing when nothing
+        -- arrived, so the caller can bind the whole batch once it is complete.
         moveOne (target, position) = do
           mNew <- Event.changeZoneEntering target zone position entry (Just controller)
-          case mNew of
-            -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was
-            -- already gone (CR 603.7c's "no longer in the zone it's expected to
-            -- be in ... the ability won't affect it"). Nothing entered, so there
-            -- is nothing to join to combat and nothing to bind.
-            Nothing -> pure ()
-            Just newId -> do
-              -- CR 508.4: "if a creature is put onto the battlefield attacking,
-              -- its controller chooses which defending player ... it's
-              -- attacking". The rules for that live in Pawl.Engine.Combat, which
-              -- is also what keeps this from looking like a declaration -- CR
-              -- 508.3a's attack triggers see nothing, INCLUDING the returning
-              -- creature's own (Meandering Towershell's ruling says so in as
-              -- many words). The Create arm calls the same function for the same
-              -- rule.
-              --
-              -- It reads the new permanent's controller, and CR 506.3b refuses
-              -- one who is not the active player -- which the funnel above has
-              -- already settled. A Towershell its attacker does not own would
-              -- otherwise return to its owner and then fail to be attacking at
-              -- all (Pawl.CombatSpec pins both halves).
-              Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
-              -- CR 603.7c: bind the arriving incarnation into the resolving
-              -- object's live bindings, so a LATER EFFECT of this same resolution
-              -- or a delayed ability it arms can name it -- the exiled card in
-              -- "exile it. Return IT to the battlefield". Nothing to ask: CR 400.7
-              -- minted exactly one object and it is the whole candidate set.
-              --
-              -- Under EachMatching this is always Nothing, so nothing is bound:
-              -- binding ONE incarnation is meaningless for a swept set, and a
-              -- CardSpec lint rejects the combination rather than letting a card
-              -- ask for it (#972).
-              Monad.mapM_ (\bindTo -> State.modify' (bindSlot resolving bindTo newId)) mSlot
+          -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was already
+          -- gone (CR 603.7c's "no longer in the zone it's expected to be in ...
+          -- the ability won't affect it"). Nothing entered, so there is nothing
+          -- to join to combat and nothing to bind.
+          Monad.forM_ mNew $ \newId ->
+            -- CR 508.4: "if a creature is put onto the battlefield attacking,
+            -- its controller chooses which defending player ... it's
+            -- attacking". The rules for that live in Pawl.Engine.Combat, which
+            -- is also what keeps this from looking like a declaration -- CR
+            -- 508.3a's attack triggers see nothing, INCLUDING the returning
+            -- creature's own (Meandering Towershell's ruling says so in as
+            -- many words). The Create arm calls the same function for the same
+            -- rule.
+            --
+            -- It reads the new permanent's controller, and CR 506.3b refuses
+            -- one who is not the active player -- which the funnel above has
+            -- already settled. A Towershell its attacker does not own would
+            -- otherwise return to its owner and then fail to be attacking at
+            -- all (Pawl.CombatSpec pins both halves).
+            Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
+          pure mNew
+        -- CR 400.7j: "if an effect causes an object to move to a public zone,
+        -- other parts of that effect can find that object" -- so bind what
+        -- arrived into the resolving object's live bindings, where a LATER
+        -- EFFECT of this same resolution or a delayed ability it arms (CR
+        -- 603.7c) can name it. Meandering Towershell's "exile it. Return IT to
+        -- the battlefield" is the singular reader; Act on Impulse's "you may
+        -- play THOSE CARDS" is the plural one.
+        --
+        -- WHICH SHAPE is decided by how many actually arrived rather than by
+        -- which ObjectRef named them, because that is the number the rule is
+        -- about: a depth-three exile off a two-card library moved two cards, and
+        -- a cancelled move (CR 614.6) left none. One arrival takes the single
+        -- binding, which is the only shape a singular reader can see (slotOne
+        -- reads Binding.targets) and which an ObjectRef.InSlot still reaches
+        -- through each resolution path's per-effect re-read of the bindings;
+        -- several take the group, which only the ObjectRef readers see, through
+        -- slotGroup. Nothing arrived binds nothing at all, which keeps a slot
+        -- from naming an empty set.
+        bindArrivals slot arrived = case arrived of
+          [] -> pure ()
+          [only] -> State.modify' (bindSlot resolving slot only)
+          _ -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList arrived))
      in do
           -- WHICH objects move, gathered first and moved second, so that the CR
           -- 401.2 and CR 401.4 questions between the two steps are asked of the
@@ -2556,15 +2570,17 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- Players, and no card moves one to a zone. objectRefObjects' empty
             -- answer, so the move is a no-op rather than a rejected card.
             ObjectRef.EachPlayer -> pure []
-            -- Count on Luck's "exile the top card of your library", read from the
-            -- pre-move state exactly as the swept set above is: the batch is at
-            -- most one card per library, so nothing an earlier move of this same
-            -- resolution did can change which card is on top by the time this one
-            -- runs (CR 608.2c, CR 608.2f).
-            ObjectRef.TopOfLibrary _ -> do
+            -- Count on Luck's "exile the top card of your library" and Act on
+            -- Impulse's "exile the top three cards of your library", read from
+            -- the pre-move state exactly as the swept set above is: the whole
+            -- batch comes off one look at each library, so nothing an earlier
+            -- move of this same resolution did can change what the next card off
+            -- the top is (CR 608.2c, CR 608.2f).
+            ObjectRef.TopOfLibrary _ _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
-          Monad.mapM_ moveOne =<< settleArrivals zone placement targets
+          arrived <- Monad.mapM moveOne =<< settleArrivals zone placement targets
+          Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries.
   -- Two steps, in this order and with the owners read before either:
   --
@@ -4086,10 +4102,12 @@ bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
--- bindSlot's plural: bind EVERY token a Create minted into `slot`, for a card
--- that refers back to all of them at once. Same holder and same reason (CR
--- 603.7c) -- ArmDelayedTrigger captures this object's whole environment, which is
--- how "those tokens" outlives the resolution that minted them.
+-- bindSlot's plural: bind EVERY object one instruction produced into `slot`, for
+-- a card that refers back to all of them at once -- every token a Create minted
+-- ("those tokens"), every incarnation a MoveToZone left in a public zone ("those
+-- cards", CR 400.7j). Same holder and same further reason (CR 603.7c) --
+-- ArmDelayedTrigger captures this object's whole environment, which is how
+-- "those tokens" outlives the resolution that minted them.
 --
 -- Readable mid-fold without either resolution path's per-effect re-read, because
 -- every reader goes through slotGroup, which reads live GameState. It has to:
