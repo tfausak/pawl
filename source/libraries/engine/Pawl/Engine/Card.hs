@@ -146,9 +146,25 @@ faceDownFace =
 -- TOTAL, which is what Card.faces being NonEmpty buys: every characteristic read
 -- in the engine funnels through here or through roomFace, and a Maybe would
 -- spread to all of them.
+--
+-- The layout case analysis is combinedFaces below, so that the NAMES this view
+-- has (CR 709.4a, combinedNames) and the characteristics it has cannot come to
+-- disagree about which halves contribute.
 combined :: Card.Card -> Face.Face Card.Card
-combined card = case Card.layout card of
-  Layout.Normal -> NonEmpty.head (Card.faces card)
+combined = foldSplit . combinedFaces
+
+-- CR 709.4a: the names CR 709.4's combined view has, one per contributing half.
+-- Plural for a split card and for a Room off the battlefield, singular for
+-- everything else -- and never the "//"-joined string Face.name carries, which
+-- is a rendering of the two and not a name the object has.
+combinedNames :: Card.Card -> Set.Set CardName.CardName
+combinedNames = Set.fromList . fmap Face.name . NonEmpty.toList . combinedFaces
+
+-- Which halves `combined` folds -- the layout's own answer to "what does a card
+-- show where nothing has singled out one half for itself".
+combinedFaces :: Card.Card -> NonEmpty.NonEmpty (Face.Face Card.Card)
+combinedFaces card = case Card.layout card of
+  Layout.Normal -> pure (NonEmpty.head (Card.faces card))
   -- CR 709.4: "In every zone except the stack, the characteristics of a split
   -- card are those of its two halves combined." Written over the whole
   -- NonEmpty rather than over a pair because docs/design.md §2.11 is a
@@ -156,7 +172,7 @@ combined card = case Card.layout card of
   -- tournament-legal split card has exactly two faces, but a fold over N costs
   -- nothing to write and so also covers Who // What // When // Where // Why, a
   -- five-part split card from a silver-border Un-set, entirely outside the CR.
-  Layout.Split -> foldSplit (Card.faces card)
+  Layout.Split -> Card.faces card
   -- CR 709.4 again, and the same expression for a different reason. A Room is a
   -- split card (CR 709.5's own first words, "Some split cards are permanent
   -- cards with a single shared type line"), so its off-the-battlefield view is
@@ -167,7 +183,7 @@ combined card = case Card.layout card of
   -- hand, a graveyard or a library has no designations because it is not a
   -- permanent, so no half is locked and nothing is taken back out -- see
   -- roomFace below, which is this value with the locked halves subtracted.
-  Layout.Room -> foldSplit (Card.faces card)
+  Layout.Room -> Card.faces card
   -- CR 715.4: "In every zone except the stack, and while on the stack not as an
   -- Adventure, an adventurer card has only its normal characteristics." The
   -- alternative characteristics of CR 715.2 are reached ONLY through
@@ -177,7 +193,7 @@ combined card = case Card.layout card of
   -- takes is a different claim: that a card with TWO printed sets of
   -- characteristics shows one of them, rather than that a card with one shows
   -- it.
-  Layout.Adventure -> NonEmpty.head (Card.faces card)
+  Layout.Adventure -> pure (NonEmpty.head (Card.faces card))
   -- CR 712.8a: "While a double-faced card is outside the game or in a zone other
   -- than the battlefield or stack, it has only the characteristics of its front
   -- face", and CR 712.8d says the same of a permanent showing that face. The
@@ -186,7 +202,7 @@ combined card = case Card.layout card of
   -- double-faced card shows where nothing has turned it over.
   --
   -- The BACK face is reached only through Object.face, which CR 701.27a writes.
-  Layout.Transforming -> NonEmpty.head (Card.faces card)
+  Layout.Transforming -> pure (NonEmpty.head (Card.faces card))
   -- CR 712.8a again, whose scope is every double-faced card and not just the
   -- nonmodal one above: a modal double-faced card in a hand, a graveyard or a
   -- library has only its front face's characteristics. So this is one card that
@@ -197,7 +213,7 @@ combined card = case Card.layout card of
   -- The BACK face is reached only through Object.face, which CR 712.11b's choice
   -- writes as the spell is put onto the stack and CR 712.13 carries onto the
   -- permanent (enteringFace below).
-  Layout.ModalDoubleFaced -> NonEmpty.head (Card.faces card)
+  Layout.ModalDoubleFaced -> pure (NonEmpty.head (Card.faces card))
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
@@ -211,10 +227,12 @@ foldSplit faces = List.foldl' merge2 (NonEmpty.head faces) (NonEmpty.tail faces)
 merge2 :: Face.Face Card.Card -> Face.Face Card.Card -> Face.Face Card.Card
 merge2 l r =
   l
-    { -- CR 709.4a gives the card BOTH names and no joined one; a single
-      -- CardName cannot carry that, so this is the form docs/rules.txt's own
-      -- Examples write, unspaced -- "Fire//Ice" (lines 3882, 5747) and
-      -- "Assault//Battery" (line 5746). #650 carries the plural axis.
+    { -- CR 709.4a gives the card BOTH names and no joined one, and a single
+      -- CardName cannot carry that: this field is a RENDERING of the two, in
+      -- the form docs/rules.txt's own Examples write, unspaced -- "Fire//Ice"
+      -- (lines 3882, 5747) and "Assault//Battery" (line 5746). What the object
+      -- has for rules purposes is combinedNames above, which every name
+      -- question goes through (Pawl.Engine.Projection.hasName).
       Face.name = CardName.join (Face.name l NonEmpty.:| [Face.name r]),
       -- CR 709.4b: "the combined mana costs of its two halves", from which
       -- colours and mana value fall out with no further arm.
@@ -764,13 +782,26 @@ hasSharedTypeLine card = case Card.layout card of
 -- it, and one that matches no printing.
 roomFace :: Set.Set CardName.CardName -> Card.Card -> Face.Face Card.Card
 roomFace unlocked card =
-  let isUnlocked face = Set.member (Face.name face) unlocked
-      folded = foldSplit (fmap (\face -> if isUnlocked face then face else subtractHalf face) (Card.faces card))
+  let folded = foldSplit (fmap (\face -> if Set.member (Face.name face) unlocked then face else subtractHalf face) (Card.faces card))
    in folded
-        { Face.name = case filter isUnlocked (NonEmpty.toList (Card.faces card)) of
+        { Face.name = case unlockedFaces unlocked card of
             [] -> CardName.MkCardName Text.empty
             face : faces -> CardName.join (Face.name face NonEmpty.:| fmap Face.name faces)
         }
+
+-- CR 709.5c: the halves of this Room permanent that ARE unlocked -- the halves
+-- roomFace above keeps whole, in printed order. Pawl.Engine.Room.lockedHalves is
+-- its complement, and asks the object rather than a designation set because its
+-- caller needs the object anyway.
+unlockedFaces :: Set.Set CardName.CardName -> Card.Card -> [Face.Face Card.Card]
+unlockedFaces unlocked card = filter (\face -> Set.member (Face.name face) unlocked) (NonEmpty.toList (Card.faces card))
+
+-- CR 709.4a / 709.5: the names a Room permanent has -- one per UNLOCKED door,
+-- since the shared type line's static abilities take a locked half's name away.
+-- None with both doors shut, which is CR 708.2a's "no name" read off a different
+-- rule: an empty set, and never the empty name Face.name has to fall back on.
+roomNames :: Set.Set CardName.CardName -> Card.Card -> Set.Set CardName.CardName
+roomNames unlocked card = Set.fromList (fmap Face.name (unlockedFaces unlocked card))
 
 -- roomFace's per-half half: one LOCKED half of a Room, emptied of everything CR
 -- 709.5's static abilities take away -- "the name, mana cost, or rules text".

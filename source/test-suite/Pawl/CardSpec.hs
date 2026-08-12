@@ -301,9 +301,11 @@ cardSpec s = Spec.describe s "Card" $ do
     -- its combined mana cost."
     Spec.assertEqWith s "both colours" (Projection.printedColorsOf c) (Set.fromList [Color.Green, Color.White])
     Spec.assertEqWith s "mana value 2" (Quantity.manaValueOf c) 2
-    -- CR 709.4a, as far as a single CardName can carry it (#650): unspaced,
-    -- the form docs/rules.txt's own Examples write it in ("Fire//Ice",
-    -- "Assault//Battery").
+    -- The two names RENDERED as one string, unspaced -- the form
+    -- docs/rules.txt's own Examples write it in ("Fire//Ice",
+    -- "Assault//Battery"). What the card HAS is both names, which is a set and
+    -- is asserted through the projection (Pawl.CastSpec's "in hand, the
+    -- combined view has both names").
     Spec.assertEqWith s "the joined name" (Face.name c) (CardName.MkCardName (Text.pack "Wax//Wane"))
     -- CR 709.4c: "A split card has each card type specified on either of its
     -- halves and each ability in the text box of each half." Both halves

@@ -70,7 +70,6 @@ module Pawl.FaceDownSpec where
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Cast as Cast
@@ -297,14 +296,14 @@ turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
     let after = S.runPure (aimAtCreature morphling) gs (Cast.castSpell S.alice spell (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
     Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceDown)
     Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 3/3" (S.powerToughnessOf morphling after) (Just (2, 2))
-    Spec.assertEqWith s "CR 708.2a no name" (Projection.nameOf morphling after) noName
+    Spec.assertEqWith s "CR 708.2a no name" (Projection.namesOf morphling after) noNames
     Spec.assertEqWith s "CR 708.2a no subtypes, not Dog Scout" (Projection.subtypesOf morphling after) Set.empty
     Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike morphling after)) "CR 708.2a no text, so no first strike"
     -- The untargeted creature is untouched, which is CR 115.1 as much as rule 708:
     -- one target, one victim.
     Spec.assertEqWith s "the Piker is still face up" (fmap Object.facing (Game.lookupObject vanilla after)) (Just Facing.FaceUp)
     Spec.assertEqWith s "and still the printed 2/1" (S.powerToughnessOf vanilla after) (Just (2, 1))
-    Spec.assertEqWith s "and still named" (Projection.nameOf vanilla after) (S.printingName piker)
+    Spec.assertEqWith s "and still named" (Projection.namesOf vanilla after) (Set.singleton (S.printingName piker))
 
   -- CR 708.2a lists the copiable CHARACTERISTICS and nothing else, so everything
   -- that is not a characteristic rides through: marked damage, counters and the
@@ -353,9 +352,11 @@ aimAtCreature oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
--- CR 708.2a's name: the empty one, which matches no printed card.
-noName :: CardName.CardName
-noName = CardName.MkCardName Text.empty
+-- CR 708.2a's "no name", which a set says by being EMPTY: a face-down object
+-- has no name for CR 709.4a's membership test to find, rather than one that
+-- happens to match no printed card.
+noNames :: Set.Set CardName.CardName
+noNames = Set.empty
 
 -- alice holds one card of a morph printing with `n` untapped lands in play, in
 -- her own precombat main phase with priority. The land is a parameter because
@@ -470,7 +471,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
       Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
       Just permanent -> do
         Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 3/3" (S.powerToughnessOf permanent after) (Just (2, 2))
-        Spec.assertEqWith s "CR 708.2a no name" (Projection.nameOf permanent after) noName
+        Spec.assertEqWith s "CR 708.2a no name" (Projection.namesOf permanent after) noNames
         Spec.assertEqWith s "CR 708.2a no subtypes, not Dog Scout" (Projection.subtypesOf permanent after) Set.empty
         Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike permanent after)) "CR 708.2a no text, so no first strike"
         -- CR 110.5 / 708.4's last sentence: the permanent the spell becomes is a
@@ -511,7 +512,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
       Nothing -> Spec.assertFailure s "the ordinary cast did not reach the battlefield"
       Just permanent -> do
         Spec.assertEqWith s "the printed 3/3" (S.powerToughnessOf permanent after) (Just (3, 3))
-        Spec.assertEqWith s "the printed name" (Projection.nameOf permanent after) (S.printingName ainok)
+        Spec.assertEqWith s "the printed name" (Projection.namesOf permanent after) (Set.singleton (S.printingName ainok))
         Spec.assertEqWith s "the printed subtypes" (Projection.subtypesOf permanent after) (Set.fromList [Subtype.Dog, Subtype.Scout])
         Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike permanent after) "and first strike"
         Spec.assertEqWith s "face up" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
@@ -552,7 +553,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "three lands tapped before" (S.tappedCount S.alice before) 3
         let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice permanent)
         Spec.assertEqWith s "CR 708.8 the printed 3/3 after" (S.powerToughnessOf permanent after) (Just (3, 3))
-        Spec.assertEqWith s "CR 708.8 the printed name after" (Projection.nameOf permanent after) (S.printingName ainok)
+        Spec.assertEqWith s "CR 708.8 the printed name after" (Projection.namesOf permanent after) (Set.singleton (S.printingName ainok))
         Spec.assertEqWith s "CR 708.8 the printed subtypes after" (Projection.subtypesOf permanent after) (Set.fromList [Subtype.Dog, Subtype.Scout])
         Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike permanent after) "CR 708.8 first strike after"
         Spec.assertEqWith s "CR 110.5 face up after" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
@@ -623,7 +624,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         -- and was not broadcast at the table.
         Spec.assertEqWith s "and alice took none" (S.lifeOf S.alice after) (Just 20)
         Spec.assertEqWith s "CR 708.8 the printed 2/1" (S.powerToughnessOf permanent after) (Just (2, 1))
-        Spec.assertEqWith s "CR 708.8 the printed name" (Projection.nameOf permanent after) (S.printingName marauder)
+        Spec.assertEqWith s "CR 708.8 the printed name" (Projection.namesOf permanent after) (Set.singleton (S.printingName marauder))
         Spec.assertEqWith s "CR 110.5 face up" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
         -- {3} for the cast and {2}{R} for the morph cost: six, which is a
         -- multiple of neither printed cost alone.
@@ -745,7 +746,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         -- asserted: a 2/1 read as 2/2, a name read as none, two keywords read as
         -- none.
         Spec.assertEqWith s "CR 708.2a a 2/2 before, not the printed 2/1" (S.powerToughnessOf permanent before) (Just (2, 2))
-        Spec.assertEqWith s "CR 708.2a no name before" (Projection.nameOf permanent before) noName
+        Spec.assertEqWith s "CR 708.2a no name before" (Projection.namesOf permanent before) noNames
         Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying permanent before)) "CR 708.2a no flying before"
         Spec.assertBool s (not (Projection.hasKeyword Keyword.Vigilance permanent before)) "CR 708.2a no vigilance before"
         Spec.assertEqWith s "CR 702.37b no counter before" (S.counterOf CounterKind.PlusOnePlusOne permanent before) 0
@@ -764,7 +765,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         -- CR 708.8: the face-up characteristics really came back, which is what
         -- makes the 3/2 above the printed 2/1 plus a counter rather than some
         -- other 3/2.
-        Spec.assertEqWith s "CR 708.8 the printed name after" (Projection.nameOf permanent after) (S.printingName kirin)
+        Spec.assertEqWith s "CR 708.8 the printed name after" (Projection.namesOf permanent after) (Set.singleton (S.printingName kirin))
         Spec.assertBool s (Projection.hasKeyword Keyword.Flying permanent after) "CR 708.8 flying after"
         Spec.assertBool s (Projection.hasKeyword Keyword.Vigilance permanent after) "CR 708.8 vigilance after"
         Spec.assertEqWith s "CR 110.5 face up after" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)

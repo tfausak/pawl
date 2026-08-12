@@ -21,7 +21,7 @@ slotTokens = SlotName.MkSlotName (Text.pack "tokens")
 sampleSnapshot :: PC.ProjectedCharacteristics
 sampleSnapshot =
   PC.MkProjectedCharacteristics
-    { PC.name = CardName.MkCardName $ Text.pack "Sample",
+    { PC.names = Set.singleton . CardName.MkCardName $ Text.pack "Sample",
       PC.supertypes = Set.empty,
       PC.keywords = Map.empty,
       PC.colors = Set.empty,

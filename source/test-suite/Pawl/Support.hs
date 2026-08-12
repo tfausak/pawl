@@ -1066,7 +1066,8 @@ creaturesInPlay pid gs =
 -- The name on a card's combined face, which for every card in this pool is its
 -- only face and so its only name. NOT "the name a card answers to" in general:
 -- CR 709.4a gives a split card two names and no combined one, so a card that
--- prints two faces needs the joined name rather than this (#650). Every caller
+-- prints two faces answers here with the two RENDERED as one string. A test
+-- about a multi-named object wants Pawl.Engine.Projection.namesOf; every caller
 -- here is comparing against a one-faced card's printed name.
 nameOf :: Card.Type.Card -> CardName.CardName
 nameOf = Face.name . Card.combined
@@ -1141,11 +1142,13 @@ zoneChangesOf :: GameState.GameState -> [ZoneChange.ZoneChange]
 zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (eventsOf gs)
 
 -- Who revealed what, so far this turn, in order (CR 701.20a). Projects the
--- snapshot down to the card's NAME: a reveal shows every characteristic, but the
--- name is what identifies the card to the table and the only part an assertion
--- can write down legibly. A test that needs more reads Event.revealOf directly.
-revealsOf :: GameState.GameState -> [(PlayerId.PlayerId, CardName.CardName)]
-revealsOf gs = fmap (fmap PC.name) (Maybe.mapMaybe Event.revealOf (eventsOf gs))
+-- snapshot down to the card's NAMES: a reveal shows every characteristic, but
+-- the name is what identifies the card to the table and the only part an
+-- assertion can write down legibly. Plural because CR 709.4a's is (a split card
+-- revealed from a library shows both halves' names); every caller so far reveals
+-- a one-named card. A test that needs more reads Event.revealOf directly.
+revealsOf :: GameState.GameState -> [(PlayerId.PlayerId, Set.Set CardName.CardName)]
+revealsOf gs = fmap (fmap PC.names) (Maybe.mapMaybe Event.revealOf (eventsOf gs))
 
 -- The battlefield objects that are tokens (CR 111.1) rather than cards.
 tokensOf :: GameState.GameState -> [ObjectId.ObjectId]

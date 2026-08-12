@@ -49,8 +49,9 @@ import qualified Pawl.Types.Zone as Zone
 -- it. CR 712.19 does let the chooser name the OTHER face -- "the player may
 -- choose the name of either face of a double-faced card but not both" -- and
 -- naming it prohibits nothing here, which is the same reading from the other
--- side rather than a second decision. A land with several names would want a set
--- here rather than one name (#650).
+-- side rather than a second decision. A land with SEVERAL names is asked as a
+-- set, CR 709.4a's "one of its names": no printed land has two, but the
+-- prohibition is a membership test rather than a comparison all the same.
 playableLands :: PlayerId -> GameState -> [(ObjectId, Maybe CardName.CardName)]
 playableLands pid gs =
   let cardOfHandCard oid = case Game.lookupObject oid gs of
@@ -65,7 +66,7 @@ playableLands pid gs =
       playable oid = case cardOfHandCard oid of
         Nothing -> []
         Just card ->
-          if PlayerEffect.prohibitsPlayingLand pid (Face.name (Card.combined card)) gs
+          if PlayerEffect.prohibitsPlayingLand pid (Card.combinedNames card) gs
             then []
             else fmap (\(mName, _) -> (oid, mName)) (Card.landFaces card)
    in concatMap playable (Game.zoneMembers Zone.Hand pid gs)
