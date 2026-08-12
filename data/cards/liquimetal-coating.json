@@ -29,7 +29,10 @@
                               "type": "Artifact"
                             }
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       }
                     ]

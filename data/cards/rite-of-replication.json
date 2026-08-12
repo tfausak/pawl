@@ -45,35 +45,44 @@
             "clauses": [
               {
                 "condition": {
-                  "comparison": {
-                    "type": "Exactly"
-                  },
-                  "measured": {
-                    "type": "WasKicked"
-                  },
-                  "threshold": {
-                    "type": "Literal",
-                    "value": 0
+                  "type": "Compares",
+                  "value": {
+                    "comparison": {
+                      "type": "Exactly"
+                    },
+                    "measured": {
+                      "type": "WasKicked"
+                    },
+                    "threshold": {
+                      "type": "Literal",
+                      "value": 0
+                    }
                   }
                 },
                 "effects": [
                   {
                     "type": "CreateCopy",
-                    "value": "target"
+                    "value": {
+                      "type": "InSlot",
+                      "value": "target"
+                    }
                   }
                 ]
               },
               {
                 "condition": {
-                  "comparison": {
-                    "type": "Exactly"
-                  },
-                  "measured": {
-                    "type": "WasKicked"
-                  },
-                  "threshold": {
-                    "type": "Literal",
-                    "value": 1
+                  "type": "Compares",
+                  "value": {
+                    "comparison": {
+                      "type": "Exactly"
+                    },
+                    "measured": {
+                      "type": "WasKicked"
+                    },
+                    "threshold": {
+                      "type": "Literal",
+                      "value": 1
+                    }
                   }
                 },
                 "effects": [
@@ -84,7 +93,10 @@
                         "type": "Literal",
                         "value": 5
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]

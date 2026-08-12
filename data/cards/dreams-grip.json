@@ -34,7 +34,10 @@
                 "effects": [
                   {
                     "type": "Tap",
-                    "value": "tapped"
+                    "value": {
+                      "type": "InSlot",
+                      "value": "tapped"
+                    }
                   }
                 ]
               }
@@ -56,7 +59,10 @@
                 "effects": [
                   {
                     "type": "Untap",
-                    "value": "untapped"
+                    "value": {
+                      "type": "InSlot",
+                      "value": "untapped"
+                    }
                   }
                 ]
               }

@@ -36,7 +36,10 @@
                               }
                             ]
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       },
                       {
@@ -51,7 +54,10 @@
                               "type": "Trample"
                             }
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       }
                     ]

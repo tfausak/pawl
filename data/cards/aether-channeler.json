@@ -88,7 +88,10 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          "permanent",
+                          {
+                            "type": "InSlot",
+                            "value": "permanent"
+                          },
                           {
                             "type": "Hand"
                           }

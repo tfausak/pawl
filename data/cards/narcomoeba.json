@@ -44,7 +44,10 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          "self",
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
                           {
                             "type": "Battlefield"
                           }

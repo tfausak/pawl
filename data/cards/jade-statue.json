@@ -29,7 +29,10 @@
                               "type": "Creature"
                             }
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       },
                       {
@@ -44,7 +47,10 @@
                               "type": "Golem"
                             }
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       },
                       {
@@ -66,7 +72,10 @@
                               }
                             ]
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       }
                     ]

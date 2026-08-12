@@ -137,7 +137,10 @@
                               }
                             ]
                           },
-                          "thatDamager"
+                          {
+                            "type": "InSlot",
+                            "value": "thatDamager"
+                          }
                         ]
                       }
                     ]

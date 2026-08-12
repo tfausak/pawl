@@ -32,7 +32,10 @@
                       {
                         "type": "LoseAllAbilities"
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {
@@ -49,7 +52,10 @@
                           }
                         ]
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {
@@ -64,7 +70,10 @@
                           "type": "Frog"
                         }
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {
@@ -86,7 +95,10 @@
                           }
                         ]
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]

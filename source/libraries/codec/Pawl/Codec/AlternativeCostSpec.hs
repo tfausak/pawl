@@ -53,4 +53,4 @@ spec s = Spec.describe s "Pawl.Codec.AlternativeCost" $ do
                 Cost.components = []
               }
         }
-      """ {"condition":{"measured":{"type":"CardsDiscardedThisTurn","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}},"cost":{"mana":[{"type":"Hybrid","value":[{"type":"Colored","value":{"type":"Black"}},{"type":"Colored","value":{"type":"Red"}}]}]}} """
+      """ {"condition":{"type":"Compares","value":{"measured":{"type":"CardsDiscardedThisTurn","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"cost":{"mana":[{"type":"Hybrid","value":[{"type":"Colored","value":{"type":"Black"}},{"type":"Colored","value":{"type":"Red"}}]}]}} """

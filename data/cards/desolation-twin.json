@@ -4,17 +4,17 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 10
+          "value": 1E+1
         }
       ],
       "name": "Desolation Twin",
       "power": {
         "type": "Literal",
-        "value": 10
+        "value": 1E+1
       },
       "toughness": {
         "type": "Literal",
-        "value": 10
+        "value": 1E+1
       },
       "triggeredAbilities": [
         {
@@ -40,11 +40,11 @@
                                 "name": "Eldrazi Token",
                                 "power": {
                                   "type": "Literal",
-                                  "value": 10
+                                  "value": 1E+1
                                 },
                                 "toughness": {
                                   "type": "Literal",
-                                  "value": 10
+                                  "value": 1E+1
                                 },
                                 "typeLine": {
                                   "subtypes": [

@@ -42,7 +42,10 @@
                           }
                         ]
                       },
-                      "creatures"
+                      {
+                        "type": "InSlot",
+                        "value": "creatures"
+                      }
                     ]
                   }
                 ]

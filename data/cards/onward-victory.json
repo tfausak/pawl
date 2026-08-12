@@ -41,7 +41,10 @@
                           }
                         ]
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]
@@ -108,7 +111,10 @@
                           "type": "DoubleStrike"
                         }
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]

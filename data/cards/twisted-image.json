@@ -28,7 +28,10 @@
                       {
                         "type": "SwitchPowerToughness"
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {

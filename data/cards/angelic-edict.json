@@ -26,7 +26,10 @@
                   {
                     "type": "MoveToZone",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Exile"
                       }

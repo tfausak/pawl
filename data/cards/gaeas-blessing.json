@@ -30,7 +30,10 @@
                         "type": "InSlot",
                         "value": "player"
                       },
-                      "cards"
+                      {
+                        "type": "InSlot",
+                        "value": "cards"
+                      }
                     ]
                   }
                 ]
@@ -104,16 +107,18 @@
                               "type": "You"
                             }
                           },
-                          [
-                            "EachCardInGraveyard",
-                            {
-                              "type": "You"
-                            },
-                            {
-                              "type": "And",
-                              "value": []
-                            }
-                          ]
+                          {
+                            "type": "EachCardInGraveyard",
+                            "value": [
+                              {
+                                "type": "You"
+                              },
+                              {
+                                "type": "And",
+                                "value": []
+                              }
+                            ]
+                          }
                         ]
                       }
                     ]

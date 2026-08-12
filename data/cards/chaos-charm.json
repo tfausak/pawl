@@ -22,7 +22,10 @@
                   {
                     "type": "Destroy",
                     "value": [
-                      "wall",
+                      {
+                        "type": "InSlot",
+                        "value": "wall"
+                      },
                       {
                         "type": "Regenerable"
                       }
@@ -55,7 +58,10 @@
                   {
                     "type": "DealDamage",
                     "value": [
-                      "damaged",
+                      {
+                        "type": "InSlot",
+                        "value": "damaged"
+                      },
                       {
                         "type": "Literal",
                         "value": 1
@@ -92,7 +98,10 @@
                           "type": "Haste"
                         }
                       },
-                      "hasted"
+                      {
+                        "type": "InSlot",
+                        "value": "hasted"
+                      }
                     ]
                   }
                 ]

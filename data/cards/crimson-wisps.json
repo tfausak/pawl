@@ -33,7 +33,10 @@
                           }
                         ]
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {
@@ -48,7 +51,10 @@
                           "type": "Haste"
                         }
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {

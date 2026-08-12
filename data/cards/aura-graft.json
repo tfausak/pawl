@@ -29,7 +29,10 @@
                       {
                         "type": "Indefinite"
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {

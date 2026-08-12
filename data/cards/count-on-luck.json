@@ -56,15 +56,15 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          [
-                            "TopOfLibrary",
-                            {
+                          {
+                            "type": "TopOfLibrary",
+                            "value": {
                               "type": "Relative",
                               "value": {
                                 "type": "You"
                               }
                             }
-                          ],
+                          },
                           {
                             "type": "Exile"
                           },
@@ -77,7 +77,10 @@
                           {
                             "type": "UntilEndOfTurn"
                           },
-                          "exiled"
+                          {
+                            "type": "InSlot",
+                            "value": "exiled"
+                          }
                         ]
                       }
                     ]

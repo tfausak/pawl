@@ -33,7 +33,10 @@
                         "type": "Literal",
                         "value": 1
                       },
-                      "creatures"
+                      {
+                        "type": "InSlot",
+                        "value": "creatures"
+                      }
                     ]
                   }
                 ]

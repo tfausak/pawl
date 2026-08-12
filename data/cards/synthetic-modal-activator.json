@@ -20,7 +20,10 @@
                       {
                         "type": "DealDamage",
                         "value": [
-                          "damaged",
+                          {
+                            "type": "InSlot",
+                            "value": "damaged"
+                          },
                           {
                             "type": "Literal",
                             "value": 1
@@ -55,7 +58,10 @@
                             "type": "Literal",
                             "value": 1
                           },
-                          "strengthened"
+                          {
+                            "type": "InSlot",
+                            "value": "strengthened"
+                          }
                         ]
                       }
                     ]

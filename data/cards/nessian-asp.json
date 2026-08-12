@@ -26,18 +26,21 @@
                 "clauses": [
                   {
                     "condition": {
-                      "comparison": {
-                        "type": "Exactly"
-                      },
-                      "measured": {
-                        "type": "HasDesignation",
-                        "value": {
-                          "type": "Monstrous"
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "Exactly"
+                        },
+                        "measured": {
+                          "type": "HasDesignation",
+                          "value": {
+                            "type": "Monstrous"
+                          }
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 0
                         }
-                      },
-                      "threshold": {
-                        "type": "Literal",
-                        "value": 0
                       }
                     },
                     "effects": [
@@ -51,7 +54,10 @@
                             "type": "Literal",
                             "value": 4
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       },
                       {

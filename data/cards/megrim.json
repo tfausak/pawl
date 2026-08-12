@@ -34,7 +34,10 @@
                       {
                         "type": "DealDamage",
                         "value": [
-                          "thatPlayer",
+                          {
+                            "type": "InSlot",
+                            "value": "thatPlayer"
+                          },
                           {
                             "type": "Literal",
                             "value": 2

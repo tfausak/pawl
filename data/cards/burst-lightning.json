@@ -32,22 +32,28 @@
             "clauses": [
               {
                 "condition": {
-                  "comparison": {
-                    "type": "Exactly"
-                  },
-                  "measured": {
-                    "type": "WasKicked"
-                  },
-                  "threshold": {
-                    "type": "Literal",
-                    "value": 0
+                  "type": "Compares",
+                  "value": {
+                    "comparison": {
+                      "type": "Exactly"
+                    },
+                    "measured": {
+                      "type": "WasKicked"
+                    },
+                    "threshold": {
+                      "type": "Literal",
+                      "value": 0
+                    }
                   }
                 },
                 "effects": [
                   {
                     "type": "DealDamage",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Literal",
                         "value": 2
@@ -58,22 +64,28 @@
               },
               {
                 "condition": {
-                  "comparison": {
-                    "type": "Exactly"
-                  },
-                  "measured": {
-                    "type": "WasKicked"
-                  },
-                  "threshold": {
-                    "type": "Literal",
-                    "value": 1
+                  "type": "Compares",
+                  "value": {
+                    "comparison": {
+                      "type": "Exactly"
+                    },
+                    "measured": {
+                      "type": "WasKicked"
+                    },
+                    "threshold": {
+                      "type": "Literal",
+                      "value": 1
+                    }
                   }
                 },
                 "effects": [
                   {
                     "type": "DealDamage",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Literal",
                         "value": 4

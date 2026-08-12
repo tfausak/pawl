@@ -43,18 +43,21 @@
                         ]
                       },
                       {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "IsAttacking"
                             }
-                          },
-                          {
-                            "type": "IsAttacking"
-                          }
-                        ]
+                          ]
+                        }
                       }
                     ]
                   }

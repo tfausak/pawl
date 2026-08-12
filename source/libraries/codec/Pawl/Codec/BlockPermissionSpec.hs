@@ -50,7 +50,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
           (Just (Quantity.Literal 1))
           (Just (Condition.Compares (Quantity.IsMonarch (PlayerRef.Relative PlayerRelation.You)) Comparison.AtLeast (Quantity.Literal 1)))
       )
-      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Literal","value":1},"while":{"comparison":{"type":"AtLeast"},"measured":{"type":"IsMonarch","value":{"type":"Relative","value":{"type":"You"}}},"threshold":{"type":"Literal","value":1}}} """
+      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Literal","value":1},"while":{"type":"Compares","value":{"measured":{"type":"IsMonarch","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}}} """
   -- Kemba's Legion's: the arity itself is counted (CR 301.5a), so "additional"
   -- holds a whole Quantity rather than a number.
   Spec.it s "a counted permission" $

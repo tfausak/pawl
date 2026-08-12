@@ -48,9 +48,12 @@
                             "type": "Indefinite"
                           },
                           {
-                            "type": "HasCardType",
+                            "type": "EachMatching",
                             "value": {
-                              "type": "Enchantment"
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Enchantment"
+                              }
                             }
                           }
                         ]

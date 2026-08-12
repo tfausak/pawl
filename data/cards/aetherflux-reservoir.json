@@ -7,7 +7,7 @@
             "components": [
               {
                 "type": "PayLife",
-                "value": 50
+                "value": 5E+1
               }
             ],
             "mana": []
@@ -21,10 +21,13 @@
                       {
                         "type": "DealDamage",
                         "value": [
-                          "target",
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
                           {
                             "type": "Literal",
-                            "value": 50
+                            "value": 5E+1
                           }
                         ]
                       }

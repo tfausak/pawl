@@ -23,7 +23,10 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          "card",
+                          {
+                            "type": "InSlot",
+                            "value": "card"
+                          },
                           {
                             "type": "Library"
                           }

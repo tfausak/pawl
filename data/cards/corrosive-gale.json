@@ -23,21 +23,24 @@
                     "type": "DealDamage",
                     "value": [
                       {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "HasKeyword",
+                              "value": {
+                                "type": "Flying"
+                              }
                             }
-                          },
-                          {
-                            "type": "HasKeyword",
-                            "value": {
-                              "type": "Flying"
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       },
                       {
                         "type": "InSlot",

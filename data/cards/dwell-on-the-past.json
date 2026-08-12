@@ -26,7 +26,10 @@
                         "type": "InSlot",
                         "value": "player"
                       },
-                      "cards"
+                      {
+                        "type": "InSlot",
+                        "value": "cards"
+                      }
                     ]
                   }
                 ]

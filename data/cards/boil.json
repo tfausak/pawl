@@ -27,9 +27,12 @@
                     "type": "Destroy",
                     "value": [
                       {
-                        "type": "HasSubtype",
+                        "type": "EachMatching",
                         "value": {
-                          "type": "Island"
+                          "type": "HasSubtype",
+                          "value": {
+                            "type": "Island"
+                          }
                         }
                       },
                       {

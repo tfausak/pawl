@@ -49,21 +49,24 @@
                         "type": "Destroy",
                         "value": [
                           {
-                            "type": "Or",
-                            "value": [
-                              {
-                                "type": "HasCardType",
-                                "value": {
-                                  "type": "Artifact"
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "Or",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Artifact"
+                                  }
+                                },
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Enchantment"
+                                  }
                                 }
-                              },
-                              {
-                                "type": "HasCardType",
-                                "value": {
-                                  "type": "Enchantment"
-                                }
-                              }
-                            ]
+                              ]
+                            }
                           },
                           {
                             "type": "Regenerable"
@@ -81,7 +84,10 @@
                             "type": "InSlot",
                             "value": "destroyed"
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       }
                     ]

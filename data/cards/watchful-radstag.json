@@ -43,7 +43,10 @@
                     "effects": [
                       {
                         "type": "CreateCopy",
-                        "value": "self"
+                        "value": {
+                          "type": "InSlot",
+                          "value": "self"
+                        }
                       }
                     ]
                   }

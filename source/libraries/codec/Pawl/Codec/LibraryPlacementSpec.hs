@@ -2,7 +2,10 @@
 
 module Pawl.Codec.LibraryPlacementSpec where
 
+import qualified Data.Either as Either
+import qualified Data.Text as Text
 import qualified Pawl.Codec.LibraryPlacement as LibraryPlacement
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -10,26 +13,32 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LibraryPlacement" $ do
-  -- A stated end keeps the POSITION's tag, so no card file moved when the
-  -- placement type landed.
+  -- A stated end writes its own tag around the position's, rather than the
+  -- position's alone.
   Spec.it s "Stated Top" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      LibraryPlacement.toJson
-      LibraryPlacement.fromJson
+      LibraryPlacement.codec
       (LibraryPlacement.Stated LibraryPosition.Top)
-      """ {"type":"Top"} """
+      """ {"type":"Stated","value":{"type":"Top"}} """
   Spec.it s "Stated Bottom" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      LibraryPlacement.toJson
-      LibraryPlacement.fromJson
+      LibraryPlacement.codec
       (LibraryPlacement.Stated LibraryPosition.Bottom)
-      """ {"type":"Bottom"} """
+      """ {"type":"Stated","value":{"type":"Bottom"}} """
   Spec.it s "OwnerChooses" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      LibraryPlacement.toJson
-      LibraryPlacement.fromJson
+      LibraryPlacement.codec
       LibraryPlacement.OwnerChooses
       """ {"type":"OwnerChooses"} """
+  -- A bare position is no longer a placement. That rejection is what keeps the
+  -- schema's oneOf honest, and it is what tells a placement from a zone in
+  -- Pawl.Codec.Effect's moveTail.
+  Spec.it s "rejects a bare position" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"Top"} """) >>= Codec.decode LibraryPlacement.codec))
+      "expected a decode failure"
+  Spec.it s "has a schema" $ Common.assertHasSchema s LibraryPlacement.codec
