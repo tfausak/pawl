@@ -36,6 +36,8 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaUnit (ManaUnit)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -420,26 +422,23 @@ castsThisTurn pid gs =
 -- Cast.asProposed-stamped for the half being asked about, as it already had to be
 -- for the adjustments.
 --
--- CR 601.3a's LOOKAHEAD is still not implemented: the rule lets a player begin
--- casting when some choice made during the proposal could move the spell out of
--- the prohibited class, and nothing here searches choice space (#95).
+-- CR 601.3a's LOOKAHEAD rides on the Filter arm, in choiceCouldEscape below: a
+-- prohibition that names the spell as it stands is ignored when a choice still to
+-- be made during the proposal could take it out of the class. X is the one such
+-- choice pawl has, and Void Winnower against Molten Disaster is what observes it.
 --
--- Nothing in this pool reaches the LOOKAHEAD, and that rests on a missing
--- capability rather than on a claim about Magic. CR 601.2b names two choices
--- that are made BEFORE the announcement it governs and may restrict it --
--- "choosing to cast a spell with flashback from a graveyard or choosing to cast
--- a creature with morph face down" -- and both would move a spell across this
--- prohibition, since CR 702.37a gives a face-down spell "no name" at all.
+-- The two choices CR 601.2b names as preceding the announcement -- "choosing to
+-- cast a spell with flashback from a graveyard or choosing to cast a creature
+-- with morph face down" -- need no search, because each is its own Action here:
+-- the offer is per (half, facing) pair and this predicate is asked once per pair
+-- with that pair's own name. CR 708.2a's empty name is what a morph cast brings,
+-- which is why a Null Chamber naming the card stops its face-up cast and not its
+-- face-down one -- Pawl.FaceDownSpec's "CR 708.4 a prohibition naming the card
+-- stops the face-up cast and not the morph one".
 --
--- Both of those choices are now MADE BEFORE this is asked rather than searched
--- for: each is its own Action, so the offer is per (half, facing) pair and this
--- predicate is asked once per pair with that pair's own name. CR 708.2a's empty
--- name is what a morph cast brings, which is why a Null Chamber naming the card
--- stops its face-up cast and not its face-down one -- Pawl.FaceDownSpec's
--- "CR 708.4 a prohibition naming the card stops the face-up cast and not the
--- morph one". What is still absent is the SEARCH: a player who must be told they
--- may begin casting because some choice not yet on the menu would escape the
--- prohibition gets no such offer (#95).
+-- A NAME cannot be searched over, and no card asks it to: CR 201.1 fixes a
+-- spell's name with the half and the facing, both of which are already chosen
+-- here.
 prohibitsCasting :: PlayerId -> ObjectId -> CardName -> GameState -> Bool
 prohibitsCasting pid oid name gs =
   let cast = castsThisTurn pid gs
@@ -484,7 +483,13 @@ prohibitsCasting pid oid name gs =
         -- characteristics rather than over its name, read off the proposal's
         -- projection so Damping Engine's "artifact, creature, or enchantment
         -- spells" reaches the face a morph proposal actually shows.
-        PlayerEffect.CantCastMatching criterion -> matchesObject criterion oid gs
+        --
+        -- And CR 601.3a's LOOKAHEAD on top of it, which is a question only a
+        -- quality-bearing prohibition can be asked: the spell is in the class
+        -- right now, and the player may begin casting it anyway if a choice they
+        -- have not yet made could take it out.
+        PlayerEffect.CantCastMatching criterion ->
+          matchesObject criterion oid gs && not (choiceCouldEscape criterion oid gs)
         -- CR 305.1 again, exactly as CantPlayLandChosenName above: a land is
         -- played and never cast, so the unrestricted play-side prohibition stops
         -- nothing here either.
@@ -686,6 +691,64 @@ matchesObject :: Filter Keyword -> ObjectId -> GameState -> Bool
 matchesObject filter_ oid gs =
   -- No source in scope at this site: `oid` is the AFFECTED object, not a source.
   Filter.matches (Filter.contextFor (Projection.controllerOf oid gs) Nothing) (Projection.viewOfObject oid gs) filter_
+
+-- CR 601.3a's LOOKAHEAD, asked of a prohibition that matches the spell as it
+-- stands: could a choice still to be made during this spell's proposal cause the
+-- criterion to stop naming it? A True here is the rule's "the player may begin to
+-- cast the spell, ignoring the effect", so prohibitsCasting negates it.
+--
+-- ONE choice can do it in pawl, and X is that choice. CR 202.3e gives a variable
+-- a contribution of zero off the stack, so a card's mana value in hand is fixed
+-- while the spell's is not, and Void Winnower's "spells with even mana values"
+-- lands on opposite sides of the two for an {X}{R}{R} card (Molten Disaster).
+-- Every other characteristic a Filter can read is settled before the announcement
+-- CR 601.2b governs: a card type, a colour, a supertype and a subtype are all
+-- fixed by the half and the facing, and both of the choices CR 601.2b names as
+-- preceding the announcement -- flashback from a graveyard, a face-down morph --
+-- are their own Action here, so each is asked this question with its own answers
+-- rather than searched for.
+--
+-- The other proposal choices reach nothing: CR 601.2b's modes, CR 601.2b's
+-- targets and CR 601.2f's cost payments change no characteristic of the spell
+-- this criterion can read.
+--
+-- Over the PRINTED MANA COST's variables, which is exactly where CR 202.3 reads
+-- a mana value from -- an X in an additional cost buys the caster nothing here,
+-- because it is not in the mana cost at all. Not implemented: CR 107.3b's clamp,
+-- which leaves 0 as the only legal X for a spell cast while paying neither its
+-- mana cost nor an alternative cost including X (#1362).
+--
+-- FINITE by Filter.manaValueThresholds' argument: two steps past the greatest
+-- literal the criterion compares against, nothing but parity is left to change,
+-- so `climb + 2` samples have seen every verdict the criterion can give. A cost
+-- with no variable never gets here at all.
+--
+-- Asked ONCE, and nothing re-asks it: CR 601.3a lets the player begin "ignoring
+-- the effect", so a player who then announces an X that leaves the spell in the
+-- prohibited class still casts it.
+choiceCouldEscape :: Filter Keyword -> ObjectId -> GameState -> Bool
+choiceCouldEscape criterion oid gs =
+  let variables = variablesIn oid gs
+      context = Filter.contextFor (Projection.controllerOf oid gs) Nothing
+      view = Projection.viewOfObject oid gs
+      escapes base =
+        let limit = 2 + maximum (0 : Filter.manaValueThresholds criterion)
+            climb = if limit <= base then 0 else div (limit - base + variables - 1) variables
+            reachable = fmap (\x -> base + variables * x) [0 .. climb + 2]
+         in any (\mv -> not (Filter.matches context view {Filter.manaValue = Just mv} criterion)) reachable
+   in variables > 0 && maybe False escapes (Filter.manaValue view)
+
+-- How many variables the object's mana cost prints -- CR 107.3's {X}, counted
+-- rather than tested, because a cost printing the symbol twice moves the mana
+-- value in steps of two as X climbs, and a step of two never changes its parity.
+--
+-- The MANA COST FACE (CR 202.3b), which is the face the mana value itself is read
+-- from, so the count and the base it steps from come off the same face.
+variablesIn :: ObjectId -> GameState -> Integer
+variablesIn oid gs =
+  let symbolsOf face = foldMap ManaCost.unwrap (Face.manaCost face)
+      variable symbol = symbol == ManaSymbol.Variable
+   in toInteger (length (filter variable (foldMap symbolsOf (Game.manaCostFaceOf oid gs))))
 
 -- CR 613.11 / 601.2f: the cost increases and the cost reductions that apply to
 -- `pid` CASTING `oid`.
