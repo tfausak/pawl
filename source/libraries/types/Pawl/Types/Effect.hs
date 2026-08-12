@@ -1071,11 +1071,25 @@ data Effect card
     -- countered" is: CR 701.24e and CR 701.24f are both about abilities that
     -- trigger when a library is shuffled, which a library move alone does not fire.
     --
-    -- No PlayerRef saying whose library, and none is expressible: the answer is
-    -- the OWNER of the object the reference names, which PlayerRef's three arms
-    -- cannot read off a bound OBJECT. Derived rather than named is what the card
-    -- says, and it is what makes this one opcode rather than a move plus a
-    -- shuffle: CR 701.24c shuffles the library even when the move did not
+    -- The Maybe PlayerRef NAMES the library, and is what CR 701.24c's first
+    -- half needs: "that library is shuffled even if none of those objects are in
+    -- the zone they're expected to be in". An owner read off the objects
+    -- disappears with them, so a card whose shuffle-in resolves with every named
+    -- object gone -- Dwell on the Past's and Gaea's Blessing's "target player
+    -- shuffles up to N target cards from their graveyard into THEIR library",
+    -- kept resolving by the player slot CR 608.2b leaves legal -- has no library
+    -- left to shuffle unless the effect said which one.
+    --
+    -- Absent when the card's own words derive it instead: Riftsweeper's "its
+    -- owner shuffles it into their library" names no player at all, and
+    -- PlayerRef's arms cannot read the owner off a bound OBJECT. The libraries
+    -- shuffled are the UNION of the two readings -- every owner still resolvable
+    -- plus the named one -- which is one library either way for every card in
+    -- the pool, since CR 400.3 files a card in a player's graveyard under that
+    -- same player.
+    --
+    -- Still one opcode rather than a move plus a shuffle, whichever half names
+    -- the library: CR 701.24c shuffles the library even when the move did not
     -- happen, which a second effect reading the first one's result could not
     -- say. A pair CAN be written -- OfferCast reads a slot MoveToZone bound in
     -- the same list -- so the reason is the rule and not a limit of the DSL.
@@ -1084,8 +1098,10 @@ data Effect card
     -- cards" (Dwell on the Past) can be read out of one slot -- rule 701.24's
     -- "one or more specific objects" is plural in the rule's own words, and the
     -- batch is one CR 608.2f action. A library named by more than one of them is
-    -- still shuffled once.
-    ShuffleIntoLibrary ObjectRef.ObjectRef
+    -- still shuffled once. The same arm reaches CR 701.24d's set ("shuffled even
+    -- if there are no objects in that set") through EachCardInGraveyard, which
+    -- is Gaea's Blessing's "shuffle your graveyard into your library".
+    ShuffleIntoLibrary (Maybe PlayerRef.PlayerRef) ObjectRef.ObjectRef
   | -- | CR 608.2g: offer this effect's controller the cast of the object the slot
     -- names -- "if an effect specifically instructs or allows a player to cast a
     -- spell during resolution, they do so by following the steps in rules

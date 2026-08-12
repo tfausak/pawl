@@ -21,7 +21,13 @@
                 "effects": [
                   {
                     "type": "ShuffleIntoLibrary",
-                    "value": "cards"
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "player"
+                      },
+                      "cards"
+                    ]
                   }
                 ]
               }
