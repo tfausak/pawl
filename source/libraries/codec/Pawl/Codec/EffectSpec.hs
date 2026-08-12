@@ -80,8 +80,8 @@ fromJson = Effect.fromJson cardFromJson
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Effect" $ do
-  -- ObjectRef is untagged, so both arms have to survive.
-  Spec.it s "DealDamage round-trips both ObjectRef arms" $ do
+  -- ObjectRef is untagged, so every arm has to survive.
+  Spec.it s "DealDamage round-trips all three ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
@@ -94,6 +94,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.DealDamage (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) (Quantity.Literal 1))
       """ {"type":"DealDamage","value":[{"type":"HasKeyword","value":{"type":"Flying"}},{"type":"Literal","value":1}]} """
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.DealDamage ObjectRef.EachPlayer (Quantity.Literal 2))
+      """ {"type":"DealDamage","value":[["EachPlayer"],{"type":"Literal","value":2}]} """
   -- ModifyTarget's ObjectRef is untagged, so both arms have to survive.
   Spec.it s "ModifyTarget round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
@@ -778,6 +784,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Evolve (SlotName.MkSlotName (Text.pack "self")))
       """ {"type":"Evolve","value":"self"} """
+  -- CR 702.134a's counter and CR 702.134c's marker. The slot is the ability's
+  -- chosen target rather than "self", which is what parts it from Evolve above.
+  Spec.it s "Mentor" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Mentor (SlotName.MkSlotName (Text.pack "mentored")))
+      """ {"type":"Mentor","value":"mentored"} """
   Spec.it s "ItBecomes" $
     Common.assertJsonCodec
       s

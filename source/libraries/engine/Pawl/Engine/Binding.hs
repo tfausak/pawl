@@ -348,6 +348,29 @@ attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 combatDamager :: SlotName
 combatDamager = SlotName.MkSlotName (Text.pack "thatDamager")
 
+-- CR 702.134c: the reserved slot under which the creature that WAS MENTORED is
+-- bound -- Aegis of the Legion's "put a shield counter on that creature". Stamped
+-- by Pawl.Engine.Event.eventBindings off GameEvent.Mentored, alongside
+-- `blockingCreature` and the rest, so the payload is an ordinary slot read rather
+-- than a "the creature my equipped creature mentored" opcode.
+--
+-- The MENTORED creature and not the mentor, which is the pair's other half: rule
+-- 702.134c names both, and the printed sentence acts on the second. The first
+-- needs no slot -- Aegis' condition already reaches it through the source's
+-- attachment, and no printed payload names it.
+--
+-- Distinct from `triggerSource` (CR 113.7a) for `blockingCreature`'s reason and
+-- one more: the bearer here is an Equipment, so the mentor is not the bearer
+-- either, and the mentored creature is a third object again.
+--
+-- One object, never a group: rule 702.134a's ability has one target, so each
+-- resolution mentors exactly one creature and two mentors are two events. Not a
+-- target (nothing was chosen), so the same CR 608.2b posture and the same "no
+-- card's targetSpecs may name it" sweep as `blockingCreature`; a dead id by
+-- resolution is the payload's problem, as it is there.
+mentoredCreature :: SlotName
+mentoredCreature = SlotName.MkSlotName (Text.pack "thatMentoredCreature")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -418,6 +441,10 @@ setAttackingCreature oid = Map.insert attackingCreature (toObject oid)
 -- Bind an object under the reserved combatDamager slot (CR 510.2).
 setCombatDamager :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setCombatDamager oid = Map.insert combatDamager (toObject oid)
+
+-- Bind an object under the reserved mentoredCreature slot (CR 702.134c).
+setMentoredCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setMentoredCreature oid = Map.insert mentoredCreature (toObject oid)
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

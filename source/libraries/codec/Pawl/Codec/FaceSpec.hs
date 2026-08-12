@@ -59,6 +59,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapRestriction as UntapRestriction
 
 -- Fixtures --------------------------------------------------------------------
 --
@@ -122,6 +123,7 @@ baseFace =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
+      Face.untapRestrictions = [],
       Face.attackCosts = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
@@ -165,6 +167,7 @@ minimalFace =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
+      Face.untapRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
@@ -199,7 +202,7 @@ populatedFace =
     { Face.keywords = Set.singleton Keyword.Deathtouch,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
       Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing],
-      Face.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy],
+      Face.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.AsCopy [])],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       Face.loyalty = Just (Loyalty.MkLoyalty 3),
@@ -212,6 +215,7 @@ populatedFace =
       Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached],
       Face.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
+      Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (ManaCost.MkManaCost [ManaSymbol.Generic 2])],
       Face.additionalCosts = [CostComponent.TapThis],
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
@@ -245,6 +249,7 @@ populatedFaceJson =
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
     <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
+    <> "\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
@@ -303,6 +308,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "sacrificeRestrictions (CR 701.21a/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.sacrificeRestrictions <$> decodeFace v) (Right [])
+    Spec.it s "untapRestrictions (CR 502.3/101.2) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.untapRestrictions <$> decodeFace v) (Right [])
     Spec.it s "attackCosts (CR 508.1c/508.1h) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attackCosts <$> decodeFace v) (Right [])
@@ -409,6 +417,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached]}
         (init baseFaceJson <> ",\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}]}")
+    Spec.it s "untapRestrictions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached]}
+        (init baseFaceJson <> ",\"untapRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}]}")
     Spec.it s "attackCosts" $
       Common.assertJsonCodec
         s

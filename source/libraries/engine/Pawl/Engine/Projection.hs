@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -95,6 +96,7 @@ layer m = case m of
   Modification.AddLandSubtype _ -> Layer.Type
   Modification.SetCreatureSubtype _ -> Layer.Type
   Modification.AddCreatureSubtype _ -> Layer.Type
+  Modification.AddEveryCreatureSubtype -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.AddSupertype _ -> Layer.Type
   Modification.RemoveSupertype _ -> Layer.Type
@@ -169,6 +171,13 @@ applyModification lyr src cands gs oid m pc =
         -- the one line separating this arm from the set above.
         Modification.AddCreatureSubtype s ->
           pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
+        -- The same add over CR 205.3m's whole list. Identical to what
+        -- applySubtypeDefining writes at the start of this layer, and deliberately
+        -- so: rule 702.73a says one thing, and the two sites differ only in WHEN
+        -- they run -- the CDA first (CR 613.3), this in timestamp order (CR
+        -- 613.7).
+        Modification.AddEveryCreatureSubtype ->
+          pc {PC.subtypes = Set.union Subtype.everyCreatureType (PC.subtypes pc)}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 205.4b: a gain is an INSERT into the supertype set, so every other
@@ -516,16 +525,23 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
   Nothing -> powerGiven pcs oid gs
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
--- candidates projected through the layers BEFORE that one. Off-battlefield
--- candidates have no projection at all (gather walks the battlefield only), so
--- they fall back to the printed card -- a library/hand/graveyard candidate is
--- matched against its PRINTED characteristics, never a projected view (#160).
--- Its POWER is the one axis a rule reaches into off the battlefield: CR 208.2a
--- makes a characteristic-defining one function everywhere, which is why the
--- fallback is viewOfCardIn rather than viewOfCard.
+-- candidates projected through the layers BEFORE that one. A candidate in a
+-- library, hand, graveyard or exile has no projection at all, since gather does
+-- not walk those zones, so it falls back to the printed card and is matched
+-- against its PRINTED characteristics (#160). Its POWER is the one axis a rule
+-- reaches into there: CR 208.2a makes a characteristic-defining one function everywhere,
+-- which is why the fallback is viewOfCardIn rather than viewOfCard.
+--
+-- The STACK is projected, not fallen back on, and gatherGiven's CR 113.6 walk is
+-- what makes that worth doing: a spell can carry a static ability of its own, so
+-- a clause read against it must see the grant. It also brings this in line with
+-- viewOfObject, which has never had a zone gate -- so a "target spell" filter
+-- and an "as long as" clause now read one spell the same way. The axes that only
+-- an object has (its controller, CR 702.33d's kicked flag) come with that, and
+-- Molten Disaster's own clause is the reader of the second.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
-  if Set.member oid (GameState.battlefield gs)
+  if Set.member oid (GameState.battlefield gs) || elem oid (GameState.stack gs)
     then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
     else fmap (viewOfCardIn gs oid) (Game.faceOf oid gs)
 
@@ -618,7 +634,20 @@ viewOfCard face =
           -- describes a printed face. Not a lost distinction either: each of those
           -- rules gives its designation only to a permanent.
           Filter.designations = Set.empty,
-          Filter.kicked = False
+          Filter.kicked = False,
+          -- CR 602.1 / 605.1a off the PRINTED face, the posture `keywords` above
+          -- takes: nothing off the battlefield is projected (#160).
+          --
+          -- The card's printed abilities plus rule 702's HAND ones, which CR 702.29b
+          -- and CR 702.77b keep in existence in every zone. NOT the battlefield ones
+          -- (crew, CR 702.122a): those are minted from the post-layer keyword map for
+          -- a permanent, and CR 113.6's default already keeps them on the battlefield.
+          Filter.nonManaActivatedAbility =
+            not
+              ( all
+                  ManaAbility.isManaAbility
+                  (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face))
+              )
         }
 
 -- viewOfCard for a card that IS an object in some zone, so a
@@ -835,7 +864,18 @@ viewOfCharacteristics oid pc controller counters gs =
       -- Nothing asks it there: the only reader is the kicked spell's own clause
       -- condition, gated while it is still on the stack
       -- (Pawl.Engine.Resolve.gateHolds).
-      Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs)
+      Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs),
+      -- CR 602.1 / 605.1a, off the PROJECTION like `keywords` above: abilities are
+      -- characteristics (CR 109.3) written by layer 6, so a land under Humility has
+      -- none and Tsabo's Web stops seeing it.
+      --
+      -- The whole list the object HAS, which abilitiesFromCharacteristics assembles
+      -- -- printed, rule 702's battlefield ones, and rule 702's hand ones, the last
+      -- of which CR 702.29b and CR 702.77b keep in existence here. Not the list it
+      -- can activate here: that is Activate.abilitiesForGiven's narrower question.
+      --
+      -- LAZY -- see the field's own comment in Pawl.Engine.Filter.
+      Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (abilitiesFromCharacteristics pc oid gs))
     }
 
 -- CR 122.1: the counters on an object right now, and none for an id that names
@@ -983,7 +1023,7 @@ definesEveryCreatureType = Set.member Keyword.Type.Changeling
 -- Humility cannot remove it either, LoseAllAbilities being layer 6.
 --
 -- A devoid GRANTED by another object's static ability deliberately never reaches
--- here: CR 604.3a denies it CDA status, so grantedDevoidParts routes it into layer
+-- here: CR 604.3a denies it CDA status, so grantedDefiningParts routes it into layer
 -- 5 as a timestamped colour effect instead. Pawl.ColorSpec's "CR 613.7a a granted
 -- devoid clears an OLDER 'in addition' colour" is what holds the two routes apart:
 -- widening this fold to reach a granted instance answers that case blue.
@@ -1007,11 +1047,13 @@ applyColorDefining pc =
 -- folds after this. Humility cannot undo it either, LoseAllAbilities being
 -- layer 6.
 --
--- Not implemented: changeling GRANTED by another object's static ability, which
--- CR 604.3a denies CDA status and which would need devoid's second route
--- (grantedDevoidParts). No card in the pool grants it -- Maskwood Nexus and
--- Amoeboid Changeling write the SUBTYPE sentence rather than the keyword
--- (#1200).
+-- A changeling GRANTED by another object's static ability deliberately never
+-- reaches here, devoid's posture above verbatim: CR 604.3a denies it CDA status,
+-- so grantedDefiningParts routes it into layer 4 as a timestamped
+-- AddEveryCreatureSubtype instead. Pawl.ProjectionSpec's "CR 613.7a a granted
+-- changeling beats an OLDER Turn to Frog, where a printed one loses to it" is
+-- what holds the two routes apart: widening this fold to reach a granted instance
+-- answers that case Frog.
 applySubtypeDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applySubtypeDefining pc =
   if definesEveryCreatureType (Map.keysSet (PC.keywords pc))
@@ -1106,6 +1148,7 @@ freezeQuantities gs oid you m =
         Modification.AddLandSubtype _ -> Just m
         Modification.SetCreatureSubtype _ -> Just m
         Modification.AddCreatureSubtype _ -> Just m
+        Modification.AddEveryCreatureSubtype -> Just m
         Modification.AddCardType _ -> Just m
         Modification.AddSupertype _ -> Just m
         Modification.RemoveSupertype _ -> Just m
@@ -1131,6 +1174,7 @@ quantitiesOf m = case m of
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCreatureSubtype _ -> []
+  Modification.AddEveryCreatureSubtype -> []
   Modification.AddCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
@@ -1166,6 +1210,7 @@ setLandSubtypeEffects gs =
         -- CR 205.1a/205.1b's creature-type set carries no such clause.
         Modification.SetCreatureSubtype _ -> False
         Modification.AddCreatureSubtype _ -> False
+        Modification.AddEveryCreatureSubtype -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
@@ -1365,6 +1410,11 @@ rewriteModification pairs m =
         -- on the stack, so the spell resolves making its target the new type.
         Modification.SetCreatureSubtype s -> Modification.SetCreatureSubtype (swap Subtype.isCreatureType from to s)
         Modification.AddCreatureSubtype s -> Modification.AddCreatureSubtype (swap Subtype.isCreatureType from to s)
+        -- Holds no word to swap: it names CR 205.3m's list, not a member of it.
+        -- CR 612.2 changes which types a word MEANS, and a text change that
+        -- rewrote one creature type into another would leave this add covering
+        -- the same list either way.
+        Modification.AddEveryCreatureSubtype -> acc
         -- CR 702.14a: "[type]walk" holds a land-type word, so a hacked Lord of
         -- Atlantis grants swampwalk rather than the printed islandwalk. The
         -- GRANTER's text is what this reads -- gatherStatic calls it with the
@@ -1519,6 +1569,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Designate _ _ -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.Evolve _ -> effect
+  Effect.Mentor _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
@@ -1542,11 +1593,13 @@ swapWordIn family pairs word = List.foldl' step word pairs
 
 -- CR 612.1 through an ObjectRef. InSlot names an object chosen at cast time
 -- rather than a word on the card; EachMatching's Filter is card text like any
--- other.
+-- other. EachPlayer carries no word at all -- CR 612.1 changes subtype words,
+-- and "each player" has none.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
+  ObjectRef.EachPlayer -> ref
 
 -- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --
@@ -1750,6 +1803,10 @@ rewriteTriggerCondition pairs condition = case condition of
   -- Filter, so CR 612.1 reaches it too.
   TriggerCondition.PermanentBecomesDesignated d f -> TriggerCondition.PermanentBecomesDesignated d (Filter.rewrite pairs f)
   TriggerCondition.SelfEvolves -> condition
+  -- CR 702.134c's is nullary as well: the mentor is found through the source's
+  -- attachment and the mentored creature through the event, so no subtype word of
+  -- the card's is in it for CR 612.1 to swap.
+  TriggerCondition.AttachedCreatureMentors -> condition
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
   TriggerCondition.PermanentSacrificed -> condition
@@ -1885,6 +1942,12 @@ alwaysFunctioning _ _ _ = True
 -- Emblems are included for the reason gatherGiven gathers them (CR 114.4 / 113.6);
 -- no emblem in the pool carries a condition, and a walk that skipped them would
 -- silently ungate the first one that did.
+--
+-- So is the stack, and there the first one HAS arrived: Molten Disaster's "if
+-- this spell was kicked, it has split second" is a CR 604.2 clause on an ability
+-- gatherGiven gathers from the stack. Skipping the stack here would leave that
+-- clause wired open by alwaysFunctioning, so an UNKICKED Molten Disaster would
+-- carry split second.
 anyConditional :: GameState -> Bool
 anyConditional gs =
   let conditional oid = case Game.faceOf oid gs of
@@ -1892,6 +1955,7 @@ anyConditional gs =
         Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
    in any conditional (Set.toList (GameState.battlefield gs))
         || any conditional (Set.toList (GameState.command gs))
+        || any conditional (GameState.stack gs)
 
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
@@ -1948,9 +2012,47 @@ gatherGiven stripped functioning gs =
             -- 114.5).
             concat (zipWith (gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
+      fromSpell spellId = case Game.lookupObject spellId gs of
+        Nothing -> []
+        Just spellObj -> case Game.faceOf spellId gs of
+          Nothing -> []
+          Just face ->
+            -- CR 604.2's second limb -- "or as long as the object with the
+            -- ability remains in the appropriate zone, as described in rule
+            -- 113.6" -- and CR 113.6's first sentence names that zone:
+            -- "Abilities of an instant or sorcery spell usually function only
+            -- while that object is on the stack."
+            --
+            -- Read off the CARD TYPES, which is a classification and not an
+            -- identity -- the same act as the battlefield walk above reading
+            -- Face.staticAbilities. A permanent spell's static abilities are
+            -- NOT gathered here: rule 113.6's second sentence keeps them on the
+            -- battlefield, and the exceptions that do reach the stack (CR
+            -- 113.6d/e/g) are asked elsewhere, off the printed face.
+            --
+            -- CR 613.7a again: the effect shares the stack object's timestamp.
+            -- No liveness or text-change pass and never stripped, for the
+            -- emblem branch's reason -- the pool's CR 613.1f removers reach
+            -- creatures on the battlefield, and a spell on the stack is not
+            -- one.
+            if Set.null (Set.intersection spellStaticTypes (TypeLine.types (Face.typeLine face)))
+              then []
+              else concat (zipWith (gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False) [0 ..] (Face.staticAbilities face))
+      spells = concatMap fromSpell (GameState.stack gs)
       counters = counterGathered gs
       designations = designationGathered gs
-   in stored <> static <> emblems <> counters <> designations
+   in stored <> static <> emblems <> spells <> counters <> designations
+
+-- CR 113.6's first sentence: the card types whose object has its abilities
+-- function on the stack rather than on the battlefield. Its own binding rather
+-- than a literal in gatherGiven, so the rule reads as a rule.
+--
+-- anyConditional deliberately does NOT narrow by this: it is a structural
+-- precondition, and a superset of the abilities gatherGiven will actually
+-- gather can only cost a second walk, where a subset would leave a CR 604.2
+-- clause wired open.
+spellStaticTypes :: Set CardType.CardType
+spellStaticTypes = Set.fromList [CardType.Instant, CardType.Sorcery]
 
 -- ONE battlefield permanent's static-ability parts, each tagged with the index
 -- of the ability it came from -- gatherStatic's `n`, and so the key half CR
@@ -2091,6 +2193,7 @@ removesAbilities m = case m of
   -- strip belongs to the land arm above.
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
+  Modification.AddEveryCreatureSubtype -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False
   Modification.SwitchPowerToughness -> False
@@ -2169,39 +2272,47 @@ abilitiesRemoved cands gs oid =
          in any removes cs
    in any removesAt (Map.toList byLowest)
 
--- CR 702.114a: devoid is the static ability "This object is colorless". PRINTED,
--- it is a characteristic-defining ability and applyColorDefining folds it at the
--- start of layer 5 (CR 613.3). GRANTED by another object's static ability, it is
--- not one: CR 604.3a's clause (2) limits CDA status to an ability printed on the
--- card it affects, granted to a token by the effect that created the token, or
--- acquired by a copy or text-changing effect, and clauses (3) and (4) exclude an
--- ability that directly affects other objects and one an object grants to itself.
--- So the granted instance's colourless is an ORDINARY colour-changing effect,
--- applied in layer 5 (CR 613.1e) in timestamp order -- and "this object is
--- colorless" is exactly SetColor with no colours (CR 105.3).
+-- The two keywords rule 702 states as a characteristic-defining ability, expanded
+-- for the case where CR 604.3a denies them that status. CR 604.3a's clause (2)
+-- limits CDA status to an ability printed on the card it affects, granted to a
+-- token by the effect that created the token, or acquired by a copy or
+-- text-changing effect, and clauses (3) and (4) exclude an ability that directly
+-- affects other objects and one an object grants to itself. So an instance
+-- another object's static ability GRANTS is an ordinary continuous effect,
+-- applied in its own layer in timestamp order rather than at the start of it (CR
+-- 613.3).
+--
+--   * CR 702.114a, devoid: "this object is colorless" is exactly SetColor with no
+--     colours (CR 105.3), layer 5 (CR 613.1e). applyColorDefining is the printed
+--     instance's route.
+--   * CR 702.73a, changeling: "this object is every creature type" is exactly
+--     AddEveryCreatureSubtype, CR 205.1b's add, layer 4 (CR 613.1d).
+--     applySubtypeDefining is the printed instance's route.
 --
 -- Emitted as a second PART of the granting ability rather than as an effect of its
 -- own, which is what CR 613.6 and CR 613.7a ask for: one ability, so one affected
 -- set decided once, and one timestamp -- the granting permanent's. An effect of its
 -- own would have neither, since there is no second ability to hang them on.
 --
--- The colour half is not the last word on the object's colour. It applies in
--- timestamp order like any other layer-5 effect, so a NEWER colour-changing effect
--- lands on top of it and the object ends up with the devoid keyword and a colour.
--- That is CR 613.7, not a leak.
+-- Neither minted part is the last word on the characteristic. Each applies in
+-- timestamp order like any other effect in its layer, so a NEWER colour-changing
+-- or type-changing effect lands on top of it and the object ends up with the
+-- keyword and a colour, or with the keyword and one creature type. That is CR
+-- 613.7, not a leak.
 --
 -- Casing on a KEYWORD, which rule 702 makes part of the rulebook -- the same act
 -- as reading Keyword.Type.StartYourEngines off a projection. It is not a case on an
--- effect's identity: the caller still routes by `layer`, and the modification this
--- produces is the one Moonlace already stores.
+-- effect's identity: the caller still routes by `layer`, and the modifications this
+-- produces are the ones Moonlace and Wings of Velis Vel already store.
 --
 -- Only a static ability's grant is expanded. A devoid granted by the resolution of
--- a spell or ability is not (#793). counterGathered's grants need no arm at all:
--- CR 122.1b enumerates the keywords a keyword counter can be and devoid is not
--- among them, so no board can put one there.
-grantedDevoidParts :: Modification -> NonEmpty.NonEmpty Modification
-grantedDevoidParts m = case m of
+-- a spell or ability is not (#793), nor a changeling so granted (#1288).
+-- counterGathered's grants need no arm at all: CR 122.1b enumerates the keywords a
+-- keyword counter can be and neither is among them, so no board can put one there.
+grantedDefiningParts :: Modification -> NonEmpty.NonEmpty Modification
+grantedDefiningParts m = case m of
   Modification.GainKeyword Keyword.Type.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]
+  Modification.GainKeyword Keyword.Type.Changeling -> m NonEmpty.:| [Modification.AddEveryCreatureSubtype]
   _ -> m NonEmpty.:| []
 
 -- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the ability's
@@ -2231,10 +2342,10 @@ grantedDevoidParts m = case m of
 -- the effect start to apply at all.
 gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
 gatherStatic functioning src ts changes stripped n sa =
-  let -- CR 612 rewrites each printed modification, and grantedDevoidParts then
+  let -- CR 612 rewrites each printed modification, and grantedDefiningParts then
       -- expands what the rewrite produced -- in that order, since the expansion
       -- emits an engine-minted part that is not card text for CR 612 to reach.
-      ms = StaticAbility.modifications sa >>= grantedDevoidParts . rewriteModification changes
+      ms = StaticAbility.modifications sa >>= grantedDefiningParts . rewriteModification changes
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
         _ -> Nothing
@@ -2493,6 +2604,10 @@ filterReads f = case f of
   Filter.Type.IsToken -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
   Filter.Type.IsTapped -> Set.empty
+  -- CR 109.3 counts abilities among the characteristics and CR 613.1f writes them,
+  -- so this reads the aspect LoseAllAbilities writes -- the same one HasKeyword
+  -- reads, Aspect having no finer grain than "the abilities".
+  Filter.Type.HasNonManaActivatedAbility -> Set.singleton Keywords
   -- Reads nothing, which is a claim about the rules and not a default: no
   -- Modification writes Object.ringBearerFor -- CR 701.54a's designation is made by
   -- a keyword action a resolution performs, and CR 701.54b keeps it off the
@@ -2544,6 +2659,7 @@ modificationWrites m = case m of
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
+  Modification.AddEveryCreatureSubtype -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord _ _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
   Modification.AddSupertype _ -> Set.singleton Supertypes
@@ -3091,9 +3207,22 @@ abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.
 abilitiesOf = abilitiesGiven Map.empty
 
 abilitiesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilitiesGiven pcs oid gs =
-  let pc = projectGiven pcs oid gs
-      granted ability = case ActivatedAbility.condition ability of
+abilitiesGiven pcs oid gs = abilitiesFromCharacteristics (projectGiven pcs oid gs) oid gs
+
+-- abilitiesGiven with the projection already in hand -- the half
+-- viewOfCharacteristics calls, which holds a ProjectedCharacteristics and no way
+-- to ask for another one.
+--
+-- CR 702.29b and CR 702.77b are why handAbilitiesOf is in this list: a cycling or
+-- reinforce ability "continues to exist while the object is on the battlefield
+-- and in all other zones", so the object HAS it here. What it cannot do here is
+-- be activated -- CR 113.6m gives its "Discard this card" cost the hand, and
+-- Pawl.Engine.Activate.abilitiesForGiven filters this list through functionsIn
+-- before offering anything. Pawl.Engine.Mana's reader is safe for the other
+-- reason: neither ability adds mana, so CR 605.1a excludes both.
+abilitiesFromCharacteristics :: ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+abilitiesFromCharacteristics pc oid gs =
+  let granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
         Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
    in -- Rule 702's own activated abilities are appended here, the shape
@@ -3101,7 +3230,12 @@ abilitiesGiven pcs oid gs =
       -- is the projection's, and Pawl.Engine.Keyword mints the rule's from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest. Every
       -- reader gets one flat list and never learns rule 702 wrote part of it.
-      filter granted (PC.activatedAbilities pc <> Keyword.battlefieldAbilitiesOf (PC.keywords pc))
+      filter
+        granted
+        ( PC.activatedAbilities pc
+            <> Keyword.battlefieldAbilitiesOf (PC.keywords pc)
+            <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords pc))
+        )
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none --
@@ -3305,6 +3439,7 @@ grantsKeywordWhere p m = case m of
   Modification.AddLandSubtype _ -> False
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
+  Modification.AddEveryCreatureSubtype -> False
   Modification.AddCardType _ -> False
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False

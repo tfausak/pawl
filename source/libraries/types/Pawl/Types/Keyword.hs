@@ -927,7 +927,10 @@ data Keyword
 -- is a characteristic-defining ability and is folded at the start of layer 5
 -- (Projection.applyColorDefining), per CR 613.3. A GRANTED one is not, CR 604.3a
 -- denying CDA status to an ability that is not printed on the card it affects, so
--- Projection.grantedDevoidParts routes it into layer 5 as an ordinary colour
+-- Projection.grantedDefiningParts routes it into layer 5 as an ordinary colour
 -- effect timestamped with the granting permanent (CR 613.7a). Slivdrazi
 -- Monstrosity is the card that separates them, and Pawl.ColorSpec's "CR 613.7a a
 -- granted devoid clears an OLDER 'in addition' colour" is the proof.
+--
+-- CR 702.73a's changeling takes the same two routes one layer down, through the
+-- same pair of functions.

@@ -160,14 +160,15 @@ playerRefSlots ref = case ref of
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
 
--- The slots an ObjectRef reads. Only InSlot names one; EachMatching is swept from
--- the battlefield at resolution and names nothing at cast, so a card whose only
--- object reference is a set declares no target spec and CR 608.2b has nothing to
--- fizzle (CR 115.10a).
+-- The slots an ObjectRef reads. Only InSlot names one; the two sweeping arms are
+-- swept at resolution and name nothing at cast, so a card whose only object
+-- reference is a set declares no target spec and CR 608.2b has nothing to fizzle
+-- (CR 115.10a).
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
+  ObjectRef.EachPlayer -> Map.empty
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -295,6 +296,7 @@ slotsOf effect = case effect of
   -- A READ, Designate's: the slot names the permanent rule 702.100a's
   -- counter goes on.
   Effect.Evolve slot -> oneSlot slot
+  Effect.Mentor slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
   Effect.ExileUntilMonarch slot -> oneSlot slot
   Effect.Attach slot -> oneSlot slot
@@ -448,6 +450,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Designate _ _ -> True
   Effect.Unsuspect _ -> True
   Effect.Evolve _ -> True
+  Effect.Mentor _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
   Effect.Attach _ -> True
@@ -545,6 +548,7 @@ readsX = any effectReadsX
       Effect.Designate _ _ -> False
       Effect.Unsuspect _ -> False
       Effect.Evolve _ -> False
+      Effect.Mentor _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
       Effect.Attach _ -> False
@@ -614,6 +618,7 @@ searchesLibrary effect = case effect of
   Effect.Designate _ _ -> False
   Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
+  Effect.Mentor _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
   Effect.Attach _ -> False
@@ -742,6 +747,7 @@ boundSlots effect = case effect of
   Effect.Designate _ _ -> Set.empty
   Effect.Unsuspect _ -> Set.empty
   Effect.Evolve _ -> Set.empty
+  Effect.Mentor _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
   Effect.Attach _ -> Set.empty
@@ -1452,6 +1458,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           Nothing -> last_
           Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
      in List.sortOn (\oid -> (seat oid, oid)) matching
+  -- Names players and so no objects at all. Empty rather than an error: every
+  -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
+  -- empty answer is what a slot holding a player already gives them.
+  ObjectRef.EachPlayer -> []
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
@@ -1541,6 +1551,12 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
     Just group -> fmap Recipient.ToObject (Foldable.toList group)
     Nothing -> legalMany slot legal
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  -- CR 120.3a: a player is a damage recipient, and this is the arm
+  -- objectRefObjects has nothing to say about. APNAP (CR 608.2f) for
+  -- objectRefObjects' reason, and Game.apnapOrder is the turn order rotated to
+  -- the active player -- so a player CR 800.4 has taken out of the turn order is
+  -- already not in it.
+  ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (Game.apnapOrder gs)
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
 -- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
@@ -2308,6 +2324,9 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             ObjectRef.EachMatching _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
+            -- Players, and no card moves one to a zone. objectRefObjects' empty
+            -- answer, so the move is a no-op rather than a rejected card.
+            ObjectRef.EachPlayer -> pure []
           Monad.mapM_ moveOne =<< settleArrivals zone placement targets
   -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
   -- this order and with the owner read before either:
@@ -3153,6 +3172,27 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         Just target -> do
           placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
           Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.Evolved target)))
+      _ -> pure ()
+  -- CR 702.134a's counter and CR 702.134c's marker, Evolve's arm above with the
+  -- rule's own gate rather than that one's: rule 702.134c fires on the mentor
+  -- ability RESOLVING, so the event is recorded however many counters CR 614.16 left
+  -- to place. That ungated emission is a FENCE and not a tested branch: re-gating it
+  -- on `placed` leaves the suite green, because the only pooled replacement that can
+  -- reduce a placement to nothing (an opponent's Vorinclex, Monstrous Raider) halves
+  -- the shield counter this trigger would put on to nothing as well, so no board can
+  -- see the difference.
+  --
+  -- The pair the event names is the resolving ability's SOURCE and the slot's
+  -- creature, in rule 702.134c's order. An illegal slot never arrives here at all
+  -- (CR 608.2b removes the ability), and an id naming no object writes nothing and
+  -- emits nothing, both Evolve's postures.
+  Effect.Mentor slot ->
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target -> do
+          _ <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
+          State.modify' (Event.recordEvent (GameEvent.Mentored source target))
       _ -> pure ()
   -- CR 731.1: the GAME gains the designation. Everything about what that entails
   -- -- CR 731.1's at-most-one, and the CR 702.145c/f transforms it causes

@@ -284,6 +284,7 @@ movedOf event = case event of
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.BecameDesignated _ _ -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
@@ -313,6 +314,7 @@ damageOf event = case event of
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.BecameDesignated _ _ -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
@@ -342,6 +344,7 @@ revealOf event = case event of
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.BecameDesignated _ _ -> Nothing
   GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
@@ -639,7 +642,7 @@ apply batch candidate event =
     -- outer pattern would let a new EntryRewrite constructor fall through
     -- silently whenever it happened to pair with WouldEnter.
     (ReplacementEffect.EntryR _ rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
-      EntryRewrite.AsCopy -> do
+      EntryRewrite.AsCopy exceptions -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         case Projection.controllerOf oid gs of
@@ -662,7 +665,13 @@ apply batch candidate event =
               Nothing -> pure (Just event)
               Just src2 -> do
                 State.modify' $ \g ->
-                  let stamp o = o {Object.bindings = Binding.setCopy (copiedSnapshot src2 g) (Object.bindings o)}
+                  -- CR 707.9: the exceptions are applied to the snapshot on the
+                  -- way in, so they are part of the copy's own copiable values
+                  -- (CR 707.9b) rather than an effect layered over them. Only on
+                  -- this branch: a declined copy is no copying process, so its
+                  -- exceptions do not happen either.
+                  let stamped = Replacement.applyCopyExceptions exceptions (copiedSnapshot src2 g)
+                      stamp o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 pure (Just event)
       -- CR 614.1c / 208.2b: Primal Plasma's choice of which printed
@@ -2752,6 +2761,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -2805,6 +2815,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -2833,6 +2844,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -2867,6 +2879,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -2913,6 +2926,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -2954,6 +2968,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -2999,6 +3014,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3041,6 +3057,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3082,6 +3099,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3135,6 +3153,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3177,6 +3196,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3224,6 +3244,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3265,6 +3286,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3299,6 +3321,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3331,6 +3354,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3379,6 +3403,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3415,6 +3440,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3458,6 +3484,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3497,6 +3524,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3533,6 +3561,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3572,6 +3601,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3611,6 +3641,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3663,6 +3694,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3705,6 +3737,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3746,6 +3779,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3798,6 +3832,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3846,6 +3881,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3900,6 +3936,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3944,6 +3981,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -3978,6 +4016,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -4023,6 +4062,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.CountersRemoved {} -> False
@@ -4072,6 +4112,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
@@ -4093,6 +4134,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.SpellCast {} -> False
@@ -4131,6 +4173,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp oid -> oid == bearer
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
@@ -4188,6 +4231,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
@@ -4221,6 +4265,49 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- has since left: the marker is about an event, not about the object now.
   TriggerCondition.SelfEvolves -> case event of
     GameEvent.Evolved oid -> oid == bearer
+    GameEvent.Mentored {} -> False
+    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+  -- CR 702.134c: the creature the BEARER IS ATTACHED TO mentored another. The
+  -- event's first id is rule 702.134c's "first creature", the mentor, and this arm
+  -- asks only whether that is the bearer's host -- the pairing with the second
+  -- creature is the event's, decided where the mentor ability resolved.
+  --
+  -- CR 301.5a's "equipped creature" read off Object.attachedTo, which is where the
+  -- Equipment records it, through Recipient.objectOf for CR 303.4's other
+  -- destination: an Equipment attached to nothing, or an Aura enchanting a player,
+  -- has no host id to compare and answers False.
+  --
+  -- A LIVE read, PermanentTurnedFaceUp's posture: nothing here is a zone change, so
+  -- CR 603.10a's look-back does not reach this condition, and the attachment as it
+  -- stands when the trigger is gathered is CR 603.2's own reading of "equipped
+  -- creature".
+  TriggerCondition.AttachedCreatureMentors -> case event of
+    GameEvent.Mentored mentor _ ->
+      (Recipient.objectOf =<< Object.attachedTo =<< Game.lookupObject bearer gs) == Just mentor
+    GameEvent.Evolved _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -4254,6 +4341,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           Nothing -> False
           Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4305,6 +4393,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.SpellCast {} -> False
@@ -4341,6 +4430,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
@@ -4414,6 +4504,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
@@ -4463,6 +4554,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated _ _ -> False
     GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
@@ -4559,6 +4651,12 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   TriggerCondition.PermanentBecomesDesignated _ _ -> False
   TriggerCondition.SelfEvolves -> False
+  -- CR 702.134c watches a mentor ability RESOLVING, which is neither of CR 603.3b's
+  -- two classes' subjects read carelessly: an ability resolving is something the
+  -- rules did, but the rule's second pass is for a condition that IS another
+  -- ability TRIGGERING, and a resolution is a first-pass event like any other. A
+  -- mentor ability's own trigger has long since been placed by the time this fires.
+  TriggerCondition.AttachedCreatureMentors -> False
   TriggerCondition.PermanentSacrificed -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
@@ -4791,6 +4889,15 @@ eventBindings cond event = case (cond, event) of
   -- and so gets no second name.
   (TriggerCondition.SelfBlocksCreature, GameEvent.BlockerDeclared _ attacker) ->
     Binding.setBlockedCreature attacker Map.empty
+  -- CR 702.134c's "that creature": the creature that was mentored, the event's
+  -- second id -- Aegis of the Legion's shield counter goes on it. The MENTOR gets no
+  -- slot: matchesTrigger has just proved it is the bearer's host, and no printed
+  -- payload points at it.
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.Mentored carries both ids.
+  (TriggerCondition.AttachedCreatureMentors, GameEvent.Mentored _ mentored) ->
+    Binding.setMentoredCreature mentored Map.empty
   -- CR 603.1b's multi-condition ability reaches this fallthrough and stamps
   -- nothing, which agrees with eventBindingSlots' intersection for the pool's one
   -- AnyOf and is pinned by Pawl.TriggerSpec against every event either branch
@@ -5040,6 +5147,11 @@ eventBindingSlots cond = case cond of
   -- the bearer -- Renegade Krasis says "this creature", so there is no "it" to
   -- bind that Binding.triggerSource does not already answer.
   TriggerCondition.SelfEvolves -> Set.empty
+  -- NOT empty, unlike SelfEvolves above, and the pair CR 702.134c names is why:
+  -- neither the mentor nor the mentored creature is the bearer, so Aegis of the
+  -- Legion's "that creature" has no other name to be read under. Guaranteed given a
+  -- match, as this classification has to be: every Mentored event carries both ids.
+  TriggerCondition.AttachedCreatureMentors -> Set.singleton Binding.mentoredCreature
   -- CR 701.21a's event names a player and a permanent, and this claims NEITHER --
   -- a deliberate empty, decided rather than defaulted, since eventBindings' own
   -- fallthrough would answer the same for a condition nobody wrote an arm for.
@@ -5157,6 +5269,10 @@ looksBack condition = case condition of
   TriggerCondition.PermanentBecomesDesignated _ _ -> False
   -- Nor here: rule 702.100b's counters are put on a permanent on the battlefield.
   TriggerCondition.SelfEvolves -> False
+  -- Nor here, for the same reason one rule over: rule 702.134a's counter goes on a
+  -- creature that CR 508.1k has made an attacking creature, and a permanent leaving
+  -- the battlefield is removed from combat (CR 506.4) rather than mentored.
+  TriggerCondition.AttachedCreatureMentors -> False
   -- Entries, not departures (CR 603.6a). The rule's own CR 603.6a checks "all
   -- permanents on the battlefield (including the newcomers)" AFTER the event.
   TriggerCondition.SelfEnters -> False
@@ -5393,6 +5509,7 @@ eventTriggers events gs =
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.BecameDesignated _ _ -> Map.empty
         GameEvent.Evolved _ -> Map.empty
+        GameEvent.Mentored {} -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -5507,6 +5624,7 @@ eventTriggers events gs =
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.BecameDesignated _ _ -> Map.empty
         GameEvent.Evolved _ -> Map.empty
+        GameEvent.Mentored {} -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -5580,6 +5698,7 @@ eventTriggers events gs =
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.BecameDesignated _ _ -> Map.empty
         GameEvent.Evolved _ -> Map.empty
+        GameEvent.Mentored {} -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
@@ -5714,6 +5833,11 @@ zoneTriggeredFrom cond = case cond of
   -- The same default again: rule 702.100b's marker goes to a creature, and
   -- Renegade Krasis is the creature watching itself.
   TriggerCondition.SelfEvolves -> Nothing
+  -- The same default a third time, from the Equipment's side: CR 301.5c unattaches
+  -- an Equipment rather than moving it, so one that equips anything is on the
+  -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
+  -- is for a condition that cannot trigger from the battlefield at all.
+  TriggerCondition.AttachedCreatureMentors -> Nothing
   -- CR 113.6's default: an ability of a permanent functions only while that
   -- permanent is on the battlefield. CR 113.6k's exception is for a trigger
   -- condition that CANNOT trigger from the battlefield, and this one plainly can
@@ -5867,6 +5991,11 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentBecomesDesignated _ _ -> False
   -- Rule 702.100b names no turn either: a creature can evolve on anyone's.
   TriggerCondition.SelfEvolves -> False
+  -- Rule 702.134c names none either. CR 508.1 does make every mentoring happen on
+  -- the mentor's controller's turn, but that is a consequence of what mentor
+  -- watches rather than a narrowing this condition states, and the Equipment's
+  -- controller need not be that player.
+  TriggerCondition.AttachedCreatureMentors -> False
   -- CR 701.21a says nothing about whose turn it is, and neither does the printed
   -- "whenever a player sacrifices a permanent".
   TriggerCondition.PermanentSacrificed -> False
@@ -6063,6 +6192,11 @@ stateTriggers gs
               -- CR 702.100b is an EVENT trigger and leaves no state at all behind:
               -- the counters it put are indistinguishable from any others.
               TriggerCondition.SelfEvolves -> False
+              -- CR 702.134c likewise, and one step further removed: what it fires
+              -- on is a resolution, and the counter that resolution put is a
+              -- counter like any other, so the board afterwards says nothing about
+              -- which creature mentored which.
+              TriggerCondition.AttachedCreatureMentors -> False
               -- CR 701.21a is a game ACTION, so this is an event trigger too: it
               -- fires on the moment the permanent is sacrificed, and the board
               -- afterwards holds no state a read could recover.

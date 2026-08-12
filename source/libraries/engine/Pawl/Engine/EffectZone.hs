@@ -44,12 +44,14 @@ import Pawl.Types.Zone (Zone)
 zoneFunctionedFrom :: Effect Card.Type.Card -> Maybe Zone
 zoneFunctionedFrom effect = case effect of
   -- Only an InSlot naming the reserved source slot can be "the object it's on".
-  -- A swept set is never one object, so EachMatching answers Nothing however the
-  -- card file states the origin -- the same inert card-data error the note above
-  -- describes for a move of somebody else's permanent.
+  -- A swept set is never one object, so neither sweeping arm can be, and both
+  -- answer Nothing however the card file states the origin -- the same inert
+  -- card-data error the note above describes for a move of somebody else's
+  -- permanent.
   Effect.MoveToZone ref _ _ _ origin _ -> case ref of
     ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
     ObjectRef.EachMatching _ -> Nothing
+    ObjectRef.EachPlayer -> Nothing
   Effect.DealDamage _ _ -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
@@ -102,6 +104,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Designate _ _ -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
+  Effect.Mentor _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.Attach _ -> Nothing

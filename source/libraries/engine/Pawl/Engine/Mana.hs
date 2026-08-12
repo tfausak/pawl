@@ -19,7 +19,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Activations as Activations
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
@@ -70,16 +70,17 @@ import qualified Pawl.Types.Supertype as Supertype
 -- window to apply one in. It takes the pre-projected board because CR 302.6's
 -- reads want it (#200).
 --
--- And WHAT ONE ACTIVATION TAKES OUT OF A ZONE, because the count is a fact about
--- one source asked alone and the supply model has to add several of them up: two
+-- And WHAT ONE ACTIVATION SPENDS besides, because the count is a fact about one
+-- source asked alone and the supply model has to add several of them up: two
 -- sources that each sacrifice a creature both answer 1 beside one creature, and
--- the claims are what stop the two being counted as two (payableResolutionsGiven,
--- #1126). Unscaled -- one activation's, whatever the count.
+-- two that each pay 3 life both answer 2 at 6 life. The claims and the life are
+-- what stop either pair being counted twice over (payableResolutionsGiven, #1126).
+-- Unscaled -- one activation's, whatever the count.
 --
 -- A CALLBACK rather than a call, for Pawl.Engine.Count.ViewOf's reason: those
 -- are Pawl.Engine.Cost's questions, and that module imports this one.
 -- Pawl.Engine.Cost.manaActivations is the only answer the engine passes.
-type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> GameState -> (Natural, [Claim])
+type Capacity = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> GameState -> Activations.Activations
 
 -- | CR 305.6
 subtypeMana :: Subtype -> Maybe ManaType
@@ -167,7 +168,7 @@ manaRoutesOfGiven pcs oid gs =
         fmap
           (\effects -> (ActivatedAbility.cost ability, Maybe.mapMaybe ManaAbility.manaProduced effects))
           (Modal.selectionEffects (ActivatedAbility.modal ability))
-      fromAbilities = concatMap selectionRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
+      fromAbilities = concatMap selectionRoutes (filter ManaAbility.isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
 
 -- CR 305.6's intrinsic mana ability is "{T}: Add [the type]", printed on no card
@@ -207,7 +208,7 @@ manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId ->
 manaYieldsOfGiven pcs oid gs = List.nub (fmap ManaOption.yield (manaOptionsOfGiven pcs oid gs))
 
 -- The same yields narrowed to the ones this player could actually get, each with
--- HOW MANY TIMES they could get it and WHAT ONE of those activations claims: an
+-- HOW MANY TIMES they could get it and WHAT ONE of those activations spends: an
 -- activation answered 0 -- CR 118.3's unpayable cost, CR 302.6's sick creature --
 -- yields nothing, so it is no supply (payableResolutionsGiven) and no offer
 -- (Pawl.Engine.Cost.tapForMana), and one answered 2 is two activations' worth of
@@ -218,29 +219,25 @@ manaYieldsOfGiven pcs oid gs = List.nub (fmap ManaOption.yield (manaOptionsOfGiv
 -- to the LARGER count and not to their sum: they are separate activations, so
 -- the sum would be exact, but no card in the pool prints two, and understating
 -- supply only ever refuses a cost the payment loop could have paid -- where
--- overstating it offers a cast that cannot be paid. The claims that survive the
--- collapse are that same route's, so the count and the claims describe one
--- activation of one route rather than a blend of two.
+-- overstating it offers a cast that cannot be paid. What survives the collapse is
+-- that one route's whole answer, claims and life included, so the count and what
+-- it spends describe one activation of one route rather than a blend of two.
 --
 -- Separate from manaYieldsOf above rather than replacing it, and CR 106.7 is why
 -- rather than tidiness: "the type of mana a permanent could produce" is defined
 -- to IGNORE whether the ability's costs could be paid, so manaTypesOf has to go
 -- on answering the ungated question.
-manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Natural, [Claim], Mana)]
+manaSuppliesGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Activations.Activations, Mana)]
 manaSuppliesGiven capacity pcs pid oid gs =
   let counted =
         fmap
-          ( \option ->
-              let (times, claims) = capacity pcs pid oid (ManaOption.cost option) gs
-               in (times, claims, ManaOption.yield option)
-          )
+          (\option -> (capacity pcs pid oid (ManaOption.cost option) gs, ManaOption.yield option))
           (manaOptionsOfGiven pcs oid gs)
-      available = filter (\(times, _, _) -> times > 0) counted
-      yieldOf (_, _, yield) = yield
-      timesOf (times, _, _) = times
+      available = filter (\(activations, _) -> Activations.times activations > 0) counted
+      timesOf (activations, _) = Activations.times activations
    in fmap
-        (\yield -> List.maximumBy (Ord.comparing timesOf) (filter ((==) yield . yieldOf) available))
-        (List.nub (fmap yieldOf available))
+        (\yield -> List.maximumBy (Ord.comparing timesOf) (filter ((==) yield . snd) available))
+        (List.nub (fmap snd available))
 
 -- Every way this object could be tapped for mana, as the COST CR 602.2b makes
 -- that activation pay paired with the mana it adds -- one entry per (route,
@@ -305,27 +302,6 @@ typesOf = fmap ManaUnit.manaType . unitsOf
 -- solRingSpec is the standing proof against.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
 manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
-
--- CR 605.1a: an activated ability is a mana ability if it could add mana AND
--- doesn't target and is not itself a loyalty ability (CR 606.2, which
--- Pawl.Engine.Cost.isLoyaltyCost answers; no loyalty ability in the pool adds
--- mana, so the clause is inert rather than checked here). Read at two sites:
--- manaRoutesOfGiven includes a mana ability as a source, and
--- Activate.activatableGiven refuses to put one on the stack (CR 605.3b). What
--- Action.legalActions offers instead is Action.ActivateManaAbility, one per
--- manaSourcesGiven, which is CR 605.3a's priority window.
---
--- Asked of the WHOLE ability, across every mode -- CR 605.1a's "could add mana"
--- is satisfied by any mode that does, and CR 605.2 keeps it a mana ability even
--- where the game state stops it producing.
---
--- DECLARING a slot is what disqualifies it, not filling one, and CR 605.1a's own
--- "(see rule 115.6)" is why: an ability whose slot may be left empty is "still
--- said to require targets", so a CR 115.6 slot keeps it off this list too.
-isManaAbility :: ActivatedAbility.ActivatedAbility Card.Card -> Bool
-isManaAbility ab =
-  not (null (Maybe.mapMaybe ManaAbility.manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
-    && Map.null (Modal.allTargetSpecs (ActivatedAbility.modal ab))
 
 setPool :: PlayerId -> Mana -> GameState -> GameState
 setPool pid pool gs = gs {GameState.manaPool = Map.insert pid pool (GameState.manaPool gs)}
@@ -401,7 +377,7 @@ manaSourcesGiven capacity grants pcs pid gs =
       -- the tap and sickness rules reach only such a cost. A Blood Pet is a
       -- black source while tapped and on the turn it arrives, because
       -- "Sacrifice this creature: Add {B}" is neither (#1116).
-      isSource oid = any (\(cost, _) -> fst (capacity pcs pid oid cost gs) > 0) (manaRoutesOfGiven pcs oid gs)
+      isSource oid = any (\(cost, _) -> Activations.times (capacity pcs pid oid cost gs) > 0) (manaRoutesOfGiven pcs oid gs)
    in filter isSource (Projection.controlsGiven grants pid gs)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
@@ -885,17 +861,20 @@ canPayCommittingGiven capacity grants pcs pid committed claimed cost gs = not (n
 -- One source's contribution to the supply side, as the OPTIONS it offers: one
 -- option per group of yields (see the collapse below), and each option is that
 -- group -- read as one supply per mana it adds -- repeated as many times as it is
--- taken, paired with the CLAIMS those activations make on a zone
--- (manaSuppliesGiven). payableResolutions picks exactly ONE option per source.
+-- taken, paired with what those activations SPEND: the claims they make on a zone,
+-- and the life they pay (manaSuppliesGiven). payableResolutions picks exactly ONE
+-- option per source.
 --
--- How many times is enumerated, 0 up to the ceiling, for an option that CLAIMS
--- something, and fixed at the ceiling for one that does not. That asymmetry is
--- the whole of #1126: the clauses payableResolutions asks of a board only ever
--- grow as supplies are added, so a claimless source is never worth taking fewer
--- times -- but a claiming one is, since the objects it leaves alone are what
--- another source's cost can then have. Ashnod's Altar and Phyrexian Tower beside
--- one creature buy one sacrifice between them, and whose is the player's to
--- choose.
+-- How many times is enumerated, 0 up to the ceiling, for an option that SPENDS
+-- something a board is measured against -- a claim on a zone, or CR 119.4's life
+-- -- and fixed at the ceiling for one that spends neither. That asymmetry is the
+-- whole of #1126: the clauses payableResolutions asks of a board only ever grow as
+-- supplies are added, so a free source is never worth taking fewer times -- but a
+-- claiming or a life-paying one is, since the objects and the life it leaves alone
+-- are what another source's cost, or the cost being paid, can then have. Ashnod's
+-- Altar and Phyrexian Tower beside one creature buy one sacrifice between them,
+-- and whose is the player's to choose; a Treasonous Ogre activated fewer times
+-- than it could be is the life half of the same thing.
 --
 -- The COLLAPSE is where several yields become one option, and it is exact rather
 -- than a shortcut. Where a yield adds at most one mana, its option is at most one
@@ -910,38 +889,39 @@ canPayCommittingGiven capacity grants pcs pid committed claimed cost gs = not (n
 -- adding SEVERAL mana cannot join a union -- "one mana of any of these types"
 -- cannot speak for Sol Ring's {C}{C} -- so it stays its own option.
 --
--- Collapsed PER (count, claims), which is what lets a repeatable source MIX its
--- yields across activations: each activation of Phyrexian Altar ("Sacrifice a
--- creature: Add one mana of any color") chooses a colour on its own, so two
--- creatures buy one red and one green, and the union repeated twice says exactly
--- that where one option per yield said "two of one colour" (#1131). Exact because
--- the KEY is what an activation costs: every yield in a group is reachable by the
--- same number of activations claiming the same objects, so k of them are k
--- supplies of the union and claim Claim.scale k.
+-- Collapsed PER whole answer (Pawl.Types.Activations: the count, the claims and
+-- the life), which is what lets a repeatable source MIX its yields across
+-- activations: each activation of Phyrexian Altar ("Sacrifice a creature: Add one
+-- mana of any color") chooses a colour on its own, so two creatures buy one red
+-- and one green, and the union repeated twice says exactly that where one option
+-- per yield said "two of one colour" (#1131). Exact because the KEY is what an
+-- activation costs: every yield in a group is reachable by the same number of
+-- activations spending the same objects and the same life, so k of them are k
+-- supplies of the union, claim Claim.scale k, and pay k times the life.
 --
 -- Two GROUPS are still never mixed, since a source offers one option: a
 -- multi-mana yield cannot be taken on one activation and a one-mana yield on the
--- next, nor can two groups with different ceilings. Not implemented; no card in
--- the pool has either shape (#1137).
+-- next, nor can two groups that differ in what an activation costs. Not
+-- implemented; no card in the pool has either shape (#1137).
 --
 -- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
 -- makes them all facts about that one source.
-sourceOptions :: [(Natural, [Claim], Mana)] -> [([Supply], [Claim])]
+sourceOptions :: [(Activations.Activations, Mana)] -> [([Supply], [Claim], Natural)]
 sourceOptions supplies =
-  let unitLists = fmap (\(times, claims, yield) -> (times, claims, unitsOf yield)) supplies
-      (narrow, wide) = List.partition (\(_, _, units) -> length units <= 1) unitLists
-      grouped =
-        fmap
-          (\((times, claims), units) -> (times, claims, collapsed units))
-          (Map.toList (Map.fromListWith (<>) (fmap (\(times, claims, units) -> ((times, claims), units)) narrow)))
-      apart = fmap (\(times, claims, units) -> (times, claims, fmap supplyOf units)) wide
+  let unitLists = [(activations, unitsOf yield) | (activations, yield) <- supplies]
+      (narrow, wide) = List.partition (\(_, units) -> length units <= 1) unitLists
+      grouped = [(activations, collapsed units) | (activations, units) <- Map.toList (Map.fromListWith (<>) narrow)]
+      apart = [(activations, fmap supplyOf units) | (activations, units) <- wide]
    in List.nub (concatMap optionsFor (grouped <> apart))
   where
-    optionsFor (times, claims, offered) =
-      fmap
-        (\k -> (concat (List.genericReplicate k offered), Claim.scale k claims))
-        (if null claims then [times] else [0 .. times])
+    optionsFor (activations, offered) =
+      let claims = Activations.claims activations
+          life = Activations.life activations
+          counts = if null claims && life == 0 then [Activations.times activations] else [0 .. Activations.times activations]
+       in fmap
+            (\k -> (concat (List.genericReplicate k offered), Claim.scale k claims, k * life))
+            counts
     collapsed units =
       if null units
         then []
@@ -975,8 +955,8 @@ sourceOptions supplies =
 -- player would actually have in front of them after tapping everything -- and it
 -- is a board only if the activations it took are JOINTLY payable alongside
 -- `claimed`, since two of them, or one of them and the cost being paid, may claim
--- one object (payableResolutionsGiven below). A RESOLVED cost is payable when
--- clause 3 holds and SOME board satisfies clauses 1 and 2:
+-- one object (payableResolutionsGiven below). A RESOLVED cost is payable when SOME
+-- board satisfies all three clauses:
 --
 --   1. every typed demand can be met at once -- a matching of demands into
 --      supplies that saturates the demand side;
@@ -984,15 +964,18 @@ sourceOptions supplies =
 --      matching consumes exactly one supply per typed symbol, so the leftover
 --      count does not depend on WHICH matching, and this is a plain comparison;
 --      and
---   3. CR 119.4's floor admits the life -- this resolution's own, PLUS whatever
---      is already spoken for (`committed`: an announcement in progress, or the
---      life the whole cost's components owe; see canPayCommitting). The clause
---      that reads the PLAYER rather than the board, and the only one a cost that
---      spends no life anywhere can never fail: every resolution of such a cost
---      costs 0 life and commits none, and CR 119.4b lets anyone pay 0 -- see
---      Event.canPayLife.
+--   3. CR 119.4's floor admits the life: this resolution's own, PLUS the life the
+--      BOARD's own activations pay -- Treasonous Ogre's "Pay 3 life: Add {R}" taken
+--      three times is 9 -- PLUS whatever is already spoken for (`committed`: an
+--      announcement in progress, or the life the whole cost's components owe; see
+--      canPayCommitting). One total on one life total, which is CR 118.3's "fully"
+--      read over the whole payment, exactly as clause 1's claims are: paying k
+--      amounts in turn is affordable iff their sum is, since the total only falls.
+--      Where neither the cost nor any source on the board spends life, the total is
+--      0 and CR 119.4b lets anyone pay that, so the clause changes no answer such a
+--      board used to give -- see Event.canPayLife.
 --
--- Clauses 1 and 2 are asked of ONE board at a time, and that is the whole of
+-- All three clauses are asked of ONE board at a time, and that is the whole of
 -- #450's fix. Asking them of a per-source union instead lets one source's first
 -- mana come from one yield and its second from another, which is not a board any
 -- sequence of activations reaches: Ashaya, Soul of the Wild makes a Palladium Myr
@@ -1064,24 +1047,27 @@ payableResolutionsGiven capacity grants pcs pid committed claimed cost gs =
       options = fmap (\oid -> sourceOptions (manaSuppliesGiven capacity pcs pid oid gs)) (manaSourcesGiven capacity grants pcs pid gs)
       -- One option taken from each source, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
-      -- pool alone -- when the player controls no source at all.
+      -- pool alone -- when the player controls no source at all. Each board
+      -- carries the LIFE its activations pay, which its CR 119.4 clause below is
+      -- then asked about.
       boards =
-        [ pooled <> concatMap fst taken
+        [ (pooled <> concatMap (\(supplies, _, _) -> supplies) taken, sum (fmap (\(_, _, life) -> life) taken))
         | taken <- sequenceA options,
-          Claim.satisfiable (claimed <> concatMap snd taken)
+          Claim.satisfiable (claimed <> concatMap (\(_, claims, _) -> claims) taken)
         ]
       payable (demands, generic, life) =
         let subsets = List.subsequences (List.nub demands)
-            fits supplies =
+            fits (supplies, spent) =
               let -- "The supplies that could serve this set of demands" and "the
                   -- demands in it", the two sides of Hall's condition for one
                   -- subset.
                   couldServe wanted = length (filter (\supply -> any (serves supply) wanted) supplies)
                   demandedIn wanted = length (filter (`elem` wanted) demands)
                   hallHolds wanted = demandedIn wanted <= couldServe wanted
-               in Natural.length supplies >= Natural.length demands + generic
+               in Event.canPayLife pid (committed + life + spent) gs
+                    && Natural.length supplies >= Natural.length demands + generic
                     && all hallHolds subsets
-         in Event.canPayLife pid (committed + life) gs && any fits boards
+         in any fits boards
    in filter payable (resolutions cost)
 
 -- The least life any payable resolution of this cost costs, or Nothing when none

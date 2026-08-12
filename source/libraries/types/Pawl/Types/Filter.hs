@@ -379,6 +379,30 @@ data Filter keyword
     -- a +1/+1 counter grants is CR 613.4c's, which the projection applies over the
     -- top of what this atom reads.
     HasCounters (CounterKind.CounterKind keyword)
+  | -- | CR 602.1 / 605.1a: does the CANDIDATE have one or more activated
+    -- abilities that aren't mana abilities? Tsabo's Web's "each land with an
+    -- activated ability that isn't a mana ability", and Ravager Wurm's second
+    -- mode says the same words.
+    --
+    -- ONE atom for the whole clause rather than an ability atom and a mana
+    -- qualifier beside it: CR 605.1a's mana-ability test is about an ability and
+    -- not about the object, so there is nothing for a conjunct to be asked of.
+    -- Every printing that asks this question asks it with the exclusion already
+    -- attached, and the two cards that word it differently
+    -- (Magewright's Stone's "with {T} in its cost") ask about the ability's COST,
+    -- which is a third question again.
+    --
+    -- Characteristic, unlike the atoms above it: CR 109.3 counts abilities among
+    -- an object's characteristics and CR 613.1f writes them, so
+    -- Pawl.Engine.Projection.filterReads declares this atom as reading Keywords
+    -- -- Humility takes the abilities away and the atom stops matching.
+    --
+    -- The abilities it reads are the ones the object HAS, which is not the same
+    -- list as the ones it can activate here: CR 702.29b and CR 702.77b keep a
+    -- cycling or reinforce ability in existence in every zone while letting it be
+    -- activated only from a hand, and this atom is the reader those two rules
+    -- were written for.
+    HasNonManaActivatedAbility
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

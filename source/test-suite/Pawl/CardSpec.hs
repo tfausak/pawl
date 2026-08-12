@@ -135,6 +135,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapRestriction as UntapRestriction
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified System.Directory as Directory
@@ -174,6 +175,7 @@ vanillaFace name typeLine =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
+      Face.untapRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
@@ -434,6 +436,7 @@ modificationCounts modification = case modification of
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCreatureSubtype _ -> []
+  Modification.AddEveryCreatureSubtype -> []
   Modification.AddCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
@@ -475,6 +478,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
   TriggerCondition.PermanentBecomesDesignated _ _ -> []
   TriggerCondition.SelfEvolves -> []
+  -- CR 702.134c's is nullary too, so it holds no Quantity.
+  TriggerCondition.AttachedCreatureMentors -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
   TriggerCondition.PermanentSacrificed -> []
   -- CR 603.3b's carries a PlayerRelation, which holds no Count.
@@ -596,6 +601,7 @@ effectCounts effect = case effect of
   Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -858,6 +864,7 @@ effectReplacements effect = case effect of
   Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -1270,7 +1277,8 @@ reservedSlots =
       Binding.blockingCreature,
       Binding.blockedCreature,
       Binding.attackingCreature,
-      Binding.combatDamager
+      Binding.combatDamager,
+      Binding.mentoredCreature
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T
@@ -1359,6 +1367,7 @@ effectMintedFaces effect = case effect of
   Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -1570,6 +1579,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsAttachedToSource -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
+  Filter.Type.HasNonManaActivatedAbility -> 0
   Filter.Type.IsRingBearer -> 0
   Filter.Type.HasDesignation _ -> 0
 
@@ -1813,6 +1823,8 @@ objectRefFilters ref = case ref of
   ObjectRef.InSlot _ -> []
   -- Day of Judgment's "all creatures", Boil's "all Islands".
   ObjectRef.EachMatching f -> [f]
+  -- Molten Disaster's "each player" holds no Filter to lint.
+  ObjectRef.EachPlayer -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -1844,6 +1856,7 @@ modificationFilters modification = case modification of
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCreatureSubtype _ -> []
+  Modification.AddEveryCreatureSubtype -> []
   Modification.AddCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
@@ -1886,6 +1899,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
   TriggerCondition.PermanentBecomesDesignated _ f -> [f]
   TriggerCondition.SelfEvolves -> []
+  -- CR 702.134c's carries none either: "equipped creature" is CR 301.5f's one
+  -- permanent rather than a class of them, and "a creature" narrows by nothing.
+  TriggerCondition.AttachedCreatureMentors -> []
   -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
   -- PermanentDies below there is no Filter to sweep.
   TriggerCondition.PermanentSacrificed -> []
@@ -2141,7 +2157,10 @@ storedPlayerScope effect = case effect of
 entryRewriteFilters :: EntryRewrite.EntryRewrite -> [Filter.Type.Filter Keyword.Keyword]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> [f]
-  EntryRewrite.AsCopy -> []
+  -- CR 707.9's exceptions carry no Filter: an "except ..." clause states values,
+  -- never a criterion over objects (Pawl.Types.CopyException imports no Filter,
+  -- which is what keeps the count above honest).
+  EntryRewrite.AsCopy _ -> []
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
@@ -2307,6 +2326,7 @@ effectFilters effect = case effect of
   Effect.Designate _ _ -> []
   Effect.Unsuspect ref -> unframed (objectRefFilters ref)
   Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and
@@ -2354,7 +2374,7 @@ activatedAbilityFilters ability =
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach
--- frames it. Twenty-two of Pawl.Types.Face's thirty-one fields can hold one, and
+-- frames it. Twenty-four of Pawl.Types.Face's thirty-three fields can hold one, and
 -- here is where each one's comes from:
 --
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
@@ -2371,8 +2391,9 @@ activatedAbilityFilters ability =
 --   * `playerAbilities` -- CR 613.11's cost modifiers and CR 601.3b's timing
 --     permission.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
---     701.21a / 101.2), `attackRequirements` (CR 508.1d), `blockRequirements`
---     (CR 509.1c) and `attackCosts` (CR 508.1h) -- five more affected sets.
+--     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
+--     `attackRequirements` (CR 508.1d), `blockRequirements`
+--     (CR 509.1c) and `attackCosts` (CR 508.1h) -- six more affected sets.
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target specs and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -2388,7 +2409,7 @@ activatedAbilityFilters ability =
 -- TriggerCondition, TurnUpRewrite and ZoneChangePattern -- and nothing those nine
 -- fields reach is one of them.
 --
--- Twenty-two and nine is thirty-one, the whole record.
+-- Twenty-four and nine is thirty-three, the whole record.
 --
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
@@ -2415,6 +2436,7 @@ cardFilters card =
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
         <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
+        <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
     )
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)

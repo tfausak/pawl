@@ -59,6 +59,7 @@ toJson encode filter_ = case filter_ of
   Filter.IsRingBearer -> Common.nullary "IsRingBearer"
   Filter.HasDesignation d -> Common.tagged "HasDesignation" . Just $ Designation.toJson d
   Filter.HasCounters k -> Common.tagged "HasCounters" . Just $ CounterKind.toJson encode k
+  Filter.HasNonManaActivatedAbility -> Common.nullary "HasNonManaActivatedAbility"
   Filter.And fs -> Common.tagged "And" . Just . Value.array $ fmap (toJson encode) fs
   Filter.Or fs -> Common.tagged "Or" . Just . Value.array $ fmap (toJson encode) fs
   Filter.Not f -> Common.tagged "Not" . Just $ toJson encode f
@@ -95,6 +96,7 @@ fromJson decode value = do
     ("IsRingBearer", _) -> Right Filter.IsRingBearer
     ("HasDesignation", Just v) -> Filter.HasDesignation <$> Designation.fromJson v
     ("HasCounters", Just v) -> Filter.HasCounters <$> CounterKind.fromJson decode v
+    ("HasNonManaActivatedAbility", _) -> Right Filter.HasNonManaActivatedAbility
     ("And", Just (Value.Array (Array.MkArray vs))) -> Filter.And <$> traverse (fromJson decode) vs
     ("Or", Just (Value.Array (Array.MkArray vs))) -> Filter.Or <$> traverse (fromJson decode) vs
     ("Not", Just v) -> Filter.Not <$> fromJson decode v

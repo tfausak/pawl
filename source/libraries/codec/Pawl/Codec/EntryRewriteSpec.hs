@@ -7,6 +7,7 @@ import qualified Pawl.Codec.EntryRewrite as EntryRewrite
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -17,15 +18,23 @@ import qualified Pawl.Types.Supertype as Supertype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
-  -- CR 707.5: Clone becomes a copy as it enters, with no producer-visible
-  -- payload of its own.
+  -- CR 707.5: Clone becomes a copy as it enters, excepting nothing -- so the
+  -- exception list is omitted and the tag stays nullary on the wire.
   Spec.it s "AsCopy (Clone)" $
     Common.assertJsonCodec
       s
       EntryRewrite.toJson
       EntryRewrite.fromJson
-      EntryRewrite.AsCopy
+      (EntryRewrite.AsCopy [])
       """ {"type":"AsCopy"} """
+  -- CR 707.9b / 707.9d: Quicksilver Gargantuan's "except it's 7/7".
+  Spec.it s "AsCopy with an exception (Quicksilver Gargantuan)" $
+    Common.assertJsonCodec
+      s
+      EntryRewrite.toJson
+      EntryRewrite.fromJson
+      (EntryRewrite.AsCopy [CopyException.SetPowerToughness 7 7])
+      """ {"type":"AsCopy","value":[{"type":"SetPowerToughness","value":[7,7]}]} """
   -- CR 208.2b: two P/T-and-keyword choices, enough to show the keyword union
   -- isn't lost on the wire.
   Spec.it s "ChoiceOf (Primal Plasma)" $

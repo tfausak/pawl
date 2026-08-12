@@ -1,6 +1,7 @@
 module Pawl.Codec.EntryRewrite where
 
 import qualified Data.Text as Text
+import qualified Pawl.Codec.CopyException as CopyException
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryOption as EntryOption
 import qualified Pawl.Codec.Filter as Filter
@@ -12,7 +13,11 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 
 toJson :: EntryRewrite.EntryRewrite -> Value.Value
 toJson r = case r of
-  EntryRewrite.AsCopy -> Common.nullary "AsCopy"
+  -- CR 707.9: the exceptions are omitted when there are none, the posture
+  -- Common.optionalPair takes on a record field -- a plain Clone's rewrite stays
+  -- the nullary tag it has always been.
+  EntryRewrite.AsCopy [] -> Common.nullary "AsCopy"
+  EntryRewrite.AsCopy exceptions -> Common.tagged "AsCopy" . Just $ Common.encodeList CopyException.toJson exceptions
   EntryRewrite.ChoiceOf options -> Common.tagged "ChoiceOf" . Just $ Common.encodeList EntryOption.toJson options
   EntryRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Value.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
   EntryRewrite.ChooseColor -> Common.nullary "ChooseColor"
@@ -29,7 +34,8 @@ fromJson :: Value.Value -> Either Text.Text EntryRewrite.EntryRewrite
 fromJson value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
-    ("AsCopy", _) -> Right EntryRewrite.AsCopy
+    ("AsCopy", Nothing) -> Right (EntryRewrite.AsCopy [])
+    ("AsCopy", Just v) -> EntryRewrite.AsCopy <$> Common.decodeList CopyException.fromJson v
     ("ChooseColor", _) -> Right EntryRewrite.ChooseColor
     ("ChooseBasicLandType", _) -> Right EntryRewrite.ChooseBasicLandType
     ("UnderSourceControl", _) -> Right EntryRewrite.UnderSourceControl

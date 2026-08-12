@@ -48,6 +48,7 @@ toJson e = case e of
   GameEvent.TurnedFaceUp oid -> Common.tagged "TurnedFaceUp" . Just $ ObjectId.toJson oid
   GameEvent.BecameDesignated d oid -> Common.tagged "BecameDesignated" . Just . Value.array $ [Designation.toJson d, ObjectId.toJson oid]
   GameEvent.Evolved oid -> Common.tagged "Evolved" . Just $ ObjectId.toJson oid
+  GameEvent.Mentored mentor mentored -> Common.tagged "Mentored" . Just . Value.array $ [ObjectId.toJson mentor, ObjectId.toJson mentored]
   GameEvent.PermanentSacrificed pid oid -> Common.tagged "PermanentSacrificed" . Just . Value.array $ [Codec.encode PlayerId.codec pid, ObjectId.toJson oid]
   GameEvent.AbilityTriggered oid pid cond ->
     Common.tagged "AbilityTriggered" . Just . Value.array $ [ObjectId.toJson oid, Codec.encode PlayerId.codec pid, TriggerCondition.toJson cond]
@@ -84,6 +85,8 @@ fromJson value = do
     ("BecameDesignated", Just (Value.Array (Array.MkArray [d, oid]))) ->
       GameEvent.BecameDesignated <$> Designation.fromJson d <*> ObjectId.fromJson oid
     ("Evolved", Just v) -> GameEvent.Evolved <$> ObjectId.fromJson v
+    ("Mentored", Just (Value.Array (Array.MkArray [mentor, mentored]))) ->
+      GameEvent.Mentored <$> ObjectId.fromJson mentor <*> ObjectId.fromJson mentored
     ("PermanentSacrificed", Just (Value.Array (Array.MkArray [pid, oid]))) -> GameEvent.PermanentSacrificed <$> Codec.decode PlayerId.codec pid <*> ObjectId.fromJson oid
     ("AbilityTriggered", Just (Value.Array (Array.MkArray [oid, pid, cond]))) ->
       GameEvent.AbilityTriggered <$> ObjectId.fromJson oid <*> Codec.decode PlayerId.codec pid <*> TriggerCondition.fromJson cond

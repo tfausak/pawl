@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
@@ -348,7 +349,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
-     in Spec.assertBool s (Mana.isManaAbility ab) "mana ability"
+     in Spec.assertBool s (ManaAbility.isManaAbility ab) "mana ability"
 
   Spec.it s "CR 605.1a an ability that targets is NOT a mana ability" $
     let ab =
@@ -361,7 +362,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
-     in Spec.assertBool s (not (Mana.isManaAbility ab)) "targets -> not mana"
+     in Spec.assertBool s (not (ManaAbility.isManaAbility ab)) "targets -> not mana"
 
   Spec.it s "CR 605.1a a damage ability is NOT a mana ability" $
     let ab =
@@ -374,7 +375,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
-     in Spec.assertBool s (not (Mana.isManaAbility ab)) "no mana produced -> not mana"
+     in Spec.assertBool s (not (ManaAbility.isManaAbility ab)) "no mana produced -> not mana"
 
   Spec.it s "CR 605 a settled Llanowar Elves is a green mana source" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
@@ -511,9 +512,13 @@ prefersColor wanted p = case p of
 -- Alice controls `permanents` and holds `spell`; she casts it and resolves it,
 -- with every prompt answered by `answer`.
 castOffBoard :: (forall r. Prompt.Prompt r -> r) -> [Printing.Printing] -> Printing.Printing -> GameState.GameState
-castOffBoard answer permanents spell =
-  let board = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) permanents
-      (withSpell, oid) = S.handOne spell board
+castOffBoard answer permanents = castFrom answer (alicePermanents permanents)
+
+-- The same two steps off a board the caller has already built, which is what a
+-- case wanting alice at some particular life total needs.
+castFrom :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Printing.Printing -> GameState.GameState
+castFrom answer board spell =
+  let (withSpell, oid) = S.handOne spell board
       afterCast = S.runPure answer withSpell (S.cast S.alice oid)
    in S.runPure answer afterCast Stack.resolveTop
 
@@ -1735,6 +1740,90 @@ nextColor p = case p of
           candidates
   _ -> pure (S.identityAnswer p)
 
+-- CR 118.3 on the supply side again, for a repeatable ability whose cost spends no
+-- OBJECT. Treasonous Ogre ({3}{R} Creature -- Ogre Shaman, dethrone, "Pay 3 life:
+-- Add {R}") is the pool's first: its cost holds no {T} for CR 107.5 to bar a
+-- second activation and takes nothing out of a zone for the claims to count, so
+-- what limits it is CR 119.4's life total and nothing else. Counting it once read a
+-- cost only several activations could pay as unpayable, so the cast was never
+-- offered (#1132).
+--
+-- The Ogre is the only mana source on every board below, so every mana comes
+-- through it at 3 life apiece and no count here can be met another way. What
+-- separates the halves of a case is ONE life, or ONE Ogre, and nothing else.
+treasonousOgreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+treasonousOgreSpec s registry = Spec.describe s "Treasonous Ogre" $ do
+  -- ONE board for both halves, so what separates six red mana from seven is only
+  -- how many activations CR 119.4 admits at 20 life: six, and not one and not
+  -- seven.
+  Spec.it s "CR 119.4 the life total is the ceiling" $ do
+    board <- ogreBoard s registry 1 20
+    Spec.assertBool s (paysColors (replicate 6 Color.Red) board) "six activations pay 18 of her 20 life"
+    Spec.assertBool s (not (paysColors (replicate 7 Color.Red) board)) "and a seventh wants 21, which she does not have"
+
+  -- What says the ceiling is arithmetic on the life total rather than some fixed
+  -- number: one life is the whole difference between these two boards.
+  Spec.it s "CR 119.4 three activations want nine life" $ do
+    nine <- ogreBoard s registry 1 9
+    eight <- ogreBoard s registry 1 8
+    Spec.assertBool s (paysColors (replicate 3 Color.Red) nine) "9 life is three activations exactly"
+    Spec.assertBool s (not (paysColors (replicate 3 Color.Red) eight)) "8 life is not"
+    Spec.assertBool s (paysColors (replicate 2 Color.Red) eight) "though it is still two"
+
+  -- CR 118.3's "fully" across two sources, the life half of #1126's object half: a
+  -- second Ogre adds no life to spend, so the pair is worth no more mana than one.
+  Spec.it s "CR 118.3 two Ogres share one life total" $ do
+    board <- ogreBoard s registry 2 20
+    Spec.assertBool s (paysColors (replicate 6 Color.Red) board) "six activations, however the two Ogres split them"
+    Spec.assertBool s (not (paysColors (replicate 7 Color.Red) board)) "and not a seventh: what a second Ogre cannot buy is more life"
+
+  -- The gameplay-level proof (design.md section 4). Hill Giant is {3}{R} with no
+  -- abilities and targets nothing as it is cast, so the whole cast turns on the
+  -- Ogre being counted four times -- and the life total afterwards is what says
+  -- four activations happened rather than three or five.
+  Spec.it s "CR 605.3a Hill Giant is cast off four activations of one Ogre" $ do
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    rich <- ogreBoard s registry 1 20
+    poor <- ogreBoard s registry 1 11
+    let resolved = castFrom S.identityAnswer rich hillGiant
+        short = castFrom S.identityAnswer poor hillGiant
+        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
+    Spec.assertEqWith s "the Giant resolved" (countOf "Hill Giant" resolved) 1
+    Spec.assertEqWith s "and four activations paid 12 life for it" (S.lifeOf S.alice resolved) (Just 8)
+    Spec.assertEqWith s "at 11 life the fourth activation is unpayable, so the cast fails" (countOf "Hill Giant" short) 0
+    -- CR 601.2h reverses the whole cast, so the three activations it did make are
+    -- rolled back with it.
+    Spec.assertEqWith s "and nothing was spent trying" (S.lifeOf S.alice short) (Just 11)
+
+  -- The gate rather than the payment, and the pair that pins it to one life: at 12
+  -- the fourth activation pays her to exactly 0, which CR 119.4 allows.
+  Spec.it s "CR 118.3 the cast is offered at 12 life and not at 11" $ do
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    twelve <- ogreBoard s registry 1 12
+    eleven <- ogreBoard s registry 1 11
+    let offered board =
+          let (withSpell, oid) = S.handOne hillGiant board
+           in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
+    Spec.assertBool s (offered twelve) "12 life pays for four activations"
+    Spec.assertBool s (not (offered eleven)) "11 pays for three, and {3}{R} wants four"
+
+  -- The prompt-level half, since a board cannot say whether the window CLOSED
+  -- early: the Ogre has to be offered a fourth time, with the cost still
+  -- uncovered, for the fourth activation to happen at all. How many times to
+  -- activate a repeatable source is the player's, and this is where they are asked.
+  Spec.it s "CR 601.2g the mana window offers the Ogre once per activation" $ do
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    board <- ogreBoard s registry 1 20
+    let (withSpell, oid) = S.handOne hillGiant board
+        offers = State.execState (Engine.runGame recordingManaSources withSpell (S.cast S.alice oid)) []
+    Spec.assertEqWith s "asked four times, the Ogre the only candidate each time" (fmap length offers) [1, 1, 1, 1]
+
+-- Alice at `life` life with `copies` Treasonous Ogres and nothing else.
+ogreBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> Integer -> m GameState.GameState
+ogreBoard s registry copies life = do
+  ogre <- S.printingOf s registry "Treasonous Ogre"
+  pure (atLife life (alicePermanents (replicate copies ogre)))
+
 -- CR 118.3's "fully" across TWO mana sources. Ashnod's Altar ("Sacrifice a
 -- creature: Add {C}{C}") and Phyrexian Tower ("{T}: Add {C}", "{T}, Sacrifice a
 -- creature: Add {B}{B}") both buy their mana with a creature, and the supply
@@ -1906,6 +1995,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
   phyrexianAltarSpec s registry
+  treasonousOgreSpec s registry
   sharedVictimSpec s registry
   villageRitesSpec s registry
 

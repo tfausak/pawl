@@ -470,6 +470,16 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfEvolves
       """ {"type":"SelfEvolves"} """
+  -- CR 702.134c's marker, read through the source's attachment, so nullary for
+  -- SelfEvolves' reason: neither the mentor nor the mentored creature is named by
+  -- the condition.
+  Spec.it s "AttachedCreatureMentors" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.AttachedCreatureMentors
+      """ {"type":"AttachedCreatureMentors"} """
   -- CR 603.10a's sacrifice family. Nullary: "a player" is neither PlayerRelation
   -- arm and "a permanent" names no Filter, so there is nothing to encode.
   Spec.it s "PermanentSacrificed" $

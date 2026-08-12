@@ -1,7 +1,11 @@
--- One of CR 605.1a's three criteria, asked of an EFFECT: could it add mana, and
--- how is its type decided? The ABILITY-level classification that rule defines
--- is Pawl.Engine.Mana.isManaAbility, which folds this over an ability's effects
--- and adds the no-target and not-a-loyalty-ability clauses.
+-- CR 605.1a's classification, at both the scales the rule needs it: `manaProduced`
+-- asks one EFFECT whether it could add mana, and `isManaAbility` folds that over
+-- a whole ABILITY and adds the no-target and not-a-loyalty-ability clauses.
+--
+-- The ability-level half lives here rather than in Pawl.Engine.Mana because
+-- Pawl.Engine.Projection needs it -- CR 605.1a's exclusion is half of
+-- Filter.HasNonManaActivatedAbility, and Mana imports Projection, so the
+-- classification had to sit below both.
 --
 -- Here rather than in Pawl.Engine.Resolve so that Pawl.Engine.Mana need not
 -- import the resolver: Resolve is a high-level module, so Mana -> Resolve ->
@@ -13,10 +17,37 @@
 -- below answers the one question in the type.
 module Pawl.Engine.ManaAbility where
 
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import Pawl.Types.ManaProduction (ManaProduction)
+
+-- CR 605.1a: an activated ability is a mana ability if it could add mana AND
+-- doesn't target and is not itself a loyalty ability (CR 606.2, which
+-- Pawl.Engine.Cost.isLoyaltyCost answers; no loyalty ability in the pool adds
+-- mana, so the clause is inert rather than checked here). Read at three sites:
+-- Mana.manaRoutesOfGiven includes a mana ability as a source,
+-- Activate.activatableGiven refuses to put one on the stack (CR 605.3b), and
+-- Projection's view builders answer Filter.HasNonManaActivatedAbility with its
+-- negation. What Action.legalActions offers instead is
+-- Action.ActivateManaAbility, one per Mana.manaSourcesGiven, which is CR 605.3a's
+-- priority window.
+--
+-- Asked of the WHOLE ability, across every mode -- CR 605.1a's "could add mana"
+-- is satisfied by any mode that does, and CR 605.2 keeps it a mana ability even
+-- where the game state stops it producing.
+--
+-- DECLARING a slot is what disqualifies it, not filling one, and CR 605.1a's own
+-- "(see rule 115.6)" is why: an ability whose slot may be left empty is "still
+-- said to require targets", so a CR 115.6 slot keeps it off this list too.
+isManaAbility :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Bool
+isManaAbility ab =
+  not (null (Maybe.mapMaybe manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
+    && Map.null (Modal.allTargetSpecs (ActivatedAbility.modal ab))
 
 -- CR 605: does this effect add mana, and how is its type decided? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by
@@ -80,6 +111,7 @@ manaProduced effect = case effect of
   Effect.Designate _ _ -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
+  Effect.Mentor _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.Attach _ -> Nothing

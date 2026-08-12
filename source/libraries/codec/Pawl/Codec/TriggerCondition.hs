@@ -63,6 +63,7 @@ toJson c = case c of
   TriggerCondition.PermanentTurnedFaceUp f -> Common.tagged "PermanentTurnedFaceUp" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.PermanentBecomesDesignated d f -> Common.tagged "PermanentBecomesDesignated" . Just . Value.array $ [Designation.toJson d, Filter.toJson Keyword.toJson f]
   TriggerCondition.SelfEvolves -> Common.nullary "SelfEvolves"
+  TriggerCondition.AttachedCreatureMentors -> Common.nullary "AttachedCreatureMentors"
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
   TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerBecomesMonarch r -> Common.tagged "PlayerBecomesMonarch" . Just $ PlayerRelation.toJson r
@@ -114,6 +115,7 @@ fromJson value = do
     ("PermanentBecomesDesignated", Just (Value.Array (Array.MkArray [d, f]))) ->
       TriggerCondition.PermanentBecomesDesignated <$> Designation.fromJson d <*> Filter.fromJson Keyword.fromJson f
     ("SelfEvolves", _) -> Right TriggerCondition.SelfEvolves
+    ("AttachedCreatureMentors", _) -> Right TriggerCondition.AttachedCreatureMentors
     ("PermanentSacrificed", _) -> Right TriggerCondition.PermanentSacrificed
     ("SagaFinalChapterTriggers", Just v) -> TriggerCondition.SagaFinalChapterTriggers <$> PlayerRelation.fromJson v
     ("PlayerBecomesMonarch", Just v) -> TriggerCondition.PlayerBecomesMonarch <$> PlayerRelation.fromJson v
