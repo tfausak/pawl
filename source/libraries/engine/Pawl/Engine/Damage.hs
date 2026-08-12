@@ -116,25 +116,62 @@ tier r = case r of
 -- loyalty), because that half of the same sentence -- "damage already marked on
 -- the creature" -- is knowable when the division is offered, where the other
 -- half is not settled until the whole step's assignment is announced.
-tiersCleared :: Map.Map Recipient.Recipient Natural -> Map.Map Recipient.Recipient Natural -> Map.Map Recipient.Recipient Natural -> Bool
-tiersCleared thresholds assigned answer =
+--
+-- `lethal` is CR 702.2c's other reading of the same totals: a creature that some
+-- nonzero deathtouch assignment named is AT its bar whatever the number, since
+-- that assignment "is considered to be lethal damage for the purposes of
+-- determining if excess damage is being dealt". The rule is about the recipient
+-- and not about who is spilling past it, so it clears the gate for every creature
+-- assigning this step -- deathtouchedRecipients reads it off the step's events.
+tiersCleared :: Map.Map Recipient.Recipient Natural -> Map.Map Recipient.Recipient Natural -> Set.Set Recipient.Recipient -> Map.Map Recipient.Recipient Natural -> Bool
+tiersCleared thresholds assigned lethal answer =
   let -- Every recipient in a STRICTLY EARLIER tier is at its threshold. Vacuously
       -- true at tier 0, which is CR 702.19b's "need not assign lethal damage to
       -- all those blocking creatures".
       earlierTiersMet t =
         all
-          (\(r, threshold) -> Map.findWithDefault 0 r assigned >= threshold)
+          (\(r, threshold) -> Set.member r lethal || Map.findWithDefault 0 r assigned >= threshold)
           (filter (\(r, _) -> tier r < t) (Map.toList thresholds))
    in all (\(r, n) -> n == 0 || earlierTiersMet (tier r)) (Map.toList answer)
+
+-- CR 702.2c: which recipients an assignment has given lethal damage by being
+-- made at all -- "any nonzero amount of combat damage assigned to a creature by
+-- a source with deathtouch".
+--
+-- A CREATURE only. The rule says so, and the bar CR 702.19c states over a
+-- planeswalker is a count of loyalty counters (CR 306.5c) that deathtouch says
+-- nothing about. A player and a battle carry threshold 0 and so gate nothing
+-- either way, and combat builds no Recipient.ToObject at all (CR 510.1b-d).
+--
+-- Read off the announced events rather than re-derived from the assigning
+-- creature, so it uses the same DamageEvent.dealtByDeathtouch rider the CR 704.5h
+-- SBA will (damageEvent captures it as the damage is dealt, per CR 702.2e).
+deathtouchedRecipients :: [DamageEvent.DamageEvent] -> Set.Set Recipient.Recipient
+deathtouchedRecipients events =
+  Set.fromList
+    [ target
+    | event <- events,
+      DamageEvent.dealtByDeathtouch event,
+      -- Every combat event is built with amount > 0 (CR 510.1a), so this is a
+      -- fence on "nonzero" rather than a reachable filter.
+      DamageEvent.amount event > 0,
+      target <- case DamageEvent.target event of
+        Recipient.ToCreature _ -> [DamageEvent.target event]
+        Recipient.ToObject _ -> []
+        Recipient.ToPlaneswalker _ -> []
+        Recipient.ToBattle _ -> []
+        Recipient.ToPlayer _ -> []
+    ]
 
 -- CR 702.19b / 702.2c: a blocker's lethal threshold is toughness minus marked
 -- damage -- but 702.2c makes any nonzero assignment by a deathtouch source
 -- lethal, so a deathtouch attacker needs only 1 (0 if the blocker is already
 -- lethal). Read through the projection, the same way the CR 704.5h SBA reads it.
 --
--- CR 702.2c applied to THIS attacker only. Another creature's deathtouch damage
--- assigned to the same blocker in the same step counts toward the bar as a
--- number, since tiersCleared sums, rather than clearing it outright (#1349).
+-- THIS attacker's own reading of the bar, which is what the division is OFFERED
+-- at. Another creature's deathtouch damage clears the same bar for everyone (CR
+-- 702.2c, in tiersCleared's `lethal`), but only once the whole step has been
+-- announced, where this much is knowable when the offer is made.
 blockerThreshold :: GameState -> ObjectId -> ObjectId -> Natural
 blockerThreshold gs attacker blocker =
   let marked = maybe 0 Object.damage (Game.lookupObject blocker gs)
@@ -568,8 +605,13 @@ contestedAssignment gs attackers (attacker, target) =
 settleAssignments :: [([DamageEvent.DamageEvent], Map.Map Recipient.Recipient Natural)] -> [DamageEvent.DamageEvent]
 settleAssignments announced =
   let totalsOf events = Map.fromListWith (+) (fmap (\ev -> (DamageEvent.target ev, DamageEvent.amount ev)) events)
-      assigned = totalsOf (concatMap fst announced)
-      kept = filter (\(events, thresholds) -> tiersCleared thresholds assigned (totalsOf events)) announced
+      everything = concatMap fst announced
+      assigned = totalsOf everything
+      -- CR 702.2c, read off the SAME round's events as the totals beside it: an
+      -- announcement this round drops takes its deathtouch damage with it, so a
+      -- gate only that damage cleared closes again.
+      lethal = deathtouchedRecipients everything
+      kept = filter (\(events, thresholds) -> tiersCleared thresholds assigned lethal (totalsOf events)) announced
    in if length kept == length announced
         then concatMap fst kept
         else settleAssignments kept

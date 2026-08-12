@@ -1423,10 +1423,13 @@ deathtouchSpec s registry =
 -- read exactly what they read before the step's total became their comparand. The
 -- cases where another creature's damage is what clears a gate are gameplay-level,
 -- in Pawl.CombatSpec's TrampleOverPlaneswalkers and SharedBlocker groups.
+--
+-- No deathtouch anywhere in the step, so CR 702.2c's set is empty and every bar
+-- is cleared by the numbers alone.
 assignedAlone :: Map.Map Recipient.Recipient Natural.Natural -> Natural.Natural -> Map.Map Recipient.Recipient Natural.Natural -> Bool
 assignedAlone thresholds power answer =
   Damage.wellFormedAssignment thresholds power answer
-    && Damage.tiersCleared thresholds answer answer
+    && Damage.tiersCleared thresholds answer Set.empty answer
 
 assignmentLegalitySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 assignmentLegalitySpec s =

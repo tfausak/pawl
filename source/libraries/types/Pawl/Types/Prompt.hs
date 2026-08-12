@@ -309,7 +309,8 @@ data Prompt r where
   -- A threshold is the recipient's own bar, and clearing it is a question about
   -- the whole combat damage step rather than about this answer (CR 702.19b's and
   -- CR 702.19c's last sentences), so an answer under a threshold can still be
-  -- legal when another creature covers the rest. Validation is
+  -- legal when another creature covers the rest -- or, under CR 702.2c, has
+  -- assigned the blocker any deathtouch damage at all. Validation is
   -- Damage.wellFormedAssignment, then Damage.tiersCleared over every attacking
   -- creature's answer at once. See the M2c spec, section 4.
   AssignCombatDamage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map Recipient.Recipient Natural.Natural -> Natural.Natural -> Prompt (Map.Map Recipient.Recipient Natural.Natural)
