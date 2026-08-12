@@ -114,20 +114,22 @@ layer m = case m of
 -- evaluation is the identity on them.
 --
 -- CR 109.5: a static ability's perspective is its SOURCE's controller, so `src`
--- supplies both that and the InSlot binding source of the Filter.Context. `lyr`
--- bounds the Count fold (viewUpTo). A characteristic-defining ability is the
--- other case (CR 604.3a(3)) and is applied by applyCharacteristicPT, which
--- builds its context from the object's own controller.
+-- supplies both that and the InSlot binding source of the Filter.Context. The
+-- ViewOf a Count folds over is the CALLER's: projectDeciding hands in the board
+-- as it stands mid-layer, so a count reads the same-layer effects that have
+-- already applied (CR 613.8b), and the bounded viewUpTo only where no such
+-- effect exists. A characteristic-defining ability is the other case (CR
+-- 604.3a(3)) and is applied by applyCharacteristicPT, which builds its context
+-- from the object's own controller.
 --
 -- What discriminates the two perspectives is Empyrial Armor on an OPPONENT's
 -- creature, in Pawl.PowerToughnessSpec's "Empyrial Armor" group: "+1/+1 for each
 -- card in your hand" reads the Aura controller's hand and not the enchanted
 -- creature's controller's, and the two hands are deliberately different sizes.
 -- Building the context from `oid` instead of `src` fails that test alone.
-applyModification :: Layer -> ObjectId -> [Gathered] -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
-applyModification lyr src cands gs oid m pc =
+applyModification :: Count.ViewOf -> ObjectId -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyModification viewOf src gs oid m pc =
   let context = Filter.contextFor (controllerOf src gs) (Just src)
-      viewOf = viewUpTo lyr cands gs
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
         -- keyword count twice rather than the second being absorbed.
@@ -2684,6 +2686,91 @@ modificationWrites m = case m of
   Modification.SetController _ -> Set.singleton Controller
   Modification.SetControllerToSource -> Set.singleton Controller
 
+-- Which aspects a Modification's own QUANTITIES read -- the aspects that decide
+-- how much it does, where modificationWrites above says what it changes. The
+-- pair of them is CR 613.8a clause (b)'s last limb: applying another effect can
+-- change "what it does to any of the things it applies to" without touching what
+-- it applies to at all.
+--
+-- Only the two power/toughness arms carry a quantity, so only they can read
+-- anything; every other arm's payload is a card type, a colour, a subtype or a
+-- player, all of them literal. A new arm carrying a Quantity has to be
+-- classified here, or the dependency would silently stop being seen.
+modificationReads :: Modification -> Set Aspect
+modificationReads m = case m of
+  Modification.SetBasePowerToughness p t -> quantityReads p <> quantityReads t
+  Modification.ModifyPowerToughness p t -> quantityReads p <> quantityReads t
+  Modification.GainKeyword _ -> Set.empty
+  Modification.LoseAllAbilities -> Set.empty
+  Modification.SwitchPowerToughness -> Set.empty
+  Modification.SetLandSubtype _ -> Set.empty
+  Modification.SetLandSubtypeToChosen -> Set.empty
+  Modification.AddLandSubtype _ -> Set.empty
+  Modification.SetCreatureSubtype _ -> Set.empty
+  Modification.AddCreatureSubtype _ -> Set.empty
+  Modification.AddEveryCreatureSubtype -> Set.empty
+  Modification.ChangeSubtypeWord _ _ -> Set.empty
+  Modification.AddCardType _ -> Set.empty
+  Modification.AddSupertype _ -> Set.empty
+  Modification.RemoveSupertype _ -> Set.empty
+  Modification.SetColor _ -> Set.empty
+  Modification.AddColor _ -> Set.empty
+  Modification.AddChosenColor -> Set.empty
+  Modification.SetController _ -> Set.empty
+  Modification.SetControllerToSource -> Set.empty
+
+-- Which aspects evaluating a Quantity reads off a projection. The counterpart of
+-- filterReads for the OTHER half of a P/T modification, and exhaustive for the
+-- same reason.
+--
+-- Three ways to read one. A Count folds a population its Filter keeps, so it
+-- reads whatever that filter reads (plus whatever its aggregation reads); Power
+-- and Toughness read CR 613.4's own layer off the object the evaluation is aimed
+-- at; and Plus and AgainstSlot are composition, reading what they contain.
+--
+-- Everything else reads nothing a Modification writes, each for the reason its
+-- sibling filter atom gives: ManaValue is computed from the printed mana cost
+-- (CR 202.3), ObjectCounters and PlayerCounters read counter stores that CR
+-- 109.3 keeps out of the characteristics, and the rest are facts about a player,
+-- a binding, a mana pool or the combat record. A Star is notation and evaluates
+-- to nothing at all.
+--
+-- Over-declaring is the safe direction: this is only a SCREEN, and the
+-- dependency itself is settled by re-evaluating the modification (see
+-- projectDeciding's resolve).
+quantityReads :: Quantity.Type.Quantity -> Set Aspect
+quantityReads q = case q of
+  Quantity.Type.Count c -> filterReads (Count.Type.filter c) <> aggregationReads (Count.Type.aggregation c)
+  Quantity.Type.Power -> Set.singleton PowerA
+  Quantity.Type.Toughness -> Set.singleton PowerA
+  Quantity.Type.Plus a b -> quantityReads a <> quantityReads b
+  Quantity.Type.AgainstSlot _ a -> quantityReads a
+  Quantity.Type.Literal _ -> Set.empty
+  Quantity.Type.ManaValue -> Set.empty
+  Quantity.Type.InSlot _ -> Set.empty
+  Quantity.Type.Star -> Set.empty
+  Quantity.Type.ManaCount _ -> Set.empty
+  Quantity.Type.LifeTotal _ -> Set.empty
+  Quantity.Type.Speed _ -> Set.empty
+  Quantity.Type.IsMonarch _ -> Set.empty
+  Quantity.Type.PlayerCounters _ _ -> Set.empty
+  Quantity.Type.ObjectCounters _ -> Set.empty
+  Quantity.Type.HasDesignation _ -> Set.empty
+  Quantity.Type.WasKicked -> Set.empty
+  Quantity.Type.OpponentsAttacked _ -> Set.empty
+  Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
+  Quantity.Type.BlockersBeyondFirst -> Set.empty
+
+-- What an Aggregation reads off each member the Filter kept. DistinctCardTypes is
+-- CR 208.2a's Tarmogoyf fold over card types (CR 613.1d layer 4); Greatest names
+-- a per-member Quantity and reads whatever that reads; Members reads nothing but
+-- how many survived, which filterReads has already accounted for.
+aggregationReads :: Aggregation.Aggregation Quantity.Type.Quantity -> Set Aspect
+aggregationReads a = case a of
+  Aggregation.Members -> Set.empty
+  Aggregation.DistinctCardTypes -> Set.singleton Types
+  Aggregation.Greatest q -> quantityReads q
+
 -- What could move `c`'s affected set, as the aspects its filter reads -- Nothing
 -- when nothing can move it. Two ways to be immovable, each CR 613.8a's own
 -- precondition made cheap to test: a TheseObjects set names ids (CR 611.2c) and an
@@ -2721,6 +2808,16 @@ staticallyMovable c = case gAffected c of
   -- reason, but WHO CONTROLS a candidate is a layer-2 effect's business
   -- (CR 613.1b), so a control change moves this set.
   Affected.AttachedPlayerControls _ -> True
+
+-- The aspects one effect's parts at a layer write, and the aspects their
+-- quantities read. Both halves of CR 613.8a's clause (b) are asked of the whole
+-- unit rather than of a single modification, that being CR 613.8's own unit --
+-- see effectUnits below.
+unitWrites :: NonEmpty.NonEmpty Gathered -> Set Aspect
+unitWrites = foldMap (modificationWrites . gModification)
+
+unitReads :: NonEmpty.NonEmpty Gathered -> Set Aspect
+unitReads = foldMap (modificationReads . gModification)
 
 -- CR 613.8's unit is an EFFECT, not a modification, and CR 613.6 calls one
 -- ability's modifications the parts of that effect. Two parts landing in the SAME
@@ -2778,14 +2875,17 @@ project oid gs = projectFrom (gather gs) oid gs
 --
 -- CR 604.3a(3): a CDA does not affect any other object, so the Filter.Context is
 -- the object's OWN controller -- contrast applyModification's, which is the
--- source's (CR 109.5). The caller always passes Layer.CharacteristicPT, so a CDA's
--- count sees layers 1-6.
-applyCharacteristicPT :: Layer -> [Gathered] -> GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
-applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
+-- source's (CR 109.5). The caller always passes the view bounded at
+-- Layer.CharacteristicPT, so a CDA's count sees layers 1-6.
+--
+-- Not implemented: CR 613.8a's clause (c) makes two CDAs able to depend on each
+-- other, so a CDA counting a characteristic another CDA defines should see the
+-- defined value and sees the printed one instead (#1332).
+applyCharacteristicPT :: Count.ViewOf -> GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
+applyCharacteristicPT viewOf gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
   Just (p, t) ->
     let context = Filter.contextFor (controllerOf oid gs) (Just oid)
-        viewOf = viewUpTo lyr cands gs
      in pc
           { PC.power = Just (Quantity.determine viewOf context gs oid p),
             PC.toughness = Just (Quantity.determine viewOf context gs oid t)
@@ -2806,9 +2906,14 @@ projectWith admits cands =
 -- The bound exists for counting: a Count evaluated while layer L is being applied
 -- sees its candidates through `< L`, so one encountered inside that fold is
 -- applied at some K < L and sees `< K`. The bound strictly decreases and Layer is
--- finite, so the nesting terminates. It is a terminating approximation -- exact
--- whenever a count reads strictly earlier layers, under-reading one over its own
--- layer or later (#157).
+-- finite, so the nesting terminates.
+--
+-- It is EXACT wherever it is taken, which is the layers holding nothing that
+-- writes an aspect anything there counts: CR 613.1 has already settled every
+-- earlier layer, and no later one has begun. Where a layer does hold such a pair,
+-- CR 613.8a's clause (b) makes the two effects dependent and the layer goes
+-- through `resolve`, which reads the running board instead of re-projecting --
+-- so no bound is taken and none is needed.
 --
 -- Returns CR 613.6's decision memo beside the characteristics, since the question
 -- "did this effect's affected set include `oid`?" is settled in here and cannot
@@ -2826,16 +2931,34 @@ projectDeciding admits cands = forObject
     -- each extra pass is the identity.
     layers = filter admits (Set.toAscList (Set.insert Layer.Type (Set.insert Layer.Color (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))))
     -- The layers CR 613.8 could reorder anything in: those holding an effect whose
-    -- affected set another can move (staticallyMovable). Bound before the object,
-    -- so a whole-board sweep pays once rather than per object per layer.
+    -- affected set another can move (staticallyMovable), and those holding an
+    -- effect whose MAGNITUDE another can move (countingLayers). Bound before the
+    -- object, so a whole-board sweep pays once rather than per object per layer.
     --
     -- Deliberately coarser than the fold's own test, skipping the CR 613.6 memo
     -- (decidedAt) and the filter's own aspects. Both only turn True into False, so
     -- this over-admits -- costing the general path, never a different answer.
-    movableLayers = Set.fromList (fmap gLayer (filter staticallyMovable cands))
+    movableLayers = Set.union (Set.fromList (fmap gLayer (filter staticallyMovable cands))) countingLayers
+    -- CR 613.8a clause (b)'s "what it does to" limb, screened statically: a layer
+    -- holding an effect whose quantities read an aspect that same layer writes. Same-layer is
+    -- the whole of it -- a count reading only EARLIER layers is answered exactly by
+    -- the bounded view, which is why "holds a count" would be the wrong test.
+    --
+    -- Over-admits by counting an effect's own writes and by ignoring which
+    -- candidate wrote what, both in the harmless direction: they can only route a
+    -- layer through resolve, whose answers agree with the tighter fold wherever CR
+    -- 613.8 is silent.
+    countingLayers = Set.fromList (fmap gLayer (filter countsItsOwnLayer cands))
+    writesByLayer = Map.fromListWith Set.union (fmap (\c -> (gLayer c, modificationWrites (gModification c))) cands)
+    countsItsOwnLayer c = not (Set.disjoint (modificationReads (gModification c)) (Map.findWithDefault Set.empty (gLayer c) writesByLayer))
     forObject oid gs =
       let applyLayer (partial, decided) lyr =
-            let -- CR 613.3: characteristic-defining abilities first, within the
+            let -- What a Count sees when nothing at this layer can move it: the
+                -- layers strictly below (CR 613.1). Bound once per layer so the
+                -- candidate-only work inside projectUpTo is shared across every
+                -- count the layer evaluates.
+                bounded = viewUpTo lyr cands gs
+                -- CR 613.3: characteristic-defining abilities first, within the
                 -- layer they define. Subtype is layer 4 (CR 613.1d), colour is
                 -- layer 5 (CR 613.1e), P/T is layer 7a (CR 613.4a). Taken per
                 -- OBJECT, since the dependency scan seeds every other object's
@@ -2843,7 +2966,7 @@ projectDeciding admits cands = forObject
                 seedFor o p = case lyr of
                   Layer.Type -> applySubtypeDefining p
                   Layer.Color -> applyColorDefining p
-                  Layer.CharacteristicPT -> applyCharacteristicPT lyr cands gs o p
+                  Layer.CharacteristicPT -> applyCharacteristicPT bounded gs o p
                   _ -> p
                 seeded = seedFor oid partial
                 -- CR 613.6: the affected set is asked ONCE per effect, at the
@@ -2864,17 +2987,22 @@ projectDeciding admits cands = forObject
                 -- Fold every part of ONE effect landing in this layer, in the order
                 -- the card lists them (CR 613.6). The parts share a source and an
                 -- affected set, so the caller asks applicability once.
-                applyUnit o pc cs = List.foldl' (\p c -> applyModification lyr (gSource c) cands gs o (gModification c) p) pc (NonEmpty.toList cs)
+                --
+                -- The ViewOf comes from the caller and is the SAME one for every
+                -- object the effect reaches: CR 613.6 applies an effect's parts to
+                -- its whole affected set at once, so a count inside it must not see
+                -- the effect's own work on a sibling.
+                applyUnit viewOf o pc cs = List.foldl' (\p c -> applyModification viewOf (gSource c) gs o (gModification c) p) pc (NonEmpty.toList cs)
                 -- Apply one effect, recording its decision the first time.
                 -- Re-inserting an existing key rewrites the value just read, so this
                 -- is idempotent rather than a second determination.
-                applyOne o (pc, ds) cs =
+                applyOne viewOf o (pc, ds) cs =
                   let c = NonEmpty.head cs
                       answer = appliesTo o ds pc c
                       ds' = case gEffect c of
                         Nothing -> ds
                         Just k -> Map.insert k answer ds
-                   in (if answer then applyUnit o pc cs else pc, ds')
+                   in (if answer then applyUnit viewOf o pc cs else pc, ds')
                 -- CR 613.6's other half of movableAspects, and the half that is per
                 -- object: an effect whose set this object already settled cannot be
                 -- moved at it, whatever its filter reads.
@@ -2900,7 +3028,11 @@ projectDeciding admits cands = forObject
                 snapshot o =
                   let (p, d) = projectDeciding (\l -> admits l && l < lyr) cands o gs
                    in (seedFor o p, d)
-                otherBoards = fmap (\o -> (o, snapshot o)) (Set.toList (Set.delete oid (GameState.battlefield gs)))
+                -- Keyed rather than an association list, because resolve's ViewOf
+                -- looks an object up once per candidate a Count folds over. Strict in
+                -- the Map's values only to WHNF, and every value here is a pair
+                -- constructor, so the snapshots stay as lazy as the comment above says.
+                otherBoards = Map.fromSet snapshot (Set.delete oid (GameState.battlefield gs))
                 -- CR 613.8b: an effect that depends on another waits for it, and CR
                 -- 613.7 timestamp order picks the next among those waiting on
                 -- nothing. Re-deriving `ready` each round IS CR 613.8c, and removing
@@ -2928,9 +3060,37 @@ projectDeciding admits cands = forObject
                         -- for the unit.
                         answersAt o p d = fmap (\(i, cs) -> (i, appliesTo o d p (NonEmpty.head cs))) pending
                         answerFor ans i = Maybe.fromMaybe False (List.lookup i ans)
+                        -- The board as it stands: every battlefield object plus the
+                        -- projected one, which need not be on the battlefield.
+                        running = Map.insert oid (pc, ds) others
+                        -- What a Count sees: CR 613 puts no bound on the state an
+                        -- effect's magnitude is computed from, so a count reads the
+                        -- layers below AND this layer's effects that have already
+                        -- applied. Pawl.ProjectionSpec's Ferocious Chorus group is
+                        -- what proves it, and proves the reorder beside it.
+                        --
+                        -- No recursion, so nothing here has to terminate: the
+                        -- partials are already built. What made a bound necessary
+                        -- was a count RE-PROJECTING its candidates; this reads them.
+                        --
+                        -- An object with no entry falls back to the bounded view. A
+                        -- card in a zone gather does not walk has no continuous
+                        -- effect on it to miss (#160). Not implemented: a SPELL is
+                        -- projected but not scanned here, so a count reading a
+                        -- same-layer effect on one still gets the bound (#1332).
+                        --
+                        -- noncreaturePT is CR 208.3, applied for the reason
+                        -- projectDeciding applies it to its own result: the card types
+                        -- it reads are settled at layer 4, and the bounded view this
+                        -- stands in for applies it too, so the two agree wherever
+                        -- there is nothing at this layer to see.
+                        viewOfBoard board o = case Map.lookup o board of
+                          Just (p, _) -> Just (viewOfCharacteristics o (noncreaturePT o gs p) (controllerOf o gs) (countersOf o gs) gs)
+                          Nothing -> bounded o
+                        view = viewOfBoard running
                         -- Every object CR 613.8a's question ranges over, the
                         -- projected one first.
-                        boards = (oid, pc, ds, answersAt oid pc ds) : fmap (\(o, (p, d)) -> (o, p, d, answersAt o p d)) others
+                        boards = (oid, pc, ds, answersAt oid pc ds) : fmap (\(o, (p, d)) -> (o, p, d, answersAt o p d)) (Map.toList others)
                         -- CR 613.8a clause (b)'s "what it applies to", at ONE
                         -- object: applying `b` there changes whether `a` applies.
                         -- The tentative application is thrown away and only the
@@ -2944,7 +3104,7 @@ projectDeciding admits cands = forObject
                           let a = NonEmpty.head as
                            in not (decidedAt d a)
                                 && answerFor ans j
-                                && appliesTo o d (applyUnit o p bs) a /= answerFor ans i
+                                && appliesTo o d (applyUnit view o p bs) a /= answerFor ans i
                         -- `a` depends on `b` when that holds ANYWHERE: CR 613.8a
                         -- asks about the effect's whole affected SET, so one object
                         -- deciding it for the board is the rule rather than an
@@ -2955,16 +3115,52 @@ projectDeciding admits cands = forObject
                         -- Reached only for a pair that could interact, `b` writing
                         -- an aspect `a`'s filter reads. Clause (c)'s CDA exclusion
                         -- needs no test: a CDA is never a candidate, both in-place
-                        -- folds sitting outside this list. Clause (b)'s "text" and
-                        -- "what it does to" halves have no producer; "existence" is
-                        -- handled by liveGiven.
-                        dependsOnOne x@(i, as) y@(j, bs) =
+                        -- folds sitting outside this list. Clause (b)'s "text" half
+                        -- has no producer; "existence" is handled by liveGiven.
+                        movesSet x@(_, as) y@(_, bs) =
                           case movableAspects (NonEmpty.head as) of
                             Nothing -> False
                             Just aspects ->
-                              j /= i
-                                && not (Set.disjoint aspects (foldMap (modificationWrites . gModification) bs))
+                              not (Set.disjoint aspects (unitWrites bs))
                                 && any (changesAt y x) boards
+                        -- CR 613.8a clause (b)'s LAST limb: applying `b` changes
+                        -- what `a` does to the things it applies to, without
+                        -- touching what it applies to. Only a magnitude can move --
+                        -- the two P/T arms are the only modifications carrying a
+                        -- quantity (modificationReads) -- so what is compared is the
+                        -- power and toughness `a` writes, from the SAME base under
+                        -- two views: the board as it stands, and the board with `b`
+                        -- applied wherever it applies.
+                        --
+                        -- Judged only where `a` itself applies. CR 613.8a asks what
+                        -- an effect does "to any of the things it applies to", so an
+                        -- object outside `a`'s set has no answer to give.
+                        --
+                        -- No decidedAt gate, unlike changesAt above: a settled
+                        -- affected set says nothing about how much the effect does.
+                        changesMagnitude (i, as) (_, bs) =
+                          let after = appliedEverywhere bs
+                              afterView = viewOfBoard after
+                              writtenPT p = (PC.power p, PC.toughness p)
+                           in any
+                                ( \(o, p, _, ans) ->
+                                    answerFor ans i
+                                      && writtenPT (applyUnit view o p as) /= writtenPT (applyUnit afterView o p as)
+                                )
+                                boards
+                        -- `b` applied to every object whose set holds it, judged and
+                        -- applied against the board as it stands -- CR 613.6's
+                        -- simultaneity again, and the same rule applyOne obeys when
+                        -- the effect is really chosen.
+                        appliedEverywhere bs =
+                          Map.mapWithKey
+                            (\o (p, d) -> (if appliesTo o d p (NonEmpty.head bs) then applyUnit view o p bs else p, d))
+                            running
+                        dependsOnOne x@(i, as) y@(j, bs) =
+                          j /= i
+                            && ( movesSet x y
+                                   || (not (Set.disjoint (unitReads as) (unitWrites bs)) && changesMagnitude x y)
+                               )
                         ready = filter (\a -> not (any (dependsOnOne a) pending)) pending
                         -- The dependency edges, built only when the whole round is
                         -- blocked -- which is the one case that needs to know the
@@ -2993,7 +3189,7 @@ projectDeciding admits cands = forObject
                         -- permanent's timestamp, so the head part's stamp is the
                         -- unit's.
                         (chosen, next) = List.minimumBy (Ord.comparing (\(_, cs) -> gTimestamp (NonEmpty.head cs))) batch
-                     in resolve (applyOne oid (pc, ds) next) (fmap (\(o, st) -> (o, applyOne o st next)) others) (filter ((/= chosen) . fst) pending)
+                     in resolve (applyOne view oid (pc, ds) next) (Map.mapWithKey (\o st -> applyOne view o st next) others) (filter ((/= chosen) . fst) pending)
                 -- Is there anything at this layer CR 613.8 could reorder? One Set
                 -- lookup, almost always in an empty Set.
                 movableHere = Set.member lyr movableLayers
@@ -3008,19 +3204,22 @@ projectDeciding admits cands = forObject
              in if movableHere
                   then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits (filter (\c -> gLayer c == lyr) cands)))
                   else
-                    -- Nothing here can be moved, so no candidate depends on any other
-                    -- and none's answer can change as the layer is applied. CR 613.8
-                    -- therefore says nothing, CR 613.7 timestamp order stands, and
-                    -- judging against `seeded` gives the same answers as judging one
-                    -- at a time -- the rule where the rule is silent, not a shortcut
-                    -- past it. Also almost every layer of almost every projection,
-                    -- which is why it keeps a tighter fold than `resolve`'s.
+                    -- Nothing here can be moved, so no candidate depends on any other:
+                    -- no affected set can change as the layer is applied, and no
+                    -- magnitude either, since nothing at this layer writes an aspect
+                    -- anything here counts (countingLayers). CR 613.8 therefore says
+                    -- nothing, CR 613.7 timestamp order stands, and judging against
+                    -- `seeded` through the bounded view gives the same answers as
+                    -- judging one at a time -- the rule where the rule is silent, not
+                    -- a shortcut past it. Also almost every layer of almost every
+                    -- projection, which is why it keeps a tighter fold than
+                    -- `resolve`'s.
                     let decided' = List.foldl' remember decided cands
                         applies c = case gEffect c of
                           Nothing -> affects (gSource c) oid (gAffected c) seeded gs
                           Just k -> Map.findWithDefault False k decided'
                         ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
-                        step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
+                        step pc c = applyModification bounded (gSource c) gs oid (gModification c) pc
                      in (List.foldl' step seeded ordered, decided')
           (folded, decisions) = List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers
        in (noncreaturePT oid gs folded, decisions)
@@ -3054,11 +3253,12 @@ projectDeciding admits cands = forObject
 -- -- Filter.PowerAtLeast over a graveyard pool, a Count, the codec -- is
 -- unaffected.
 --
--- Sound on a layer-BOUNDED projection too (projectUpTo), though it is reading
--- card types the bound may not have finished: a printed creature type arrives in
--- the seed and no bound can remove it, so the only thing a bound can hide is a
--- type-CHANGING effect -- which under-reads in exactly the direction #157
--- already records for a bounded count.
+-- Sound on a layer-BOUNDED projection too (projectUpTo), and on the mid-layer
+-- partial `resolve` builds its ViewOf from, though either may be reading card
+-- types its layer has not finished: a printed creature type arrives in the seed
+-- and no bound can remove it, so the only thing a bound can hide is a
+-- type-CHANGING effect -- and layer 4 is settled before layer 7, which is the
+-- only layer whose modifications carry a quantity to count with.
 noncreaturePT :: ObjectId -> GameState -> ProjectedCharacteristics -> ProjectedCharacteristics
 noncreaturePT oid gs pc
   | Set.member CardType.Creature (PC.cardTypes pc) = pc
@@ -3101,8 +3301,9 @@ noValuePT pc
 -- it. Every projection a reader can observe -- project, projectAll, and so every
 -- powerOf, toughnessOf and state-based-action sweep -- comes through here.
 --
--- Not implemented: a bounded count that reads a P/T set in its own layer or
--- later still sees the unsubstituted Nothing (#157).
+-- Not implemented: CR 208.5's substitution is likewise absent from the view a
+-- Count reads mid-layer, so a count over the power of a creature whose only
+-- source of one has been stripped reads no value where the rule says 0 (#1332).
 projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectFrom cands oid gs = noValuePT (projectWith (const True) cands oid gs)
 
