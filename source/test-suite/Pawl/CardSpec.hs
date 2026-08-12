@@ -704,6 +704,9 @@ cardResolutionEffects card =
     <> concatMap (Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities card)
     <> concatMap (Modal.allEffects . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+    -- CR 309.4c: a room ability's effects, which no other limb above reaches --
+    -- Pawl.Types.Face.rooms is the fifth carrier.
+    <> concatMap (Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
 
 cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
@@ -716,6 +719,7 @@ cardCounts card =
     <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
+    <> concatMap (concatMap effectCounts . Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AlternativeCost.condition) (Face.alternativeCosts card)
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
     <> concatMap blockPermissionCounts (Face.blockPermissions card)
@@ -1036,6 +1040,7 @@ cardSlotNamesCollide card =
         || any (slotNamesCollide . modeSlots . ActivatedAbility.modal) (Face.activatedAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Face.triggeredAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+        || any (slotNamesCollide . modeSlots . DungeonRoom.ability) (Face.rooms card)
 
 -- The TRIGGERED-ability half of the D4 dataflow lint: every slot one of a
 -- triggered ability's effects READS must be a slot something binds for that
@@ -1419,6 +1424,7 @@ ownDeclaredTargetSlots card =
           ( fmap ActivatedAbility.modal (Face.activatedAbilities card)
               <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
               <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
+              <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms card))
           )
     )
 
@@ -2485,6 +2491,7 @@ cardFilters card =
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
+    <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)
     <> concatMap (concatMap effectFilters) (Face.mulliganActions card)
     <> concatMap (concatMap effectFilters) (Face.openingHandActions card)
 
@@ -2657,6 +2664,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             : fmap ActivatedAbility.modal (Face.activatedAbilities card)
               <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
               <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
+              <> fmap DungeonRoom.ability (Foldable.toList (Face.rooms card))
         offenders = filter (anyFace cardSlotNamesCollide . Printing.card) ps
     -- Guards against passing vacuously: a pool whose every modal had at most one
     -- slot-declaring mode could not collide whatever the lint said. Dream's Grip
