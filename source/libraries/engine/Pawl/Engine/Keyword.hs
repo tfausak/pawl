@@ -374,7 +374,9 @@ cycling cost searchFor =
     -- why a search does not reveal on its own.
     effect = case searchFor of
       Nothing -> Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
-      Just filter_ -> Effect.Search (PlayerRef.Relative PlayerRelation.You) filter_ SearchDestination.RevealThenHand
+      -- CR 702.29e's "search your library for a [quality] card", so one card is
+      -- the whole instruction's count.
+      Just filter_ -> Effect.Search (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) filter_ SearchDestination.RevealThenHand
 
 -- CR 702.77a: "reinforce N-[cost]" means "[cost], Discard this card: Put N +1/+1
 -- counters on target creature." Cycling's ability one clause over, and the first

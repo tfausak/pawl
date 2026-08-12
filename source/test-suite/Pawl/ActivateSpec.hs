@@ -77,12 +77,11 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- Finds the first matching library card on a search, else fails to find.
+-- Finds as many matching library cards as the search allows, off the head of the
+-- offered list, else fails to find.
 findFirst :: Prompt.Prompt r -> r
 findFirst p = case p of
-  Prompt.SearchLibrary _ _ matches -> case matches of
-    m : _ -> Just m
-    [] -> Nothing
+  Prompt.SearchLibrary _ _ matches cap -> List.genericTake cap matches
   _ -> S.identityAnswer p
 
 -- Answers ChooseModes with the empty selection, which is an illegal answer to

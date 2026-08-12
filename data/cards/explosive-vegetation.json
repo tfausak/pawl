@@ -4,7 +4,7 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1
+          "value": 3
         },
         {
           "type": "OfType",
@@ -16,7 +16,7 @@
           }
         }
       ],
-      "name": "Rampant Growth",
+      "name": "Explosive Vegetation",
       "spell": {
         "modes": [
           {
@@ -34,7 +34,7 @@
                       },
                       {
                         "type": "Literal",
-                        "value": 1
+                        "value": 2
                       },
                       {
                         "type": "And",
