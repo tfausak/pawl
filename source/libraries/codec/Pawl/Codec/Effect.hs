@@ -124,7 +124,7 @@ toJson codec e = case e of
   -- pair out.
   Effect.CreateCopy q r
     | q == Quantity.Literal 1 -> Common.tagged "CreateCopy" (Just (ObjectRef.toJson r))
-    | otherwise -> Common.tagged "CreateCopy" (Just (Common.array [Quantity.toJson q, ObjectRef.toJson r]))
+    | otherwise -> Common.tagged "CreateCopy" (Just (Value.array [Quantity.toJson q, ObjectRef.toJson r]))
   Effect.Replace d u o c re ->
     Common.tagged "Replace" . Just . Value.array $
       [Duration.toJson d, Uses.toJson u, ReplacementOrigin.toJson o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
