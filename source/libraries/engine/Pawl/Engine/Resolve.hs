@@ -334,8 +334,8 @@ durationSlots duration = case duration of
 
 -- Every slot a whole MODE reads: every clause's effects', plus every payer CR
 -- 118.12a's "unless [a player] pays" names, plus every slot a TARGET SPEC's own
--- pool or filter names. What the D4 dataflow lint asks, since a payer slot no effect ALSO
--- reads would otherwise dangle unnoticed. Mana Leak's Counter happens to read
+-- pool or filter names. What the D4 dataflow lint asks, since a payer slot no
+-- effect ALSO reads would otherwise dangle unnoticed. Mana Leak's Counter happens to read
 -- the very slot its "unless" names, so the lint's answer is the same either way
 -- for the one card in the pool; a card whose payer and target differ is what
 -- this exists for.

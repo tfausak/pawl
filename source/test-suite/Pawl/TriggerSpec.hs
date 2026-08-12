@@ -67,7 +67,10 @@
 -- of the declaration for a bigger companion, with Apprentice Sharpshooter --
 -- `trainingSpec`. CR 702.39 provoke, the first whose payload
 -- creates a CR 509.1c blocking requirement, with Goblin Grappler --
--- `provokeSpec`. CR 702.112 renown, the first minted
+-- `provokeSpec`. CR 603.2's "that player" narrowing a TARGET SPEC rather than an
+-- effect's operand -- Filter.ControlledByBound, baked to the player the event
+-- named -- with Trygon Predator at three seats -- `trygonPredatorSpec`. CR
+-- 702.112 renown, the first minted
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
 -- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
 -- 701.37b's designation watched the same way -- the shared
@@ -4128,7 +4131,7 @@ trygonPredatorSpec s registry =
             _ -> Spec.assertFailure s "fixture should give alice a Predator and a Moon, bob and carol a Moon each, and place one trigger"
         -- The same board run to the end: the ability resolves and destroys the
         -- one permanent, leaving both other seats' untouched. The whole card,
-        -- CR 701.7a's destruction included.
+        -- CR 701.8a's destruction included.
         Spec.it s "CR 608.2c whole card: only carol's Bad Moon is destroyed" $ do
           (mine, theirs, others, placed) <- board
           let after = S.runPure plan placed Engine.priorityLoop
