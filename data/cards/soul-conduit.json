@@ -32,20 +32,17 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "players",
-                    "spec": {
-                      "count": {
-                        "least": 2,
-                        "most": 2
-                      },
-                      "pool": {
-                        "type": "Players"
-                      }
+                "targetSpecs": {
+                  "players": {
+                    "count": {
+                      "least": 2,
+                      "most": 2
+                    },
+                    "pool": {
+                      "type": "Players"
                     }
                   }
-                ]
+                }
               }
             ]
           }

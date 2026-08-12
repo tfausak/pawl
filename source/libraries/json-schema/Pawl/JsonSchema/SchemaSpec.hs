@@ -78,3 +78,15 @@ spec s = Spec.describe s "Pawl.JsonSchema.Schema" $ do
           Value.pair "minItems" (Value.integer 2),
           Value.pair "maxItems" (Value.integer 2)
         ]
+
+  -- The value shape is pinned and the KEYS are not, which is exactly what
+  -- Pawl.JsonCodec.Common.decodeTextMap accepts. No propertyNames: a schema
+  -- constraining keys would claim more than the decoder guarantees. The exact
+  -- keyword set is asserted, so this also pins mapOf apart from `object [] []`
+  -- -- that emits properties and required, and would fail here.
+  Spec.it s "mapOf pins the value shape and leaves keys unconstrained" $ do
+    Spec.assertEq s (Schema.unwrap (Schema.mapOf Schema.integer))
+      . obj
+      $ [ Value.pair "type" (str "object"),
+          Value.pair "additionalProperties" (Schema.unwrap Schema.integer)
+        ]

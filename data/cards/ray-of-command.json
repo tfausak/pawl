@@ -1,36 +1,33 @@
 {
   "faces": [
     {
-      "delayedAbilities": [
-        {
-          "ability": {
-            "condition": {
-              "type": "LoseControlOfBound",
-              "value": "target"
-            },
-            "modal": {
-              "modes": [
-                {
-                  "clauses": [
-                    {
-                      "effects": [
-                        {
-                          "type": "Tap",
-                          "value": {
-                            "type": "InSlot",
-                            "value": "target"
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
+      "delayedAbilities": {
+        "tap it": {
+          "condition": {
+            "type": "LoseControlOfBound",
+            "value": "target"
           },
-          "name": "tap it"
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Tap",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
-      ],
+      },
       "manaCost": [
         {
           "type": "Generic",
@@ -97,22 +94,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "ControlledBy",
-                    "value": {
-                      "type": "Opponent"
-                    }
-                  },
-                  "pool": {
-                    "type": "Creatures"
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "Opponent"
                   }
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

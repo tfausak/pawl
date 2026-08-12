@@ -176,33 +176,30 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasKeyword",
-                            "value": {
-                              "type": "Flying"
-                            }
-                          },
-                          {
-                            "type": "ControlledBy",
-                            "value": {
-                              "type": "Opponent"
-                            }
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasKeyword",
+                          "value": {
+                            "type": "Flying"
                           }
-                        ]
-                      },
-                      "pool": {
-                        "type": "Creatures"
-                      }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "Opponent"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Creatures"
                     }
                   }
-                ]
+                }
               }
             ]
           }

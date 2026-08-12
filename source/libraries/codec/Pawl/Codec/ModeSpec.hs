@@ -48,7 +48,7 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
           (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
           (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.required Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
       )
-      """ {"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]} """
+      """ {"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}} """
   -- A mode with no clauses or targetSpecs is what a card that says nothing
   -- extra means, and it round-trips through the empty object.
   Spec.it s "omits every default field" $

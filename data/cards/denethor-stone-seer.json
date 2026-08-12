@@ -57,24 +57,18 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "damage",
-                    "spec": {
-                      "pool": {
-                        "type": "AnyTarget"
-                      }
+                "targetSpecs": {
+                  "damage": {
+                    "pool": {
+                      "type": "AnyTarget"
                     }
                   },
-                  {
-                    "slot": "player",
-                    "spec": {
-                      "pool": {
-                        "type": "Players"
-                      }
+                  "player": {
+                    "pool": {
+                      "type": "Players"
                     }
                   }
-                ]
+                }
               }
             ]
           }

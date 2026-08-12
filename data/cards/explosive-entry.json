@@ -58,38 +58,32 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "artifact",
-                "spec": {
-                  "count": {
-                    "least": 0,
-                    "most": 1
-                  },
-                  "filter": {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Artifact"
-                    }
-                  },
-                  "pool": {
-                    "type": "Permanents"
+            "targetSpecs": {
+              "artifact": {
+                "count": {
+                  "least": 0,
+                  "most": 1
+                },
+                "filter": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
                   }
+                },
+                "pool": {
+                  "type": "Permanents"
                 }
               },
-              {
-                "slot": "creature",
-                "spec": {
-                  "count": {
-                    "least": 0,
-                    "most": 1
-                  },
-                  "pool": {
-                    "type": "Creatures"
-                  }
+              "creature": {
+                "count": {
+                  "least": 0,
+                  "most": 1
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

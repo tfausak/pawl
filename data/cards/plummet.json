@@ -38,22 +38,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "HasKeyword",
-                    "value": {
-                      "type": "Flying"
-                    }
-                  },
-                  "pool": {
-                    "type": "Creatures"
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "HasKeyword",
+                  "value": {
+                    "type": "Flying"
                   }
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

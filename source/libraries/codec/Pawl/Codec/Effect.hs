@@ -61,7 +61,7 @@ toJson codec e = case e of
     Common.tagged "ChangeText" . Just . Value.array $
       [Codec.encode SubtypeFamily.codec family, Common.encodeSet (Codec.encode Subtype.codec) forbidden, Codec.encode SlotName.codec s]
   Effect.AddMana production -> Common.tagged "AddMana" (Just (Codec.encode ManaProduction.codec production))
-  Effect.Search r f d -> Common.tagged "Search" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode (Filter.codec Keyword.codec) f, Codec.encode SearchDestination.codec d]))
+  Effect.Search r q f d -> Common.tagged "Search" (Just (Value.array [Codec.encode PlayerRef.codec r, Quantity.toJson q, Codec.encode (Filter.codec Keyword.codec) f, Codec.encode SearchDestination.codec d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
   Effect.Proliferate -> Common.nullary "Proliferate"
   Effect.TemptWithTheRing -> Common.nullary "TemptWithTheRing"
@@ -264,8 +264,8 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "ChangeText expects [subtypeFamily, forbiddenSubtypes, slot]"
     "AddMana" -> Common.withValue mv (fmap Effect.AddMana . Codec.decode ManaProduction.codec)
     "Search" -> case mv of
-      Just (Value.Array (Array.MkArray [r, f, d])) -> Effect.Search <$> Codec.decode PlayerRef.codec r <*> Codec.decode (Filter.codec Keyword.codec) f <*> Codec.decode SearchDestination.codec d
-      _ -> Left . Text.pack $ "Search expects [player, filter, destination]"
+      Just (Value.Array (Array.MkArray [r, q, f, d])) -> Effect.Search <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q <*> Codec.decode (Filter.codec Keyword.codec) f <*> Codec.decode SearchDestination.codec d
+      _ -> Left . Text.pack $ "Search expects [player, quantity, filter, destination]"
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "TemptWithTheRing" -> Right Effect.TemptWithTheRing

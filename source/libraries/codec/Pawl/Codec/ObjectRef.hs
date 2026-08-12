@@ -22,9 +22,10 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- was waiting on. The wire format is unchanged by that conversion -- the same
 -- five tags, emitted identically -- and what it adds is the schema.
 --
--- 'EachCardInGraveyard' is the one arm with two payloads, so it takes a
--- 'Common.tuple'. Under the #1305 decision it owes a record of its own like
--- every other multi-payload arm; that lands with the payload-records unit.
+-- 'EachCardInGraveyard' and 'TopOfLibrary' are the arms with two payloads, so
+-- each takes a 'Common.tuple'. Under the #1305 decision they owe records of
+-- their own like every other multi-payload arm; that lands with the
+-- payload-records unit.
 codec :: Codec.Codec ObjectRef.ObjectRef
 codec =
   Arm.tagged
@@ -33,7 +34,7 @@ codec =
       Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching,
       Arm.payload "EachCardInGraveyard" (Common.tuple PlayerScope.codec filterCodec) (uncurry ObjectRef.EachCardInGraveyard),
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
-      Arm.payload "TopOfLibrary" PlayerRef.codec ObjectRef.TopOfLibrary
+      Arm.payload "TopOfLibrary" (Common.tuple PlayerRef.codec Common.natural) (uncurry ObjectRef.TopOfLibrary)
     ]
   where
     -- Written once so the encoder, the decoder and the schema cannot disagree
@@ -46,4 +47,6 @@ codec =
         Common.tagged "EachCardInGraveyard" . Just . Value.array $
           [Codec.encode PlayerScope.codec s, Codec.encode filterCodec f]
       ObjectRef.EachPlayer -> Common.nullary "EachPlayer"
-      ObjectRef.TopOfLibrary p -> Common.tagged "TopOfLibrary" . Just $ Codec.encode PlayerRef.codec p
+      ObjectRef.TopOfLibrary p n ->
+        Common.tagged "TopOfLibrary" . Just . Value.array $
+          [Codec.encode PlayerRef.codec p, Common.encodeNatural n]

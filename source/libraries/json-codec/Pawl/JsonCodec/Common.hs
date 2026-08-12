@@ -240,6 +240,37 @@ encodeMultiset f = encodeList f . concatMap (\(k, n) -> List.genericReplicate n 
 decodeMultiset :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Map.Map a Natural.Natural)
 decodeMultiset f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> decodeList f value
 
+-- A name-keyed map, on the wire as a JSON OBJECT keyed by the name. Ascending
+-- by key, which is canonical and byte-stable for the reason an entry array was
+-- once reached for and did not need to be: 'Object.Object' is a LIST OF PAIRS
+-- rather than a map, so the order written is the order rendered (#1303).
+--
+-- The key is a JSON string rather than a 'Value.Value', so these take the key's
+-- own wrap and unwrap rather than a codec for it.
+encodeTextMap :: (k -> Text.Text) -> (v -> Value.Value) -> Map.Map k v -> Value.Value
+encodeTextMap key f =
+  Value.object
+    . fmap (\(k, v) -> Pair.MkPair (String.MkString (key k)) (f v))
+    . Map.toAscList
+
+-- | Rejects a repeated key rather than letting the first win, which is
+-- 'decodeSet''s reason: a duplicate in a hand-written card file is plausibly a
+-- typo rather than a value worth accepting. A JSON object genuinely can carry
+-- one here, since 'Object.Object' does not dedupe.
+decodeTextMap ::
+  (Ord k) =>
+  (Text.Text -> k) ->
+  (Value.Value -> Either Text.Text v) ->
+  Value.Value ->
+  Either Text.Text (Map.Map k v)
+decodeTextMap key f value = do
+  ps <- asObject value
+  entries <- traverse (\p -> fmap ((,) (key (String.unwrap (Pair.name p)))) (f (Pair.value p))) ps
+  let m = Map.fromList entries
+  if Map.size m == length entries
+    then Right m
+    else Left $ Text.pack "expected an object with no repeated keys"
+
 encodeMaybe :: (a -> Value.Value) -> Maybe a -> Value.Value
 encodeMaybe = Maybe.maybe Value.null
 

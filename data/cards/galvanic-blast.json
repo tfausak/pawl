@@ -111,16 +111,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "AnyTarget"
-                  }
+            "targetSpecs": {
+              "target": {
+                "pool": {
+                  "type": "AnyTarget"
                 }
               }
-            ]
+            }
           }
         ]
       },

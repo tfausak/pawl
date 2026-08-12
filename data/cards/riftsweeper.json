@@ -46,16 +46,13 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "pool": {
-                        "type": "CardsInExile"
-                      }
+                "targetSpecs": {
+                  "target": {
+                    "pool": {
+                      "type": "CardsInExile"
                     }
                   }
-                ]
+                }
               }
             ]
           }

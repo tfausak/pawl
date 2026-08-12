@@ -38,25 +38,22 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "Not",
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "Not",
+                  "value": {
+                    "type": "HasColor",
                     "value": {
-                      "type": "HasColor",
-                      "value": {
-                        "type": "Black"
-                      }
+                      "type": "Black"
                     }
-                  },
-                  "pool": {
-                    "type": "Creatures"
                   }
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

@@ -48,16 +48,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "spell",
-                "spec": {
-                  "pool": {
-                    "type": "Spells"
-                  }
+            "targetSpecs": {
+              "spell": {
+                "pool": {
+                  "type": "Spells"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [
@@ -78,16 +75,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "permanent",
-                "spec": {
-                  "pool": {
-                    "type": "Permanents"
-                  }
+            "targetSpecs": {
+              "permanent": {
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [

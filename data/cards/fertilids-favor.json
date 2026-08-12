@@ -31,6 +31,10 @@
                         "value": "player"
                       },
                       {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
                         "type": "And",
                         "value": [
                           {
@@ -75,45 +79,39 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "permanent",
-                "spec": {
-                  "count": {
-                    "least": 0,
-                    "most": 1
-                  },
-                  "filter": {
-                    "type": "Or",
-                    "value": [
-                      {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Artifact"
-                        }
-                      },
-                      {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Creature"
-                        }
+            "targetSpecs": {
+              "permanent": {
+                "count": {
+                  "least": 0,
+                  "most": 1
+                },
+                "filter": {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Artifact"
                       }
-                    ]
-                  },
-                  "pool": {
-                    "type": "Permanents"
-                  }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    }
+                  ]
+                },
+                "pool": {
+                  "type": "Permanents"
                 }
               },
-              {
-                "slot": "player",
-                "spec": {
-                  "pool": {
-                    "type": "Players"
-                  }
+              "player": {
+                "pool": {
+                  "type": "Players"
                 }
               }
-            ]
+            }
           }
         ]
       },

@@ -46,6 +46,10 @@
                             }
                           },
                           {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
                             "type": "And",
                             "value": [
                               {

@@ -16,7 +16,7 @@
           }
         }
       ],
-      "name": "Act of Treason",
+      "name": "Act on Impulse",
       "spell": {
         "modes": [
           {
@@ -24,52 +24,41 @@
               {
                 "effects": [
                   {
-                    "type": "GainControl",
+                    "type": "MoveToZone",
                     "value": [
                       {
-                        "type": "UntilEndOfTurn"
+                        "type": "TopOfLibrary",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          3
+                        ]
                       },
                       {
-                        "type": "InSlot",
-                        "value": "target"
-                      }
+                        "type": "Exile"
+                      },
+                      "exiled"
                     ]
                   },
                   {
-                    "type": "Untap",
-                    "value": {
-                      "type": "InSlot",
-                      "value": "target"
-                    }
-                  },
-                  {
-                    "type": "ModifyTarget",
+                    "type": "GrantPlayFromExile",
                     "value": [
                       {
                         "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "GainKeyword",
-                        "value": {
-                          "type": "Haste"
-                        }
-                      },
-                      {
                         "type": "InSlot",
-                        "value": "target"
+                        "value": "exiled"
                       }
                     ]
                   }
                 ]
               }
-            ],
-            "targetSpecs": {
-              "target": {
-                "pool": {
-                  "type": "Creatures"
-                }
-              }
-            }
+            ]
           }
         ]
       },

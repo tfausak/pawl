@@ -31,9 +31,9 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))
       """ {"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
-  -- The one arm with two payloads, so it keeps an array -- inside the tag's
-  -- value now, rather than being the array that carried the tag. Common.tuple
-  -- writes the same two elements the hand-written pair did.
+  -- A two-payload arm, so it keeps an array -- inside the tag's value now,
+  -- rather than being the array that carried the tag. Common.tuple writes the
+  -- same two elements the hand-written pair did.
   Spec.it s "EachCardInGraveyard" $
     Common.assertCodec
       s
@@ -61,12 +61,25 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       ObjectRef.EachPlayer
       """ {"type":"EachPlayer"} """
+  -- The other two-payload arm: whose library, and how deep. A depth ABOVE ONE,
+  -- since a 1 is what a decoder that dropped the field would answer anyway.
   Spec.it s "TopOfLibrary" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You))
-      """ {"type":"TopOfLibrary","value":{"type":"Relative","value":{"type":"You"}}} """
+      (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)
+      """ {"type":"TopOfLibrary","value":[{"type":"Relative","value":{"type":"You"}},3]} """
+  Spec.it s "TopOfLibrary rejects a bare player reference with no depth" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":{"type":"Relative","value":{"type":"You"}}} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
+  -- CR 401.2 counts cards, so a negative depth is not a number of them.
+  Spec.it s "TopOfLibrary rejects a negative depth" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":[{"type":"Relative","value":{"type":"You"}},-1]} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
   -- Guards against a decoder that read every payload as one arm. The arms are
   -- all objects, so only the tag separates them, and a duplicated tag would
   -- collapse two of these.
@@ -80,7 +93,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
-                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You))
+                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)
               ]
           )
       )

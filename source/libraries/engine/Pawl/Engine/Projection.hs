@@ -1502,7 +1502,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ChangeText family forbidden slot ->
     Effect.ChangeText family (Set.map (swapWordIn family pairs) forbidden) slot
   Effect.AddMana _ -> effect
-  Effect.Search ref filter_ destination -> Effect.Search ref (Filter.rewrite pairs filter_) destination
+  Effect.Search ref quantity filter_ destination -> Effect.Search ref quantity (Filter.rewrite pairs filter_) destination
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.TemptWithTheRing -> effect
@@ -1616,7 +1616,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
   ObjectRef.EachCardInGraveyard s f -> ObjectRef.EachCardInGraveyard s (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
-  ObjectRef.TopOfLibrary _ -> ref
+  ObjectRef.TopOfLibrary _ _ -> ref
 
 -- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --
