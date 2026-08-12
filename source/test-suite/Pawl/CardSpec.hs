@@ -1827,6 +1827,9 @@ objectRefFilters ref = case ref of
   ObjectRef.EachMatching f -> [f]
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
+  -- Count on Luck's "the top card of your library" names a POSITION, so it holds
+  -- no Filter either; its PlayerRef names players and never characteristics.
+  ObjectRef.TopOfLibrary _ -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -3527,8 +3530,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- splitting the opcode to keep one field off one arm would duplicate them.
   Spec.it s "no MoveToZone binds an incarnation under a swept set (#972)" $ do
     ps <- S.allPrintings s
-    let offends effect = case effect of
-          Effect.MoveToZone (ObjectRef.EachMatching _) _ _ mSlot _ _ -> Maybe.isJust mSlot
+    let -- The refs that move at most ONE object, and so have one incarnation to
+        -- bind. A TopOfLibrary is one card PER LIBRARY, so only a PlayerRef
+        -- naming a single library qualifies -- "each player's" and, in a game of
+        -- three, "each opponent's" both move several.
+        movesAtMostOne ref = case ref of
+          ObjectRef.InSlot _ -> True
+          ObjectRef.EachMatching _ -> False
+          ObjectRef.EachPlayer -> False
+          ObjectRef.TopOfLibrary player -> case player of
+            PlayerRef.Relative PlayerRelation.You -> True
+            PlayerRef.Relative PlayerRelation.Opponent -> False
+            PlayerRef.InSlot _ -> True
+            PlayerRef.EachPlayer -> False
+        offends effect = case effect of
+          Effect.MoveToZone ref _ _ mSlot _ _ -> Maybe.isJust mSlot && not (movesAtMostOne ref)
           _ -> False
         binds effect = case effect of
           Effect.MoveToZone (ObjectRef.InSlot _) _ _ mSlot _ _ -> Maybe.isJust mSlot

@@ -2,15 +2,16 @@ module Pawl.Types.ObjectRef where
 
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | WHICH OBJECTS an object-affecting effect names -- the object-side counterpart
 -- of Pawl.Types.PlayerRef.
 --
--- The first two arms differ in whether the objects were named BEFORE the effect
--- runs -- a slot, filled at cast or as the ability was placed -- or are found AS
--- it runs. That is the distinction CR 115.10a draws: only InSlot can name a
--- target; the other two never do.
+-- InSlot stands apart from the other arms: its objects were named BEFORE the
+-- effect runs -- a slot, filled at cast or as the ability was placed -- where
+-- every other arm's are found AS it runs. That is the distinction CR 115.10a
+-- draws: only InSlot can name a target; no other arm ever does.
 data ObjectRef
   = -- | The objects bound in a slot (CR 601.2c filled it by targeting, or the
     -- engine reserved it -- Binding.triggerSource). Usually ONE, the slot's
@@ -58,4 +59,20 @@ data ObjectRef
     -- flying and each player") has to be written as two DealDamage
     -- instructions, so its one CR 608.2f batch becomes two (#1285).
     EachPlayer
+  | -- | The ONE card on top of a library -- Count on Luck's "exile the top card of
+    -- your library". A library is a per-player zone (CR 400.1) kept as an ordered
+    -- pile (CR 401.2), so "the top card" is a position rather than a property, and
+    -- that is what no Filter can say: EachMatching sweeps the battlefield (CR
+    -- 109.2) and a Filter matches characteristics, neither of which can pick the
+    -- head of a hidden pile (CR 400.2).
+    --
+    -- The PlayerRef is WHOSE library, so "the top card of target player's library"
+    -- is the same arm through its InSlot. One card per library named and no depth:
+    -- a printing wanting the top THREE has no spelling here (#1299).
+    --
+    -- Not a target and never one (CR 115.10a) -- the player may be targeted, the
+    -- card is not -- so CR 608.2b has nothing to fizzle. Read when the effect
+    -- executes (CR 608.2c), which is what makes an empty library a no-op rather
+    -- than an error: there is no top card, so the arm names nothing.
+    TopOfLibrary PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)
