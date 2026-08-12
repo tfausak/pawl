@@ -119,7 +119,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
-  Effect.ShuffleIntoLibrary _ -> Nothing
+  Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.OfferCast {} -> Nothing
   -- CR 113.6m names a zone an ability FUNCTIONS in by moving its own object out
   -- of it. This opcode moves nothing -- it writes a permission onto objects an

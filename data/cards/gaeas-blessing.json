@@ -1,0 +1,136 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Gaea's Blessing",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ShuffleIntoLibrary",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "player"
+                      },
+                      "cards"
+                    ]
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "cards",
+                "spec": {
+                  "count": {
+                    "least": 0,
+                    "most": 3
+                  },
+                  "pool": {
+                    "type": "CardsInGraveyard",
+                    "value": {
+                      "type": "InSlot",
+                      "value": "player"
+                    }
+                  }
+                }
+              },
+              {
+                "slot": "player",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfPutIntoGraveyardFromLibrary"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ShuffleIntoLibrary",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          [
+                            "EachCardInGraveyard",
+                            {
+                              "type": "You"
+                            },
+                            {
+                              "type": "And",
+                              "value": []
+                            }
+                          ]
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

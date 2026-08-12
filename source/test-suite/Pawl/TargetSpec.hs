@@ -150,6 +150,14 @@ aimingDwell oids p = case p of
       asked
   _ -> S.identityAnswer p
 
+-- aimingDwell with aimAtCardShuffling's reversing Prompt.Shuffle, for the same
+-- reason: CR 701.24a leaves a shuffle observable only through the order it
+-- produces.
+aimingDwellShuffling :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+aimingDwellShuffling oids p = case p of
+  Prompt.Shuffle ids -> reverse ids
+  _ -> aimingDwell oids p
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- CR 702.18a: "Shroud is a static ability. 'Shroud' means 'This permanent or
@@ -1306,6 +1314,70 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertBool s (not (Set.member (Recipient.ToCreature pikerId) legal)) "Goblin Piker has no toxic at all"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature enteringId) legal)) "CR 601.2c: not the entering Raptor itself"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature hisStalkerId) legal)) "CR 109.5: not bob's toxic creature"
+
+  -- CR 701.24c's FIRST half: "that library is shuffled even if none of those
+  -- objects are in the zone they're expected to be in". Dwell on the Past is the
+  -- pool's first card that can reach it, because CR 608.2b only fizzles a spell
+  -- whose targets are ALL illegal -- its player slot stays legal when both
+  -- targeted cards are exiled in response, so the spell resolves with nothing
+  -- left to shuffle in and bob's library must be shuffled anyway (#558).
+  --
+  -- A PAIR OF RUNS off one board differing in exactly one thing: whether the two
+  -- cards were exiled between the cast and the resolution. The control run is
+  -- what says the shuffle in the other one is not merely the arrival's doing --
+  -- it shows the graveyard losing exactly those two cards and the library
+  -- gaining exactly two.
+  --
+  -- ORDER is how a shuffle is observed at all (CR 701.24a makes it unobservable
+  -- otherwise), under the interpreter that REVERSES every Prompt.Shuffle. What
+  -- ORDER the shuffle leaves is deliberately not asserted anywhere: a real
+  -- shuffle has no assertable one. The seeded libraries are two cards each, so a
+  -- reversal is visible.
+  --
+  -- THREE SEATS, and three seeded libraries. alice casts, bob is targeted, carol
+  -- is neither -- so "the library the spell NAMES" is told apart both from the
+  -- controller's (alice's, untouched) and from everyone's (carol's, untouched).
+  -- carol also holds a graveyard card of the same printing as one of bob's,
+  -- which is what makes "their graveyard" observable rather than "any".
+  Spec.it s "CR 701.24c Dwell on the Past shuffles the targeted player's library even when both targeted cards have left the graveyard" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    dwell <- S.printingOf s registry "Dwell on the Past"
+    -- S.addLibraryCard puts each card ON TOP, so the second of each pair heads
+    -- the library and the first sits under it.
+    let (_, g1) = S.addCreature forest S.alice S.threePlayerGame
+        (hisId, g2) = S.addGraveyardCard piker S.bob g1
+        (hisOtherId, g3) = S.addGraveyardCard bolt S.bob g2
+        (hersId, g4) = S.addGraveyardCard piker S.carol g3
+        (herDeeperId, g5) = S.addLibraryCard bolt S.alice g4
+        (herTopId, g6) = S.addLibraryCard piker S.alice g5
+        (hisDeeperId, g7) = S.addLibraryCard bolt S.bob g6
+        (hisTopId, g8) = S.addLibraryCard piker S.bob g7
+        (carolDeeperId, g9) = S.addLibraryCard piker S.carol g8
+        (carolTopId, g10) = S.addLibraryCard bolt S.carol g9
+        (board, dwellId) = S.handOne dwell g10
+        cast = S.runPure (aimingDwellShuffling [hisId, hisOtherId]) board (S.cast S.alice dwellId)
+        exiled =
+          S.runPure S.identityAnswer (S.runPure S.identityAnswer cast (Event.changeZone hisId Zone.Exile)) $
+            Event.changeZone hisOtherId Zone.Exile
+        resolvedWithCards = S.runPure (aimingDwellShuffling [hisId, hisOtherId]) cast Stack.resolveTop
+        resolvedWithout = S.runPure (aimingDwellShuffling [hisId, hisOtherId]) exiled Stack.resolveTop
+        arrivalsIn pid seeded gs = filter (`notElem` seeded) (Game.zoneMembers Zone.Library pid gs)
+    Spec.assertEqWith s "the spell is on the stack" (length (GameState.stack cast)) 1
+    Spec.assertEqWith s "the control: his graveyard loses exactly the two named cards" (Game.zoneMembers Zone.Graveyard S.bob resolvedWithCards) []
+    Spec.assertEqWith s "and his library gains exactly two" (length (arrivalsIn S.bob [hisTopId, hisDeeperId] resolvedWithCards)) 2
+    Spec.assertEqWith s "with carol's graveyard card untouched, so it was HIS graveyard the cards came from" (Game.zoneMembers Zone.Graveyard S.carol resolvedWithCards) [hersId]
+    Spec.assertEqWith s "exiled in response, both cards are gone from his graveyard before the spell resolves" (Game.zoneMembers Zone.Graveyard S.bob exiled) []
+    Spec.assertEqWith s "so nothing arrives in his library" (length (arrivalsIn S.bob [hisTopId, hisDeeperId] resolvedWithout)) 0
+    Spec.assertEqWith
+      s
+      "CR 701.24c: his library is shuffled all the same -- the reversal shows through"
+      (Game.zoneMembers Zone.Library S.bob resolvedWithout)
+      [hisDeeperId, hisTopId]
+    Spec.assertEqWith s "alice's library is not shuffled, so the library is the one the spell NAMED and not the controller's" (Game.zoneMembers Zone.Library S.alice resolvedWithout) [herTopId, herDeeperId]
+    Spec.assertEqWith s "and carol's is not either, so it is one library and not every library" (Game.zoneMembers Zone.Library S.carol resolvedWithout) [carolTopId, carolDeeperId]
+    Spec.assertEqWith s "with the spell off the stack" (length (GameState.stack resolvedWithout)) 0
 
   -- CR 725.5: "If the result of a continuous effect generated by a static
   -- ability is determined based on who is currently the monarch, but there is no

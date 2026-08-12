@@ -176,9 +176,16 @@ toJson codec e = case e of
   Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Value.array [Codec.encode SlotName.codec s, Codec.encode (Filter.codec Keyword.codec) f]))
   Effect.PlaySubgame s -> Common.tagged "PlaySubgame" (Just (Codec.encode SlotName.codec s))
   Effect.TakeExtraTurn r skips -> Common.tagged "TakeExtraTurn" (Just (Value.array [PlayerRef.toJson r, Common.encodeSet (Codec.encode PhaseSelector.codec) skips]))
-  -- A bare slot name, not an array: the library is derived from the object that
-  -- slot names (CR 701.24), so there is no second field to write.
-  Effect.ShuffleIntoLibrary r -> Common.tagged "ShuffleIntoLibrary" (Just (ObjectRef.toJson r))
+  -- The library-naming PlayerRef is ELIDED when absent, Mill's tally posture:
+  -- Riftsweeper's derived owner (CR 701.24) keeps the bare ObjectRef it has
+  -- always had, and only a card naming the library spells the pair out.
+  --
+  -- Told apart on decode by JSON TYPE, as Create's riders are: a PlayerRef is an
+  -- object, and a bare ObjectRef is either a string (InSlot) or an array whose
+  -- head is the constructor's name, so the pair form can never be read as one.
+  Effect.ShuffleIntoLibrary mp r -> case mp of
+    Nothing -> Common.tagged "ShuffleIntoLibrary" (Just (ObjectRef.toJson r))
+    Just p -> Common.tagged "ShuffleIntoLibrary" (Just (Value.array [PlayerRef.toJson p, ObjectRef.toJson r]))
   -- The slot alone when the offer carries neither of CR 310.11b's riders, which
   -- is an ordinary cast of the card; the pair otherwise. Elided the way
   -- MoveToZone's EntryRiders are, and told apart on decode by JSON TYPE.
@@ -404,7 +411,10 @@ fromJson decode value = do
     "TakeExtraTurn" -> case mv of
       Just (Value.Array (Array.MkArray [r, skips])) -> Effect.TakeExtraTurn <$> PlayerRef.fromJson r <*> Common.decodeSet (Codec.decode PhaseSelector.codec) skips
       _ -> Left . Text.pack $ "TakeExtraTurn expects [playerRef, phaseSelectors]"
-    "ShuffleIntoLibrary" -> Common.withValue mv (fmap Effect.ShuffleIntoLibrary . ObjectRef.fromJson)
+    "ShuffleIntoLibrary" -> case mv of
+      Just (Value.Array (Array.MkArray [p@(Value.Object _), r])) ->
+        Effect.ShuffleIntoLibrary <$> fmap Just (PlayerRef.fromJson p) <*> ObjectRef.fromJson r
+      _ -> Common.withValue mv (fmap (Effect.ShuffleIntoLibrary Nothing) . ObjectRef.fromJson)
     "OfferCast" -> case mv of
       Just (Value.Array (Array.MkArray [s, o])) -> Effect.OfferCast <$> Codec.decode SlotName.codec s <*> Codec.decode CastOffer.codec o
       _ -> Common.withValue mv (fmap (\s -> Effect.OfferCast s CastOffer.defaultValue) . Codec.decode SlotName.codec)
