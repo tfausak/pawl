@@ -212,7 +212,7 @@ slotsOf effect = case effect of
     joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (Projection.quantitiesOf modification)), durationSlots duration]
   Effect.ChangeText _ _ slot -> oneSlot slot
   Effect.AddMana _ -> Map.empty
-  Effect.Search _ _ -> Map.empty
+  Effect.Search ref _ _ -> playerRefSlots ref
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
   Effect.TemptWithTheRing -> Map.empty
@@ -427,7 +427,7 @@ slotsAreExhaustive effect = case effect of
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
   Effect.AddMana _ -> True
-  Effect.Search _ _ -> True
+  Effect.Search {} -> True
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.TemptWithTheRing -> True
@@ -545,7 +545,7 @@ readsX = any effectReadsX
       Effect.ModifyTarget _ modification _ -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
-      Effect.Search _ _ -> False
+      Effect.Search {} -> False
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       Effect.TemptWithTheRing -> False
@@ -609,7 +609,7 @@ readsX = any effectReadsX
 -- Search searches the controller's own library; every other effect does not.
 searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
-  Effect.Search _ _ -> True
+  Effect.Search {} -> True
   Effect.Proliferate -> False
   Effect.TemptWithTheRing -> False
   Effect.PlayerSacrifices {} -> False
@@ -749,7 +749,7 @@ boundSlots effect = case effect of
   Effect.ModifyTarget {} -> Set.empty
   Effect.ChangeText {} -> Set.empty
   Effect.AddMana _ -> Set.empty
-  Effect.Search _ _ -> Set.empty
+  Effect.Search {} -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
@@ -2037,7 +2037,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- Cost.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
-  Effect.Search filter_ destination ->
+  Effect.Search ref filter_ destination ->
     -- CR 701.23a: match each library card through the PRINTED-card view -- a card
     -- in a library has no projection. Its power is CR 208.2a's exception, which
     -- is why the view is Projection.viewOfCardIn: Imperial Recruiter's "creature
@@ -2049,65 +2049,91 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           Nothing -> False
           Just face -> Filter.matches searchContext (Projection.viewOfCardIn g oid face) filter_
      in do
-          -- CR 101.2 / Leonin Arbiter: a player who can't search libraries does
-          -- not, and finds nothing. Asked BEFORE CR 601.3's offer below, because
-          -- that offer is made WHILE SEARCHING and this player never begins to.
+          gs0 <- State.get
+          -- Whoever the PlayerRef names searches -- the controller for Evolving
+          -- Wilds' `Relative You`, the targeted player for Fertilid's Favor's
+          -- `InSlot`. Each searches THEIR OWN library (#1317): the library read
+          -- below, the player prompted, the player offered CR 601.3's cast and
+          -- the player who shuffles are all this one seat, never `controller`.
           --
-          -- The rest of the instruction still happens: CR 701.23 says only how
-          -- to look, so the shuffle at the end is the CARD's separate
-          -- instruction and a prohibition on searching is no reason to skip it.
-          prohibited <- State.gets (PlayerEffect.prohibitsSearching controller)
-          found <-
-            if prohibited
-              then pure Nothing
-              else do
-                -- CR 601.3 (Panglacial Wurm): the chance to cast a
-                -- castable-while-searching card is offered AT THE SEARCH, not
-                -- when the resolution began (#57). Two things follow, and both
-                -- are the rule rather than conveniences:
-                --
-                --   * everything this resolution sequences BEFORE the search has
-                --     already happened, so the offer is made in the game state
-                --     the player is actually searching from -- Scapeshift's
-                --     sacrificed lands are gone before the Wurm's affordability
-                --     is judged;
-                --   * CR 601.3's subject is "a spell or ability", and this site
-                --     is reached by both. The old site was Stack's
-                --     Source.OfAbility arm alone, so a searching SPELL was never
-                --     offered the cast at all.
-                Cast.castWhileSearching controller
-                gs <- State.get
-                let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
-                    decider = Decide.deciderFor controller gs
-                answer <- Game.choose (Prompt.SearchLibrary decider controller matches)
-                -- CR 701.23a: the card found is one the search's own filter
-                -- admits. Filtered, not trusted (#222): naming a card the filter
-                -- excluded, or one that is not in the library at all, finds
-                -- nothing rather than fetching it. CR 701.23b makes that a legal
-                -- outcome in its own right -- "that player isn't required to
-                -- find some or all of those cards even if they're present" -- so
-                -- rejecting needs no new branch downstream.
-                pure $ case answer of
-                  Just oid | List.elem oid matches -> Just oid
-                  _ -> Nothing
-          -- Where the card goes is the CARD's instruction, not rule 701.23's --
-          -- that rule says only how to look, and CR 701.23e says the same of the
-          -- reveal ("if the effect that contains the search instruction doesn't
-          -- also contain instructions to reveal the found card(s), then they're
-          -- not revealed"). Evolving Wilds puts it onto the battlefield tapped;
-          -- CR 702.29e's typecycling reveals it and puts it into the hand.
+          -- CR 701.23i supplies the order, as CR 121.2c does for Draw, and the
+          -- intersection with apnapOrder is that arm's: apnapOrder supplies the
+          -- ORDER and the ref the MEMBERSHIP.
           --
-          -- The searcher is the revealer: CR 701.20a's "show that card to all
-          -- players" is done by the player following the instruction, which for
-          -- a search of "your library" is its controller.
-          mapM_ (putFound controller destination) found
-          -- Shuffle the (possibly reduced) library afterward. The CARD's
-          -- instruction, not rule 701.23's -- as eleven lines above, that rule
-          -- says only how to look. CR 701.23h and CR 701.24b both describe the
-          -- shuffle as something an effect instructs, never as part of a search.
-          lib <- State.gets (Game.zoneMembers Zone.Library controller)
-          shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
-          State.modify' (reorderLibrary controller (Game.honourShuffle lib shuffleAnswer))
+          -- Not implemented: rule 701.23i's SIMULTANEOUS look, each searcher
+          -- seeing the libraries before any of them decides. This loop lets each
+          -- searcher finish before the next begins, which is the same game for
+          -- the one-player refs the pool uses and not for a several-player one
+          -- (#1319).
+          let named = playerRefPlayers legal controller gs0 ref
+              searchers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
+          Monad.forM_ searchers $ \searcher -> do
+            -- CR 101.2 / Leonin Arbiter: a player who can't search libraries does
+            -- not, and finds nothing. Asked BEFORE CR 601.3's offer below, because
+            -- that offer is made WHILE SEARCHING and this player never begins to.
+            --
+            -- The rest of the instruction still happens: CR 701.23 says only how
+            -- to look, so the shuffle at the end is the CARD's separate
+            -- instruction and a prohibition on searching is no reason to skip it.
+            prohibited <- State.gets (PlayerEffect.prohibitsSearching searcher)
+            found <-
+              if prohibited
+                then pure Nothing
+                else do
+                  -- CR 601.3 (Panglacial Wurm): the chance to cast a
+                  -- castable-while-searching card is offered AT THE SEARCH, not
+                  -- when the resolution began (#57). Three things follow, and all
+                  -- are the rule rather than conveniences:
+                  --
+                  --   * everything this resolution sequences BEFORE the search has
+                  --     already happened, so the offer is made in the game state
+                  --     the player is actually searching from -- Scapeshift's
+                  --     sacrificed lands are gone before the Wurm's affordability
+                  --     is judged;
+                  --   * CR 601.3's subject is "a spell or ability", and this site
+                  --     is reached by both. The old site was Stack's
+                  --     Source.OfAbility arm alone, so a searching SPELL was never
+                  --     offered the cast at all;
+                  --   * the Wurm's own words are "while you're searching your
+                  --     library", so the offer goes to the SEARCHER and reads the
+                  --     library they are searching -- which is the one they own,
+                  --     by the opcode's shape.
+                  Cast.castWhileSearching searcher
+                  gs <- State.get
+                  let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library searcher gs)
+                      decider = Decide.deciderFor searcher gs
+                  answer <- Game.choose (Prompt.SearchLibrary decider searcher matches)
+                  -- CR 701.23a: the card found is one the search's own filter
+                  -- admits. Filtered, not trusted (#222): naming a card the filter
+                  -- excluded, or one that is not in the library at all, finds
+                  -- nothing rather than fetching it. CR 701.23b makes that a legal
+                  -- outcome in its own right -- "that player isn't required to
+                  -- find some or all of those cards even if they're present" -- so
+                  -- rejecting needs no new branch downstream.
+                  pure $ case answer of
+                    Just oid | List.elem oid matches -> Just oid
+                    _ -> Nothing
+            -- Where the card goes is the CARD's instruction, not rule 701.23's --
+            -- that rule says only how to look, and CR 701.23e says the same of the
+            -- reveal ("if the effect that contains the search instruction doesn't
+            -- also contain instructions to reveal the found card(s), then they're
+            -- not revealed"). Evolving Wilds puts it onto the battlefield tapped;
+            -- CR 702.29e's typecycling reveals it and puts it into the hand.
+            --
+            -- The searcher is the revealer: CR 701.20a's "show that card to all
+            -- players" is done by the player following the instruction, which is
+            -- this seat rather than the resolution's controller.
+            mapM_ (putFound searcher destination) found
+            -- Shuffle the (possibly reduced) library afterward. The CARD's
+            -- instruction, not rule 701.23's -- as eleven lines above, that rule
+            -- says only how to look. CR 701.23h and CR 701.24b both describe the
+            -- shuffle as something an effect instructs, never as part of a
+            -- search. Fertilid's Favor's "then shuffles" names the searcher, and
+            -- every other shuffling search in the pool says "your library" of the
+            -- same seat.
+            lib <- State.gets (Game.zoneMembers Zone.Library searcher)
+            shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
+            State.modify' (reorderLibrary searcher (Game.honourShuffle lib shuffleAnswer))
   -- Rest in Peace's ETB: exile every card in every graveyard (CR 400.7 each move
   -- funnels through changeZone). A graveyard->exile move matches no M3f
   -- replacement or trigger, so no cascade.

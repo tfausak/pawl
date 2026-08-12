@@ -62,7 +62,7 @@ manaProduced effect = case effect of
   Effect.DealDamage _ _ -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
-  Effect.Search _ _ -> Nothing
+  Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
   Effect.TemptWithTheRing -> Nothing

@@ -314,10 +314,11 @@ data PlayerEffect
     -- Pawl.Types.Modification.
     --
     -- WHICH library is not carried. Leonin Arbiter's sentence names none, and CR
-    -- 101.2 needs no help from a narrowing to stop the one search pawl can
-    -- perform: Effect.Search searches the RESOLVING CONTROLLER's own library and
-    -- no card in the pool searches another player's (#283). A card that
-    -- prohibited searching only some libraries would want a filter here.
+    -- 101.2 needs no help from a narrowing to stop the searches pawl can perform:
+    -- every Effect.Search is a player searching their OWN library (#1317), so the
+    -- searcher this prohibition names and the library it stops are the same seat.
+    -- A card that prohibited searching only some libraries would want a filter
+    -- here.
     --
     -- WHOSE searching is the carrier's PlayerScope, as for every arm here:
     -- Leonin Arbiter says "players" with no possessive, so EachPlayer.
