@@ -32,9 +32,9 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
       ( Count.MkCount
           (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
           (Filter.And [Filter.HasSubtype Subtype.Swamp, Filter.ControlledBy PlayerRelation.You])
-          Aggregation.Objects
+          Aggregation.Members
       )
-      """ {"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Swamp"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Objects"}} """
+      """ {"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Swamp"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}} """
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "MkCount, scoped to the event history" $
     Common.assertJsonCodec
@@ -55,6 +55,6 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
       ( Count.MkCount
           (Scope.InZone Zone.Hand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
           (Filter.And [])
-          Aggregation.Objects
+          Aggregation.Members
       )
-      """ {"scope":{"type":"InZone","value":[{"type":"Hand"},{"type":"InSlot","value":"target"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"Objects"}} """
+      """ {"scope":{"type":"InZone","value":[{"type":"Hand"},{"type":"InSlot","value":"target"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"Members"}} """

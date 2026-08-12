@@ -11,7 +11,10 @@ module Pawl.Types.Aggregation where
 -- Parameterizing keeps this module Quantity-free; Pawl.Types.Quantity ties the
 -- knot by instantiating `Count Quantity`.
 data Aggregation quantity
-  = Objects
+  = -- | How many members the Filter kept. Named for the SCOPE's candidates
+    -- rather than for objects: Pawl.Types.Scope.OverPlayers folds over players,
+    -- and CR 109.1's list of what an object is has no player in it.
+    Members
   | DistinctCardTypes
   | -- | The largest value of a per-member quantity -- "the greatest mana value
     -- among artifacts you control" (Karn, Legacy Reforged). Unlike the two above

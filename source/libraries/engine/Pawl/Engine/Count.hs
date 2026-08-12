@@ -74,6 +74,23 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
     let views = Maybe.mapMaybe (snapshotView gs shape . snd) (Foldable.toList (GameState.events gs))
         kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
      in aggregate quantityOf aggregation kept
+  -- CR 102.1: the players themselves. Candidates come from the same
+  -- playersFor the zone arm indexes by, so CR 800.4a's departed seat is
+  -- uncountable here without a second reading of who is in the game -- and
+  -- unlike there, that IS observable: a departed player's zones were emptied,
+  -- so naming them cost nothing, while naming the player costs one.
+  --
+  -- Each candidate is seen through Filter.playerView rather than through the
+  -- injected ViewOf, which answers about OBJECTS (CR 109.1) and has no id to
+  -- be asked with here. So the members are objectless, as InHistory's are, and
+  -- an Aggregation.Greatest over this scope folds a per-OBJECT quantity against
+  -- a player, which CR 208.1 and CR 202.3 give no answer to. Not implemented:
+  -- a maximum over a per-PLAYER quantity, which is what such a card would mean
+  -- (#1315).
+  Scope.OverPlayers ref -> do
+    pids <- playersFor context gs ref
+    let kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just . Filter.playerView) pids)
+    aggregate quantityOf aggregation kept
   where
     predicate = Count.Type.filter count
     aggregation = Count.Type.aggregation count
@@ -84,7 +101,7 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
 -- neither the Scope nor the Filter holds a slot name.
 slots :: (quantity -> Set slot) -> Count.Type.Count quantity -> Set slot
 slots slotsOfQuantity count = case Count.Type.aggregation count of
-  Aggregation.Objects -> Set.empty
+  Aggregation.Members -> Set.empty
   Aggregation.DistinctCardTypes -> Set.empty
   Aggregation.Greatest quantity -> slotsOfQuantity quantity
 
@@ -95,7 +112,7 @@ slots slotsOfQuantity count = case Count.Type.aggregation count of
 -- answer the empty set above -- there is nothing there to ask.
 anyQuantity :: (quantity -> Bool) -> Count.Type.Count quantity -> Bool
 anyQuantity predicate count = case Count.Type.aggregation count of
-  Aggregation.Objects -> False
+  Aggregation.Members -> False
   Aggregation.DistinctCardTypes -> False
   Aggregation.Greatest quantity -> predicate quantity
 
@@ -113,7 +130,7 @@ keep predicate context mv = case mv of
 -- so Greatest hands the reader both and lets it answer from whichever it can.
 aggregate :: QuantityOf quantity -> Aggregation.Aggregation quantity -> [(Maybe ObjectId, Filter.View)] -> Maybe Integer
 aggregate quantityOf aggregation members = case aggregation of
-  Aggregation.Objects -> Just (toInteger (length members))
+  Aggregation.Members -> Just (toInteger (length members))
   Aggregation.DistinctCardTypes -> Just (toInteger (Set.size (Set.unions (fmap (Filter.cardTypes . snd) members))))
   -- Total in both directions. A member whose quantity cannot be determined
   -- makes the whole maximum undeterminable rather than being dropped, which
@@ -140,11 +157,11 @@ aggregate quantityOf aggregation members = case aggregation of
 -- Player.status changes), so `everyone` is Game.stillPlaying rather than the
 -- map's keys, and neither EachPlayer nor Opponent names a departed seat.
 --
--- Unobservable HERE, unlike at Resolve.playerRefPlayers, and written anyway: CR
--- 800.4a already emptied every zone a departing player owned, so they
--- contributed nothing to any fold. The two readings of a PlayerRef must not
--- disagree, and the first Scope folding over PLAYERS rather than their objects
--- would observe it.
+-- Observable through Scope.OverPlayers, which folds the players this returns
+-- rather than their objects, and Pawl.CountSpec's Tyranid Invasion group is
+-- what proves it. Through Scope.InZone it still is not: CR 800.4a already
+-- emptied every zone a departing player owned, so naming a departed seat there
+-- folds nothing either way.
 playersFor :: Filter.Context -> GameState -> PlayerRef.PlayerRef -> Maybe [PlayerId]
 playersFor context gs ref =
   let everyone = Game.stillPlaying gs

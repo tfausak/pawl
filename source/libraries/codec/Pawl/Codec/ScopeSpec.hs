@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Zone as Zone
 
@@ -27,3 +28,11 @@ spec s = Spec.describe s "Pawl.Codec.Scope" $ do
       Scope.fromJson
       (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
       """ {"type":"InHistory","value":{"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]}} """
+  -- CR 102.1's domain: the players a reference names, rather than their zones.
+  Spec.it s "OverPlayers" $
+    Common.assertJsonCodec
+      s
+      Scope.toJson
+      Scope.fromJson
+      (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
+      """ {"type":"OverPlayers","value":{"type":"Relative","value":{"type":"Opponent"}}} """

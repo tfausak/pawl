@@ -59,7 +59,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Affected.Attached
           ( Just
               ( Condition.Compares
-                  (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Forest) Aggregation.Objects))
+                  (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Forest) Aggregation.Members))
                   Comparison.AtLeast
                   (Quantity.Literal 1)
               )
@@ -67,7 +67,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Nothing
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
-      """ {"affected":{"type":"Attached"},"condition":{"comparison":{"type":"AtLeast"},"measured":{"type":"Count","value":{"aggregation":{"type":"Objects"},"filter":{"type":"HasSubtype","value":{"type":"Forest"}},"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]}}},"threshold":{"type":"Literal","value":1}},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
+      """ {"affected":{"type":"Attached"},"condition":{"comparison":{"type":"AtLeast"},"measured":{"type":"Count","value":{"aggregation":{"type":"Members"},"filter":{"type":"HasSubtype","value":{"type":"Forest"}},"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]}}},"threshold":{"type":"Literal","value":1}},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- Titania's Song's second sentence: CR 604.2's other override, and optional
   -- for the condition's reason -- absent means the effect ends with its
   -- permanent, which is every other ability in the pool.

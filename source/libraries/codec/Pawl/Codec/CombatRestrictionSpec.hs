@@ -79,7 +79,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       ( "{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"unless\":"
           <> "{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},"
           <> "\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Giant\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},"
-          <> "\"aggregation\":{\"type\":\"Objects\"}}},"
+          <> "\"aggregation\":{\"type\":\"Members\"}}},"
           <> "\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}}}"
       )
   -- CR 509.1b's second clause is the same sentence with "block" in place of
@@ -101,7 +101,7 @@ anotherGiant =
         ( Count.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
             (Filter.And [Filter.HasSubtype Subtype.Giant, Filter.ControlledBy PlayerRelation.You])
-            Aggregation.Objects
+            Aggregation.Members
         )
     )
     Comparison.AtLeast

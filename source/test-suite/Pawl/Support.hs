@@ -402,7 +402,7 @@ youControlSource =
         ( Count.Type.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
             (Filter.Type.And [Filter.Type.IsSource, Filter.Type.ControlledBy PlayerRelation.You])
-            Aggregation.Objects
+            Aggregation.Members
         )
     )
     Comparison.Exactly
@@ -420,7 +420,7 @@ youControlNoSwamps =
         ( Count.Type.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
             (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
-            Aggregation.Objects
+            Aggregation.Members
         )
     )
     Comparison.Exactly

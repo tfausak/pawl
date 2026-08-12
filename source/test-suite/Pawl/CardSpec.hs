@@ -391,7 +391,7 @@ quantityCounts quantity = case quantity of
 -- scope.
 countCounts :: Count.Type.Count Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
 countCounts count = case Count.Type.aggregation count of
-  Aggregation.Objects -> []
+  Aggregation.Members -> []
   Aggregation.DistinctCardTypes -> []
   Aggregation.Greatest quantity -> quantityCounts quantity
 
@@ -730,6 +730,10 @@ scopeOffends :: Scope.Scope -> Bool
 scopeOffends scope = case scope of
   Scope.InZone zone ref -> isSharedZone zone && ref /= PlayerRef.EachPlayer
   Scope.InHistory _ -> False
+  -- No zone at all, shared or otherwise: this scope folds the players a
+  -- PlayerRef names rather than a copy of a zone each of them owns, so the
+  -- pairing the lint rejects cannot arise.
+  Scope.OverPlayers _ -> False
 
 cardOffendsSharedZoneScope :: Face.Face Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =
@@ -4048,7 +4052,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.staticAbilities =
                     [ boostedBy
                         ( Quantity.Type.Count
-                            (Count.Type.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) buried Aggregation.Objects)
+                            (Count.Type.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) buried Aggregation.Members)
                         )
                     ]
                 }

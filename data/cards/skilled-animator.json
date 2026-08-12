@@ -49,7 +49,7 @@
                                 "type": "Count",
                                 "value": {
                                   "aggregation": {
-                                    "type": "Objects"
+                                    "type": "Members"
                                   },
                                   "filter": {
                                     "type": "IsSource"
@@ -95,7 +95,7 @@
                                 "type": "Count",
                                 "value": {
                                   "aggregation": {
-                                    "type": "Objects"
+                                    "type": "Members"
                                   },
                                   "filter": {
                                     "type": "IsSource"
@@ -141,7 +141,7 @@
                                 "type": "Count",
                                 "value": {
                                   "aggregation": {
-                                    "type": "Objects"
+                                    "type": "Members"
                                   },
                                   "filter": {
                                     "type": "IsSource"

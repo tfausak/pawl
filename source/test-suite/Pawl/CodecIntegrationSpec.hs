@@ -260,7 +260,7 @@ noZombiesOnBattlefield =
         ( Count.Type.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
             (Filter.Type.HasSubtype Subtype.Zombie)
-            Aggregation.Objects
+            Aggregation.Members
         )
     )
     Comparison.Exactly

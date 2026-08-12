@@ -13,13 +13,13 @@ import qualified Pawl.Types.Aggregation as Aggregation
 -- concrete element type this spec exercises.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Aggregation" $ do
-  Spec.it s "Objects" $
+  Spec.it s "Members" $
     Common.assertJsonCodec
       s
       (Aggregation.toJson Value.integer)
       (Aggregation.fromJson Common.asInteger)
-      Aggregation.Objects
-      """ {"type":"Objects"} """
+      Aggregation.Members
+      """ {"type":"Members"} """
   Spec.it s "DistinctCardTypes" $
     Common.assertJsonCodec
       s

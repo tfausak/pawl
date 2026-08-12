@@ -11,7 +11,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 -- this module sit below @Pawl.Codec.Quantity@ rather than in a cycle with it.
 toJson :: (q -> Value.Value) -> Aggregation.Aggregation q -> Value.Value
 toJson codec a = case a of
-  Aggregation.Objects -> Common.nullary "Objects"
+  Aggregation.Members -> Common.nullary "Members"
   Aggregation.DistinctCardTypes -> Common.nullary "DistinctCardTypes"
   Aggregation.Greatest q -> Common.tagged "Greatest" . Just $ codec q
 
@@ -19,7 +19,7 @@ fromJson :: (Value.Value -> Either Text.Text q) -> Value.Value -> Either Text.Te
 fromJson decode value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
-    ("Objects", Nothing) -> Right Aggregation.Objects
+    ("Members", Nothing) -> Right Aggregation.Members
     ("DistinctCardTypes", Nothing) -> Right Aggregation.DistinctCardTypes
     ("Greatest", Just v) -> Aggregation.Greatest <$> decode v
     _ -> Left . Text.pack $ "unknown Aggregation: " <> t
