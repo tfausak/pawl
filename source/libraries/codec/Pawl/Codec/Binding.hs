@@ -6,7 +6,6 @@ import qualified Pawl.Codec.ModeIndex as ModeIndex
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
-import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -42,19 +41,9 @@ fromJson value = do
         Binding.objects = o
       }
 
--- A name-keyed map as a sorted array of entries, so the render is
--- deterministic.
+-- A name-keyed map as a JSON OBJECT keyed by the slot name.
 toJsonMap :: Map.Map SlotName.SlotName Binding.Binding -> Value.Value
-toJsonMap m =
-  Common.encodeList
-    (\(k, v) -> Value.object [Value.pair "slot" (Codec.encode SlotName.codec k), Value.pair "binding" (toJson v)])
-    (Map.toAscList m)
+toJsonMap = Common.encodeTextMap SlotName.unwrap toJson
 
 fromJsonMap :: Value.Value -> Either Text.Text (Map.Map SlotName.SlotName Binding.Binding)
-fromJsonMap value =
-  let decodeEntry v = do
-        ps <- Common.asObject v
-        k <- Common.field "slot" ps >>= Codec.decode SlotName.codec
-        b <- Common.field "binding" ps >>= fromJson
-        pure (k, b)
-   in Map.fromList <$> Common.decodeList decodeEntry value
+fromJsonMap = Common.decodeTextMap SlotName.MkSlotName fromJson
