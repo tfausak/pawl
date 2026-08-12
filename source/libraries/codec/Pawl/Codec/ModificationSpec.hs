@@ -90,6 +90,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.AddCreatureSubtype Subtype.Saproling)
       """ {"type":"AddCreatureSubtype","value":{"type":"Saproling"}} """
+  -- layer 4, CR 205.1b add over the whole of CR 205.3m (Wings of Velis Vel).
+  Spec.it s "AddEveryCreatureSubtype" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      Modification.AddEveryCreatureSubtype
+      """ {"type":"AddEveryCreatureSubtype"} """
   -- layer 4 (Opalescence -> Creature).
   Spec.it s "AddCardType" $
     Common.assertJsonCodec

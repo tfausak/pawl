@@ -58,6 +58,20 @@ data Modification
     -- land arms' alone, which is why neither creature-type arm routes through
     -- setLandSubtypeTo.
     AddCreatureSubtype Subtype.Subtype
+  | -- | layer 4, CR 205.1b add over the WHOLE of CR 205.3m: this object gains
+    -- every creature type. "Gains all creature types" (Wings of Velis Vel) and
+    -- "is every creature type" (Maskwood Nexus) are the two printed wordings.
+    --
+    -- NULLARY, where AddCreatureSubtype above carries one type: rule 205.3m's
+    -- list is the payload, it grows with every set, and no card enumerates it.
+    -- A card that could would be authoring the rulebook.
+    --
+    -- An ADD, so the object keeps its other families (a Vehicle stays a Vehicle)
+    -- and its own creature types. That is CR 702.73a's changeling stated as an
+    -- ordinary timestamped effect -- which is exactly what the keyword becomes
+    -- when another object GRANTS it (CR 604.3a denies the granted instance CDA
+    -- status), so Pawl.Engine.Projection.grantedDefiningParts mints this arm.
+    AddEveryCreatureSubtype
   | AddCardType CardType.CardType -- layer 4 (Opalescence -> Creature)
   | -- | layer 4, CR 613.1d / 205.4b: this object gains a supertype (Leyline of
     -- Singularity's "All nonland permanents are legendary"). An ADD and never a

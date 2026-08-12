@@ -24,6 +24,7 @@ toJson m = case m of
   Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Subtype.toJson s
   Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Subtype.toJson s
   Modification.AddCreatureSubtype s -> Common.tagged "AddCreatureSubtype" . Just $ Subtype.toJson s
+  Modification.AddEveryCreatureSubtype -> Common.nullary "AddEveryCreatureSubtype"
   Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ CardType.toJson c
   Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Supertype.toJson t
   Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Supertype.toJson t
@@ -51,6 +52,7 @@ fromJson value = do
     "AddLandSubtype" -> Common.withValue mv (fmap Modification.AddLandSubtype . Subtype.fromJson)
     "SetCreatureSubtype" -> Common.withValue mv (fmap Modification.SetCreatureSubtype . Subtype.fromJson)
     "AddCreatureSubtype" -> Common.withValue mv (fmap Modification.AddCreatureSubtype . Subtype.fromJson)
+    "AddEveryCreatureSubtype" -> Right Modification.AddEveryCreatureSubtype
     "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
     "AddSupertype" -> Common.withValue mv (fmap Modification.AddSupertype . Supertype.fromJson)
     "RemoveSupertype" -> Common.withValue mv (fmap Modification.RemoveSupertype . Supertype.fromJson)
