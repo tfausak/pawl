@@ -316,6 +316,39 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
 --
 -- Shroofus is the pool's only printed nontoken Saproling, and is transcribed
 -- without its combat-damage token trigger (#1113).
+-- Synthetic Ferocious Chorus, Bad Moon, a Bog Wraith and a Child of Night, all
+-- alice's. `chorusFirst` controls the timestamp order (fresh timestamps ascend
+-- with placement).
+--
+-- CR 613.8a clause (b)'s "what it does to" limb, the one no affected set moves:
+-- both effects are CR 613.4c layer 7c, Bad Moon's set is the black creatures and
+-- the Chorus's is alice's creatures, and neither writes anything the other's
+-- filter reads. What Bad Moon moves is HOW MUCH the Chorus does -- its "for each
+-- creature you control with power 4 or greater" counts a Bog Wraith only Bad
+-- Moon lifts to 4 -- so the Chorus depends on it and CR 613.8b makes it wait, in
+-- either timestamp order.
+--
+-- The Child of Night is what stops the count reading as "every creature": Bad
+-- Moon leaves it 3/2, under the threshold, so the count is 1 and not 2. It also
+-- rules out a fixpoint reading, since the FINISHED board holds two creatures with
+-- power 4 or greater and the count was still 1 -- CR 613.8b's "just after all of
+-- those effects have been applied", asked once, not re-asked.
+--
+-- Synthetic (#157): the effect DSL puts a quantity in the two layer-7 arms alone,
+-- so the only count that can read its own layer is a P/T effect counting power,
+-- and every printed one is a resolution's frozen number (CR 608.2h), a cost
+-- modification (CR 613.11), or Sword of the Squeak's BASE power -- which reads
+-- layer 7b from 7c and is exact already.
+chorusBadMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+chorusBadMoon chorus badMoon bogWraith childOfNight chorusFirst =
+  let place g =
+        if chorusFirst
+          then snd (S.addCreature badMoon S.alice (snd (S.addCreature chorus S.alice g)))
+          else snd (S.addCreature chorus S.alice (snd (S.addCreature badMoon S.alice g)))
+      (wraithId, g2) = S.addCreature bogWraith S.alice (place (Setup.emptyGame S.bothPlayers))
+      (childId, gs) = S.addCreature childOfNight S.alice g2
+   in (wraithId, childId, gs)
+
 limbBloodMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 limbBloodMoon bayou shroofus limb bloodMoon limbFirst =
   let base = Setup.emptyGame S.bothPlayers
@@ -1340,6 +1373,56 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf ashayaId gs)) "Ashaya is a land"
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf ashayaId gs)) "Ashaya is a Mountain"
+
+  -- CR 613.8a clause (b)'s last limb -- "what it does to any of the things it
+  -- applies to" -- reached without moving any affected set. See chorusBadMoon for
+  -- the board and why the card is synthetic.
+  --
+  -- Both halves of the fix are load-bearing here, and the older-Chorus board is
+  -- what needs both: reading the running board without the dependency edge leaves
+  -- the Chorus counting first and finding nothing, and adding the edge without
+  -- the running board leaves it counting against a view that stops below its own
+  -- layer. Either alone gives the Wraith 4/4.
+  Spec.it s "CR 613.8a a count depends on a same-layer effect that changes what it counts (Chorus older)" $ do
+    chorus <- S.printingOf s registry "Synthetic Ferocious Chorus"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    childOfNight <- S.printingOf s registry "Child of Night"
+    let (wraithId, childId, gs) = chorusBadMoon chorus badMoon bogWraith childOfNight True
+    Spec.assertEqWith s "CR 613.8b: Bad Moon first (3+1), then a Chorus counting the 4-power Wraith (+1)" (Projection.powerOf wraithId gs) (Just 5)
+    Spec.assertEqWith s "and its toughness with it" (Projection.toughnessOf wraithId gs) (Just 5)
+    Spec.assertEqWith s "the Child gets the same +1/+1 without ever being counted" (Projection.powerOf childId gs) (Just 4)
+    Spec.assertEqWith s "so its toughness is 1+1+1" (Projection.toughnessOf childId gs) (Just 3)
+
+  -- The dependency overrides CR 613.7, so the answer is the same with the
+  -- timestamps swapped. This board is the one that passes on the running-board
+  -- half alone, which is why it is not the proving test.
+  Spec.it s "CR 613.8b the count's dependency overrides timestamp order (Bad Moon older)" $ do
+    chorus <- S.printingOf s registry "Synthetic Ferocious Chorus"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    childOfNight <- S.printingOf s registry "Child of Night"
+    let (wraithId, childId, gs) = chorusBadMoon chorus badMoon bogWraith childOfNight False
+    Spec.assertEqWith s "order-independent: still 5/5" (Projection.powerOf wraithId gs) (Just 5)
+    Spec.assertEqWith s "order-independent: still 5/5" (Projection.toughnessOf wraithId gs) (Just 5)
+    Spec.assertEqWith s "order-independent: still 4/3" (Projection.powerOf childId gs) (Just 4)
+    Spec.assertEqWith s "order-independent: still 4/3" (Projection.toughnessOf childId gs) (Just 3)
+
+  -- The negative, the same board minus the one thing under test: with no Bad Moon
+  -- nothing reaches power 4, the Chorus counts nothing, and the +1/+1 it would
+  -- otherwise hand out is absent. Without this a Chorus that counted every
+  -- creature, or one that counted itself into a fixpoint, would pass above.
+  Spec.it s "CR 613.8a control: no Bad Moon, so nothing reaches power 4 and the count is 0" $ do
+    chorus <- S.printingOf s registry "Synthetic Ferocious Chorus"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    childOfNight <- S.printingOf s registry "Child of Night"
+    let (_, g1) = S.addCreature chorus S.alice (Setup.emptyGame S.bothPlayers)
+        (wraithId, g2) = S.addCreature bogWraith S.alice g1
+        (childId, gs) = S.addCreature childOfNight S.alice g2
+    Spec.assertEqWith s "the Wraith is its printed 3/3" (Projection.powerOf wraithId gs) (Just 3)
+    Spec.assertEqWith s "the Wraith is its printed 3/3" (Projection.toughnessOf wraithId gs) (Just 3)
+    Spec.assertEqWith s "the Child is its printed 2/1" (Projection.powerOf childId gs) (Just 2)
+    Spec.assertEqWith s "the Child is its printed 2/1" (Projection.toughnessOf childId gs) (Just 1)
 
   -- The card-level proof of the layer-4 AddCreatureSubtype arm: Life and Limb
   -- makes a basic Forest a 1/1 green Saproling creature land, and the Saproling
