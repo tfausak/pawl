@@ -54,26 +54,23 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "card",
-                    "spec": {
-                      "count": {
-                        "least": 0,
-                        "most": 1
-                      },
-                      "pool": {
-                        "type": "CardsInGraveyard",
+                "targetSpecs": {
+                  "card": {
+                    "count": {
+                      "least": 0,
+                      "most": 1
+                    },
+                    "pool": {
+                      "type": "CardsInGraveyard",
+                      "value": {
+                        "type": "Scoped",
                         "value": {
-                          "type": "Scoped",
-                          "value": {
-                            "type": "You"
-                          }
+                          "type": "You"
                         }
                       }
                     }
                   }
-                ]
+                }
               }
             ]
           }

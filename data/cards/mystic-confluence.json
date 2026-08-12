@@ -50,16 +50,13 @@
                 }
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "spell",
-                "spec": {
-                  "pool": {
-                    "type": "Spells"
-                  }
+            "targetSpecs": {
+              "spell": {
+                "pool": {
+                  "type": "Spells"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [
@@ -80,16 +77,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "creature",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
-                  }
+            "targetSpecs": {
+              "creature": {
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [

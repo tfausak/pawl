@@ -26,22 +26,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "spell",
-                "spec": {
-                  "filter": {
-                    "type": "HasColor",
-                    "value": {
-                      "type": "Blue"
-                    }
-                  },
-                  "pool": {
-                    "type": "Spells"
+            "targetSpecs": {
+              "spell": {
+                "filter": {
+                  "type": "HasColor",
+                  "value": {
+                    "type": "Blue"
                   }
+                },
+                "pool": {
+                  "type": "Spells"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [
@@ -62,22 +59,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "permanent",
-                "spec": {
-                  "filter": {
-                    "type": "HasColor",
-                    "value": {
-                      "type": "Blue"
-                    }
-                  },
-                  "pool": {
-                    "type": "Permanents"
+            "targetSpecs": {
+              "permanent": {
+                "filter": {
+                  "type": "HasColor",
+                  "value": {
+                    "type": "Blue"
                   }
+                },
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           }
         ]
       },

@@ -1,102 +1,99 @@
 {
   "faces": [
     {
-      "delayedAbilities": [
-        {
-          "ability": {
-            "condition": {
-              "type": "StepBegins",
-              "value": [
-                {
-                  "type": "Ending",
-                  "value": {
-                    "type": "EndStep"
-                  }
-                },
-                {
-                  "type": "EachTurn"
+      "delayedAbilities": {
+        "gain 2 life": {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
                 }
-              ]
-            },
-            "intervening": {
-              "type": "Compares",
-              "value": {
-                "comparison": {
-                  "type": "AtLeast"
-                },
-                "measured": {
-                  "type": "Count",
-                  "value": {
-                    "aggregation": {
-                      "type": "Members"
-                    },
-                    "filter": {
-                      "type": "And",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Creature"
-                          }
-                        },
-                        {
-                          "type": "ControlledBy",
-                          "value": {
-                            "type": "You"
-                          }
-                        }
-                      ]
-                    },
-                    "scope": {
-                      "type": "InZone",
-                      "value": [
-                        {
-                          "type": "Battlefield"
-                        },
-                        {
-                          "type": "EachPlayer"
-                        }
-                      ]
-                    }
-                  }
-                },
-                "threshold": {
-                  "type": "Literal",
-                  "value": 1
-                }
+              },
+              {
+                "type": "EachTurn"
               }
-            },
-            "modal": {
-              "modes": [
-                {
-                  "clauses": [
-                    {
-                      "effects": [
-                        {
-                          "type": "GainLife",
-                          "value": [
-                            {
-                              "type": "Relative",
-                              "value": {
-                                "type": "You"
-                              }
-                            },
-                            {
-                              "type": "Literal",
-                              "value": 2
-                            }
-                          ]
+            ]
+          },
+          "intervening": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "Count",
+                "value": {
+                  "aggregation": {
+                    "type": "Members"
+                  },
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
                         }
-                      ]
-                    }
-                  ]
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    ]
+                  },
+                  "scope": {
+                    "type": "InZone",
+                    "value": [
+                      {
+                        "type": "Battlefield"
+                      },
+                      {
+                        "type": "EachPlayer"
+                      }
+                    ]
+                  }
                 }
-              ]
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
             }
           },
-          "name": "gain 2 life"
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "GainLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
-      ],
+      },
       "manaCost": [
         {
           "type": "OfType",

@@ -46,22 +46,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "creature",
-                "spec": {
-                  "filter": {
-                    "type": "ControlledBy",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  "pool": {
-                    "type": "Creatures"
+            "targetSpecs": {
+              "creature": {
+                "filter": {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
                   }
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

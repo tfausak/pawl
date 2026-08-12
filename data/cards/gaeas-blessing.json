@@ -58,32 +58,26 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "cards",
-                "spec": {
-                  "count": {
-                    "least": 0,
-                    "most": 3
-                  },
-                  "pool": {
-                    "type": "CardsInGraveyard",
-                    "value": {
-                      "type": "InSlot",
-                      "value": "player"
-                    }
+            "targetSpecs": {
+              "cards": {
+                "count": {
+                  "least": 0,
+                  "most": 3
+                },
+                "pool": {
+                  "type": "CardsInGraveyard",
+                  "value": {
+                    "type": "InSlot",
+                    "value": "player"
                   }
                 }
               },
-              {
-                "slot": "player",
-                "spec": {
-                  "pool": {
-                    "type": "Players"
-                  }
+              "player": {
+                "pool": {
+                  "type": "Players"
                 }
               }
-            ]
+            }
           }
         ]
       },

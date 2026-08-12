@@ -74,22 +74,19 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "opponent",
-                    "spec": {
-                      "filter": {
-                        "type": "IsPlayer",
-                        "value": {
-                          "type": "Opponent"
-                        }
-                      },
-                      "pool": {
-                        "type": "Players"
+                "targetSpecs": {
+                  "opponent": {
+                    "filter": {
+                      "type": "IsPlayer",
+                      "value": {
+                        "type": "Opponent"
                       }
+                    },
+                    "pool": {
+                      "type": "Players"
                     }
                   }
-                ]
+                }
               }
             ]
           }

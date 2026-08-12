@@ -47,30 +47,27 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "HasSubtype",
-                        "value": {
-                          "type": "Aura"
-                        }
-                      },
-                      {
-                        "type": "IsAttachedToPermanent"
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Aura"
                       }
-                    ]
-                  },
-                  "pool": {
-                    "type": "Permanents"
-                  }
+                    },
+                    {
+                      "type": "IsAttachedToPermanent"
+                    }
+                  ]
+                },
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           }
         ]
       },

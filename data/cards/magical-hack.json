@@ -32,16 +32,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "SpellsAndPermanents"
-                  }
+            "targetSpecs": {
+              "target": {
+                "pool": {
+                  "type": "SpellsAndPermanents"
                 }
               }
-            ]
+            }
           }
         ]
       },

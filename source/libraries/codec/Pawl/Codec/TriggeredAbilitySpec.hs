@@ -94,10 +94,10 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           }
       )
       """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":[{"type":"InSlot","value":"you"},{"type":"Literal","value":1}]}]}]}]},"intervening":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
-  -- CR 603.7: Face.delayedAbilities is a name-keyed map, rendered as a sorted
-  -- array of entries so the render is deterministic. The two entries are
-  -- inserted in DESCENDING name order, so a trip that emitted the map's
-  -- incidental traversal order rather than Map.toAscList fails this case.
+  -- CR 603.7: Face.delayedAbilities is a name-keyed map, rendered as a JSON
+  -- OBJECT keyed by the name in ascending order. The two entries are inserted in
+  -- DESCENDING name order, so a trip that emitted the map's incidental traversal
+  -- order rather than Map.toAscList fails this case.
   Spec.it s "toJsonDelayed/fromJsonDelayed sorts by name (Full Throttle, Tidal Wave)" $
     Common.assertJsonCodec
       s
@@ -126,7 +126,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             )
           ]
       )
-      """ [{"name":"each combat","ability":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Untap","value":{"type":"EachMatching","value":{"type":"AttackedThisTurn"}}}]}]}]}}},{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}]}}}] """
+      """ {"each combat":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Untap","value":{"type":"EachMatching","value":{"type":"AttackedThisTurn"}}}]}]}]}},"sacrifice it":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}]}}} """
   -- CR 603.4: an ability stating no intervening "if" leaves only the two
   -- required keys.
   Spec.it s "an all-default value omits every optional key" $

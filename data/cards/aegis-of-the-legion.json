@@ -24,22 +24,19 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "ControlledBy",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      "pool": {
-                        "type": "Creatures"
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
                       }
+                    },
+                    "pool": {
+                      "type": "Creatures"
                     }
                   }
-                ]
+                }
               }
             ]
           },

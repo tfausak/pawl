@@ -38,16 +38,13 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "pool": {
-                        "type": "Permanents"
-                      }
+                "targetSpecs": {
+                  "target": {
+                    "pool": {
+                      "type": "Permanents"
                     }
                   }
-                ]
+                }
               }
             ]
           }
