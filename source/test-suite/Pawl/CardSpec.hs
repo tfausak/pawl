@@ -3582,6 +3582,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             PlayerRef.Relative PlayerRelation.Opponent -> False
             PlayerRef.InSlot _ -> True
             PlayerRef.EachPlayer -> False
+            -- One seat, so one library -- InSlot's answer. Unreachable from card
+            -- data, which the sweep below is what enforces.
+            PlayerRef.Specific _ -> True
         offends effect = case effect of
           Effect.MoveToZone ref _ _ mSlot _ _ -> Maybe.isJust mSlot && not (movesAtMostOne ref)
           _ -> False
@@ -3999,6 +4002,39 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- CR 611.2b's baked half, in exactly the position the atom above holds: a
+  -- PlayerId only a resolution can know, written by Pawl.Engine.Condition.bakeBound
+  -- as a "for as long as" duration begins and round-tripped by a total codec
+  -- (Pawl.Codec.Expiry serialises a whole stored condition), so nothing but this
+  -- keeps card JSON from naming a seat. The UNBAKED PlayerRef.InSlot beside it is
+  -- card data -- Garland, Royal Kidnapper writes it -- and is not swept.
+  Spec.it s "CR 611.2b no card writes a Specific PlayerRef" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "Specific") (Face.Codec.toJson Card.toJson c)
+        offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
+    Spec.assertEqWith s "the baked reference is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- Not vacuous, for the sibling sweeps' reason: the same counter over a
+    -- hand-built face carrying the reference inside a duration's condition finds
+    -- it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let crowned =
+          Condition.Type.Compares
+            (Quantity.Type.IsMonarch (PlayerRef.Specific (PlayerId.MkPlayerId 1)))
+            Comparison.AtLeast
+            (Quantity.Type.Literal 1)
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  ( Seq.singleton
+                      ( Mode.MkMode
+                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.GainControl (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))))
+                          (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.required Pool.Creatures Nothing))
+                      )
+                  )
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted reference is seen" (atoms planted) 1
   -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura
   -- Graft only exercises the ACCEPTING direction, so the rejecting direction is
   -- proven here instead -- hand-built, never a card file, because a card that

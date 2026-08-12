@@ -30,6 +30,7 @@
 --     against and it passes Projection.fullView.
 module Pawl.Engine.Condition where
 
+import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Quantity as Quantity
@@ -37,6 +38,8 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import Pawl.Types.GameState (GameState)
 import Pawl.Types.ObjectId (ObjectId)
+import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.SlotName (SlotName)
 
 holds :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Condition.Type.Condition -> Bool
 holds viewOf context gs oid condition = case condition of
@@ -56,3 +59,15 @@ holds viewOf context gs oid condition = case condition of
   Condition.Type.Any conditions -> any (holds viewOf context gs oid) conditions
   where
     evaluate = Quantity.evaluate viewOf context gs oid
+
+-- CR 611.2b: the condition with every PlayerRef.InSlot inside it baked to the
+-- seat the resolution's bindings name (Quantity.bakeBound, which carries the
+-- argument). Applied by Pawl.Engine.Expiry.arm as a "for as long as" duration
+-- begins, and by nothing else: a condition a STATIC ability states (CR 604.2) is
+-- re-derived every projection with no resolution behind it, and an intervening
+-- "if" (CR 603.4) is read while the bindings are still reachable.
+bakeBound :: Map.Map SlotName PlayerId -> Condition.Type.Condition -> Condition.Type.Condition
+bakeBound players condition = case condition of
+  Condition.Type.Compares measured comparison threshold ->
+    Condition.Type.Compares (Quantity.bakeBound players measured) comparison (Quantity.bakeBound players threshold)
+  Condition.Type.Any conditions -> Condition.Type.Any (fmap (bakeBound players) conditions)

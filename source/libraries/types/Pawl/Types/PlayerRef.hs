@@ -1,5 +1,6 @@
 module Pawl.Types.PlayerRef where
 
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -24,4 +25,17 @@ data PlayerRef
   | -- | The player bound in a slot -- Sudden Impact's "that player's hand", where
     -- the slot was filled by targeting (CR 601.2c).
     InSlot SlotName.SlotName
+  | -- | InSlot's BAKED half, and runtime-only: one particular player, named
+    -- outright. Pawl.Engine.Condition.bakeBound substitutes it for an InSlot as a
+    -- CR 611.2b duration begins, so a "for as long as" condition naming the
+    -- player a trigger's event bound (Garland, Royal Kidnapper's "for as long as
+    -- they're the monarch") still answers once the resolution that stored it is
+    -- over and its bindings are unreachable. Filter.ControlledByPlayer is the same
+    -- move one type over, and Modification.SetController's baked controller is the
+    -- older precedent.
+    --
+    -- NO CARD MAY WRITE IT -- only a resolution knows a PlayerId -- which the
+    -- codec cannot enforce (it is total both ways, since an Expiry serialises
+    -- through Pawl.Codec.Condition) and Pawl.CardSpec's pool sweep does.
+    Specific PlayerId.PlayerId
   deriving (Eq, Ord, Show)

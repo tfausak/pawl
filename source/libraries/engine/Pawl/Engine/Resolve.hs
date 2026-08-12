@@ -154,14 +154,17 @@ insertOne slot = joinTwo (oneSlot slot)
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
 
--- The slots a PlayerRef reads. Only InSlot names one; EachPlayer and Relative
--- are answered from the evaluation context alone. Factored out of slotsOf below
+-- The slots a PlayerRef reads. Only InSlot names one; the other three are
+-- answered from the evaluation context alone. Factored out of slotsOf below
 -- so the recursion into PlayerRef is stated once.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
+  -- InSlot's baked half names a seat, not a slot. Unreachable from card data,
+  -- which this lint's whole input is (Pawl.CardSpec sweeps the pool for one).
+  PlayerRef.Specific _ -> Map.empty
 
 -- The slots an ObjectRef reads. Only InSlot names one directly; the sweeping
 -- arms are swept at resolution and name nothing at cast, so a card whose only
@@ -1438,6 +1441,11 @@ playerRefPlayers legal controller gs ref = case ref of
   PlayerRef.Relative PlayerRelation.You -> [controller]
   PlayerRef.Relative PlayerRelation.Opponent -> filter (/= controller) everyone
   PlayerRef.EachPlayer -> everyone
+  -- The baked seat, named outright -- InSlot's answer with the lookup already
+  -- done, and unreachable from card data. Not filtered against the roster, the
+  -- reason InSlot is not: it names one specific player who arrived from
+  -- elsewhere.
+  PlayerRef.Specific pid -> [pid]
   where
     everyone = Game.stillPlaying gs
 
@@ -1789,8 +1797,8 @@ offerCast resolving controller slot offer = do
 -- The `rider` is CR 615.5's additional effect, Nothing for a row that has none.
 -- Only Effect.PreventNextDamage's arm ever passes one: the unbounded shield has
 -- no producer that wants one (#1107) and a redirection is not a prevention.
-installDamageRow :: PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite -> Maybe PreventionRider.PreventionRider -> GameState -> Recipient -> GameState
-installDamageRow controller source duration kind rewrite rider g recipient = case Expiry.arm controller source duration g of
+installDamageRow :: Map.Map SlotName PlayerId -> PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite -> Maybe PreventionRider.PreventionRider -> GameState -> Recipient -> GameState
+installDamageRow players controller source duration kind rewrite rider g recipient = case Expiry.arm players controller source duration g of
   -- CR 611.2b: the duration never started, so no shield is installed.
   Nothing -> g
   Just expiry ->
@@ -1931,7 +1939,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- arrives as the empty one and stores nothing.
       case objectRefObjects legal resolving controller source gs ref of
         [] -> gs
-        targets -> case Expiry.arm controller source duration gs of
+        targets -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
           -- CR 611.2b: the duration never started, so the effect does nothing
           -- and is never stored.
           Nothing -> gs
@@ -2008,7 +2016,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           -- stored Expiry here. Indefinite always arms, so the Nothing branch
           -- is unreachable; it is written out because arm is total over
           -- Duration and CR 611.2b's "never starts" is its general answer.
-          case Expiry.arm controller source Duration.Indefinite gs of
+          case Expiry.arm (Binding.playersIn legal) controller source Duration.Indefinite gs of
             Nothing -> gs
             Just expiry ->
               -- CR 611 / 612: a continuous effect over the one target (CR 611.2c
@@ -2536,7 +2544,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- the empty list and change nothing.
       case objectRefObjects legal resolving controller source gs ref of
         [] -> gs
-        targets -> case Expiry.arm controller source duration gs of
+        targets -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
           -- CR 611.2b: the duration never started, so the effect does nothing and
           -- no permission is stored -- not one a later sweep would take away.
           Nothing -> gs
@@ -2996,7 +3004,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                   -- Both collapse to Nothing, and both should: an ability whose
                   -- stated duration never began has no duration to outlive its
                   -- first firing, so CR 603.7b's default is exactly right for it.
-                  DelayedTrigger.expiry = duration >>= \d -> Expiry.arm controller source d gs
+                  DelayedTrigger.expiry = duration >>= \d -> Expiry.arm (Binding.playersIn legal) controller source d gs
                 }
          in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
   Effect.Replace duration uses origin condition re ->
@@ -3018,7 +3026,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- stack and the board is live, unlike CR 603.4's intervening "if" on a
       -- leaves-the-battlefield trigger.
       let met = maybe True (Condition.holds (Projection.fullView gs) (effectContext controller source legal) gs source) condition
-       in case (met, Expiry.arm controller source duration gs) of
+       in case (met, Expiry.arm (Binding.playersIn legal) controller source duration gs) of
             -- The stated condition is false, so the clause creates nothing.
             (False, _) -> gs
             -- CR 611.2b: the duration never started, so no floating replacement
@@ -3088,7 +3096,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         -- the same state `setShield` leaves a spent one in.
         Monad.when (n > 0) . State.modify' $ \g0 ->
           let amount = Integer.toNaturalSaturating n
-           in List.foldl' (installDamageRow controller source duration Nothing (DamageRewrite.PreventNext amount) rider) g0 recipients
+           in List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration Nothing (DamageRewrite.PreventNext amount) rider) g0 recipients
   Effect.PreventAllDamage duration ref -> do
     -- CR 615.1 / 615.3: install one floating prevention shield per recipient the
     -- ref names, with no amount to count down -- "prevent all damage that would
@@ -3100,7 +3108,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- Through Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
     gs <- State.get
     let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
-    State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration Nothing DamageRewrite.PreventAll Nothing) g0 recipients
+    State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration Nothing DamageRewrite.PreventAll Nothing) g0 recipients
   Effect.RedirectDamage duration kind srcRef destRef -> do
     -- CR 614.9: install a floating redirection effect -- Turn the Tables' "all
     -- combat damage that would be dealt to you this turn is dealt to target
@@ -3119,7 +3127,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- nothing and no row is installed.
     case recipientsOf destRef of
       [dest] ->
-        State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration kind (DamageRewrite.Redirect dest) Nothing) g0 (recipientsOf srcRef)
+        State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.Redirect dest) Nothing) g0 (recipientsOf srcRef)
       _ -> pure ()
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
@@ -3178,7 +3186,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- instant). The SCOPE is not: CR 611.2c makes a rules-modifying effect one
     -- that "can affect objects that weren't affected when that continuous effect
     -- began", so it is re-resolved on every read.
-    State.modify' $ \gs -> case Expiry.arm controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -3202,7 +3210,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- Both sets are enumerated ONCE, for the CR 608.2f simultaneity
     -- objectRefObjects buys; an illegal slot (CR 608.2b) arrives as the empty
     -- list and stores nothing, which is provoke's fizzle.
-    State.modify' $ \gs -> case Expiry.arm controller source duration gs of
+    State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
@@ -3710,7 +3718,13 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           -- permanent would simply sit on the battlefield controlled by a
           -- player who is not in the game.
           | List.notElem controller (Game.stillPlaying gs) -> gs
-          | otherwise -> case Expiry.arm controller source duration gs of
+          -- CR 611.2b's condition is baked against `legal` rather than `chosen`,
+          -- the map every other player reference in this resolution is read
+          -- through (playerRefPlayers): a slot CR 608.2b has emptied names nobody
+          -- here too, so the duration never starts rather than starting on a
+          -- target that is no longer legal. For a slot the EVENT bound -- Garland,
+          -- Royal Kidnapper's "they", never a target -- the two maps agree.
+          | otherwise -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
               -- CR 611.2b: the duration never started -- no control effect is
               -- stored, and nothing is re-Sicked, because control never changed.
               Nothing -> gs

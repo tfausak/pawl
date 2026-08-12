@@ -155,6 +155,76 @@
               }
             ]
           }
+        },
+        {
+          "condition": {
+            "type": "PlayerBecomesMonarch",
+            "value": {
+              "type": "Opponent"
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "GainControl",
+                        "value": [
+                          {
+                            "type": "ForAsLongAs",
+                            "value": {
+                              "comparison": {
+                                "type": "AtLeast"
+                              },
+                              "measured": {
+                                "type": "IsMonarch",
+                                "value": {
+                                  "type": "InSlot",
+                                  "value": "thatPlayer"
+                                }
+                              },
+                              "threshold": {
+                                "type": "Literal",
+                                "value": 1
+                              }
+                            }
+                          },
+                          "target"
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
+                          },
+                          {
+                            "type": "ControlledByBound",
+                            "value": "thatPlayer"
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
         }
       ],
       "typeLine": {
