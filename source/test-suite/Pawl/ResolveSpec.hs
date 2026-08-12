@@ -5324,6 +5324,87 @@ returnAllSpec s registry = Spec.describe s "ReturnAll" $ do
       )
       (survivors, True, 2, 1)
 
+-- CR 401.2's ordered pile named by POSITION rather than by characteristics:
+-- ObjectRef.TopOfLibrary, the arm no Filter could stand in for.
+--
+-- Count on Luck {R}{R}{R} Enchantment -- "At the beginning of your upkeep, exile
+-- the top card of your library. You may play that card this turn." (name, cost,
+-- type line and Oracle text checked against api.scryfall.com). Its whole text is
+-- the one trigger, so nothing else on the card can be what these assertions read.
+--
+-- The board is built so that three readings of "the top card of your library"
+-- are told apart, since a board that cannot distinguish them proves nothing:
+--
+--   * TOP versus any other card. alice's library holds three distinct cards, so
+--     an arm reading the bottom or an arbitrary member names a different one.
+--   * YOUR library versus each player's. bob's library is stocked too, with a
+--     printing that appears nowhere in alice's, and it must be untouched -- which
+--     also covers the "target opponent's" reading.
+--   * A LIBRARY read at all versus a battlefield sweep. The enchantment itself
+--     and nothing else is on the battlefield, and it stays there.
+--
+-- The permission the second sentence grants is asserted only as far as CR 400.7's
+-- binding goes: the exiled card carries one, which is what proves the MoveToZone's
+-- slot bound the incarnation this arm minted rather than some other object.
+countOnLuckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+countOnLuckSpec s registry =
+  let -- alice controls Count on Luck and her library holds `stock`, DEEPEST
+      -- FIRST -- S.addLibraryCard puts each card on top, so the last name given
+      -- is the top card. bob's library holds one Ogre Sentry, a printing alice
+      -- never has. Her upkeep then begins, the trigger goes on the stack and
+      -- resolves.
+      board stock = do
+        countOnLuck <- S.printingOf s registry "Count on Luck"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        stocked <- mapM (S.printingOf s registry) stock
+        let (luckId, g1) = S.addCreature countOnLuck S.alice (Setup.emptyGame S.bothPlayers)
+            g2 = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) g1 stocked
+            g3 = snd (S.addLibraryCard sentry S.bob g2)
+            upkeep = Phase.Beginning BeginningStep.Upkeep
+            begun =
+              Event.recordEvent
+                (GameEvent.StepBegan upkeep S.alice)
+                (g3 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+            onStack = S.runPure S.identityAnswer begun Engine.settleForPriority
+        pure (luckId, S.runPure S.identityAnswer onStack Engine.priorityLoop)
+      -- What the top-level namesIn answers with. It reports a zone in its own
+      -- order, which for a library is top first -- Pawl.Engine.Game.zoneMembers
+      -- hands the Seq back as stored.
+      named = Just . CardName.MkCardName . Text.pack
+      permissionsIn pid gs = fmap Object.playableFromExile (Maybe.mapMaybe (\oid -> Game.lookupObject oid gs) (Game.zoneMembers Zone.Exile pid gs))
+   in Spec.describe s "CountOnLuck" $ do
+        Spec.it s "CR 401.2 the top card of your library, and only it, is exiled" $ do
+          (luckId, after) <- board ["Goblin Piker", "Bird Maiden", "Benalish Hero"]
+          Spec.assertEqWith
+            s
+            "the Benalish Hero on top is in exile and the two under it are still in the library, in order"
+            (namesIn Zone.Exile S.alice after, namesIn Zone.Library S.alice after)
+            ([named "Benalish Hero"], [named "Bird Maiden", named "Goblin Piker"])
+          Spec.assertEqWith
+            s
+            "bob's library is untouched, so this is not each player's library and not an opponent's"
+            (namesIn Zone.Library S.bob after, namesIn Zone.Exile S.bob after)
+            ([named "Ogre Sentry"], [])
+          Spec.assertBool s (S.onBattlefield luckId after) "the enchantment is still on the battlefield, so nothing swept it"
+          Spec.assertEqWith
+            s
+            "the one exiled card carries the play permission, so the move bound the incarnation IT minted"
+            (fmap Maybe.isJust (permissionsIn S.alice after))
+            [True]
+        -- The empty-library case, which is the same board minus the stock alone.
+        -- CR 104.3c takes nobody out of the game here: an empty library only
+        -- loses when its owner would DRAW from it, and the trigger draws nothing.
+        Spec.it s "CR 401.2 an empty library has no top card, so the exile does nothing" $ do
+          (luckId, after) <- board []
+          Spec.assertEqWith
+            s
+            "nothing at all was exiled"
+            (namesIn Zone.Exile S.alice after, namesIn Zone.Exile S.bob after)
+            ([], [])
+          Spec.assertEqWith s "bob's library is still untouched" (namesIn Zone.Library S.bob after) [named "Ogre Sentry"]
+          Spec.assertBool s (S.onBattlefield luckId after) "and alice is still in the game with her enchantment"
+          Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
+
 -- alice is mid-combat with one creature per printing in `mine`, bob defends with
 -- one per printing in `theirs`, and alice holds a Trumpet Blast plus exactly the
 -- three Mountains that pay for it. The board sits at the declare attackers step
@@ -6291,6 +6372,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   upToOneTargetSpec s registry
   multiTargetSpec s registry
   supportSpec s registry
+  countOnLuckSpec s registry
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.

@@ -208,10 +208,11 @@ data Effect card
     -- this resolution arms (CR 603.7c's "it") must name the object, and after a
     -- zone change the old id is gone. Meandering Towershell is the producer, its
     -- two "it"s two incarnations of one card. A DEFINITION, not a read: never a
-    -- target, never in targetSpecs. Meaningful only under InSlot, which moves at
-    -- most one object: binding ONE arriving incarnation is meaningless for a set,
-    -- and no card in the pool asks for the group form. A CardSpec lint rejects
-    -- the combination rather than inventing a group binding (#972).
+    -- target, never in targetSpecs. Meaningful only under a ref that moves at most
+    -- one object -- InSlot, or a TopOfLibrary naming ONE library, which is Count
+    -- on Luck: binding ONE arriving incarnation is meaningless for a set, and no
+    -- card in the pool asks for the group form. A CardSpec lint rejects the
+    -- combination rather than inventing a group binding (#972).
     --
     -- The trailing Maybe Zone is the zone the effect's own words say the object
     -- is moved OUT of -- Reassembling Skeleton's "return this card FROM YOUR

@@ -1593,13 +1593,14 @@ swapWordIn family pairs word = List.foldl' step word pairs
 
 -- CR 612.1 through an ObjectRef. InSlot names an object chosen at cast time
 -- rather than a word on the card; EachMatching's Filter is card text like any
--- other. EachPlayer carries no word at all -- CR 612.1 changes subtype words,
--- and "each player" has none.
+-- other. EachPlayer and TopOfLibrary carry no word at all -- CR 612.1 changes
+-- subtype words, and "each player" and "the top card of your library" have none.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
+  ObjectRef.TopOfLibrary _ -> ref
 
 -- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --
