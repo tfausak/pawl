@@ -173,7 +173,7 @@ toJson codec e = case e of
   Effect.TakeExtraTurn r skips -> Common.tagged "TakeExtraTurn" (Just (Value.array [PlayerRef.toJson r, Common.encodeSet (Codec.encode PhaseSelector.codec) skips]))
   -- A bare slot name, not an array: the library is derived from the object that
   -- slot names (CR 701.24), so there is no second field to write.
-  Effect.ShuffleIntoLibrary s -> Common.tagged "ShuffleIntoLibrary" (Just (SlotName.toJson s))
+  Effect.ShuffleIntoLibrary r -> Common.tagged "ShuffleIntoLibrary" (Just (ObjectRef.toJson r))
   -- The slot alone when the offer carries neither of CR 310.11b's riders, which
   -- is an ordinary cast of the card; the pair otherwise. Elided the way
   -- MoveToZone's EntryRiders are, and told apart on decode by JSON TYPE.
@@ -386,7 +386,7 @@ fromJson decode value = do
     "TakeExtraTurn" -> case mv of
       Just (Value.Array (Array.MkArray [r, skips])) -> Effect.TakeExtraTurn <$> PlayerRef.fromJson r <*> Common.decodeSet (Codec.decode PhaseSelector.codec) skips
       _ -> Left . Text.pack $ "TakeExtraTurn expects [playerRef, phaseSelectors]"
-    "ShuffleIntoLibrary" -> Common.withValue mv (fmap Effect.ShuffleIntoLibrary . SlotName.fromJson)
+    "ShuffleIntoLibrary" -> Common.withValue mv (fmap Effect.ShuffleIntoLibrary . ObjectRef.fromJson)
     "OfferCast" -> case mv of
       Just (Value.Array (Array.MkArray [s, o])) -> Effect.OfferCast <$> SlotName.fromJson s <*> CastOffer.fromJson o
       _ -> Common.withValue mv (fmap (\s -> Effect.OfferCast s CastOffer.defaultValue) . SlotName.fromJson)

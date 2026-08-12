@@ -44,6 +44,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -2476,9 +2477,9 @@ servoToken =
 -- TARGET names, which is chosen when the trigger is put on the stack (CR 603.3d)
 -- and long after the bearer's own trip to the graveyard.
 --
--- Pool.CardsInGraveyard You is rule 702.46a's "your graveyard", read as CR
--- 115.2's clause (a) -- Raise Dead's pool, and the reason the pool carries a
--- PlayerScope rather than a Filter: CR 108.4 gives a card in a graveyard no
+-- A CardsInGraveyard pool scoped to You is rule 702.46a's "your graveyard", read
+-- as CR 115.2's clause (a) -- Raise Dead's pool, and the reason the pool carries
+-- a GraveyardScope rather than a Filter: CR 108.4 gives a card in a graveyard no
 -- controller at all.
 --
 -- The Filter is the rest of the printed phrase. Filter.ManaValueAtMost is CR
@@ -2508,7 +2509,7 @@ soulshift n =
   where
     spec =
       TargetSpec.required
-        (Pool.CardsInGraveyard PlayerScope.You)
+        (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You))
         (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.ManaValueAtMost (toInteger n)]))
     back =
       Effect.MoveToZone

@@ -7,12 +7,12 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Black"
+              "type": "Green"
             }
           }
         }
       ],
-      "name": "Raise Dead",
+      "name": "Dwell on the Past",
       "spell": {
         "modes": [
           {
@@ -20,35 +20,34 @@
               {
                 "effects": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "target",
-                      {
-                        "type": "Hand"
-                      }
-                    ]
+                    "type": "ShuffleIntoLibrary",
+                    "value": "cards"
                   }
                 ]
               }
             ],
             "targetSpecs": [
               {
-                "slot": "target",
+                "slot": "cards",
                 "spec": {
-                  "filter": {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
+                  "count": {
+                    "least": 0,
+                    "most": 4
                   },
                   "pool": {
                     "type": "CardsInGraveyard",
                     "value": {
-                      "type": "Scoped",
-                      "value": {
-                        "type": "You"
-                      }
+                      "type": "InSlot",
+                      "value": "player"
                     }
+                  }
+                }
+              },
+              {
+                "slot": "player",
+                "spec": {
+                  "pool": {
+                    "type": "Players"
                   }
                 }
               }

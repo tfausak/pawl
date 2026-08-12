@@ -98,7 +98,10 @@
                       "pool": {
                         "type": "CardsInGraveyard",
                         "value": {
-                          "type": "You"
+                          "type": "Scoped",
+                          "value": {
+                            "type": "You"
+                          }
                         }
                       }
                     }
