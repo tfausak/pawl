@@ -22,7 +22,8 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- `scope`'s Scoped arm, by contrast, stays DYNAMIC. CR 611.2c freezes a stored
 -- effect's object set but carves out this axis: a rules-modifying effect can
 -- affect objects that were not affected when it began. There is no analogue of
--- Affected.TheseObjects here, and PlayerScope is the same type on both carriers.
+-- Affected.TheseObjects here, and the scope that arm carries is the same
+-- PlayerScope the printed carrier holds.
 --
 -- The Named arm is the half the printed carrier cannot have: the seat the ability
 -- TARGETED (CR 601.2c), baked by Resolve as the effect begins because the
@@ -31,9 +32,12 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- freeze of the CR 611.2c kind -- see Pawl.Types.AffectedPlayers.
 --
 -- `expiry` decides when a Pawl.Engine.Expiry sweep drops it (CR 514.2, 611.2a,
--- 611.2b). AtCleanup has a producer (Silence) and so does Never (Sea Gate
--- Restoration's "for the rest of the game"); no card arms While or AtTurnOf on
--- this carrier (#97).
+-- 611.2b). Every arm the pool reaches has a producer: AtCleanup (Silence),
+-- Never (Sea Gate Restoration's "for the rest of the game"), AtTurnOf
+-- (Blossoming Calm) and While (Synthetic Conditional Silence, which is
+-- synthetic because a "for as long as" player effect is printed as a static on a
+-- permanent and so rides Pawl.Types.PlayerStaticAbility instead).
+-- Pawl.PlayerEffectSpec's groups of those names are the proof.
 --
 -- `timestamp` is CR 613.7b's stamp, taken as the effect began, and it is READ:
 -- Pawl.Engine.PlayerEffect.applying merges these rows into the printed carrier's
