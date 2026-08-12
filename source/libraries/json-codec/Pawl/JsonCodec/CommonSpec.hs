@@ -1,8 +1,14 @@
 module Pawl.JsonCodec.CommonSpec where
 
 import qualified Data.Either as Either
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 
@@ -138,3 +144,69 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         s
         (Either.isLeft (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Value.pair "k" Value.null]))
         "expected a decode failure"
+
+  Spec.describe s "tuple" $ do
+    Spec.it s "round trips" $
+      Common.assertCodec s (Common.tuple Common.integer Common.integer) (1, 2) "[1,2]"
+    Spec.it s "rejects a one-element array" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.tuple Common.integer Common.integer) =<< Common.parse (Text.pack "[1]")))
+        "expected a decode failure"
+    Spec.it s "rejects a three-element array" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.tuple Common.integer Common.integer) =<< Common.parse (Text.pack "[1,2,3]")))
+        "expected a decode failure"
+
+  Spec.describe s "natural"
+    . Spec.it s "round trips"
+    $ Common.assertCodec s Common.natural 2 "2"
+
+  -- Descending and carrying a duplicate, unlike the ascending duplicate-free
+  -- literals elsewhere in this file: 'list' preserves order and permits
+  -- repeats, and an ascending duplicate-free case would still pass an
+  -- implementation that reordered or deduplicated.
+  Spec.describe s "list"
+    . Spec.it s "round trips"
+    $ Common.assertCodec s (Common.list Common.integer) [3, 3, 1] "[3,3,1]"
+
+  Spec.describe s "set" $ do
+    Spec.it s "round trips" $
+      Common.assertCodec s (Common.set Common.integer) (Set.fromList [1, 2, 3]) "[1,2,3]"
+    -- The schema says uniqueItems, so the decoder has to guarantee it: a
+    -- repeated element is a decode failure, not a value that silently
+    -- collapses.
+    Spec.it s "rejects a repeated element on decode" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.set Common.integer) =<< Common.parse (Text.pack "[1,1,2]")))
+        "expected a decode failure"
+
+  Spec.describe s "seq"
+    . Spec.it s "round trips"
+    $ Common.assertCodec s (Common.seq Common.integer) (Seq.fromList [1, 2, 3]) "[1,2,3]"
+
+  Spec.describe s "nonEmpty" $ do
+    Spec.it s "round trips" $
+      Common.assertCodec s (Common.nonEmpty Common.integer) (NonEmpty.fromList [1, 2, 3]) "[1,2,3]"
+    Spec.it s "rejects an empty array" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.nonEmpty Common.integer) =<< Common.parse (Text.pack "[]")))
+        "expected a decode failure"
+
+  Spec.describe s "multiset" $ do
+    Spec.it s "round trips to ascending order" $
+      Common.assertCodec
+        s
+        (Common.multiset Common.integer)
+        (Map.fromList [(1, 2), (2, 1)] :: Map.Map Integer Natural.Natural)
+        "[1,1,2]"
+    -- decodeMultiset recounts, so the wire order need not match the key order
+    -- the encoder would have produced.
+    Spec.it s "recounts repeats regardless of input order" $
+      Spec.assertEq
+        s
+        (Codec.decode (Common.multiset Common.integer) =<< Common.parse (Text.pack "[2,1,2]"))
+        (Right (Map.fromList [(1, 1), (2, 2)]) :: Either Text.Text (Map.Map Integer Natural.Natural))

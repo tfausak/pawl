@@ -58,14 +58,14 @@ toJson codec e = case e of
   Effect.ModifyTarget d m r -> Common.tagged "ModifyTarget" (Just (Value.array [Duration.toJson d, Modification.toJson m, ObjectRef.toJson r]))
   Effect.ChangeText family forbidden s ->
     Common.tagged "ChangeText" . Just . Value.array $
-      [SubtypeFamily.toJson family, Common.encodeSet Subtype.toJson forbidden, SlotName.toJson s]
+      [SubtypeFamily.toJson family, Common.encodeSet (Codec.encode Subtype.codec) forbidden, SlotName.toJson s]
   Effect.AddMana production -> Common.tagged "AddMana" (Just (ManaProduction.toJson production))
-  Effect.Search f d -> Common.tagged "Search" (Just (Value.array [Filter.toJson Keyword.toJson f, SearchDestination.toJson d]))
+  Effect.Search f d -> Common.tagged "Search" (Just (Value.array [Codec.encode (Filter.codec Keyword.codec) f, SearchDestination.toJson d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
   Effect.Proliferate -> Common.nullary "Proliferate"
   Effect.TemptWithTheRing -> Common.nullary "TemptWithTheRing"
   Effect.ExileHandThenDraw -> Common.nullary "ExileHandThenDraw"
-  Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Value.array [SlotName.toJson slot, Filter.toJson Keyword.toJson f, Quantity.toJson q]))
+  Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Value.array [SlotName.toJson slot, Codec.encode (Filter.codec Keyword.codec) f, Quantity.toJson q]))
   Effect.RestartGame -> Common.nullary "RestartGame"
   Effect.ControlPlayerNextTurn s -> Common.tagged "ControlPlayerNextTurn" (Just (SlotName.toJson s))
   -- The bound-count slot is ELIDED when absent, so a card that says nothing
@@ -131,8 +131,8 @@ toJson codec e = case e of
         <> [Common.encodeSeq (toJson codec) rider | not (Seq.null rider)]
   Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Value.array [Duration.toJson d, ObjectRef.toJson r]))
   Effect.RedirectDamage d k f t -> Common.tagged "RedirectDamage" (Just (Value.array [Duration.toJson d, Common.encodeMaybe DamageKind.toJson k, ObjectRef.toJson f, ObjectRef.toJson t]))
-  Effect.PutCounters k q r -> Common.tagged "PutCounters" (Just (Value.array [CounterKind.toJson Keyword.toJson k, Quantity.toJson q, ObjectRef.toJson r]))
-  Effect.RemoveCounters k q s -> Common.tagged "RemoveCounters" (Just (Value.array [CounterKind.toJson Keyword.toJson k, Quantity.toJson q, SlotName.toJson s]))
+  Effect.PutCounters k q r -> Common.tagged "PutCounters" (Just (Value.array [Codec.encode (CounterKind.codec Keyword.codec) k, Quantity.toJson q, ObjectRef.toJson r]))
+  Effect.RemoveCounters k q s -> Common.tagged "RemoveCounters" (Just (Value.array [Codec.encode (CounterKind.codec Keyword.codec) k, Quantity.toJson q, SlotName.toJson s]))
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Value.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.RemovePlayerCounters r k q -> Common.tagged "RemovePlayerCounters" (Just (Value.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
@@ -161,7 +161,7 @@ toJson codec e = case e of
   Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Daytime.toJson d))
   Effect.ExileUntilMonarch s -> Common.tagged "ExileUntilMonarch" (Just (SlotName.toJson s))
   Effect.Attach s -> Common.tagged "Attach" (Just (SlotName.toJson s))
-  Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Value.array [SlotName.toJson s, Filter.toJson Keyword.toJson f]))
+  Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Value.array [SlotName.toJson s, Codec.encode (Filter.codec Keyword.codec) f]))
   Effect.PlaySubgame s -> Common.tagged "PlaySubgame" (Just (SlotName.toJson s))
   Effect.TakeExtraTurn r skips -> Common.tagged "TakeExtraTurn" (Just (Value.array [PlayerRef.toJson r, Common.encodeSet (Codec.encode PhaseSelector.codec) skips]))
   -- A bare slot name, not an array: the library is derived from the object that
@@ -238,18 +238,18 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "ModifyTarget expects [duration, modification, objectRef]"
     "ChangeText" -> case mv of
       Just (Value.Array (Array.MkArray [fv, xv, sv])) ->
-        Effect.ChangeText <$> SubtypeFamily.fromJson fv <*> Common.decodeSet Subtype.fromJson xv <*> SlotName.fromJson sv
+        Effect.ChangeText <$> SubtypeFamily.fromJson fv <*> Common.decodeSet (Codec.decode Subtype.codec) xv <*> SlotName.fromJson sv
       _ -> Left . Text.pack $ "ChangeText expects [subtypeFamily, forbiddenSubtypes, slot]"
     "AddMana" -> Common.withValue mv (fmap Effect.AddMana . ManaProduction.fromJson)
     "Search" -> case mv of
-      Just (Value.Array (Array.MkArray [f, d])) -> Effect.Search <$> Filter.fromJson Keyword.fromJson f <*> SearchDestination.fromJson d
+      Just (Value.Array (Array.MkArray [f, d])) -> Effect.Search <$> Codec.decode (Filter.codec Keyword.codec) f <*> SearchDestination.fromJson d
       _ -> Left . Text.pack $ "Search expects [filter, destination]"
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "TemptWithTheRing" -> Right Effect.TemptWithTheRing
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
-      Just (Value.Array (Array.MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> SlotName.fromJson sv <*> Filter.fromJson Keyword.fromJson fv <*> Quantity.fromJson qv
+      Just (Value.Array (Array.MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> SlotName.fromJson sv <*> Codec.decode (Filter.codec Keyword.codec) fv <*> Quantity.fromJson qv
       _ -> Left . Text.pack $ "PlayerSacrifices expects [slot, filter, quantity]"
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> Common.withValue mv (fmap Effect.ControlPlayerNextTurn . SlotName.fromJson)
@@ -330,10 +330,10 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [d, k, from, to])) -> Effect.RedirectDamage <$> Duration.fromJson d <*> Common.decodeMaybe DamageKind.fromJson k <*> ObjectRef.fromJson from <*> ObjectRef.fromJson to
       _ -> Left . Text.pack $ "RedirectDamage expects [Duration, Maybe DamageKind, ObjectRef, ObjectRef]"
     "PutCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [k, q, r])) -> Effect.PutCounters <$> CounterKind.fromJson Keyword.fromJson k <*> Quantity.fromJson q <*> ObjectRef.fromJson r
+      Just (Value.Array (Array.MkArray [k, q, r])) -> Effect.PutCounters <$> Codec.decode (CounterKind.codec Keyword.codec) k <*> Quantity.fromJson q <*> ObjectRef.fromJson r
       _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, objectRef]"
     "RemoveCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.RemoveCounters <$> CounterKind.fromJson Keyword.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
+      Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.RemoveCounters <$> Codec.decode (CounterKind.codec Keyword.codec) k <*> Quantity.fromJson q <*> SlotName.fromJson s
       _ -> Left . Text.pack $ "RemoveCounters expects [counterKind, quantity, slot]"
     "GainPlayerCounters" -> case mv of
       Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> PlayerRef.fromJson r <*> PlayerCounterKind.fromJson k <*> Quantity.fromJson q
@@ -368,7 +368,7 @@ fromJson decode value = do
     "ExileUntilMonarch" -> Common.withValue mv (fmap Effect.ExileUntilMonarch . SlotName.fromJson)
     "Attach" -> Common.withValue mv (fmap Effect.Attach . SlotName.fromJson)
     "AttachTarget" -> case mv of
-      Just (Value.Array (Array.MkArray [s, f])) -> Effect.AttachTarget <$> SlotName.fromJson s <*> Filter.fromJson Keyword.fromJson f
+      Just (Value.Array (Array.MkArray [s, f])) -> Effect.AttachTarget <$> SlotName.fromJson s <*> Codec.decode (Filter.codec Keyword.codec) f
       _ -> Left . Text.pack $ "AttachTarget expects [slot, filter]"
     "PlaySubgame" -> Common.withValue mv (fmap Effect.PlaySubgame . SlotName.fromJson)
     "TakeExtraTurn" -> case mv of

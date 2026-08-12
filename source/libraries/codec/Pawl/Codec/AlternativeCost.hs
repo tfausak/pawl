@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 
@@ -19,12 +20,12 @@ toJson :: AlternativeCost.AlternativeCost -> Value.Value
 toJson a =
   Value.object
     ( Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (AlternativeCost.condition a)
-        <> Common.requiredPair "cost" (Cost.toJson Keyword.toJson) (AlternativeCost.cost a)
+        <> Common.requiredPair "cost" (Codec.encode (Cost.codec Keyword.codec)) (AlternativeCost.cost a)
     )
 
 fromJson :: Value.Value -> Either Text.Text AlternativeCost.AlternativeCost
 fromJson value = do
   ps <- Common.asObject value
   condition <- Common.defaultedField "condition" Nothing (Common.decodeMaybe Condition.fromJson) ps
-  cost <- Common.field "cost" ps >>= Cost.fromJson Keyword.fromJson
+  cost <- Common.field "cost" ps >>= Codec.decode (Cost.codec Keyword.codec)
   pure AlternativeCost.MkAlternativeCost {AlternativeCost.condition = condition, AlternativeCost.cost = cost}

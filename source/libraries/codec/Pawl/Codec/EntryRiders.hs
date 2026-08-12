@@ -6,6 +6,7 @@ import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.TapState as TapState
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.TapState as TapState
@@ -24,7 +25,7 @@ toJson e =
         -- A MULTISET, the shape ProjectedCharacteristics' keywords take: a kind
         -- repeated as many times as there are counters, ascending, so the
         -- encoding is canonical.
-        <> Common.optionalPair "counters" Map.empty (Common.encodeMultiset (CounterKind.toJson Keyword.toJson)) (EntryRiders.counters e)
+        <> Common.optionalPair "counters" Map.empty (Common.encodeMultiset (Codec.encode (CounterKind.codec Keyword.codec))) (EntryRiders.counters e)
         <> Common.optionalPair "underOwner" False Value.boolean (EntryRiders.underOwner e)
     )
 
@@ -34,7 +35,7 @@ fromJson value = do
   t <- Common.defaultedField "tapped" defaultTapped TapState.fromJson ps
   a <- Common.defaultedField "attacking" False Common.asBoolean ps
   f <- Common.defaultedField "transformed" False Common.asBoolean ps
-  c <- Common.defaultedField "counters" Map.empty (Common.decodeMultiset (CounterKind.fromJson Keyword.fromJson)) ps
+  c <- Common.defaultedField "counters" Map.empty (Common.decodeMultiset (Codec.decode (CounterKind.codec Keyword.codec))) ps
   o <- Common.defaultedField "underOwner" False Common.asBoolean ps
   pure
     EntryRiders.MkEntryRiders

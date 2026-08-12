@@ -11,6 +11,7 @@ import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Quantity as Quantity
 
@@ -36,7 +37,7 @@ toJson q = case q of
   Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Value.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
   -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
   -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
-  Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ CounterKind.toJson Keyword.toJson k
+  Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ Codec.encode (CounterKind.codec Keyword.codec) k
   -- CR 702.112b's designation, with nothing on the wire: the object is whichever
   -- one the quantity is evaluated against, and the answer is a 0/1 rather than a
   -- stored number, so there is neither a reference nor a payload.
@@ -75,7 +76,7 @@ fromJson value = do
     ("Speed", Just v) -> Quantity.Speed <$> PlayerRef.fromJson v
     ("IsMonarch", Just v) -> Quantity.IsMonarch <$> PlayerRef.fromJson v
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
-    ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson Keyword.fromJson v
+    ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> Codec.decode (CounterKind.codec Keyword.codec) v
     ("HasDesignation", Just v) -> Quantity.HasDesignation <$> Designation.fromJson v
     ("WasKicked", _) -> Right Quantity.WasKicked
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v

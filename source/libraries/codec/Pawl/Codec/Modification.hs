@@ -16,24 +16,24 @@ import qualified Pawl.Types.Modification as Modification
 
 toJson :: Modification.Modification -> Value.Value
 toJson m = case m of
-  Modification.GainKeyword k -> Common.tagged "GainKeyword" . Just $ Keyword.toJson k
+  Modification.GainKeyword k -> Common.tagged "GainKeyword" . Just $ Codec.encode Keyword.codec k
   Modification.LoseAllAbilities -> Common.nullary "LoseAllAbilities"
   Modification.SetBasePowerToughness p t -> Common.tagged "SetBasePowerToughness" . Just . Value.array $ [Quantity.toJson p, Quantity.toJson t]
   Modification.ModifyPowerToughness p t -> Common.tagged "ModifyPowerToughness" . Just . Value.array $ [Quantity.toJson p, Quantity.toJson t]
-  Modification.SetLandSubtype s -> Common.tagged "SetLandSubtype" . Just $ Subtype.toJson s
+  Modification.SetLandSubtype s -> Common.tagged "SetLandSubtype" . Just $ Codec.encode Subtype.codec s
   Modification.SetLandSubtypeToChosen -> Common.nullary "SetLandSubtypeToChosen"
-  Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Subtype.toJson s
-  Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Subtype.toJson s
-  Modification.AddCreatureSubtype s -> Common.tagged "AddCreatureSubtype" . Just $ Subtype.toJson s
+  Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Codec.encode Subtype.codec s
+  Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Codec.encode Subtype.codec s
+  Modification.AddCreatureSubtype s -> Common.tagged "AddCreatureSubtype" . Just $ Codec.encode Subtype.codec s
   Modification.AddEveryCreatureSubtype -> Common.nullary "AddEveryCreatureSubtype"
-  Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ CardType.toJson c
-  Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Supertype.toJson t
-  Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Supertype.toJson t
-  Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Value.array $ [Subtype.toJson a, Subtype.toJson b]
+  Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ Codec.encode CardType.codec c
+  Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Codec.encode Supertype.codec t
+  Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Codec.encode Supertype.codec t
+  Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Value.array $ [Codec.encode Subtype.codec a, Codec.encode Subtype.codec b]
   Modification.SetController p -> Common.tagged "SetController" . Just $ Codec.encode PlayerId.codec p
   Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
-  Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet Color.toJson cs
-  Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Common.encodeSet Color.toJson cs
+  Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet (Codec.encode Color.codec) cs
+  Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Common.encodeSet (Codec.encode Color.codec) cs
   Modification.AddChosenColor -> Common.nullary "AddChosenColor"
   Modification.SwitchPowerToughness -> Common.nullary "SwitchPowerToughness"
 
@@ -44,24 +44,24 @@ fromJson value = do
         Just (Value.Array (Array.MkArray [x, y])) -> Right (x, y)
         _ -> Left $ Text.pack "expected a two-element array"
   case t of
-    "GainKeyword" -> Common.withValue mv (fmap Modification.GainKeyword . Keyword.fromJson)
+    "GainKeyword" -> Common.withValue mv (fmap Modification.GainKeyword . Codec.decode Keyword.codec)
     "LoseAllAbilities" -> Right Modification.LoseAllAbilities
     "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
     "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
-    "SetLandSubtype" -> Common.withValue mv (fmap Modification.SetLandSubtype . Subtype.fromJson)
+    "SetLandSubtype" -> Common.withValue mv (fmap Modification.SetLandSubtype . Codec.decode Subtype.codec)
     "SetLandSubtypeToChosen" -> Right Modification.SetLandSubtypeToChosen
-    "AddLandSubtype" -> Common.withValue mv (fmap Modification.AddLandSubtype . Subtype.fromJson)
-    "SetCreatureSubtype" -> Common.withValue mv (fmap Modification.SetCreatureSubtype . Subtype.fromJson)
-    "AddCreatureSubtype" -> Common.withValue mv (fmap Modification.AddCreatureSubtype . Subtype.fromJson)
+    "AddLandSubtype" -> Common.withValue mv (fmap Modification.AddLandSubtype . Codec.decode Subtype.codec)
+    "SetCreatureSubtype" -> Common.withValue mv (fmap Modification.SetCreatureSubtype . Codec.decode Subtype.codec)
+    "AddCreatureSubtype" -> Common.withValue mv (fmap Modification.AddCreatureSubtype . Codec.decode Subtype.codec)
     "AddEveryCreatureSubtype" -> Right Modification.AddEveryCreatureSubtype
-    "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
-    "AddSupertype" -> Common.withValue mv (fmap Modification.AddSupertype . Supertype.fromJson)
-    "RemoveSupertype" -> Common.withValue mv (fmap Modification.RemoveSupertype . Supertype.fromJson)
-    "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> Subtype.fromJson x <*> Subtype.fromJson y
+    "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . Codec.decode CardType.codec)
+    "AddSupertype" -> Common.withValue mv (fmap Modification.AddSupertype . Codec.decode Supertype.codec)
+    "RemoveSupertype" -> Common.withValue mv (fmap Modification.RemoveSupertype . Codec.decode Supertype.codec)
+    "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> Codec.decode Subtype.codec x <*> Codec.decode Subtype.codec y
     "SetController" -> Common.withValue mv (fmap Modification.SetController . Codec.decode PlayerId.codec)
     "SetControllerToSource" -> Right Modification.SetControllerToSource
-    "SetColor" -> Common.withValue mv (fmap Modification.SetColor . Common.decodeSet Color.fromJson)
-    "AddColor" -> Common.withValue mv (fmap Modification.AddColor . Common.decodeSet Color.fromJson)
+    "SetColor" -> Common.withValue mv (fmap Modification.SetColor . Common.decodeSet (Codec.decode Color.codec))
+    "AddColor" -> Common.withValue mv (fmap Modification.AddColor . Common.decodeSet (Codec.decode Color.codec))
     "AddChosenColor" -> Right Modification.AddChosenColor
     "SwitchPowerToughness" -> Right Modification.SwitchPowerToughness
     _ -> Left . Text.pack $ "unknown Modification: " <> t

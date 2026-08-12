@@ -41,9 +41,9 @@ toJson e = case e of
   GameEvent.LifeGained p n -> Common.tagged "LifeGained" . Just $ Value.array [Codec.encode PlayerId.codec p, Common.encodeNatural n]
   GameEvent.LoyaltyAbilityActivated oid -> Common.tagged "LoyaltyAbilityActivated" . Just $ ObjectId.toJson oid
   GameEvent.CountersPut oid kind before after ->
-    Common.tagged "CountersPut" . Just . Value.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
+    Common.tagged "CountersPut" . Just . Value.array $ [ObjectId.toJson oid, Codec.encode (CounterKind.codec Keyword.codec) kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.CountersRemoved oid kind before after ->
-    Common.tagged "CountersRemoved" . Just . Value.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
+    Common.tagged "CountersRemoved" . Just . Value.array $ [ObjectId.toJson oid, Codec.encode (CounterKind.codec Keyword.codec) kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.HalfUnlocked oid name fully -> Common.tagged "HalfUnlocked" . Just . Value.array $ [ObjectId.toJson oid, CardName.toJson name, Value.boolean fully]
   GameEvent.TurnedFaceUp oid -> Common.tagged "TurnedFaceUp" . Just $ ObjectId.toJson oid
   GameEvent.BecameDesignated d oid -> Common.tagged "BecameDesignated" . Just . Value.array $ [Designation.toJson d, ObjectId.toJson oid]
@@ -77,9 +77,9 @@ fromJson value = do
     ("LifeGained", Just (Value.Array (Array.MkArray [p, n]))) -> GameEvent.LifeGained <$> Codec.decode PlayerId.codec p <*> Common.decodeNatural n
     ("LoyaltyAbilityActivated", Just v) -> GameEvent.LoyaltyAbilityActivated <$> ObjectId.fromJson v
     ("CountersPut", Just (Value.Array (Array.MkArray [oid, kind, before, after]))) ->
-      GameEvent.CountersPut <$> ObjectId.fromJson oid <*> CounterKind.fromJson Keyword.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
+      GameEvent.CountersPut <$> ObjectId.fromJson oid <*> Codec.decode (CounterKind.codec Keyword.codec) kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     ("CountersRemoved", Just (Value.Array (Array.MkArray [oid, kind, before, after]))) ->
-      GameEvent.CountersRemoved <$> ObjectId.fromJson oid <*> CounterKind.fromJson Keyword.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
+      GameEvent.CountersRemoved <$> ObjectId.fromJson oid <*> Codec.decode (CounterKind.codec Keyword.codec) kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     ("HalfUnlocked", Just (Value.Array (Array.MkArray [oid, name, fully]))) -> GameEvent.HalfUnlocked <$> ObjectId.fromJson oid <*> CardName.fromJson name <*> Common.asBoolean fully
     ("TurnedFaceUp", Just v) -> GameEvent.TurnedFaceUp <$> ObjectId.fromJson v
     ("BecameDesignated", Just (Value.Array (Array.MkArray [d, oid]))) ->

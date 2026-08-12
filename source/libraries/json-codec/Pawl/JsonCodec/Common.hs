@@ -188,8 +188,8 @@ decodeNullary tyName table value = do
     Nothing -> Left . Text.pack $ "unknown " <> tyName <> ": " <> t
 
 -- The pairs below (encodeList/decodeList and its siblings) are the last
--- function-shaped combinators; each is waiting to collapse into one
--- Codec-shaped replacement, e.g. a future Codec.list, during the full
+-- function-shaped combinators; each is waiting to collapse into its
+-- Codec-shaped replacement below ('list' and its siblings) during the full
 -- pawl:codec conversion (#1263).
 
 encodeList :: (a -> Value.Value) -> [a] -> Value.Value
@@ -218,8 +218,17 @@ decodeSeq f value = Seq.fromList <$> decodeList f value
 encodeSet :: (a -> Value.Value) -> Set.Set a -> Value.Value
 encodeSet f = encodeList f . Set.toAscList
 
+-- | Rejects a repeated element rather than silently collapsing it: a
+-- duplicate in a hand-written card file is plausibly a typo, not a value
+-- worth accepting, and 'set''s schema says 'Schema.uniqueArray' -- so the
+-- decoder has to guarantee what the schema claims.
 decodeSet :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Set.Set a)
-decodeSet f value = Set.fromList <$> decodeList f value
+decodeSet f value = do
+  xs <- decodeList f value
+  let s = Set.fromList xs
+  if Set.size s == length xs
+    then Right s
+    else Left $ Text.pack "expected an array with no repeated elements"
 
 -- A count-per-key multiset, on the wire as a plain array WITH REPEATS rather
 -- than as key/count pairs, ascending by key so it is canonical. decodeMultiset
@@ -305,6 +314,13 @@ assertJson s j = case parse (Text.pack j) of
   Right v -> pure v
 
 -- Bundles --------------------------------------------------------------------
+--
+-- GOVERNING PRINCIPLE: a codec's schema should be as expressive as the
+-- constraint it names, and the decoder is tightened to guarantee what the
+-- schema claims rather than the other way around. 'set' and 'nonEmpty' below
+-- both hold to it: 'decodeSet' rejects a repeated element so its
+-- 'Schema.uniqueArray' schema is honest, and 'decodeNonEmpty' rejects an
+-- empty array so its 'Schema.nonEmptyArray' schema is too.
 
 -- | The JSON scalars a wrapper is wrapped around. None of them is filed in
 -- @$defs@: a definition is named for a Pawl type, and @Integer@ is not one.
@@ -345,6 +361,72 @@ maybe c =
     { Codec.encode = encodeMaybe (Codec.encode c),
       Codec.decode = decodeMaybe (Codec.decode c),
       Codec.schema = fmap Schema.nullable (Codec.schema c)
+    }
+
+-- The Codec-shaped siblings of encodeList/decodeList and the rest above.
+-- 'list', 'set', 'seq', 'nonEmpty' and 'multiset' each wrap their existing
+-- function-shaped pair rather than reimplementing it; 'tuple' has no such
+-- pair to wrap (see its own Haddock). Each coexists with its function-shaped
+-- half until #1263 converts the last caller and deletes it.
+
+-- | Encodes to a two-element array and rejects any other length on decode.
+-- There is no existing encodeTuple/decodeTuple pair to wrap, unlike its
+-- siblings below.
+tuple :: Codec.Codec a -> Codec.Codec b -> Codec.Codec (a, b)
+tuple ca cb =
+  Codec.MkCodec
+    { Codec.encode = \(a, b) -> Value.array [Codec.encode ca a, Codec.encode cb b],
+      Codec.decode = \value -> do
+        xs <- asArray value
+        case xs of
+          [av, bv] -> (,) <$> Codec.decode ca av <*> Codec.decode cb bv
+          _ -> Left . Text.pack $ "expected a 2-element array but got " <> show value,
+      Codec.schema = (\a b -> Schema.tupleOf [a, b]) <$> Codec.schema ca <*> Codec.schema cb
+    }
+
+list :: Codec.Codec a -> Codec.Codec [a]
+list c =
+  Codec.MkCodec
+    { Codec.encode = encodeList (Codec.encode c),
+      Codec.decode = decodeList (Codec.decode c),
+      Codec.schema = Schema.array <$> Codec.schema c
+    }
+
+-- | 'Schema.uniqueArray': both 'Set' on the wire (via 'encodeSet') and
+-- 'decodeSet' below reject a repeated element, so the schema saying
+-- @uniqueItems@ is a claim the decoder actually guarantees.
+set :: (Ord a) => Codec.Codec a -> Codec.Codec (Set.Set a)
+set c =
+  Codec.MkCodec
+    { Codec.encode = encodeSet (Codec.encode c),
+      Codec.decode = decodeSet (Codec.decode c),
+      Codec.schema = Schema.uniqueArray <$> Codec.schema c
+    }
+
+seq :: Codec.Codec a -> Codec.Codec (Seq.Seq a)
+seq c =
+  Codec.MkCodec
+    { Codec.encode = encodeSeq (Codec.encode c),
+      Codec.decode = decodeSeq (Codec.decode c),
+      Codec.schema = Schema.array <$> Codec.schema c
+    }
+
+-- | 'Schema.nonEmptyArray', not 'Schema.array': 'decodeNonEmpty' below rejects
+-- an empty array outright, so the schema says the same thing.
+nonEmpty :: Codec.Codec a -> Codec.Codec (NonEmpty.NonEmpty a)
+nonEmpty c =
+  Codec.MkCodec
+    { Codec.encode = encodeNonEmpty (Codec.encode c),
+      Codec.decode = decodeNonEmpty (Codec.decode c),
+      Codec.schema = Schema.nonEmptyArray <$> Codec.schema c
+    }
+
+multiset :: (Ord a) => Codec.Codec a -> Codec.Codec (Map.Map a Natural.Natural)
+multiset c =
+  Codec.MkCodec
+    { Codec.encode = encodeMultiset (Codec.encode c),
+      Codec.decode = decodeMultiset (Codec.decode c),
+      Codec.schema = Schema.array <$> Codec.schema c
     }
 
 -- | 'assertJsonCodec' against a bundle rather than a loose pair.

@@ -3,6 +3,7 @@
 module Pawl.Codec.KeywordSpec where
 
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
@@ -19,62 +20,54 @@ import qualified Pawl.Types.Supertype as Supertype
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   Spec.it s "Deathtouch" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Deathtouch
       """ {"type":"Deathtouch"} """
   Spec.it s "Defender" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Defender
       """ {"type":"Defender"} """
   Spec.it s "DoubleStrike" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.DoubleStrike
       """ {"type":"DoubleStrike"} """
   Spec.it s "FirstStrike" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.FirstStrike
       """ {"type":"FirstStrike"} """
   Spec.it s "Flash" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Flash
       """ {"type":"Flash"} """
   Spec.it s "Flying" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Flying
       """ {"type":"Flying"} """
   Spec.it s "Haste" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Haste
       """ {"type":"Haste"} """
   -- CR 702.11b's plain hexproof takes no parameter, so it encodes as the bare
   -- tag -- the wire format Slippery Bogle's committed printing already carries,
   -- unchanged by rule 702.11d's quality arriving beside it.
   Spec.it s "Hexproof" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Hexproof Nothing)
       """ {"type":"Hexproof"} """
   -- CR 702.11d's "[quality]" rides the same constructor, so "hexproof from
@@ -83,241 +76,214 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- Grace into it, which is exactly the far-too-strong reading the variant exists
   -- to avoid.
   Spec.it s "Hexproof carries CR 702.11d's quality" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Hexproof (Just (Filter.HasColor Color.Black)))
       """ {"type":"Hexproof","value":{"type":"HasColor","value":{"type":"Black"}}} """
     -- CR 702.16a's "any characteristic value or information": a quality need not
     -- be a colour. Eradicator Valkyrie's "hexproof from planeswalkers".
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Hexproof (Just (Filter.HasCardType CardType.Planeswalker)))
       """ {"type":"Hexproof","value":{"type":"HasCardType","value":{"type":"Planeswalker"}}} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Hexproof Nothing) /= Keyword.toJson (Keyword.Hexproof (Just (Filter.HasColor Color.Black))))
+      (Codec.encode Keyword.codec (Keyword.Hexproof Nothing) /= Codec.encode Keyword.codec (Keyword.Hexproof (Just (Filter.HasColor Color.Black))))
       "hexproof and hexproof from black encode differently"
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Hexproof (Just (Filter.HasColor Color.Black))) /= Keyword.toJson (Keyword.Hexproof (Just (Filter.HasColor Color.White))))
+      (Codec.encode Keyword.codec (Keyword.Hexproof (Just (Filter.HasColor Color.Black))) /= Codec.encode Keyword.codec (Keyword.Hexproof (Just (Filter.HasColor Color.White))))
       "and so do hexproof from black and hexproof from white"
   Spec.it s "Indestructible" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Indestructible
       """ {"type":"Indestructible"} """
   -- CR 702.14a's "[type]" rides the constructor, so swampwalk and islandwalk
   -- are DIFFERENT keywords and must encode differently.
   Spec.it s "Landwalk carries a land-type criterion" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp))
       """ {"type":"Landwalk","value":{"type":"HasSubtype","value":{"type":"Swamp"}}} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Landwalk (Filter.HasSubtype Subtype.Island))
       """ {"type":"Landwalk","value":{"type":"HasSubtype","value":{"type":"Island"}}} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)) /= Keyword.toJson (Keyword.Landwalk (Filter.HasSubtype Subtype.Island)))
+      (Codec.encode Keyword.codec (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)) /= Codec.encode Keyword.codec (Keyword.Landwalk (Filter.HasSubtype Subtype.Island)))
       "swampwalk and islandwalk encode differently"
   -- The other three shapes CR 702.14c names, which a bare Subtype could not
   -- say: a codec that flattened the criterion back to a subtype would
   -- round-trip the swampwalk above and lose all three.
   Spec.it s "Landwalk carries CR 702.14c's other three shapes" $ do
     -- Dryad Sophisticate: "without the specified type or supertype".
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Landwalk (Filter.Not (Filter.HasSupertype Supertype.Basic)))
       """ {"type":"Landwalk","value":{"type":"Not","value":{"type":"HasSupertype","value":{"type":"Basic"}}}} """
     -- With both the specified type or supertype and the specified subtype.
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Landwalk (Filter.And [Filter.HasSupertype Supertype.Snow, Filter.HasSubtype Subtype.Swamp]))
       """ {"type":"Landwalk","value":{"type":"And","value":[{"type":"HasSupertype","value":{"type":"Snow"}},{"type":"HasSubtype","value":{"type":"Swamp"}}]}} """
     -- With the specified type or supertype: artifact landwalk, which no
     -- creature prints -- it is only ever granted.
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Landwalk (Filter.HasCardType CardType.Artifact))
       """ {"type":"Landwalk","value":{"type":"HasCardType","value":{"type":"Artifact"}}} """
   Spec.it s "Lifelink" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Lifelink
       """ {"type":"Lifelink"} """
   Spec.it s "Reach" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Reach
       """ {"type":"Reach"} """
   -- CR 702.18a's shroud is nullary, so what this pins is the TAG.
   Spec.it s "Shroud" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Shroud
       """ {"type":"Shroud"} """
-    Spec.assertBool s (Keyword.toJson Keyword.Shroud /= Keyword.toJson Keyword.Trample) "shroud is not trample"
+    Spec.assertBool s (Codec.encode Keyword.codec Keyword.Shroud /= Codec.encode Keyword.codec Keyword.Trample) "shroud is not trample"
   Spec.it s "Trample" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Trample
       """ {"type":"Trample"} """
   -- CR 702.19c is a keyword of its own and not a flavour of the one above, so
-  -- the pair is asserted distinct: a fromJson arm that fell through to Trample
+  -- the pair is asserted distinct: an arm that decoded to Trample instead
   -- would round-trip the tag and quietly drop the variant.
   Spec.it s "TrampleOverPlaneswalkers" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.TrampleOverPlaneswalkers
       """ {"type":"TrampleOverPlaneswalkers"} """
-    Spec.assertBool s (Keyword.toJson Keyword.TrampleOverPlaneswalkers /= Keyword.toJson Keyword.Trample) "the variant is not trample"
+    Spec.assertBool s (Codec.encode Keyword.codec Keyword.TrampleOverPlaneswalkers /= Codec.encode Keyword.codec Keyword.Trample) "the variant is not trample"
   Spec.it s "Vigilance" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Vigilance
       """ {"type":"Vigilance"} """
   -- CR 702.22: only the combat-damage-division halves are modeled; see the type.
   Spec.it s "Banding" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Banding
       """ {"type":"Banding"} """
   -- CR 702.25a: nullary, because the rule takes no parameter -- its "without
   -- flanking" is a Filter over the blocker in the ability this mints, not a
   -- payload.
   Spec.it s "Flanking" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Flanking
       """ {"type":"Flanking"} """
   -- CR 702.26a: nullary, because the rule takes no parameter -- what a phasing
   -- permanent does is entirely the untap step's business.
   Spec.it s "Phasing" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Phasing
       """ {"type":"Phasing"} """
   -- CR 702.28b: nullary, because the rule takes no parameter -- both of its
   -- sentences ask only whether the other creature has the same keyword.
   Spec.it s "Shadow" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Shadow
       """ {"type":"Shadow"} """
   -- CR 702.31b: nullary, because the rule takes no parameter -- the only thing it
   -- asks about a blocker is whether it has horsemanship too.
   Spec.it s "Horsemanship" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Horsemanship
       """ {"type":"Horsemanship"} """
   -- CR 702.127a: nullary, because what an aftermath half costs is its own printed
   -- mana cost -- unlike flashback, whose alternative cost rides the constructor.
   Spec.it s "Aftermath" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Aftermath
       """ {"type":"Aftermath"} """
   -- CR 702.133a: nullary for aftermath's reason and one more -- the discard the
   -- rule names is the rule's, not the card's, so there is no payload to carry.
   Spec.it s "JumpStart" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.JumpStart
       """ {"type":"JumpStart"} """
   -- CR 702.29e: the typecycling filter rides the same keyword arm and
   -- is absent for plain cycling, so both spellings have to survive the trip.
   Spec.it s "Cycling round-trips with and without a typecycling filter" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Cycling cost Nothing)
       """ {"type":"Cycling","value":[{"mana":[{"type":"Generic","value":1}]},null]} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Cycling cost (Just (Filter.HasCardType CardType.Land)))
       """ {"type":"Cycling","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"HasCardType","value":{"type":"Land"}}]} """
   -- CR 702.34a's payload is a whole Cost, not a number -- the first keyword
   -- whose parameter is itself a composite.
   Spec.it s "Flashback carries its cost" $ do
     let flashback n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (flashback 1)
       """ {"type":"Flashback","value":{"mana":[{"type":"Generic","value":1}]}} """
-    Spec.assertBool s (Keyword.toJson (flashback 1) /= Keyword.toJson (flashback 4)) "the cost is part of the encoding"
+    Spec.assertBool s (Codec.encode Keyword.codec (flashback 1) /= Codec.encode Keyword.codec (flashback 4)) "the cost is part of the encoding"
   -- CR 702.107a's payload is a Cost too, Flashback's shape rather than Crew's
   -- Natural.
   Spec.it s "Outlast carries its cost" $ do
     let outlast n = Keyword.Outlast (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (outlast 1)
       """ {"type":"Outlast","value":{"mana":[{"type":"Generic","value":1}]}} """
-    Spec.assertBool s (Keyword.toJson (outlast 1) /= Keyword.toJson (outlast 4)) "the cost is part of the encoding"
+    Spec.assertBool s (Codec.encode Keyword.codec (outlast 1) /= Codec.encode Keyword.codec (outlast 4)) "the cost is part of the encoding"
   Spec.it s "Fear" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Fear
       """ {"type":"Fear"} """
   Spec.it s "Intimidate" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Intimidate
       """ {"type":"Intimidate"} """
   -- CR 702.37a's payload is a whole Cost too -- the MORPH cost, which CR 702.37e
@@ -325,401 +291,361 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   Spec.it s "Morph carries its cost, and is not Flashback" $ do
     let morph n = Keyword.Morph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) MorphVariant.Plain
         flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (morph 1)
       """ {"type":"Morph","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"Plain"}]} """
-    Spec.assertBool s (Keyword.toJson (morph 1) /= Keyword.toJson (flashbackOf 1)) "morph {1} is not flashback {1}"
+    Spec.assertBool s (Codec.encode Keyword.codec (morph 1) /= Codec.encode Keyword.codec (flashbackOf 1)) "morph {1} is not flashback {1}"
   -- CR 702.37b: megamorph is the SAME constructor with a different variant, so
   -- the two must not encode alike -- a codec that dropped the variant would make
   -- Misthoof Kirin's megamorph {1}{W} indistinguishable from a morph {1}{W}.
   Spec.it s "Morph's variant tells megamorph from plain morph" $ do
     let morphOf = Keyword.Morph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (morphOf MorphVariant.Mega)
       """ {"type":"Morph","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"Mega"}]} """
-    Spec.assertBool s (Keyword.toJson (morphOf MorphVariant.Mega) /= Keyword.toJson (morphOf MorphVariant.Plain)) "megamorph {1} is not morph {1}"
+    Spec.assertBool s (Codec.encode Keyword.codec (morphOf MorphVariant.Mega) /= Codec.encode Keyword.codec (morphOf MorphVariant.Plain)) "megamorph {1} is not morph {1}"
   -- CR 702.33a's payload is a whole Cost too, and it must not share Flashback's
   -- tag either.
   Spec.it s "Kicker carries its cost, and is not Flashback" $ do
     let kicker n = Keyword.Kicker (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
         flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (kicker 4)
       """ {"type":"Kicker","value":{"mana":[{"type":"Generic","value":4}]}} """
-    Spec.assertBool s (Keyword.toJson (kicker 4) /= Keyword.toJson (flashbackOf 4)) "kicker {4} is not flashback {4}"
+    Spec.assertBool s (Codec.encode Keyword.codec (kicker 4) /= Codec.encode Keyword.codec (flashbackOf 4)) "kicker {4} is not flashback {4}"
   -- CR 702.42a's payload is a whole Cost too, and it must not share Flashback's
   -- tag.
   Spec.it s "Entwine carries its cost, and is not Flashback" $ do
     let entwine n = Keyword.Entwine (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
         flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (entwine 1)
       """ {"type":"Entwine","value":{"mana":[{"type":"Generic","value":1}]}} """
-    Spec.assertBool s (Keyword.toJson (entwine 1) /= Keyword.toJson (flashbackOf 1)) "entwine {1} is not flashback {1}"
+    Spec.assertBool s (Codec.encode Keyword.codec (entwine 1) /= Codec.encode Keyword.codec (flashbackOf 1)) "entwine {1} is not flashback {1}"
   -- CR 702.45a's N rides the constructor as poisonous' does.
   Spec.it s "Bushido carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Bushido 2)
       """ {"type":"Bushido","value":2} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Bushido 3) /= Keyword.toJson (Keyword.Poisonous 3))
+      (Codec.encode Keyword.codec (Keyword.Bushido 3) /= Codec.encode Keyword.codec (Keyword.Poisonous 3))
       "bushido 3 is not poisonous 3"
   -- CR 702.43a's N is a COUNT OF COUNTERS too, so the tag is again the only thing
   -- separating modular 2 from bushido 2 on the wire.
   Spec.it s "Modular carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Modular 2)
       """ {"type":"Modular","value":2} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Modular 3) /= Keyword.toJson (Keyword.Bushido 3))
+      (Codec.encode Keyword.codec (Keyword.Modular 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "modular 3 is not bushido 3"
   -- CR 702.63a's N is a COUNT OF COUNTERS rather than a size or a threshold, and
   -- the wire cannot tell those apart -- so the tag is all that keeps vanishing 2
   -- from bushido 2.
   Spec.it s "Vanishing carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Vanishing 2)
       """ {"type":"Vanishing","value":2} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Vanishing 3) /= Keyword.toJson (Keyword.Bushido 3))
+      (Codec.encode Keyword.codec (Keyword.Vanishing 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "vanishing 3 is not bushido 3"
   Spec.it s "SplitSecond" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.SplitSecond
       """ {"type":"SplitSecond"} """
   -- CR 702.70a's N rides the constructor the same way, and the two payloaded
   -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Poisonous 1)
       """ {"type":"Poisonous","value":1} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Poisonous 3) /= Keyword.toJson (Keyword.Toxic 3))
+      (Codec.encode Keyword.codec (Keyword.Poisonous 3) /= Codec.encode Keyword.codec (Keyword.Toxic 3))
       "poisonous 3 is not toxic 3"
   -- CR 702.112a's N is written like every other keyword's, so the TAG is what
   -- keeps them apart: `Renown 2` and `Poisonous 2` differ only by it on the wire.
   Spec.it s "Renown carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Renown 2)
       """ {"type":"Renown","value":2} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Renown 2) /= Keyword.toJson (Keyword.Poisonous 2))
+      (Codec.encode Keyword.codec (Keyword.Renown 2) /= Codec.encode Keyword.codec (Keyword.Poisonous 2))
       "renown 2 is not poisonous 2"
   -- CR 702.135a's N is written like the rest, so it must not collide either.
   Spec.it s "Afterlife carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Afterlife 2)
       """ {"type":"Afterlife","value":2} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Afterlife 2) /= Keyword.toJson (Keyword.Renown 2))
+      (Codec.encode Keyword.codec (Keyword.Afterlife 2) /= Codec.encode Keyword.codec (Keyword.Renown 2))
       "afterlife 2 is not renown 2"
   -- CR 702.46a's N is written like the rest, and it is a MANA VALUE BOUND rather
   -- than a count, so a collision with a same-numbered keyword would be a real
   -- misread.
   Spec.it s "Soulshift carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Soulshift 3)
       """ {"type":"Soulshift","value":3} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Soulshift 3) /= Keyword.toJson (Keyword.Bushido 3))
+      (Codec.encode Keyword.codec (Keyword.Soulshift 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "soulshift 3 is not bushido 3"
   -- CR 702.77a writes BOTH an N and a cost, so the array carries two fields the
   -- way cycling's and morph's do, and both must survive the round trip.
   Spec.it s "Reinforce carries its N and its cost" $ do
     let reinforce n g = Keyword.Reinforce n (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic g])) [])
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (reinforce 2 1)
       """ {"type":"Reinforce","value":[2,{"mana":[{"type":"Generic","value":1}]}]} """
-    Spec.assertBool s (Keyword.toJson (reinforce 2 1) /= Keyword.toJson (reinforce 3 1)) "the N is part of the encoding"
-    Spec.assertBool s (Keyword.toJson (reinforce 2 1) /= Keyword.toJson (reinforce 2 4)) "the cost is part of the encoding"
+    Spec.assertBool s (Codec.encode Keyword.codec (reinforce 2 1) /= Codec.encode Keyword.codec (reinforce 3 1)) "the N is part of the encoding"
+    Spec.assertBool s (Codec.encode Keyword.codec (reinforce 2 1) /= Codec.encode Keyword.codec (reinforce 2 4)) "the cost is part of the encoding"
   -- CR 702.86a's N rides the constructor the same way poisonous' does, and the
   -- two must not share a tag either.
   Spec.it s "Annihilator carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Annihilator 1)
       """ {"type":"Annihilator","value":1} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Annihilator 3) /= Keyword.toJson (Keyword.Poisonous 3))
+      (Codec.encode Keyword.codec (Keyword.Annihilator 3) /= Codec.encode Keyword.codec (Keyword.Poisonous 3))
       "annihilator 3 is not poisonous 3"
   -- CR 702.23a's N rides the constructor the same way.
   Spec.it s "Rampage carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Rampage 2)
       """ {"type":"Rampage","value":2} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Rampage 3) /= Keyword.toJson (Keyword.Bushido 3))
+      (Codec.encode Keyword.codec (Keyword.Rampage 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "rampage 3 is not bushido 3"
   -- CR 702.130a's N rides the constructor the same way, and must not share a tag
   -- with the other payloaded keywords either.
   Spec.it s "Afflict carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Afflict 2)
       """ {"type":"Afflict","value":2} """
     Spec.assertBool
       s
-      (Keyword.toJson (Keyword.Afflict 3) /= Keyword.toJson (Keyword.Annihilator 3))
+      (Codec.encode Keyword.codec (Keyword.Afflict 3) /= Codec.encode Keyword.codec (Keyword.Annihilator 3))
       "afflict 3 is not annihilator 3"
   Spec.it s "Infect" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Infect
       """ {"type":"Infect"} """
   -- CR 702.80d makes multiple instances redundant, so wither is a bare tag with
   -- nothing to count.
   Spec.it s "Wither" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Wither
       """ {"type":"Wither"} """
   -- CR 702.83a takes no parameter either, so exalted is a bare tag. What is
   -- multiple is the COUNT the projection keeps -- rule 702.83 prints no
   -- redundancy clause, unlike wither's above.
   Spec.it s "Exalted" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Exalted
       """ {"type":"Exalted"} """
   -- CR 702.134a takes no parameter either, and CR 702.134b makes the instances
   -- separate rather than redundant -- so, like exalted, a bare tag over a count.
   Spec.it s "Mentor" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Mentor
       """ {"type":"Mentor"} """
   -- CR 702.149a is nullary and CR 702.149b separate, so mentor's shape exactly.
   Spec.it s "Training" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Training
       """ {"type":"Training"} """
   -- CR 702.39a takes no parameter either, and CR 702.39b makes the instances
   -- separate -- so a bare tag over a count, as mentor is.
   Spec.it s "Provoke" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Provoke
       """ {"type":"Provoke"} """
   -- CR 702.91a's battle cry takes no parameter, so it encodes as a bare tag.
   -- What CR 702.91b makes multiple is the COUNT the projection keeps, never the
   -- value.
   Spec.it s "BattleCry" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.BattleCry
       """ {"type":"BattleCry"} """
   -- CR 702.108a's prowess takes no parameter either, and CR 702.108b makes the
   -- COUNT multiple rather than the value.
   Spec.it s "Prowess" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Prowess
       """ {"type":"Prowess"} """
   -- CR 702.100a's evolve is nullary too, and CR 702.100d makes the COUNT
   -- multiple rather than the value.
   Spec.it s "Evolve" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Evolve
       """ {"type":"Evolve"} """
   -- CR 702.105a's dethrone is nullary as well, CR 702.105b making the COUNT
   -- multiple rather than the value.
   Spec.it s "Dethrone" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Dethrone
       """ {"type":"Dethrone"} """
   Spec.it s "Menace" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Menace
       """ {"type":"Menace"} """
   Spec.it s "Changeling" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Changeling
       """ {"type":"Changeling"} """
   Spec.it s "Devoid" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Devoid
       """ {"type":"Devoid"} """
   Spec.it s "Skulk" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Skulk
       """ {"type":"Skulk"} """
   Spec.it s "Melee" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Melee
       """ {"type":"Melee"} """
   -- CR 702.122a's N rides the constructor, so crew 1 and crew 6 are distinct
   -- keywords and must encode distinguishably.
   Spec.it s "Crew carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Crew 6)
       """ {"type":"Crew","value":6} """
-    Spec.assertBool s (Keyword.toJson (Keyword.Crew 1) /= Keyword.toJson (Keyword.Crew 6)) "crew 1 and crew 6 encode differently"
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Crew 1) /= Codec.encode Keyword.codec (Keyword.Crew 6)) "crew 1 and crew 6 encode differently"
   -- CR 702.123a's N is both the counters and the tokens, so fabricate 1 and
   -- fabricate 2 are distinct keywords, Crew's shape.
   Spec.it s "Fabricate carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Fabricate 2)
       """ {"type":"Fabricate","value":2} """
-    Spec.assertBool s (Keyword.toJson (Keyword.Fabricate 1) /= Keyword.toJson (Keyword.Fabricate 2)) "fabricate 1 and fabricate 2 encode differently"
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Fabricate 1) /= Codec.encode Keyword.codec (Keyword.Fabricate 2)) "fabricate 1 and fabricate 2 encode differently"
   Spec.it s "Riot" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Riot
       """ {"type":"Riot"} """
   Spec.it s "Unleash" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Unleash
       """ {"type":"Unleash"} """
-    Spec.assertBool s (Keyword.toJson Keyword.Unleash /= Keyword.toJson Keyword.Riot) "unleash and riot encode differently"
+    Spec.assertBool s (Codec.encode Keyword.codec Keyword.Unleash /= Codec.encode Keyword.codec Keyword.Riot) "unleash and riot encode differently"
   Spec.it s "Daybound" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Daybound
       """ {"type":"Daybound"} """
   Spec.it s "Nightbound" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Nightbound
       """ {"type":"Nightbound"} """
   Spec.it s "Decayed" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Decayed
       """ {"type":"Decayed"} """
-  -- CR 702.164a's N rides the constructor, so this is the first keyword that is
-  -- not a bare tag.
+  -- CR 702.164a's N rides the constructor.
   Spec.it s "Toxic carries its N" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       (Keyword.Toxic 1)
       """ {"type":"Toxic","value":1} """
-    Spec.assertBool s (Keyword.toJson (Keyword.Toxic 1) /= Keyword.toJson (Keyword.Toxic 2)) "toxic 1 and toxic 2 encode differently"
+    Spec.assertBool s (Codec.encode Keyword.codec (Keyword.Toxic 1) /= Codec.encode Keyword.codec (Keyword.Toxic 2)) "toxic 1 and toxic 2 encode differently"
   Spec.it s "Persist" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Persist
       """ {"type":"Persist"} """
   -- Persist's mirror, and told apart from it by the tag alone: rules 702.79a and
   -- 702.93a differ only in a counter kind neither encoding carries.
   Spec.it s "Undying" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Keyword.toJson
-      Keyword.fromJson
+      Keyword.codec
       Keyword.Undying
       """ {"type":"Undying"} """
-    Spec.assertBool s (Keyword.toJson Keyword.Undying /= Keyword.toJson Keyword.Persist) "undying and persist encode differently"
+    Spec.assertBool s (Codec.encode Keyword.codec Keyword.Undying /= Codec.encode Keyword.codec Keyword.Persist) "undying and persist encode differently"
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Keyword.codec

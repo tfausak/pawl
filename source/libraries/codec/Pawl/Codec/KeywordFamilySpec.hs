@@ -4,6 +4,7 @@ module Pawl.Codec.KeywordFamilySpec where
 
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -11,178 +12,156 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
   Spec.it s "Hexproof" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Hexproof
       """ {"type":"Hexproof"} """
 
   Spec.it s "Landwalk" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Landwalk
       """ {"type":"Landwalk"} """
 
   Spec.it s "Cycling" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Cycling
       """ {"type":"Cycling"} """
 
   Spec.it s "Flashback" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Flashback
       """ {"type":"Flashback"} """
 
   Spec.it s "Morph" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Morph
       """ {"type":"Morph"} """
 
   Spec.it s "Kicker" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Kicker
       """ {"type":"Kicker"} """
 
   Spec.it s "Entwine" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Entwine
       """ {"type":"Entwine"} """
 
   Spec.it s "Bushido" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Bushido
       """ {"type":"Bushido"} """
 
   Spec.it s "Modular" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Modular
       """ {"type":"Modular"} """
 
   Spec.it s "Vanishing" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Vanishing
       """ {"type":"Vanishing"} """
 
   Spec.it s "Poisonous" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Poisonous
       """ {"type":"Poisonous"} """
 
   Spec.it s "Renown" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Renown
       """ {"type":"Renown"} """
 
   Spec.it s "Afterlife" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Afterlife
       """ {"type":"Afterlife"} """
 
   Spec.it s "Soulshift" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Soulshift
       """ {"type":"Soulshift"} """
 
   Spec.it s "Reinforce" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Reinforce
       """ {"type":"Reinforce"} """
 
   Spec.it s "Annihilator" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Annihilator
       """ {"type":"Annihilator"} """
 
   Spec.it s "Outlast" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Outlast
       """ {"type":"Outlast"} """
 
   Spec.it s "Crew" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Crew
       """ {"type":"Crew"} """
 
   Spec.it s "Fabricate" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Fabricate
       """ {"type":"Fabricate"} """
 
   Spec.it s "Rampage" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Rampage
       """ {"type":"Rampage"} """
 
   Spec.it s "Afflict" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Afflict
       """ {"type":"Afflict"} """
 
   Spec.it s "Toxic" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      KeywordFamily.toJson
-      KeywordFamily.fromJson
+      KeywordFamily.codec
       KeywordFamily.Toxic
       """ {"type":"Toxic"} """
 
@@ -194,5 +173,8 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
   Spec.it s "the family tag is not the instance's tag" $
     Spec.assertBool
       s
-      (KeywordFamily.toJson KeywordFamily.Toxic /= Common.tagged "Toxic" (Just (Value.integer 2)))
+      (Codec.encode KeywordFamily.codec KeywordFamily.Toxic /= Common.tagged "Toxic" (Just (Value.integer 2)))
       "the toxic family is not toxic 2"
+
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s KeywordFamily.codec

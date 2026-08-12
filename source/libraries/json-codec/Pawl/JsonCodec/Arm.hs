@@ -20,14 +20,15 @@ import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.JsonSchema.Name as Name
 import qualified Pawl.JsonSchema.Schema as Schema
 
--- | 'Payload' stores the element codec's decoder and schema rather than the
--- codec itself, so the element type does not escape into an existential and
--- this stays an ordinary sum. 'Nullary' is not a special case of it: a nullary
--- arm's schema carries no @value@ property at all, and its decode ignores one
--- that is present.
+-- | 'Payload' and 'OptionalPayload' store the element codec's decoder and
+-- schema rather than the codec itself, so the element type does not escape into
+-- an existential and this stays an ordinary sum. 'Nullary' is not a special
+-- case of either: a nullary arm's schema carries no @value@ property at all,
+-- and its decode ignores one that is present.
 data Arm a
   = Nullary String a
   | Payload String (Value.Value -> Either Text.Text a) (Define.SchemaM Schema.Schema)
+  | OptionalPayload String (Maybe Value.Value -> Either Text.Text a) (Define.SchemaM Schema.Schema)
 
 nullary :: String -> a -> Arm a
 nullary = Nullary
@@ -35,21 +36,41 @@ nullary = Nullary
 payload :: String -> Codec.Codec b -> (b -> a) -> Arm a
 payload t c inject = Payload t (fmap inject . Codec.decode c) (Codec.schema c)
 
+-- | A payload arm whose @value@ key may be absent as well as present, both
+-- under the same tag -- 'Pawl.Codec.Keyword'\'s @Hexproof@ is the first user:
+-- CR 702.11b's bare hexproof omits @value@ entirely and CR 702.11d's
+-- "hexproof from [quality]" carries it, and both decode to the one
+-- constructor. 'payload' cannot express this -- NOT because its schema is
+-- wrong: 'payload'\'s schema and its decoder agree exactly, both requiring
+-- @value@ ('Common.withValue' fails on 'Nothing' the same way the schema's
+-- @required@ list does). The real reason is that 'Hexproof' needs ONE
+-- constructor to accept TWO shapes, and a single 'payload' arm only ever
+-- accepts one. (The stricter-than-the-codec defect this branch actually
+-- shipped belonged to the hand-written decode override 'optionalPayload'
+-- replaced, not to 'payload' itself.) Decode here takes an absent @value@ as
+-- 'Nothing' and a present one through the element codec as 'Just', and the
+-- schema marks @value@ optional to match.
+optionalPayload :: String -> Codec.Codec b -> (Maybe b -> a) -> Arm a
+optionalPayload t c inject =
+  OptionalPayload t (fmap inject . traverse (Codec.decode c)) (Codec.schema c)
+
 tag :: Arm a -> String
 tag arm = case arm of
   Nullary t _ -> t
   Payload t _ _ -> t
+  OptionalPayload t _ _ -> t
 
 -- | Assumes distinct tags across 'arms': 'List.find' takes the first match on
 -- decode, so a duplicate tag is dead code, and 'armSchema' does not dedupe
 -- either, so a duplicate emits two identical 'Schema.oneOf' branches that
 -- nothing (including the value the decoder accepts) validates against.
 --
--- A known tag missing its @value@ reports 'Common.withValue''s
--- @"missing tagged value"@, not an unknown-tag message. Most hand-written
--- codecs fall through their wildcard on a @(tag, mv)@ match instead and
--- report the tag as unknown; converting one to 'tagged' changes that string,
--- deliberately, since the tag genuinely is known here.
+-- A known 'Payload' tag missing its @value@ reports 'Common.withValue''s
+-- @"missing tagged value"@, not an unknown-tag message -- an 'OptionalPayload'
+-- tag takes the same absence as 'Nothing' instead of failing. Most
+-- hand-written codecs fall through their wildcard on a @(tag, mv)@ match
+-- instead and report the tag as unknown; converting one to 'tagged' changes
+-- that string, deliberately, since the tag genuinely is known here.
 tagged :: forall a. (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a
 tagged enc arms =
   Codec.MkCodec
@@ -59,7 +80,8 @@ tagged enc arms =
         case List.find ((== t) . tag) arms of
           Nothing -> Left . Text.pack $ "unknown " <> name <> ": " <> t
           Just (Nullary _ x) -> Right x
-          Just (Payload _ dec _) -> Common.withValue mv dec,
+          Just (Payload _ dec _) -> Common.withValue mv dec
+          Just (OptionalPayload _ dec _) -> dec mv,
       Codec.schema = Define.define (Name.typeName proxy) $ do
         schemas <- traverse armSchema arms
         pure (Schema.oneOf schemas)
@@ -72,11 +94,13 @@ armSchema :: Arm a -> Define.SchemaM Schema.Schema
 armSchema arm = case arm of
   Nullary t _ -> pure (armObject t Nothing)
   Payload t _ s -> fmap (armObject t . Just) s
+  OptionalPayload t _ s -> fmap (armObjectOptional t) s
 
 -- | No @additionalProperties: false@: 'Common.asTagged' ignores unknown keys,
 -- and a nullary arm ignores a @value@ outright, so forbidding them would reject
 -- documents the decoder accepts. @value@ IS required on a payload arm, because
--- 'Common.withValue' fails without it.
+-- 'Common.withValue' fails without it -- 'armObjectOptional' is the one arm
+-- shape where it is not.
 armObject :: String -> Maybe Schema.Schema -> Schema.Schema
 armObject t ms =
   let typePair = Value.pair "type" (Schema.unwrap (Schema.constant (Text.pack t)))
@@ -86,3 +110,13 @@ armObject t ms =
           Schema.object
             [typePair, Value.pair "value" (Schema.unwrap s)]
             [Text.pack "type", Text.pack "value"]
+
+-- | 'armObject'\'s payload case with @value@ NOT in @required@, for
+-- 'OptionalPayload': the decoder accepts an absent @value@, so a schema that
+-- required it would reject a document the codec itself writes and reads.
+armObjectOptional :: String -> Schema.Schema -> Schema.Schema
+armObjectOptional t s =
+  let typePair = Value.pair "type" (Schema.unwrap (Schema.constant (Text.pack t)))
+   in Schema.object
+        [typePair, Value.pair "value" (Schema.unwrap s)]
+        [Text.pack "type"]

@@ -10,121 +10,109 @@ import qualified Pawl.Types.CardType as CardType
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CardType" $ do
   Spec.it s "Artifact" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Artifact
       """ {"type":"Artifact"} """
 
   Spec.it s "Battle" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Battle
       """ {"type":"Battle"} """
 
   Spec.it s "Conspiracy" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Conspiracy
       """ {"type":"Conspiracy"} """
 
   Spec.it s "Creature" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Creature
       """ {"type":"Creature"} """
 
   Spec.it s "Dungeon" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Dungeon
       """ {"type":"Dungeon"} """
 
   Spec.it s "Enchantment" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Enchantment
       """ {"type":"Enchantment"} """
 
   Spec.it s "Instant" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Instant
       """ {"type":"Instant"} """
 
   Spec.it s "Kindred" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Kindred
       """ {"type":"Kindred"} """
 
   Spec.it s "Land" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Land
       """ {"type":"Land"} """
 
   Spec.it s "Phenomenon" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Phenomenon
       """ {"type":"Phenomenon"} """
 
   Spec.it s "Plane" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Plane
       """ {"type":"Plane"} """
 
   Spec.it s "Planeswalker" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Planeswalker
       """ {"type":"Planeswalker"} """
 
   Spec.it s "Scheme" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Scheme
       """ {"type":"Scheme"} """
 
   Spec.it s "Sorcery" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Sorcery
       """ {"type":"Sorcery"} """
 
   Spec.it s "Vanguard" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CardType.toJson
-      CardType.fromJson
+      CardType.codec
       CardType.Vanguard
       """ {"type":"Vanguard"} """
+
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s CardType.codec

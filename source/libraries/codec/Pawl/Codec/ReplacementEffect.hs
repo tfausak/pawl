@@ -25,7 +25,7 @@ toJson re = case re of
   ReplacementEffect.ZoneChangeR p z ->
     Common.tagged "ZoneChangeR" . Just . Value.array $ [ZoneChangePattern.toJson p, Zone.toJson z]
   ReplacementEffect.EntryR p r ->
-    Common.tagged "EntryR" . Just . Value.array $ [Filter.toJson Keyword.toJson p, EntryRewrite.toJson r]
+    Common.tagged "EntryR" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) p, EntryRewrite.toJson r]
   ReplacementEffect.DamageR p r ->
     Common.tagged "DamageR" . Just . Value.array $ [DamagePattern.toJson p, DamageRewrite.toJson r]
   ReplacementEffect.DestructionR r ->
@@ -35,7 +35,7 @@ toJson re = case re of
   ReplacementEffect.TokenR p sc ->
     Common.tagged "TokenR" . Just . Value.array $ [TokenPattern.toJson p, Scaling.toJson sc]
   ReplacementEffect.TurnUpR p r ->
-    Common.tagged "TurnUpR" . Just . Value.array $ [Filter.toJson Keyword.toJson p, TurnUpRewrite.toJson r]
+    Common.tagged "TurnUpR" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) p, TurnUpRewrite.toJson r]
   ReplacementEffect.PhaseR p ->
     Common.tagged "PhaseR" . Just $ Codec.encode PhasePattern.codec p
 
@@ -48,7 +48,7 @@ fromJson value = do
       dest <- Zone.fromJson z
       pure (ReplacementEffect.ZoneChangeR pattern_ dest)
     ("EntryR", Just (Value.Array (Array.MkArray [p, r]))) -> do
-      pattern_ <- Filter.fromJson Keyword.fromJson p
+      pattern_ <- Codec.decode (Filter.codec Keyword.codec) p
       rewrite <- EntryRewrite.fromJson r
       pure (ReplacementEffect.EntryR pattern_ rewrite)
     ("DamageR", Just (Value.Array (Array.MkArray [p, r]))) -> do
@@ -65,7 +65,7 @@ fromJson value = do
       scaling <- Scaling.fromJson sc
       pure (ReplacementEffect.TokenR pattern_ scaling)
     ("TurnUpR", Just (Value.Array (Array.MkArray [p, r]))) -> do
-      pattern_ <- Filter.fromJson Keyword.fromJson p
+      pattern_ <- Codec.decode (Filter.codec Keyword.codec) p
       rewrite <- TurnUpRewrite.fromJson r
       pure (ReplacementEffect.TurnUpR pattern_ rewrite)
     ("PhaseR", Just v) -> ReplacementEffect.PhaseR <$> Codec.decode PhasePattern.codec v
