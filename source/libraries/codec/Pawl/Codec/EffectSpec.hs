@@ -419,20 +419,30 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Create (Quantity.Literal 1) card attacking (Just slot))
       """ {"type":"Create","value":[{"type":"Literal","value":1},"Goblin Piker",{"tapped":{"type":"Tapped"},"attacking":true},"token"]} """
-  -- CreateCopy's ObjectRef is untagged, so both arms have to survive.
+  -- CreateCopy's ObjectRef is untagged, so both arms have to survive. A count of
+  -- one is elided, so the bare-ref form is what both of these write.
   Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CreateCopy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      (Effect.CreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"CreateCopy","value":"target"} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CreateCopy (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)))
+      (Effect.CreateCopy (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)))
       """ {"type":"CreateCopy","value":{"type":"HasKeyword","value":{"type":"Flying"}}} """
+  -- Kicked Rite of Replication's five: the pair form, which the decoder tells
+  -- from a ref by length.
+  Spec.it s "CreateCopy round-trips a count above one" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.CreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"CreateCopy","value":[{"type":"Literal","value":5},"target"]} """
   Spec.it s "Replace" $
     Common.assertJsonCodec
       s

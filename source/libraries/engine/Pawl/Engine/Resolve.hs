@@ -237,7 +237,8 @@ slotsOf effect = case effect of
   -- A READ, unlike Create's slot: the ref names the permanent being copied,
   -- which is a target on Cackling Counterpart and the reserved self slot on
   -- Watchful Radstag. Both are reads; only the first is a target (CR 115.10a).
-  Effect.CreateCopy ref -> objectRefSlots ref
+  -- Its Quantity is a read like Create's.
+  Effect.CreateCopy quantity ref -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
   -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
   -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
   -- one, but a dangling one would slip past the lint as ModifyTarget's would.
@@ -405,8 +406,8 @@ slotsAreExhaustive effect = case effect of
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
   Effect.Create quantity _ _ _ -> Quantity.slotsAreExhaustive quantity
-  -- The ObjectRef is the whole of it, and slotsOf reports it.
-  Effect.CreateCopy _ -> True
+  -- The ObjectRef is reported by slotsOf, so only the count can hide a slot.
+  Effect.CreateCopy quantity _ -> Quantity.slotsAreExhaustive quantity
   -- The ReplacementEffect holds no Quantity and no reference, so slotsOf's two
   -- unions are the whole of it once their quantities check out.
   Effect.Replace duration _ _ condition _ ->
@@ -521,7 +522,7 @@ readsX = any effectReadsX
       Effect.ExchangeLifeTotals _ -> False
       Effect.IncreaseSpeed _ quantity -> Quantity.readsX quantity
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
-      Effect.CreateCopy _ -> False
+      Effect.CreateCopy quantity _ -> Quantity.readsX quantity
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too, an X-cost shield's rider being
@@ -589,7 +590,7 @@ searchesLibrary effect = case effect of
   Effect.ExchangeLifeTotals _ -> False
   Effect.IncreaseSpeed {} -> False
   Effect.Create {} -> False
-  Effect.CreateCopy _ -> False
+  Effect.CreateCopy {} -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   -- Not descended into for CR 615.5's rider, because this classification is
@@ -691,7 +692,7 @@ boundSlots effect = case effect of
   -- object" is the case that needs the name to survive the resolution.
   Effect.Create _ _ _ mSlot -> foldMap Set.singleton mSlot
   -- Binds nothing: no card in the pool names the token copy it minted.
-  Effect.CreateCopy _ -> Set.empty
+  Effect.CreateCopy {} -> Set.empty
   -- CR 729.1b: the subgame's loser, derived rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
@@ -2750,9 +2751,9 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
                 State.modify' (bindSlot resolving slot named)
       _ -> pure ()
-  Effect.CreateCopy ref -> do
+  Effect.CreateCopy quantity ref -> do
     gs <- State.get
-    -- CR 707.2 / 111.3: one token per named permanent, minted through the same
+    -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the same
     -- CR 111.2 funnel a given-text token uses, carrying the copied permanent's
     -- COPIABLE values (Event.copiedSnapshot) rather than its projection -- CR
     -- 707.2 copies neither counters nor other effects. All of it read off ONE `gs`,
@@ -2770,15 +2771,28 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- copy of it". The pair has to move together: the card without the snapshot
     -- would mint the printed card rather than the copy, and the snapshot without
     -- the card would mint nothing to stamp it on.
-    let sources = objectRefObjects legal resolving controller source gs ref
-    Monad.forM_ sources $ \src ->
-      Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
-        -- No riders: CR 707.2 copies no counters, and Effect.CreateCopy carries
-        -- nothing for an effect to add any with.
-        --
-        -- Not implemented: a copy token an effect says enters with counters on it
-        -- (Ochre Jelly, Littjara Mirrorlake) arrives bare (#1255).
-        Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) 1 TapState.Untapped Map.empty)
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        sources = objectRefObjects legal resolving controller source gs ref
+    -- The count is Create's, read the same way and off the same `gs`: kicked
+    -- Rite of Replication's five (CR 707.1). An unevaluable or non-positive
+    -- count mints nothing, which is Create's arm's posture one rule over.
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Just n
+        | n > 0 ->
+            Monad.forM_ sources $ \src ->
+              Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
+                -- No riders: CR 707.2 copies no counters, and Effect.CreateCopy
+                -- carries nothing for an effect to add any with.
+                --
+                -- Not implemented: a copy token an effect says enters with counters on it
+                -- (Ochre Jelly, Littjara Mirrorlake) arrives bare (#1255).
+                --
+                -- ONE call per named permanent, with the whole count: CR 614.12's
+                -- entry loop is handed the batch, so five copies of one creature
+                -- enter simultaneously and none of them may copy a sibling.
+                Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) (Integer.toNaturalSaturating n) TapState.Untapped Map.empty)
+      _ -> pure ()
   Effect.ArmDelayedTrigger name onset duration -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and NOT belt and braces: the source can

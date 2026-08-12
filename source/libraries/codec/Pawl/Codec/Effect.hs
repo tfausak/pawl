@@ -48,6 +48,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.Onset as Onset
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
 
@@ -116,7 +117,13 @@ toJson codec e = case e of
       [Quantity.toJson q, codec c]
         <> (if te == EntryRiders.defaultValue then [] else [EntryRiders.toJson te])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
-  Effect.CreateCopy r -> Common.tagged "CreateCopy" (Just (ObjectRef.toJson r))
+  -- The count is ELIDED when it is one, which is Mill's tally posture and
+  -- Create's riders': every card that mints a single copy keeps the bare
+  -- ObjectRef it has always had, and only a card that mints several spells the
+  -- pair out.
+  Effect.CreateCopy q r
+    | q == Quantity.Literal 1 -> Common.tagged "CreateCopy" (Just (ObjectRef.toJson r))
+    | otherwise -> Common.tagged "CreateCopy" (Just (Common.array [Quantity.toJson q, ObjectRef.toJson r]))
   Effect.Replace d u o c re ->
     Common.tagged "Replace" . Just . Common.array $
       [Duration.toJson d, Uses.toJson u, ReplacementOrigin.toJson o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
@@ -297,7 +304,12 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [q, c, s])) -> Effect.Create <$> Quantity.fromJson q <*> decode c <*> pure EntryRiders.defaultValue <*> (Just <$> SlotName.fromJson s)
       Just (Value.Array (Array.MkArray [q, c, e, s])) -> Effect.Create <$> Quantity.fromJson q <*> decode c <*> EntryRiders.fromJson e <*> (Just <$> SlotName.fromJson s)
       _ -> Left . Text.pack $ "Create expects [Quantity, Card], optionally with EntryRiders and/or a slot"
-    "CreateCopy" -> Common.withValue mv (fmap Effect.CreateCopy . ObjectRef.fromJson)
+    -- Told apart by LENGTH, and safe to: an ObjectRef's own array arm is
+    -- always exactly one word (Pawl.Codec.ObjectRef), so a two-element array is
+    -- never a ref.
+    "CreateCopy" -> case mv of
+      Just (Value.Array (Array.MkArray [q, r])) -> Effect.CreateCopy <$> Quantity.fromJson q <*> ObjectRef.fromJson r
+      _ -> Common.withValue mv (fmap (Effect.CreateCopy (Quantity.Literal 1)) . ObjectRef.fromJson)
     -- The three shapes the encoder above can emit, told apart by LENGTH.
     "ArmDelayedTrigger" -> case mv of
       Just (Value.Array (Array.MkArray [n, o, d])) ->

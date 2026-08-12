@@ -1535,7 +1535,7 @@ rewriteEffect pairs effect = case effect of
   -- word a CR 612.1 swap reaches. What the token BECOMES is not text on this
   -- card at all -- it is the copied permanent's copiable values, and CR 707.2
   -- excludes text-changing effects from those, so nothing here rewrites them.
-  Effect.CreateCopy ref -> Effect.CreateCopy (rewriteObjectRef pairs ref)
+  Effect.CreateCopy quantity ref -> Effect.CreateCopy quantity (rewriteObjectRef pairs ref)
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other, so the recursion
