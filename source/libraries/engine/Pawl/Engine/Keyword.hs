@@ -1410,11 +1410,12 @@ poisonous n =
 -- about a shortfall asks for -- objectRefObjects takes 1 of an empty pile.
 --
 -- Face up, and no rider says otherwise: CR 406.3 makes an exiled card face up by
--- default and rule 702.115a states no exception. The EntryRiders are inert for an
--- exile destination, no slot is bound because nothing later reads what arrived --
--- rule 702.115a has no second sentence -- and the origin zone is Nothing for
--- soulshift's reason: rule 702.115a states the library in the REF, which names
--- only cards that are already there.
+-- default and rule 702.115a states no exception. The EntryRiders and the
+-- LibraryPlacement are both inert for an exile destination, no slot is bound
+-- because nothing later reads what arrived --
+-- rule 702.115a has no second sentence -- and the origin zone is Nothing because
+-- the REF states it: TopOfLibrary can only name a card already in that library,
+-- so CR 113.6m has nothing left to read off the field.
 --
 -- Single mode, no targets (CR 115.10a: the top card of a library is never one),
 -- ChooseExactly 1, no intervening "if": rule 702.115a leaves nothing to ask.

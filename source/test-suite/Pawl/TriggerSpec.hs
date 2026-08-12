@@ -2229,8 +2229,8 @@ ingestSpec s registry =
               -- ability is additional, so the two life still goes.
               Spec.assertEqWith s "bob took the Drone's two" (S.lifeOf S.bob after) (Just 18)
         -- The negative, on the SAME board but for one blocker: rule 702.115a is
-        -- scoped to combat damage dealt TO A PLAYER, and a blocked creature deals
-        -- its damage to the blocker (CR 510.1a).
+        -- scoped to combat damage dealt TO A PLAYER, and a blocked creature
+        -- assigns its damage to the creatures blocking it (CR 510.1c).
         Spec.it s "CR 702.115a a blocked Culling Drone exiles nothing" $ do
           drone <- S.printingOf s registry "Culling Drone"
           piker <- S.printingOf s registry "Goblin Piker"
