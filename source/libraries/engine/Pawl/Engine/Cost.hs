@@ -250,9 +250,17 @@ costsFor name oid gs = case Game.lookupObject oid gs of
 -- The mana part alone is adjusted, and the components are carried through
 -- untouched: every increase and reduction pawl can express is an amount of MANA,
 -- so there is nothing for a CostComponent to absorb. WHICH part of the mana cost
--- each one lands on is applyAdjustments's business. Nor is the result ever
--- "locked in": CR 601.2f fixes the total once determined, but this is recomputed
--- fresh from the current game state on every call (#94).
+-- each one lands on is applyAdjustments's business.
+--
+-- CR 601.2f's LOCK-IN belongs to the caller and not to this function, which is
+-- only the totalling as a function of state. Pawl.Engine.Cast.castProposed and
+-- Pawl.Engine.Activate.activateAbility each total the cost ONCE per announcement
+-- -- through totalWith, over the adjustments CR 118.7e's prompt resolved -- and
+-- hand the resulting VALUE to `pay` below, which never re-reads the state for it
+-- -- so an effect that would change the total after that point does nothing.
+-- Pawl.CostSpec's Altar's Reap group is what proves it: the creature paying the
+-- additional cost is the cost reducer, so a total re-read after CR 601.2h's
+-- sacrifice costs a mana more.
 --
 -- CR 118.6a's first sentence needs no special case: fmap over the Maybe leaves
 -- Nothing as Nothing.
@@ -1337,6 +1345,10 @@ canPayComponent pid oid component gs = case component of
 -- CR 601.2g then 601.2h: the mana window first, then the payment. The order the
 -- components are paid in is the PAYER'S, and payComponents below is where it is
 -- asked for.
+--
+-- The cost is the one the CALLER determined, taken as a value and never re-read
+-- from the game state -- which is CR 601.2f's "locked in" (see `total` above).
+-- Paying one part of it therefore cannot change what another part costs.
 --
 -- A payment can still go Unpaid where `canPay` called the cost payable, and that
 -- is the player's own doing rather than the engine's: paying one object-removing
