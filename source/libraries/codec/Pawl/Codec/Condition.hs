@@ -8,33 +8,37 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Condition as Condition
 
--- | TWO BARE OBJECT shapes, told apart by their keys rather than by
--- Common.tagged's "type": a comparison is @measured@/@comparison@/@threshold@
--- and a disjunction is a lone @any@. Naming the comparison's sides is what a
--- positional array could not do -- both are a Quantity, so a card file that
--- swapped them would decode silently into the wrong condition.
+-- | Tagged like every other sum. The two shapes were previously told apart by
+-- their KEYS -- a comparison by @measured@\/@comparison@\/@threshold@ and a
+-- disjunction by a lone @any@ -- which read as well as a tag but could not be
+-- stated as a schema a decoder guarantees (#1304).
 --
--- Untagged even though Condition is now a sum, which is the one place this
--- codec departs from that convention: the comparison shape is what every card
--- file in the pool already writes, and a key no comparison has separates the
--- two as surely as a tag would.
+-- Naming the comparison's sides survives the move: they are the tagged payload's
+-- OWN keys, not the condition's, so a card file that swapped two Quantities is
+-- still rejected rather than decoding into the wrong condition.
+--
+-- Still a loose toJson\/fromJson pair rather than an 'Pawl.JsonCodec.Arm.tagged'
+-- bundle: 'Pawl.Codec.Quantity' is not a bundle yet, so neither arm has a
+-- 'Codec.Codec' to hand 'Pawl.JsonCodec.Arm.payload' (#1263).
 toJson :: Condition.Condition -> Value.Value
 toJson condition = case condition of
   Condition.Compares m c t ->
-    Value.object . concat $
+    Common.tagged "Compares" . Just . Value.object . concat $
       [ Common.requiredPair "measured" Quantity.toJson m,
         Common.requiredPair "comparison" (Codec.encode Comparison.codec) c,
         Common.requiredPair "threshold" Quantity.toJson t
       ]
-  Condition.Any cs -> Value.object (Common.requiredPair "any" (Value.array . fmap toJson) cs)
+  Condition.Any cs -> Common.tagged "Any" . Just $ Common.encodeList toJson cs
 
 fromJson :: Value.Value -> Either Text.Text Condition.Condition
 fromJson value = do
-  ps <- Common.asObject value
-  case Common.optionalField "any" ps of
-    Just v -> Common.asArray v >>= fmap Condition.Any . traverse fromJson
-    Nothing -> do
-      m <- Common.field "measured" ps >>= Quantity.fromJson
-      c <- Common.field "comparison" ps >>= Codec.decode Comparison.codec
-      t <- Common.field "threshold" ps >>= Quantity.fromJson
-      pure $ Condition.Compares m c t
+  (t, mv) <- Common.asTagged value
+  case t of
+    "Compares" -> Common.withValue mv $ \v -> do
+      ps <- Common.asObject v
+      Condition.Compares
+        <$> (Common.field "measured" ps >>= Quantity.fromJson)
+        <*> (Common.field "comparison" ps >>= Codec.decode Comparison.codec)
+        <*> (Common.field "threshold" ps >>= Quantity.fromJson)
+    "Any" -> Common.withValue mv $ fmap Condition.Any . Common.decodeList fromJson
+    _ -> Left . Text.pack $ "unknown Condition: " <> t

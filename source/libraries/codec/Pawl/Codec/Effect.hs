@@ -98,7 +98,7 @@ toJson codec e = case e of
         <> (if riders == EntryRiders.defaultValue then [] else [EntryRiders.toJson riders])
         <> fmap (Codec.encode SlotName.codec) (Maybe.maybeToList ms)
         <> fmap (Codec.encode Zone.codec) (Maybe.maybeToList mo)
-        <> (if p == LibraryPlacement.defaultValue then [] else [LibraryPlacement.toJson p])
+        <> (if p == LibraryPlacement.defaultValue then [] else [Codec.encode LibraryPlacement.codec p])
   Effect.Draw r q -> Common.tagged "Draw" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.Scry r q -> Common.tagged "Scry" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.Surveil r q -> Common.tagged "Surveil" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
@@ -207,9 +207,9 @@ toJson codec e = case e of
 -- ZONE AND PLACEMENT FIRST is what makes that order-independent rather than
 -- merely ordered: EntryRiders.fromJson defaults every field it does not find, so
 -- it would accept either tagged object and silently return the default riders,
--- while the zone codec and LibraryPlacement.fromJson accept nothing but their
--- own tagged shapes. Those two shapes cannot be confused with each other either --
--- no zone is named Top, Bottom or OwnerChooses.
+-- while the zone codec and the placement codec accept nothing but their own
+-- tagged shapes. Those two shapes cannot be confused with each other either --
+-- no zone is named Stated or OwnerChooses.
 --
 -- A REPEATED element is an error rather than last-one-wins. Two origin zones is
 -- a card file saying something CR 113.6m's "a particular zone" cannot mean, and
@@ -235,7 +235,7 @@ moveTail = go Nothing Nothing Nothing Nothing
           Right zone -> case mOrigin of
             Just _ -> Left . Text.pack $ "MoveToZone names two origin zones"
             Nothing -> go mRiders mSlot (Just zone) mPlacement rest
-          Left _ -> case LibraryPlacement.fromJson v of
+          Left _ -> case Codec.decode LibraryPlacement.codec v of
             Right placement -> case mPlacement of
               Just _ -> Left . Text.pack $ "MoveToZone names two library placements"
               Nothing -> go mRiders mSlot mOrigin (Just placement) rest
