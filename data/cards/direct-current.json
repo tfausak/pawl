@@ -40,7 +40,10 @@
                   {
                     "type": "DealDamage",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Literal",
                         "value": 2

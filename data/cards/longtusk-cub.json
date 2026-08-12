@@ -28,7 +28,10 @@
                             "type": "Literal",
                             "value": 1
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       }
                     ]

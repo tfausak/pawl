@@ -61,33 +61,36 @@
                             "value": 1
                           },
                           {
-                            "type": "And",
-                            "value": [
-                              {
-                                "type": "HasCardType",
-                                "value": {
-                                  "type": "Creature"
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasCardType",
+                                  "value": {
+                                    "type": "Creature"
+                                  }
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                },
+                                {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsSource"
+                                  }
+                                },
+                                {
+                                  "type": "HasCounters",
+                                  "value": {
+                                    "type": "PlusOnePlusOne"
+                                  }
                                 }
-                              },
-                              {
-                                "type": "ControlledBy",
-                                "value": {
-                                  "type": "You"
-                                }
-                              },
-                              {
-                                "type": "Not",
-                                "value": {
-                                  "type": "IsSource"
-                                }
-                              },
-                              {
-                                "type": "HasCounters",
-                                "value": {
-                                  "type": "PlusOnePlusOne"
-                                }
-                              }
-                            ]
+                              ]
+                            }
                           }
                         ]
                       }

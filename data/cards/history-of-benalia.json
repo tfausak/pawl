@@ -201,21 +201,24 @@
                             ]
                           },
                           {
-                            "type": "And",
-                            "value": [
-                              {
-                                "type": "HasSubtype",
-                                "value": {
-                                  "type": "Knight"
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "And",
+                              "value": [
+                                {
+                                  "type": "HasSubtype",
+                                  "value": {
+                                    "type": "Knight"
+                                  }
+                                },
+                                {
+                                  "type": "ControlledBy",
+                                  "value": {
+                                    "type": "You"
+                                  }
                                 }
-                              },
-                              {
-                                "type": "ControlledBy",
-                                "value": {
-                                  "type": "You"
-                                }
-                              }
-                            ]
+                              ]
+                            }
                           }
                         ]
                       }

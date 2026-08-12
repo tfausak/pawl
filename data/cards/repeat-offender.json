@@ -26,18 +26,21 @@
                 "clauses": [
                   {
                     "condition": {
-                      "comparison": {
-                        "type": "Exactly"
-                      },
-                      "measured": {
-                        "type": "HasDesignation",
-                        "value": {
-                          "type": "Suspected"
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "Exactly"
+                        },
+                        "measured": {
+                          "type": "HasDesignation",
+                          "value": {
+                            "type": "Suspected"
+                          }
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 1
                         }
-                      },
-                      "threshold": {
-                        "type": "Literal",
-                        "value": 1
                       }
                     },
                     "effects": [
@@ -51,25 +54,31 @@
                             "type": "Literal",
                             "value": 1
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       }
                     ]
                   },
                   {
                     "condition": {
-                      "comparison": {
-                        "type": "Exactly"
-                      },
-                      "measured": {
-                        "type": "HasDesignation",
-                        "value": {
-                          "type": "Suspected"
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "Exactly"
+                        },
+                        "measured": {
+                          "type": "HasDesignation",
+                          "value": {
+                            "type": "Suspected"
+                          }
+                        },
+                        "threshold": {
+                          "type": "Literal",
+                          "value": 0
                         }
-                      },
-                      "threshold": {
-                        "type": "Literal",
-                        "value": 0
                       }
                     },
                     "effects": [

@@ -44,7 +44,10 @@
                       {
                         "type": "DealDamage",
                         "value": [
-                          "damage",
+                          {
+                            "type": "InSlot",
+                            "value": "damage"
+                          },
                           {
                             "type": "Literal",
                             "value": 3

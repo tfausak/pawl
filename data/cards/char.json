@@ -26,7 +26,10 @@
                   {
                     "type": "DealDamage",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Literal",
                         "value": 4
@@ -36,7 +39,10 @@
                   {
                     "type": "DealDamage",
                     "value": [
-                      "you",
+                      {
+                        "type": "InSlot",
+                        "value": "you"
+                      },
                       {
                         "type": "Literal",
                         "value": 2

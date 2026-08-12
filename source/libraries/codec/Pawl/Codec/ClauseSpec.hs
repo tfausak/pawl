@@ -88,7 +88,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
           Nothing
           Seq.empty
       )
-      """ {"condition":{"measured":{"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}} """
+      """ {"condition":{"type":"Compares","value":{"measured":{"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
   Spec.it s "an empty clause omits every default field" $
     Common.assertJsonCodec
       s

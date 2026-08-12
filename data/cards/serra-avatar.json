@@ -63,7 +63,10 @@
                     "effects": [
                       {
                         "type": "ShuffleIntoLibrary",
-                        "value": "self"
+                        "value": {
+                          "type": "InSlot",
+                          "value": "self"
+                        }
                       }
                     ]
                   }

@@ -12,7 +12,7 @@
         {
           "effect": {
             "type": "SetMaximumHandSize",
-            "value": 10
+            "value": 1E+1
           },
           "scope": {
             "type": "You"

@@ -26,12 +26,18 @@
                   {
                     "type": "MoveToZone",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Library"
                       },
                       {
-                        "type": "Top"
+                        "type": "Stated",
+                        "value": {
+                          "type": "Top"
+                        }
                       }
                     ]
                   }

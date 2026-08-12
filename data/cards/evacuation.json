@@ -36,9 +36,12 @@
                     "type": "MoveToZone",
                     "value": [
                       {
-                        "type": "HasCardType",
+                        "type": "EachMatching",
                         "value": {
-                          "type": "Creature"
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
                         }
                       },
                       {

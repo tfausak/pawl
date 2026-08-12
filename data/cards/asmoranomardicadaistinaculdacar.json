@@ -4,21 +4,24 @@
       "alternativeCosts": [
         {
           "condition": {
-            "comparison": {
-              "type": "AtLeast"
-            },
-            "measured": {
-              "type": "CardsDiscardedThisTurn",
-              "value": {
-                "type": "Relative",
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "CardsDiscardedThisTurn",
                 "value": {
-                  "type": "You"
+                  "type": "Relative",
+                  "value": {
+                    "type": "You"
+                  }
                 }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
               }
-            },
-            "threshold": {
-              "type": "Literal",
-              "value": 1
             }
           },
           "cost": {

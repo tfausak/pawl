@@ -16,7 +16,10 @@
                   {
                     "type": "DealDamage",
                     "value": [
-                      "loser",
+                      {
+                        "type": "InSlot",
+                        "value": "loser"
+                      },
                       {
                         "type": "Literal",
                         "value": 3

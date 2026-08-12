@@ -38,7 +38,10 @@
                           }
                         ]
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]
@@ -87,7 +90,10 @@
                   {
                     "type": "Destroy",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Regenerable"
                       }

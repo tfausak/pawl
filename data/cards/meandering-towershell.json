@@ -27,7 +27,10 @@
                         {
                           "type": "MoveToZone",
                           "value": [
-                            "exiled",
+                            {
+                              "type": "InSlot",
+                              "value": "exiled"
+                            },
                             {
                               "type": "Battlefield"
                             },
@@ -110,7 +113,10 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          "self",
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
                           {
                             "type": "Exile"
                           },

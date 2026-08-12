@@ -47,12 +47,18 @@
                           {
                             "type": "UntilEndOfTurn"
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       },
                       {
                         "type": "Untap",
-                        "value": "target"
+                        "value": {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
                       },
                       {
                         "type": "ModifyTarget",
@@ -66,7 +72,10 @@
                               "type": "Haste"
                             }
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       }
                     ]

@@ -35,7 +35,10 @@
                       {
                         "type": "Destroy",
                         "value": [
-                          "thatAttacker",
+                          {
+                            "type": "InSlot",
+                            "value": "thatAttacker"
+                          },
                           {
                             "type": "Regenerable"
                           }
@@ -44,7 +47,10 @@
                       {
                         "type": "Destroy",
                         "value": [
-                          "self",
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          },
                           {
                             "type": "Regenerable"
                           }

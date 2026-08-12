@@ -38,7 +38,10 @@
                           }
                         ]
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {
@@ -53,7 +56,10 @@
                           "type": "Flying"
                         }
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {
@@ -69,7 +75,10 @@
                           "value": 1
                         }
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]

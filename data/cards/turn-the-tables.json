@@ -41,8 +41,14 @@
                       {
                         "type": "Combat"
                       },
-                      "you",
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "you"
+                      },
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]

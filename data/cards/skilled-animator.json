@@ -42,34 +42,37 @@
                           {
                             "type": "ForAsLongAs",
                             "value": {
-                              "comparison": {
-                                "type": "Exactly"
-                              },
-                              "measured": {
-                                "type": "Count",
-                                "value": {
-                                  "aggregation": {
-                                    "type": "Members"
-                                  },
-                                  "filter": {
-                                    "type": "IsSource"
-                                  },
-                                  "scope": {
-                                    "type": "InZone",
-                                    "value": [
-                                      {
-                                        "type": "Battlefield"
-                                      },
-                                      {
-                                        "type": "EachPlayer"
-                                      }
-                                    ]
+                              "type": "Compares",
+                              "value": {
+                                "comparison": {
+                                  "type": "Exactly"
+                                },
+                                "measured": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Members"
+                                    },
+                                    "filter": {
+                                      "type": "IsSource"
+                                    },
+                                    "scope": {
+                                      "type": "InZone",
+                                      "value": [
+                                        {
+                                          "type": "Battlefield"
+                                        },
+                                        {
+                                          "type": "EachPlayer"
+                                        }
+                                      ]
+                                    }
                                   }
+                                },
+                                "threshold": {
+                                  "type": "Literal",
+                                  "value": 1
                                 }
-                              },
-                              "threshold": {
-                                "type": "Literal",
-                                "value": 1
                               }
                             }
                           },
@@ -79,7 +82,10 @@
                               "type": "Artifact"
                             }
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       },
                       {
@@ -88,34 +94,37 @@
                           {
                             "type": "ForAsLongAs",
                             "value": {
-                              "comparison": {
-                                "type": "Exactly"
-                              },
-                              "measured": {
-                                "type": "Count",
-                                "value": {
-                                  "aggregation": {
-                                    "type": "Members"
-                                  },
-                                  "filter": {
-                                    "type": "IsSource"
-                                  },
-                                  "scope": {
-                                    "type": "InZone",
-                                    "value": [
-                                      {
-                                        "type": "Battlefield"
-                                      },
-                                      {
-                                        "type": "EachPlayer"
-                                      }
-                                    ]
+                              "type": "Compares",
+                              "value": {
+                                "comparison": {
+                                  "type": "Exactly"
+                                },
+                                "measured": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Members"
+                                    },
+                                    "filter": {
+                                      "type": "IsSource"
+                                    },
+                                    "scope": {
+                                      "type": "InZone",
+                                      "value": [
+                                        {
+                                          "type": "Battlefield"
+                                        },
+                                        {
+                                          "type": "EachPlayer"
+                                        }
+                                      ]
+                                    }
                                   }
+                                },
+                                "threshold": {
+                                  "type": "Literal",
+                                  "value": 1
                                 }
-                              },
-                              "threshold": {
-                                "type": "Literal",
-                                "value": 1
                               }
                             }
                           },
@@ -125,7 +134,10 @@
                               "type": "Creature"
                             }
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       },
                       {
@@ -134,34 +146,37 @@
                           {
                             "type": "ForAsLongAs",
                             "value": {
-                              "comparison": {
-                                "type": "Exactly"
-                              },
-                              "measured": {
-                                "type": "Count",
-                                "value": {
-                                  "aggregation": {
-                                    "type": "Members"
-                                  },
-                                  "filter": {
-                                    "type": "IsSource"
-                                  },
-                                  "scope": {
-                                    "type": "InZone",
-                                    "value": [
-                                      {
-                                        "type": "Battlefield"
-                                      },
-                                      {
-                                        "type": "EachPlayer"
-                                      }
-                                    ]
+                              "type": "Compares",
+                              "value": {
+                                "comparison": {
+                                  "type": "Exactly"
+                                },
+                                "measured": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Members"
+                                    },
+                                    "filter": {
+                                      "type": "IsSource"
+                                    },
+                                    "scope": {
+                                      "type": "InZone",
+                                      "value": [
+                                        {
+                                          "type": "Battlefield"
+                                        },
+                                        {
+                                          "type": "EachPlayer"
+                                        }
+                                      ]
+                                    }
                                   }
+                                },
+                                "threshold": {
+                                  "type": "Literal",
+                                  "value": 1
                                 }
-                              },
-                              "threshold": {
-                                "type": "Literal",
-                                "value": 1
                               }
                             }
                           },
@@ -178,7 +193,10 @@
                               }
                             ]
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       }
                     ]

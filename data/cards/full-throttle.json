@@ -27,7 +27,10 @@
                         {
                           "type": "Untap",
                           "value": {
-                            "type": "AttackedThisTurn"
+                            "type": "EachMatching",
+                            "value": {
+                              "type": "AttackedThisTurn"
+                            }
                           }
                         }
                       ]

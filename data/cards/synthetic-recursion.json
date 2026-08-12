@@ -39,7 +39,10 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          "became",
+                          {
+                            "type": "InSlot",
+                            "value": "became"
+                          },
                           {
                             "type": "Battlefield"
                           }

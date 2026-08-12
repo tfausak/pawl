@@ -141,7 +141,10 @@
                               "type": "Haste"
                             }
                           },
-                          "token"
+                          {
+                            "type": "InSlot",
+                            "value": "token"
+                          }
                         ]
                       },
                       {

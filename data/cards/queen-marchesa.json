@@ -91,21 +91,24 @@
             ]
           },
           "intervening": {
-            "comparison": {
-              "type": "AtLeast"
-            },
-            "measured": {
-              "type": "IsMonarch",
-              "value": {
-                "type": "Relative",
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "IsMonarch",
                 "value": {
-                  "type": "Opponent"
+                  "type": "Relative",
+                  "value": {
+                    "type": "Opponent"
+                  }
                 }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
               }
-            },
-            "threshold": {
-              "type": "Literal",
-              "value": 1
             }
           },
           "modal": {

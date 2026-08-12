@@ -25,7 +25,10 @@
                       {
                         "type": "UntilEndOfTurn"
                       },
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Literal",
                         "value": 4
