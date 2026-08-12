@@ -624,7 +624,7 @@ effectCounts effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
-  Effect.ShuffleIntoLibrary _ -> []
+  Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
   -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
   -- "for as long as you control this creature" is a Count, and dropping it here
@@ -902,7 +902,7 @@ effectReplacements effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
-  Effect.ShuffleIntoLibrary _ -> []
+  Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -1411,7 +1411,7 @@ effectMintedFaces effect = case effect of
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
-  Effect.ShuffleIntoLibrary _ -> []
+  Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
   Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
@@ -2404,7 +2404,7 @@ effectFilters effect = case effect of
   Effect.Attach _ -> []
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn _ _ -> []
-  Effect.ShuffleIntoLibrary ref -> unframed (objectRefFilters ref)
+  Effect.ShuffleIntoLibrary _ ref -> unframed (objectRefFilters ref)
   Effect.OfferCast {} -> []
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would

@@ -6136,6 +6136,102 @@ graveyardTriggerSpec s registry =
           Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
           Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped entered) entered))) []
 
+-- Gaea's Blessing {1}{G} Sorcery, "Target player shuffles up to three target
+-- cards from their graveyard into their library. Draw a card. When this card is
+-- put into your graveyard from your library, shuffle your graveyard into your
+-- library." (name, cost, type line and oracle text checked against Scryfall.)
+--
+-- Narcomoeba's CR 113.6k condition carrying rule 701.24's OTHER shape: a set
+-- rather than named objects (Effect.ShuffleIntoLibrary over
+-- ObjectRef.EachCardInGraveyard), which is CR 701.24d -- "if an effect would
+-- cause a player to shuffle a set of objects into a library, that library is
+-- shuffled even if there are no objects in that set". The set is empty when the
+-- graveyard is emptied in response, and the library named by the effect is then
+-- the only thing left saying which library to shuffle (#558).
+gaeasBlessingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+gaeasBlessingSpec s registry =
+  let namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+      -- CR 701.24a leaves a shuffle observable only through the order it
+      -- produces, so the interpreter REVERSES it (TargetSpec's Riftsweeper cases,
+      -- for the same reason). What order a shuffle leaves is not asserted
+      -- anywhere -- a real one has none.
+      reversing :: Prompt.Prompt r -> r
+      reversing p = case p of
+        Prompt.Shuffle ids -> reverse ids
+        _ -> S.identityAnswer p
+   in Spec.describe s "GaeasBlessing" $ do
+        -- The whole card through a real mill: Tome Scour empties alice's
+        -- three-card library, so every card lands in her graveyard at once and
+        -- the trigger scan has to find the ability on a SORCERY card there. Tome
+        -- Scour itself joins them on the way out (CR 608.2n), which is why the
+        -- library the trigger refills is four cards and not three.
+        Spec.it s "CR 113.6k whole card: milled, Gaea's Blessing shuffles the whole graveyard back into the library" $ do
+          island <- S.printingOf s registry "Island"
+          tomeScour <- S.printingOf s registry "Tome Scour"
+          blessing <- S.printingOf s registry "Gaea's Blessing"
+          piker <- S.printingOf s registry "Goblin Piker"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          let base = S.landsInPlay island 1
+              (_, g1) = S.addLibraryCard blessing S.alice base
+              (_, g2) = S.addLibraryCard piker S.alice g1
+              (_, g3) = S.addLibraryCard bolt S.alice g2
+              (g4, spellId) = S.handOne tomeScour g3
+              board = g4 {GameState.priority = Just S.alice}
+              cast = S.runPure reversing board (S.cast S.alice spellId)
+              milled = S.runPure reversing cast Stack.resolveTop
+              placed = S.runPure reversing milled Engine.settleForPriority
+              after = S.runPure reversing placed Stack.resolveTop
+          Spec.assertEqWith s "the mill emptied the library" (length (Game.zoneMembers Zone.Library S.alice milled)) 0
+          Spec.assertEqWith s "and its trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertEqWith s "which empties the graveyard" (Game.zoneMembers Zone.Graveyard S.alice after) []
+          Spec.assertEqWith s "into a library of four -- the three milled cards and Tome Scour" (length (Game.zoneMembers Zone.Library S.alice after)) 4
+          Spec.assertEqWith
+            s
+            "each of them by name"
+            (namesIn Zone.Library S.alice after)
+            (Set.fromList (fmap (CardName.MkCardName . Text.pack) ["Gaea's Blessing", "Goblin Piker", "Lightning Bolt", "Tome Scour"]))
+        -- CR 701.24d, off a PAIR of boards differing in exactly one thing:
+        -- whether the graveyard was emptied between the trigger going on the
+        -- stack and its resolution. With the set empty there is no object left to
+        -- read an owner off, so only the library the effect NAMES can be shuffled
+        -- -- and the reversal is what shows it was.
+        --
+        -- THREE SEATS: bob's library is seeded and untouched, so "your library"
+        -- is told apart from every library. carol holds the third seat so that
+        -- bob is not simply "the other player".
+        Spec.it s "CR 701.24d the library is shuffled even when the graveyard has been emptied in response" $ do
+          blessing <- S.printingOf s registry "Gaea's Blessing"
+          piker <- S.printingOf s registry "Goblin Piker"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          -- S.addLibraryCard puts each card ON TOP, so the second of each pair
+          -- heads the library and the first sits under it.
+          let (blessingId, g1) = S.addLibraryCard blessing S.alice S.threePlayerGame
+              (herDeeperId, g2) = S.addLibraryCard piker S.alice g1
+              (herTopId, g3) = S.addLibraryCard bolt S.alice g2
+              (hisDeeperId, g4) = S.addLibraryCard bolt S.bob g3
+              (hisTopId, board) = S.addLibraryCard piker S.bob g4
+              buried = S.runPure S.identityAnswer board (Event.changeZone blessingId Zone.Graveyard)
+              placed = S.runPure S.identityAnswer buried Engine.settleForPriority
+              emptied = case Game.zoneMembers Zone.Graveyard S.alice placed of
+                -- CR 400.7 minted a fresh id when the card arrived, so the
+                -- graveyard's own member is the one to exile.
+                [buriedId] -> S.runPure S.identityAnswer placed (Event.changeZone buriedId Zone.Exile)
+                _ -> placed
+              withCard = S.runPure reversing placed Stack.resolveTop
+              withoutCard = S.runPure reversing emptied Stack.resolveTop
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertEqWith s "the control: it shuffles the graveyard's one card in, leaving the graveyard empty" (Game.zoneMembers Zone.Graveyard S.alice withCard) []
+          Spec.assertEqWith s "and her library three" (length (Game.zoneMembers Zone.Library S.alice withCard)) 3
+          Spec.assertEqWith s "exiled in response, the graveyard is empty before the trigger resolves" (Game.zoneMembers Zone.Graveyard S.alice emptied) []
+          Spec.assertEqWith
+            s
+            "CR 701.24d: her library is shuffled all the same, and gains nothing -- the reversal shows through"
+            (Game.zoneMembers Zone.Library S.alice withoutCard)
+            [herDeeperId, herTopId]
+          Spec.assertEqWith s "with bob's library neither shuffled nor added to" (Game.zoneMembers Zone.Library S.bob withoutCard) [hisTopId, hisDeeperId]
+          Spec.assertEqWith s "and the trigger off the stack" (length (GameState.stack withoutCard)) 0
+
 -- CR 113.6m for a TRIGGERED ability: "an ability whose cost or effect specifies
 -- that it moves the object it's on out of a particular zone functions only in
 -- that zone". The rule says "an ability", not "an activated ability", and
@@ -10133,6 +10229,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   rampageSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
+  gaeasBlessingSpec s registry
   graveyardEffectZoneTriggerSpec s registry
   serraAvatarSpec s registry
   diesTriggerSpec s registry

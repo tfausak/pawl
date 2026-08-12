@@ -579,16 +579,29 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Counter (SlotName.MkSlotName (Text.pack "spell")))
       """ {"type":"Counter","value":"spell"} """
-  -- CR 701.24: an ObjectRef, which for a slot is written as the bare slot name
-  -- -- the library is derived from the objects it names (CR 400.3), so there is
-  -- no second field to write.
+  -- CR 701.24: an ObjectRef, which for a slot is written as the bare slot name.
+  -- Riftsweeper's shape -- the library is derived from the objects it names (CR
+  -- 400.3), so there is no second field to write.
   Spec.it s "ShuffleIntoLibrary" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ShuffleIntoLibrary (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      (Effect.ShuffleIntoLibrary Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"ShuffleIntoLibrary","value":"target"} """
+  -- CR 701.24c's named library (Dwell on the Past's "their library"): the pair
+  -- form, whose PlayerRef is an OBJECT where a bare ObjectRef is a string or an
+  -- array led by its constructor's name -- which is what tells the two apart.
+  Spec.it s "ShuffleIntoLibrary naming the library" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.ShuffleIntoLibrary
+          (Just (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player"))))
+          (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "cards")))
+      )
+      """ {"type":"ShuffleIntoLibrary","value":[{"type":"InSlot","value":"player"},"cards"]} """
   Spec.it s "PutCounters" $
     Common.assertJsonCodec
       s

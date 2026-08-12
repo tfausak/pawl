@@ -324,7 +324,9 @@ slotsOf effect = case effect of
   Effect.PlaySubgame _ -> Map.empty
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
   Effect.TakeExtraTurn ref _ -> playerRefSlots ref
-  Effect.ShuffleIntoLibrary ref -> objectRefSlots ref
+  -- Both halves may name a slot: the ObjectRef names what is shuffled, and the
+  -- PlayerRef whose library (Dwell on the Past's "target player").
+  Effect.ShuffleIntoLibrary named ref -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
   -- OfferCast's slot is a READ: it names the object being offered, bound by an
   -- earlier effect of the same list (CR 400.7).
   Effect.OfferCast slot _ -> oneSlot slot
@@ -519,7 +521,7 @@ slotsAreExhaustive effect = case effect of
   -- of the game that spawned it.
   Effect.PlaySubgame _ -> True
   Effect.TakeExtraTurn _ _ -> True
-  Effect.ShuffleIntoLibrary _ -> True
+  Effect.ShuffleIntoLibrary _ _ -> True
   Effect.OfferCast _ _ -> True
   Effect.GrantPlayFromExile duration _ -> durationSlotsAreExhaustive duration
 
@@ -620,7 +622,7 @@ readsX = any effectReadsX
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
       Effect.TakeExtraTurn {} -> False
-      Effect.ShuffleIntoLibrary _ -> False
+      Effect.ShuffleIntoLibrary {} -> False
       Effect.OfferCast {} -> False
       Effect.GrantPlayFromExile {} -> False
 
@@ -701,7 +703,7 @@ searchesLibrary effect = case effect of
   Effect.PlaySubgame _ -> False
   -- CR 701.24 shuffles a library but never LOOKS at one, which is what CR 701.23a
   -- makes a search, so this opens no window.
-  Effect.ShuffleIntoLibrary _ -> False
+  Effect.ShuffleIntoLibrary {} -> False
   -- CR 608.2g's other producer, and not a search: the offered cast names one
   -- object the effect already has, so no library is looked at and the
   -- Panglacial window does not open on top of it.
@@ -833,7 +835,7 @@ boundSlots effect = case effect of
   Effect.Attach _ -> Set.empty
   Effect.AttachTarget {} -> Set.empty
   Effect.TakeExtraTurn {} -> Set.empty
-  Effect.ShuffleIntoLibrary _ -> Set.empty
+  Effect.ShuffleIntoLibrary {} -> Set.empty
   Effect.OfferCast {} -> Set.empty
   -- Reads a slot, binds none: the object it permits already exists and already
   -- has a name.
@@ -2535,8 +2537,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
           Monad.mapM_ moveOne =<< settleArrivals zone placement targets
-  -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
-  -- this order and with the owner read before either:
+  -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries.
+  -- Two steps, in this order and with the owners read before either:
   --
   --   * CR 400.7's move, through the same changeZone funnel every other
   --     destination uses, so a replacement watching a library entry gets its CR
@@ -2551,26 +2553,44 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- incarnation the funnel mints: a cancelled move leaves no incarnation and the
   -- library still has to be shuffled.
   --
-  -- An id that no longer resolves shuffles NOTHING, the one place this falls short
-  -- of rule 701.24c (#558). Dwell on the Past reaches it: its player slot keeps
-  -- CR 608.2b from fizzling the spell once every targeted card has left the
-  -- graveyard, where Riftsweeper's single target made the ability fizzle first.
+  -- CR 701.24c's OTHER half -- "even if none of those objects are in the zone
+  -- they're expected to be in" -- is the effect's own PlayerRef, and not the
+  -- owners: an id that no longer resolves has no owner left to read, so a
+  -- resolution that finds every named object gone shuffles the named library and
+  -- nothing else. Dwell on the Past and Gaea's Blessing are what reach it, their
+  -- player slot keeping CR 608.2b from fizzling the spell once every targeted
+  -- card has left the graveyard, where Riftsweeper's single target made the
+  -- ability fizzle first. Riftsweeper names no library and is unchanged.
   --
-  -- CR 608.2f: the objects are moved as ONE action and each named library is then
+  -- The same reading covers CR 701.24d's empty SET -- "shuffled even if there
+  -- are no objects in that set" -- which is Gaea's Blessing's trigger over a
+  -- graveyard something else emptied first.
+  --
+  -- The UNION of the two, rather than the PlayerRef alone when it is there:
+  -- rule 701.24's objects go to their OWNERS' libraries (CR 400.3), and the named
+  -- player need not be one of those owners, so every library that receives an
+  -- object is shuffled beside the one the effect names. For every card in the
+  -- pool the two answers coincide, since a card in a player's graveyard is that
+  -- player's; the union is what stays correct for one where they do not.
+  --
+  -- CR 608.2f: the objects are moved as ONE action and each library is then
   -- shuffled ONCE, however many of the objects it received. Rule 701.24's own
   -- words are plural ("one or more specific objects"), so a card naming four is
-  -- one shuffle per owner and not four.
+  -- one shuffle per library and not four.
   --
   -- CR 701.24a's "so that no player knows their order" makes WHO shuffles
   -- unobservable, which is why the card's "its owner shuffles" needs nothing
   -- here: Prompt.Shuffle deliberately carries no Decider (randomness is not a
   -- choice), so there is no player for it to be asked of.
-  Effect.ShuffleIntoLibrary ref -> do
+  Effect.ShuffleIntoLibrary named ref -> do
     gs <- State.get
     let targets = objectRefObjects legal resolving controller source gs ref
         -- The owners are read from the PRE-MOVE objects, for rule 701.24c's
-        -- reason above; an id that no longer resolves contributes no owner.
-        owners = Set.fromList (Maybe.mapMaybe (\target -> fmap Object.owner (Game.lookupObject target gs)) targets)
+        -- reason above; an id that no longer resolves contributes no owner, and
+        -- the named library is what covers that case.
+        owners =
+          Set.fromList (Maybe.mapMaybe (\target -> fmap Object.owner (Game.lookupObject target gs)) targets)
+            <> Set.fromList (foldMap (playerRefPlayers legal controller gs) named)
     Monad.forM_ targets $ \target -> Monad.void (Event.changeZoneReturning target Zone.Library)
     -- APNAP (CR 608.2f), which is what makes the ORDER of the Prompt.Shuffle
     -- calls a transcript can replay a fact about the rules rather than about

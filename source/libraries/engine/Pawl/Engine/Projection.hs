@@ -1588,7 +1588,7 @@ rewriteEffect pairs effect = case effect of
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
   Effect.PlaySubgame _ -> effect
   Effect.TakeExtraTurn {} -> effect
-  Effect.ShuffleIntoLibrary ref -> Effect.ShuffleIntoLibrary (rewriteObjectRef pairs ref)
+  Effect.ShuffleIntoLibrary named ref -> Effect.ShuffleIntoLibrary named (rewriteObjectRef pairs ref)
   Effect.OfferCast {} -> effect
   -- The ObjectRef alone, exactly as GainControl above: the Duration is left
   -- untouched, so a ForAsLongAs Condition's Filters are not rewritten. That
