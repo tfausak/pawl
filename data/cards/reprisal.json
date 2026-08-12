@@ -38,20 +38,17 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "PowerAtLeast",
-                    "value": 4
-                  },
-                  "pool": {
-                    "type": "Creatures"
-                  }
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "PowerAtLeast",
+                  "value": 4
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

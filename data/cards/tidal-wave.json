@@ -1,43 +1,40 @@
 {
   "faces": [
     {
-      "delayedAbilities": [
-        {
-          "ability": {
-            "condition": {
-              "type": "StepBegins",
-              "value": [
-                {
-                  "type": "Ending",
-                  "value": {
-                    "type": "EndStep"
-                  }
-                },
-                {
-                  "type": "EachTurn"
+      "delayedAbilities": {
+        "sacrifice it": {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
                 }
-              ]
-            },
-            "modal": {
-              "modes": [
-                {
-                  "clauses": [
-                    {
-                      "effects": [
-                        {
-                          "type": "Sacrifice",
-                          "value": "token"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
+              },
+              {
+                "type": "EachTurn"
+              }
+            ]
           },
-          "name": "sacrifice it"
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Sacrifice",
+                        "value": "token"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
-      ],
+      },
       "manaCost": [
         {
           "type": "Generic",

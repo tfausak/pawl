@@ -43,33 +43,30 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Land"
-                            }
-                          },
-                          {
-                            "type": "HasSupertype",
-                            "value": {
-                              "type": "Snow"
-                            }
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Land"
                           }
-                        ]
-                      },
-                      "pool": {
-                        "type": "Permanents"
-                      }
+                        },
+                        {
+                          "type": "HasSupertype",
+                          "value": {
+                            "type": "Snow"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
                     }
                   }
-                ]
+                }
               }
             ]
           }
@@ -115,42 +112,39 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Land"
-                            }
-                          },
-                          {
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Land"
+                          }
+                        },
+                        {
+                          "type": "HasSupertype",
+                          "value": {
+                            "type": "Basic"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
                             "type": "HasSupertype",
                             "value": {
-                              "type": "Basic"
-                            }
-                          },
-                          {
-                            "type": "Not",
-                            "value": {
-                              "type": "HasSupertype",
-                              "value": {
-                                "type": "Snow"
-                              }
+                              "type": "Snow"
                             }
                           }
-                        ]
-                      },
-                      "pool": {
-                        "type": "Permanents"
-                      }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
                     }
                   }
-                ]
+                }
               }
             ]
           }

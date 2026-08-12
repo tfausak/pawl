@@ -39,16 +39,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "spell",
-                "spec": {
-                  "pool": {
-                    "type": "Spells"
-                  }
+            "targetSpecs": {
+              "spell": {
+                "pool": {
+                  "type": "Spells"
                 }
               }
-            ]
+            }
           }
         ]
       },

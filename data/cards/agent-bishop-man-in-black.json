@@ -66,20 +66,17 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "creatures",
-                    "spec": {
-                      "count": {
-                        "least": 0,
-                        "most": 2
-                      },
-                      "pool": {
-                        "type": "Creatures"
-                      }
+                "targetSpecs": {
+                  "creatures": {
+                    "count": {
+                      "least": 0,
+                      "most": 2
+                    },
+                    "pool": {
+                      "type": "Creatures"
                     }
                   }
-                ]
+                }
               }
             ]
           }

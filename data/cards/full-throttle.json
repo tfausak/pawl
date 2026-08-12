@@ -1,48 +1,45 @@
 {
   "faces": [
     {
-      "delayedAbilities": [
-        {
-          "ability": {
-            "condition": {
-              "type": "StepBegins",
-              "value": [
-                {
-                  "type": "Combat",
-                  "value": {
-                    "type": "BeginningOfCombat"
-                  }
-                },
-                {
-                  "type": "EachTurn"
+      "delayedAbilities": {
+        "each combat": {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Combat",
+                "value": {
+                  "type": "BeginningOfCombat"
                 }
-              ]
-            },
-            "modal": {
-              "modes": [
-                {
-                  "clauses": [
-                    {
-                      "effects": [
-                        {
-                          "type": "Untap",
+              },
+              {
+                "type": "EachTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Untap",
+                        "value": {
+                          "type": "EachMatching",
                           "value": {
-                            "type": "EachMatching",
-                            "value": {
-                              "type": "AttackedThisTurn"
-                            }
+                            "type": "AttackedThisTurn"
                           }
                         }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          "name": "each combat"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
-      ],
+      },
       "manaCost": [
         {
           "type": "Generic",

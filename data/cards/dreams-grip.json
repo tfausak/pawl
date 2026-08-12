@@ -42,16 +42,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "tapped",
-                "spec": {
-                  "pool": {
-                    "type": "Permanents"
-                  }
+            "targetSpecs": {
+              "tapped": {
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [
@@ -67,16 +64,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "untapped",
-                "spec": {
-                  "pool": {
-                    "type": "Permanents"
-                  }
+            "targetSpecs": {
+              "untapped": {
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           }
         ]
       },

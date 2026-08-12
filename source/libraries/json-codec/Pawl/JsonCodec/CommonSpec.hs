@@ -234,3 +234,35 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         s
         (Codec.decode (Common.multiset Common.integer) =<< Common.parse (Text.pack "[2,1,2]"))
         (Right (Map.fromList [(1, 1), (2, 2)]) :: Either Text.Text (Map.Map Integer Natural.Natural))
+  Spec.describe s "textMap" $ do
+    -- Written in ascending key order rather than the map's traversal order, so
+    -- the render is canonical. The entries are given in DESCENDING order here,
+    -- so an encoder that emitted them as it found them fails.
+    Spec.it s "encodes in ascending key order" $
+      Spec.assertEq
+        s
+        (Common.render (Common.encodeTextMap id Value.integer (Map.fromList [(Text.pack "z", 1), (Text.pack "a", 2)])))
+        (Text.pack "{\"a\":2,\"z\":1}")
+    Spec.it s "round trips" $
+      Spec.assertEq
+        s
+        (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "{\"a\":2,\"z\":1}"))
+        (Right (Map.fromList [(Text.pack "a", 2), (Text.pack "z", 1)]))
+    Spec.it s "decodes the empty object" $
+      Spec.assertEq
+        s
+        (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "{}"))
+        (Right Map.empty :: Either Text.Text (Map.Map Text.Text Integer))
+    -- Pawl.Json.Object does not dedupe, so a repeated key genuinely reaches the
+    -- decoder. Rejected rather than letting the first win, which is decodeSet's
+    -- posture for the same reason.
+    Spec.it s "rejects a repeated key" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "{\"a\":1,\"a\":2}")))
+        "expected a decode failure"
+    Spec.it s "rejects an array" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "[]")))
+        "expected a decode failure"

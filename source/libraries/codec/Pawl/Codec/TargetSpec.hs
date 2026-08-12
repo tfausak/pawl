@@ -5,7 +5,6 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Pool as Pool
-import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TargetCount as TargetCount
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -41,19 +40,9 @@ fromJson value = do
         TargetSpec.count = c
       }
 
--- A name-keyed map as a sorted array of entries, so the render is
--- deterministic.
+-- A name-keyed map as a JSON OBJECT keyed by the slot name.
 toJsonMap :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value.Value
-toJsonMap m =
-  Common.encodeList
-    (\(k, v) -> Value.object [Value.pair "slot" (Codec.encode SlotName.codec k), Value.pair "spec" (toJson v)])
-    (Map.toAscList m)
+toJsonMap = Common.encodeTextMap SlotName.unwrap toJson
 
 fromJsonMap :: Value.Value -> Either Text.Text (Map.Map SlotName.SlotName TargetSpec.TargetSpec)
-fromJsonMap value =
-  let decodeEntry v = do
-        ps <- Common.asObject v
-        k <- Common.field "slot" ps >>= Codec.decode SlotName.codec
-        spec <- Common.field "spec" ps >>= fromJson
-        pure (k, spec)
-   in Map.fromList <$> Common.decodeList decodeEntry value
+fromJsonMap = Common.decodeTextMap SlotName.MkSlotName fromJson
