@@ -2654,6 +2654,9 @@ filterReads f = case f of
   -- CR 202.3 reads the printed mana cost, and no Modification writes one -- there
   -- is no mana-cost Aspect for this to name, because nothing could change it.
   Filter.Type.ManaValueAtMost _ -> Set.empty
+  -- Reads nothing for the atom above's reason: parity is read off the same
+  -- printed mana cost no Modification can write.
+  Filter.Type.ManaValueIsEven -> Set.empty
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g

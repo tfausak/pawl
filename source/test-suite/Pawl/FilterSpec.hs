@@ -368,6 +368,33 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   Spec.it s "ManaValueAtMost is False for a player" $ do
     Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.ManaValueAtMost 99))) "player"
 
+  -- CR 202.3 read for parity: Void Winnower's "spells with even mana values",
+  -- whose reminder text settles the boundary -- "(Zero is even.)"
+  Spec.it s "ManaValueIsEven splits the mana values by parity" $ do
+    let at n = blackCreature {Filter.manaValue = Just n}
+    Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ManaValueIsEven)) "mana value 3 is odd"
+    Spec.assertBool s (Filter.matches self (at 2) Filter.Type.ManaValueIsEven) "2 is even"
+    Spec.assertBool s (Filter.matches self (at 0) Filter.Type.ManaValueIsEven) "and zero is even"
+
+  Spec.it s "ManaValueIsEven is False when there is no mana value at all" $ do
+    Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.manaValue = Nothing}) Filter.Type.ManaValueIsEven)) "no mana value"
+    Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.ManaValueIsEven)) "player"
+
+  -- CR 601.3a's bound (Pawl.Engine.PlayerEffect.choiceCouldEscape): the literals
+  -- the criterion compares against, and nothing else. A parity atom contributes
+  -- none -- it is the tail past the greatest literal that covers it.
+  Spec.it s "manaValueThresholds collects every literal at any depth" $ do
+    Spec.assertEqWith
+      s
+      "both bounds, from inside an Or under a Not"
+      (Filter.manaValueThresholds (Filter.Type.Not (Filter.Type.Or [Filter.Type.ManaValueAtMost 5, Filter.Type.And [Filter.Type.ManaValueIsEven, Filter.Type.ManaValueAtMost 2]])))
+      [5, 2]
+    Spec.assertEqWith
+      s
+      "and none from a criterion with no literal in it"
+      (Filter.manaValueThresholds Filter.Type.ManaValueIsEven)
+      []
+
   Spec.it s "ControlledBy You holds for own object" $ do
     Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.ControlledBy PlayerRelation.You)) "you"
 
