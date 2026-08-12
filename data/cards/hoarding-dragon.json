@@ -60,6 +60,10 @@
                             }
                           },
                           {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
                             "type": "HasCardType",
                             "value": {
                               "type": "Artifact"

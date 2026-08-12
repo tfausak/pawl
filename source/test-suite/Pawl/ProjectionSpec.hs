@@ -133,9 +133,9 @@ aimAtObject oid p = case p of
 -- so the set itself has to be observed.
 searchRecordingAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State ([[ObjectId.ObjectId]], [[ObjectId.ObjectId]]) r
 searchRecordingAnswer wanted p = case p of
-  Prompt.SearchLibrary _ _ matches -> do
+  Prompt.SearchLibrary _ _ matches _ -> do
     State.modify' (\(searches, shuffles) -> (searches <> [matches], shuffles))
-    pure (Just wanted)
+    pure [wanted]
   Prompt.Shuffle library -> do
     State.modify' (\(searches, shuffles) -> (searches, shuffles <> [library]))
     -- An identity permutation: what was shuffled is the assertion, not the order.

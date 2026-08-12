@@ -96,8 +96,9 @@ data Effect card
     -- 605.3b: a mana ability never uses the stack), never by Resolve.applyEffect.
     AddMana ManaProduction.ManaProduction
   | -- | CR 701.23: the players the PlayerRef names each search THEIR OWN library
-    -- for a card matching the Filter, put it where the SearchDestination says,
-    -- then shuffle. The Filter is evaluated over the PRINTED-card view
+    -- for up to Quantity cards matching the Filter, put them where the
+    -- SearchDestination says, then shuffle. The Filter is evaluated over the
+    -- PRINTED-card view
     -- (Projection.viewOfCardIn) -- a card in a library has no projection, only CR
     -- 208.2a's characteristic-defining power. Evolving Wilds' "basic land card"
     -- (CR 701.23a / 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and
@@ -117,9 +118,17 @@ data Effect card
     -- someone else's hidden zone (#1317). Nor a search of any zone but a library
     -- (#1318).
     --
-    -- Finds at most one card, always: no card in the pool searches for two
-    -- (#283).
-    Search PlayerRef.PlayerRef (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
+    -- The Quantity is the MOST cards this search may find, never a quota:
+    -- Explosive Vegetation's "up to two basic land cards" is `Literal 2`, and
+    -- Rampant Growth's "a basic land card" is `Literal 1`. Fewer is always a
+    -- legal outcome, because every search in the pool is for a stated quality
+    -- and CR 701.23b lets such a search find "some or all" -- down to none.
+    --
+    -- Not implemented: CR 701.23d's MANDATORY find, where a search for a bare
+    -- quantity of cards ("three cards") must find that many. No card in the
+    -- pool searches for a quantity with no quality attached, so every search
+    -- pawl has is a maximum (#1377).
+    Search PlayerRef.PlayerRef Quantity.Quantity (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk; a general exile-from-zone is future.
     ExileAllGraveyards

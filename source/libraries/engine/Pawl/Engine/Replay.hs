@@ -428,8 +428,9 @@ defaultAnswer p = case p of
   -- Not implemented: neither swap prompt's stated restrictions are checked
   -- against the answer that comes back (#641).
   Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  -- CR 701.23b: failing to find is always legal.
-  Prompt.SearchLibrary {} -> Nothing
+  -- CR 701.23b: failing to find is always legal, and the empty answer is that
+  -- outcome for a search of any size.
+  Prompt.SearchLibrary {} -> []
   -- Declining the re-entrant cast is always legal.
   Prompt.CastWhileSearching {} -> Nothing
   -- CR 601.2b: X=0 is always payable.

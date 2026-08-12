@@ -400,9 +400,16 @@ data Prompt r where
   -- written to Object.chosenSubtype on the entering permanent.
   ChooseBasicLandType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
   -- | CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
-  -- criterion (the engine pre-filters to legal choices); Nothing is "fail to
-  -- find," always permitted for a search of one's own library for a quality.
-  SearchLibrary :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  -- criterion (the engine pre-filters to legal choices); the empty answer is
+  -- "fail to find," always permitted for a search of one's own library for a
+  -- quality.
+  --
+  -- The Natural is the MOST cards this search may find -- Explosive Vegetation's
+  -- "up to two" -- and answering with fewer is legal on every search pawl has,
+  -- since all of them state a quality (CR 701.23b's "some or all"). A LIST
+  -- rather than a Maybe and a repeated prompt: CR 701.23a's find is one look at
+  -- the whole zone, so the searcher names the whole set at once.
+  SearchLibrary :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 608.2g: the re-entrant cast opportunity during a library search (Panglacial
   -- Wurm) -- an effect that "specifically instructs or allows a player to cast a
   -- spell during resolution", following CR 601.2a-i except that no player receives
