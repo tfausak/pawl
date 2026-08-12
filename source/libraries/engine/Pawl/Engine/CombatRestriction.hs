@@ -300,20 +300,19 @@ inForce gs =
       -- CR 114.4: "abilities of emblems function in the command zone", which is
       -- what makes CR 701.54c's restriction on the emblem named The Ring do
       -- anything at all. Pawl.Engine.Projection.gatherGiven walks the same zone
-      -- for the same rule, and this branch takes its posture exactly: no liveness
-      -- gate, no CR 612.1 text change and no minted rows, since the pool's CR
-      -- 613.1f removers and text changers reach creatures on the battlefield and
-      -- an emblem is not one (CR 114.5). The "unless" gate IS asked, because a
-      -- gated emblem restriction would otherwise be wired open -- no emblem in the
-      -- pool prints one.
+      -- for the same rule, and this branch takes its posture for the gates: no
+      -- liveness gate, no CR 612.1 text change and no minted rows, since the
+      -- pool's CR 613.1f removers and text changers reach creatures on the
+      -- battlefield and an emblem is not one (CR 114.5). The "unless" gate IS
+      -- asked, because a gated emblem restriction would otherwise be wired open --
+      -- no emblem in the pool prints one.
       --
-      -- EMBLEMS alone, where Pawl.Engine.Projection.gatherGiven walks the whole
-      -- zone: CR 114.4 is about emblems, and CR 113.6 leaves a permanent card's
-      -- abilities functioning only on the battlefield. The difference is
-      -- observable here in a way it is not there, because two of this module's
-      -- questions name no creature at all -- a commander whose card prints Silent
-      -- Arbiter's bound would otherwise cap the whole table's attackers from the
-      -- command zone.
+      -- EMBLEMS alone, where that walk takes the whole zone: CR 114.4 is about
+      -- emblems, and CR 113.6 leaves a permanent card's abilities functioning only
+      -- on the battlefield. The difference bites here in a way it does not there,
+      -- because two of this module's questions name no creature at all -- a
+      -- commander whose card printed Silent Arbiter's bound would otherwise cap
+      -- the whole table's attackers from the command zone.
       isEmblem source = case fmap Object.source (Game.lookupObject source gs) of
         Just (Source.OfEmblem _) -> True
         _ -> False

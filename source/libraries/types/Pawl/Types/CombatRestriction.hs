@@ -42,12 +42,6 @@ import qualified Pawl.Types.Keyword as Keyword
 -- own Example is a "can't attack alone" board -- so they share the type rather
 -- than splitting into a second carrier.
 --
--- The FOURTH shape is answered about a PAIR, which is CantBeBlockedBy: it names
--- attackers and describes the blockers that may not block them, so no set of
--- creatures on either side is the answer -- CR 509.1b's own Example is a pairwise
--- board, and the rule's second paragraph calls a restriction of this shape an
--- evasion ability.
---
 -- The THIRD shape bounds the SIZE of a declaration from above, which is Silent
 -- Arbiter's "no more than one creature can attack each combat". CantAttackAlone
 -- is not it turned around: it NAMES creatures and asks whether the declaration
@@ -60,6 +54,13 @@ import qualified Pawl.Types.Keyword as Keyword
 -- card does not print. Like CantAttackAlone and unlike CantAttack, a bound
 -- subtracts nothing from CR 508.1a's or CR 509.1a's candidate list: every
 -- creature stays a legal candidate and it is the DECLARATION that is refused.
+--
+-- The FOURTH shape is answered about a PAIR, which is CantBeBlockedBy: it names
+-- attackers and describes the blockers that may not block them, so no set of
+-- creatures on either side is the answer, and CR 509.1b's own Example is a
+-- pairwise board. It is the shape that rule's second paragraph is about, though
+-- not always its evasion ABILITY: that paragraph's definition wants the ability
+-- on the attacking creature, and CR 701.54c's is on an emblem.
 --
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The
@@ -90,9 +91,9 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- Gathered LIVE on every read and never captured, the posture all five siblings
 -- take -- from the battlefield, and from the command zone for an emblem, whose
--- abilities CR 114.4 makes function there -- so a Pacifism leaving the battlefield lifts
--- its restriction with nothing to unwind. The gate is re-read on the same
--- schedule: CR 508.1 and CR 509.1 make the declaration a SEQUENCE OF STEPS, of
+-- abilities CR 114.4 makes function there -- so a Pacifism leaving the
+-- battlefield lifts its restriction with nothing to unwind. The gate is re-read
+-- on the same schedule: CR 508.1 and CR 509.1 make the declaration a SEQUENCE OF STEPS, of
 -- which CR 508.1c and CR 509.1b are one, so the only moment a gate's answer has
 -- to be right is the moment it is asked, and a gate that stops holding
 -- re-imposes the restriction with nothing to unwind either. CR 509.1b's note
