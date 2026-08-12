@@ -77,14 +77,30 @@ resolveTopWith runSubgame = do
               -- record of which half is up and not the face a fallback resolved
               -- to.
               entering = Card.enteringFace (Printing.card printing) (Object.face obj)
-              -- CR 110.2b: "a permanent spell's controller becomes the
-              -- permanent's controller", so the entry controller both moves
-              -- below carry is the SPELL's -- Resolve.spellController, the same
-              -- CR 405.4 read its own effects would have run under. It is
-              -- Object.owner for a spell nobody stole and nobody cast off
-              -- another player's card, which is why this argument was Nothing
-              -- until a card made the two differ (#83).
-              controller = Resolve.spellController obj oid gs
+              -- CR 110.2b: "the permanent's controller by default is the player
+              -- who put that spell onto the stack" -- CR 405.4's caster, which is
+              -- what Object.enteredUnder holds for a spell and what
+              -- defaultControllerOf reads off it. It is Object.owner for every
+              -- spell whose caster owns the card, which is why this argument was
+              -- Nothing until one did not (#83).
+              --
+              -- The DEFAULT and not Resolve.spellController's projected answer,
+              -- which is the same rule's other half: an effect that gave someone
+              -- control of the permanent SPELL leaves them controlling the
+              -- permanent, and CR 110.2b flags that as a different thing from the
+              -- default precisely because CR 800.4c tells them apart. Writing a
+              -- layer-2 answer into this field would put a control-changing
+              -- effect on the wrong side of that line (see Pawl.Types.Object).
+              -- Nothing in the pool changes a spell's control, so the two
+              -- coincide today.
+              --
+              -- UNOBSERVED, and said plainly rather than left to look tested: the
+              -- pool's one card that casts somebody else's card (Dire Fleet
+              -- Daredevil) reaches only instants and sorceries, so no permanent
+              -- spell in the suite has a caster its owner disagrees with, and
+              -- replacing this with Object.owner leaves the suite green. It is
+              -- CR 110.2b written out, not a passing test.
+              controller = Projection.defaultControllerOf obj
            in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid
                 else

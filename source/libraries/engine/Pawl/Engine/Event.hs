@@ -1870,12 +1870,15 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid req
 -- scanned over the arrival) would see a spell controlled by whoever happens to
 -- own the card.
 --
--- The one door that stamps Object.enteredUnder for a NON-battlefield
--- destination, and the one caller is Pawl.Engine.Cast. A cast is the only way a
--- card reaches the stack, and CR 405.4 fixes the controller there and then; a
--- redirect that lands the move somewhere else drops the stamp, exactly as it
--- drops the face, because CR 109.4 gives an object in that zone no controller to
--- record.
+-- One caller, Pawl.Engine.Cast, which is the only route a CARD takes onto the
+-- stack. changeZoneEntering carries a player too, so an Effect.MoveToZone naming
+-- the stack would stamp one as well -- no card in the pool does, and CR 800.4b's
+-- "put onto the stack under the control of" says such a move would have a
+-- controller to name if one did.
+--
+-- A CR 616.1 redirect that lands the move in any zone but the stack or the
+-- battlefield drops the stamp, exactly as it drops the face, because CR 109.4
+-- gives an object there no controller to record.
 changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
 changeZoneCasting caster oid requestedDest = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster)
 

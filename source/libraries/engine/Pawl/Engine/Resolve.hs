@@ -925,10 +925,9 @@ modesOf oid gs = case Game.lookupObject oid gs of
           rewriteMode m = m {Mode.clauses = fmap rewriteClause (Mode.clauses m)}
        in fmap (fmap rewriteMode) (Card.chosenModes chosen face)
 
--- CR 405.4: who controls a SPELL on the stack -- for CR 608.2b's legality
--- perspective, for the effects' own execution, and for CR 110.2b's entry
--- controller when the spell is a permanent one (Pawl.Engine.Stack). One function
--- because those must name the same player, not because they disagree today.
+-- CR 405.4: who controls a SPELL on the stack -- both CR 608.2b's legality
+-- perspective and the effects' own execution. One function because those two
+-- must name the same player, not because they disagree today.
 --
 -- The player who CAST it, fixed by CR 601.2a's move and stamped on the object
 -- (Object.enteredUnder), never re-derived from the board -- which is what

@@ -2367,9 +2367,9 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
 -- controller and CR 108.3's owner name different players (#83).
 --
 -- Two clauses of the printed card are not expressed. "Mana of any type can be
--- spent to cast that spell" (#1359) -- the board below pays with the colours the
+-- spent to cast that spell" (#1357) -- the board below pays with the colours the
 -- spell actually asks for, so nothing here leans on it. "If that spell would be
--- put into a graveyard, exile it instead" (#1360) -- a floating CR 614.1a
+-- put into a graveyard, exile it instead" (#1358) -- a floating CR 614.1a
 -- redirect naming one object, which card data cannot write. Both leave pawl's
 -- card STRICTER than printed.
 daredevilName, renewedFaithName :: CardName.CardName
