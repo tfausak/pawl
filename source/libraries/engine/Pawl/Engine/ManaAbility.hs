@@ -123,6 +123,6 @@ manaProduced effect = case effect of
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
-  Effect.ShuffleIntoLibrary _ -> Nothing
+  Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.GrantPlayFromExile {} -> Nothing
