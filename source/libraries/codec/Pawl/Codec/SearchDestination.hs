@@ -9,11 +9,13 @@ toJson :: SearchDestination.SearchDestination -> Value.Value
 toJson d = Common.nullary $ case d of
   SearchDestination.BattlefieldTapped -> "BattlefieldTapped"
   SearchDestination.RevealThenHand -> "RevealThenHand"
+  SearchDestination.Exile -> "Exile"
 
 fromJson :: Value.Value -> Either Text.Text SearchDestination.SearchDestination
 fromJson =
   Common.decodeNullary
     "SearchDestination"
     [ ("BattlefieldTapped", SearchDestination.BattlefieldTapped),
-      ("RevealThenHand", SearchDestination.RevealThenHand)
+      ("RevealThenHand", SearchDestination.RevealThenHand),
+      ("Exile", SearchDestination.Exile)
     ]
