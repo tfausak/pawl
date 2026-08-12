@@ -813,6 +813,64 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
     Spec.assertBool s (elem pikerId (Game.zoneMembers Zone.Library S.alice resolved)) "it is still in the library"
     Spec.assertEqWith s "and nothing else was fetched either" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 0
+  -- Hoarding Dragon -- "Flying. When this creature enters, you may search your
+  -- library for an artifact card, exile it, then shuffle." The whole-card proof
+  -- of SearchDestination.Exile, cast and resolved rather than assembled.
+  --
+  -- The printed card also has "When this creature dies, you may put the exiled
+  -- card into its owner's hand". CR 607.2a links that ability to the first one,
+  -- and pawl records nothing about which cards an instruction exiled (#968), so
+  -- that trigger is omitted from data/cards/hoarding-dragon.json. The omission
+  -- runs STRICTER for the card's controller: the printed second half only ever
+  -- hands its controller a card back, so pawl's Dragon buries the artifact for
+  -- good and no assertion below can pass because of what is missing.
+  --
+  -- The destination is the assertion, and three readings have to be told apart:
+  -- exile, hand (RevealThenHand) and battlefield (BattlefieldTapped). So the
+  -- Altar is asserted present in exile AND absent from both other zones, and the
+  -- empty reveal log separates CR 701.23e's silent exile from the Sextant's
+  -- "reveal that card". The Piker is in the library so the filter has a card to
+  -- reject; it is added second, so Support.addLibraryCard makes it the head and a
+  -- filter that admitted everything would exile it instead.
+  Spec.it s "CR 701.23a/701.23e whole card: Hoarding Dragon exiles the artifact it finds, unrevealed" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    dragon <- S.printingOf s registry "Hoarding Dragon"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base0 = S.landsInPlay mountain 5
+        (_, base1) = S.addLibraryCard altar S.alice base0
+        (pikerId, base2) = S.addLibraryCard piker S.alice base1
+        (gs, spellId) = S.handOne dragon base2
+        cast = snd (Engine.runGamePure findFirstExercising gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure findFirstExercising cast Engine.priorityLoop)
+    Spec.assertEqWith s "the Dragon resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Hoarding Dragon") S.alice settled) 1
+    Spec.assertEqWith
+      s
+      "the Altar, and only the Altar, is in exile"
+      (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Exile S.alice settled))
+      [CardName.MkCardName $ Text.pack "Ashnod's Altar"]
+    Spec.assertEqWith s "it did NOT go to her hand -- she cast her only card" (S.handSize S.alice settled) 0
+    Spec.assertEqWith s "nor onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ashnod's Altar") S.alice settled) 0
+    Spec.assertEqWith s "CR 701.23e: the card says only \"exile it\", so nothing was revealed" (S.revealsOf settled) []
+    Spec.assertEqWith s "the nonartifact was no candidate and stayed in the library" (Game.zoneMembers Zone.Library S.alice settled) [pikerId]
+  -- The paired negative: the SAME board, the same mana, the same answers, with
+  -- CR 603.5's "may" declined instead of exercised. Nothing is searched and
+  -- nothing is exiled, so an engine that exiled a card off some other path than
+  -- this search would fail here.
+  Spec.it s "CR 603.5 declining Hoarding Dragon's \"may\" exiles nothing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    dragon <- S.printingOf s registry "Hoarding Dragon"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base0 = S.landsInPlay mountain 5
+        (altarId, base1) = S.addLibraryCard altar S.alice base0
+        (pikerId, base2) = S.addLibraryCard piker S.alice base1
+        (gs, spellId) = S.handOne dragon base2
+        cast = snd (Engine.runGamePure findFirstDeclining gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure findFirstDeclining cast Engine.priorityLoop)
+    Spec.assertEqWith s "the Dragon still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Hoarding Dragon") S.alice settled) 1
+    Spec.assertEqWith s "exile is empty" (Game.zoneMembers Zone.Exile S.alice settled) []
+    Spec.assertEqWith s "both library cards are still there" (Set.fromList (Game.zoneMembers Zone.Library S.alice settled)) (Set.fromList [altarId, pikerId])
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1402,6 +1460,19 @@ findForbidden :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 findForbidden wanted p = case p of
   Prompt.SearchLibrary {} -> Just wanted
   _ -> S.identityAnswer p
+
+-- findFirst, plus CR 603.5's printed "may" taken. The pair below it declines the
+-- same "may" and answers every other prompt identically, so a board run through
+-- both differs in exactly that one decision.
+findFirstExercising :: Prompt.Prompt r -> r
+findFirstExercising p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> findFirst p
+
+findFirstDeclining :: Prompt.Prompt r -> r
+findFirstDeclining p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  _ -> findFirst p
 
 findNothing :: Prompt.Prompt r -> r
 findNothing p = case p of
