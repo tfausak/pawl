@@ -95,40 +95,42 @@ data Effect card
     -- list as one activation's yield. Executed by Cost.tapForMana at payment (CR
     -- 605.3b: a mana ability never uses the stack), never by Resolve.applyEffect.
     AddMana ManaProduction.ManaProduction
-  | -- | CR 701.23: the players the PlayerRef names each search THEIR OWN library
-    -- for up to Quantity cards matching the Filter, put them where the
-    -- SearchDestination says, then shuffle. The Filter is evaluated over the
-    -- PRINTED-card view
+  | -- | CR 701.23: the players the FIRST PlayerRef names each search the library
+    -- of each player the SECOND names, for Quantity cards matching the
+    -- Filter, put them where the SearchDestination says, then that library's
+    -- owner shuffles. The Filter is evaluated over the PRINTED-card view
     -- (Projection.viewOfCardIn) -- a card in a library has no projection, only CR
     -- 208.2a's characteristic-defining power. Evolving Wilds' "basic land card"
     -- (CR 701.23a / 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and
     -- CR 702.29e's basic landcycling is the same filter with the other
     -- destination.
     --
-    -- The PlayerRef names each searcher, and names them several times over: CR
-    -- 701.23a's looking, the CR 701.23e-silent placement, and the shuffle the
-    -- card's own next sentence instructs are all acts of that same player.
-    -- Evolving Wilds' "your library" is `Relative You`; Fertilid's Favor's
-    -- "target player searches their library" is `InSlot`, reading a slot
-    -- TARGETING filled (CR 601.2c). A PlayerRef rather than a Maybe SlotName, for
-    -- the reason Draw's comment gives.
+    -- TWO refs, because CR 701.23a's looking and CR 400.1's ownership are
+    -- genuinely independent and no card's text derives one from the other:
+    -- Evolving Wilds says `You`/`You`, Fertilid's Favor's "target player searches
+    -- their library" says the same `InSlot` twice, and Extract's "search target
+    -- player's library" says `You`/`InSlot` -- the controller looks, the target
+    -- owns. Each role is named several times over. The SEARCHER does CR 701.23a's
+    -- looking, answers CR 101.2's prohibition, is offered CR 601.3's cast (only
+    -- over their own library, which is what Panglacial Wurm's "your library"
+    -- says) and performs the CR 701.23e-silent placement; the OWNER's library is
+    -- read and shuffled. A PlayerRef rather than a Maybe SlotName, for the reason
+    -- Draw's comment gives.
     --
-    -- Not implemented: a search of a library the searching player does not own --
-    -- Extract's "search target player's library", where the CONTROLLER looks at
-    -- someone else's hidden zone (#1317). Nor a search of any zone but a library
-    -- (#1318).
+    -- The Quantity is how many cards the search may find: Explosive Vegetation's
+    -- "up to two basic land cards" is `Literal 2`, and Rampant Growth's "a basic
+    -- land card" is `Literal 1`. Whether it is a CEILING or a QUOTA is read off
+    -- the Filter rather than stored, since the rule reads the search's own
+    -- description of what it looks for: CR 701.23b lets a search STATING A
+    -- QUALITY find fewer or none even when the library holds them, while CR
+    -- 701.23d makes a search for a bare quantity -- "a card", Extract's whole
+    -- filter -- find that many, or as many as the library can supply.
+    -- Filter.statesAQuality is that classification.
     --
-    -- The Quantity is the MOST cards this search may find, never a quota:
-    -- Explosive Vegetation's "up to two basic land cards" is `Literal 2`, and
-    -- Rampant Growth's "a basic land card" is `Literal 1`. Fewer is always a
-    -- legal outcome, because every search in the pool is for a stated quality
-    -- and CR 701.23b lets such a search find "some or all" -- down to none.
-    --
-    -- Not implemented: CR 701.23d's MANDATORY find, where a search for a bare
-    -- quantity of cards ("three cards") must find that many. No card in the
-    -- pool searches for a quantity with no quality attached, so every search
-    -- pawl has is a maximum (#1377).
-    Search PlayerRef.PlayerRef Quantity.Quantity (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
+    -- Not implemented: a search of any zone but a library (#1318). Nor "up to N
+    -- cards" with no quality stated, which CR 701.23d does not force and this
+    -- pair of fields cannot tell from a bare "N cards" (#1379).
+    Search PlayerRef.PlayerRef PlayerRef.PlayerRef Quantity.Quantity (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk; a general exile-from-zone is future.
     ExileAllGraveyards

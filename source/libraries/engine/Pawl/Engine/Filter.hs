@@ -959,6 +959,68 @@ manaValueThresholds predicate = case predicate of
   Filter.HasCounters _ -> []
   Filter.HasNonManaActivatedAbility -> []
 
+-- CR 701.23b vs CR 701.23d: does this predicate state a QUALITY? A search whose
+-- filter states one may find fewer cards than it asks for, or none, even when the
+-- zone holds them (701.23b); a search "simply for a quantity of cards" -- "a
+-- card", which is the whole of Extract's filter -- must find that many if the
+-- zone can supply them (701.23d). Pawl.Engine.Resolve's Search arm is the caller,
+-- and the answer is the difference between an answer of "nothing" being honoured
+-- and being overridden.
+--
+-- Derived rather than stored on the opcode: the two are not independent -- the
+-- rule reads the search's own description of what it looks for -- so a flag
+-- beside the Filter could only ever disagree with it.
+--
+-- A quality is stated unless the predicate is TRIVIALLY TRUE, and by the type's
+-- own note `And []` is the only way to write that. Hence And joins with `any` and
+-- Or with `all`: one trivially-true branch of an Or makes the whole thing
+-- trivially true, while an And needs only one branch to state something. `Not`
+-- and `Or []` match nothing at all, so a search through either finds nothing
+-- whichever answer this gives, and True is the safe one.
+--
+-- Exhaustive rather than a catch-all, manaValueThresholds' posture: a new atom is
+-- a stated quality, but that is a claim about the atom and should be made by
+-- someone reading it rather than by a wildcard.
+--
+-- Polymorphic in the keyword, since no arm reads one.
+statesAQuality :: Filter.Filter keyword -> Bool
+statesAQuality predicate = case predicate of
+  Filter.And fs -> any statesAQuality fs
+  Filter.Or fs -> all statesAQuality fs
+  Filter.Not _ -> True
+  Filter.ManaValueAtMost _ -> True
+  Filter.ManaValueIsEven -> True
+  Filter.HasCardType _ -> True
+  Filter.HasSupertype _ -> True
+  Filter.HasColor _ -> True
+  Filter.HasSubtype _ -> True
+  Filter.HasKeyword _ -> True
+  Filter.HasKeywordFamily _ -> True
+  Filter.PowerAtLeast _ -> True
+  Filter.PowerAtMost _ -> True
+  Filter.PowerLessThanSource -> True
+  Filter.PowerGreaterThanSource -> True
+  Filter.ControlledBy _ -> True
+  Filter.ControlledByDefendingPlayer -> True
+  Filter.ControlledByBound _ -> True
+  Filter.ControlledByPlayer _ -> True
+  Filter.OwnedBy _ -> True
+  Filter.IsSource -> True
+  Filter.IsPlayer _ -> True
+  Filter.IsAttacking -> True
+  Filter.IsBlocking -> True
+  Filter.AttackedThisTurn -> True
+  Filter.IsAttachedToCreature -> True
+  Filter.IsAttachedToPermanent -> True
+  Filter.IsAttachedToSource -> True
+  Filter.CanHostSubject -> True
+  Filter.IsToken -> True
+  Filter.IsTapped -> True
+  Filter.IsRingBearer -> True
+  Filter.HasDesignation _ -> True
+  Filter.HasCounters _ -> True
+  Filter.HasNonManaActivatedAbility -> True
+
 -- The slots a Filter READS -- today exactly the ControlledByBound atoms in it.
 -- Pawl.Engine.Resolve.modeSlots folds this over a mode's target specs, which is
 -- what makes the card dataflow lint see a slot named in a FILTER rather than in

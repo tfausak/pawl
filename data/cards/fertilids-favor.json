@@ -31,6 +31,10 @@
                         "value": "player"
                       },
                       {
+                        "type": "InSlot",
+                        "value": "player"
+                      },
+                      {
                         "type": "Literal",
                         "value": 1
                       },
