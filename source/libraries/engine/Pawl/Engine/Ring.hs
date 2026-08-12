@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
@@ -66,15 +67,21 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- Every field but the name is at its empty value, which is CR 114.3 stated
 -- directly -- "an emblem has no types, no mana cost, and no color".
 --
--- CR 701.54c's base ability is `theRingIsLegendary` below, which is the whole of
--- `staticAbilities`. CR 114.4 is what makes one ability on an object in the command
--- zone do anything at all -- "abilities of emblems function in the command zone" --
--- and Pawl.Engine.Projection.gatherGiven walks the command zone for exactly that.
+-- CR 701.54c's base ability is both clauses of one sentence, carried in the two
+-- places their two shapes belong: "your Ring-bearer is legendary" is
+-- `theRingIsLegendary` below, the whole of `staticAbilities`, and "and can't be
+-- blocked by creatures with greater power" is
+-- `theRingCantBeBlockedByGreaterPower`, the whole of `combatRestrictions` -- CR
+-- 613.11 puts a combat restriction outside the layers, so no static ability could
+-- have held it. CR 114.4 is what makes either do anything at all on an object in
+-- the command zone -- "abilities of emblems function in the command zone" -- and
+-- Pawl.Engine.Projection.gatherGiven and
+-- Pawl.Engine.CombatRestriction.inForce each walk the command zone for exactly
+-- that.
 --
--- Not implemented: the SECOND clause of that base ability, "and can't be blocked by
--- creatures with greater power" (#707). The two-, three- and four-temptation
--- abilities are triggered, and an emblem's triggered ability never fires because
--- the trigger scans read only the battlefield (#709).
+-- Not implemented: the two-, three- and four-temptation abilities are triggered,
+-- and an emblem's triggered ability never fires because the trigger scans read
+-- only the battlefield (#709).
 theRingEmblem :: Card.Card
 theRingEmblem =
   Card.MkCard
@@ -108,7 +115,7 @@ theRingEmblem =
               Face.blockRequirements = [],
               Face.blockPermissions = [],
               Face.attackRequirements = [],
-              Face.combatRestrictions = [],
+              Face.combatRestrictions = [theRingCantBeBlockedByGreaterPower],
               Face.sacrificeRestrictions = [],
               Face.untapRestrictions = [],
               Face.attackCosts = [],
@@ -156,6 +163,37 @@ theRingIsLegendary =
       StaticAbility.lingers = Nothing,
       StaticAbility.modifications = NonEmpty.singleton (Modification.AddSupertype Supertype.Legendary)
     }
+
+-- | CR 701.54c's second clause, "and can't be blocked by creatures with greater
+-- power", as the emblem's one combat restriction. Rulebook text minted here for
+-- theRingIsLegendary's reason.
+--
+-- The SAME affected set as theRingIsLegendary, because it is the same sentence's
+-- subject -- CR 701.54e's "is your Ring-bearer", spelled as its two conjuncts
+-- beside Affected.Matching's own battlefield one. The two must not drift apart:
+-- one clause reaching a creature the other does not would be a Ring-bearer that
+-- is legendary but blockable, or blockable but not legendary.
+--
+-- Filter.PowerGreaterThanSource is "with greater power" exactly, and strictly:
+-- CR 701.54c says greater, so a blocker of EQUAL power blocks legally. The source
+-- it compares against is the Ring-bearer, supplied by
+-- Pawl.Engine.CombatRestriction.cantBeBlockedBy -- the emblem has no power to
+-- compare against (CR 114.3).
+--
+-- Ungated, since CR 701.54c gates the two-, three- and four-temptation abilities
+-- on a temptation count and this one on nothing.
+theRingCantBeBlockedByGreaterPower :: CombatRestriction.CombatRestriction
+theRingCantBeBlockedByGreaterPower =
+  CombatRestriction.CantBeBlockedBy
+    ( Affected.Matching
+        ( Filter.And
+            [ Filter.IsRingBearer,
+              Filter.ControlledBy PlayerRelation.You
+            ]
+        )
+    )
+    Filter.PowerGreaterThanSource
+    Nothing
 
 -- CR 701.54c: does this player already have an emblem named The Ring?
 --
@@ -316,8 +354,10 @@ endOnControlChange = do
 -- ControlledBy reads the partial projection's controller, which is CR 613.1b's
 -- layer 2 either way.
 --
--- Still read by no RULE -- what would read it is the emblem's remaining abilities,
--- and none of those has a carrier (#707's blocking clause, #709). Pawl.RingSpec
+-- Still read by no RULE -- what reads CR 701.54e in anger is the emblem's own
+-- text, and both of the base ability's clauses spell those conjuncts as a Filter
+-- instead (theRingIsLegendary, theRingCantBeBlockedByGreaterPower); the emblem's
+-- remaining abilities are triggered and have no carrier (#709). Pawl.RingSpec
 -- proves the designation through it.
 isRingBearerOf :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 isRingBearerOf pid oid gs =

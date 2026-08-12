@@ -120,7 +120,10 @@ data Filter keyword
     --
     -- Context-relative for that atom's reason, and reading the same
     -- Pawl.Engine.Filter.Context sourcePower -- which this atom is the first to
-    -- want at a TRIGGER match rather than a target slot's.
+    -- want anywhere but a target slot: at a TRIGGER match
+    -- (Pawl.Engine.Event.matchesTrigger) and at CR 509.1b's blocking gate
+    -- (Pawl.Engine.CombatRestriction.cantBeBlockedBy), where the source is the
+    -- attacker being blocked.
     PowerGreaterThanSource
   | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
     -- Command's "creature card with mana value 2 or less".

@@ -17,6 +17,8 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
@@ -26,6 +28,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -103,6 +106,48 @@ twoCreatureBoard island piker escape lands =
       -- the order they were added.
       (lower, higher) = if a < b then (a, b) else (b, a)
    in (lower, higher, spellId, gs)
+
+-- alice holds one Birthday Escape, has one untapped Island and one card left to
+-- draw, and controls one creature per printing in `mine`; bob controls one per
+-- printing in `theirs`. Still in alice's precombat main phase, so the spell can
+-- actually be cast -- a sorcery cannot be cast in combat, which is why CR 701.54c's
+-- blocking clause needs a board built in two moves rather than S.combatBoardOf.
+--
+-- Returns the spell, alice's creatures and bob's, in the order their printings were
+-- given.
+ringCombatBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (ObjectId, [ObjectId], [ObjectId], GameState.GameState)
+ringCombatBoard island escape filler mine theirs =
+  let addAll pid ps g = List.foldl' (\(ids, acc) p -> let (oid, acc1) = S.addCreature p pid acc in (ids <> [oid], acc1)) ([], g) ps
+      (_, g0) = S.addLibraryCard filler S.alice (S.landsInPlay island 1)
+      (ours, g1) = addAll S.alice mine g0
+      (yours, g2) = addAll S.bob theirs g1
+      (gs, spellId) = S.handOne escape g2
+   in (spellId, ours, yours, gs)
+
+-- Move a main-phase board into the declare attackers step and attack with
+-- everything, which is what puts alice's Ring-bearer where CR 509.1b can be asked
+-- about it.
+--
+-- The combat fields are COPIED off an empty S.combatBoardOf rather than restated,
+-- so this fixture cannot drift from that one: alice active in the declare attackers
+-- step with bob already settled as the defending player (CR 703.4h), and the rest
+-- of the combat phase queued behind it.
+intoCombat :: GameState.GameState -> GameState.GameState
+intoCombat gs =
+  let (template, _, _) = S.combatBoardOf [] []
+      moved =
+        gs
+          { GameState.activePlayer = GameState.activePlayer template,
+            GameState.phase = GameState.phase template,
+            GameState.priority = GameState.priority template,
+            GameState.combat = GameState.combat template,
+            GameState.remaining = GameState.remaining template
+          }
+   in S.runPure S.aggressiveAnswer moved (Combat.declareAttackers S.alice)
+
+-- CR 509.1a/509.1b: may bob declare this one creature blocking that one attacker?
+blocks :: ObjectId -> ObjectId -> GameState.GameState -> Bool
+blocks blocker attacker = Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton attacker))
 
 -- CR 205.4: is this object legendary? Read off the PROJECTION, which is where CR
 -- 613.1d's layer 4 writes a granted supertype -- never off the printed type line,
@@ -360,3 +405,94 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     Spec.assertEqWith s "the mark has not been lifted yet" (markedFor S.alice unsettled) [bearer]
     Spec.assertEqWith s "but bob controls it already (CR 613.1b)" (Projection.controllerOf bearer unsettled) (Just S.bob)
     Spec.assertBool s (not (isLegendary bearer unsettled)) "CR 701.54e's control clause refuses it to alice"
+
+  -- CR 701.54c's SECOND clause, "and can't be blocked by creatures with greater
+  -- power". alice's Ring-bearer is a 2/1 Goblin Piker in every case below, and
+  -- bob's blockers are a 3/3 Hill Giant, a 2/1 Piker and a 1/1 Llanowar Elves --
+  -- distinct powers straddling the threshold, so no two of them are told apart by a
+  -- coincidence.
+  Spec.it s "CR 701.54c a bigger creature can't block the Ring-bearer, an equal or smaller one can" $ do
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (spellId, mine, theirs, board) = ringCombatBoard island escape piker [piker] [hillGiant, piker, elves]
+        gs = intoCombat (castAndResolve S.identityAnswer S.alice spellId board)
+    case (mine, theirs) of
+      ([bearer], [bigger, equal, smaller]) -> do
+        Spec.assertEqWith s "the attacker is alice's Ring-bearer" (markedFor S.alice gs) [bearer]
+        Spec.assertEqWith
+          s
+          "3 is barred, 2 and 1 are not"
+          (blocks bigger bearer gs, blocks equal bearer gs, blocks smaller bearer gs)
+          (False, True, True)
+      _ -> Spec.assertFailure s "fixture should have one attacker and three blockers"
+  Spec.it s "CR 701.54c without the emblem the same board admits the same blocker" $ do
+    -- THE FALSIFIER, and the reason the case above cannot pass on a fixture whose
+    -- blockers never block: the same board with Birthday Escape left in hand. One
+    -- difference, and it is the emblem.
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (_, mine, theirs, board) = ringCombatBoard island escape piker [piker] [hillGiant]
+        gs = intoCombat board
+    case (mine, theirs) of
+      ([attacker], [bigger]) -> do
+        Spec.assertEqWith s "nobody is a Ring-bearer" (markedFor S.alice gs) []
+        Spec.assertBool s (blocks bigger attacker gs) "the 3/3 blocks the 2/1"
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  Spec.it s "CR 701.54c the clause reaches the Ring-bearer alone" $ do
+    -- CR 701.54c says "YOUR RING-BEARER", not "creatures you control": alice attacks
+    -- with a 1/1 Llanowar Elves as well, and bob's 3/3 outpowers both. The Elves is
+    -- the case an implementation whose affected set is the controller's whole board
+    -- gets wrong, and the two attackers have distinct power and toughness, so which
+    -- one was blocked is readable.
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (spellId, mine, theirs, board) = ringCombatBoard island escape piker [elves, piker] [hillGiant]
+        -- The LAST candidate, so the designation lands on the Piker rather than on
+        -- the first creature a never-prompting implementation would take.
+        gs = intoCombat (castAndResolve lastCandidate S.alice spellId board)
+    case (mine, theirs) of
+      ([other, bearer], [bigger]) -> do
+        Spec.assertEqWith s "the Piker is the Ring-bearer" (markedFor S.alice gs) [bearer]
+        Spec.assertBool s (not (blocks bigger bearer gs)) "the 3/3 may not block the Ring-bearer"
+        Spec.assertBool s (blocks bigger other gs) "but may block the 1/1 beside it"
+      _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
+  Spec.it s "CR 701.54c the powers compared are the PROJECTED ones" $ do
+    -- The same 2/1 Piker of bob's, blocking legally at its printed power and
+    -- illegally at 3 after a CR 122.1a +1/+1 counter -- so the comparison reads CR
+    -- 613's answer and not the printed box. One board, one counter apart.
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (spellId, mine, theirs, board) = ringCombatBoard island escape piker [piker] [piker]
+        gs = intoCombat (castAndResolve S.identityAnswer S.alice spellId board)
+    case (mine, theirs) of
+      ([bearer], [blocker]) ->
+        Spec.assertEqWith
+          s
+          "printed 2 blocks, counter-boosted 3 does not"
+          (blocks blocker bearer gs, blocks blocker bearer (S.addCounter CounterKind.PlusOnePlusOne 1 blocker gs))
+          (True, False)
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  Spec.it s "CR 701.54c the Ring-bearer connects past a bigger untapped creature, in a real combat" $ do
+    -- The gameplay-level case, with its own control: the same board with the spell
+    -- left in hand blocks and trades instead. bob's Hill Giant is untapped and able
+    -- throughout, so what changed is CR 701.54c and not the fixture.
+    island <- S.printingOf s registry "Island"
+    escape <- S.printingOf s registry "Birthday Escape"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (spellId, _, _, board) = ringCombatBoard island escape piker [piker] [hillGiant]
+        play gs = let after = S.settleSba (S.runPure S.aggressiveAnswer (intoCombat gs) (Combat.declareBlockers >> Damage.dealCombatDamage)) in (S.lifeOf S.bob after, S.creaturesInPlay S.alice after, S.creaturesInPlay S.bob after)
+    Spec.assertEqWith
+      s
+      "unblockable with the Ring; blocked and dead without it"
+      (play (castAndResolve S.identityAnswer S.alice spellId board), play board)
+      ((Just 18, 1, 1), (Just 20, 0, 1))
