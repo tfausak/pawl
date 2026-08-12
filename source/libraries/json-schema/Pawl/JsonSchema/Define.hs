@@ -45,7 +45,7 @@ define name body = do
       pure (reference name)
 
 reference :: Name.Name -> Schema.Schema
-reference name = Schema.fromPairs [Pair.fromString "$ref" (Value.text (fragment name))]
+reference name = Schema.fromPairs [Value.pair "$ref" (Value.text (fragment name))]
 
 -- | A @$ref@ is a URI-reference holding a JSON Pointer, which is RFC 6901
 -- section 6's fragment form: @#@, then the pointer, percent-encoded for a URI
@@ -68,9 +68,9 @@ run :: SchemaM Schema.Schema -> Value.Value
 run m =
   let (root, definitions) = State.runState m Map.empty
    in Value.Object . Object.MkObject $
-        [Pair.fromString "$schema" (Value.text (Text.pack "https://json-schema.org/draft/2020-12/schema"))]
+        [Value.pair "$schema" (Value.text (Text.pack "https://json-schema.org/draft/2020-12/schema"))]
           <> Schema.keywords root
-          <> [Pair.fromString "$defs" (Value.Object (Object.MkObject (Maybe.mapMaybe definition (Map.toAscList definitions))))]
+          <> [Value.pair "$defs" (Value.Object (Object.MkObject (Maybe.mapMaybe definition (Map.toAscList definitions))))]
 
 -- | A 'Nothing' entry -- a definition still in progress -- is dropped rather
 -- than emitted, which would otherwise write a dangling @$ref@ no key answers.

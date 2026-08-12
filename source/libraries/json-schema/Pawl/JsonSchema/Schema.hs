@@ -26,40 +26,40 @@ fromPairs = MkSchema . Value.object
 keywords :: Schema -> [Pair.Pair Value.Value]
 keywords s = case unwrap s of
   Value.Object o -> Object.unwrap o
-  v -> [Pair.fromString "allOf" (Value.array [v])]
+  v -> [Value.pair "allOf" (Value.array [v])]
 
 string :: Schema
-string = fromPairs [Pair.fromString "type" (Value.text (Text.pack "string"))]
+string = fromPairs [Value.pair "type" (Value.text (Text.pack "string"))]
 
 integer :: Schema
-integer = fromPairs [Pair.fromString "type" (Value.text (Text.pack "integer"))]
+integer = fromPairs [Value.pair "type" (Value.text (Text.pack "integer"))]
 
 natural :: Schema
 natural =
   fromPairs
-    [ Pair.fromString "type" (Value.text (Text.pack "integer")),
-      Pair.fromString "minimum" (Value.integer 0)
+    [ Value.pair "type" (Value.text (Text.pack "integer")),
+      Value.pair "minimum" (Value.integer 0)
     ]
 
 null :: Schema
-null = fromPairs [Pair.fromString "type" (Value.text (Text.pack "null"))]
+null = fromPairs [Value.pair "type" (Value.text (Text.pack "null"))]
 
 constant :: Text.Text -> Schema
-constant = fromPairs . pure . Pair.fromString "const" . Value.text
+constant = fromPairs . pure . Value.pair "const" . Value.text
 
 object :: [Pair.Pair Value.Value] -> [Text.Text] -> Schema
 object properties required =
   fromPairs
-    [ Pair.fromString "type" (Value.text (Text.pack "object")),
-      Pair.fromString "properties" (Value.object properties),
-      Pair.fromString "required" (Value.array (fmap Value.text required))
+    [ Value.pair "type" (Value.text (Text.pack "object")),
+      Value.pair "properties" (Value.object properties),
+      Value.pair "required" (Value.array (fmap Value.text required))
     ]
 
 oneOf :: [Schema] -> Schema
-oneOf = fromPairs . pure . Pair.fromString "oneOf" . Value.array . fmap unwrap
+oneOf = fromPairs . pure . Value.pair "oneOf" . Value.array . fmap unwrap
 
 nullable :: Schema -> Schema
 nullable s = oneOf [s, Pawl.JsonSchema.Schema.null]
 
 withDefault :: Value.Value -> Schema -> Schema
-withDefault v s = fromPairs $ keywords s <> [Pair.fromString "default" v]
+withDefault v s = fromPairs $ keywords s <> [Value.pair "default" v]

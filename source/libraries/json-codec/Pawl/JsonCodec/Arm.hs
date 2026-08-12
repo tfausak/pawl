@@ -13,7 +13,6 @@ module Pawl.JsonCodec.Arm where
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Data.Typeable as Typeable
-import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -80,10 +79,10 @@ armSchema arm = case arm of
 -- 'Common.withValue' fails without it.
 armObject :: String -> Maybe Schema.Schema -> Schema.Schema
 armObject t ms =
-  let typePair = Pair.fromString "type" (Schema.unwrap (Schema.constant (Text.pack t)))
+  let typePair = Value.pair "type" (Schema.unwrap (Schema.constant (Text.pack t)))
    in case ms of
         Nothing -> Schema.object [typePair] [Text.pack "type"]
         Just s ->
           Schema.object
-            [typePair, Pair.fromString "value" (Schema.unwrap s)]
+            [typePair, Value.pair "value" (Schema.unwrap s)]
             [Text.pack "type", Text.pack "value"]

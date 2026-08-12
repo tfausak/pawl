@@ -7,7 +7,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.ModeSelection as ModeSelection
-import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -74,6 +73,6 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
       ( either
           (const True)
           (const False)
-          (fromJson (Value.object [Pair.fromString "modes" (Value.array []), Pair.fromString "selection" (ModeSelection.toJson (ModeSelection.ChooseExactly 1))]))
+          (fromJson (Value.object [Value.pair "modes" (Value.array []), Value.pair "selection" (ModeSelection.toJson (ModeSelection.ChooseExactly 1))]))
       )
       "left"

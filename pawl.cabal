@@ -50,7 +50,7 @@ common executable
   import: library
   ghc-options: -rtsopts
 
--- JSON encoders and decoders for Pawl's types.
+-- A JSON codec for each type.
 library codec
   import: library
   build-depends:
@@ -482,8 +482,7 @@ library json
     Pawl.Json.Value
     Pawl.Json.ValueSpec
 
--- The shape of a JSON codec, and the generic helpers every codec is written in
--- terms of.
+-- A JSON codec, which is an encoder, decoder, and schema bundled together.
 library json-codec
   import: library
   build-depends:
@@ -513,7 +512,6 @@ library json-pointer
   build-depends:
     bytestring ^>=0.12.2,
     parsec ^>=3.1.18,
-    pawl:decimal,
     pawl:extra,
     pawl:json,
     pawl:spec,
@@ -529,7 +527,7 @@ library json-pointer
     Pawl.JsonPointer.Token
     Pawl.JsonPointer.TokenSpec
 
--- JSON Schema documents, modelled as plain JSON values.
+-- JSON schemas, represented as plain JSON values.
 library json-schema
   import: library
   build-depends:
@@ -587,8 +585,8 @@ library slug
     Pawl.Slug
     Pawl.SlugSpec
 
--- An abstract testing interface, identical to the heck package. Base-only,
--- which is why every other sublibrary can afford to expose its specs.
+-- An abstract testing interface, similar to the heck package. Only depends on
+-- base which allows other sublibraries to afford to expose their specs.
 library spec
   import: library
   hs-source-dirs: source/libraries/spec
@@ -596,7 +594,7 @@ library spec
   exposed-modules:
     Pawl.Spec
 
--- All of Pawl's type definitions, without any associated behavior.
+-- All of the type definitions, without any associated behavior.
 library types
   import: library
   build-depends:

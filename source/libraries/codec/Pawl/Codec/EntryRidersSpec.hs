@@ -4,7 +4,6 @@ module Pawl.Codec.EntryRidersSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Codec.EntryRiders as EntryRiders
-import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -74,7 +73,7 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
     Spec.it s "an explicit null tapped is now a decode error" $
       Spec.assertBool
         s
-        ( case EntryRiders.fromJson (Value.object [Pair.fromString "tapped" Value.null, Pair.fromString "attacking" (Value.boolean False)]) of
+        ( case EntryRiders.fromJson (Value.object [Value.pair "tapped" Value.null, Value.pair "attacking" (Value.boolean False)]) of
             Left _ -> True
             Right _ -> False
         )

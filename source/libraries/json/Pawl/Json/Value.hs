@@ -23,8 +23,6 @@ data Value
   | Object (Object.Object Value)
   deriving (Eq, Show)
 
--- | Building a value, so that neither a codec nor a schema has to spell out the
--- constructor and its wrapper at every leaf.
 null :: Value
 null = Null $ Null.MkNull ()
 
@@ -34,7 +32,6 @@ boolean = Boolean . Boolean.MkBoolean
 number :: Integer -> Integer -> Value
 number m = Number . Number.MkNumber . Decimal.mkDecimal m
 
--- | The whole-number case of 'number', which is every number a codec writes.
 integer :: Integer -> Value
 integer = flip number 0
 
@@ -46,6 +43,9 @@ string = text . Text.pack
 
 array :: [Value] -> Value
 array = Array . Array.MkArray
+
+pair :: String -> a -> Pair.Pair a
+pair = Pair.MkPair . String.MkString . Text.pack
 
 object :: [Pair.Pair Value] -> Value
 object = Object . Object.MkObject

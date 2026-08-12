@@ -57,9 +57,9 @@ import qualified Text.Parsec as Parsec
 tagged :: String -> Maybe Value.Value -> Value.Value
 tagged t mv =
   Value.object $
-    Pair.fromString "type" (Value.string t) : case mv of
+    Value.pair "type" (Value.string t) : case mv of
       Nothing -> []
-      Just v -> [Pair.fromString "value" v]
+      Just v -> [Value.pair "value" v]
 
 nullary :: String -> Value.Value
 nullary t = tagged t Nothing
@@ -154,13 +154,13 @@ withValue mv f = case mv of
 -- so that 'Value.object . concat' can take required and optional fields in one
 -- list, with which is which readable down the left edge.
 requiredPair :: String -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
-requiredPair k f x = [Pair.fromString k (f x)]
+requiredPair k f x = [Value.pair k (f x)]
 
 -- | A field written only when it differs from the default that an absent key
 -- means. The default passed here and the one 'defaultedField' supplies must be
 -- the same binding.
 optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
-optionalPair k d f x = if x == d then [] else [Pair.fromString k (f x)]
+optionalPair k d f x = if x == d then [] else [Value.pair k (f x)]
 
 -- | Reads a field that may be absent, supplying the default 'optionalPair'
 -- omits. A key that is present but null goes to the decoder rather than

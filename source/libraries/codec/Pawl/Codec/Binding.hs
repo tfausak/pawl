@@ -7,7 +7,6 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.SlotName as SlotName
-import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Binding as Binding
@@ -47,7 +46,7 @@ fromJson value = do
 toJsonMap :: Map.Map SlotName.SlotName Binding.Binding -> Value.Value
 toJsonMap m =
   Common.encodeList
-    (\(k, v) -> Value.object [Pair.fromString "slot" (SlotName.toJson k), Pair.fromString "binding" (toJson v)])
+    (\(k, v) -> Value.object [Value.pair "slot" (SlotName.toJson k), Value.pair "binding" (toJson v)])
     (Map.toAscList m)
 
 fromJsonMap :: Value.Value -> Either Text.Text (Map.Map SlotName.SlotName Binding.Binding)
