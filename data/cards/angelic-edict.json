@@ -38,33 +38,30 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "Or",
-                    "value": [
-                      {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Creature"
-                        }
-                      },
-                      {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Enchantment"
-                        }
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "Or",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
                       }
-                    ]
-                  },
-                  "pool": {
-                    "type": "Permanents"
-                  }
+                    },
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Enchantment"
+                      }
+                    }
+                  ]
+                },
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           }
         ]
       },

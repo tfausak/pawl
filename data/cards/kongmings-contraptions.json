@@ -33,19 +33,16 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "IsAttacking"
-                      },
-                      "pool": {
-                        "type": "Creatures"
-                      }
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "IsAttacking"
+                    },
+                    "pool": {
+                      "type": "Creatures"
                     }
                   }
-                ]
+                }
               }
             ]
           },

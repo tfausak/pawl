@@ -1,43 +1,40 @@
 {
   "faces": [
     {
-      "delayedAbilities": [
-        {
-          "ability": {
-            "condition": {
-              "type": "StepBegins",
-              "value": [
-                {
-                  "type": "Ending",
-                  "value": {
-                    "type": "EndStep"
-                  }
-                },
-                {
-                  "type": "EachTurn"
+      "delayedAbilities": {
+        "sacrifice them": {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
                 }
-              ]
-            },
-            "modal": {
-              "modes": [
-                {
-                  "clauses": [
-                    {
-                      "effects": [
-                        {
-                          "type": "Sacrifice",
-                          "value": "tokens"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
+              },
+              {
+                "type": "EachTurn"
+              }
+            ]
           },
-          "name": "sacrifice them"
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Sacrifice",
+                        "value": "tokens"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
-      ],
+      },
       "manaCost": [
         {
           "type": "Generic",
@@ -139,16 +136,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
-                  }
+            "targetSpecs": {
+              "target": {
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

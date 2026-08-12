@@ -44,16 +44,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Players"
-                  }
+            "targetSpecs": {
+              "target": {
+                "pool": {
+                  "type": "Players"
                 }
               }
-            ]
+            }
           }
         ]
       },

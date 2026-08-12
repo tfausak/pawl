@@ -34,22 +34,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "wall",
-                "spec": {
-                  "filter": {
-                    "type": "HasSubtype",
-                    "value": {
-                      "type": "Wall"
-                    }
-                  },
-                  "pool": {
-                    "type": "Creatures"
+            "targetSpecs": {
+              "wall": {
+                "filter": {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Wall"
                   }
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [
@@ -71,16 +68,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "damaged",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
-                  }
+            "targetSpecs": {
+              "damaged": {
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [
@@ -107,16 +101,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "hasted",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
-                  }
+            "targetSpecs": {
+              "hasted": {
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

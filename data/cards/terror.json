@@ -38,39 +38,36 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "Not",
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "Not",
+                      "value": {
+                        "type": "HasColor",
                         "value": {
-                          "type": "HasColor",
-                          "value": {
-                            "type": "Black"
-                          }
-                        }
-                      },
-                      {
-                        "type": "Not",
-                        "value": {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Artifact"
-                          }
+                          "type": "Black"
                         }
                       }
-                    ]
-                  },
-                  "pool": {
-                    "type": "Creatures"
-                  }
+                    },
+                    {
+                      "type": "Not",
+                      "value": {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Artifact"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

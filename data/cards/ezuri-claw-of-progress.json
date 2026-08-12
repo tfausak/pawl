@@ -141,33 +141,30 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "Not",
-                            "value": {
-                              "type": "IsSource"
-                            }
-                          },
-                          {
-                            "type": "ControlledBy",
-                            "value": {
-                              "type": "You"
-                            }
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsSource"
                           }
-                        ]
-                      },
-                      "pool": {
-                        "type": "Creatures"
-                      }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Creatures"
                     }
                   }
-                ]
+                }
               }
             ]
           }

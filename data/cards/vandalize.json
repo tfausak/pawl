@@ -38,22 +38,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "artifact",
-                "spec": {
-                  "filter": {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Artifact"
-                    }
-                  },
-                  "pool": {
-                    "type": "Permanents"
+            "targetSpecs": {
+              "artifact": {
+                "filter": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Artifact"
                   }
+                },
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           },
           {
             "clauses": [
@@ -74,22 +71,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "land",
-                "spec": {
-                  "filter": {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Land"
-                    }
-                  },
-                  "pool": {
-                    "type": "Permanents"
+            "targetSpecs": {
+              "land": {
+                "filter": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Land"
                   }
+                },
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           }
         ],
         "selection": {

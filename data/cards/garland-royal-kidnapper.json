@@ -136,22 +136,19 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "player",
-                    "spec": {
-                      "filter": {
-                        "type": "IsPlayer",
-                        "value": {
-                          "type": "Opponent"
-                        }
-                      },
-                      "pool": {
-                        "type": "Players"
+                "targetSpecs": {
+                  "player": {
+                    "filter": {
+                      "type": "IsPlayer",
+                      "value": {
+                        "type": "Opponent"
                       }
+                    },
+                    "pool": {
+                      "type": "Players"
                     }
                   }
-                ]
+                }
               }
             ]
           }
@@ -203,31 +200,28 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          },
-                          {
-                            "type": "ControlledByBound",
-                            "value": "thatPlayer"
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
                           }
-                        ]
-                      },
-                      "pool": {
-                        "type": "Permanents"
-                      }
+                        },
+                        {
+                          "type": "ControlledByBound",
+                          "value": "thatPlayer"
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
                     }
                   }
-                ]
+                }
               }
             ]
           }

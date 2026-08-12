@@ -47,16 +47,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
-                  }
+            "targetSpecs": {
+              "target": {
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },
@@ -102,22 +99,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Enchantment"
-                    }
-                  },
-                  "pool": {
-                    "type": "Permanents"
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Enchantment"
                   }
+                },
+                "pool": {
+                  "type": "Permanents"
                 }
               }
-            ]
+            }
           }
         ]
       },

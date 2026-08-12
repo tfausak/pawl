@@ -71,7 +71,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           [ActivationRestriction.SorcerySpeed]
           Nothing
       )
-      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"restrictions":[{"type":"SorcerySpeed"}]} """
+      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}}]},"restrictions":[{"type":"SorcerySpeed"}]} """
   -- CR 602.5's conjunction, in the JSON: two clauses in printed order, which is
   -- the shape a single tagged object could not hold.
   Spec.it s "MkActivatedAbility, Kongming's Contraptions' two clauses" $

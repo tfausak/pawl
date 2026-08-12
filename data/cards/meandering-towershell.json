@@ -1,57 +1,54 @@
 {
   "faces": [
     {
-      "delayedAbilities": [
-        {
-          "ability": {
-            "condition": {
-              "type": "StepBegins",
-              "value": [
-                {
-                  "type": "Combat",
-                  "value": {
-                    "type": "DeclareAttackers"
-                  }
-                },
-                {
-                  "type": "ControllersTurn"
+      "delayedAbilities": {
+        "return it": {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Combat",
+                "value": {
+                  "type": "DeclareAttackers"
                 }
-              ]
-            },
-            "modal": {
-              "modes": [
-                {
-                  "clauses": [
-                    {
-                      "effects": [
-                        {
-                          "type": "MoveToZone",
-                          "value": [
-                            {
-                              "type": "InSlot",
-                              "value": "exiled"
-                            },
-                            {
-                              "type": "Battlefield"
-                            },
-                            {
-                              "attacking": true,
-                              "tapped": {
-                                "type": "Tapped"
-                              }
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
           },
-          "name": "return it"
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "exiled"
+                          },
+                          {
+                            "type": "Battlefield"
+                          },
+                          {
+                            "attacking": true,
+                            "tapped": {
+                              "type": "Tapped"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
-      ],
+      },
       "keywords": [
         {
           "type": "Landwalk",

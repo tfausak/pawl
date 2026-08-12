@@ -27,22 +27,19 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "HasSubtype",
-                        "value": {
-                          "type": "Forest"
-                        }
-                      },
-                      "pool": {
-                        "type": "Permanents"
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Forest"
                       }
+                    },
+                    "pool": {
+                      "type": "Permanents"
                     }
                   }
-                ]
+                }
               }
             ]
           }
