@@ -149,6 +149,33 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
       "and it is the dungeon she owns"
       (fmap (\oid -> fmap Face.name (Game.faceOf oid after)) (dungeonsOf S.alice after))
       [Just (CardName.MkCardName (Text.pack "Lost Mine of Phandelver"))]
+  -- CR 309.4c and CR 701.22a: entering Cave Entrance triggers its room ability,
+  -- which is the printed "Scry 1". The dungeon carried no ability there at all
+  -- until Effect.Scry landed, so this is the case that proves the topmost room
+  -- does its job.
+  --
+  -- One Mountain on top of dungeonBoard's four Islands, because the Islands are
+  -- interchangeable: a library of one printing cannot tell a card that moved
+  -- from a card that stayed. The two boards are identical and differ only in
+  -- the answer given to Prompt.ChooseScry.
+  Spec.it s "CR 309.4c / 701.22a Cave Entrance's Scry 1 puts the top card where its controller says" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    door <- S.printingOf s registry "Secret Door"
+    lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
+    let (doorId, base) = dungeonBoard island door lostMine 5
+        (marker, gs) = S.addLibraryCard mountain S.alice base
+        answering split p = case p of
+          Prompt.ChooseScry {} -> split
+          _ -> paying p
+        libraryOf = Game.zoneMembers Zone.Library S.alice
+        bottomed = ventureOnce (answering ([marker], [])) (ventureAbility door) doorId gs
+        kept = ventureOnce (answering ([], [marker])) (ventureAbility door) doorId gs
+    Spec.assertEqWith s "the Mountain starts on top" (take 1 (libraryOf gs)) [marker]
+    Spec.assertEqWith s "the marker is on Cave Entrance either way" (markerOf S.alice bottomed, markerOf S.alice kept) (Just RoomIndex.topmost, Just RoomIndex.topmost)
+    Spec.assertEqWith s "bottoming it moved it to the bottom" (take 1 (reverse (libraryOf bottomed))) [marker]
+    Spec.assertBool s (take 1 (libraryOf bottomed) /= [marker]) "so it is no longer on top"
+    Spec.assertEqWith s "and keeping it left it on top" (take 1 (libraryOf kept)) [marker]
   -- CR 309.5a: "if there are multiple arrows pointing away from the room the
   -- player's venture marker is on, THEY CHOOSE one of them to follow."
   --

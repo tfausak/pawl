@@ -77,6 +77,23 @@ data Prompt r where
   RandomFirstPlayer :: NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 514.2. The [ObjectId] is the hand; the Natural is how many to discard.
   ChooseDiscard :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
+  -- | CR 701.22a: how a scrying player splits the cards they just looked at. The
+  -- [ObjectId] is the top of their own library, top-first, as many cards as the
+  -- scry reached -- and showing it to this one seat IS rule 701.20e's look, which
+  -- is why no separate looking step precedes this prompt.
+  --
+  -- The answer is (bottom, top): which of them go to the BOTTOM, in the order
+  -- they end up there reading downwards, and which stay on TOP, in the order they
+  -- end up there reading down from the top. TWO ordered lists rather than a set
+  -- and a count, because rule 701.22a hands the player three decisions -- which
+  -- cards, and then BOTH ends' order -- and a set answers only the first.
+  --
+  -- Asked whenever there is a decision, which is more often than "any number to
+  -- the bottom" suggests: even one card is a real top-or-bottom question so long
+  -- as the library holds another card behind it. Elided only where the rule
+  -- leaves nothing to ask -- CR 701.22b's scry 0, an empty library, and the lone
+  -- card that IS the whole library, for which top and bottom are one position.
+  ChooseScry :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt ([ObjectId.ObjectId], [ObjectId.ObjectId])
   -- | CR 507.1 / 703.4h: the active player chooses one of their opponents to be
   -- the defending player. The NonEmpty is the candidates; the answer is the one
   -- chosen.

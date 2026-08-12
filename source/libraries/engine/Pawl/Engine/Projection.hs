@@ -1524,6 +1524,7 @@ rewriteEffect pairs effect = case effect of
   -- swap reaches it; the slot it binds to is a name no card prints.
   Effect.Mill ref quantity mTally ->
     Effect.Mill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally)
+  Effect.Scry {} -> effect
   Effect.Discard {} -> effect
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect
