@@ -2466,9 +2466,11 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         -- about: a depth-three exile off a two-card library moved two cards, and
         -- a cancelled move (CR 614.6) left none. One arrival takes the single
         -- binding, which is the only shape a singular reader can see (slotOne
-        -- reads Binding.targets); several take the group, which every ObjectRef
-        -- reader sees through slotGroup. Nothing arrived binds nothing at all,
-        -- which keeps a slot from naming an empty set.
+        -- reads Binding.targets) and which an ObjectRef.InSlot still reaches
+        -- through each resolution path's per-effect re-read of the bindings;
+        -- several take the group, which only the ObjectRef readers see, through
+        -- slotGroup. Nothing arrived binds nothing at all, which keeps a slot
+        -- from naming an empty set.
         bindArrivals slot arrived = case arrived of
           [] -> pure ()
           [only] -> State.modify' (bindSlot resolving slot only)
@@ -2545,9 +2547,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- the pre-move state exactly as the swept set above is: the whole
             -- batch comes off one look at each library, so nothing an earlier
             -- move of this same resolution did can change what the next card off
-            -- the top is (CR 608.2c, CR 608.2f). Reading a card at a time instead
-            -- would take the same cards here and a different set as soon as a
-            -- replacement put one back.
+            -- the top is (CR 608.2c, CR 608.2f).
             ObjectRef.TopOfLibrary _ _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
