@@ -15,7 +15,6 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
-import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -221,7 +220,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       s
       PlayerEffect.toJson
       PlayerEffect.fromJson
-      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing SourceRelation.AnySource Nothing))
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing (Filter.And []) Nothing))
       """ {"type":"DamageCantBePrevented","value":{}} """
   -- CR 615.12 narrowed / Excruciator, "damage that would be dealt by this
   -- creature": the same effect keyed to its own source (CR 614.15's relation),
@@ -231,8 +230,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       s
       PlayerEffect.toJson
       PlayerEffect.fromJson
-      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing))
-      """ {"type":"DamageCantBePrevented","value":{"whichSource":{"type":"TheSource"}}} """
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing))
+      """ {"type":"DamageCantBePrevented","value":{"whatSource":{"type":"IsSource"}}} """
   -- CR 701.23 / Leonin Arbiter.
   Spec.it s "CantSearchLibraries" $
     Common.assertJsonCodec

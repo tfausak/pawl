@@ -276,8 +276,6 @@ library codec
     Pawl.Codec.SearchDestinationSpec
     Pawl.Codec.SlotName
     Pawl.Codec.SlotNameSpec
-    Pawl.Codec.SourceRelation
-    Pawl.Codec.SourceRelationSpec
     Pawl.Codec.SpecialAction
     Pawl.Codec.SpecialActionSpec
     Pawl.Codec.StaticAbility
@@ -783,7 +781,6 @@ library types
     Pawl.Types.SlotArity
     Pawl.Types.SlotName
     Pawl.Types.Source
-    Pawl.Types.SourceRelation
     Pawl.Types.SpecialAction
     Pawl.Types.StaticAbility
     Pawl.Types.Status

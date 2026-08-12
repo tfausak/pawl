@@ -89,7 +89,6 @@ import Pawl.Types.ReplacementEntry (ReplacementEntry)
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
-import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
@@ -298,7 +297,7 @@ applies gs event candidate =
         -- plus the one fact about the ROW rather than the event -- a shield
         -- spent to nothing is no longer a prevention effect.
         (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) ->
-          matchesDamagePattern (Just src) pat de && unspent rewrite && admitsRecipient src rewrite de
+          matchesDamagePattern gs (candidateContext candidate) pat de && unspent rewrite && admitsRecipient src rewrite de
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only. CR
         -- 122.1c's "this permanent" is the same self-scope reached from the other
@@ -422,35 +421,36 @@ matchesController gs src rel oid = case rel of
     (Just theirs, Just yours) -> theirs /= yours
     _ -> False
 
--- CR 614.1 / 614.15: is this DAMAGE coming from the object the pattern names?
--- AnySource always is; TheSource is the CR 614.15 keying -- the damage this
--- effect's own source is dealing (Galvanic Blast's metalcraft clause).
+-- CR 614.1 / 615.1: is this DAMAGE coming from a source the pattern admits?
+-- Matched through Pawl.Engine.Filter, against the PROJECTED view of the damage's
+-- own source (CR 113.7a) -- for a resolving spell, the spell on the stack, which
+-- is also the object Resolve installs a floating row under.
 --
--- The compared id is the DamageEvent's `source` (CR 113.7a) -- for a resolving
--- spell, the spell on the stack, which is also the object Resolve installs the
--- floating row under. Board-free, so no GameState: an identity test, not a
--- characteristic one, like matchesZoneSubject.
+-- Two readings ride one Filter. CR 609.7b's characteristic shield (Luminesce's
+-- "black sources and red sources") is a predicate over that view, rechecked here
+-- at the event exactly as the rule says rather than locked in when the shield was
+-- created; CR 614.15's "this way" is `Filter.IsSource`, which compares the
+-- candidate's identity to the Context's source and so keys Galvanic Blast's
+-- metalcraft clause to the damage its own resolution deals. `And []` admits
+-- everything and never forces the view, which is what keeps CR 615.10's "if a
+-- source would deal damage" free of a projection.
 --
--- Not implemented: CR 615.1's shields that name a source by CHARACTERISTIC
--- (Circle of Protection: Red, Questing Beast's "creatures you control") rather
--- than by identity (#588).
---
--- The source is a MAYBE because CR 615.12's carrier has one: a "damage can't be
--- prevented" effect stored by a resolution has no permanent behind it. Nothing
--- names no object, so TheSource -- which is the "THIS creature" of a printed
--- clause -- cannot be satisfied by it, and no printing writes that pair anyway.
-matchesDamageSource :: Maybe ObjectId -> SourceRelation.SourceRelation -> DamageEvent.DamageEvent -> Bool
-matchesDamageSource src relation de = case relation of
-  SourceRelation.AnySource -> True
-  SourceRelation.TheSource -> src == Just (DamageEvent.source de)
+-- The Context's source is a MAYBE because CR 615.12's carrier has one: a "damage
+-- can't be prevented" effect stored by a resolution has no permanent behind it.
+-- Nothing names no object, so IsSource -- the "THIS creature" of a printed clause
+-- -- is vacuously False for it, and no printing writes that pair anyway.
+matchesDamageSource :: GameState -> Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> DamageEvent.DamageEvent -> Bool
+matchesDamageSource gs context filter_ de =
+  Filter.matches context (Projection.viewOfObject (DamageEvent.source de) gs) filter_
 
 -- CR 615.1 / 614.1a: does this damage event have the qualities the pattern
 -- names? Three of them, and they are the three a printed clause narrows by: a
 -- pattern naming no KIND admits combat and noncombat alike (CR 510.2's dealing
--- versus CR 608's), one naming TheSource admits only the damage its own source
--- is dealing (CR 120.1's "an object that deals damage is the source of that
--- damage", keyed as CR 614.15 keys it), and one naming a RECIPIENT admits only
--- the damage addressed to the permanent or player it names (CR 615.7).
+-- versus CR 608's), one narrowing the SOURCE admits only the damage a source it
+-- describes is dealing (CR 120.1's "an object that deals damage is the source of
+-- that damage" -- CR 609.7b's characteristic, or CR 614.15's identity), and one
+-- naming a RECIPIENT admits only the damage addressed to the permanent or player
+-- it names (CR 615.7).
 --
 -- ONE reading of what a DamagePattern means, shared by the two questions that
 -- ask it: `applies` above, for CR 615.1's shields and CR 614.1a's replacements,
@@ -461,10 +461,10 @@ matchesDamageSource src relation de = case relation of
 -- The rewrite is NOT asked about here, though `applies` asks `unspent` right
 -- after: a spent shield is a row that no longer exists as a prevention effect,
 -- which is a fact about the ROW and not about which events the pattern admits.
-matchesDamagePattern :: Maybe ObjectId -> DamagePattern.DamagePattern -> DamageEvent.DamageEvent -> Bool
-matchesDamagePattern src pat de =
+matchesDamagePattern :: GameState -> Filter.Context -> DamagePattern.DamagePattern -> DamageEvent.DamageEvent -> Bool
+matchesDamagePattern gs context pat de =
   maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
-    && matchesDamageSource src (DamagePattern.whichSource pat) de
+    && matchesDamageSource gs context (DamagePattern.whatSource pat) de
     && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
 
 -- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
@@ -575,8 +575,19 @@ sacrificeCandidates pid source filter_ gs =
 -- Replacement.applicable passed down, which is that same reading.
 matchesFiltered :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesFiltered gs candidate filter_ oid =
-  let context = Filter.contextFor (ReplacementCandidate.controller candidate) (Just (ReplacementCandidate.source candidate))
-   in Filter.matches context (Projection.viewOfObject oid gs) filter_
+  Filter.matches (candidateContext candidate) (Projection.viewOfObject oid gs) filter_
+
+-- The Context a candidate's own Filters are read in: CR 109.5's "you" is the
+-- ROW's controller -- the baked one for a floating row, since deriving it from
+-- the source would answer Nothing once the spell that made it has resolved --
+-- and the source is what CR 614.1c's and CR 614.15's `IsSource` compares against.
+--
+-- Shared by matchesFiltered above and by the damage arm of `applies`, so a
+-- shield naming its source by characteristic (Luminesce) and an entry
+-- replacement naming its own permanent (Clone) read one context.
+candidateContext :: ReplacementCandidate -> Filter.Context
+candidateContext candidate =
+  Filter.contextFor (ReplacementCandidate.controller candidate) (Just (ReplacementCandidate.source candidate))
 
 -- CR 614.1a: apply a scaling to a number. "Plus one" and "twice that many" are
 -- the same operation with different data, and so is Furnace of Rath's doubling
@@ -1101,9 +1112,16 @@ redirectDestination gs dest = case Recipient.objectOf dest of
 -- this lives on, so this module never sees a PlayerEffect constructor -- it
 -- reads only the DamagePattern each effect hands back, with the same
 -- matchesDamagePattern that reads a shield's.
+--
+-- CR 109.5's "you" for one of these patterns is the controller of the ability's
+-- own source (Questing Beast's "creatures you control"), derived here rather than
+-- carried: unlike a floating shield row, CR 615.12's carriers are the printed
+-- static ability -- whose source is on the battlefield to be asked about -- and a
+-- stored effect that names no source at all, and so has no "you" either.
 preventable :: GameState -> DamageEvent.DamageEvent -> Bool
 preventable gs de =
-  not (any (\(src, pat) -> matchesDamagePattern src pat de) (PlayerEffect.unpreventable gs))
+  let context src = Filter.contextFor (src >>= \oid -> Projection.controllerOf oid gs) src
+   in not (any (\(src, pat) -> matchesDamagePattern gs (context src) pat de) (PlayerEffect.unpreventable gs))
 
 -- CR 615.12: is this the pairing the rule describes -- a PREVENTION effect
 -- chosen against damage that CAN'T BE PREVENTED? True means the application

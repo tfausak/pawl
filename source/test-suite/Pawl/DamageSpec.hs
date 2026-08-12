@@ -47,6 +47,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -70,7 +71,6 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
-import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
@@ -309,7 +309,7 @@ damageSpec s registry =
           (victim, gs0) = S.addCreature piker S.alice base
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource Nothing) DamageRewrite.PreventAll,
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing) DamageRewrite.PreventAll,
                 ActiveReplacement.source = victim,
                 ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
@@ -329,7 +329,7 @@ damageSpec s registry =
       let base = Setup.emptyGame S.bothPlayers
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource Nothing) DamageRewrite.PreventAll,
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing) DamageRewrite.PreventAll,
                 ActiveReplacement.source = ObjectId.MkObjectId 900,
                 ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
@@ -563,7 +563,7 @@ toxicSpec s registry =
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource Nothing) DamageRewrite.PreventAll,
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing) DamageRewrite.PreventAll,
                 ActiveReplacement.source = oid,
                 ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
@@ -691,7 +691,7 @@ lifelinkSpec s registry =
       let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
           shield =
             ActiveReplacement.MkActiveReplacement
-              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) SourceRelation.AnySource Nothing) DamageRewrite.PreventAll,
+              { ActiveReplacement.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern (Just DamageKind.Combat) (Filter.Type.And []) Nothing) DamageRewrite.PreventAll,
                 ActiveReplacement.source = oid,
                 ActiveReplacement.controller = S.alice,
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,

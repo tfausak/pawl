@@ -31,8 +31,8 @@
           "effect": {
             "type": "DamageCantBePrevented",
             "value": {
-              "whichSource": {
-                "type": "TheSource"
+              "whatSource": {
+                "type": "IsSource"
               }
             }
           },

@@ -77,6 +77,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -93,7 +94,6 @@ import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
@@ -1216,7 +1216,7 @@ apnapSpec s registry = Spec.describe s "APNAP (CR 616.1)" $ do
 -- creature can't be prevented"). Spider-Punk's sentence names no quality of the
 -- damage and this one names its SOURCE -- CR 120.1's "an object that deals
 -- damage is the source of that damage", which is Pawl.Types.DamagePattern's
--- `whichSource`.
+-- `whatSource`.
 --
 -- ONE board carries both directions, and that is the whole point of the group:
 -- alice's Goblin Piker is shielded by a Mending Hands she really casts on it,
@@ -1284,6 +1284,60 @@ excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
       Spec.assertEqWith s "only the Excruciator's event happened" (amounts after) [3]
       Spec.assertEqWith s "so only its 3 is marked" (S.damageOf victim after) (Just 3)
       Spec.assertEqWith s "and only the Piker's 2 came off the shield" (shieldsLeft after) [2]
+
+-- CR 615.1 / 609.7b: a shield that names its source by CHARACTERISTIC rather than
+-- by identity, whose producer is Luminesce ({W} Instant, Tenth Edition 28,
+-- "Prevent all damage that black sources and red sources would deal this turn").
+-- Fog with a colour filter on the source and nothing else: no recipient, no
+-- amount, no choice made at creation, so it isolates that one axis.
+--
+-- THE VACUITY TRAP is that "prevented" and "prevents everything" leave the same
+-- board when every source on it matches, so bob's three attackers are a Bog
+-- Wraith (black), a Goblin Piker (red) and a War Mammoth (green), and all three
+-- deal damage in ONE batch. The amounts are 4, 2 and 3 -- distinct, so every
+-- reading of the card lands alice on a different life total: 20 - 3 = 17 is the
+-- card, 11 prevents nothing, 13 and 15 each drop one of the two disjuncts, and 20
+-- ignores the filter altogether.
+--
+-- The DAMAGE BATCH is hand-built and the SPELL is not, for mendingHandsSpec's
+-- reason.
+luminesceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ do
+  let hit src n = DamageEvent.MkDamageEvent src (Recipient.ToPlayer S.alice) n False False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      withBoard act = do
+        plains <- S.printingOf s registry "Plains"
+        wraithPrinting <- S.printingOf s registry "Bog Wraith"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        mammothPrinting <- S.printingOf s registry "War Mammoth"
+        luminesce <- S.printingOf s registry "Luminesce"
+        let base = S.landsInPlay plains 1
+            (wraith, g1) = S.addCreature wraithPrinting S.bob base
+            (piker, g2) = S.addCreature pikerPrinting S.bob g1
+            (mammoth, g3) = S.addCreature mammothPrinting S.bob g2
+            (g4, spellId) = S.handOne luminesce g3
+        act wraith piker mammoth (castAndResolve S.identityAnswer g4 spellId)
+  Spec.it s "CR 615.1 the green source's 3 lands and the black and red 4 and 2 are prevented"
+    . withBoard
+    $ \wraith piker mammoth shielded -> do
+      let after = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit mammoth 3, hit wraith 4, hit piker 2])
+      Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+      Spec.assertEqWith s "setup: alice starts on 20" (S.lifeOf S.alice shielded) (Just 20)
+      Spec.assertEqWith s "only the War Mammoth's event happened" (amounts after) [3]
+      Spec.assertEqWith s "so alice loses 3 and no more" (S.lifeOf S.alice after) (Just 17)
+      Spec.assertEqWith s "and the shield is not spent by preventing (CR 615.1)" (length (GameState.replacements after)) 1
+  -- CR 609.7b's RECHECK, which is what makes this a filter rather than a list of
+  -- objects captured when the shield was made: the Piker's damage is prevented
+  -- while it is red and dealt in full once it is not. One board, one shield, and
+  -- the only thing that differs between the two readings is the source's colour.
+  Spec.it s "CR 609.7b the shield rechecks the source: a Piker made green deals its 2"
+    . withBoard
+    $ \_ piker _ shielded -> do
+      let bleached = S.withEffect piker (Modification.SetColor (Set.singleton Color.Green))
+          after = S.runPure S.identityAnswer (bleached shielded) (Damage.applyDamage [hit piker 2])
+          asPrinted = S.runPure S.identityAnswer shielded (Damage.applyDamage [hit piker 2])
+      Spec.assertEqWith s "while red, the Piker's 2 is prevented whole" (S.lifeOf S.alice asPrinted) (Just 20)
+      Spec.assertEqWith s "once green, the same 2 is dealt" (S.lifeOf S.alice after) (Just 18)
 
 -- CR 615.13's trigger, whose one producer in the pool is Selfless Squire ({3}{W}
 -- Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
@@ -2346,6 +2400,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   spiderPunkSpec s registry
   apnapSpec s registry
   excruciatorSpec s registry
+  luminesceSpec s registry
   selflessSquireSpec s registry
   turnTheTablesSpec s registry
   gatherSpecimensSpec s registry
@@ -2824,7 +2879,7 @@ blastShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
         ReplacementEffect.DamageR
-          (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing)
+          (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing)
           (DamageRewrite.SetAmount 4),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
