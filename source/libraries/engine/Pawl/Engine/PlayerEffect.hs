@@ -1129,11 +1129,12 @@ cantBeCountered pid oid gs =
 -- owns for the shields, and one reading of what a DamagePattern means is worth
 -- more than a boolean asked here.
 --
--- The SOURCE rides out because SourceRelation.TheSource is resolved against it
--- -- Excruciator's clause names the permanent that prints it -- and it is the
--- Maybe `applying` already carries: Nothing for a stored CR 611.2c effect, which
--- has no permanent behind it, and no printing pairs one with a self-naming
--- pattern.
+-- The SOURCE rides out because the pattern's Filter is resolved against it --
+-- Filter.IsSource is Excruciator's clause naming the permanent that prints it,
+-- and CR 109.5's "you" inside such a filter is that permanent's controller -- and
+-- it is the Maybe `applying` already carries: Nothing for a stored CR 611.2c
+-- effect, which has no permanent behind it, and no printing pairs one with a
+-- self-naming pattern.
 --
 -- Gathered from EVERY still-playing player rather than from one, because
 -- `applying` is indexed by player and this effect is not. That reading is EXACT

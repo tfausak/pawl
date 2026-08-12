@@ -113,7 +113,6 @@ import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SlotNameSpec
-import qualified Pawl.Codec.SourceRelationSpec
 import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.SubtypeFamilySpec
@@ -383,7 +382,6 @@ spec s registry = do
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
-  Pawl.Codec.SourceRelationSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
   Pawl.Codec.SubtypeFamilySpec.spec s
