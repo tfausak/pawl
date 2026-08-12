@@ -160,15 +160,18 @@ playerRefSlots ref = case ref of
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
 
--- The slots an ObjectRef reads. Only InSlot names one; the two sweeping arms are
--- swept at resolution and name nothing at cast, so a card whose only object
--- reference is a set declares no target spec and CR 608.2b has nothing to fizzle
--- (CR 115.10a).
+-- The slots an ObjectRef reads. Only InSlot names one directly; the two sweeping
+-- arms are swept at resolution and name nothing at cast, so a card whose only
+-- object reference is a set declares no target spec and CR 608.2b has nothing to
+-- fizzle (CR 115.10a). TopOfLibrary names no object slot either -- it reads a
+-- POSITION -- but the PlayerRef saying whose library may name a player slot, and
+-- that read is playerRefSlots' already.
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
+  ObjectRef.TopOfLibrary player -> playerRefSlots player
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -1463,6 +1466,22 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
   -- empty answer is what a slot holding a player already gives them.
   ObjectRef.EachPlayer -> []
+  -- CR 401.2's ordered pile, whose head Pawl.Engine.Game.insertIntoZone and
+  -- Pawl.Engine.Event.drawCard both already treat as the top (CR 121.1). At most
+  -- one card per library named, and NONE from an empty one -- `take 1` of an
+  -- empty list -- which is what makes "exile the top card of your library" with
+  -- nothing to exile a no-op rather than a failure.
+  --
+  -- Restricted to the players still in the turn order, and delivered in it, for
+  -- the reason the EachMatching arm sorts: CR 608.2f processes the batch at once
+  -- and CR 101.4 fixes the order any per-object question is then asked in. That
+  -- also drops a player CR 800.4 has taken out of the game, whose library
+  -- playerRefPlayers would otherwise still be able to name.
+  ObjectRef.TopOfLibrary player ->
+    let named = playerRefPlayers legal controller gs player
+     in concatMap
+          (\pid -> take 1 (Game.zoneMembers Zone.Library pid gs))
+          (filter (`elem` named) (Game.apnapOrder gs))
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
@@ -1552,6 +1571,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
     Just group -> fmap Recipient.ToObject (Foldable.toList group)
     Nothing -> legalMany slot legal
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  -- A card, so it arrives as Recipient.ToObject for EachMatching's reason: what
+  -- kind of object a library's top card is, is the OPCODE's question.
+  ObjectRef.TopOfLibrary _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient, and this is the arm
   -- objectRefObjects has nothing to say about. APNAP (CR 608.2f) for
   -- objectRefObjects' reason, and Game.apnapOrder is the turn order rotated to
@@ -2328,6 +2350,14 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- Players, and no card moves one to a zone. objectRefObjects' empty
             -- answer, so the move is a no-op rather than a rejected card.
             ObjectRef.EachPlayer -> pure []
+            -- Count on Luck's "exile the top card of your library", read from the
+            -- pre-move state exactly as the swept set above is: the batch is at
+            -- most one card per library, so nothing an earlier move of this same
+            -- resolution did can change which card is on top by the time this one
+            -- runs (CR 608.2c, CR 608.2f).
+            ObjectRef.TopOfLibrary _ -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
           Monad.mapM_ moveOne =<< settleArrivals zone placement targets
   -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
   -- this order and with the owner read before either:

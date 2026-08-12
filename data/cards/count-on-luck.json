@@ -1,0 +1,100 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Count on Luck",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": [
+                          [
+                            "TopOfLibrary",
+                            {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
+                          ],
+                          {
+                            "type": "Exile"
+                          },
+                          "exiled"
+                        ]
+                      },
+                      {
+                        "type": "GrantPlayFromExile",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "exiled"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
