@@ -98,6 +98,8 @@ data Prompt r where
   -- ChooseScry's payload and ChooseScry's look, with the FIRST list going to the
   -- player's GRAVEYARD rather than to the bottom of their library, in the order
   -- they are put there (so the first named ends up deepest, CR 404.1's pile).
+  -- That order is a real choice rather than a convention: CR 404.3 gives cards
+  -- put into one graveyard at once to their owner to arrange.
   --
   -- Its own constructor and not ChooseScry reused, by ChooseExilesFromGraveyard's
   -- argument: a responder that knows which prompt it is answering knows where the

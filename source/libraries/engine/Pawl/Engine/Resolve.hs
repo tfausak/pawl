@@ -645,8 +645,9 @@ searchesLibrary effect = case effect of
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
   Effect.Mill {} -> False
-  -- CR 701.22a looks at the top N, where CR 701.23a's search looks at ALL of a
-  -- zone; Panglacial Wurm's window is the latter's alone.
+  -- The three look-and-split actions look at the top N, where CR 701.23a's
+  -- search looks at ALL of a zone; Panglacial Wurm's window is the latter's
+  -- alone.
   Effect.Scry {} -> False
   Effect.Surveil {} -> False
   Effect.Fateseal {} -> False
@@ -4194,8 +4195,11 @@ splitLooked looked (away, kept) =
 --
 -- Half of it IS a zone change, unlike scry: the graveyard cards go through
 -- Event.changeZone so each mints a CR 400.7 incarnation, in the order the answer
--- named them, so the first named ends up deepest in the pile (CR 404.1). The
--- kept cards never leave the library and are written back by reorderLibrary.
+-- named them, so the first named ends up deepest in the pile (CR 404.1 puts each
+-- arrival on top). That order is the player's to pick and not the engine's,
+-- which is CR 404.3 -- cards put into one graveyard at once are arranged by
+-- their owner, who here is the surveilling player. The kept cards never leave
+-- the library and are written back by reorderLibrary.
 --
 -- The ELISION is scryOne's minus its one-card case: with a lone card that is the
 -- whole library, the graveyard and the top of the library are still two
@@ -4209,9 +4213,10 @@ surveilOne n pid = do
   Monad.unless (null looked) $ do
     answer <- Game.choose (Prompt.ChooseSurveil (Decide.deciderFor pid gs) pid looked)
     let (toGraveyard, onTop) = splitLooked looked answer
-    -- The library is rewritten FIRST, so the cards that stay are already in
-    -- their chosen order when the moves run and Event.changeZone's own library
-    -- bookkeeping has nothing left to disagree with.
+    -- Order-independent: Game.removeFromZones takes each mover out of the
+    -- library by identity rather than by position, so rewriting the kept order
+    -- before or after the moves lands the same board. Written first because the
+    -- kept cards are what this function decided.
     State.modify' (reorderLibrary pid (onTop <> beneath))
     Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard
 
@@ -4240,7 +4245,11 @@ fatesealOne source n pid = do
       answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor pid gs) pid source offered)
       pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
   Monad.forM_ victim $ \owner -> do
-    let whole = Game.zoneMembers Zone.Library owner gs
+    -- Re-read rather than reusing the state the opponent choice was made
+    -- against: nothing between the two asks moves a card, but a prompt is the
+    -- one place this function yields.
+    chosen <- State.get
+    let whole = Game.zoneMembers Zone.Library owner chosen
         looked = List.genericTake n whole
         beneath = List.genericDrop n whole
         decided = case looked of
@@ -4248,6 +4257,6 @@ fatesealOne source n pid = do
           [_] -> not (null beneath)
           _ -> True
     Monad.when decided $ do
-      answer <- Game.choose (Prompt.ChooseFateseal (Decide.deciderFor pid gs) pid owner looked)
+      answer <- Game.choose (Prompt.ChooseFateseal (Decide.deciderFor pid chosen) pid owner looked)
       let (toBottom, onTop) = splitLooked looked answer
       State.modify' (reorderLibrary owner (onTop <> beneath <> toBottom))
