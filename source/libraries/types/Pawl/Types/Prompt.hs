@@ -305,7 +305,13 @@ data Prompt r where
   -- 0); trample-ness is entirely in whether the defender is a key and what the
   -- thresholds are. Every threshold is 0 on the blocking side, CR 510.1d imposing
   -- no minimum. Not asked when the division is forced (one recipient, no excess).
-  -- Validation is Damage.legalAssignment. See the M2c spec, section 4.
+  --
+  -- A threshold is the recipient's own bar, and clearing it is a question about
+  -- the whole combat damage step rather than about this answer (CR 702.19b's and
+  -- CR 702.19c's last sentences), so an answer under a threshold can still be
+  -- legal when another creature covers the rest. Validation is
+  -- Damage.wellFormedAssignment, then Damage.tiersCleared over every attacking
+  -- creature's answer at once. See the M2c spec, section 4.
   AssignCombatDamage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map Recipient.Recipient Natural.Natural -> Natural.Natural -> Prompt (Map.Map Recipient.Recipient Natural.Natural)
   -- | CR 601.2c. Per named slot of the spell being cast (the ObjectId): HOW MANY
   -- targets it takes, and the legal recipients to take them from. The answer
