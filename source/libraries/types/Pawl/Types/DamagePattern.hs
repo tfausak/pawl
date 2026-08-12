@@ -18,11 +18,12 @@ import qualified Pawl.Types.Recipient as Recipient
 -- trivial predicate, so a pattern that says nothing about the source needs no
 -- "any source" arm -- ZoneChangePattern.whatObject's shape, for its reason.
 --
--- CR 614.15's "this way" rides the same Filter as `Filter.IsSource`, the atom
--- that asks whether the candidate IS the evaluation's source object: Galvanic
--- Blast's metalcraft clause replaces the damage its own resolution deals and
--- nothing else. A separate identity enum beside the Filter would be a second
--- spelling of one relation (#163).
+-- CR 614.15's "this way" is spelled in that same Filter as `Filter.IsSource`,
+-- the atom asking whether the candidate IS the evaluation's source object:
+-- Galvanic Blast's metalcraft clause replaces the damage its own resolution
+-- deals and nothing else. An identity enum beside the Filter would be a second
+-- spelling of one relation (#163). The candidate is the damage's SOURCE rather
+-- than the event's subject, which is what gives the atom something to compare.
 --
 -- `whichRecipient` is the permanent or player a prevention shield covers -- CR
 -- 615.7's, and CR 615.3's unbounded one -- and Nothing means EVERY recipient

@@ -1292,7 +1292,7 @@ excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
 -- amount, no choice made at creation, so it isolates that one axis.
 --
 -- THE VACUITY TRAP is that "prevented" and "prevents everything" leave the same
--- board when every source on it matches, so bob's three attackers are a Bog
+-- board when every source on it matches, so bob's three creatures are a Bog
 -- Wraith (black), a Goblin Piker (red) and a War Mammoth (green), and all three
 -- deal damage in ONE batch. The amounts are 4, 2 and 3 -- distinct, so every
 -- reading of the card lands alice on a different life total: 20 - 3 = 17 is the
@@ -1325,7 +1325,7 @@ luminesceSpec s registry = Spec.describe s "Luminesce (CR 615.1, CR 609.7b)" $ d
       Spec.assertEqWith s "setup: alice starts on 20" (S.lifeOf S.alice shielded) (Just 20)
       Spec.assertEqWith s "only the War Mammoth's event happened" (amounts after) [3]
       Spec.assertEqWith s "so alice loses 3 and no more" (S.lifeOf S.alice after) (Just 17)
-      Spec.assertEqWith s "and the shield is not spent by preventing (CR 615.1)" (length (GameState.replacements after)) 1
+      Spec.assertEqWith s "and it lasts the turn rather than being used up (CR 615.3)" (length (GameState.replacements after)) 1
   -- CR 609.7b's RECHECK, which is what makes this a filter rather than a list of
   -- objects captured when the shield was made: the Piker's damage is prevented
   -- while it is red and dealt in full once it is not. One board, one shield, and
