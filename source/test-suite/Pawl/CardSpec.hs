@@ -570,8 +570,9 @@ effectCounts effect = case effect of
   Effect.ExchangeLifeTotals _ -> []
   Effect.IncreaseSpeed _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
-  -- No Quantity and no embedded card: the copied permanent supplies both.
-  Effect.CreateCopy _ -> []
+  -- No embedded card -- the copied permanent supplies the text -- but the count
+  -- is card data like Create's.
+  Effect.CreateCopy quantity _ -> quantityCounts quantity
   -- The Condition is Galvanic Blast's "if you control three or more
   -- artifacts", and its Counts are as much card data as a Duration's.
   Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
@@ -818,7 +819,7 @@ effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.Replace
 effectReplacements effect = case effect of
   Effect.Replace _ _ _ _ replacement -> [replacement]
   Effect.Create _ token _ _ -> overFaces cardReplacementEffects token
-  Effect.CreateCopy _ -> []
+  Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
   Effect.DealDamage _ _ -> []
   Effect.ModifyTarget {} -> []
@@ -1320,7 +1321,7 @@ effectMintedFaces :: Effect.Effect Card.Type.Card -> [Face.Face Card.Type.Card]
 effectMintedFaces effect = case effect of
   Effect.Create _ token _ _ -> NonEmpty.toList (Card.Type.faces token)
   -- Mints no face of its own: the token's text is the copied permanent's.
-  Effect.CreateCopy _ -> []
+  Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> NonEmpty.toList (Card.Type.faces emblem)
   Effect.Replace {} -> []
   Effect.DealDamage _ _ -> []
@@ -2290,8 +2291,9 @@ effectFilters effect = case effect of
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
   Effect.Create quantity card riders _ -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
-  -- An EachMatching ref's Filter is card text like RequireBlock's below.
-  Effect.CreateCopy ref -> unframed (objectRefFilters ref)
+  -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
+  -- count's Filters are as much card text as Create's.
+  Effect.CreateCopy quantity ref -> unframed (quantityFilters quantity <> objectRefFilters ref)
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped

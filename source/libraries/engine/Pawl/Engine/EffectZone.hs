@@ -76,7 +76,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.ExchangeLifeTotals _ -> Nothing
   Effect.IncreaseSpeed {} -> Nothing
   Effect.Create {} -> Nothing
-  Effect.CreateCopy _ -> Nothing
+  Effect.CreateCopy {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
   -- CR 615.5's rider is not descended into, and the answer stands: the rider

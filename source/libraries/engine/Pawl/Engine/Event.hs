@@ -515,8 +515,9 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --
 -- A simultaneously-entering sibling can reach a later token's entry loop through
 -- three channels; only the first needs this explicit exclusion:
---   1. Copy targets -- excluded by `batch`. IMPLEMENTED BUT UNTESTED: no card in
---      the pool puts two copy-choosers onto the battlefield at once (#73).
+--   1. Copy targets -- excluded by `batch`. Kicked Rite of Replication on a Clone
+--      is the board that observes it: five token Clones enter at once, and
+--      Pawl.CopySpec's "none may copy a sibling" fails without this exclusion.
 --   2. Candidate collection -- unreachable regardless of `batch`, though no
 --      longer impossible by construction. Every entry replacement a PERMANENT
 --      carries in this pool is CR 614.1c's self-only `IsSource` (Clone, Primal
@@ -2533,9 +2534,11 @@ sacrifice pid oid = do
 -- simultaneously-entering siblings from any copy choice (CR 614.12a; see
 -- applyReplacementsIn for why 614.12a and not 614.13a).
 --
--- That nesting is design intent no test exercises: every token card in the pool
--- has empty `replacementEffects`, so each entry loop returns immediately. CR
--- 616.1g's own worked example needs a token WITH an entry replacement (#73).
+-- A token whose text is GIVEN has empty `replacementEffects`, so its entry loop
+-- returns immediately; a token copy of a Clone carries the copied permanent's own
+-- `EntryR AsCopy`, which is CR 616.1g's worked example and what makes the nesting
+-- observable. Pawl.CopySpec's "none may copy a sibling" is the proof: deleting
+-- the loop below leaves five 0/0 Clones for CR 704.5f to bury.
 --
 -- CR 800.4b / 800.4d: no token is created for a player who has left the game. The
 -- two sentences coincide by CR 111.2, which makes a token's owner and controller

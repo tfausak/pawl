@@ -5,12 +5,14 @@
 -- from inside Pawl.Engine.Event's changeZone) and its CR 707.9 exceptions
 -- (Replacement.applyCopyExceptions, Quicksilver Gargantuan), the P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
--- Counterpart and Watchful Radstag). Gameplay-level: Clone enters via the
+-- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
+-- count buys, kicked Rite of Replication). Gameplay-level: Clone enters via the
 -- zone-change funnel, the Counterpart is cast and resolved and the Radstag
 -- evolves, and their projected characteristics are asserted.
 module Pawl.CopySpec where
 
 import qualified Data.List as List
+import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
@@ -28,6 +30,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Modification as Modification
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -35,6 +38,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -118,6 +122,27 @@ settle answer gs = snd (Engine.runGamePure answer gs Engine.settleForPriority)
 resolveAndSettle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
 resolveAndSettle answer gs =
   snd (Engine.runGamePure answer gs (Stack.resolveTop >> Engine.settleForPriority))
+
+-- Rite of Replication {2}{U}{U} Sorcery: "Kicker {5} ... Create a token that's a
+-- copy of target creature. If this spell was kicked, create five of those tokens
+-- instead" -- two clauses on Quantity.WasKicked, the kicked one carrying a count
+-- of five (data/cards/rite-of-replication.json).
+--
+-- Answers CR 702.33a's kicker question with `decision` and aims the one target
+-- slot at `victim` -- PINNED to that id rather than searched for, so a mutation
+-- cannot be repaired by an answerer that finds another legal target. Every
+-- as-enters copy choice a minted token then makes goes to copyNewest.
+rites :: KickerDecision.KickerDecision -> ObjectId -> Prompt.Prompt r -> r
+rites decision victim p = case p of
+  Prompt.ChooseKicker {} -> decision
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
+  _ -> copyNewest p
+
+-- What each token on the battlefield IS -- its name and its projected P/T --
+-- rather than how many there are. A batch that minted the right NUMBER of the
+-- wrong things fails on this where a length check would not.
+mintedTokens :: GameState.GameState -> [(CardName.CardName, Maybe (Integer, Integer))]
+mintedTokens gs = fmap (\oid -> (PC.name (Projection.project oid gs), S.powerToughnessOf oid gs)) (tokensOnBattlefield gs)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
@@ -415,3 +440,52 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the token is a Radstag all the same" (PC.name (Projection.project tokenId after)) $ CardName.MkCardName (Text.pack "Watchful Radstag")
         Spec.assertEqWith s "at its copiable 2/2, not the -2/-2 it died at" (S.powerToughnessOf tokenId after) $ Just (2, 2)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- CR 707.1's count. Nine Islands is the KICKED cost ({2}{U}{U} plus {5}), and
+  -- the kicked test that follows is the same board, the same answerer and the
+  -- same pinned target but for the one kicker answer -- so the count is the only
+  -- thing the two boards disagree about.
+  Spec.it s "unkicked Rite of Replication mints one token copy (CR 707.1)" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rite <- S.printingOf s registry "Rite of Replication"
+    let (pikerId, board) = S.addCreature piker S.alice (S.landsInPlay island 9)
+        resolved = castAndResolve (rites KickerDecision.Declines pikerId) rite board
+    Spec.assertEqWith s "one token, and it is the Piker" (mintedTokens resolved) [(CardName.MkCardName (Text.pack "Goblin Piker"), Just (2, 1))]
+
+  Spec.it s "kicked Rite of Replication mints five instead (CR 702.33d, CR 707.1)" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rite <- S.printingOf s registry "Rite of Replication"
+    let (pikerId, board) = S.addCreature piker S.alice (S.landsInPlay island 9)
+        resolved = castAndResolve (rites KickerDecision.Kicks pikerId) rite board
+    Spec.assertEqWith s "five tokens, and every one of them is the Piker" (mintedTokens resolved) (replicate 5 (CardName.MkCardName (Text.pack "Goblin Piker"), Just (2, 1)))
+
+  -- THE PROVING TEST for CR 614.12's batch exclusion and for CR 616.1g's
+  -- containment. Five token Clones enter at ONE moment, each with its own
+  -- `EntryR AsCopy`, so each runs an entry loop that finds a real candidate --
+  -- and copyNewest names the highest-id legal creature, which is the Giant only
+  -- while the four siblings entering beside it are kept out of the offer.
+  --
+  -- Both mutations are visible here: dropping Event.createTokens' per-token
+  -- runEntry leaves five 0/0 Clones that CR 704.5f buries, and dropping
+  -- Replacement.legalCopyTargets' batch exclusion has a token name a sibling
+  -- that has not copied anything yet and become a 0/0 in its turn.
+  Spec.it s "five token Clones enter at once, each choosing, and none may copy a sibling (CR 614.12, CR 616.1g)" $ do
+    island <- S.printingOf s registry "Island"
+    clone <- S.printingOf s registry "Clone"
+    giant <- S.printingOf s registry "Hill Giant"
+    rite <- S.printingOf s registry "Rite of Replication"
+    let (cloneId, board0) = S.addCreature clone S.alice (S.landsInPlay island 9)
+        -- A +1/+1 counter is what keeps a Clone that copied NOTHING alive past
+        -- CR 704.5f, and so leaves an `EntryR AsCopy` on the battlefield for the
+        -- Rite to copy. Counters are not copiable (CR 707.2), so each token is a
+        -- printed 0/0 Clone carrying the copy ability rather than a 1/1.
+        board1 = S.addCounter CounterKind.PlusOnePlusOne 1 cloneId board0
+        -- Added AFTER the Clone, so it is the highest-id creature already on the
+        -- battlefield and copyNewest names it -- unless a sibling token, minted
+        -- later still, is wrongly offered.
+        (_, board) = S.addCreature giant S.bob board1
+        resolved = castAndResolve (rites KickerDecision.Kicks cloneId) rite board
+    Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (CardName.MkCardName (Text.pack "Hill Giant"), Just (3, 3)))
+    Spec.assertEqWith s "the copied Clone itself still copied nothing" (S.powerToughnessOf cloneId resolved) (Just (1, 1))
