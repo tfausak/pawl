@@ -217,7 +217,10 @@ slotsOf effect = case effect of
     joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (Projection.quantitiesOf modification)), durationSlots duration]
   Effect.ChangeText _ _ slot -> oneSlot slot
   Effect.AddMana _ -> Map.empty
-  Effect.Search ref quantity _ _ -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  -- BOTH refs: Extract's library owner is the slot it targets, and a slot read
+  -- only by that ref would otherwise look dangling to the dataflow lint.
+  Effect.Search searcher owner quantity _ _ ->
+    joinSlots [playerRefSlots searcher, playerRefSlots owner, quantitySlots quantity]
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
   Effect.TemptWithTheRing -> Map.empty
@@ -439,7 +442,7 @@ slotsAreExhaustive effect = case effect of
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
   Effect.AddMana _ -> True
-  Effect.Search _ quantity _ _ -> Quantity.slotsAreExhaustive quantity
+  Effect.Search _ _ quantity _ _ -> Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.TemptWithTheRing -> True
@@ -562,7 +565,7 @@ readsX = any effectReadsX
       Effect.ModifyTarget _ modification _ -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
-      Effect.Search _ quantity _ _ -> Quantity.readsX quantity
+      Effect.Search _ _ quantity _ _ -> Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       Effect.TemptWithTheRing -> False
@@ -628,8 +631,8 @@ readsX = any effectReadsX
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
--- Search searches the library of whoever its PlayerRef names, whatever its
--- count; every other effect searches none.
+-- Search reads the library of whoever its SECOND PlayerRef names, whatever its
+-- count; every other effect reads none.
 searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
   Effect.Search {} -> True
@@ -2097,7 +2100,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- Cost.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
-  Effect.Search ref quantity filter_ destination ->
+  Effect.Search searcherRef ownerRef quantity filter_ destination ->
     -- CR 701.23a: match each library card through the PRINTED-card view -- a card
     -- in a library has no projection. Its power is CR 208.2a's exception, which
     -- is why the view is Projection.viewOfCardIn: Imperial Recruiter's "creature
@@ -2110,35 +2113,42 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           Just face -> Filter.matches searchContext (Projection.viewOfCardIn g oid face) filter_
      in do
           gs0 <- State.get
-          -- Whoever the PlayerRef names searches -- the controller for Evolving
-          -- Wilds' `Relative You`, the targeted player for Fertilid's Favor's
-          -- `InSlot`. Each searches THEIR OWN library (#1317): the library read
-          -- below, the player prompted, the player offered CR 601.3's cast and
-          -- the player who shuffles are all this one seat, never `controller`.
+          -- Whoever the first PlayerRef names searches -- the controller for
+          -- Evolving Wilds' and Extract's `Relative You`, the targeted player for
+          -- Fertilid's Favor's `InSlot`. Whoever the second names owns the library
+          -- read: the same seat for the first two cards, the TARGET for Extract's
+          -- "target player's library". The searcher is prompted and offered CR
+          -- 601.3's cast; the owner's library is read and shuffled. Neither is
+          -- `controller` except where a ref says so.
           --
           -- CR 701.23i supplies the order, as CR 121.2c does for Draw, and the
           -- intersection with apnapOrder is that arm's: apnapOrder supplies the
-          -- ORDER and the ref the MEMBERSHIP.
+          -- ORDER and the ref the MEMBERSHIP. The owners are ordered the same way,
+          -- so a search naming several of either is at least deterministic.
           --
           -- Not implemented: rule 701.23i's SIMULTANEOUS look, each searcher
           -- seeing the libraries before any of them decides. This loop lets each
           -- searcher finish before the next begins, which is the same game for
           -- the one-player refs the pool uses and not for a several-player one
-          -- (#1319).
-          let named = playerRefPlayers legal controller gs0 ref
-              searchers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
-              -- The MOST this search may find (CR 701.23a): Explosive Vegetation's
-              -- "up to two" is Literal 2 and Rampant Growth's "a basic land card"
-              -- is Literal 1. Evaluated ONCE, before the loop -- one instruction
-              -- names one count, so several searchers each search for that many
-              -- rather than for a number re-read per seat.
+          -- (#1319). A ref naming several OWNERS is the same gap read down the
+          -- other axis, and the pool has no such card either.
+          let inApnapOrder r =
+                let named = playerRefPlayers legal controller gs0 r
+                 in filter (\pid -> List.elem pid named) (Game.apnapOrder gs0)
+              searchers = inApnapOrder searcherRef
+              owners = inApnapOrder ownerRef
+              -- How many cards this search may find (CR 701.23a): Explosive
+              -- Vegetation's "up to two" is Literal 2 and Rampant Growth's "a basic
+              -- land card" is Literal 1. Evaluated ONCE, before the loop -- one
+              -- instruction names one count, so several searchers each search for
+              -- that many rather than for a number re-read per seat.
               --
               -- An unevaluable quantity and a non-positive one both come out as 0,
               -- the posture Draw and Mill take, and 0 finds nothing.
               cap = case Quantity.evaluateFor (Projection.viewWithLastKnown source gs0) (effectContext controller source legal) gs0 resolving source quantity of
                 Just n | n > 0 -> Integer.toNaturalSaturating n
                 _ -> 0
-          Monad.forM_ searchers $ \searcher -> do
+          Monad.forM_ searchers $ \searcher -> Monad.forM_ owners $ \owner -> do
             -- CR 101.2 / Leonin Arbiter: a player who can't search libraries does
             -- not, and finds nothing. Asked BEFORE CR 601.3's offer below, because
             -- that offer is made WHILE SEARCHING and this player never begins to.
@@ -2171,33 +2181,45 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                   --     Source.OfAbility arm alone, so a searching SPELL was never
                   --     offered the cast at all;
                   --   * the Wurm's own words are "while you're searching your
-                  --     library", so the offer goes to the SEARCHER and reads the
-                  --     library they are searching -- which is the one they own,
-                  --     by the opcode's shape.
-                  Cast.castWhileSearching searcher
+                  --     library", so the offer goes to the SEARCHER and is made
+                  --     only when the library being searched is the searcher's
+                  --     OWN. Extract's controller searching someone else's
+                  --     library is not searching theirs, and neither is the owner
+                  --     of the library being read, who is not searching at all.
+                  Monad.when (searcher == owner) (Cast.castWhileSearching searcher)
                   gs <- State.get
-                  let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library searcher gs)
+                  let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library owner gs)
                       decider = Decide.deciderFor searcher gs
                   answer <- Game.choose (Prompt.SearchLibrary decider searcher matches cap)
                   -- CR 701.23a: every card found is one the search's own filter
                   -- admits. Filtered, not trusted (#222): naming a card the filter
                   -- excluded, or one that is not in the library at all, finds
-                  -- nothing rather than fetching it. CR 701.23b makes that a legal
-                  -- outcome in its own right -- "that player isn't required to
-                  -- find some or all of those cards even if they're present" -- so
-                  -- rejecting needs no new branch downstream.
+                  -- nothing rather than fetching it.
                   --
                   -- Deduplicated as well as filtered, for ChooseDiscard's reason:
                   -- the answer is a LIST, and one card named twice would otherwise
-                  -- be fetched twice off a single library card.
+                  -- be fetched twice off a single library card. TRUNCATED too: an
+                  -- answer longer than the count is out of the count's range and
+                  -- its tail is dropped.
                   --
-                  -- FILTERED-AND-TRUNCATED, never completed -- the opposite of
-                  -- Effect.Discard's posture below, and CR 701.23b is the whole
-                  -- difference: finding fewer than the count is already a legal
-                  -- answer here, so an omission needs no filler, while an answer
-                  -- LONGER than the count is out of the count's range and its tail
-                  -- is dropped.
-                  pure . List.genericTake cap . List.nub $ filter (\oid -> List.elem oid matches) answer
+                  -- What a SHORT answer leaves is the difference between CR 701.23b
+                  -- and CR 701.23d, and Filter.statesAQuality is which rule this
+                  -- search is under. Stating a quality, it may find "some or all of
+                  -- those cards even if they're present" -- down to none -- so the
+                  -- omission is honoured and needs no filler. Searching for a bare
+                  -- quantity, Extract's "a card", it must find that many or as many
+                  -- as the library holds, so the answer is COMPLETED from the
+                  -- remaining matches: Effect.Discard's posture below, for the same
+                  -- reason -- the rule leaves the player no way to decline, so a
+                  -- declining answer cannot be obeyed. `filler` is disjoint from
+                  -- `picked` and both are drawn from `matches`, so the take yields
+                  -- the cap or the whole of what matched, whichever is smaller.
+                  let picked = List.genericTake cap . List.nub $ filter (\oid -> List.elem oid matches) answer
+                      filler = filter (\oid -> List.notElem oid picked) matches
+                  pure $
+                    if Filter.statesAQuality filter_
+                      then picked
+                      else List.genericTake cap (picked <> filler)
             -- Where the cards go is the CARD's instruction, not rule 701.23's --
             -- that rule says only how to look, and CR 701.23e says the same of the
             -- reveal ("if the effect that contains the search instruction doesn't
@@ -2215,12 +2237,13 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- instruction, not rule 701.23's -- as just above, that rule says only
             -- how to look. CR 701.23h and CR 701.24b both describe the
             -- shuffle as something an effect instructs, never as part of a
-            -- search. Fertilid's Favor's "then shuffles" names the searcher, and
-            -- every other shuffling search in the pool says "your library" of the
-            -- same seat.
-            lib <- State.gets (Game.zoneMembers Zone.Library searcher)
+            -- search. The library shuffled is the one that was READ, so this seat
+            -- is the owner: Extract's "then that player shuffles" names its
+            -- target, and every other shuffling search in the pool says "your
+            -- library" of a seat that searches its own.
+            lib <- State.gets (Game.zoneMembers Zone.Library owner)
             shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
-            State.modify' (reorderLibrary searcher (Game.honourShuffle lib shuffleAnswer))
+            State.modify' (reorderLibrary owner (Game.honourShuffle lib shuffleAnswer))
   -- Rest in Peace's ETB: exile every card in every graveyard (CR 400.7 each move
   -- funnels through changeZone). A graveyard->exile move matches no M3f
   -- replacement or trigger, so no cascade.

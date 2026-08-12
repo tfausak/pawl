@@ -33,6 +33,12 @@
                         }
                       },
                       {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
                         "type": "Literal",
                         "value": 2
                       },

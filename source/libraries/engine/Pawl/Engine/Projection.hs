@@ -1502,7 +1502,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ChangeText family forbidden slot ->
     Effect.ChangeText family (Set.map (swapWordIn family pairs) forbidden) slot
   Effect.AddMana _ -> effect
-  Effect.Search ref quantity filter_ destination -> Effect.Search ref quantity (Filter.rewrite pairs filter_) destination
+  Effect.Search searcher owner quantity filter_ destination -> Effect.Search searcher owner quantity (Filter.rewrite pairs filter_) destination
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.TemptWithTheRing -> effect

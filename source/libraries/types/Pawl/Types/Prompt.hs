@@ -400,15 +400,17 @@ data Prompt r where
   -- written to Object.chosenSubtype on the entering permanent.
   ChooseBasicLandType :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt Subtype.Subtype
   -- | CR 701.23 / 701.23b: the [ObjectId] is the library cards MATCHING the
-  -- criterion (the engine pre-filters to legal choices); the empty answer is
-  -- "fail to find," always permitted for a search of one's own library for a
-  -- quality.
+  -- criterion (the engine pre-filters to legal choices), and the PlayerId is the
+  -- player SEARCHING, who need not own the library the cards came from --
+  -- Extract's controller searches its target's.
   --
-  -- The Natural is the MOST cards this search may find -- Explosive Vegetation's
-  -- "up to two" -- and answering with fewer is legal on every search pawl has,
-  -- since all of them state a quality (CR 701.23b's "some or all"). A LIST
-  -- rather than a Maybe and a repeated prompt: CR 701.23a's find is one look at
-  -- the whole zone, so the searcher names the whole set at once.
+  -- The Natural is how many cards this search may find -- Explosive Vegetation's
+  -- "up to two". Answering with fewer is legal for a search stating a quality (CR
+  -- 701.23b's "some or all"), and the empty answer is that search's "fail to
+  -- find"; a search for a bare quantity is under CR 701.23d instead, and
+  -- Pawl.Engine.Resolve completes a short answer there rather than honouring it.
+  -- A LIST rather than a Maybe and a repeated prompt: CR 701.23a's find is one
+  -- look at the whole zone, so the searcher names the whole set at once.
   SearchLibrary :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 608.2g: the re-entrant cast opportunity during a library search (Panglacial
   -- Wurm) -- an effect that "specifically instructs or allows a player to cast a

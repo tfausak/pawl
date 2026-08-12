@@ -315,12 +315,11 @@ data PlayerEffect
     -- object -- which is why it sits here rather than in
     -- Pawl.Types.Modification.
     --
-    -- WHICH library is not carried. Leonin Arbiter's sentence names none, and CR
-    -- 101.2 needs no help from a narrowing to stop the searches pawl can perform:
-    -- every Effect.Search is a player searching their OWN library (#1317), so the
-    -- searcher this prohibition names and the library it stops are the same seat.
-    -- A card that prohibited searching only some libraries would want a filter
-    -- here.
+    -- WHICH library is not carried, and Leonin Arbiter's sentence names none
+    -- either: it stops the player from searching, whoever owns the library, which
+    -- is exactly what an unqualified prohibition on the SEARCHER does. A card
+    -- that prohibited searching only some libraries would want a filter here
+    -- (#1269).
     --
     -- WHOSE searching is the carrier's PlayerScope, as for every arm here:
     -- Leonin Arbiter says "players" with no possessive, so EachPlayer.
