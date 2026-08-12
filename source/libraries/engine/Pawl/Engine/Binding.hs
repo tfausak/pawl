@@ -473,6 +473,16 @@ targetsOf = Map.filter (not . Set.null) . Map.mapMaybe Binding.targets
 objectSlots :: Map SlotName Binding -> Map SlotName ObjectId
 objectSlots = Map.mapMaybe (Recipient.objectOf Monad.<=< onlyOne) . targetsOf
 
+-- The PLAYERS a binding environment names, one slot at a time: objectSlots' twin
+-- on the other kind of Recipient, and what Pawl.Engine.Filter.bakeBound
+-- substitutes into a target slot's CR 603.2 "that player" atom.
+--
+-- No CR 608.2b legality filter, objectSlots' reason unchanged and sharper here:
+-- the slot this is read for is `triggerPlayer`, which the EVENT bound and which
+-- was never a target to become illegal.
+playerSlots :: Map SlotName Binding -> Map SlotName PlayerId
+playerSlots = Map.mapMaybe (Recipient.playerOf Monad.<=< onlyOne) . targetsOf
+
 -- The ONE recipient a slot names, or Nothing when it names none or several. What
 -- every reader that can point at one object and no more asks of a slot -- CR
 -- 601.2c lets a slot hold several, and a reader that cannot take them must not

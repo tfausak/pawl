@@ -39,3 +39,15 @@ objectOf r = case r of
   ToBattle oid -> Just oid
   ToObject oid -> Just oid
   ToPlayer _ -> Nothing
+
+-- | The player a recipient names, if any -- 'objectOf''s mirror, Nothing for
+-- every object arm. Read by Pawl.Engine.Binding.playerSlots for CR 603.2's
+-- "that player", and exhaustive for objectOf's reason: a new arm must break this
+-- build rather than answer Nothing by default.
+playerOf :: Recipient -> Maybe PlayerId.PlayerId
+playerOf r = case r of
+  ToPlayer pid -> Just pid
+  ToCreature _ -> Nothing
+  ToPlaneswalker _ -> Nothing
+  ToBattle _ -> Nothing
+  ToObject _ -> Nothing

@@ -13,6 +13,12 @@ Copy `cabal.project.local` in from the primary checkout. A fresh worktree does
 not have it, so `+pedantic` and `-Werror` are off and a locally green build
 says nothing about CI.
 
+Run that `cp` as a BARE command of its own, and confirm the file is there before
+the first build. The worktree-isolation guard refuses a compound command
+wholesale, and its error names the other half --- one run read the refusal as
+being about the `git` it was chained with, and every build and mutation in it
+silently ran unpedantic until CI caught it.
+
 ## Running the suite
 
     cabal test --test-options '--timeout 2s --hide-successes'
@@ -58,6 +64,12 @@ say:
   positive and the negative share mana, seats, timing and stock; the single
   difference is the thing under test. A negative assembled on its own board
   passes for reasons you did not choose.
+
+- **Keep the mutated binding referenced.** Deleting a use rather than changing
+  an answer makes `-Werror` reject the source on `-Wunused-local-binds`, so the
+  suite never runs and a real red comes back as a build failure. Neutralize the
+  value instead --- `const Map.empty . f`, a `filter (const False)`, a `seq` ---
+  so every binding still has a use.
 
 - **Report a mutation you could not run.** If a behaviour holds by construction
   rather than by a guard you wrote, or `-Werror` rejects the mutated source so

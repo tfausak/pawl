@@ -2,6 +2,7 @@
 
 module Pawl.Codec.FilterSpec where
 
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -14,7 +15,9 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -98,6 +101,20 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.ControlledByDefendingPlayer
       """ {"type":"ControlledByDefendingPlayer"} """
+  Spec.it s "ControlledByBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.ControlledByBound (SlotName.MkSlotName (Text.pack "thatPlayer")))
+      """ {"type":"ControlledByBound","value":"thatPlayer"} """
+  -- Runtime-only (Pawl.CardSpec lints it out of the pool), but round-tripped
+  -- here for the reason its codec arm exists at all: the codec is total.
+  Spec.it s "ControlledByPlayer" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.ControlledByPlayer (PlayerId.MkPlayerId 1))
+      """ {"type":"ControlledByPlayer","value":1} """
   Spec.it s "ManaValueAtMost" $
     Common.assertCodec
       s

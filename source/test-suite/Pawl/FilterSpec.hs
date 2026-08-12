@@ -3,6 +3,7 @@ module Pawl.FilterSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
@@ -19,6 +20,7 @@ import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -300,6 +302,53 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches (defended 0) noController Filter.Type.ControlledByDefendingPlayer)) "no candidate controller"
       Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ControlledByDefendingPlayer)) "no defending player"
 
+  -- CR 603.2's "that player controls", the pair a trigger's binding is baked
+  -- through. blackCreature is controlled by player 0 and owned by player 1, so a
+  -- reading off the wrong field disagrees with both arms below.
+  Spec.describe s "ControlledByBound and ControlledByPlayer" $ do
+    let slot = SlotName.MkSlotName (Text.pack "thatPlayer")
+        player = PlayerId.MkPlayerId
+    Spec.it s "the baked atom compares the candidate's controller" $ do
+      Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.ControlledByPlayer (player 0))) "controller is player 0"
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.ControlledByPlayer (player 1)))) "the owner is not the controller"
+
+    -- Perspective-free, which is the whole point of baking a player in: the same
+    -- answer under a context that names nobody.
+    Spec.it s "the baked atom needs no perspective" $
+      Spec.assertBool s (Filter.matches noPerspective blackCreature (Filter.Type.ControlledByPlayer (player 0))) "no perspective needed"
+
+    Spec.it s "the baked atom is False for a player and for a candidate with no controller" $ do
+      let noController = blackCreature {Filter.controller = Nothing}
+      Spec.assertBool s (not (Filter.matches self noController (Filter.Type.ControlledByPlayer (player 0)))) "no candidate controller"
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.ControlledByPlayer (player 0)))) "player"
+
+    -- UNBAKED is False, always: the substitution happens where the bindings are,
+    -- so an atom that survives to a match named a slot nothing bound.
+    Spec.it s "the unbaked atom admits nothing" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.ControlledByBound slot))) "unbaked"
+      Spec.assertBool s (not (Filter.matches noPerspective blackCreature (Filter.Type.ControlledByBound slot))) "unbaked, no perspective"
+
+    -- bakeBound is what turns the first into the second, under every combinator
+    -- -- an implementation that looked only at the top of a Filter would leave
+    -- this one standing -- and it leaves a slot the environment does not name
+    -- alone rather than guessing.
+    Spec.it s "bakeBound substitutes the bound player, buried and at the top" $ do
+      let buried f = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not f]]
+          bound = Map.singleton slot (player 0)
+      Spec.assertEqWith
+        s
+        "the atom is replaced in place"
+        (Filter.bakeBound bound (buried (Filter.Type.ControlledByBound slot)))
+        (buried (Filter.Type.ControlledByPlayer (player 0)))
+      Spec.assertEqWith
+        s
+        "and left standing when the slot names nobody"
+        (Filter.bakeBound Map.empty (Filter.Type.ControlledByBound slot))
+        (Filter.Type.ControlledByBound slot)
+      Spec.assertBool
+        s
+        (Filter.matches self blackCreature (Filter.bakeBound bound (Filter.Type.ControlledByBound slot)))
+        "so the baked filter matches where the unbaked one did not"
   -- CR 202.3, a ceiling on a different characteristic: Ojutai's Command's
   -- "mana value 2 or less".
   Spec.it s "ManaValueAtMost compares the mana value" $ do

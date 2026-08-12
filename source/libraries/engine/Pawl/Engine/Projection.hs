@@ -2561,6 +2561,12 @@ filterReads f = case f of
   -- about any projection. Nothing in the pool puts this atom in an affected set
   -- either -- CR 702.39a writes it into a target slot.
   Filter.Type.ControlledByDefendingPlayer -> Set.singleton Controller
+  -- The same aspect again, and for the same reason both siblings above read it:
+  -- each compares the CANDIDATE's controller against a player the surrounding
+  -- frame supplies. Neither of these is in an affected set in the pool either --
+  -- CR 603.2's atom is written into a target slot.
+  Filter.Type.ControlledByBound _ -> Set.singleton Controller
+  Filter.Type.ControlledByPlayer _ -> Set.singleton Controller
   -- Reads NOTHING, where its sibling above reads Controller, and the contrast is
   -- CR 108.3's: no Modification writes Object.owner, because no rule changes an
   -- owner at all -- CR 613.1b's layer 2 moves control and rule 108.3 has no

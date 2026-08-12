@@ -441,6 +441,17 @@ matches context view predicate = case predicate of
   Filter.ControlledByDefendingPlayer -> case (controller view, defendingPlayer context) of
     (Just c, Just d) -> c == d
     _ -> False
+  -- CR 603.2's "that player controls", and False WHEREVER IT IS REACHED: `bakeBound`
+  -- below replaces the atom with the arm under it before either of CR 115's moments
+  -- judges the slot, so an atom that survives to here is one whose slot named no one
+  -- player. That is the vacuous posture every player-referencing atom takes, and it
+  -- is why this reads no Context field -- the substitution happens where the bindings
+  -- are, which is not here.
+  Filter.ControlledByBound _ -> False
+  -- The baked half: the candidate's controller IS this player, with no perspective
+  -- to relate it to. Vacuously False off an object, `controller` being Nothing for a
+  -- player view and for a card in a hidden zone (CR 108.4).
+  Filter.ControlledByPlayer pid -> controller view == Just pid
   -- CR 108.3 / 110.2: the same comparison ControlledBy makes, against the other
   -- player -- so Garland's "creatures you control but don't own" is the two atoms
   -- conjoined. Every other player is an Opponent by construction, for the reason
@@ -585,6 +596,10 @@ rewrite pairs predicate = case predicate of
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason.
   Filter.ControlledByDefendingPlayer -> predicate
+  -- Untouched for the same reason twice over: neither a slot name nor a player id
+  -- is a word CR 612.1's swap can find in the text.
+  Filter.ControlledByBound _ -> predicate
+  Filter.ControlledByPlayer _ -> predicate
   -- Untouched for ControlledBy's reason: CR 612.1 swaps a WORD in the text, and
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
@@ -808,3 +823,81 @@ rewriteComponent pairs component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.ExileThisFromGraveyard -> component
+
+-- CR 603.2: replace every ControlledByBound atom whose slot this environment
+-- names with the baked ControlledByPlayer arm. What makes "target creature THAT
+-- PLAYER controls" answerable at all -- the player is a fact about the EVENT that
+-- fired the trigger, and the two sites that judge a target slot
+-- (Pawl.Engine.Engine.placeBorne at CR 603.3d, Pawl.Engine.Resolve.resolveModes
+-- at CR 608.2b) are the ones holding it, so they substitute before the match
+-- rather than a Context field carrying the bindings into every match that will
+-- never ask.
+--
+-- The atom is LEFT STANDING when the slot names no one player, which is the
+-- honest answer rather than a defensive one: `matches` reads it as False, so a
+-- slot nothing bound admits no candidate, exactly as an absent perspective makes
+-- ControlledBy vacuous.
+--
+-- NO DESCENT INTO A KEYWORD, unlike `rewrite` above, and the difference is
+-- load-bearing: HasKeyword compares its keyword against the PROJECTION's keyword
+-- map by equality, so baking a player into a Filter one carries would produce a
+-- key the projection can never hold. There is no reading of a card under which a
+-- keyword's own criterion names a trigger's player anyway -- CR 702.14c's
+-- criterion is a land description.
+--
+-- Exhaustive rather than a catch-all, `rewrite`'s posture: a later atom that can
+-- carry a Filter must fail to compile here instead of silently keeping an
+-- unbaked one.
+bakeBound :: Map.Map SlotName.SlotName PlayerId.PlayerId -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
+bakeBound players predicate = case predicate of
+  Filter.ControlledByBound slot -> maybe predicate Filter.ControlledByPlayer (Map.lookup slot players)
+  Filter.And fs -> Filter.And (fmap (bakeBound players) fs)
+  Filter.Or fs -> Filter.Or (fmap (bakeBound players) fs)
+  Filter.Not f -> Filter.Not (bakeBound players f)
+  Filter.ControlledByPlayer _ -> predicate
+  Filter.HasCardType _ -> predicate
+  Filter.HasSupertype _ -> predicate
+  Filter.HasColor _ -> predicate
+  Filter.HasSubtype _ -> predicate
+  Filter.HasKeyword _ -> predicate
+  Filter.HasKeywordFamily _ -> predicate
+  Filter.PowerAtLeast _ -> predicate
+  Filter.PowerAtMost _ -> predicate
+  Filter.PowerLessThanSource -> predicate
+  Filter.PowerGreaterThanSource -> predicate
+  Filter.ManaValueAtMost _ -> predicate
+  Filter.ControlledBy _ -> predicate
+  Filter.ControlledByDefendingPlayer -> predicate
+  Filter.OwnedBy _ -> predicate
+  Filter.IsSource -> predicate
+  Filter.IsPlayer _ -> predicate
+  Filter.IsAttacking -> predicate
+  Filter.IsBlocking -> predicate
+  Filter.AttackedThisTurn -> predicate
+  Filter.IsAttachedToCreature -> predicate
+  Filter.IsAttachedToPermanent -> predicate
+  Filter.IsAttachedToSource -> predicate
+  Filter.CanHostSubject -> predicate
+  Filter.IsToken -> predicate
+  Filter.IsTapped -> predicate
+  Filter.IsRingBearer -> predicate
+  Filter.HasDesignation _ -> predicate
+  Filter.HasCounters _ -> predicate
+  Filter.HasNonManaActivatedAbility -> predicate
+
+-- The slots a Filter READS -- today exactly the ControlledByBound atoms in it.
+-- Pawl.Engine.Resolve.modeSlots folds this over a mode's target specs, which is
+-- what makes the card dataflow lint see a slot named in a FILTER rather than in
+-- an effect: a card reading "that player" under a condition that never binds one
+-- is then a failing test rather than a slot that silently admits nothing.
+--
+-- The same descent `bakeBound` makes, and deliberately so: a position that
+-- function does not bake is a position this one must not report as read, or the
+-- lint would bless an atom the engine can never answer.
+boundSlots :: Filter.Filter Keyword.Type.Keyword -> Set.Set SlotName.SlotName
+boundSlots predicate = case predicate of
+  Filter.ControlledByBound slot -> Set.singleton slot
+  Filter.And fs -> foldMap boundSlots fs
+  Filter.Or fs -> foldMap boundSlots fs
+  Filter.Not f -> boundSlots f
+  _ -> Set.empty
