@@ -85,6 +85,7 @@ encode p answer = case p of
   Prompt.ChooseBasicLandType {} -> Response.ChoseBasicLandType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
+  Prompt.OrderCostComponents {} -> Response.OrderedCostComponents answer
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
@@ -223,6 +224,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OrderDamage {} -> case response of
     Response.OrderedDamage order -> Just order
+    _ -> Nothing
+  Prompt.OrderCostComponents {} -> case response of
+    Response.OrderedCostComponents order -> Just order
     _ -> Nothing
   Prompt.ChooseReplacement {} -> case response of
     Response.ChoseReplacement n -> Just n
@@ -446,6 +450,9 @@ defaultAnswer p = case p of
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   -- CR 615.7: likewise, and it is the order the batch was gathered in.
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
+  -- CR 601.2h: likewise, and it is the cost's PRINTED order -- what pawl paid in
+  -- before the order became the payer's to choose.
+  Prompt.OrderCostComponents _ _ _ components -> zipWith const [0 ..] components
   -- CR 616.1: the bucket is non-empty when this is asked, so index 0 is legal.
   Prompt.ChooseReplacement {} -> 0
   -- CR 603.7c: every minted token is a legal thing for "it" to name.
