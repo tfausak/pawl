@@ -1334,16 +1334,17 @@ canPayComponent pid oid component gs = case component of
   -- ability resolves.
   CostComponent.PutPlusOneCountersOnThis _ -> Set.member oid (GameState.battlefield gs)
 
--- CR 601.2g then 601.2h: the mana window first, then the payment. Components are
--- paid in PRINTED order; CR 601.2h lets the player pay in any order, which is an
--- elision here (#105).
+-- CR 601.2g then 601.2h: the mana window first, then the payment. The order the
+-- components are paid in is the PAYER'S, and payComponents below is where it is
+-- asked for.
 --
--- That elision is OBSERVABLE, and this is where: paying one object-removing
--- component takes an object the next one could have used, so a payer who would
--- have ordered the two differently -- or answered the first prompt differently
--- -- can lose a payment `canPay` correctly called payable. The board never goes
--- illegal for it; the restore below makes an Unpaid payment a complete no-op, so
--- what is lost is the activation rather than the game state.
+-- A payment can still go Unpaid where `canPay` called the cost payable, and that
+-- is the player's own doing rather than the engine's: paying one object-removing
+-- component takes an object the next one could have used, so an order -- or an
+-- answer to the first component's own prompt -- that spends the wrong object
+-- loses the payment. The board never goes illegal for it; the restore below
+-- makes an Unpaid payment a complete no-op, so what is lost is the activation
+-- rather than the game state.
 --
 -- All or nothing (CR 601.2h: partial payments are not allowed). The entry state
 -- is captured and restored on any rejection, so an Unpaid result is a complete
@@ -1370,14 +1371,90 @@ pay pid oid cost = do
               State.put before
               pure Payment.Unpaid
 
+-- CR 601.2h: the parts are paid "in any order", and the ORDER IS THE PAYER'S --
+-- so this asks for it rather than fixing it. Which order is chosen is
+-- observable: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a Forest" beside
+-- one Bayou and one plain Swamp is payable, and a payer who spends the Bayou on
+-- the Swamp half loses it -- which paying the Forest half first denies them.
+--
+-- Asked ONCE for the whole cost rather than once per part. Nothing is lost:
+-- each component's own prompts are still issued as that component is paid, so a
+-- payer still chooses which Swamp to sacrifice knowing what the earlier parts
+-- took.
+--
+-- ONE pass, where CR 601.2h states two. The second pass takes the parts that
+-- involve a random element or move an object from a library to a public zone,
+-- and this vocabulary has none -- see `orderSensitive` below, whose exhaustive
+-- case is where a component that did would land.
+--
+-- FILTERED, NOT TRUSTED, payComponent's posture: Game.permute keeps the printed
+-- order for an answer that is not a permutation of the offered indices.
 payComponents :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
-payComponents pid oid components = case components of
+payComponents pid oid components =
+  if orderObservable components
+    then do
+      gs <- State.get
+      answer <- Game.choose (Prompt.OrderCostComponents (Decide.deciderFor pid gs) pid oid components)
+      payInOrder pid oid (Game.permute components answer)
+    else payInOrder pid oid components
+
+payInOrder :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
+payInOrder pid oid components = case components of
   [] -> pure Payment.Paid
   component : rest -> do
     outcome <- payComponent pid oid component
     case outcome of
       Payment.Unpaid -> pure Payment.Unpaid
-      Payment.Paid -> payComponents pid oid rest
+      Payment.Paid -> payInOrder pid oid rest
+
+-- CR 601.2h: can this cost's payer tell one order from another? Two conditions,
+-- and the prompt above is asked only when both hold.
+--
+-- TWO OR MORE parts that touch objects, `orderSensitive` below. A part that
+-- spends only a per-player scalar is inert with respect to every other part:
+-- nothing in this vocabulary reads a life total or an energy count, and CR
+-- 118.3's check totals what the whole cost spends of each (canPay's `lifeOwedBy`
+-- above), so no ordering of them pays where another fails.
+--
+-- And NOT ALL EQUAL, the elision Prompt.OrderTriggers' `interchangeable` makes
+-- for its own batch: equal parts draw on one pool for one count each, and each
+-- is asked its own choices when its turn comes, so every permutation of them
+-- offers the payer the same decisions. A FENCE rather than proven behaviour --
+-- no card in the pool prints two identical order-sensitive parts, so dropping
+-- this conjunct leaves the suite green.
+orderObservable :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Bool
+orderObservable components = case filter orderSensitive components of
+  first : rest@(_ : _) -> not (all (== first) rest)
+  _ -> False
+
+-- Can paying this part change what another part of the same cost can pay with?
+-- True for every part that moves an object out of a zone, taps or untaps one, or
+-- changes the counters on one -- a criterion reads tap state and counters (a
+-- Filter), and TapForTotalPower totals the power counters change.
+--
+-- False for the two per-player scalars, for `orderObservable`'s stated reason.
+--
+-- EXHAUSTIVE with no wildcard, `removalClaim`'s posture and for its reason: a new
+-- component has to answer here, and -Werror is what makes it. A component that
+-- involved a random element, or moved an object from a library to a public zone,
+-- would want CR 601.2h's second pass as well as an answer here.
+orderSensitive :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
+orderSensitive component = case component of
+  CostComponent.Sacrifice _ _ -> True
+  CostComponent.SacrificeThis -> True
+  CostComponent.DiscardCards _ -> True
+  CostComponent.DiscardThis -> True
+  CostComponent.ExileCardsFromGraveyard _ _ -> True
+  CostComponent.ExileTopFromGraveyard _ -> True
+  CostComponent.ExileThisFromGraveyard -> True
+  CostComponent.TapThis -> True
+  CostComponent.UntapThis -> True
+  CostComponent.TapForTotalPower _ _ -> True
+  CostComponent.AddLoyaltyToThis _ -> True
+  CostComponent.RemoveLoyaltyFromThis _ -> True
+  CostComponent.PutPlusOneCountersOnThis _ -> True
+  CostComponent.PayLife _ -> False
+  CostComponent.PayEnergy _ -> False
 
 -- CR 601.2g: if the total cost includes a mana payment, the player then has a
 -- chance to activate mana abilities. Reached from an ability too, by CR 602.2b.

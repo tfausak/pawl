@@ -19,6 +19,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
@@ -336,6 +337,14 @@ sacrificePromptCount responses =
         Response.ChoseSacrifices _ -> True
         _ -> False
    in length (filter isSacrifice responses)
+
+-- CR 601.2h: was the payer asked which order to pay a cost's parts in?
+wasAskedForOrder :: [Response.Response] -> Bool
+wasAskedForOrder responses =
+  let isOrder r = case r of
+        Response.OrderedCostComponents _ -> True
+        _ -> False
+   in any isOrder responses
 
 wasAskedToChooseCost :: [Response.Response] -> Bool
 wasAskedToChooseCost responses =
@@ -893,18 +902,37 @@ longtuskCubSpec s registry =
 -- that asks each half on its own says yes and a gate that asks them together
 -- says no. The Bayou is added first, so it sorts ahead of every extra and is
 -- what Replay.defaultAnswer picks out of a ChooseSacrifices.
-jaradBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+--
+-- Its id comes back so a case can PIN a sacrifice answer to it rather than
+-- letting an answerer search for whatever land is still legal (#105).
+jaradBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 jaradBoard jarad bayou extras =
   let add gs printing = snd (S.addCreature printing S.alice gs)
-      withExtras = List.foldl' add (S.landsInPlay bayou 1) extras
+      (bayouId, withBayou) = S.addCreature bayou S.alice (Setup.emptyGame S.bothPlayers)
+      withExtras = List.foldl' add withBayou extras
       (jaradId, withJarad) = S.addGraveyardCard jarad S.alice withExtras
-   in ( jaradId,
+   in ( bayouId,
+        jaradId,
         withJarad
           { GameState.phase = Phase.PrecombatMain,
             GameState.activePlayer = S.alice,
             GameState.priority = Just S.alice
           }
       )
+
+-- CR 601.2h: pay a cost's parts in `order`, and sacrifice `bayou` whenever asked
+-- to sacrifice anything.
+--
+-- PINNED, not searching: the sacrifice answer is the same set on every board, so
+-- an engine that pays the parts in some other order cannot be rescued by the
+-- answerer finding whichever land is still legal. An answer naming a permanent
+-- that is no longer a candidate is rejected by Cost.payComponent, which is
+-- exactly the failure the printed order runs into below.
+payingInOrder :: [Natural.Natural] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+payingInOrder order bayou p = case p of
+  Prompt.OrderCostComponents {} -> order
+  Prompt.ChooseSacrifices {} -> Set.singleton bayou
+  _ -> S.identityAnswer p
 
 -- The names of alice's objects in one zone, sorted. CR 400.7 mints a fresh id
 -- on every zone change, so a permanent that paid a cost has to be found in the
@@ -925,8 +953,8 @@ jaradSpec s registry =
       bayou <- S.printingOf s registry "Bayou"
       forest <- S.printingOf s registry "Forest"
       let cost = ActivatedAbility.cost (theAbility jarad)
-          (loneId, lone) = jaradBoard jarad bayou []
-          (pairId, pair) = jaradBoard jarad bayou [forest]
+          (_, loneId, lone) = jaradBoard jarad bayou []
+          (_, pairId, pair) = jaradBoard jarad bayou [forest]
       -- Guards the two below against passing vacuously off a card file that
       -- states one component, or none.
       Spec.assertEqWith s "the cost really has two components" (length (Cost.Type.components cost)) 2
@@ -957,7 +985,7 @@ jaradSpec s registry =
       bayou <- S.printingOf s registry "Bayou"
       forest <- S.printingOf s registry "Forest"
       swamp <- S.printingOf s registry "Swamp"
-      let (jaradId, gs) = jaradBoard jarad bayou [swamp, forest]
+      let (_, jaradId, gs) = jaradBoard jarad bayou [swamp, forest]
           activating = Activate.activateAbility S.alice jaradId (theAbility jarad)
           asked = answersFor S.identityAnswer gs activating
           after = S.runPure S.identityAnswer gs activating
@@ -972,6 +1000,57 @@ jaradSpec s registry =
         "and the Bayou and the Forest are the two lands that paid"
         (namesIn Zone.Graveyard after)
         (fmap (CardName.MkCardName . Text.pack) ["Bayou", "Forest", "Jarad, Golgari Lich Lord"])
+    -- CR 601.2h: the parts are paid "in any order", and the ORDER IS THE
+    -- PAYER'S. One Bayou and one plain Swamp is the board where it shows: the
+    -- cost is payable (Bayou for the Forest half, Swamp for the Swamp half), and
+    -- ONLY in that order -- spend the Bayou on the Swamp half and the Forest
+    -- half has nothing left.
+    --
+    -- A PAIR of legs differing in exactly one thing: the same board, the same
+    -- pinned sacrifice answer, and only the order answered. The sacrifice answer
+    -- names the Bayou on both legs, so nothing about the outcome comes from the
+    -- answerer picking a different land.
+    --
+    -- The assertion reads the ENGINE's output -- what is on the battlefield and
+    -- in the graveyard afterwards -- and not the answers it was given.
+    Spec.it s "CR 601.2h the payer's order decides whether one Bayou and one Swamp pay for a Swamp and a Forest" $ do
+      jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
+      bayou <- S.printingOf s registry "Bayou"
+      swamp <- S.printingOf s registry "Swamp"
+      let (bayouId, jaradId, gs) = jaradBoard jarad bayou [swamp]
+          cost = ActivatedAbility.cost (theAbility jarad)
+          activating = Activate.activateAbility S.alice jaradId (theAbility jarad)
+          run order = S.runPure (payingInOrder order bayouId) gs activating
+          forestFirst = run [1, 0]
+          printedOrder = run [0, 1]
+          names :: [String] -> [CardName.CardName]
+          names = fmap (CardName.MkCardName . Text.pack)
+      -- The board is payable, so a leg that fails fails on the ORDER and not on
+      -- resources CR 118.3 never had.
+      Spec.assertBool s (Cost.canPay S.alice jaradId cost gs) "the cost is payable on this board"
+      Spec.assertBool
+        s
+        (wasAskedForOrder (answersFor (payingInOrder [1, 0] bayouId) gs activating))
+        "and the payer is asked for the order"
+      Spec.assertEqWith s "paying the Forest half first spends both lands" (namesIn Zone.Battlefield forestFirst) []
+      Spec.assertEqWith
+        s
+        "the Bayou and the Swamp are what paid"
+        (namesIn Zone.Graveyard forestFirst)
+        (names ["Bayou", "Jarad, Golgari Lich Lord", "Swamp"])
+      -- The other order is a legal answer that loses the payment, which is the
+      -- player's own doing: Cost.pay restores the entry state, so the Bayou it
+      -- spent on the Swamp half is back and nothing was paid.
+      Spec.assertEqWith
+        s
+        "paying the Swamp half first pays nothing"
+        (namesIn Zone.Battlefield printedOrder)
+        (names ["Bayou", "Swamp"])
+      Spec.assertEqWith
+        s
+        "and Jarad is still in the graveyard"
+        (namesIn Zone.Graveyard printedOrder)
+        (names ["Jarad, Golgari Lich Lord"])
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do

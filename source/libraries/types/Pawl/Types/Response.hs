@@ -149,6 +149,11 @@ data Response
     -- controller) chose for the simultaneous damage events one prevention shield
     -- may cover, as a permutation of the offered indices.
     OrderedDamage [Natural.Natural]
+  | -- | CR 601.2h: the order a player chose to pay a cost's parts in, as a
+    -- permutation of the offered indices. A separate constructor from the two
+    -- above, though the payload has the same shape: replaying a transcript
+    -- against the wrong one would reorder a trigger batch instead of a payment.
+    OrderedCostComponents [Natural.Natural]
   | -- | CR 616.1: the index of the replacement effect a player chose to apply
     -- next.
     ChoseReplacement Natural.Natural
