@@ -6,7 +6,9 @@ import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
+import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Json.Value as Value
@@ -45,6 +47,11 @@ codec keywordCodec =
       Arm.nullary "PowerLessThanSource" Filter.PowerLessThanSource,
       Arm.nullary "PowerGreaterThanSource" Filter.PowerGreaterThanSource,
       Arm.nullary "ControlledByDefendingPlayer" Filter.ControlledByDefendingPlayer,
+      Arm.payload "ControlledByBound" SlotName.codec Filter.ControlledByBound,
+      -- Runtime-only, and accepted here anyway: the codec must stay total, so a
+      -- corpus lint keeps the pool honest instead (#199) -- the treatment
+      -- Modification.SetController's baked PlayerId gets.
+      Arm.payload "ControlledByPlayer" PlayerId.codec Filter.ControlledByPlayer,
       Arm.payload "ManaValueAtMost" Common.integer Filter.ManaValueAtMost,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy,
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy,
@@ -80,6 +87,8 @@ codec keywordCodec =
       Filter.PowerLessThanSource -> Common.nullary "PowerLessThanSource"
       Filter.PowerGreaterThanSource -> Common.nullary "PowerGreaterThanSource"
       Filter.ControlledByDefendingPlayer -> Common.nullary "ControlledByDefendingPlayer"
+      Filter.ControlledByBound slot -> Common.tagged "ControlledByBound" . Just $ Codec.encode SlotName.codec slot
+      Filter.ControlledByPlayer pid -> Common.tagged "ControlledByPlayer" . Just $ Codec.encode PlayerId.codec pid
       Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Value.integer n
       Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ Codec.encode PlayerRelation.codec r
       Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ Codec.encode PlayerRelation.codec r

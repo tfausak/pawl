@@ -814,7 +814,13 @@ placeBorne srcId pending = do
       (abilId, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       decider = Decide.deciderFor controller gs
-      modal = TriggeredAbility.modal ability
+      -- CR 603.2/603.3d: the event's own bindings are known before a target is
+      -- chosen, so a slot saying "that player controls" is baked to the player the
+      -- event named before either the mode gate or the target prompt reads it
+      -- (Pawl.Engine.Target.bakeModal). Baked HERE and not stored: the stack
+      -- object keeps the printed ability, and CR 608.2b's re-check bakes again
+      -- from the same bindings.
+      modal = Target.bakeModal (Binding.playerSlots (PendingTrigger.bindings pending)) (TriggeredAbility.modal ability)
       legal = Target.fillableModes (Just controller) srcId Map.empty modal gs
       selection = Modal.Type.selection modal
       obj =

@@ -1566,6 +1566,10 @@ canHostSubjects predicate = case predicate of
   Filter.Type.PowerLessThanSource -> 0
   Filter.Type.PowerGreaterThanSource -> 0
   Filter.Type.ControlledByDefendingPlayer -> 0
+  -- Zero for ControlledBy's reason: one carries a slot name and the other a
+  -- PlayerId, and neither holds a Filter for a card author to reach.
+  Filter.Type.ControlledByBound _ -> 0
+  Filter.Type.ControlledByPlayer _ -> 0
   Filter.Type.ManaValueAtMost _ -> 0
   Filter.Type.ControlledBy _ -> 0
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
@@ -3191,6 +3195,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace roaches))))
       "the real card's dies trigger is accepted"
+  -- The same equality, on the read that is NOT an effect's operand: CR 603.2's
+  -- "that player" may be named by a target slot's own FILTER (Trygon Predator),
+  -- which Resolve.modeSlots sees through Filter.boundSlots. Without that clause
+  -- the pairing below would be invisible and a card could narrow a slot by a
+  -- player its condition never binds -- a slot that then admits nothing.
+  Spec.it s "the lint itself catches a reserved event slot named by a target filter" $ do
+    trygon <- S.printingOf s registry "Trygon Predator"
+    let target = SlotName.MkSlotName (Text.pack "target")
+        narrowed =
+          Mode.MkMode
+            (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
+            (Map.singleton target (TargetSpec.required Pool.Permanents (Just (Filter.Type.ControlledByBound Binding.triggerPlayer))))
+    Spec.assertBool
+      s
+      (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [narrowed]))
+      "CR 603.2 thatPlayer in a filter under an enters trigger is rejected"
+    Spec.assertBool
+      s
+      (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDealsCombatDamageToPlayer [narrowed])))
+      "and under a combat-damage trigger it is accepted"
+    Spec.assertBool
+      s
+      (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace trygon))))
+      "the real card's own trigger is accepted"
   -- The same equality over a card's ACTIVATED abilities, the one carrier with no
   -- event slot answering a read at all: an activation is not an event. See
   -- activatedAbilityOffends for the whole of it.
@@ -3927,6 +3955,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- hand-built face carrying the atom in a target spec finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ControlledByDefendingPlayer]]
+        slotSpec = TargetSpec.required Pool.Creatures (Just buried)
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slotSpec)))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+  -- CR 603.2's baked half is in Modification.SetController's position rather
+  -- than CR 702.39a's: a PlayerId that only a resolution can know, round-tripped
+  -- by a total codec, so nothing but this keeps card JSON from naming a seat
+  -- (#199). The UNBAKED atom beside it is card data and is not swept -- Trygon
+  -- Predator writes it, and Pawl.Engine.Resolve.modeSlots is what checks the slot
+  -- it names is one the ability's condition binds.
+  Spec.it s "CR 603.2 no card writes ControlledByPlayer" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "ControlledByPlayer") (Face.Codec.toJson Card.toJson c)
+        offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
+    Spec.assertEqWith s "the baked atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- Not vacuous, for the sibling sweep's reason: the same counter over a
+    -- hand-built face carrying the atom in a target spec finds it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.ControlledByPlayer (PlayerId.MkPlayerId 1))]]
         slotSpec = TargetSpec.required Pool.Creatures (Just buried)
         planted =
           (S.combinedFace piker)

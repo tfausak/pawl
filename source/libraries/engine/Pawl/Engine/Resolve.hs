@@ -334,8 +334,8 @@ durationSlots duration = case duration of
 
 -- Every slot a whole MODE reads: every clause's effects', plus every payer CR
 -- 118.12a's "unless [a player] pays" names, plus every slot a TARGET SPEC's own
--- pool names. What the D4 dataflow lint asks, since a payer slot no effect ALSO
--- reads would otherwise dangle unnoticed. Mana Leak's Counter happens to read
+-- pool or filter names. What the D4 dataflow lint asks, since a payer slot no
+-- effect ALSO reads would otherwise dangle unnoticed. Mana Leak's Counter happens to read
 -- the very slot its "unless" names, so the lint's answer is the same either way
 -- for the one card in the pool; a card whose payer and target differ is what
 -- this exists for.
@@ -350,9 +350,19 @@ modeSlots mode =
   joinSlots
     [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
       joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap (poolSlot . TargetSpec.pool) (Map.elems (Mode.targetSpecs mode)))
+      joinSlots (fmap (poolSlot . TargetSpec.pool) (Map.elems (Mode.targetSpecs mode))),
+      -- And every slot a target slot's own FILTER names -- CR 603.2's "target
+      -- artifact or enchantment that player controls", where the player is read
+      -- from the trigger's bindings rather than from an effect's operand.
+      -- Without this the lint would never see that read, and a card naming "that
+      -- player" under a condition that binds no player would quietly admit
+      -- nothing.
+      joinSlots (fmap specSlots (Map.elems (Mode.targetSpecs mode)))
     ]
   where
+    specSlots =
+      maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots)
+        . TargetSpec.filter
     -- Every clause's payer, not just one: CR 118.12a scopes an "unless" to the
     -- clause it is printed on, so a mode may state more than one and each names
     -- a slot the card owes a declaration for.
@@ -1096,7 +1106,12 @@ resolveModes stackId srcId modes = do
       -- CR 700.2d: instance-named, not printed-named -- two instances of one
       -- repeated mode declare one printed slot and fill two, and this union would
       -- otherwise collapse them.
-      let specs = Map.unions (fmap (\(mi, mode) -> Map.mapKeys (Modal.instanceSlot mi) (Mode.targetSpecs mode)) modes)
+      -- CR 608.2b re-judges the slot against the SAME spec CR 603.3d offered, so
+      -- the "that player controls" atoms are baked here too, off the bindings the
+      -- placement stamped on this very object (Pawl.Engine.Target.bakeSpecs). An
+      -- ability whose environment binds no player leaves them standing, which
+      -- admits nothing -- see Pawl.Engine.Filter.bakeBound.
+      let specs = Target.bakeSpecs (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (\(mi, mode) -> Map.mapKeys (Modal.instanceSlot mi) (Mode.targetSpecs mode)) modes))
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipients = case Map.lookup slot specs of
             -- CR 608.2b is about TARGETS. A slot with no target spec is a

@@ -5,7 +5,9 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -154,6 +156,33 @@ data Filter keyword
     -- False when either player is absent -- a source that is not attacking has no
     -- defending player.
     ControlledByDefendingPlayer
+  | -- | CR 603.2: the candidate's controller is the PLAYER BOUND at this slot --
+    -- Trygon Predator's "target artifact or enchantment THAT PLAYER controls",
+    -- where "that player" is the one the trigger's own event named
+    -- (Pawl.Engine.Binding.triggerPlayer). The atom card JSON writes; the arm
+    -- below is what it becomes.
+    --
+    -- NOT ControlledBy Opponent, and the difference is a wrong answer rather than
+    -- a nicety, exactly as it is for ControlledByDefendingPlayer above: CR 806.1's
+    -- free-for-all has several opponents, and only one of them is the player the
+    -- event named. The two coincide on a two-player board alone.
+    --
+    -- Answered by REWRITING rather than by a Context field
+    -- (Pawl.Engine.Filter.bakeBound): the two moments that judge a target slot --
+    -- CR 603.3d's choosing (Pawl.Engine.Engine.placeBorne) and CR 608.2b's
+    -- re-check (Pawl.Engine.Resolve.resolveModes) -- each hold the bindings and
+    -- hand Pawl.Engine.Target a spec with this atom already replaced. Vacuously
+    -- False if it survives to a match, which is a slot that named no one player.
+    ControlledByBound SlotName.SlotName
+  | -- | The atom above with its player resolved: the candidate's controller IS this
+    -- player. RUNTIME-ONLY, in Modification.SetController's sense and enforced the
+    -- same way -- the codec round-trips the PlayerId, so Pawl.CardSpec lints the
+    -- pool against a card authoring one, a baked player in printed text being
+    -- meaningless (#199).
+    --
+    -- Perspective-free, unlike every other player-relating atom here: the player is
+    -- named outright, so CR 109.5's "you" does not enter into it.
+    ControlledByPlayer PlayerId.PlayerId
   | -- | CR 108.3 / 110.2: the candidate's OWNER relates thus to the perspective --
     -- Garland, Royal Kidnapper's "creatures you control but don't own", which is
     -- `And [ControlledBy You, Not (OwnedBy You)]`.
