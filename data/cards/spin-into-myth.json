@@ -1,0 +1,78 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Spin into Myth",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Library"
+                      },
+                      {
+                        "type": "Top"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Fateseal",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

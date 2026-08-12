@@ -4768,6 +4768,351 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
     Spec.assertEqWith s "not asked" asked 0
     Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
 
+-- CR 701.25a: "to 'surveil N' means to look at the top N cards of your library,
+-- then put any number of them into your graveyard and the rest on top of your
+-- library in any order."
+--
+-- Curate ({1}{U} instant, "Surveil 2. Draw a card.") is the producer, cast for
+-- real: surveil TWO for the reason the scry group takes two, and the draw is
+-- what makes the kept ORDER observable from outside the library -- whichever
+-- card the answer left on top is the card that ends up in hand.
+--
+-- Four DIFFERENT printings in alice's library, top-first [piker, maiden,
+-- mountain, forest]. Interchangeable cards could not tell a chosen order from
+-- the order they were found in, and could not tell a graveyard arrival from any
+-- other.
+surveilBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+surveilBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  mountain <- S.printingOf s registry "Mountain"
+  forest <- S.printingOf s registry "Forest"
+  curate <- S.printingOf s registry "Curate"
+  let deal (acc, g) printing = let (oid, g') = S.addLibraryCard printing S.alice g in (oid : acc, g')
+      -- addLibraryCard puts its card ON TOP, so the deepest is stocked first and
+      -- `ids` comes back top-first.
+      (ids, stocked) = List.foldl' deal ([], S.landsInPlay island 2) [forest, mountain, maiden, piker]
+      (board, spellId) = S.handOne curate stocked
+  pure (ids, spellId, board)
+
+-- Answers Prompt.ChooseSurveil with a FIXED pair of lists, scryAnswer's posture
+-- and for its reason: an answerer that searched the offered list for a legal
+-- pick would repair the assertion after a mutation broke which cards the engine
+-- looked at.
+surveilAnswer :: ([ObjectId.ObjectId], [ObjectId.ObjectId]) -> Prompt.Prompt r -> r
+surveilAnswer split p = case p of
+  Prompt.ChooseSurveil {} -> split
+  _ -> S.identityAnswer p
+
+-- The card names in alice's graveyard, bottom-first (Pawl.Engine.Game's arrival
+-- end), which is the only way to read a graveyard arrival: CR 400.7 minted a
+-- fresh id for it, so the id the prompt named is not the id that landed.
+surveilGraveyard :: GameState.GameState -> [Maybe CardName.CardName]
+surveilGraveyard gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers Zone.Graveyard S.alice gs)
+
+cardNamed :: String -> Maybe CardName.CardName
+cardNamed = Just . CardName.MkCardName . Text.pack
+
+surveilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+surveilSpec s registry = Spec.describe s "Surveil" $ do
+  -- The SPLIT: one looked-at card into the graveyard, the other kept, and then
+  -- Curate's own draw takes the kept one. A surveil that BOTTOMED the unwanted
+  -- card instead -- CR 701.22a's scry, the neighbouring reading -- would leave
+  -- piker under forest and the graveyard holding nothing but Curate.
+  Spec.it s "CR 701.25a whole card: Curate's surveil 2 bins one, keeps one, then draws it" $ do
+    (ids, spellId, board) <- surveilBoard s registry
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let after = S.runPure (surveilAnswer ([piker], [maiden])) board $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+        Spec.assertEqWith s "the library started top-first piker, maiden, mountain, forest" (Game.zoneMembers Zone.Library S.alice board) [piker, maiden, mountain, forest]
+        Spec.assertEqWith s "maiden was drawn off the top, leaving mountain and forest" (Game.zoneMembers Zone.Library S.alice after) [mountain, forest]
+        Spec.assertEqWith
+          s
+          "and the drawn card is the one surveil kept"
+          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
+          [cardNamed "Bird Maiden"]
+        -- Curate follows its own surveilled card in, CR 608.2n putting the spell
+        -- into its owner's graveyard as the final part of its resolution.
+        Spec.assertEqWith s "piker is in the graveyard, under Curate" (surveilGraveyard after) [cardNamed "Goblin Piker", cardNamed "Curate"]
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- CR 701.25a's "the rest on top of your library IN ANY ORDER": nothing is
+  -- binned and the two looked-at cards go back swapped, so the draw takes the
+  -- card that was SECOND. A surveil that put them back as it found them draws
+  -- piker instead.
+  Spec.it s "CR 701.25a the kept cards go back in the CHOSEN order" $ do
+    (ids, spellId, board) <- surveilBoard s registry
+    case ids of
+      [piker, maiden, mountain, forest] -> do
+        let after = S.runPure (surveilAnswer ([], [maiden, piker])) board $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+        Spec.assertEqWith s "piker fell to second and was left there by the draw" (Game.zoneMembers Zone.Library S.alice after) [piker, mountain, forest]
+        Spec.assertEqWith
+          s
+          "maiden was on top, so maiden was drawn"
+          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
+          [cardNamed "Bird Maiden"]
+        Spec.assertEqWith s "and nothing but the spell reached the graveyard" (surveilGraveyard after) [cardNamed "Curate"]
+      _ -> Spec.assertFailure s "expected four library cards"
+  -- "Any number" reaching ALL of them, and the graveyard's own order: the answer
+  -- names maiden first, so maiden is put in first and ends up UNDER piker.
+  Spec.it s "CR 701.25a both looked-at cards can go, in the order the answer names them" $ do
+    (ids, spellId, board) <- surveilBoard s registry
+    case ids of
+      [piker, maiden, _, forest] -> do
+        let after = S.runPure (surveilAnswer ([maiden, piker], [])) board $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+        Spec.assertEqWith s "mountain rose to the top and was drawn, leaving forest" (Game.zoneMembers Zone.Library S.alice after) [forest]
+        Spec.assertEqWith
+          s
+          "the draw took mountain, the card that was third"
+          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Hand S.alice after))
+          [cardNamed "Mountain"]
+        Spec.assertEqWith s "maiden went in first, so piker sits on top of it" (surveilGraveyard after) [cardNamed "Bird Maiden", cardNamed "Goblin Piker", cardNamed "Curate"]
+      _ -> Spec.assertFailure s "expected four library cards"
+
+-- The elision half, driven through the opcode: Curate's count is fixed at two,
+-- and casting it on a one-card library would deck alice (CR 104.3c) before the
+-- assertion could read anything.
+--
+-- alice has a Piker on the battlefield to apply the effect from, and `stock`
+-- distinct cards in her library, top-first.
+surveilOpcodeBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Int ->
+  m ([ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+surveilOpcodeBoard s registry stock = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  mountain <- S.printingOf s registry "Mountain"
+  let (sourceId, base) = S.addCreature piker S.alice (S.landsInPlay island 1)
+      deal (acc, gs) printing = let (oid, gs') = S.addLibraryCard printing S.alice gs in (oid : acc, gs')
+      (ids, stocked) = List.foldl' deal ([], base) (reverse (take stock [maiden, mountain]))
+  pure (ids, sourceId, stocked {GameState.priority = Just S.alice})
+
+surveilPromptSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+surveilPromptSpec s registry = Spec.describe s "SurveilPrompt" $ do
+  let counting :: Prompt.Prompt r -> State.State Int r
+      counting p = case p of
+        Prompt.ChooseSurveil {} -> do
+          State.modify (+ 1)
+          pure (S.identityAnswer p)
+        _ -> pure (S.identityAnswer p)
+      surveilTwo = Effect.Surveil (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)
+      apply effect sourceId = Resolve.applyEffect sourceId sourceId S.alice Map.empty Map.empty effect
+      asks effect sourceId gs = State.execState (Engine.runGame counting gs (apply effect sourceId)) 0
+  -- Nothing to LOOK at, the one case rule 701.25a's process cannot run on.
+  Spec.it s "CR 701.25a an empty library raises no surveil prompt" $ do
+    (_, sourceId, board) <- surveilOpcodeBoard s registry 0
+    Spec.assertEqWith s "not asked" (asks surveilTwo sourceId board) 0
+  -- The case that separates surveil from scry, and the reason this pair exists:
+  -- with ONE card that is the whole library, Pawl.Engine.Resolve.scryOne asks
+  -- nothing because top and bottom are the same position -- but a graveyard is
+  -- somewhere else, so the player IS asked, and the answer is honoured.
+  Spec.it s "CR 701.25a one card that is the whole library is still a real choice" $ do
+    (ids, sourceId, board) <- surveilOpcodeBoard s registry 1
+    let after = S.runPure (surveilAnswer (ids, [])) board (apply surveilTwo sourceId)
+    Spec.assertEqWith s "asked once" (asks surveilTwo sourceId board) 1
+    Spec.assertEqWith s "and the card it named left the library" (Game.zoneMembers Zone.Library S.alice after) []
+    Spec.assertEqWith s "for the graveyard" (surveilGraveyard after) [cardNamed "Bird Maiden"]
+  -- CR 701.25c: "if a player is instructed to surveil 0, no surveil event
+  -- occurs." Driven through the opcode, no printing surveilling zero.
+  Spec.it s "CR 701.25c surveil 0 raises no prompt and moves nothing" $ do
+    (ids, sourceId, board) <- surveilOpcodeBoard s registry 2
+    let surveilZero = Effect.Surveil (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 0)
+        after = S.runPure (surveilAnswer ([], [])) board (apply surveilZero sourceId)
+    Spec.assertEqWith s "not asked" (asks surveilZero sourceId board) 0
+    Spec.assertEqWith s "and the library is what it was" (Game.zoneMembers Zone.Library S.alice after) ids
+    Spec.assertEqWith s "with an empty graveyard" (surveilGraveyard after) []
+
+-- CR 701.29a: "to 'fateseal N' means to look at the top N cards of an opponent's
+-- library, then put any number of them on the bottom of that library in any
+-- order and the rest on top of that library in any order."
+--
+-- Spin into Myth ({4}{U} instant, "Put target creature on top of its owner's
+-- library, then fateseal 2") is the producer, cast for real.
+--
+-- THREE SEATS, because two cannot tell "the opponent the fatesealer chose" from
+-- "an opponent" or from "every opponent" -- and the answer names CAROL, who is
+-- not the first candidate, so an implementation that ignored the answer and took
+-- the head would fateseal bob and fail.
+--
+-- alice targets HER OWN Piker with the first half, so the library the creature
+-- lands in and the library the fateseal reorders are different libraries: a
+-- fateseal that looked at its own controller's library would have to disturb the
+-- card just placed there.
+--
+-- Returns (alice's library card, bob's library top-first, carol's library
+-- top-first, alice's creature, the spell in hand, the board).
+fatesealBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  NonEmpty.NonEmpty PlayerId.PlayerId ->
+  m (ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+fatesealBoard s registry seats = do
+  island <- S.printingOf s registry "Island"
+  piker <- S.printingOf s registry "Goblin Piker"
+  maiden <- S.printingOf s registry "Bird Maiden"
+  mountain <- S.printingOf s registry "Mountain"
+  forest <- S.printingOf s registry "Forest"
+  spin <- S.printingOf s registry "Spin into Myth"
+  let deal pid (acc, g) printing = let (oid, g') = S.addLibraryCard printing pid g in (oid : acc, g')
+      (creatureId, b1) = S.addCreature piker S.alice (S.landsFor island S.alice 5 (Setup.emptyGame seats))
+      (aliceLib, b2) = S.addLibraryCard forest S.alice b1
+      (bobIds, b3) = List.foldl' (deal S.bob) ([], b2) [forest, mountain]
+      -- Only when carol is at the table: a library belonging to a seat the game
+      -- does not have would be a fixture nothing in the rules can reach.
+      (carolIds, b4)
+        | List.elem S.carol (NonEmpty.toList seats) = List.foldl' (deal S.carol) ([], b3) [forest, mountain, maiden]
+        | otherwise = ([], b3)
+      (board, spellId) = S.handOne spin b4
+  pure (aliceLib, bobIds, carolIds, creatureId, spellId, board)
+
+-- Answers Prompt.ChooseFateseal with a FIXED pair of lists, surveilAnswer's
+-- posture and for its reason.
+fatesealAnswer :: ([ObjectId.ObjectId], [ObjectId.ObjectId]) -> Prompt.Prompt r -> r
+fatesealAnswer split p = case p of
+  Prompt.ChooseFateseal {} -> split
+  _ -> S.identityAnswer p
+
+fatesealSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fatesealSpec s registry = Spec.describe s "Fateseal" $ do
+  let aimAt :: ObjectId.ObjectId -> PlayerId.PlayerId -> ([ObjectId.ObjectId], [ObjectId.ObjectId]) -> Prompt.Prompt r -> r
+      aimAt creatureId victim split p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature creatureId))) sets
+        -- PINNED to the second candidate, not the first: S.identityAnswer and
+        -- Replay.defaultAnswer both take the head, so a fateseal that dropped
+        -- this answer would still reorder a library and still pass a membership
+        -- assertion -- against the WRONG seat.
+        Prompt.ChooseOpponent {} -> victim
+        Prompt.ChooseFateseal {} -> split
+        _ -> S.identityAnswer p
+      castSpin :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      castSpin answer spellId board = S.runPure answer board $ do
+        S.cast S.alice spellId
+        Stack.resolveTop
+  Spec.it s "CR 701.29a whole card: Spin into Myth reorders the CHOSEN opponent's library and nobody else's" $ do
+    (aliceLib, bobIds, carolIds, creatureId, spellId, board) <- fatesealBoard s registry S.threePlayers
+    case (bobIds, carolIds) of
+      ([bobTop, bobDeep], [carolTop, carolMiddle, carolDeep]) -> do
+        -- The pinned answer names a card from BOB'S library as well as carol's.
+        -- Against carol's prompt the stray id is filtered out and changes
+        -- nothing; against a fateseal that swept every opponent it would bottom
+        -- bob's top card, which is what makes the next assertion discriminate
+        -- rather than pass because the answer named nothing bob owns.
+        let after = castSpin (aimAt creatureId S.carol ([carolTop, bobTop], [carolMiddle])) spellId board
+        Spec.assertEqWith s "carol's library started top-first maiden, mountain, forest" (Game.zoneMembers Zone.Library S.carol board) [carolTop, carolMiddle, carolDeep]
+        Spec.assertEqWith s "the kept card is on top of carol's library and the bottomed one is last" (Game.zoneMembers Zone.Library S.carol after) [carolMiddle, carolDeep, carolTop]
+        -- The seat the answer did NOT name. Two opponents is what makes this
+        -- assertion mean anything: on a two-player board it would hold for a
+        -- fateseal that swept every opponent.
+        Spec.assertEqWith s "bob's library is untouched" (Game.zoneMembers Zone.Library S.bob after) [bobTop, bobDeep]
+        -- CR 701.29a's library is an OPPONENT'S, never the fatesealer's: alice's
+        -- library holds the returned creature on top of the card she started
+        -- with, in the order the first half of the card put them there.
+        Spec.assertBool s (not (S.onBattlefield creatureId after)) "the targeted creature left the battlefield"
+        Spec.assertEqWith
+          s
+          "alice's library is the returned creature on top of her own card"
+          (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (Game.zoneMembers Zone.Library S.alice after))
+          [cardNamed "Goblin Piker", cardNamed "Forest"]
+        Spec.assertEqWith s "and the card she started with is still the one underneath" (drop 1 (Game.zoneMembers Zone.Library S.alice after)) [aliceLib]
+      _ -> Spec.assertFailure s "expected two library cards for bob and three for carol"
+  -- WHO is asked and about WHOSE library -- the half a board cannot show by its
+  -- final state. The fatesealer is shown the cards; the library's owner is shown
+  -- nothing and asked nothing.
+  Spec.it s "CR 701.29a the fatesealer is asked, about the chosen opponent's top cards" $ do
+    (_, _, carolIds, creatureId, spellId, board) <- fatesealBoard s registry S.threePlayers
+    case carolIds of
+      [carolTop, carolMiddle, _] -> do
+        let recording :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, PlayerId.PlayerId, [ObjectId.ObjectId])] r
+            recording p = case p of
+              Prompt.ChooseFateseal _ seat owner looked -> do
+                State.modify (<> [(seat, owner, looked)])
+                pure ([], looked)
+              _ -> pure (aimAt creatureId S.carol ([], []) p)
+            asked =
+              State.execState
+                ( Engine.runGame recording board $ do
+                    S.cast S.alice spellId
+                    Stack.resolveTop
+                )
+                []
+        Spec.assertEqWith s "alice asked, about carol's library, showing its top two" asked [(S.alice, S.carol, [carolTop, carolMiddle])]
+      _ -> Spec.assertFailure s "expected three library cards for carol"
+  -- The elision pair for the OPPONENT choice, two boards differing in seat count
+  -- alone: CR 102.2's two-player game leaves exactly one opponent and nothing to
+  -- ask, and a third seat makes it a real question.
+  Spec.it s "CR 102.2 the opponent is chosen only when there are two of them" $ do
+    let counting :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State Int r
+        counting creatureId p = case p of
+          Prompt.ChooseOpponent {} -> do
+            State.modify (+ 1)
+            pure (aimAt creatureId S.carol ([], []) p)
+          _ -> pure (aimAt creatureId S.carol ([], []) p)
+        asks (_, _, _, creatureId, spellId, board) =
+          State.execState
+            ( Engine.runGame (counting creatureId) board $ do
+                S.cast S.alice spellId
+                Stack.resolveTop
+            )
+            0
+    two <- fatesealBoard s registry S.bothPlayers
+    three <- fatesealBoard s registry S.threePlayers
+    Spec.assertEqWith s "one opponent, not asked" (asks two) 0
+    Spec.assertEqWith s "two opponents, asked once" (asks three) 1
+    -- And the two-seat board still fateseals: the elision skips the question,
+    -- not the action.
+    case two of
+      (_, bobIds, _, creatureId, spellId, board) -> case bobIds of
+        [bobTop, bobDeep] -> do
+          let after = castSpin (aimAt creatureId S.carol ([bobTop], [])) spellId board
+          Spec.assertEqWith s "bob's only opponent fatesealed him" (Game.zoneMembers Zone.Library S.bob after) [bobDeep, bobTop]
+        _ -> Spec.assertFailure s "expected two library cards for bob"
+  -- The elision pair for the SPLIT question, two boards differing in one card:
+  -- a lone card that is the whole library has its top and its bottom at the same
+  -- position, so both answers give the same library and there is nothing to ask
+  -- -- scryOne's case, and NOT surveil's, where the two destinations differ.
+  -- Driven through the opcode, Spin into Myth's count being fixed at two.
+  Spec.it s "CR 701.29a a one-card library raises no fateseal prompt, and a card beneath it does" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    let (sourceId, base) = S.addCreature piker S.alice (S.landsInPlay island 1)
+        (deep, one) = S.addLibraryCard forest S.bob base
+        (top, two) = S.addLibraryCard mountain S.bob one
+        counting :: Prompt.Prompt r -> State.State Int r
+        counting p = case p of
+          Prompt.ChooseFateseal {} -> do
+            State.modify (+ 1)
+            pure (S.identityAnswer p)
+          _ -> pure (S.identityAnswer p)
+        fatesealTwo = Effect.Fateseal (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)
+        apply = Resolve.applyEffect sourceId sourceId S.alice Map.empty Map.empty fatesealTwo
+        asks gs = State.execState (Engine.runGame counting gs apply) 0
+    Spec.assertEqWith s "one card, not asked" (asks one) 0
+    Spec.assertEqWith s "a card beneath it, asked once" (asks two) 1
+    -- Asked AND honoured, which is what separates the pair from an engine that
+    -- raises the prompt and drops the answer.
+    Spec.assertEqWith
+      s
+      "and the named card went under"
+      (Game.zoneMembers Zone.Library S.bob (S.runPure (fatesealAnswer ([top], [])) two apply))
+      [deep, top]
+
 slotTarget :: SlotName.SlotName
 slotTarget = SlotName.MkSlotName (Text.pack "target")
 
@@ -6697,6 +7042,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   proliferateSpec s registry
   scrySpec s registry
   scryPromptSpec s registry
+  surveilSpec s registry
+  surveilPromptSpec s registry
+  fatesealSpec s registry
   playerSacrificesSpec s registry
   createEmblemSpec s registry
   becomeMonarchSpec s registry

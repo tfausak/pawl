@@ -239,6 +239,8 @@ slotsOf effect = case effect of
   -- posture, for the same reason.
   Effect.Mill ref quantity _ -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Scry ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Surveil ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Fateseal ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Discard slot quantity -> insertOne slot (quantitySlots quantity)
   Effect.LoseLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.GainLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -450,6 +452,8 @@ slotsAreExhaustive effect = case effect of
   Effect.Draw _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Mill _ quantity _ -> Quantity.slotsAreExhaustive quantity
   Effect.Scry _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Surveil _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Fateseal _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Discard _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.LoseLife _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife _ quantity -> Quantity.slotsAreExhaustive quantity
@@ -570,6 +574,8 @@ readsX = any effectReadsX
       Effect.Draw _ quantity -> Quantity.readsX quantity
       Effect.Mill _ quantity _ -> Quantity.readsX quantity
       Effect.Scry _ quantity -> Quantity.readsX quantity
+      Effect.Surveil _ quantity -> Quantity.readsX quantity
+      Effect.Fateseal _ quantity -> Quantity.readsX quantity
       Effect.Discard _ quantity -> Quantity.readsX quantity
       Effect.LoseLife _ quantity -> Quantity.readsX quantity
       Effect.GainLife _ quantity -> Quantity.readsX quantity
@@ -639,9 +645,12 @@ searchesLibrary effect = case effect of
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
   Effect.Mill {} -> False
-  -- CR 701.22a looks at the top N, where CR 701.23a's search looks at ALL of a
-  -- zone; Panglacial Wurm's window is the latter's alone.
+  -- The three look-and-split actions look at the top N, where CR 701.23a's
+  -- search looks at ALL of a zone; Panglacial Wurm's window is the latter's
+  -- alone.
   Effect.Scry {} -> False
+  Effect.Surveil {} -> False
+  Effect.Fateseal {} -> False
   Effect.Discard {} -> False
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
@@ -760,6 +769,8 @@ boundSlots effect = case effect of
   -- filter, for CR 728.1's "for each nonland card milled this way" to read.
   Effect.Mill _ _ mTally -> foldMap (Set.singleton . MillTally.slot) mTally
   Effect.Scry {} -> Set.empty
+  Effect.Surveil {} -> Set.empty
+  Effect.Fateseal {} -> Set.empty
   Effect.DealDamage {} -> Set.empty
   Effect.ModifyTarget {} -> Set.empty
   Effect.ChangeText {} -> Set.empty
@@ -2658,6 +2669,33 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- no player and raises no prompt.
       Just n | n > 0 -> Monad.forM_ scryers (scryOne n)
       _ -> pure ()
+  Effect.Surveil ref quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        -- Scry's arm in every respect: the empty-list posture for a reference
+        -- naming nobody, and APNAP for the order several surveillers are asked
+        -- in (CR 101.4, rule 701.25 stating no order of its own).
+        named = playerRefPlayers legal controller gs ref
+        surveillers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      -- CR 701.25c: surveil 0 is not a surveil at all.
+      Just n | n > 0 -> Monad.forM_ surveillers (surveilOne n)
+      _ -> pure ()
+  Effect.Fateseal ref quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        -- The players who FATESEAL, not the ones fatesealed: rule 701.29a's
+        -- subject is the looker, and whose library is looked at is the separate
+        -- choice fatesealOne makes below.
+        named = playerRefPlayers legal controller gs ref
+        fatesealers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      -- Zero reaches no library, so there is nothing to look at and nobody to
+      -- ask. Rule 701.29 states no zero case of its own, unlike CR 701.22b.
+      Just n | n > 0 -> Monad.forM_ fatesealers (fatesealOne source n)
+      _ -> pure ()
   Effect.Discard slot quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -4088,9 +4126,11 @@ newestBattlefieldOf _ before after =
     newId : _ -> Just newId
     [] -> Nothing
 
--- Write a whole new order back to a player's library. Two callers: the shuffle
--- after a CR 701.23 search, and CR 701.22a's scry, which reorders one library
--- rather than moving anything between zones.
+-- Write a whole new order back to a player's library. Callers: the shuffle after
+-- a CR 701.23 search, and the three look-and-split keyword actions -- CR
+-- 701.22a's scry, CR 701.25a's surveil and CR 701.29a's fateseal -- which
+-- reorder one library rather than moving anything between zones (surveil's
+-- graveyard half excepted, which is a real move).
 reorderLibrary :: PlayerId -> [ObjectId] -> GameState -> GameState
 reorderLibrary pid order gs =
   gs {GameState.library = Map.insert pid (Seq.fromList order) (GameState.library gs)}
@@ -4121,16 +4161,102 @@ scryOne n pid = do
         [_] -> not (null beneath)
         _ -> True
   Monad.when decided $ do
-    (bottom, top) <- Game.choose (Prompt.ChooseScry (Decide.deciderFor pid gs) pid looked)
-    -- Filtered, deduped and COMPLETED, Effect.Discard's arm's posture and for
-    -- its reasons: an effect has no way to reject an answer, the answer is a
-    -- list rather than a set so it can repeat itself, and every looked-at card
-    -- has to end up somewhere. A card named in neither list stays on top behind
-    -- the ones that were named, which is Replay.defaultAnswer's do-nothing
-    -- reading of "any number" -- and a card named in BOTH is bottomed, the
-    -- first list winning so that one rule settles it.
-    let keep xs = List.nub (filter (\c -> List.elem c looked) xs)
-        toBottom = keep bottom
-        onTop = filter (\c -> List.notElem c toBottom) (keep top)
-        unnamed = filter (\c -> List.notElem c toBottom && List.notElem c onTop) looked
-    State.modify' (reorderLibrary pid (onTop <> unnamed <> beneath <> toBottom))
+    answer <- Game.choose (Prompt.ChooseScry (Decide.deciderFor pid gs) pid looked)
+    let (toBottom, onTop) = splitLooked looked answer
+    State.modify' (reorderLibrary pid (onTop <> beneath <> toBottom))
+
+-- Repair a look-and-split answer into the two groups the effect then moves: the
+-- cards going AWAY from the top (to the bottom of a library, or to a graveyard),
+-- and the cards staying on top, in the order they end up in reading down.
+--
+-- Filtered, deduped and COMPLETED, Effect.Discard's arm's posture and for its
+-- reasons: an effect has no way to reject an answer, the answer is a list rather
+-- than a set so it can repeat itself, and every looked-at card has to end up
+-- somewhere. A card named in neither list stays on top behind the ones that were
+-- named, which is Replay.defaultAnswer's do-nothing reading of "any number" --
+-- and a card named in BOTH goes away, the first list winning so that one rule
+-- settles it.
+--
+-- One function for all three keyword actions, since the repair is a question
+-- about the ANSWER rather than about the destination: scry, surveil and fateseal
+-- differ in where the first group goes and in nothing this does.
+splitLooked :: [ObjectId] -> ([ObjectId], [ObjectId]) -> ([ObjectId], [ObjectId])
+splitLooked looked (away, kept) =
+  let named xs = List.nub (filter (\c -> List.elem c looked) xs)
+      leaving = named away
+      onTop = filter (\c -> List.notElem c leaving) (named kept)
+      unnamed = filter (\c -> List.notElem c leaving && List.notElem c onTop) looked
+   in (leaving, onTop <> unnamed)
+
+-- CR 701.25a: one player's surveil -- look at the top n cards of their library,
+-- then put any number of them into their graveyard and the rest back on top in
+-- any order. scryOne's shape over a different destination, and a short library
+-- is looked at as far as it goes for that function's reason.
+--
+-- Half of it IS a zone change, unlike scry: the graveyard cards go through
+-- Event.changeZone so each mints a CR 400.7 incarnation, in the order the answer
+-- named them, so the first named ends up deepest in the pile (CR 404.1 puts each
+-- arrival on top). That order is the player's to pick and not the engine's,
+-- which is CR 404.3 -- cards put into one graveyard at once are arranged by
+-- their owner, who here is the surveilling player. The kept cards never leave
+-- the library and are written back by reorderLibrary.
+--
+-- The ELISION is scryOne's minus its one-card case: with a lone card that is the
+-- whole library, the graveyard and the top of the library are still two
+-- different places, so the player is asked.
+surveilOne :: Integer -> PlayerId -> Game ()
+surveilOne n pid = do
+  gs <- State.get
+  let whole = Game.zoneMembers Zone.Library pid gs
+      looked = List.genericTake n whole
+      beneath = List.genericDrop n whole
+  Monad.unless (null looked) $ do
+    answer <- Game.choose (Prompt.ChooseSurveil (Decide.deciderFor pid gs) pid looked)
+    let (toGraveyard, onTop) = splitLooked looked answer
+    -- Order-independent: Game.removeFromZones takes each mover out of the
+    -- library by identity rather than by position, so rewriting the kept order
+    -- before or after the moves lands the same board. Written first because the
+    -- kept cards are what this function decided.
+    State.modify' (reorderLibrary pid (onTop <> beneath))
+    Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) toGraveyard
+
+-- CR 701.29a: one player's fateseal -- look at the top n cards of AN OPPONENT'S
+-- library, then put any number of them on the bottom of that library in any
+-- order and the rest on top in any order.
+--
+-- TWO choices, both the fatesealer's and in this order: which opponent, then how
+-- to split. The first is Prompt.ChooseOpponent, elided at one candidate the way
+-- Pawl.Engine.Event's Null Chamber arm elides it (CR 102.2 leaves a two-player
+-- game one opponent), and the answer is filtered rather than trusted for that
+-- arm's reason. The second is scryOne's question over somebody else's library,
+-- with scryOne's elisions -- and the library's owner is asked neither.
+--
+-- CR 102.1's opponents are Game.stillPlaying's, not GameState.turnOrder's, so a
+-- seat that has left (CR 104.3a) is not offered.
+fatesealOne :: ObjectId -> Integer -> PlayerId -> Game ()
+fatesealOne source n pid = do
+  gs <- State.get
+  let opponents = filter (/= pid) (Game.stillPlaying gs)
+  victim <- case opponents of
+    [] -> pure Nothing
+    [sole] -> pure (Just sole)
+    first : second : rest -> do
+      let offered = first NonEmpty.:| (second : rest)
+      answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor pid gs) pid source offered)
+      pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+  Monad.forM_ victim $ \owner -> do
+    -- Re-read rather than reusing the state the opponent choice was made
+    -- against: nothing between the two asks moves a card, but a prompt is the
+    -- one place this function yields.
+    chosen <- State.get
+    let whole = Game.zoneMembers Zone.Library owner chosen
+        looked = List.genericTake n whole
+        beneath = List.genericDrop n whole
+        decided = case looked of
+          [] -> False
+          [_] -> not (null beneath)
+          _ -> True
+    Monad.when decided $ do
+      answer <- Game.choose (Prompt.ChooseFateseal (Decide.deciderFor pid chosen) pid owner looked)
+      let (toBottom, onTop) = splitLooked looked answer
+      State.modify' (reorderLibrary owner (onTop <> beneath <> toBottom))
