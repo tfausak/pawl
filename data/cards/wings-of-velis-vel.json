@@ -1,0 +1,113 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Changeling"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Wings of Velis Vel",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "SetBasePowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 4
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 4
+                          }
+                        ]
+                      },
+                      "target"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "AddEveryCreatureSubtype"
+                      },
+                      "target"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Flying"
+                        }
+                      },
+                      "target"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Shapeshifter"
+          }
+        ],
+        "types": [
+          {
+            "type": "Instant"
+          },
+          {
+            "type": "Kindred"
+          }
+        ]
+      }
+    }
+  ]
+}
