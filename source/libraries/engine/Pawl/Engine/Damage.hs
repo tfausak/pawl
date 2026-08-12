@@ -138,9 +138,10 @@ tiersCleared thresholds assigned lethal answer =
 -- made at all -- "any nonzero amount of combat damage assigned to a creature by
 -- a source with deathtouch".
 --
--- A CREATURE only. The rule says so, and the tier CR 702.19c gates on a
--- planeswalker's loyalty is a count of counters (CR 306.5c) that deathtouch says
--- nothing about; the remaining recipients carry threshold 0 and gate nothing.
+-- A CREATURE only. The rule says so, and the bar CR 702.19c states over a
+-- planeswalker is a count of loyalty counters (CR 306.5c) that deathtouch says
+-- nothing about. A player and a battle carry threshold 0 and so gate nothing
+-- either way, and combat builds no Recipient.ToObject at all (CR 510.1b-d).
 --
 -- Read off the announced events rather than re-derived from the assigning
 -- creature, so it uses the same DamageEvent.dealtByDeathtouch rider the CR 704.5h
@@ -167,10 +168,10 @@ deathtouchedRecipients events =
 -- lethal, so a deathtouch attacker needs only 1 (0 if the blocker is already
 -- lethal). Read through the projection, the same way the CR 704.5h SBA reads it.
 --
--- THIS attacker's own reading of the bar, which is what the offer is: another
--- creature's deathtouch damage clears the gate for everyone (tiersCleared's
--- `lethal`), but it is not settled until the whole step is announced, where this
--- is knowable when the division is offered.
+-- THIS attacker's own reading of the bar, which is what the division is OFFERED
+-- at. Another creature's deathtouch damage clears the same bar for everyone (CR
+-- 702.2c, in tiersCleared's `lethal`), but only once the whole step has been
+-- announced, where this much is knowable when the offer is made.
 blockerThreshold :: GameState -> ObjectId -> ObjectId -> Natural
 blockerThreshold gs attacker blocker =
   let marked = maybe 0 Object.damage (Game.lookupObject blocker gs)

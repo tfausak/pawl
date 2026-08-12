@@ -4478,9 +4478,11 @@ trampleOverPlaneswalkersSpec s registry = Spec.describe s "TrampleOverPlaneswalk
   -- Typhoid Rats' 1 in the Piker's seat pays 1 of Jace's 3 and no more -- leaving
   -- Thrasta's 1 + 6 short, and rejected.
   --
-  -- The pair with the Piker case above is one difference, the 1/1 deathtouch Rats
-  -- for the 2/1 Piker: an engine that read CR 702.2c on every recipient rather
-  -- than on creatures alone lets the whole 6 through here.
+  -- The Rats stand where the 2/1 Piker stood in the case above, so the board is
+  -- that one with a smaller, deathtouch attacker: an engine that read CR 702.2c on
+  -- every recipient rather than on creatures alone lets the whole 6 through here.
+  -- The Piker's 2 covered the loyalty between them and this 1 leaves it one short,
+  -- so the two cases land on different boards for the reason the rule gives.
   Spec.it s "CR 702.2c does not clear a planeswalker's loyalty bar" $ do
     thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
     rats <- S.printingOf s registry "Typhoid Rats"
@@ -4644,8 +4646,8 @@ sharedBlockerSpec s registry = Spec.describe s "SharedBlocker" $ do
         spillItAll wurmId guardId =
           [ (wurmId, Map.fromList [(Recipient.ToCreature guardId, 0), (Recipient.ToPlayer S.bob, 9)]),
             -- CR 510.1d: the Guard's own 1 power, pinned onto the Wurm, which
-            -- survives it either way -- so the Guard's fate is the only creature
-            -- the boards can disagree about.
+            -- survives it either way -- so the Guard is the only creature whose
+            -- fate the boards can disagree about.
             (guardId, Map.singleton (Recipient.ToCreature wurmId) 1)
           ]
         -- The same board, paying the bar down by the numbers instead: 1 + 3 is the
@@ -4682,7 +4684,7 @@ sharedBlockerSpec s registry = Spec.describe s "SharedBlocker" $ do
     Spec.assertEqWith s "CR 702.2c: the Rats' 1 is lethal, so all 9 reach bob" (S.lifeOf S.bob withDeathtouch) (Just 11)
     Spec.assertBool s (not (Set.member deadlyGuard (GameState.battlefield withDeathtouch))) "CR 704.5h: the Guard took deathtouch damage"
     Spec.assertBool s (Set.member ratsId (GameState.battlefield withDeathtouch)) "the Rats took none of the Guard's damage and live"
-    -- Without deathtouch the Rats' place is a plain 1, the Guard is 3 short, and
+    -- Without deathtouch that 1 is a plain 1, the Guard is 3 short, and
     -- the Wurm's division is rejected outright -- it assigns nothing at all.
     Spec.assertEqWith s "1 of plain damage leaves the bar unmet, so the Wurm assigns nothing" (S.lifeOf S.bob without) (Just 20)
     Spec.assertBool s (Set.member plainGuard (GameState.battlefield without)) "and the Guard survives on 1 damage"
