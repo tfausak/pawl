@@ -160,14 +160,15 @@ playerRefSlots ref = case ref of
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
 
--- The slots an ObjectRef reads. Only InSlot names one; EachMatching is swept from
--- the battlefield at resolution and names nothing at cast, so a card whose only
--- object reference is a set declares no target spec and CR 608.2b has nothing to
--- fizzle (CR 115.10a).
+-- The slots an ObjectRef reads. Only InSlot names one; the two sweeping arms are
+-- swept at resolution and name nothing at cast, so a card whose only object
+-- reference is a set declares no target spec and CR 608.2b has nothing to fizzle
+-- (CR 115.10a).
 objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
+  ObjectRef.EachPlayer -> Map.empty
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -1457,6 +1458,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           Nothing -> last_
           Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
      in List.sortOn (\oid -> (seat oid, oid)) matching
+  -- Names players and so no objects at all. Empty rather than an error: every
+  -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
+  -- empty answer is what a slot holding a player already gives them.
+  ObjectRef.EachPlayer -> []
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
@@ -1546,6 +1551,12 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
     Just group -> fmap Recipient.ToObject (Foldable.toList group)
     Nothing -> legalMany slot legal
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  -- CR 120.3a: a player is a damage recipient, and this is the arm
+  -- objectRefObjects has nothing to say about. APNAP (CR 608.2f) for
+  -- objectRefObjects' reason, and Game.apnapOrder is the turn order rotated to
+  -- the active player -- so a player CR 800.4 has taken out of the turn order is
+  -- already not in it.
+  ObjectRef.EachPlayer -> fmap Recipient.ToPlayer (Game.apnapOrder gs)
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
 -- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
@@ -2313,6 +2324,9 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             ObjectRef.EachMatching _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
+            -- Players, and no card moves one to a zone. objectRefObjects' empty
+            -- answer, so the move is a no-op rather than a rejected card.
+            ObjectRef.EachPlayer -> pure []
           Monad.mapM_ moveOne =<< settleArrivals zone placement targets
   -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
   -- this order and with the owner read before either:

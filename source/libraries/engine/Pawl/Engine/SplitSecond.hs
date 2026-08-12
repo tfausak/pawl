@@ -15,9 +15,8 @@
 -- being countered, lifts the restriction by leaving the stack.
 module Pawl.Engine.SplitSecond where
 
-import qualified Data.Set as Set
-import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Types.Face as Face
+import qualified Data.Map as Map
+import qualified Pawl.Engine.Projection as Projection
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -26,21 +25,25 @@ import qualified Pawl.Types.Keyword as Keyword
 --
 -- A MEMBERSHIP question and never a tally, which is CR 702.61c -- multiple
 -- instances are redundant, so one is as good as three and no card need print
--- two.
+-- two. Map.member rather than a count for exactly that reason.
 --
 -- No player is named, because CR 702.61a names none: the restriction reaches
 -- every player, the controller of the split-second spell included. That the
 -- spell itself is not stopped is the rule's "other spells" limb holding by
 -- construction -- it is already on the stack by the time this answers True.
 --
--- Read off the PRINTED face (Game.faceOf), which is what Pawl.Engine.Event's CR
--- 113.6g counterability gate does with the other static ability that functions
--- on the stack. A spell cast face down is measured by CR 708.4 against CR
--- 708.2a's no-text characteristics, which faceOf already answers.
+-- Read off the CR 613 PROJECTION rather than the printed face, so a spell that
+-- was GRANTED split second is seen -- Molten Disaster's "if this spell was
+-- kicked, it has split second", which Pawl.Engine.Projection gathers from the
+-- stack under CR 113.6. A spell cast face down is measured by CR 708.4 against
+-- CR 708.2a's no-text characteristics, which the projection seeds from
+-- Game.faceOf and so answers unchanged.
 --
--- Not implemented: a spell that GAINS split second, which Molten Disaster and
--- Shadow the Hedgehog print (#1205).
+-- Not implemented: split second granted from OUTSIDE the spell -- Shadow the
+-- Hedgehog's "each spell you cast has split second if mana from an artifact was
+-- spent to cast it" (#1284). The projection would read such a grant; nothing can
+-- yet write one.
 inForce :: GameState -> Bool
 inForce gs =
-  let onStack oid = maybe False (Set.member Keyword.SplitSecond . Face.keywords) (Game.faceOf oid gs)
+  let onStack oid = Map.member Keyword.SplitSecond (Projection.keywordsOf oid gs)
    in any onStack (GameState.stack gs)

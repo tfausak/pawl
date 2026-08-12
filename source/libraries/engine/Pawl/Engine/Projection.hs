@@ -516,16 +516,23 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
   Nothing -> powerGiven pcs oid gs
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
--- candidates projected through the layers BEFORE that one. Off-battlefield
--- candidates have no projection at all (gather walks the battlefield only), so
--- they fall back to the printed card -- a library/hand/graveyard candidate is
--- matched against its PRINTED characteristics, never a projected view (#160).
--- Its POWER is the one axis a rule reaches into off the battlefield: CR 208.2a
--- makes a characteristic-defining one function everywhere, which is why the
--- fallback is viewOfCardIn rather than viewOfCard.
+-- candidates projected through the layers BEFORE that one. A candidate in a
+-- library, hand, graveyard or exile has no projection at all, since gather does
+-- not walk those zones, so it falls back to the printed card and is matched
+-- against its PRINTED characteristics (#160). Its POWER is the one axis a rule
+-- reaches into there: CR 208.2a makes a characteristic-defining one function everywhere,
+-- which is why the fallback is viewOfCardIn rather than viewOfCard.
+--
+-- The STACK is projected, not fallen back on, and gatherGiven's CR 113.6 walk is
+-- what makes that worth doing: a spell can carry a static ability of its own, so
+-- a clause read against it must see the grant. It also brings this in line with
+-- viewOfObject, which has never had a zone gate -- so a "target spell" filter
+-- and an "as long as" clause now read one spell the same way. The axes that only
+-- an object has (its controller, CR 702.33d's kicked flag) come with that, and
+-- Molten Disaster's own clause is the reader of the second.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
-  if Set.member oid (GameState.battlefield gs)
+  if Set.member oid (GameState.battlefield gs) || elem oid (GameState.stack gs)
     then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
     else fmap (viewOfCardIn gs oid) (Game.faceOf oid gs)
 
@@ -1543,11 +1550,13 @@ swapWordIn family pairs word = List.foldl' step word pairs
 
 -- CR 612.1 through an ObjectRef. InSlot names an object chosen at cast time
 -- rather than a word on the card; EachMatching's Filter is card text like any
--- other.
+-- other. EachPlayer carries no word at all -- CR 612.1 changes subtype words,
+-- and "each player" has none.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
+  ObjectRef.EachPlayer -> ref
 
 -- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --
@@ -1890,6 +1899,12 @@ alwaysFunctioning _ _ _ = True
 -- Emblems are included for the reason gatherGiven gathers them (CR 114.4 / 113.6);
 -- no emblem in the pool carries a condition, and a walk that skipped them would
 -- silently ungate the first one that did.
+--
+-- So is the stack, and there the first one HAS arrived: Molten Disaster's "if
+-- this spell was kicked, it has split second" is a CR 604.2 clause on an ability
+-- gatherGiven gathers from the stack. Skipping the stack here would leave that
+-- clause wired open by alwaysFunctioning, so an UNKICKED Molten Disaster would
+-- carry split second.
 anyConditional :: GameState -> Bool
 anyConditional gs =
   let conditional oid = case Game.faceOf oid gs of
@@ -1897,6 +1912,7 @@ anyConditional gs =
         Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
    in any conditional (Set.toList (GameState.battlefield gs))
         || any conditional (Set.toList (GameState.command gs))
+        || any conditional (GameState.stack gs)
 
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
@@ -1953,9 +1969,47 @@ gatherGiven stripped functioning gs =
             -- 114.5).
             concat (zipWith (gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
+      fromSpell spellId = case Game.lookupObject spellId gs of
+        Nothing -> []
+        Just spellObj -> case Game.faceOf spellId gs of
+          Nothing -> []
+          Just face ->
+            -- CR 604.2's second limb -- "or as long as the object with the
+            -- ability remains in the appropriate zone, as described in rule
+            -- 113.6" -- and CR 113.6's first sentence names that zone:
+            -- "Abilities of an instant or sorcery spell usually function only
+            -- while that object is on the stack."
+            --
+            -- Read off the CARD TYPES, which is a classification and not an
+            -- identity -- the same act as the battlefield walk above reading
+            -- Face.staticAbilities. A permanent spell's static abilities are
+            -- NOT gathered here: rule 113.6's second sentence keeps them on the
+            -- battlefield, and the exceptions that do reach the stack (CR
+            -- 113.6d/e/g) are asked elsewhere, off the printed face.
+            --
+            -- CR 613.7a again: the effect shares the stack object's timestamp.
+            -- No liveness or text-change pass and never stripped, for the
+            -- emblem branch's reason -- the pool's CR 613.1f removers reach
+            -- creatures on the battlefield, and a spell on the stack is not
+            -- one.
+            if Set.null (Set.intersection spellStaticTypes (TypeLine.types (Face.typeLine face)))
+              then []
+              else concat (zipWith (gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False) [0 ..] (Face.staticAbilities face))
+      spells = concatMap fromSpell (GameState.stack gs)
       counters = counterGathered gs
       designations = designationGathered gs
-   in stored <> static <> emblems <> counters <> designations
+   in stored <> static <> emblems <> spells <> counters <> designations
+
+-- CR 113.6's first sentence: the card types whose object has its abilities
+-- function on the stack rather than on the battlefield. Its own binding rather
+-- than a literal in gatherGiven, so the rule reads as a rule.
+--
+-- anyConditional deliberately does NOT narrow by this: it is a structural
+-- precondition, and a superset of the abilities gatherGiven will actually
+-- gather can only cost a second walk, where a subset would leave a CR 604.2
+-- clause wired open.
+spellStaticTypes :: Set CardType.CardType
+spellStaticTypes = Set.fromList [CardType.Instant, CardType.Sorcery]
 
 -- ONE battlefield permanent's static-ability parts, each tagged with the index
 -- of the ability it came from -- gatherStatic's `n`, and so the key half CR
