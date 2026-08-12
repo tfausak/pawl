@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.PlayerEffect and Pawl.Engine.Cost, plus the types they case on
--- (Pawl.Types.PlayerEffect, PlayerScope, PlayerStaticAbility) and
+-- (Pawl.Types.PlayerEffect, PlayerScope, AffectedPlayers, PlayerStaticAbility) and
 -- the stored carrier Pawl.Types.ActivePlayerEffect. The spell match runs through
 -- the identity-blind Pawl.Engine.Filter over a Pawl.Types.Filter. CR 613.10/613.11: the
 -- continuous effects that affect PLAYERS and the RULES OF THE GAME, which sit
@@ -41,6 +41,10 @@
 -- half of that pair: a prohibition on even mana values, against an {X} spell
 -- whose mana value is even only while it sits in a hand (CR 202.3e).
 --
+-- Cease-Fire is the TARGETED seat, and the reason it is a three-seat fixture:
+-- its restriction is stored against one player the spell chose (CR 601.2c)
+-- rather than against a scope, which two seats cannot tell from "your opponent".
+--
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
@@ -76,6 +80,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.BeginningStep as BeginningStep
 -- Aliased Card.Type, per the project-wide convention (CardSpec): the logic
 -- module Pawl.Engine.Card may later be imported and must not collide.
@@ -1973,7 +1978,7 @@ theTenRingsSpec s registry =
 addPlayerEffectAt ::
   ObjectId.ObjectId ->
   Expiry.Type.Expiry ->
-  PlayerScope.PlayerScope ->
+  AffectedPlayers.AffectedPlayers PlayerId.PlayerId ->
   PlayerEffect.Type.PlayerEffect ->
   PlayerId.PlayerId ->
   GameState.GameState ->
@@ -2002,7 +2007,7 @@ storedConditional piker =
         addPlayerEffectAt
           srcId
           (Expiry.Type.While S.alice S.youControlSource)
-          PlayerScope.Opponents
+          (AffectedPlayers.Scoped PlayerScope.Opponents)
           PlayerEffect.Type.CantCastSpells
           S.alice
           withSrc
@@ -2018,7 +2023,7 @@ storedSpec s registry =
         silenced =
           S.addPlayerEffect
             Expiry.Type.AtCleanup
-            PlayerScope.Opponents
+            (AffectedPlayers.Scoped PlayerScope.Opponents)
             PlayerEffect.Type.CantCastSpells
             S.alice
             base
@@ -2036,7 +2041,7 @@ storedSpec s registry =
             Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell after)) "and bob may cast again"
 
     Spec.it s "CR 514.2 the cleanup sweep keeps a Never player effect" $
-      let forever = S.addPlayerEffect Expiry.Type.Never PlayerScope.Opponents PlayerEffect.Type.CantCastSpells S.alice base
+      let forever = S.addPlayerEffect Expiry.Type.Never (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.Type.CantCastSpells S.alice base
        in Spec.assertEqWith s "survives" (length (GameState.playerEffects (Expiry.dropAtCleanup forever))) 1
 
     -- THE DISCRIMINATING SHAPE: two entries, keyed to the two different
@@ -2045,8 +2050,8 @@ storedSpec s registry =
     -- single-entry version of this test; here it would wrongly drop
     -- bob's still-live entry too.
     Spec.it s "CR 611.2a the handoff sweep drops only the entry keyed to the player whose turn began" $
-      let forBob = S.addPlayerEffect (Expiry.Type.AtTurnOf S.bob) PlayerScope.Opponents PlayerEffect.Type.CantCastSpells S.alice base
-          armed = S.addPlayerEffect (Expiry.Type.AtTurnOf S.alice) PlayerScope.Opponents PlayerEffect.Type.CantCastSpells S.alice forBob
+      let forBob = S.addPlayerEffect (Expiry.Type.AtTurnOf S.bob) (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.Type.CantCastSpells S.alice base
+          armed = S.addPlayerEffect (Expiry.Type.AtTurnOf S.alice) (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.Type.CantCastSpells S.alice forBob
           bobsTurn = S.runPure S.identityAnswer armed Engine.handoffTurn
        in do
             Spec.assertEqWith s "bob is active" (GameState.activePlayer bobsTurn) S.bob
@@ -2263,6 +2268,165 @@ silenceSpec s registry =
         []
       -- CR 109.5: the scope is resolved off the effect's controller.
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell resolved)) "alice is not prohibited"
+
+-- CR 601.2c: the three-seat Cease-Fire board. alice has three Plains and the
+-- Cease-Fire; all three seats have two Mountains, a Goblin Piker in hand and two
+-- Plains in their library, and carol also holds a Lightning Bolt. The seats are
+-- stocked IDENTICALLY on the creature axis on purpose -- the only thing that
+-- differs between bob and carol afterwards is which of them the spell targeted --
+-- and carol's Bolt is the second axis: same seat, same mana, a noncreature card.
+--
+-- THREE seats because two collapse "target player" onto "the opponent", which is
+-- exactly the reading under test. carol is the far seat.
+--
+-- The libraries are stocked because the card draws: an empty one would lose alice
+-- the game to CR 104.3c before the assertions ran, and the equal stock is what
+-- makes the draw's own control (bob's library) honest.
+--
+-- Loaded fresh inside each case that needs it -- equivalent because loading is
+-- deterministic and cached (batch-recipe.md).
+ceaseFireBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ceaseFireBoard plains ceaseFire mountain piker lightningBolt =
+  let gs0 = Setup.emptyGame S.threePlayers
+      repeatedly f n gs = List.foldl' (\g _ -> f g) gs [1 .. n :: Int]
+      addLands printing pid = repeatedly (\g -> snd (S.addCreature printing pid g))
+      stockLibrary pid = repeatedly (\g -> snd (S.addLibraryCard plains pid g)) (2 :: Int)
+      gs1 = addLands plains S.alice (3 :: Int) gs0
+      gs2 = addLands mountain S.alice (2 :: Int) gs1
+      (ceaseFireId, gs3) = S.addHandCard ceaseFire S.alice gs2
+      (alicesPiker, gs4) = S.addHandCard piker S.alice gs3
+      gs5 = addLands mountain S.bob (2 :: Int) gs4
+      (bobsPiker, gs6) = S.addHandCard piker S.bob gs5
+      gs7 = addLands mountain S.carol (2 :: Int) gs6
+      (carolsPiker, gs8) = S.addHandCard piker S.carol gs7
+      (carolsBolt, gs9) = S.addHandCard lightningBolt S.carol gs8
+      stocked = stockLibrary S.carol (stockLibrary S.bob (stockLibrary S.alice gs9))
+   in ( ceaseFireId,
+        alicesPiker,
+        bobsPiker,
+        carolsPiker,
+        carolsBolt,
+        -- carol's own main phase, which is when the card is really cast: its
+        -- effect lasts "this turn", so aiming it at the player whose turn it is
+        -- is what makes it bite at all.
+        stocked {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.carol, GameState.priority = Just S.alice}
+      )
+
+-- Every target prompt answers with CAROL -- pinned rather than searched, so a
+-- broken bake cannot be repaired by an answerer that hunts for a legal option.
+ceaseFireAtCarol :: Prompt.Prompt r -> r
+ceaseFireAtCarol p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.carol))) sets
+  _ -> S.identityAnswer p
+
+-- alice casts Cease-Fire at carol and it resolves.
+ceaseFireAfter :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, GameState.GameState)
+ceaseFireAfter plains ceaseFire mountain piker lightningBolt =
+  let (ceaseFireId, alicesPiker, bobsPiker, carolsPiker, carolsBolt, before) = ceaseFireBoard plains ceaseFire mountain piker lightningBolt
+      onStack = S.runPure ceaseFireAtCarol before (S.cast S.alice ceaseFireId)
+      after = S.runPure ceaseFireAtCarol onStack Engine.priorityLoop
+   in (alicesPiker, bobsPiker, carolsPiker, carolsBolt, before, after)
+
+-- Is a cast of this card offered to this seat, on a board staged as that seat's
+-- own main phase? CR 302.1 offers a creature spell only to the active player, so
+-- the flip is what keeps the three seats comparable -- the posture the three-seat
+-- Silence case above already takes, and nothing else about the board changes.
+offersCast :: PlayerId.PlayerId -> ObjectId.ObjectId -> Printing.Printing -> GameState.GameState -> Bool
+offersCast pid oid printing gs =
+  elem
+    (Action.Type.Cast oid (S.printingName printing) Facing.FaceUp)
+    (Action.legalActions pid (gs {GameState.activePlayer = pid}))
+
+-- How many cards this seat's library holds.
+librarySize :: PlayerId.PlayerId -> GameState.GameState -> Int
+librarySize pid gs = length (Map.findWithDefault mempty pid (GameState.library gs))
+
+-- Cease-Fire {2}{W} Instant: "Target player can't cast creature spells this
+-- turn. Draw a card." The first card in the pool to store a player effect on a
+-- TARGETED seat.
+ceaseFireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ceaseFireSpec s registry =
+  Spec.describe s "CeaseFire" $ do
+    -- The positive control both negatives are read against: before the spell
+    -- resolves, every seat may cast its Goblin Piker.
+    Spec.it s "before Cease-Fire resolves, all three seats may cast their creature" $ do
+      plains <- S.printingOf s registry "Plains"
+      ceaseFire <- S.printingOf s registry "Cease-Fire"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (alicesPiker, bobsPiker, carolsPiker, _, before, _) = ceaseFireAfter plains ceaseFire mountain piker lightningBolt
+      Spec.assertEqWith s "three seats" (length (GameState.turnOrder before)) 3
+      Spec.assertBool s (offersCast S.alice alicesPiker piker before) "alice could cast"
+      Spec.assertBool s (offersCast S.bob bobsPiker piker before) "bob could cast"
+      Spec.assertBool s (offersCast S.carol carolsPiker piker before) "carol could cast"
+
+    -- THE DISCRIMINATOR: the restriction lands on the seat CR 601.2c chose and on
+    -- no other. No PlayerScope can say this -- Opponents would stop bob too, and
+    -- You would stop alice.
+    Spec.it s "CR 601.2c the restriction lands on the targeted seat alone" $ do
+      plains <- S.printingOf s registry "Plains"
+      ceaseFire <- S.printingOf s registry "Cease-Fire"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (alicesPiker, bobsPiker, carolsPiker, _, _, after) = ceaseFireAfter plains ceaseFire mountain piker lightningBolt
+      -- The gameplay reading first, so a mutation is answered by the offers
+      -- rather than by the store's shape alone.
+      Spec.assertBool s (not (offersCast S.carol carolsPiker piker after)) "carol may not cast her creature"
+      Spec.assertBool s (offersCast S.bob bobsPiker piker after) "bob, the untargeted opponent, still may"
+      Spec.assertBool s (offersCast S.alice alicesPiker piker after) "and so may alice, who cast it"
+      Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects after)) 1
+      Spec.assertEqWith
+        s
+        "stored against the seat itself, not a scope"
+        (fmap ActivePlayerEffect.scope (GameState.playerEffects after))
+        [AffectedPlayers.Named S.carol]
+
+    -- The other axis of the same restriction, on the SAME seat and the same
+    -- board: "creature spells" is a Filter over the spell, so carol's instant is
+    -- untouched. Without this the case above would pass for a prohibition that
+    -- stopped carol casting anything at all.
+    Spec.it s "CR 601.3a the targeted seat may still cast a noncreature spell" $ do
+      plains <- S.printingOf s registry "Plains"
+      ceaseFire <- S.printingOf s registry "Cease-Fire"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (_, _, _, carolsBolt, _, after) = ceaseFireAfter plains ceaseFire mountain piker lightningBolt
+      Spec.assertBool s (offersCast S.carol carolsBolt lightningBolt after) "carol may still cast her Lightning Bolt"
+
+    -- CR 514.2: "this turn" ends at cleanup, so the restriction has to end with
+    -- it. Driven through the cleanup step's own turn-based actions rather than
+    -- the priority loop -- the narrowest path that ends the effect.
+    Spec.it s "CR 514.2 the restriction ends at cleanup" $ do
+      plains <- S.printingOf s registry "Plains"
+      ceaseFire <- S.printingOf s registry "Cease-Fire"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (_, _, carolsPiker, _, _, after) = ceaseFireAfter plains ceaseFire mountain piker lightningBolt
+          ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+      Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
+      Spec.assertBool s (offersCast S.carol carolsPiker piker ended) "carol may cast her creature again"
+
+    -- The card's second clause. Its control is the two untargeted libraries,
+    -- which the same resolution must leave alone.
+    Spec.it s "the draw is its controller's, not the targeted player's" $ do
+      plains <- S.printingOf s registry "Plains"
+      ceaseFire <- S.printingOf s registry "Cease-Fire"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      let (_, _, _, _, before, after) = ceaseFireAfter plains ceaseFire mountain piker lightningBolt
+      Spec.assertEqWith s "every library starts equal" (fmap (`librarySize` before) [S.alice, S.bob, S.carol]) [2, 2, 2]
+      Spec.assertEqWith s "alice drew one; nobody else drew" (fmap (`librarySize` after) [S.alice, S.bob, S.carol]) [1, 2, 2]
 
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).
@@ -3524,7 +3688,7 @@ jaredSpec s registry =
           let after = etbResolved jaredId gs
           Spec.assertEqWith s "bob is the monarch" (GameState.monarch after) (Just S.bob)
           Spec.assertEqWith s "one stored CR 611.2c effect" (fmap ActivePlayerEffect.effect (GameState.playerEffects after)) [PlayerEffect.Type.CantBecomeMonarch]
-          Spec.assertEqWith s "scoped to its controller" (fmap ActivePlayerEffect.scope (GameState.playerEffects after)) [PlayerScope.You]
+          Spec.assertEqWith s "scoped to its controller" (fmap ActivePlayerEffect.scope (GameState.playerEffects after)) [AffectedPlayers.Scoped PlayerScope.You]
           Spec.assertEqWith s "who is alice" (fmap ActivePlayerEffect.controller (GameState.playerEffects after)) [S.alice]
           Spec.assertBool s (PlayerEffect.prohibitsBecomingMonarch S.alice after) "so alice can't become the monarch"
           Spec.assertBool s (not (PlayerEffect.prohibitsBecomingMonarch S.bob after)) "and bob still can"
@@ -3695,6 +3859,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   theTenRingsSpec s registry
   storedSpec s registry
   silenceSpec s registry
+  ceaseFireSpec s registry
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry

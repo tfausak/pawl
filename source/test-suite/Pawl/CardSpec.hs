@@ -56,6 +56,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttackCost as AttackCost
@@ -2098,9 +2099,11 @@ playerEffectFilters playerEffect = case playerEffect of
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- player effect whose reading depends on its scope must break this build.
-unpreventableScopeOffends :: PlayerScope.PlayerScope -> PlayerEffect.PlayerEffect -> Bool
+unpreventableScopeOffends :: AffectedPlayers.AffectedPlayers SlotName.SlotName -> PlayerEffect.PlayerEffect -> Bool
 unpreventableScopeOffends scope playerEffect = case playerEffect of
-  PlayerEffect.DamageCantBePrevented _ -> scope /= PlayerScope.EachPlayer
+  -- A NAMED seat is a narrowing like any other, and the strictest one there is:
+  -- "target player" reaches one player where CR 615.12 reaches the whole table.
+  PlayerEffect.DamageCantBePrevented _ -> scope /= AffectedPlayers.Scoped PlayerScope.EachPlayer
   PlayerEffect.CantSearchLibraries -> False
   PlayerEffect.CantBecomeMonarch -> False
   -- Every other arm IS asked about a player, so its scope is read exactly as
@@ -2186,22 +2189,23 @@ anyDamage =
 -- (CR 604.2, Spider-Punk) and the stored one a resolution installs (CR 611.2c,
 -- Silence -- and Skullcrack's "damage can't be prevented this turn", whenever
 -- the pool gains it).
-cardPlayerScopes :: Face.Face Card.Type.Card -> [(PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)]
+cardPlayerScopes :: Face.Face Card.Type.Card -> [(AffectedPlayers.AffectedPlayers SlotName.SlotName, PlayerEffect.PlayerEffect)]
 cardPlayerScopes card =
   fmap printedPlayerScope (Face.playerAbilities card)
     <> Maybe.mapMaybe storedPlayerScope (cardResolutionEffects card)
 
 -- The printed carrier's pair: the record's two fields, in the order the lint
--- above reads them.
-printedPlayerScope :: PlayerStaticAbility.PlayerStaticAbility -> (PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)
-printedPlayerScope ability = (PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)
+-- above reads them. Wrapped as Scoped so the two carriers read as one list --
+-- a static ability has no slot, so it can never be the other arm.
+printedPlayerScope :: PlayerStaticAbility.PlayerStaticAbility -> (AffectedPlayers.AffectedPlayers SlotName.SlotName, PlayerEffect.PlayerEffect)
+printedPlayerScope ability = (AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), PlayerStaticAbility.effect ability)
 
 -- The stored carrier's pair, or Nothing for the overwhelming majority of
 -- effects, which install no continuous effect on the player axis at all. A
 -- wildcard here rather than one arm per effect, matching the control lint's own
 -- sweep over this sum: Pawl.Types.Effect is the open half's alphabet, and a new
 -- resolution effect is not a new player carrier.
-storedPlayerScope :: Effect.Effect Card.Type.Card -> Maybe (PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)
+storedPlayerScope :: Effect.Effect Card.Type.Card -> Maybe (AffectedPlayers.AffectedPlayers SlotName.SlotName, PlayerEffect.PlayerEffect)
 storedPlayerScope effect = case effect of
   Effect.AffectPlayers _ scope playerEffect -> Just (scope, playerEffect)
   _ -> Nothing
@@ -3773,7 +3777,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.AffectPlayers duration scope _ -> Effect.AffectPlayers duration scope (PlayerEffect.DamageCantBePrevented anyDamage)
           other -> other
         widen effect = case effect of
-          Effect.AffectPlayers duration _ playerEffect -> Effect.AffectPlayers duration PlayerScope.EachPlayer playerEffect
+          Effect.AffectPlayers duration _ playerEffect -> Effect.AffectPlayers duration (AffectedPlayers.Scoped PlayerScope.EachPlayer) playerEffect
           other -> other
         overSpell f face =
           face

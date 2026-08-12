@@ -46,6 +46,7 @@ import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
@@ -167,6 +168,14 @@ playerRefSlots ref = case ref of
   -- InSlot's baked half names a seat, not a slot. Unreachable from card data,
   -- which this lint's whole input is (Pawl.CardSpec sweeps the pool for one).
   PlayerRef.Specific _ -> Map.empty
+
+-- The slots an AffectedPlayers reads. Only the Named arm does, and only ever one
+-- player: a card writes AffectedPlayers SlotName, whose Named payload is a slot
+-- name rather than the seat Pawl.Engine.Resolve bakes it into.
+affectedPlayersSlots :: AffectedPlayers.AffectedPlayers SlotName -> Map.Map SlotName SlotArity
+affectedPlayersSlots affected = case affected of
+  AffectedPlayers.Scoped _ -> Map.empty
+  AffectedPlayers.Named slot -> Map.singleton slot SlotArity.One
 
 -- The slots an ObjectRef reads. Only InSlot names one directly; the sweeping
 -- arms are swept at resolution and name nothing at cast, so a card whose only
@@ -296,7 +305,8 @@ slotsOf effect = case effect of
   Effect.AddPhases _ -> Map.empty
   Effect.GainControl _ ref -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Map.empty
-  Effect.AffectPlayers {} -> Map.empty
+  -- The AffectedPlayers may name a target slot -- Cease-Fire's "target player".
+  Effect.AffectPlayers _ affected _ -> affectedPlayersSlots affected
   -- Both refs, for Tap and Untap's reason: either may name a slot.
   Effect.RequireBlock _ blocker attacker -> joinTwo (objectRefSlots blocker) (objectRefSlots attacker)
   Effect.CreateEmblem {} -> Map.empty
@@ -493,8 +503,8 @@ slotsAreExhaustive effect = case effect of
   -- CR 603.7c: the armed ability inherits this object's whole environment, so
   -- what it reads is not stated here at all.
   Effect.ArmDelayedTrigger {} -> False
-  -- GainControl's reason for the Duration; the PlayerScope and the PlayerEffect
-  -- beside it hold no reference of any sort.
+  -- GainControl's reason for the Duration; the AffectedPlayers is reported by
+  -- slotsOf above and the PlayerEffect beside it holds no reference of any sort.
   Effect.AffectPlayers duration _ _ ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- slotsOf's arm reports both refs but drops the Duration, so the slotless
@@ -3298,28 +3308,45 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                   }
            in g1 {GameState.replacements = active : GameState.replacements g1}
     State.modify' (\g -> List.foldl' (flip install) g named)
-  Effect.AffectPlayers duration scope playerEffect ->
-    -- CR 611.1 / 613.11: install the stored player effect. Targetless and
-    -- unprompted. CR 109.5: the CONTROLLER is baked in now, because the source
-    -- will not have one to project once it leaves the stack (Silence is an
-    -- instant). The SCOPE is not: CR 611.2c makes a rules-modifying effect one
-    -- that "can affect objects that weren't affected when that continuous effect
-    -- began", so it is re-resolved on every read.
+  Effect.AffectPlayers duration affected playerEffect ->
+    -- CR 611.1 / 613.11: install the stored player effect. Unprompted, and
+    -- targetless except through the AffectedPlayers below. CR 109.5: the
+    -- CONTROLLER is baked in now, because the source will not have one to project
+    -- once it leaves the stack (Silence is an instant). A SCOPED set is not: CR
+    -- 611.2c makes a rules-modifying effect one that "can affect objects that
+    -- weren't affected when that continuous effect began", so it is re-resolved
+    -- on every read.
+    --
+    -- A NAMED set is baked here instead, because the seat came from a target slot
+    -- (CR 601.2c) and the bindings that answer it are gone once this resolution
+    -- is over -- the move Expiry.arm already makes for CR 611.2b's condition. One
+    -- stored row per player the slot names, RequireBlock's shape: an unfilled or
+    -- illegal slot names none and stores nothing, which is CR 608.2b's "if the
+    -- spell or ability creates any continuous effects that affect game rules
+    -- (see rule 613.11), those effects don't apply to illegal targets".
     State.modify' $ \gs -> case Expiry.arm (Binding.playersIn legal) controller source duration gs of
       -- CR 611.2b: the duration never started, so nothing is stored.
       Nothing -> gs
       Just expiry ->
-        let (ts, gs1) = Game.freshTimestamp gs
-            active =
-              ActivePlayerEffect.MkActivePlayerEffect
-                { ActivePlayerEffect.source = source,
-                  ActivePlayerEffect.controller = controller,
-                  ActivePlayerEffect.timestamp = ts,
-                  ActivePlayerEffect.expiry = expiry,
-                  ActivePlayerEffect.scope = scope,
-                  ActivePlayerEffect.effect = playerEffect
-                }
-         in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
+        let baked = case affected of
+              AffectedPlayers.Scoped scope -> [AffectedPlayers.Scoped scope]
+              -- Through playerRefPlayers so the slot is read exactly as every
+              -- other opcode reads one, CR 608.2b's empty answer included.
+              AffectedPlayers.Named slot ->
+                fmap AffectedPlayers.Named (playerRefPlayers legal controller gs (PlayerRef.InSlot slot))
+            install g scope =
+              let (ts, g1) = Game.freshTimestamp g
+                  active =
+                    ActivePlayerEffect.MkActivePlayerEffect
+                      { ActivePlayerEffect.source = source,
+                        ActivePlayerEffect.controller = controller,
+                        ActivePlayerEffect.timestamp = ts,
+                        ActivePlayerEffect.expiry = expiry,
+                        ActivePlayerEffect.scope = scope,
+                        ActivePlayerEffect.effect = playerEffect
+                      }
+               in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
+         in List.foldl' install gs baked
   Effect.RequireBlock duration blockerRef attackerRef ->
     -- CR 509.1c / 613.11: store one requirement per (blocker, attacker) pair the
     -- two refs name. Rule 509.1c counts requirements PER CREATURE, so the pairs

@@ -12,6 +12,7 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
@@ -788,8 +789,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells)
-      """ {"type":"AffectPlayers","value":[{"type":"UntilEndOfTurn"},{"type":"Opponents"},{"type":"CantCastSpells"}]} """
+      (Effect.AffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.CantCastSpells)
+      """ {"type":"AffectPlayers","value":[{"type":"UntilEndOfTurn"},{"type":"Scoped","value":{"type":"Opponents"}},{"type":"CantCastSpells"}]} """
+  -- The targeted seat, which is the arm no scope can say (Cease-Fire).
+  Spec.it s "AffectPlayers at a named slot" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.AffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Named (SlotName.MkSlotName (Text.pack "target"))) PlayerEffect.CantCastSpells)
+      """ {"type":"AffectPlayers","value":[{"type":"UntilEndOfTurn"},{"type":"Named","value":"target"},{"type":"CantCastSpells"}]} """
   Spec.it s "RequireBlock" $
     Common.assertJsonCodec
       s

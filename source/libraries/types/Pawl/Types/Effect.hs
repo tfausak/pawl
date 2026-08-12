@@ -3,6 +3,7 @@ module Pawl.Types.Effect where
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -26,7 +27,6 @@ import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -811,15 +811,19 @@ data Effect card
     -- why the gate cannot live in the ability's own trigger condition.
     ArmDelayedTrigger AbilityName.AbilityName Onset.Onset (Maybe Duration.Duration)
   | -- | CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
-    -- effect on a class of players for a duration. Silence is
-    -- `AffectPlayers UntilEndOfTurn Opponents CantCastSpells`.
+    -- effect on some players for a duration. Silence is
+    -- `AffectPlayers UntilEndOfTurn (Scoped Opponents) CantCastSpells`, and
+    -- Cease-Fire is `AffectPlayers UntilEndOfTurn (Named target)
+    -- (CantCastMatching (HasCardType Creature))`.
     --
-    -- Targetless, mirroring Replace: a rules-modifying effect watches a CLASS, so
-    -- there is nothing to target and nothing to prompt. Resolve stores it into
+    -- Targets only through its AffectedPlayers, which is what the Scoped/Named
+    -- split buys: a rules-modifying effect on a CLASS watches that class and
+    -- prompts for nothing, while the Named arm names a slot the ability targeted
+    -- and Resolve bakes to a seat. Resolve stores it into
     -- GameState.playerEffects with this effect's source, its controller (CR 109.5,
     -- baked in -- the source may be in a graveyard by the time anyone asks), a
     -- fresh timestamp and Expiry.arm's answer.
-    AffectPlayers Duration.Duration PlayerScope.PlayerScope PlayerEffect.PlayerEffect
+    AffectPlayers Duration.Duration (AffectedPlayers.AffectedPlayers SlotName.SlotName) PlayerEffect.PlayerEffect
   | -- | CR 509.1c / 613.11: install a stored BLOCKING REQUIREMENT for a duration
     -- -- "that creature blocks this creature this combat if able". Provoke (CR
     -- 702.39a) is `RequireBlock UntilEndOfCombat (InSlot provokeTarget)

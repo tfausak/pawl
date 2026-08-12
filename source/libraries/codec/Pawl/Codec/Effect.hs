@@ -4,6 +4,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
+import qualified Pawl.Codec.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
@@ -27,7 +28,6 @@ import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Codec.PlayerRef as PlayerRef
-import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.Regenerability as Regenerability
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
@@ -163,7 +163,7 @@ toJson codec e = case e of
     (Onset.Immediately, Nothing) -> Codec.encode AbilityName.codec n
     (Onset.Immediately, Just d) -> Value.array [Codec.encode AbilityName.codec n, Duration.toJson d]
     _ -> Value.array [Codec.encode AbilityName.codec n, Codec.encode Onset.codec o, Common.encodeMaybe Duration.toJson md]
-  Effect.AffectPlayers d s pe -> Common.tagged "AffectPlayers" (Just (Value.array [Duration.toJson d, Codec.encode PlayerScope.codec s, PlayerEffect.toJson pe]))
+  Effect.AffectPlayers d s pe -> Common.tagged "AffectPlayers" (Just (Value.array [Duration.toJson d, AffectedPlayers.toJson s, PlayerEffect.toJson pe]))
   Effect.RequireBlock d b a -> Common.tagged "RequireBlock" (Just (Value.array [Duration.toJson d, ObjectRef.toJson b, ObjectRef.toJson a]))
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (MonarchTarget.toJson t))
@@ -391,8 +391,8 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [d, r])) -> Effect.GainControl <$> Duration.fromJson d <*> ObjectRef.fromJson r
       _ -> Left . Text.pack $ "GainControl expects [duration, objectRef]"
     "AffectPlayers" -> case mv of
-      Just (Value.Array (Array.MkArray [d, s, pe])) -> Effect.AffectPlayers <$> Duration.fromJson d <*> Codec.decode PlayerScope.codec s <*> PlayerEffect.fromJson pe
-      _ -> Left . Text.pack $ "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]"
+      Just (Value.Array (Array.MkArray [d, s, pe])) -> Effect.AffectPlayers <$> Duration.fromJson d <*> AffectedPlayers.fromJson s <*> PlayerEffect.fromJson pe
+      _ -> Left . Text.pack $ "AffectPlayers expects [Duration, AffectedPlayers, PlayerEffect]"
     "RequireBlock" -> case mv of
       Just (Value.Array (Array.MkArray [d, b, a])) -> Effect.RequireBlock <$> Duration.fromJson d <*> ObjectRef.fromJson b <*> ObjectRef.fromJson a
       _ -> Left . Text.pack $ "RequireBlock expects [Duration, ObjectRef, ObjectRef]"
