@@ -12,6 +12,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -30,6 +31,13 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.fromJson
       (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))
       """ {"type":"HasCardType","value":{"type":"Creature"}} """
+  Spec.it s "EachCardInGraveyard" $
+    Common.assertJsonCodec
+      s
+      ObjectRef.toJson
+      ObjectRef.fromJson
+      (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
+      """ ["EachCardInGraveyard",{"type":"EachPlayer"},{"type":"HasCardType","value":{"type":"Creature"}}] """
   Spec.it s "EachPlayer" $
     Common.assertJsonCodec
       s
@@ -46,20 +54,21 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       """ ["TopOfLibrary",{"type":"Relative","value":{"type":"You"}}] """
   -- Guards against a decoder that read every payload as one arm regardless of
   -- its JSON type.
-  Spec.it s "the four arms are told apart by JSON type, not by a tag" $
+  Spec.it s "the five arms are told apart by JSON type, not by a tag" $
     Spec.assertEqWith
       s
-      "a slot, a swept set, the player sweep and a library's top card all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, the player sweep and a library's top card all encode differently"
       ( length
           ( List.nub
               [ ObjectRef.toJson (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
                 ObjectRef.toJson (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
+                ObjectRef.toJson (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)),
                 ObjectRef.toJson ObjectRef.EachPlayer,
                 ObjectRef.toJson (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You))
               ]
           )
       )
-      4
+      5
   -- An array the decoder does not know is an error rather than a silent slot.
   Spec.it s "an unknown array word is rejected" $
     Spec.assertBool

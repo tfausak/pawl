@@ -44,14 +44,15 @@ import Pawl.Types.Zone (Zone)
 zoneFunctionedFrom :: Effect Card.Type.Card -> Maybe Zone
 zoneFunctionedFrom effect = case effect of
   -- Only an InSlot naming the reserved source slot can be "the object it's on".
-  -- A swept set is never one object, so neither sweeping arm can be; a library's
+  -- A swept set is never one object, so no sweeping arm can be; a library's
   -- top card is one object, but it is named by POSITION rather than by that slot,
-  -- so it cannot be one either. All three answer Nothing however the card file
+  -- so it cannot be one either. All of them answer Nothing however the card file
   -- states the origin -- the same inert card-data error the note above describes
   -- for a move of somebody else's permanent.
   Effect.MoveToZone ref _ _ _ origin _ -> case ref of
     ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
     ObjectRef.EachMatching _ -> Nothing
+    ObjectRef.EachCardInGraveyard _ _ -> Nothing
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.TopOfLibrary _ -> Nothing
   Effect.DealDamage _ _ -> Nothing

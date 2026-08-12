@@ -1829,6 +1829,10 @@ objectRefFilters ref = case ref of
   ObjectRef.InSlot _ -> []
   -- Day of Judgment's "all creatures", Boil's "all Islands".
   ObjectRef.EachMatching f -> [f]
+  -- Rise of the Dark Realms' "all creature cards from all graveyards"; its
+  -- PlayerScope names players rather than characteristics, so the Filter is the
+  -- whole of what there is to lint.
+  ObjectRef.EachCardInGraveyard _ f -> [f]
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it holds
@@ -3565,6 +3569,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         movesAtMostOne ref = case ref of
           ObjectRef.InSlot _ -> True
           ObjectRef.EachMatching _ -> False
+          ObjectRef.EachCardInGraveyard _ _ -> False
           ObjectRef.EachPlayer -> False
           ObjectRef.TopOfLibrary player -> case player of
             PlayerRef.Relative PlayerRelation.You -> True

@@ -3,6 +3,7 @@ module Pawl.Types.ObjectRef where
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | WHICH OBJECTS an object-affecting effect names -- the object-side counterpart
@@ -27,7 +28,8 @@ data ObjectRef
     InSlot SlotName.SlotName
   | -- | Every PERMANENT ON THE BATTLEFIELD matching the Filter -- Day of
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a
-    -- set drawn from any other zone has no card in the pool (#376).
+    -- set drawn from a graveyard is EachCardInGraveyard below, and from any
+    -- other zone has no card in the pool (#1309).
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then
@@ -39,6 +41,29 @@ data ObjectRef
     -- the effect itself (CR 611.2c), storing Affected.TheseObjects; the one-shots
     -- that take this type store nothing.
     EachMatching (Filter.Filter Keyword.Keyword)
+  | -- | Every CARD IN A GRAVEYARD matching the Filter, in the graveyards the
+    -- PlayerScope names -- Rise of the Dark Realms' "all creature cards from all
+    -- graveyards". EachMatching's sibling with CR 109.2's battlefield default
+    -- switched off by the card's own words, which is CR 109.2a: a description
+    -- carrying "card" and the name of a zone "means a card matching that
+    -- description in the stated zone".
+    --
+    -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, the shape
+    -- Pawl.Types.Pool.CardsInGraveyard takes one question over: no card in the
+    -- pool sweeps a filtered set out of any other zone, and the hidden ones (CR
+    -- 400.2) would owe a visibility question a graveyard does not (#1309).
+    --
+    -- The PlayerScope is WHOSE, which CR 400.1 forces this arm to say and
+    -- EachMatching's shared battlefield never has to. Not the
+    -- Pawl.Types.GraveyardScope a target pool carries: that type's other arm
+    -- reads the players another TARGET SLOT names, a reading no mass effect in
+    -- the pool asks for (#1310). Enumerated by
+    -- Pawl.Engine.PlayerEffect.playersInScope, the same fold over the one
+    -- membership test that pool uses, so the two cannot drift.
+    --
+    -- Not a target and never one (CR 115.10a), and swept when the effect executes
+    -- (CR 608.2c) -- the two properties EachMatching above has, for its reasons.
+    EachCardInGraveyard PlayerScope.PlayerScope (Filter.Filter Keyword.Keyword)
   | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The one
     -- arm that names no object at all, and it is here rather than on
     -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:

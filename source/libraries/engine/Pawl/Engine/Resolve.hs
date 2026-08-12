@@ -163,7 +163,7 @@ playerRefSlots ref = case ref of
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
 
--- The slots an ObjectRef reads. Only InSlot names one directly; the two sweeping
+-- The slots an ObjectRef reads. Only InSlot names one directly; the sweeping
 -- arms are swept at resolution and name nothing at cast, so a card whose only
 -- object reference is a set declares no target spec and CR 608.2b has nothing to
 -- fizzle (CR 115.10a). TopOfLibrary names no object slot either -- it reads a
@@ -173,6 +173,7 @@ objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
+  ObjectRef.EachCardInGraveyard _ _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
   ObjectRef.TopOfLibrary player -> playerRefSlots player
 
@@ -1460,7 +1461,8 @@ playerRefPlayers legal controller gs ref = case ref of
 -- "you" is the ability's controller and IsSource is its source -- because the
 -- filter IS the ability's card text. That is the footing AttachTarget's
 -- destination filter is on, and not PlayerSacrifices', whose filter is read
--- against the victim instead.
+-- against the victim instead. EachCardInGraveyard is the same fold over CR
+-- 400.1's per-player graveyards instead of the shared battlefield (CR 109.2a).
 --
 -- WHEN: at the moment the caller runs, which is when this instruction is
 -- reached, CR 608.2c ("follows its instructions in the order written"). The list
@@ -1510,6 +1512,37 @@ objectRefObjects legal resolving controller source gs ref = case ref of
           Nothing -> last_
           Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
      in List.sortOn (\oid -> (seat oid, oid)) matching
+  -- Rise of the Dark Realms' "all creature cards from all graveyards": the same
+  -- sweep as EachMatching with CR 109.2's battlefield default switched off by the
+  -- card's own words (CR 109.2a), over the per-player zone CR 400.1 gives each
+  -- player instead of one shared one.
+  --
+  -- Whose is PlayerEffect.playersInScope, the reading
+  -- Pawl.Engine.Target.graveyardRecipients already takes for a target pool, and
+  -- Nothing -- an absent perspective -- is empty there and here. It cannot arise
+  -- from this caller, which always has the resolving controller to offer.
+  --
+  -- The filter is matched against the projection exactly as the battlefield sweep
+  -- does, in this effect's own context. A card in a graveyard has no controller,
+  -- so Filter.ControlledBy is vacuously False for every candidate -- the posture
+  -- Pawl.Types.Pool.CardsInGraveyard's own note records.
+  --
+  -- APNAP and then ascending ObjectId, for the reasons the battlefield arm gives:
+  -- the seat order is the fold over Game.apnapOrder, which also drops a player CR
+  -- 800.4 took out of the game, and the second key is the engine's rather than the
+  -- resolving controller's (#379). Not the graveyard's own pile order, which CR
+  -- 404.2 fixes for other purposes and which no rule makes the order a batch is
+  -- processed in.
+  ObjectRef.EachCardInGraveyard scope filter_ ->
+    let context = Filter.contextFor (Just controller) (Just source)
+        named = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs scope)
+        cardsOf pid =
+          List.sort
+            ( filter
+                (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+                (Game.zoneMembers Zone.Graveyard pid gs)
+            )
+     in concatMap cardsOf (filter (`elem` named) (Game.apnapOrder gs))
   -- Names players and so no objects at all. Empty rather than an error: every
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
   -- empty answer is what a slot holding a player already gives them.
@@ -1619,6 +1652,10 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
     Just group -> fmap Recipient.ToObject (Foldable.toList group)
     Nothing -> legalMany slot legal
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  -- Cards, so they arrive as Recipient.ToObject for EachMatching's reason: CR
+  -- 109.2a draws the set from the graveyards named and says nothing about card
+  -- types beyond the Filter's own.
+  ObjectRef.EachCardInGraveyard _ _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- A card, so it arrives as Recipient.ToObject for EachMatching's reason: what
   -- kind of object a library's top card is, is the OPCODE's question.
   ObjectRef.TopOfLibrary _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -2393,6 +2430,16 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- need nothing here: the funnel is handed `Just controller`, and CR
             -- 110.2a's control question is asked only of a battlefield destination.
             ObjectRef.EachMatching _ -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
+            -- Rise of the Dark Realms' "put all creature cards from all
+            -- graveyards onto the battlefield under your control", swept once
+            -- from the PRE-MOVE state for the reason the battlefield sweep above
+            -- is (CR 608.2c, CR 608.2f). "Under your control" needs nothing here:
+            -- the funnel is handed `Just controller` and CR 110.2a hands a
+            -- battlefield arrival to the player the effect instructed, which is
+            -- what EntryRiders.underOwner would have to override.
+            ObjectRef.EachCardInGraveyard _ _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- Players, and no card moves one to a zone. objectRefObjects' empty

@@ -305,9 +305,11 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [q, c, s])) -> Effect.Create <$> Quantity.fromJson q <*> decode c <*> pure EntryRiders.defaultValue <*> (Just <$> Codec.decode SlotName.codec s)
       Just (Value.Array (Array.MkArray [q, c, e, s])) -> Effect.Create <$> Quantity.fromJson q <*> decode c <*> EntryRiders.fromJson e <*> (Just <$> Codec.decode SlotName.codec s)
       _ -> Left . Text.pack $ "Create expects [Quantity, Card], optionally with EntryRiders and/or a slot"
-    -- Told apart by LENGTH, and safe to: an ObjectRef's own array arm is
-    -- always exactly one word (Pawl.Codec.ObjectRef), so a two-element array is
-    -- never a ref.
+    -- Told apart by LENGTH. Not implemented: a ref whose own encoding is a
+    -- two-element array is read as this pair and fails on the quantity, so
+    -- ObjectRef.TopOfLibrary has no bare spelling here (#1311). A three-element
+    -- one -- ObjectRef.EachCardInGraveyard -- falls through to the bare-ref
+    -- branch and is unaffected.
     "CreateCopy" -> case mv of
       Just (Value.Array (Array.MkArray [q, r])) -> Effect.CreateCopy <$> Quantity.fromJson q <*> ObjectRef.fromJson r
       _ -> Common.withValue mv (fmap (Effect.CreateCopy (Quantity.Literal 1)) . ObjectRef.fromJson)
