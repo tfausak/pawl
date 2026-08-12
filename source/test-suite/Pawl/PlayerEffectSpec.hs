@@ -37,6 +37,10 @@
 -- which is where pawl's order used to come apart (Reliquary Tower is the third
 -- card in the group, and its ruling is the authority for the reading).
 --
+-- Void Winnower brings CR 601.3a's LOOKAHEAD, and Molten Disaster is the second
+-- half of that pair: a prohibition on even mana values, against an {X} spell
+-- whose mana value is even only while it sits in a hand (CR 202.3e).
+--
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
