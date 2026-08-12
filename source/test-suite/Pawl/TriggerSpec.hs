@@ -6164,7 +6164,7 @@ gaeasBlessingSpec s registry =
         -- The whole card through a real mill: Tome Scour empties alice's
         -- three-card library, so every card lands in her graveyard at once and
         -- the trigger scan has to find the ability on a SORCERY card there. Tome
-        -- Scour itself joins them on the way out (CR 608.2m), which is why the
+        -- Scour itself joins them on the way out (CR 608.2n), which is why the
         -- library the trigger refills is four cards and not three.
         Spec.it s "CR 113.6k whole card: milled, Gaea's Blessing shuffles the whole graveyard back into the library" $ do
           island <- S.printingOf s registry "Island"

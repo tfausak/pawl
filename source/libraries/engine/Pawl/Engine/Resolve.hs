@@ -2526,8 +2526,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
           Monad.mapM_ moveOne =<< settleArrivals zone placement targets
-  -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
-  -- this order and with the owner read before either:
+  -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries.
+  -- Two steps, in this order and with the owners read before either:
   --
   --   * CR 400.7's move, through the same changeZone funnel every other
   --     destination uses, so a replacement watching a library entry gets its CR
@@ -2551,17 +2551,21 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- card has left the graveyard, where Riftsweeper's single target made the
   -- ability fizzle first. Riftsweeper names no library and is unchanged.
   --
-  -- The UNION of the two, rather than the PlayerRef alone when it is there:
-  -- rule 701.24's objects go to their OWNERS' libraries (CR 400.3), which the
-  -- named player need not be, and every one of those libraries is shuffled. For
-  -- the pool's cards the two answers coincide -- a card in a player's graveyard
-  -- is that player's -- so the union is what keeps the arm honest for a card
-  -- whose targets are not.
+  -- The same reading covers CR 701.24d's empty SET -- "shuffled even if there
+  -- are no objects in that set" -- which is Gaea's Blessing's trigger over a
+  -- graveyard something else emptied first.
   --
-  -- CR 608.2f: the objects are moved as ONE action and each named library is then
+  -- The UNION of the two, rather than the PlayerRef alone when it is there:
+  -- rule 701.24's objects go to their OWNERS' libraries (CR 400.3), and the named
+  -- player need not be one of those owners, so every library that receives an
+  -- object is shuffled beside the one the effect names. For every card in the
+  -- pool the two answers coincide, since a card in a player's graveyard is that
+  -- player's; the union is what stays correct for one where they do not.
+  --
+  -- CR 608.2f: the objects are moved as ONE action and each library is then
   -- shuffled ONCE, however many of the objects it received. Rule 701.24's own
   -- words are plural ("one or more specific objects"), so a card naming four is
-  -- one shuffle per owner and not four.
+  -- one shuffle per library and not four.
   --
   -- CR 701.24a's "so that no player knows their order" makes WHO shuffles
   -- unobservable, which is why the card's "its owner shuffles" needs nothing
