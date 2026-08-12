@@ -1077,6 +1077,14 @@ castProposed pid sid face castFrom candidates before = do
                       -- worse one -- CR 118.7e attaches no condition to the
                       -- choice, and CR 601.2h's failed payment is what `reject`
                       -- below answers with.
+                      --
+                      -- CR 601.2f's LOCK: `paidCost` is determined here, once,
+                      -- and handed to Cost.pay as a VALUE -- so an effect that
+                      -- would change the total after this line, including the
+                      -- cost's own additional cost eating the reducer that
+                      -- produced it, does nothing. Pawl.CostSpec's Altar's Reap
+                      -- group is the proof (Baral pays the sacrifice, and the
+                      -- Reap still costs {B}).
                       adjustments <- Cost.announceReductions pid sid gs (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
                       payment <- Cost.pay pid sid paidCost
