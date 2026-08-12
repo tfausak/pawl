@@ -75,6 +75,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
   Effect.Scry {} -> Nothing
+  Effect.Explore {} -> Nothing
   Effect.Discard {} -> Nothing
   Effect.LoseLife {} -> Nothing
   Effect.GainLife {} -> Nothing

@@ -47,6 +47,7 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
@@ -239,6 +240,7 @@ slotsOf effect = case effect of
   -- posture, for the same reason.
   Effect.Mill ref quantity _ -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Scry ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Explore ref -> objectRefSlots ref
   Effect.Discard slot quantity -> insertOne slot (quantitySlots quantity)
   Effect.LoseLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.GainLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -450,6 +452,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Draw _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Mill _ quantity _ -> Quantity.slotsAreExhaustive quantity
   Effect.Scry _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Explore {} -> True
   Effect.Discard _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.LoseLife _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife _ quantity -> Quantity.slotsAreExhaustive quantity
@@ -570,6 +573,7 @@ readsX = any effectReadsX
       Effect.Draw _ quantity -> Quantity.readsX quantity
       Effect.Mill _ quantity _ -> Quantity.readsX quantity
       Effect.Scry _ quantity -> Quantity.readsX quantity
+      Effect.Explore {} -> False
       Effect.Discard _ quantity -> Quantity.readsX quantity
       Effect.LoseLife _ quantity -> Quantity.readsX quantity
       Effect.GainLife _ quantity -> Quantity.readsX quantity
@@ -642,6 +646,9 @@ searchesLibrary effect = case effect of
   -- CR 701.22a looks at the top N, where CR 701.23a's search looks at ALL of a
   -- zone; Panglacial Wurm's window is the latter's alone.
   Effect.Scry {} -> False
+  -- CR 701.44a reveals the top card, where CR 701.23a's search looks through a
+  -- whole zone; Panglacial Wurm's window is the latter's alone.
+  Effect.Explore {} -> False
   Effect.Discard {} -> False
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
@@ -760,6 +767,7 @@ boundSlots effect = case effect of
   -- filter, for CR 728.1's "for each nonland card milled this way" to read.
   Effect.Mill _ _ mTally -> foldMap (Set.singleton . MillTally.slot) mTally
   Effect.Scry {} -> Set.empty
+  Effect.Explore {} -> Set.empty
   Effect.DealDamage {} -> Set.empty
   Effect.ModifyTarget {} -> Set.empty
   Effect.ChangeText {} -> Set.empty
@@ -2658,6 +2666,13 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- no player and raises no prompt.
       Just n | n > 0 -> Monad.forM_ scryers (scryOne n)
       _ -> pure ()
+  Effect.Explore ref -> do
+    gs <- State.get
+    -- CR 608.2c: the set is swept as this instruction is reached, and an illegal
+    -- slot (CR 608.2b) or a player recipient answers with nobody. CR 701.44d's
+    -- APNAP half is objectRefObjects' own order; its second key is the engine's
+    -- where that rule gives the choice to the controller (#1345).
+    Monad.mapM_ exploreOne (objectRefObjects legal resolving controller source gs ref)
   Effect.Discard slot quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -4134,3 +4149,48 @@ scryOne n pid = do
         onTop = filter (\c -> List.notElem c toBottom) (keep top)
         unnamed = filter (\c -> List.notElem c toBottom && List.notElem c onTop) looked
     State.modify' (reorderLibrary pid (onTop <> unnamed <> beneath <> toBottom))
+
+-- CR 701.44a: one permanent's explore -- its controller reveals the top card of
+-- their library, puts a land card into their hand, and otherwise puts a +1/+1
+-- counter on the permanent and may bin the revealed card.
+--
+-- The controller comes from LAST KNOWN INFORMATION (CR 701.44c), so a permanent
+-- killed while the instruction was on the stack still explores under the player
+-- who controlled it. Its counter then lands on nothing -- Event.putCounters
+-- writes nothing for an id that is not there -- while the reveal and the choice
+-- still happen, which is exactly what rule 701.44b's "even if some or all of
+-- those actions were impossible" asks for.
+--
+-- The reveal is PUBLIC (CR 701.20a) and so rides Event.reveal, unlike scry's
+-- private look at the same position. Nothing to reveal is not a land card, so an
+-- empty library takes the "otherwise" branch: the counter goes on and no
+-- question is put, there being no card to bin.
+--
+-- The land test reads the PRINTED face through Projection.viewOfCardIn, which is
+-- what Effect.Mill's tally and Effect.Search's filter do and for their reason: a
+-- card in a library has no projection to fold.
+exploreOne :: ObjectId -> Game ()
+exploreOne oid = do
+  gs <- State.get
+  case Projection.controllerWithLastKnown oid gs of
+    -- An id nothing was ever filed under: nobody explores and nothing happens.
+    Nothing -> pure ()
+    Just pid -> case Game.zoneMembers Zone.Library pid gs of
+      [] -> grow pid
+      top : _ -> do
+        Event.reveal pid top
+        after <- State.get
+        let isLand = case Game.faceOf top after of
+              Nothing -> False
+              Just face -> Set.member CardType.Land (Filter.cardTypes (Projection.viewOfCardIn after top face))
+        if isLand
+          then Event.changeZone top Zone.Hand
+          else do
+            grow pid
+            asked <- State.get
+            decision <- Game.choose (Prompt.ChooseExplore (Decide.deciderFor pid asked) pid oid top)
+            Monad.when (decision == OptionalDecision.Exercises) (Event.changeZone top Zone.Graveyard)
+  where
+    -- CR 122.6 through the one counter funnel, so a CR 614.16 replacement
+    -- (Hardened Scales) gets its opportunity against this placement too.
+    grow pid = Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne 1)

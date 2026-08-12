@@ -1525,6 +1525,10 @@ rewriteEffect pairs effect = case effect of
   Effect.Mill ref quantity mTally ->
     Effect.Mill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally)
   Effect.Scry {} -> effect
+  -- The ObjectRef alone, as Tap and CreateCopy above: an EachMatching's Filter is
+  -- a word a CR 612.1 swap reaches, and rule 701.44a's own text is the rulebook's
+  -- rather than the card's.
+  Effect.Explore ref -> Effect.Explore (rewriteObjectRef pairs ref)
   Effect.Discard {} -> effect
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect

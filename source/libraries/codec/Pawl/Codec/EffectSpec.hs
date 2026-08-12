@@ -342,6 +342,21 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Scry (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
       """ {"type":"Scry","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":2}]} """
+  -- Merfolk Branchwalker's "it explores", against the trigger-source slot, and
+  -- the swept-set shape the ObjectRef also admits.
+  Spec.it s "Explore" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Explore (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      """ {"type":"Explore","value":"self"} """
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Explore (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      """ {"type":"Explore","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
   Spec.it s "Mill" $
     Common.assertJsonCodec
       s

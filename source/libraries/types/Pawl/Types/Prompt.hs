@@ -94,6 +94,19 @@ data Prompt r where
   -- leaves nothing to ask -- CR 701.22b's scry 0, an empty library, and the lone
   -- card that IS the whole library, for which top and bottom are one position.
   ChooseScry :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt ([ObjectId.ObjectId], [ObjectId.ObjectId])
+  -- | CR 701.44a: whether an exploring permanent's controller puts the revealed
+  -- nonland card into their graveyard. The first ObjectId is the permanent that
+  -- explored, the second the card it revealed; Exercises bins that card and
+  -- Declines leaves it on top of the library.
+  --
+  -- Its own constructor rather than Prompt.ChooseOptional, which names a printed
+  -- clause of a card by mode and clause index: this "may" is rule 701.44a's
+  -- rather than the card's, and Merfolk Branchwalker's own text never spells it.
+  --
+  -- Reached only where the rule leaves the fork open -- a revealed NONLAND card.
+  -- A land card goes to the hand with no question (CR 701.44a's first sentence),
+  -- and an empty library reveals nothing to ask about.
+  ChooseExplore :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 507.1 / 703.4h: the active player chooses one of their opponents to be
   -- the defending player. The NonEmpty is the candidates; the answer is the one
   -- chosen.

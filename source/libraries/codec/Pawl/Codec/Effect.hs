@@ -101,6 +101,7 @@ toJson codec e = case e of
         <> (if p == LibraryPlacement.defaultValue then [] else [LibraryPlacement.toJson p])
   Effect.Draw r q -> Common.tagged "Draw" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.Scry r q -> Common.tagged "Scry" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
+  Effect.Explore r -> Common.tagged "Explore" (Just (ObjectRef.toJson r))
   -- The tally is ELIDED when absent, as Destroy's bound-count slot is, so a mill
   -- nothing looks back at keeps its two-element payload.
   Effect.Mill r q mt ->
@@ -285,6 +286,7 @@ fromJson decode value = do
     "Scry" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Scry <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Scry expects [playerRef, quantity]"
+    "Explore" -> Common.withValue mv (fmap Effect.Explore . ObjectRef.fromJson)
     "Mill" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Mill <$> PlayerRef.fromJson r <*> Quantity.fromJson q <*> pure Nothing
       Just (Value.Array (Array.MkArray [r, q, tv])) -> Effect.Mill <$> PlayerRef.fromJson r <*> Quantity.fromJson q <*> (Just <$> MillTally.fromJson tv)

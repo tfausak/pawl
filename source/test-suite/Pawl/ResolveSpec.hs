@@ -103,6 +103,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
@@ -4768,6 +4769,173 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
     Spec.assertEqWith s "not asked" asked 0
     Spec.assertEqWith s "and the library is what it was" (scryLibrary after) ids
 
+-- CR 701.44a: "certain spells and abilities instruct a permanent to explore. To
+-- do so, that permanent's controller reveals the top card of their library. If a
+-- land card is revealed this way, that player puts that card into their hand.
+-- Otherwise, that player puts a +1/+1 counter on the exploring permanent and may
+-- put the revealed card into their graveyard."
+--
+-- Merfolk Branchwalker {1}{G} Creature -- Merfolk Scout 2/1, "When this creature
+-- enters, it explores", cast off two Forests and run to a stable board -- the
+-- gameplay-level route baneOfProgressSpec takes, so CR 603.6a's enters trigger
+-- is placed by the engine rather than by the fixture.
+--
+-- The library is STACKED so the branch is chosen rather than drawn: the top card
+-- is this helper's argument and a Bird Maiden always sits beneath it. Every case
+-- below is the same board with one card changed, which is what makes the land
+-- and nonland branches a pair rather than two unrelated boards. Branchwalker
+-- enters BARE, so the one +1/+1 counter the nonland branch adds cannot be
+-- confused with a counter it already had.
+exploreBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [String] ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+exploreBoard s registry deck = do
+  forest <- S.printingOf s registry "Forest"
+  branchwalker <- S.printingOf s registry "Merfolk Branchwalker"
+  myr <- S.printingOf s registry "Darksteel Myr"
+  printings <- mapM (S.printingOf s registry) deck
+  let -- A second creature alice controls, so "the exploring permanent" is told
+      -- apart from "a creature you control": rule 701.44a's counter goes on the
+      -- one that explored and this one must stay bare.
+      (bystander, withMyr) = S.addCreature myr S.alice (S.landsInPlay forest 2)
+      (withSpell, spell) = S.handOne branchwalker withMyr
+      -- addLibraryCard puts its card ON TOP, so the deepest is stocked first.
+      deal gs printing = snd (S.addLibraryCard printing S.alice gs)
+      stocked = List.foldl' deal withSpell (reverse printings)
+  pure (spell, bystander, stocked)
+
+-- Answers Prompt.ChooseExplore with a FIXED decision, whatever the engine
+-- offers. Pinned rather than derived: an answerer that read the prompt's own
+-- fields would still produce a legal answer after a mutation broke which card
+-- was revealed, and these cases would stay green over a broken choice.
+exploreAnswer :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+exploreAnswer decision p = case p of
+  Prompt.ChooseExplore {} -> decision
+  _ -> S.identityAnswer p
+
+-- Cast the Branchwalker and settle: the creature spell resolves, its enters
+-- trigger is placed, and the next round of passes resolves that.
+runExplore ::
+  (forall r. Prompt.Prompt r -> r) ->
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  GameState.GameState
+runExplore answer spell gs =
+  let afterCast = S.runPure answer gs (S.cast S.alice spell)
+   in S.runPure answer afterCast Engine.priorityLoop
+
+-- The card NAMES in one of alice's zones, in zone order. Names and not ids
+-- because CR 400.7 mints a fresh incarnation for the card the explore moves, so
+-- the id the fixture stocked is gone by the time the assertion reads the hand.
+exploreZone :: Zone.Zone -> GameState.GameState -> [String]
+exploreZone zone gs =
+  fmap
+    (\oid -> maybe "?" (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs))
+    (Game.zoneMembers zone S.alice gs)
+
+-- The names alice revealed this turn, in order. CR 701.44a's reveal is PUBLIC
+-- (CR 701.20a), so unlike scry's private look it leaves a GameEvent behind, and
+-- that event is the only thing an assertion can read it through.
+exploreReveals :: GameState.GameState -> [String]
+exploreReveals gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
+  where
+    revealedName event = case event of
+      GameEvent.Revealed pid pc
+        | pid == S.alice ->
+            fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
+      _ -> Nothing
+
+exploreSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exploreSpec s registry = Spec.describe s "Explore" $ do
+  -- The LAND branch. Nothing else on the board differs from the two cases below:
+  -- the top card is a Mountain rather than a Goblin Piker.
+  Spec.it s "CR 701.44a a revealed land card goes to hand, with no counter and no question" $ do
+    (spell, bystander, board) <- exploreBoard s registry ["Mountain", "Bird Maiden"]
+    let after = runExplore (exploreAnswer OptionalDecision.Exercises) spell board
+        walker = namedOnBattlefield "Merfolk Branchwalker" after
+    Spec.assertBool s (Maybe.isJust walker) "the Branchwalker resolved onto the battlefield"
+    Spec.assertEqWith s "stack empty: the spell and its trigger both resolved" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "the Mountain left the top of the library" (exploreZone Zone.Library after) ["Bird Maiden"]
+    Spec.assertEqWith s "and is in hand" (exploreZone Zone.Hand after) ["Mountain"]
+    -- CR 701.20a: the reveal is public, so it is in the log every player reads.
+    Spec.assertEqWith s "the Mountain was revealed on the way" (exploreReveals after) ["Mountain"]
+    Spec.assertEqWith s "nothing was binned" (exploreZone Zone.Graveyard after) []
+    -- The counter is the discriminator between the branches: rule 701.44a's
+    -- "otherwise" is the only sentence that puts one on.
+    Spec.assertEqWith s "CR 701.44a no +1/+1 counter on the land branch" (plusOnePlusOnesOn walker after) 0
+    Spec.assertEqWith s "and none on the other creature alice controls" (plusOnePlusOnesOn (Just bystander) after) 0
+  -- The NONLAND branch, exercising the "may". Same board, Goblin Piker on top.
+  Spec.it s "CR 701.44a a revealed nonland card grows the explorer, and the choice bins it" $ do
+    (spell, bystander, board) <- exploreBoard s registry ["Goblin Piker", "Bird Maiden"]
+    let after = runExplore (exploreAnswer OptionalDecision.Exercises) spell board
+        walker = namedOnBattlefield "Merfolk Branchwalker" after
+    Spec.assertBool s (Maybe.isJust walker) "the Branchwalker resolved onto the battlefield"
+    Spec.assertEqWith s "one +1/+1 counter" (plusOnePlusOnesOn walker after) 1
+    Spec.assertEqWith s "the Piker is in the graveyard" (exploreZone Zone.Graveyard after) ["Goblin Piker"]
+    Spec.assertEqWith s "the Maiden it was sitting on is now the top card" (exploreZone Zone.Library after) ["Bird Maiden"]
+    -- The TOP card and not just a card: the Maiden beneath it was never shown.
+    Spec.assertEqWith s "only the Piker was revealed" (exploreReveals after) ["Goblin Piker"]
+    Spec.assertEqWith s "a nonland card never reaches the hand" (exploreZone Zone.Hand after) []
+    -- The counter went on the permanent that EXPLORED, not on every creature.
+    Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
+  -- The other half of the "may", the ONE thing changed being the answer. Without
+  -- this case a bin-always implementation passes the case above.
+  Spec.it s "CR 701.44a declining leaves the revealed card on top of the library" $ do
+    (spell, bystander, board) <- exploreBoard s registry ["Goblin Piker", "Bird Maiden"]
+    let after = runExplore (exploreAnswer OptionalDecision.Declines) spell board
+        walker = namedOnBattlefield "Merfolk Branchwalker" after
+    Spec.assertEqWith s "the counter went on either way" (plusOnePlusOnesOn walker after) 1
+    Spec.assertEqWith s "the library is untouched, Piker still on top" (exploreZone Zone.Library after) ["Goblin Piker", "Bird Maiden"]
+    Spec.assertEqWith s "nothing was binned" (exploreZone Zone.Graveyard after) []
+    Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
+  -- CR 701.44b: the permanent explores "even if some or all of those actions were
+  -- impossible". No card is revealed, so nothing is a land card and the
+  -- "otherwise" branch runs -- the counter goes on with no card to ask about.
+  Spec.it s "CR 701.44b an empty library still grows the explorer" $ do
+    (spell, bystander, board) <- exploreBoard s registry []
+    let after = runExplore (exploreAnswer OptionalDecision.Exercises) spell board
+        walker = namedOnBattlefield "Merfolk Branchwalker" after
+    Spec.assertBool s (Maybe.isJust walker) "the Branchwalker resolved onto the battlefield"
+    Spec.assertEqWith s "one +1/+1 counter" (plusOnePlusOnesOn walker after) 1
+    Spec.assertEqWith s "no card moved anywhere" (exploreZone Zone.Hand after <> exploreZone Zone.Graveyard after) []
+    Spec.assertEqWith s "and nothing was revealed" (exploreReveals after) []
+    Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
+
+-- The elision half: which boards raise CR 701.44a's question at all. Each case
+-- counts the explore prompts one cast-and-settle raises.
+explorePromptSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+explorePromptSpec s registry = Spec.describe s "ExplorePrompt" $ do
+  let counting :: Prompt.Prompt r -> State.State Int r
+      counting p = case p of
+        Prompt.ChooseExplore {} -> do
+          State.modify (+ 1)
+          pure (S.identityAnswer p)
+        _ -> pure (S.identityAnswer p)
+      asks spell gs =
+        State.execState
+          ( Engine.runGame counting gs $ do
+              S.cast S.alice spell
+              Engine.priorityLoop
+          )
+          0
+  -- A real fork, and it is put to the player: the card can end on top or in the
+  -- graveyard, and no rule settles which.
+  Spec.it s "CR 701.44a a revealed nonland card is asked about" $ do
+    (spell, _, board) <- exploreBoard s registry ["Goblin Piker", "Bird Maiden"]
+    Spec.assertEqWith s "asked once" (asks spell board) 1
+  -- The pair's other half, one card changed. CR 701.44a's first sentence settles
+  -- a land card outright, so there is nothing to ask.
+  Spec.it s "CR 701.44a a revealed land card raises no question" $ do
+    (spell, _, board) <- exploreBoard s registry ["Mountain", "Bird Maiden"]
+    Spec.assertEqWith s "not asked" (asks spell board) 0
+  -- Nothing was revealed, so there is no card the answer could be about.
+  Spec.it s "CR 701.44b an empty library raises no question" $ do
+    (spell, _, board) <- exploreBoard s registry []
+    Spec.assertEqWith s "not asked" (asks spell board) 0
+
 slotTarget :: SlotName.SlotName
 slotTarget = SlotName.MkSlotName (Text.pack "target")
 
@@ -6697,6 +6865,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   proliferateSpec s registry
   scrySpec s registry
   scryPromptSpec s registry
+  exploreSpec s registry
+  explorePromptSpec s registry
   playerSacrificesSpec s registry
   createEmblemSpec s registry
   becomeMonarchSpec s registry

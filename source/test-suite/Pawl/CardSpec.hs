@@ -573,6 +573,9 @@ effectCounts effect = case effect of
   Effect.Draw _ quantity -> quantityCounts quantity
   Effect.Mill _ quantity _ -> quantityCounts quantity
   Effect.Scry _ quantity -> quantityCounts quantity
+  -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
+  -- the one on top, so there is no number a card author writes.
+  Effect.Explore {} -> []
   Effect.Discard _ quantity -> quantityCounts quantity
   Effect.LoseLife _ quantity -> quantityCounts quantity
   Effect.GainLife _ quantity -> quantityCounts quantity
@@ -858,6 +861,7 @@ effectReplacements effect = case effect of
   Effect.Draw _ _ -> []
   Effect.Mill {} -> []
   Effect.Scry {} -> []
+  Effect.Explore {} -> []
   Effect.Discard _ _ -> []
   Effect.LoseLife _ _ -> []
   Effect.GainLife _ _ -> []
@@ -1364,6 +1368,7 @@ effectMintedFaces effect = case effect of
   Effect.Draw _ _ -> []
   Effect.Mill {} -> []
   Effect.Scry {} -> []
+  Effect.Explore {} -> []
   Effect.Discard _ _ -> []
   Effect.LoseLife _ _ -> []
   Effect.GainLife _ _ -> []
@@ -2333,6 +2338,9 @@ effectFilters effect = case effect of
   -- it: rule 728.1's "nonland card" is one of these.
   Effect.Mill _ quantity mTally -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
   Effect.Scry _ quantity -> unframed (quantityFilters quantity)
+  -- The ObjectRef's Filter is a position a card author writes, so the lint
+  -- reaches it, as PutCounters' does.
+  Effect.Explore ref -> unframed (objectRefFilters ref)
   Effect.Discard _ quantity -> unframed (quantityFilters quantity)
   Effect.LoseLife _ quantity -> unframed (quantityFilters quantity)
   Effect.GainLife _ quantity -> unframed (quantityFilters quantity)

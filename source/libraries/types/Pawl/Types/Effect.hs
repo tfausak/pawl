@@ -317,6 +317,37 @@ data Effect card
     -- look-at-the-top-card opcode (#1338), and CR 701.22d's "whenever a player
     -- scries" trigger (#1339).
     Scry PlayerRef.PlayerRef Quantity.Quantity
+  | -- | CR 701.44a: the permanents the ObjectRef names each explore. Each one's
+    -- controller reveals the top card of their library; a land card goes to
+    -- their hand, and otherwise a +1/+1 counter goes on the exploring permanent
+    -- and they MAY put the revealed card into their graveyard.
+    --
+    -- ONE opcode rather than a reveal, a card-type condition and a branch. Rule
+    -- 701.44 is part of the rulebook, so reading "is a land card" here is the
+    -- same kind of act as Pawl.Engine.Keyword casing on CR 702's keywords --
+    -- where a general Effect.Reveal plus a condition over the revealed card
+    -- would put a hidden-zone read into the card DSL, which no rule asks for and
+    -- no other printing needs (#1338 tracks the standalone look).
+    --
+    -- An ObjectRef and not a bare slot, for PutCounters' reason: Merfolk
+    -- Branchwalker's "it explores" is `InSlot Binding.triggerSource` and Map's
+    -- "target creature you control explores" is a targeted `InSlot`, while a
+    -- sentence naming a swept set would be EachMatching without a new
+    -- constructor.
+    --
+    -- The REVEAL is public (CR 701.20a) and rides Event.reveal, unlike scry's
+    -- private look. The CHOICE is the player's, through Prompt.ChooseExplore
+    -- routed by Decide.deciderFor: it is a CR 603.5 "may" with two distinguishable
+    -- outcomes -- the card on top or in the graveyard -- so it is asked whenever
+    -- there is a revealed nonland card to ask about, and only an empty library or
+    -- a land card leaves nothing to ask.
+    --
+    -- CR 701.44b: the permanent explores even where the actions were impossible,
+    -- which is why an empty library still reaches the counter, and CR 701.44c
+    -- reads the controller from last known information. Not implemented: CR
+    -- 701.44d's choice of WHICH of several simultaneous explores goes first
+    -- (#1345), and a "whenever a creature you control explores" trigger (#1346).
+    Explore ObjectRef.ObjectRef
   | -- | CR 701.9: the slot's target player discards this many. The DISCARDING
     -- player chooses which (CR 701.9b) via Prompt.ChooseDiscard, routed through
     -- Decide.deciderFor. A hand smaller than the count discards all of it (CR
