@@ -56,7 +56,7 @@ uniqueArray s =
 
 -- | An array whose decoder rejects an empty one, e.g. 'Pawl.JsonCodec.Common.nonEmpty'.
 nonEmptyArray :: Schema -> Schema
-nonEmptyArray s = fromPairs $ keywords (array s) <> [pair "minItems" (integerValue 1)]
+nonEmptyArray s = fromPairs $ keywords (array s) <> [Value.pair "minItems" $ Value.integer 1]
 
 tupleOf :: [Schema] -> Schema
 tupleOf ss =

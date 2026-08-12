@@ -2,6 +2,7 @@ module Pawl.Codec.CostComponent where
 
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common

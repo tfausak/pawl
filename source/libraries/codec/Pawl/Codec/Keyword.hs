@@ -3,6 +3,7 @@ module Pawl.Codec.Keyword where
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.MorphVariant as MorphVariant
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common

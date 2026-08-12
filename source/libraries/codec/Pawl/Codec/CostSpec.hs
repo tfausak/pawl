@@ -5,6 +5,7 @@ module Pawl.Codec.CostSpec where
 import qualified Data.Either as Either
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec

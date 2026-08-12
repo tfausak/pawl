@@ -2,6 +2,7 @@ module Pawl.Codec.ManaSymbol where
 
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.ManaType as ManaType
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common

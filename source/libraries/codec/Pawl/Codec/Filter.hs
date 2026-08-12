@@ -9,10 +9,10 @@ import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
+import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
-import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Types.Filter as Filter
 
 -- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their
@@ -40,12 +40,12 @@ codec keywordCodec =
       Arm.payload "HasSubtype" Subtype.codec Filter.HasSubtype,
       Arm.payload "HasKeyword" keywordCodec Filter.HasKeyword,
       Arm.payload "HasKeywordFamily" KeywordFamily.codec Filter.HasKeywordFamily,
-      Arm.payload "PowerAtLeast" integerCodec Filter.PowerAtLeast,
-      Arm.payload "PowerAtMost" integerCodec Filter.PowerAtMost,
+      Arm.payload "PowerAtLeast" Common.integer Filter.PowerAtLeast,
+      Arm.payload "PowerAtMost" Common.integer Filter.PowerAtMost,
       Arm.nullary "PowerLessThanSource" Filter.PowerLessThanSource,
       Arm.nullary "PowerGreaterThanSource" Filter.PowerGreaterThanSource,
       Arm.nullary "ControlledByDefendingPlayer" Filter.ControlledByDefendingPlayer,
-      Arm.payload "ManaValueAtMost" integerCodec Filter.ManaValueAtMost,
+      Arm.payload "ManaValueAtMost" Common.integer Filter.ManaValueAtMost,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy,
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy,
       Arm.payload "IsPlayer" PlayerRelation.codec Filter.IsPlayer,
@@ -68,16 +68,6 @@ codec keywordCodec =
       Arm.payload "Not" (codec keywordCodec) Filter.Not
     ]
   where
-    -- Unnamed, mirroring 'Common.natural': a bare 'Integer' earns no $defs
-    -- entry, and CR 208.1's power comparisons and CR 202.3's mana-value one
-    -- are the only atoms here that carry one.
-    integerCodec :: Codec.Codec Integer
-    integerCodec =
-      Codec.MkCodec
-        { Codec.encode = Value.integer,
-          Codec.decode = Common.asInteger,
-          Codec.schema = pure Schema.integer
-        }
     encode filter_ = case filter_ of
       Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ Codec.encode CardType.codec t
       Filter.HasSupertype sup -> Common.tagged "HasSupertype" . Just $ Codec.encode Supertype.codec sup
