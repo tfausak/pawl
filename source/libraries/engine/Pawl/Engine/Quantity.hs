@@ -494,13 +494,81 @@ slotsAreExhaustive quantity = case quantity of
   -- PlayerRefs -- so the reported set is the whole of what evaluating it reads.
   Quantity.AgainstSlot _ inner -> slotsAreExhaustive inner
 
--- Only InSlot names a slot; the other two are answered from the evaluation
+-- Only InSlot names a slot; the other three are answered from the evaluation
 -- context alone (Resolve.playerRefSlots says the same thing as a set).
 playerRefIsSlotless :: PlayerRef.PlayerRef -> Bool
 playerRefIsSlotless ref = case ref of
   PlayerRef.EachPlayer -> True
   PlayerRef.Relative _ -> True
   PlayerRef.InSlot _ -> False
+  -- The baked half names its player outright, so it reads no slot at all. A card
+  -- cannot write one (Pawl.CardSpec's sweep), so this arm is only ever reached
+  -- through a stored Expiry.While.
+  PlayerRef.Specific _ -> True
+
+-- CR 611.2b: replace every PlayerRef.InSlot this quantity names with the baked
+-- PlayerRef.Specific arm, off the players the resolution's bindings name. What
+-- makes a "for as long as" condition that says "that player" answerable AFTER
+-- its resolution: Pawl.Engine.Expiry.arm bakes as the duration begins, so the
+-- stored condition names a seat rather than a slot on an object whose bindings
+-- the sweep cannot reach. Pawl.Engine.Filter.bakeBound is the same move for a
+-- target spec's atoms, and carries the argument for baking over threading.
+--
+-- The atom is LEFT STANDING when the environment names no player for the slot,
+-- which is bakeBound's posture there too: Count.playersFor then answers Nothing
+-- for it, Condition.holds collapses that to False, and CR 611.2b's duration
+-- never starts -- rather than starting on a reference nothing can resolve.
+--
+-- Exhaustive, `slots`' posture: a new arm carrying a PlayerRef must fail to
+-- compile here rather than silently keep an unbaked one.
+bakeBound :: Map.Map SlotName PlayerId.PlayerId -> Quantity -> Quantity
+bakeBound players quantity = case quantity of
+  Quantity.LifeTotal ref -> Quantity.LifeTotal (bakePlayerRef players ref)
+  Quantity.Speed ref -> Quantity.Speed (bakePlayerRef players ref)
+  Quantity.IsMonarch ref -> Quantity.IsMonarch (bakePlayerRef players ref)
+  Quantity.PlayerCounters ref kind -> Quantity.PlayerCounters (bakePlayerRef players ref) kind
+  Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (bakePlayerRef players ref)
+  Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (bakePlayerRef players ref)
+  Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = bakePlayerRef players (ManaCount.Type.player c)}
+  -- Both halves: the Scope says whose zone or which players, and an
+  -- Aggregation.Greatest's per-member quantity may hide a reference of its own.
+  -- Terminating for evaluate's reason -- a Greatest's payload is a strictly
+  -- smaller subterm.
+  Quantity.Count c ->
+    let baked = Count.mapQuantity (bakeBound players) c
+     in Quantity.Count baked {Count.Type.scope = bakeScope players (Count.Type.scope c)}
+  Quantity.Plus a b -> Quantity.Plus (bakeBound players a) (bakeBound players b)
+  Quantity.AgainstSlot slot inner -> Quantity.AgainstSlot slot (bakeBound players inner)
+  -- Every arm below holds no PlayerRef and no Quantity. InSlot names an AMOUNT
+  -- slot rather than a player one, so nothing here substitutes it -- an amount an
+  -- earlier effect bound is not a seat.
+  Quantity.Literal _ -> quantity
+  Quantity.ManaValue -> quantity
+  Quantity.Power -> quantity
+  Quantity.Toughness -> quantity
+  Quantity.InSlot _ -> quantity
+  Quantity.Star -> quantity
+  Quantity.ObjectCounters _ -> quantity
+  Quantity.HasDesignation _ -> quantity
+  Quantity.WasKicked -> quantity
+  Quantity.BlockersBeyondFirst -> quantity
+
+-- One reference, baked. The whole of the substitution: every arm above funnels
+-- through this, so what a slot means is stated once.
+bakePlayerRef :: Map.Map SlotName PlayerId.PlayerId -> PlayerRef.PlayerRef -> PlayerRef.PlayerRef
+bakePlayerRef players ref = case ref of
+  PlayerRef.InSlot slot -> maybe ref PlayerRef.Specific (Map.lookup slot players)
+  PlayerRef.EachPlayer -> ref
+  PlayerRef.Relative _ -> ref
+  PlayerRef.Specific _ -> ref
+
+-- A scope's reference, baked. Both scopes that name players take one; CR 608.2i's
+-- look-back names none.
+bakeScope :: Map.Map SlotName PlayerId.PlayerId -> Scope.Scope -> Scope.Scope
+bakeScope players scope = case scope of
+  Scope.InZone zone ref -> Scope.InZone zone (bakePlayerRef players ref)
+  Scope.OverPlayers ref -> Scope.OverPlayers (bakePlayerRef players ref)
+  Scope.InHistory _ -> scope
 
 -- CR 608.2i's look-back names no player and no slot; a zone scope names whose
 -- zone it is, and a player scope names the players themselves -- the same

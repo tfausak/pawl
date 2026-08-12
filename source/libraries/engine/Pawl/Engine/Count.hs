@@ -116,6 +116,19 @@ anyQuantity predicate count = case Count.Type.aggregation count of
   Aggregation.DistinctCardTypes -> False
   Aggregation.Greatest quantity -> predicate quantity
 
+-- The count with its per-member quantity REWRITTEN, injected for slots' reason:
+-- Pawl.Engine.Quantity.bakeBound is the one caller and this module cannot import
+-- it. The two aggregations carrying no quantity are returned untouched, there
+-- being nothing there to rewrite -- anyQuantity's False, one type over.
+mapQuantity :: (quantity -> quantity) -> Count.Type.Count quantity -> Count.Type.Count quantity
+mapQuantity f count =
+  count
+    { Count.Type.aggregation = case Count.Type.aggregation count of
+        Aggregation.Members -> Aggregation.Members
+        Aggregation.DistinctCardTypes -> Aggregation.DistinctCardTypes
+        Aggregation.Greatest quantity -> Aggregation.Greatest (f quantity)
+    }
+
 keep :: Filter.Type.Filter Keyword.Type.Keyword -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
 keep predicate context mv = case mv of
   Nothing -> Nothing
@@ -189,6 +202,14 @@ playersFor context gs ref =
             Recipient.ToPlaneswalker _ -> Nothing
             Recipient.ToBattle _ -> Nothing
             Recipient.ToObject _ -> Nothing
+        -- InSlot's baked half, and answered exactly as the arm above answers a
+        -- slot that names one player: the seat, with no roster test. Per the CR
+        -- 102.1 note above a departed player keeps their row, so this can name one
+        -- -- and the answer is defined rather than absent. What a departed seat
+        -- can still be TRUE of is the reader's question: CR 725.4 takes the crown
+        -- off a player as they leave, so Quantity.IsMonarch reads 0 for one and
+        -- Garland's duration ends.
+        PlayerRef.Specific pid -> Just [pid]
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event
 -- recorded rather than from any object that may no longer exist.

@@ -7414,9 +7414,9 @@ everyTriggerCondition =
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
     -- BOTH relations, on the SpellCast pair's reasoning above: an eventBindings
     -- arm that had cased on the relation and stamped nothing under one of them
-    -- would go unseen if only one were listed. Custodi Lich prints the You form;
-    -- the Opponent form is the one no card in the pool bears yet (#1051), which
-    -- is exactly the inhabitant a hand-kept list is most likely to drop.
+    -- would go unseen if only one were listed. Custodi Lich prints the You form
+    -- and Garland, Royal Kidnapper the Opponent one, and both stamp the crowned
+    -- player -- which is the claim this list exists to keep honest.
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.You,
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent,
     TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target"))

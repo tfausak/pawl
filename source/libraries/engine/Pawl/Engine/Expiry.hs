@@ -40,24 +40,38 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.SlotName (SlotName)
 
 -- CR 611.2: the moment a duration BEGINS. `controller` is the effect's
 -- controller -- CR 109.5's "you" -- and `source` is the object the effect comes
 -- from. Nothing means the duration never started, so per CR 611.2b the effect
 -- does nothing and is never stored at all.
 --
+-- `players` is the resolution's binding environment, projected to the seats it
+-- names (Binding.playersIn). It is what a CR 611.2b condition saying "that
+-- player" is baked against, HERE and only here -- see the ForAsLongAs arm. Empty
+-- for a caller with no resolution behind it, whose durations name no slot.
+--
 -- CR 611.2b's second sentence is vacuous here: this runs once, at the point the
 -- effect would be stored, and no opcode both ends and restarts a condition
 -- mid-resolution.
-arm :: PlayerId -> ObjectId -> Duration -> GameState -> Maybe Expiry
-arm controller source duration gs = case duration of
+arm :: Map.Map SlotName PlayerId -> PlayerId -> ObjectId -> Duration -> GameState -> Maybe Expiry
+arm players controller source duration gs = case duration of
   Duration.UntilEndOfTurn -> Just Expiry.AtCleanup
   Duration.Indefinite -> Just Expiry.Never
   Duration.UntilYourNextTurn -> Just (Expiry.AtTurnOf controller)
+  -- BAKED, and stored baked: the condition outlives the resolution that stored
+  -- it, and sweepConditional below re-reads it off the effect's
+  -- SOURCE, whose bindings never held the resolution's slots. An InSlot left
+  -- standing would answer Nothing there, Condition.holds would collapse that to
+  -- False, and the effect would silently end at the first settle -- or, for an
+  -- ability, never start at all, since the same unresolvable reference is read
+  -- one line below.
   Duration.ForAsLongAs cond ->
-    if Condition.holds (Projection.fullView gs) (Filter.contextFor (Just controller) (Just source)) gs source cond
-      then Just (Expiry.While controller cond)
-      else Nothing
+    let baked = Condition.bakeBound players cond
+     in if Condition.holds (Projection.fullView gs) (Filter.contextFor (Just controller) (Just source)) gs source baked
+          then Just (Expiry.While controller baked)
+          else Nothing
   -- CR 500.5a / 511.2: "until end of combat" is the end of the combat PHASE, so
   -- the stored window is PhaseSelector.CombatPhase and never the end of combat
   -- step. Naming the phase is the whole of the arming: unlike UntilYourNextTurn

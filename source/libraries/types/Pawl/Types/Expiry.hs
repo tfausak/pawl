@@ -24,6 +24,10 @@ data Expiry
     -- the effect's controller, never chosen. The duration is ONE continuous
     -- period: once the condition stops holding the effect is DELETED, and a
     -- condition that becomes true again does not bring it back.
+    --
+    -- The CONDITION is baked at the same moment (Pawl.Engine.Condition.bakeBound):
+    -- a PlayerRef naming one of the resolution's slots becomes PlayerRef.Specific,
+    -- since the sweep that re-reads this has no resolution to read a slot off.
     While PlayerId.PlayerId Condition.Condition
   | -- | CR 611.2a: "until your next turn", as a concrete player. Ends as that
     -- player's turn begins.
