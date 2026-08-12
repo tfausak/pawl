@@ -10,16 +10,16 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ReplacementOrigin" $ do
   Spec.it s "SelfReplacement" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ReplacementOrigin.toJson
-      ReplacementOrigin.fromJson
+      ReplacementOrigin.codec
       ReplacementOrigin.SelfReplacement
       """ {"type":"SelfReplacement"} """
   Spec.it s "Other" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ReplacementOrigin.toJson
-      ReplacementOrigin.fromJson
+      ReplacementOrigin.codec
       ReplacementOrigin.Other
       """ {"type":"Other"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s ReplacementOrigin.codec

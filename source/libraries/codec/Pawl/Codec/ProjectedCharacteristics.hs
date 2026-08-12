@@ -24,15 +24,15 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 toJson :: PC.ProjectedCharacteristics -> Value.Value
 toJson pc =
   Value.object . concat $
-    [ Common.requiredPair "name" CardName.toJson (PC.name pc),
+    [ Common.requiredPair "name" (Codec.encode CardName.codec) (PC.name pc),
       Common.optionalPair "supertypes" Set.empty (Common.encodeSet (Codec.encode Supertype.codec)) (PC.supertypes pc),
       Common.optionalPair "keywords" Map.empty (Common.encodeMultiset (Codec.encode Keyword.codec)) (PC.keywords pc),
       Common.optionalPair "colors" Set.empty (Common.encodeSet (Codec.encode Color.codec)) (PC.colors pc),
       Common.optionalPair "manaValue" Nothing (Common.encodeMaybe Value.integer) (PC.manaValue pc),
       Common.optionalPair "power" Nothing (Common.encodeMaybe Value.integer) (PC.power pc),
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Value.integer) (PC.toughness pc),
-      Common.optionalPair "loyalty" Nothing (Common.encodeMaybe Loyalty.toJson) (PC.loyalty pc),
-      Common.optionalPair "defense" Nothing (Common.encodeMaybe Defense.toJson) (PC.defense pc),
+      Common.optionalPair "loyalty" Nothing (Common.encodeMaybe (Codec.encode Loyalty.codec)) (PC.loyalty pc),
+      Common.optionalPair "defense" Nothing (Common.encodeMaybe (Codec.encode Defense.codec)) (PC.defense pc),
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (\(p, t) -> Value.array [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc),
       Common.requiredPair "cardTypes" (Common.encodeSet (Codec.encode CardType.codec)) (PC.cardTypes pc),
       Common.optionalPair "subtypes" Set.empty (Common.encodeSet (Codec.encode Subtype.codec)) (PC.subtypes pc),
@@ -44,15 +44,15 @@ toJson pc =
 fromJson :: Value.Value -> Either Text.Text PC.ProjectedCharacteristics
 fromJson value = do
   ps <- Common.asObject value
-  nm <- Common.field "name" ps >>= CardName.fromJson
+  nm <- Common.field "name" ps >>= Codec.decode CardName.codec
   sups <- Common.defaultedField "supertypes" Set.empty (Common.decodeSet (Codec.decode Supertype.codec)) ps
   kws <- Common.defaultedField "keywords" Map.empty (Common.decodeMultiset (Codec.decode Keyword.codec)) ps
   cols <- Common.defaultedField "colors" Set.empty (Common.decodeSet (Codec.decode Color.codec)) ps
   mv <- Common.defaultedField "manaValue" Nothing (Common.decodeMaybe Common.asInteger) ps
   pow <- Common.defaultedField "power" Nothing (Common.decodeMaybe Common.asInteger) ps
   tou <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Common.asInteger) ps
-  loy <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe Loyalty.fromJson) ps
-  def_ <- Common.defaultedField "defense" Nothing (Common.decodeMaybe Defense.fromJson) ps
+  loy <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe (Codec.decode Loyalty.codec)) ps
+  def_ <- Common.defaultedField "defense" Nothing (Common.decodeMaybe (Codec.decode Defense.codec)) ps
   cda <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe Quantity.fromJsonPair) ps
   cts <- Common.field "cardTypes" ps >>= Common.decodeSet (Codec.decode CardType.codec)
   subs <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet (Codec.decode Subtype.codec)) ps

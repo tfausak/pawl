@@ -5,6 +5,7 @@ module Pawl.Codec.LayoutSpec where
 import qualified Data.Either as Either
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Layout as Layout
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Layout as Layout
@@ -12,50 +13,44 @@ import qualified Pawl.Types.Layout as Layout
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Layout" $ do
   Spec.it s "Normal" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Layout.toJson
-      Layout.fromJson
+      Layout.codec
       Layout.Normal
       """ {"type":"Normal"} """
   -- CR 709.1.
   Spec.it s "Split" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Layout.toJson
-      Layout.fromJson
+      Layout.codec
       Layout.Split
       """ {"type":"Split"} """
   -- CR 709.5.
   Spec.it s "Room" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Layout.toJson
-      Layout.fromJson
+      Layout.codec
       Layout.Room
       """ {"type":"Room"} """
   -- CR 715.1.
   Spec.it s "Adventure" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Layout.toJson
-      Layout.fromJson
+      Layout.codec
       Layout.Adventure
       """ {"type":"Adventure"} """
   -- CR 712.2.
   Spec.it s "Transforming" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Layout.toJson
-      Layout.fromJson
+      Layout.codec
       Layout.Transforming
       """ {"type":"Transforming"} """
   -- CR 712.3.
   Spec.it s "ModalDoubleFaced" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Layout.toJson
-      Layout.fromJson
+      Layout.codec
       Layout.ModalDoubleFaced
       """ {"type":"ModalDoubleFaced"} """
   -- CR 709-722 names a dozen more layouts, most of which have not landed. A
@@ -64,5 +59,7 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
   Spec.it s "a layout that has not landed is rejected" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"type":"Flip"} """) >>= Layout.fromJson))
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"Flip"} """) >>= Codec.decode Layout.codec))
       "expected an unknown layout tag to fail to decode"
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Layout.codec

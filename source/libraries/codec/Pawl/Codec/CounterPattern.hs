@@ -20,20 +20,20 @@ toJson :: CounterPattern.CounterPattern -> Value.Value
 toJson p =
   Value.object
     ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (Codec.encode (CounterKind.codec Keyword.codec))) (CounterPattern.whichKind p)
-        <> Common.optionalPair "byWhom" Nothing (Common.encodeMaybe ControllerRelation.toJson) (CounterPattern.byWhom p)
-        <> Common.optionalPair "whose" defaultWhose ControllerRelation.toJson (CounterPattern.whose p)
+        <> Common.optionalPair "byWhom" Nothing (Common.encodeMaybe (Codec.encode ControllerRelation.codec)) (CounterPattern.byWhom p)
+        <> Common.optionalPair "whose" defaultWhose (Codec.encode ControllerRelation.codec) (CounterPattern.whose p)
         <> Common.requiredPair "onWhat" (Codec.encode (Filter.codec Keyword.codec)) (CounterPattern.onWhat p)
-        <> Common.optionalPair "onWho" Nothing (Common.encodeMaybe ControllerRelation.toJson) (CounterPattern.onWho p)
+        <> Common.optionalPair "onWho" Nothing (Common.encodeMaybe (Codec.encode ControllerRelation.codec)) (CounterPattern.onWho p)
     )
 
 fromJson :: Value.Value -> Either Text.Text CounterPattern.CounterPattern
 fromJson value = do
   ps <- Common.asObject value
   k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe (Codec.decode (CounterKind.codec Keyword.codec))) ps
-  b <- Common.defaultedField "byWhom" Nothing (Common.decodeMaybe ControllerRelation.fromJson) ps
-  w <- Common.defaultedField "whose" defaultWhose ControllerRelation.fromJson ps
+  b <- Common.defaultedField "byWhom" Nothing (Common.decodeMaybe (Codec.decode ControllerRelation.codec)) ps
+  w <- Common.defaultedField "whose" defaultWhose (Codec.decode ControllerRelation.codec) ps
   o <- Common.field "onWhat" ps >>= Codec.decode (Filter.codec Keyword.codec)
-  p <- Common.defaultedField "onWho" Nothing (Common.decodeMaybe ControllerRelation.fromJson) ps
+  p <- Common.defaultedField "onWho" Nothing (Common.decodeMaybe (Codec.decode ControllerRelation.codec)) ps
   pure
     CounterPattern.MkCounterPattern
       { CounterPattern.whichKind = k,

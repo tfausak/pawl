@@ -15,14 +15,14 @@ import qualified Pawl.Types.MillTally as MillTally
 toJson :: MillTally.MillTally -> Value.Value
 toJson tally =
   Value.object
-    ( Common.requiredPair "slot" SlotName.toJson (MillTally.slot tally)
+    ( Common.requiredPair "slot" (Codec.encode SlotName.codec) (MillTally.slot tally)
         <> Common.requiredPair "filter" (Codec.encode (Filter.codec Keyword.codec)) (MillTally.filter tally)
     )
 
 fromJson :: Value.Value -> Either Text.Text MillTally.MillTally
 fromJson value = do
   ps <- Common.asObject value
-  s <- Common.field "slot" ps >>= SlotName.fromJson
+  s <- Common.field "slot" ps >>= Codec.decode SlotName.codec
   f <- Common.field "filter" ps >>= Codec.decode (Filter.codec Keyword.codec)
   pure
     MillTally.MkMillTally

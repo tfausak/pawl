@@ -10,16 +10,16 @@ import qualified Pawl.Types.LibraryPosition as LibraryPosition
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.LibraryPosition" $ do
   Spec.it s "Top" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      LibraryPosition.toJson
-      LibraryPosition.fromJson
+      LibraryPosition.codec
       LibraryPosition.Top
       """ {"type":"Top"} """
   Spec.it s "Bottom" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      LibraryPosition.toJson
-      LibraryPosition.fromJson
+      LibraryPosition.codec
       LibraryPosition.Bottom
       """ {"type":"Bottom"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s LibraryPosition.codec

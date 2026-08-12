@@ -19,7 +19,7 @@ defaultTapped = TapState.Untapped
 toJson :: EntryRiders.EntryRiders -> Value.Value
 toJson e =
   Value.object
-    ( Common.optionalPair "tapped" defaultTapped TapState.toJson (EntryRiders.tapped e)
+    ( Common.optionalPair "tapped" defaultTapped (Codec.encode TapState.codec) (EntryRiders.tapped e)
         <> Common.optionalPair "attacking" False Value.boolean (EntryRiders.attacking e)
         <> Common.optionalPair "transformed" False Value.boolean (EntryRiders.transformed e)
         -- A MULTISET, the shape ProjectedCharacteristics' keywords take: a kind
@@ -32,7 +32,7 @@ toJson e =
 fromJson :: Value.Value -> Either Text.Text EntryRiders.EntryRiders
 fromJson value = do
   ps <- Common.asObject value
-  t <- Common.defaultedField "tapped" defaultTapped TapState.fromJson ps
+  t <- Common.defaultedField "tapped" defaultTapped (Codec.decode TapState.codec) ps
   a <- Common.defaultedField "attacking" False Common.asBoolean ps
   f <- Common.defaultedField "transformed" False Common.asBoolean ps
   c <- Common.defaultedField "counters" Map.empty (Common.decodeMultiset (Codec.decode (CounterKind.codec Keyword.codec))) ps

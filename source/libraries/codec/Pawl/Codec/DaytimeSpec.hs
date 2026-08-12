@@ -10,16 +10,16 @@ import qualified Pawl.Types.Daytime as Daytime
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Daytime" $ do
   Spec.it s "Day" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Daytime.toJson
-      Daytime.fromJson
+      Daytime.codec
       Daytime.Day
       """ {"type":"Day"} """
   Spec.it s "Night" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Daytime.toJson
-      Daytime.fromJson
+      Daytime.codec
       Daytime.Night
       """ {"type":"Night"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Daytime.codec

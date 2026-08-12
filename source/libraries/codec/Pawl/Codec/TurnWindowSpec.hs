@@ -13,23 +13,22 @@ import qualified Pawl.Types.TurnWindow as TurnWindow
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TurnWindow" $ do
   Spec.it s "AnyTurn" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      TurnWindow.toJson
-      TurnWindow.fromJson
+      TurnWindow.codec
       TurnWindow.AnyTurn
       """ {"type":"AnyTurn"} """
   Spec.it s "ControllersNextTurn" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      TurnWindow.toJson
-      TurnWindow.fromJson
+      TurnWindow.codec
       TurnWindow.ControllersNextTurn
       """ {"type":"ControllersNextTurn"} """
   Spec.it s "OnTurn carries the settled turn number" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      TurnWindow.toJson
-      TurnWindow.fromJson
+      TurnWindow.codec
       (TurnWindow.OnTurn 7)
       """ {"type":"OnTurn","value":7} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s TurnWindow.codec

@@ -12,7 +12,7 @@ toJson :: PlayerRef.PlayerRef -> Value.Value
 toJson r = case r of
   PlayerRef.EachPlayer -> Common.nullary "EachPlayer"
   PlayerRef.Relative rel -> Common.tagged "Relative" . Just $ Codec.encode PlayerRelation.codec rel
-  PlayerRef.InSlot n -> Common.tagged "InSlot" . Just $ SlotName.toJson n
+  PlayerRef.InSlot n -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec n
 
 fromJson :: Value.Value -> Either Text.Text PlayerRef.PlayerRef
 fromJson value = do
@@ -20,5 +20,5 @@ fromJson value = do
   case (t, mv) of
     ("EachPlayer", _) -> Right PlayerRef.EachPlayer
     ("Relative", Just v) -> PlayerRef.Relative <$> Codec.decode PlayerRelation.codec v
-    ("InSlot", Just v) -> PlayerRef.InSlot <$> SlotName.fromJson v
+    ("InSlot", Just v) -> PlayerRef.InSlot <$> Codec.decode SlotName.codec v
     _ -> Left . Text.pack $ "unknown PlayerRef: " <> t

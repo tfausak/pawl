@@ -10,16 +10,16 @@ import qualified Pawl.Types.Uses as Uses
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Uses" $ do
   Spec.it s "Unlimited" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Uses.toJson
-      Uses.fromJson
+      Uses.codec
       Uses.Unlimited
       """ {"type":"Unlimited"} """
   Spec.it s "Once" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Uses.toJson
-      Uses.fromJson
+      Uses.codec
       Uses.Once
       """ {"type":"Once"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Uses.codec

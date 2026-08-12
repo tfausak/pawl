@@ -10,23 +10,22 @@ import qualified Pawl.Types.Scaling as Scaling
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Scaling" $ do
   Spec.it s "Multiply" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Scaling.toJson
-      Scaling.fromJson
+      Scaling.codec
       (Scaling.Multiply 2)
       """ {"type":"Multiply","value":2} """
   Spec.it s "AddMore" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Scaling.toJson
-      Scaling.fromJson
+      Scaling.codec
       (Scaling.AddMore 1)
       """ {"type":"AddMore","value":1} """
   Spec.it s "Halve" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Scaling.toJson
-      Scaling.fromJson
+      Scaling.codec
       Scaling.Halve
       """ {"type":"Halve"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Scaling.codec

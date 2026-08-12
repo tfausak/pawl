@@ -11,7 +11,7 @@ import qualified Pawl.Types.Affected as Affected
 
 toJson :: Affected.Affected -> Value.Value
 toJson a = case a of
-  Affected.TheseObjects ids -> Common.tagged "TheseObjects" . Just $ Common.encodeSet ObjectId.toJson ids
+  Affected.TheseObjects ids -> Common.tagged "TheseObjects" . Just $ Common.encodeSet (Codec.encode ObjectId.codec) ids
   Affected.Matching f -> Common.tagged "Matching" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   Affected.MatchingAnywhere f -> Common.tagged "MatchingAnywhere" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   Affected.Attached -> Common.tagged "Attached" Nothing
@@ -21,7 +21,7 @@ fromJson :: Value.Value -> Either Text.Text Affected.Affected
 fromJson value = do
   (t, mv) <- Common.asTagged value
   case t of
-    "TheseObjects" -> Common.withValue mv (fmap Affected.TheseObjects . Common.decodeSet ObjectId.fromJson)
+    "TheseObjects" -> Common.withValue mv (fmap Affected.TheseObjects . Common.decodeSet (Codec.decode ObjectId.codec))
     "Matching" -> Common.withValue mv (fmap Affected.Matching . Codec.decode (Filter.codec Keyword.codec))
     "MatchingAnywhere" -> Common.withValue mv (fmap Affected.MatchingAnywhere . Codec.decode (Filter.codec Keyword.codec))
     "Attached" -> pure Affected.Attached

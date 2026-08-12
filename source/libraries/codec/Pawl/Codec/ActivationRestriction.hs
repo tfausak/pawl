@@ -27,7 +27,7 @@ import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 toJson :: ActivationRestriction.ActivationRestriction -> Value.Value
 toJson t = case t of
   ActivationRestriction.SorcerySpeed -> Common.nullary "SorcerySpeed"
-  ActivationRestriction.DuringPhase sel sc -> Common.tagged "DuringPhase" . Just . Value.array $ [Codec.encode PhaseSelector.codec sel, TurnScope.toJson sc]
+  ActivationRestriction.DuringPhase sel sc -> Common.tagged "DuringPhase" . Just . Value.array $ [Codec.encode PhaseSelector.codec sel, Codec.encode TurnScope.codec sc]
   ActivationRestriction.AttackedThisStep -> Common.nullary "AttackedThisStep"
 
 fromJson :: Value.Value -> Either Text.Text ActivationRestriction.ActivationRestriction
@@ -35,6 +35,6 @@ fromJson value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
     ("SorcerySpeed", _) -> Right ActivationRestriction.SorcerySpeed
-    ("DuringPhase", Just (Value.Array (Array.MkArray [sel, sc]))) -> ActivationRestriction.DuringPhase <$> Codec.decode PhaseSelector.codec sel <*> TurnScope.fromJson sc
+    ("DuringPhase", Just (Value.Array (Array.MkArray [sel, sc]))) -> ActivationRestriction.DuringPhase <$> Codec.decode PhaseSelector.codec sel <*> Codec.decode TurnScope.codec sc
     ("AttackedThisStep", _) -> Right ActivationRestriction.AttackedThisStep
     _ -> Left . Text.pack $ "unknown ActivationRestriction: " <> t

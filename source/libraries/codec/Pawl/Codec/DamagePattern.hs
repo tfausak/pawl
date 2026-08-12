@@ -5,6 +5,7 @@ import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.SourceRelation as SourceRelation
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.SourceRelation as SourceRelation
@@ -23,16 +24,16 @@ defaultWhichSource = SourceRelation.AnySource
 toJson :: DamagePattern.DamagePattern -> Value.Value
 toJson p =
   Value.object
-    ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe DamageKind.toJson) (DamagePattern.whichKind p)
-        <> Common.optionalPair "whichSource" defaultWhichSource SourceRelation.toJson (DamagePattern.whichSource p)
+    ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (Codec.encode DamageKind.codec)) (DamagePattern.whichKind p)
+        <> Common.optionalPair "whichSource" defaultWhichSource (Codec.encode SourceRelation.codec) (DamagePattern.whichSource p)
         <> Common.optionalPair "whichRecipient" Nothing (Common.encodeMaybe Recipient.toJson) (DamagePattern.whichRecipient p)
     )
 
 fromJson :: Value.Value -> Either Text.Text DamagePattern.DamagePattern
 fromJson value = do
   ps <- Common.asObject value
-  k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe DamageKind.fromJson) ps
-  src <- Common.defaultedField "whichSource" defaultWhichSource SourceRelation.fromJson ps
+  k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe (Codec.decode DamageKind.codec)) ps
+  src <- Common.defaultedField "whichSource" defaultWhichSource (Codec.decode SourceRelation.codec) ps
   r <- Common.defaultedField "whichRecipient" Nothing (Common.decodeMaybe Recipient.fromJson) ps
   pure
     DamagePattern.MkDamagePattern

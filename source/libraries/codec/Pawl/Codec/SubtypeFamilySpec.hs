@@ -10,16 +10,16 @@ import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.SubtypeFamily" $ do
   Spec.it s "BasicLandType" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SubtypeFamily.toJson
-      SubtypeFamily.fromJson
+      SubtypeFamily.codec
       SubtypeFamily.BasicLandType
       """ {"type":"BasicLandType"} """
   Spec.it s "CreatureType" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SubtypeFamily.toJson
-      SubtypeFamily.fromJson
+      SubtypeFamily.codec
       SubtypeFamily.CreatureType
       """ {"type":"CreatureType"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s SubtypeFamily.codec

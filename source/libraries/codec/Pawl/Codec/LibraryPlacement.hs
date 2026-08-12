@@ -3,6 +3,7 @@ module Pawl.Codec.LibraryPlacement where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.LibraryPosition as LibraryPosition
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 
@@ -12,11 +13,11 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 -- Pawl.Codec.Effect's `moveTail` needs to tell a placement from a zone.
 toJson :: LibraryPlacement.LibraryPlacement -> Value.Value
 toJson p = case p of
-  LibraryPlacement.Stated position -> LibraryPosition.toJson position
+  LibraryPlacement.Stated position -> Codec.encode LibraryPosition.codec position
   LibraryPlacement.OwnerChooses -> Common.nullary "OwnerChooses"
 
 fromJson :: Value.Value -> Either Text.Text LibraryPlacement.LibraryPlacement
-fromJson value = case LibraryPosition.fromJson value of
+fromJson value = case Codec.decode LibraryPosition.codec value of
   Right position -> Right (LibraryPlacement.Stated position)
   Left _ ->
     Common.decodeNullary

@@ -1,19 +1,18 @@
 module Pawl.Codec.CastingPermission where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CastingPermission as CastingPermission
 
-toJson :: CastingPermission.CastingPermission -> Value.Value
-toJson c = Common.nullary $ case c of
-  CastingPermission.CastFromLibraryWhileSearching -> "CastFromLibraryWhileSearching"
-  CastingPermission.CastFromGraveyard -> "CastFromGraveyard"
-
-fromJson :: Value.Value -> Either Text.Text CastingPermission.CastingPermission
-fromJson =
-  Common.decodeNullary
-    "CastingPermission"
-    [ ("CastFromLibraryWhileSearching", CastingPermission.CastFromLibraryWhileSearching),
-      ("CastFromGraveyard", CastingPermission.CastFromGraveyard)
+codec :: Codec.Codec CastingPermission.CastingPermission
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "CastFromLibraryWhileSearching" CastingPermission.CastFromLibraryWhileSearching,
+      Arm.nullary "CastFromGraveyard" CastingPermission.CastFromGraveyard
     ]
+  where
+    encode c = Common.nullary $ case c of
+      CastingPermission.CastFromLibraryWhileSearching -> "CastFromLibraryWhileSearching"
+      CastingPermission.CastFromGraveyard -> "CastFromGraveyard"

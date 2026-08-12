@@ -10,16 +10,16 @@ import qualified Pawl.Types.Regenerability as Regenerability
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Regenerability" $ do
   Spec.it s "Regenerable" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Regenerability.toJson
-      Regenerability.fromJson
+      Regenerability.codec
       Regenerability.Regenerable
       """ {"type":"Regenerable"} """
   Spec.it s "CantBeRegenerated" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Regenerability.toJson
-      Regenerability.fromJson
+      Regenerability.codec
       Regenerability.CantBeRegenerated
       """ {"type":"CantBeRegenerated"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Regenerability.codec

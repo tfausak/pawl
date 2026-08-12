@@ -330,6 +330,12 @@ integer = scalar Schema.integer Value.integer asInteger
 natural :: Codec.Codec Natural.Natural
 natural = scalar Schema.natural encodeNatural decodeNatural
 
+boolean :: Codec.Codec Bool
+boolean = scalar Schema.boolean Value.boolean asBoolean
+
+text :: Codec.Codec Text.Text
+text = scalar Schema.string Value.text asText
+
 scalar ::
   Schema.Schema ->
   (a -> Value.Value) ->

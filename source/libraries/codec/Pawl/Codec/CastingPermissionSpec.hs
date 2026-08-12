@@ -10,16 +10,16 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CastingPermission" $ do
   Spec.it s "CastFromLibraryWhileSearching" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CastingPermission.toJson
-      CastingPermission.fromJson
+      CastingPermission.codec
       CastingPermission.CastFromLibraryWhileSearching
       """ {"type":"CastFromLibraryWhileSearching"} """
   Spec.it s "CastFromGraveyard" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CastingPermission.toJson
-      CastingPermission.fromJson
+      CastingPermission.codec
       CastingPermission.CastFromGraveyard
       """ {"type":"CastFromGraveyard"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s CastingPermission.codec

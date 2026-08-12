@@ -13,16 +13,16 @@ import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TurnUpRewrite" $ do
   Spec.it s "WithCounters (megamorph, CR 702.37b)" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      TurnUpRewrite.toJson
-      TurnUpRewrite.fromJson
+      TurnUpRewrite.codec
       (TurnUpRewrite.WithCounters CounterKind.PlusOnePlusOne 1)
       """ {"type":"WithCounters","value":[{"type":"PlusOnePlusOne"},1]} """
   Spec.it s "MayAttachTo (Gift of Doom, CR 303.4k)" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      TurnUpRewrite.toJson
-      TurnUpRewrite.fromJson
+      TurnUpRewrite.codec
       (TurnUpRewrite.MayAttachTo (Filter.HasCardType CardType.Creature))
       """ {"type":"MayAttachTo","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s TurnUpRewrite.codec

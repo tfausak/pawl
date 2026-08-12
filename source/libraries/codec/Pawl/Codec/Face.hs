@@ -56,13 +56,13 @@ import qualified Pawl.Types.Face as Face
 toJson :: (Eq card) => (card -> Value.Value) -> Face.Face card -> Value.Value
 toJson encodeCard f =
   Value.object . concat $
-    [ Common.requiredPair "name" CardName.toJson (Face.name f),
+    [ Common.requiredPair "name" (Codec.encode CardName.codec) (Face.name f),
       Common.requiredPair "typeLine" (Codec.encode TypeLine.codec) (Face.typeLine f),
       Common.optionalPair "manaCost" Nothing (Common.encodeMaybe (Codec.encode ManaCost.codec)) (Face.manaCost f),
       Common.optionalPair "power" Nothing (Common.encodeMaybe Power.toJson) (Face.power f),
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Toughness.toJson) (Face.toughness f),
-      Common.optionalPair "loyalty" Nothing (Common.encodeMaybe Loyalty.toJson) (Face.loyalty f),
-      Common.optionalPair "defense" Nothing (Common.encodeMaybe Defense.toJson) (Face.defense f),
+      Common.optionalPair "loyalty" Nothing (Common.encodeMaybe (Codec.encode Loyalty.codec)) (Face.loyalty f),
+      Common.optionalPair "defense" Nothing (Common.encodeMaybe (Codec.encode Defense.codec)) (Face.defense f),
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe Quantity.toJson) (Face.characteristicPT f),
       Common.optionalPair "enchant" [] (Common.encodeList TargetSpec.toJson) (Face.enchant f),
       Common.optionalPair "keywords" Set.empty (Common.encodeSet (Codec.encode Keyword.codec)) (Face.keywords f),
@@ -73,8 +73,8 @@ toJson encodeCard f =
       Common.optionalPair "replacementEffects" [] (Common.encodeList ReplacementEffect.toJson) (Face.replacementEffects f),
       Common.optionalPair "triggeredAbilities" [] (Common.encodeList (TriggeredAbility.toJson encodeCard)) (Face.triggeredAbilities f),
       Common.optionalPair "delayedAbilities" Map.empty (TriggeredAbility.toJsonDelayed encodeCard) (Face.delayedAbilities f),
-      Common.optionalPair "castingPermissions" [] (Common.encodeList CastingPermission.toJson) (Face.castingPermissions f),
-      Common.optionalPair "castingRestrictions" [] (Common.encodeList CastingRestriction.toJson) (Face.castingRestrictions f),
+      Common.optionalPair "castingPermissions" [] (Common.encodeList (Codec.encode CastingPermission.codec)) (Face.castingPermissions f),
+      Common.optionalPair "castingRestrictions" [] (Common.encodeList (Codec.encode CastingRestriction.codec)) (Face.castingRestrictions f),
       Common.optionalPair "playerAbilities" [] (Common.encodeList PlayerStaticAbility.toJson) (Face.playerAbilities f),
       Common.optionalPair "blockRequirements" [] (Common.encodeList BlockRequirement.toJson) (Face.blockRequirements f),
       Common.optionalPair "blockPermissions" [] (Common.encodeList BlockPermission.toJson) (Face.blockPermissions f),
@@ -90,30 +90,30 @@ toJson encodeCard f =
       Common.optionalPair "mulliganActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.mulliganActions f),
       Common.optionalPair "openingHandActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.openingHandActions f),
       -- CR 116.2: the special actions this face grants (Pawl.Types.Face).
-      Common.optionalPair "specialActions" [] (Common.encodeList SpecialAction.toJson) (Face.specialActions f),
+      Common.optionalPair "specialActions" [] (Common.encodeList (Codec.encode SpecialAction.codec)) (Face.specialActions f),
       -- CR 113.6g: Counterable is the absence of a card stating it can't be
       -- countered.
-      Common.optionalPair "counterability" Counterability.Counterable Counterability.toJson (Face.counterability f)
+      Common.optionalPair "counterability" Counterability.Counterable (Codec.encode Counterability.codec) (Face.counterability f)
     ]
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Face.Face card)
 fromJson decodeCard value = do
   ps <- Common.asObject value
-  name <- Common.field "name" ps >>= CardName.fromJson
+  name <- Common.field "name" ps >>= Codec.decode CardName.codec
   typeLine <- Common.field "typeLine" ps >>= Codec.decode TypeLine.codec
   manaCost <- Common.defaultedField "manaCost" Nothing (Common.decodeMaybe (Codec.decode ManaCost.codec)) ps
   power <- Common.defaultedField "power" Nothing (Common.decodeMaybe Power.fromJson) ps
   toughness <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Toughness.fromJson) ps
-  loyalty <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe Loyalty.fromJson) ps
-  defense <- Common.defaultedField "defense" Nothing (Common.decodeMaybe Defense.fromJson) ps
+  loyalty <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe (Codec.decode Loyalty.codec)) ps
+  defense <- Common.defaultedField "defense" Nothing (Common.decodeMaybe (Codec.decode Defense.codec)) ps
   keywords <- Common.defaultedField "keywords" Set.empty (Common.decodeSet (Codec.decode Keyword.codec)) ps
   statics <- Common.defaultedField "staticAbilities" [] (Common.decodeList StaticAbility.fromJson) ps
   spell <- Common.defaultedField "spell" Face.defaultSpell (Modal.fromJson decodeCard) ps
   activated <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (ActivatedAbility.fromJson decodeCard)) ps
   replacements <- Common.defaultedField "replacementEffects" [] (Common.decodeList ReplacementEffect.fromJson) ps
   triggered <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (TriggeredAbility.fromJson decodeCard)) ps
-  permissions <- Common.defaultedField "castingPermissions" [] (Common.decodeList CastingPermission.fromJson) ps
-  restrictions <- Common.defaultedField "castingRestrictions" [] (Common.decodeList CastingRestriction.fromJson) ps
+  permissions <- Common.defaultedField "castingPermissions" [] (Common.decodeList (Codec.decode CastingPermission.codec)) ps
+  restrictions <- Common.defaultedField "castingRestrictions" [] (Common.decodeList (Codec.decode CastingRestriction.codec)) ps
   colorIndicator <- Common.defaultedField "colorIndicator" Set.empty (Common.decodeSet (Codec.decode Color.codec)) ps
   characteristicPT <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe Quantity.fromJson) ps
   delayed <- Common.defaultedField "delayedAbilities" Map.empty (TriggeredAbility.fromJsonDelayed decodeCard) ps
@@ -129,9 +129,9 @@ fromJson decodeCard value = do
   alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList AlternativeCost.fromJson) ps
   mulliganActions <- Common.defaultedField "mulliganActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
   openingHandActions <- Common.defaultedField "openingHandActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
-  specialActions <- Common.defaultedField "specialActions" [] (Common.decodeList SpecialAction.fromJson) ps
+  specialActions <- Common.defaultedField "specialActions" [] (Common.decodeList (Codec.decode SpecialAction.codec)) ps
   enchant <- Common.defaultedField "enchant" [] (Common.decodeList TargetSpec.fromJson) ps
-  counterability <- Common.defaultedField "counterability" Counterability.Counterable Counterability.fromJson ps
+  counterability <- Common.defaultedField "counterability" Counterability.Counterable (Codec.decode Counterability.codec) ps
   pure
     Face.MkFace
       { Face.name = name,

@@ -22,13 +22,13 @@ toJson :: TriggerCondition.TriggerCondition -> Value.Value
 toJson c = case c of
   TriggerCondition.SelfEnters -> Common.nullary "SelfEnters"
   TriggerCondition.PermanentEnters f -> Common.tagged "PermanentEnters" . Just $ Codec.encode (Filter.codec Keyword.codec) f
-  TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Value.array $ [Codec.encode Phase.codec p, TurnScope.toJson s]
+  TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Value.array $ [Codec.encode Phase.codec p, Codec.encode TurnScope.codec s]
   TriggerCondition.StateIs c2 -> Common.tagged "StateIs" . Just $ Condition.toJson c2
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Common.nullary "SelfDealsCombatDamageToPlayer"
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> Common.tagged "PermanentDealsCombatDamageToPlayer" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> Common.nullary "CreatureDealtCombatDamageToMonarch"
   TriggerCondition.OpponentLostLifeDuringYourTurn -> Common.nullary "OpponentLostLifeDuringYourTurn"
-  TriggerCondition.SelfAttacks f -> Common.tagged "SelfAttacks" . Just $ TriggerFrequency.toJson f
+  TriggerCondition.SelfAttacks f -> Common.tagged "SelfAttacks" . Just $ Codec.encode TriggerFrequency.codec f
   TriggerCondition.SelfAttacksWithAnother f -> Common.tagged "SelfAttacksWithAnother" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   TriggerCondition.CreatureAttacksAlone f -> Common.tagged "CreatureAttacksAlone" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   TriggerCondition.SelfAttacksPlayerWithMostLife -> Common.nullary "SelfAttacksPlayerWithMostLife"
@@ -52,9 +52,9 @@ toJson c = case c of
   TriggerCondition.PlayerLosesLife r -> Common.tagged "PlayerLosesLife" . Just $ Codec.encode PlayerRelation.codec r
   TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Value.array $ [Codec.encode (CounterKind.codec Keyword.codec) kind, Common.encodeNatural n]
   TriggerCondition.SelfLastCounterRemoved kind -> Common.tagged "SelfLastCounterRemoved" . Just $ Codec.encode (CounterKind.codec Keyword.codec) kind
-  TriggerCondition.SpellCast f s -> Common.tagged "SpellCast" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) f, TurnScope.toJson s]
+  TriggerCondition.SpellCast f s -> Common.tagged "SpellCast" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) f, Codec.encode TurnScope.codec s]
   TriggerCondition.SelfCast -> Common.nullary "SelfCast"
-  TriggerCondition.SelfHalfUnlocked n -> Common.tagged "SelfHalfUnlocked" . Just $ CardName.toJson n
+  TriggerCondition.SelfHalfUnlocked n -> Common.tagged "SelfHalfUnlocked" . Just $ Codec.encode CardName.codec n
   TriggerCondition.RoomFullyUnlocked r -> Common.tagged "RoomFullyUnlocked" . Just $ Codec.encode PlayerRelation.codec r
   -- RECURSIVE, and the only condition that is: an AnyOf holds conditions, so both
   -- directions of this codec call themselves.
@@ -67,7 +67,7 @@ toJson c = case c of
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
   TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ Codec.encode PlayerRelation.codec r
   TriggerCondition.PlayerBecomesMonarch r -> Common.tagged "PlayerBecomesMonarch" . Just $ Codec.encode PlayerRelation.codec r
-  TriggerCondition.LoseControlOfBound s -> Common.tagged "LoseControlOfBound" . Just $ SlotName.toJson s
+  TriggerCondition.LoseControlOfBound s -> Common.tagged "LoseControlOfBound" . Just $ Codec.encode SlotName.codec s
 
 fromJson :: Value.Value -> Either Text.Text TriggerCondition.TriggerCondition
 fromJson value = do
@@ -75,13 +75,13 @@ fromJson value = do
   case (t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> Codec.decode (Filter.codec Keyword.codec) v
-    ("StepBegins", Just (Value.Array (Array.MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Codec.decode Phase.codec p <*> TurnScope.fromJson s
+    ("StepBegins", Just (Value.Array (Array.MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Codec.decode Phase.codec p <*> Codec.decode TurnScope.codec s
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> Condition.fromJson v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("PermanentDealsCombatDamageToPlayer", Just v) -> TriggerCondition.PermanentDealsCombatDamageToPlayer <$> Codec.decode (Filter.codec Keyword.codec) v
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
     ("OpponentLostLifeDuringYourTurn", _) -> Right TriggerCondition.OpponentLostLifeDuringYourTurn
-    ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> TriggerFrequency.fromJson v
+    ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> Codec.decode TriggerFrequency.codec v
     ("SelfAttacksWithAnother", Just v) -> TriggerCondition.SelfAttacksWithAnother <$> Codec.decode (Filter.codec Keyword.codec) v
     ("CreatureAttacksAlone", Just v) -> TriggerCondition.CreatureAttacksAlone <$> Codec.decode (Filter.codec Keyword.codec) v
     ("SelfAttacksPlayerWithMostLife", _) -> Right TriggerCondition.SelfAttacksPlayerWithMostLife
@@ -105,9 +105,9 @@ fromJson value = do
     ("PlayerLosesLife", Just v) -> TriggerCondition.PlayerLosesLife <$> Codec.decode PlayerRelation.codec v
     ("SelfCountersReached", Just (Value.Array (Array.MkArray [kind, n]))) -> TriggerCondition.SelfCountersReached <$> Codec.decode (CounterKind.codec Keyword.codec) kind <*> Common.decodeNatural n
     ("SelfLastCounterRemoved", Just v) -> TriggerCondition.SelfLastCounterRemoved <$> Codec.decode (CounterKind.codec Keyword.codec) v
-    ("SpellCast", Just (Value.Array (Array.MkArray [f, s]))) -> TriggerCondition.SpellCast <$> Codec.decode (Filter.codec Keyword.codec) f <*> TurnScope.fromJson s
+    ("SpellCast", Just (Value.Array (Array.MkArray [f, s]))) -> TriggerCondition.SpellCast <$> Codec.decode (Filter.codec Keyword.codec) f <*> Codec.decode TurnScope.codec s
     ("SelfCast", _) -> Right TriggerCondition.SelfCast
-    ("SelfHalfUnlocked", Just v) -> TriggerCondition.SelfHalfUnlocked <$> CardName.fromJson v
+    ("SelfHalfUnlocked", Just v) -> TriggerCondition.SelfHalfUnlocked <$> Codec.decode CardName.codec v
     ("RoomFullyUnlocked", Just v) -> TriggerCondition.RoomFullyUnlocked <$> Codec.decode PlayerRelation.codec v
     ("AnyOf", Just (Value.Array (Array.MkArray cs))) -> TriggerCondition.AnyOf <$> traverse fromJson cs
     ("SelfTurnedFaceUp", _) -> Right TriggerCondition.SelfTurnedFaceUp
@@ -119,5 +119,5 @@ fromJson value = do
     ("PermanentSacrificed", _) -> Right TriggerCondition.PermanentSacrificed
     ("SagaFinalChapterTriggers", Just v) -> TriggerCondition.SagaFinalChapterTriggers <$> Codec.decode PlayerRelation.codec v
     ("PlayerBecomesMonarch", Just v) -> TriggerCondition.PlayerBecomesMonarch <$> Codec.decode PlayerRelation.codec v
-    ("LoseControlOfBound", Just v) -> TriggerCondition.LoseControlOfBound <$> SlotName.fromJson v
+    ("LoseControlOfBound", Just v) -> TriggerCondition.LoseControlOfBound <$> Codec.decode SlotName.codec v
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t
