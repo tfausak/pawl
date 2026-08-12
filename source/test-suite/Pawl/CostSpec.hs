@@ -360,7 +360,7 @@ wasAskedToChooseCost responses =
 -- you can't cast it without sacrificing a creature, and you can't sacrifice
 -- additional creatures."
 -- alice controls one untapped Swamp and `n` Pikers, holds one Village Rites,
--- and has three cards in her library so the draw is never a CR 121.3 loss.
+-- and has three cards in her library so the draw is never a CR 104.3c loss.
 -- Loaded fresh inside each case that needs it -- equivalent because loading
 -- is deterministic and cached (batch-recipe.md).
 villageRitesBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
@@ -469,6 +469,119 @@ villageRitesSpec s registry =
             Response.ChoseTargets _ -> True
             _ -> False
       Spec.assertBool s (not (any isTargets asked)) "no ChooseTargets was raised"
+
+-- Altar's Reap {1}{B} Instant: "As an additional cost to cast this spell,
+-- sacrifice a creature. Draw two cards."
+--
+-- alice controls `lands` untapped Swamps and exactly one creature -- the leg's
+-- only variable -- holds one Altar's Reap, and has three cards in her library so
+-- the draw is never a CR 104.3c loss. The creature is the ONLY sacrifice
+-- candidate, so CR 701.21a's choice is elided and no answerer can pick a
+-- different victim. Loaded fresh inside each case that needs it -- equivalent
+-- because loading is deterministic and cached (batch-recipe.md).
+altarsReapBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (ObjectId.ObjectId, GameState.GameState)
+altarsReapBoard swamp creature altarsReap lands =
+  let base = S.landsInPlay swamp lands
+      (_, withCreature) = S.addCreature creature S.alice base
+      (reap, gs1) = S.addHandCard altarsReap S.alice withCreature
+      stock gs _ = snd (S.addLibraryCard swamp S.alice gs)
+      gs2 = List.foldl' stock gs1 [1 .. (3 :: Int)]
+   in ( reap,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- CR 601.2f's lock-in, in the shape of the rule's own example: the creature
+-- paying the additional cost IS the cost reducer, so the total determined at CR
+-- 601.2f and the total a recomputation would reach once CR 601.2h's sacrifice
+-- has happened are different numbers. Baral, Chief of Compliance -- "Instant and
+-- sorcery spells you cast cost {1} less to cast" -- is pawl's Thunderscape
+-- Familiar, and Altar's Reap is an Instant: the locked total is {B}, a
+-- recomputed one {1}{B}.
+--
+-- The two readings are told apart by MANA SPENT, not by a board that only one of
+-- them reaches: one Swamp tapped against two.
+--
+-- What holds it is that Pawl.Engine.Cast.castProposed determines the total ONCE
+-- -- `paidCost`, off the adjustments read before any payment -- and hands that
+-- VALUE to Cost.pay, which never re-reads the game state for it. Mutating
+-- castProposed to pay the components first and then re-total the announced cost
+-- against the state that leaves (#94's own description of the defect: a total
+-- recomputed on demand) fails the first two legs below, and only those: it taps
+-- two Swamps where the first expects one, and loses the second's payment
+-- outright.
+altarsReapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+altarsReapSpec s registry =
+  Spec.describe s "Altar's Reap" $ do
+    -- Two Swamps, so the recomputing reading has the mana it would need and the
+    -- legs differ in what was SPENT rather than in whether the spell resolved.
+    Spec.it s "CR 601.2f sacrificing the reducer to the additional cost does not raise the total" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      baral <- S.printingOf s registry "Baral, Chief of Compliance"
+      altarsReap <- S.printingOf s registry "Altar's Reap"
+      let (reap, gs) = altarsReapBoard swamp baral altarsReap 2
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice reap)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertBool s (S.castable S.alice reap gs) "the Reap is offered"
+      Spec.assertEqWith s "one Swamp paid for it, not two" (S.tappedCount S.alice resolved) 1
+      Spec.assertEqWith
+        s
+        "Baral paid the additional cost, and the Reap followed it"
+        (namesIn Zone.Graveyard resolved)
+        (fmap (CardName.MkCardName . Text.pack) ["Altar's Reap", "Baral, Chief of Compliance"])
+      Spec.assertEqWith s "and two cards were drawn" (S.handSize S.alice resolved) 2
+    -- The same claim where it decides the cast rather than the change: one
+    -- Swamp is the whole of alice's mana, so a total re-read after the
+    -- sacrifice is {1}{B} and CR 601.2h's payment fails -- which rewinds the
+    -- cast and leaves the Reap in her hand.
+    Spec.it s "CR 601.2f the locked total is what CR 601.2h pays, off one Swamp" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      baral <- S.printingOf s registry "Baral, Chief of Compliance"
+      altarsReap <- S.printingOf s registry "Altar's Reap"
+      let (reap, gs) = altarsReapBoard swamp baral altarsReap 1
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice reap)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertBool s (S.castable S.alice reap gs) "the Reap is offered"
+      Spec.assertEqWith s "off the one Swamp" (S.tappedCount S.alice resolved) 1
+      -- Not the stack's emptiness, which a REWOUND cast leaves too: the Reap in
+      -- the graveyard and the two cards in hand are what only a completed
+      -- payment produces.
+      Spec.assertEqWith
+        s
+        "Baral and the resolved Reap are in the graveyard"
+        (namesIn Zone.Graveyard resolved)
+        (fmap (CardName.MkCardName . Text.pack) ["Altar's Reap", "Baral, Chief of Compliance"])
+      Spec.assertEqWith s "and two cards were drawn" (S.handSize S.alice resolved) 2
+    -- The CONTROL on the two legs above, and not a third witness to the lock:
+    -- with no reducer on the board the two readings of CR 601.2f agree, so the
+    -- mutation that reddens them leaves this one green. What it establishes is
+    -- that one Swamp is genuinely short of an unreduced Altar's Reap -- so the
+    -- leg above succeeded on the locked total and not on mana it had spare.
+    --
+    -- The board is that leg with ONE thing changed, a Goblin Piker where Baral
+    -- stood: the same one Swamp, the same seats, the same phase, the same
+    -- library, the same single sacrifice candidate. The second pair pins the
+    -- refusal to the AMOUNT -- a second Swamp buys the very same Piker board the
+    -- cast.
+    Spec.it s "CR 601.2f with no reducer to lock in, the same one Swamp does not pay" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      altarsReap <- S.printingOf s registry "Altar's Reap"
+      let (oneReap, one) = altarsReapBoard swamp piker altarsReap 1
+          (twoReap, two) = altarsReapBoard swamp piker altarsReap 2
+      Spec.assertBool s (not (S.castable S.alice oneReap one)) "one Swamp: refused"
+      Spec.assertEqWith s "and not offered" (filter (S.isCastOf oneReap) (Action.legalActions S.alice one)) []
+      Spec.assertBool s (S.castable S.alice twoReap two) "two Swamps: offered"
+      let resolved = S.runPure S.identityAnswer (S.runPure S.identityAnswer two (S.cast S.alice twoReap)) Stack.resolveTop
+      Spec.assertEqWith s "and both Swamps paid for it" (S.tappedCount S.alice resolved) 2
 
 -- Headless Skaab {2}{U} Creature -- Zombie Warrior 3/6: "As an additional cost
 -- to cast this spell, exile a creature card from your graveyard. This creature
@@ -1058,6 +1171,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   jaradSpec s registry
   greedSpec s registry
   villageRitesSpec s registry
+  altarsReapSpec s registry
   headlessSkaabSpec s registry
   catharticReunionSpec s registry
   safeholdSentrySpec s registry

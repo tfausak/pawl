@@ -1,0 +1,70 @@
+{
+  "faces": [
+    {
+      "additionalCosts": [
+        {
+          "type": "Sacrifice",
+          "value": [
+            1,
+            {
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
+            }
+          ]
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Altar's Reap",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
