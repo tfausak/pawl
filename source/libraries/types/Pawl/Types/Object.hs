@@ -24,21 +24,30 @@ import qualified Pawl.Types.Zone as Zone
 
 data Object = MkObject
   { owner :: PlayerId.PlayerId,
-    -- | CR 110.2: a permanent's controller is, by DEFAULT, the player under whose
-    -- control it entered the battlefield. That default is a fact about the
-    -- permanent rather than a continuous effect, and this field is where it is
-    -- recorded -- the base a CR 613.1b layer-2 effect then overrides.
+    -- | The player this incarnation arrived under the control of, by DEFAULT --
+    -- a fact about the object rather than a continuous effect, and the base a CR
+    -- 613.1b layer-2 effect then overrides. CR 109.4 gives a controller only to
+    -- objects on the stack and the battlefield, and this field is written for
+    -- exactly those two arrivals, under one rule each:
     --
-    -- Nothing means "no recorded entry controller, so use the owner". That is CR
-    -- 108.4a's fallback, and it covers every entry no effect spoke about: a
-    -- permanent spell resolving (CR 110.2b), a token, a land played from hand.
+    --   * CR 110.2: a permanent's controller is, by default, the player under
+    --     whose control it entered the battlefield.
+    --   * CR 405.4 / 601.2a: "the controller of a spell is the player who cast
+    --     it", fixed as the card is put onto the stack and never re-derived from
+    --     the board afterwards (#83).
     --
-    -- Two writers, both of them CR 110.2a. Event.changeZoneAttaching records the
-    -- player an effect instructed to put the object onto the battlefield, which
-    -- is the rule's main clause; Pawl.Engine.Replacement's entry loop overwrites
-    -- that with a CR 616.1b rewrite's taker (Gather Specimens), which is its
-    -- "unless the effect states otherwise". Both write only for a BATTLEFIELD
-    -- entry, the rule's own scope (CR 110.2, CR 110.5d).
+    -- Nothing means "no recorded controller, so use the owner". That is CR
+    -- 108.4a's fallback, and it covers every arrival no rule above spoke about: a
+    -- token, a land played from hand, an ability put onto the stack (whose
+    -- controller CR 113.8 makes the owner this engine stamps on it).
+    --
+    -- Three writers. Event.changeZoneAttaching records the player an effect
+    -- instructed to put the object onto the battlefield (CR 110.2a's main clause)
+    -- and the caster Pawl.Engine.Cast hands it for a move onto the stack;
+    -- Pawl.Engine.Replacement's entry loop overwrites the first with a CR 616.1b
+    -- rewrite's taker (Gather Specimens), which is CR 110.2a's "unless the effect
+    -- states otherwise". Every other destination clears it, the rules' own scope
+    -- (CR 109.4, CR 110.5d).
     --
     -- NOT a control-changing EFFECT: CR 800.4c distinguishes an effect that gives
     -- a player control of an object from the player who controlled it by
@@ -46,8 +55,8 @@ data Object = MkObject
     -- on the wrong side of that line.
     --
     -- Per-incarnation state, like damage and counters: reset by newIncarnation,
-    -- because CR 400.7 makes the moved object a new one and CR 110.2's entry is
-    -- the one this incarnation made.
+    -- because CR 400.7 makes the moved object a new one and the arrival recorded
+    -- here is the one this incarnation made.
     enteredUnder :: Maybe PlayerId.PlayerId,
     source :: Source.Source,
     zone :: Zone.Zone,

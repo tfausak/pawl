@@ -925,14 +925,25 @@ modesOf oid gs = case Game.lookupObject oid gs of
           rewriteMode m = m {Mode.clauses = fmap rewriteClause (Mode.clauses m)}
        in fmap (fmap rewriteMode) (Card.chosenModes chosen face)
 
--- CR 405.4: who controls a SPELL on the stack, fixed at cast time -- for both CR
--- 608.2b's legality perspective and the effects' own execution. One function
--- because those two must name the same player, not because they disagree today.
+-- CR 405.4: who controls a SPELL on the stack -- both CR 608.2b's legality
+-- perspective and the effects' own execution. One function because those two
+-- must name the same player, not because they disagree today.
 --
--- The projection read is a no-op in this pool: nothing installs a SetController
--- naming a stack object, so it always folds back to the owner (#83).
+-- The player who CAST it, fixed by CR 601.2a's move and stamped on the object
+-- (Object.enteredUnder), never re-derived from the board -- which is what
+-- Projection.defaultControllerOf reads under the fold below. Casting a card
+-- somebody else owns is what makes the distinction visible, and Dire Fleet
+-- Daredevil is the pool's producer.
+--
+-- Still read THROUGH the projection rather than off the object, and that is the
+-- rules' own shape rather than a leftover: CR 613.1b's layer 2 overrides a
+-- default controller wherever an object has one (CR 109.4), and a continuous
+-- effect that changed a spell's control would end by that fold stopping to say
+-- so -- not by anything rewriting the stamp. Nothing in the pool installs a
+-- SetController naming a stack object, so today the fold is the identity on this
+-- read (#83).
 spellController :: Object.Object -> ObjectId -> GameState -> PlayerId
-spellController obj oid gs = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+spellController obj oid gs = Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf oid gs)
 
 -- CR 608.2b: are ALL of this spell's targets illegal? A spell with no target spec
 -- never fizzles, and one with several survives if any one is still legal. Reserved

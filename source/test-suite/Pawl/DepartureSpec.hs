@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
@@ -481,6 +482,31 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "so it did NOT snap back to bob on the battlefield" (fmap (\(oid, _) -> Set.member oid (GameState.battlefield after)) afterTurtle) (Just False)
     Spec.assertEqWith s "CR 104.2a: bob and carol are still playing, so the game continues" (GameState.result after) Nothing
     Spec.assertEqWith s "and alice controls nothing" (Projection.controls S.alice after) []
+
+  -- CR 800.4a's fourth clause on the STACK, which is the other half of "still
+  -- controlled by that player": CR 405.4 makes a spell's controller the player
+  -- who cast it, so a spell alice cast off a card bob owns survives clause 1
+  -- (bob owns it), gives clause 2 no effect to end and is skipped by clause 3 (it
+  -- is a card) -- and arrives at clause 4 still alice's. The line of play is
+  -- Pawl.CastSpec's Dire Fleet Daredevil board, reused rather than rebuilt so the
+  -- two cannot drift about what makes the controller and the owner differ.
+  Spec.it s "CR 800.4a/405.4 a spell the departing player cast off an opponent's card is exiled" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    daredevil <- S.printingOf s registry "Dire Fleet Daredevil"
+    faith <- S.printingOf s registry "Renewed Faith"
+    let cast = CastSpec.daredevilFaithCast mountain plains daredevil faith
+        after = S.runPure S.identityAnswer cast (Departure.leaveGame Departure.Type.Conceded S.alice)
+        spellOf = soleObjectOf faith
+    -- The setup half, asserted before the departure: bob owns the card and alice
+    -- controls the spell, which is the split the clause is about.
+    Spec.assertEqWith s "the Faith is a spell on the stack, owned by bob" (fmap (\(_, obj) -> (Object.zone obj, Object.owner obj)) (spellOf cast)) (Just (Zone.Stack, S.bob))
+    Spec.assertEqWith s "and alice controls it -- CR 405.4, she cast it" (fmap (\(oid, _) -> Projection.controllerOf oid cast) (spellOf cast)) (Just (Just S.alice))
+    -- The rule under test.
+    Spec.assertEqWith s "alice leaving EXILES it" (fmap (Object.zone . snd) (spellOf after)) (Just Zone.Exile)
+    Spec.assertEqWith s "the stack no longer holds it" (fmap (\(oid, _) -> List.elem oid (GameState.stack after)) (spellOf after)) (Just False)
+    Spec.assertEqWith s "and exile really holds it" (fmap (\(oid, _) -> List.elem oid (Game.zoneMembers Zone.Exile S.bob after)) (spellOf after)) (Just True)
+    Spec.assertEqWith s "CR 104.2a: bob and carol are still playing" (GameState.result after) Nothing
 
   -- The two-seat control for the case above, and the reason it needs three seats
   -- at all: CR 800.1 makes a game that begins with two players not a multiplayer
