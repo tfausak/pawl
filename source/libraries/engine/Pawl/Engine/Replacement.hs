@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
@@ -1017,9 +1018,10 @@ setShield identity_ pat left = case identity_ of
 -- shrank the event exactly as a shield would.
 --
 -- A CLASSIFICATION of effects -- what SHAPE a rewrite has, never which effect it
--- is -- in the same genre as bucketOf, readsApplier and shieldRemaining above.
--- One arm per constructor, no wildcard, so a new rewrite that prevents damage
--- breaks the build here rather than silently going unreported.
+-- is -- in the same genre as bucketOf and readsApplier above, and
+-- contestedResource below. One arm per constructor, no wildcard, so a new
+-- rewrite that prevents damage breaks the build here rather than silently going
+-- unreported.
 --
 -- A question about the REWRITE alone, and deliberately not about the event: CR
 -- 615.12's unpreventable damage is still met by a prevention effect, which is
@@ -1196,7 +1198,10 @@ groupPreventions ps =
 
 -- CR 615.7: when two or more applicable sources would deal damage to a shielded
 -- recipient at the same time, that recipient chooses which damage the shield
--- prevents.
+-- prevents. CR 101.4c generalizes it to every prevention a simultaneous batch can
+-- exhaust -- CR 122.1c's shield counters are the second such shape -- since the
+-- player owes both events a CR 616.1 choice and "if no order is specified, the
+-- player chooses the order".
 --
 -- Asked as an ORDER over the contested events rather than as a pick, because a
 -- pick repeated IS an order: applying a shield to an event covers as much of it
@@ -1212,8 +1217,9 @@ groupPreventions ps =
 -- can be honoured at all.
 --
 -- The two rules order DIFFERENT LEVELS and so cannot contend for this list. CR
--- 615.7's freedom is entirely within one chooser: a shield names one recipient,
--- so every event it contests is addressed to one player's object, and that is
+-- 615.7's freedom is entirely within one chooser: a shield names one recipient --
+-- and CR 122.1c's pair protects the one permanent it is minted onto -- so every
+-- event it contests is addressed to one player's object, and that is
 -- the same player CR 616.1 asks about those events -- `contested` and `choose`
 -- both read the chooser off the recipient through `chooserOf`. `askOne` then
 -- permutes only within that player's own positions. CR 101.4c is the rule that
@@ -1280,17 +1286,11 @@ askOne batch (pid, positions) = do
 -- across, one entry per chooser, in CR 616.1's APNAP order.
 --
 -- A shield is CONTESTED when it admits two or more of the batch's events (CR
--- 615.7) and cannot cover all of them -- the comparison is against the total
--- DAMAGE those events would deal, not against their number, since CR 615.7's
--- unit is the amount. A shield large enough to cover the lot prevents all of it
--- whatever the order, so there is nothing to ask.
---
--- Not implemented: a counted shield is the only contested resource this asks
--- about, so a limited replacement of any other shape that two of one chooser's
--- simultaneous events could each spend is spent by whichever is settled first,
--- rather than by CR 101.4c's answer from that chooser -- CR 122.1c's shield
--- counters are one such shape, since one counter facing two simultaneous events
--- covers whichever `byApnap` happens to sort first (#839).
+-- 615.7) and cannot cover all of them -- the comparison being made in the unit
+-- the shield's OWN rule counts, which `contestedResource` below supplies: damage
+-- for CR 615.7's counted shield, whole events for CR 122.1c's shield counters. A
+-- shield large enough to cover the lot prevents all of it whatever the order, so
+-- there is nothing to ask.
 --
 -- Several shields contribute ONE question per CHOOSER, over the union of what
 -- they contest: the order the batch is settled in is a single fact about the
@@ -1316,14 +1316,15 @@ contested gs events =
       indexed = zip [0 ..] events
       hitsOf candidate = filter (\entry -> preventable gs (snd entry) && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate) indexed
       contestedBy candidate = do
-        remaining <- shieldRemaining (ReplacementCandidate.effect candidate)
+        (left, demand) <- contestedResource gs candidate
         case hitsOf candidate of
           hits@(firstHit : _ : _)
-            | remaining < sum (fmap (DamageEvent.amount . snd) hits) -> do
+            | left < demand (fmap snd hits) -> do
                 -- CR 615.7's chooser is CR 616.1's, read off the shielded
                 -- recipient -- and every hit of ONE shield shares that
                 -- recipient, since Resolve's PreventNextDamage arm always names
-                -- one, so the head is the whole answer. Nothing means the
+                -- one and CR 122.1c's pair is minted onto the permanent it
+                -- protects, so the head is the whole answer. Nothing means the
                 -- shielded object has left and no one is there to be asked.
                 pid <- chooserOf gs (ProposedEvent.WouldDealDamage (snd firstHit))
                 pure (pid, fmap fst hits)
@@ -1334,26 +1335,32 @@ contested gs events =
       | (pid, positions) <- List.sortOn (seatOf gs . fst) (Map.toList merged)
       ]
 
--- CR 615.7: how much of a prevention shield is left, or Nothing for an effect
--- that is not one.
+-- CR 615.7 / 122.1c: a prevention that a batch can exhaust, as the pair (what it
+-- has left, what a set of events would demand of it) -- both in the unit the
+-- effect's own rule counts. Nothing for an effect no batch can run out of.
+--
+-- The two units are the rules' own and not interchangeable. CR 615.7's shield
+-- "counts only the amount of damage; the number of events or sources dealing it
+-- doesn't matter", so its unit is damage. CR 122.1c's pair prevents a whole
+-- event per counter whatever its amount, so its unit is events -- and what it
+-- has left is a number on the PERMANENT rather than on the row, which is why
+-- this reads the board.
 --
 -- A CLASSIFICATION of effects -- what SHAPE an effect has, never which effect it
 -- is -- in the same genre as bucketOf and readsApplier above. One arm per
--- constructor, no wildcard, so a new rewrite that counts damage down breaks the
+-- constructor, no wildcard, so a new rewrite a batch can exhaust breaks the
 -- build here rather than silently going unasked about.
-shieldRemaining :: ReplacementEffect -> Maybe Natural
-shieldRemaining re = case re of
+contestedResource :: GameState -> ReplacementCandidate -> Maybe (Natural, [DamageEvent.DamageEvent] -> Natural)
+contestedResource gs candidate = case ReplacementCandidate.effect candidate of
   ReplacementEffect.DamageR _ rewrite -> case rewrite of
-    DamageRewrite.PreventNext remaining -> Just remaining
+    DamageRewrite.PreventNext remaining -> Just (remaining, sum . fmap DamageEvent.amount)
+    -- CR 122.1c: one counter per application, so a batch of n events demands n
+    -- of them, and the permanent's counters are the supply.
+    DamageRewrite.PreventRemovingShieldCounter ->
+      Just (Projection.shieldCounters (ReplacementCandidate.source candidate) gs, Int.toNaturalSaturating . length)
     -- Fog is unlimited for its duration, so there is nothing to allocate: it
     -- prevents every event it admits and the order cannot matter.
     DamageRewrite.PreventAll -> Nothing
-    -- CR 122.1c's prevention has no remaining AMOUNT to report: it prevents a
-    -- whole event per counter, so what limits it is a number on the permanent
-    -- rather than on the row. It IS a contested resource when one counter faces
-    -- two simultaneous events, which is the elision `contested` above records
-    -- (#839).
-    DamageRewrite.PreventRemovingShieldCounter -> Nothing
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing

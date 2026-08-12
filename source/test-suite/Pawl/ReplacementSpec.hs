@@ -165,6 +165,28 @@ aimObject oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
+-- What each COUNTDOWN shield on the board has left (CR 615.7), read off the
+-- floating rows themselves. An empty list is a shield spent to 0 and dropped,
+-- which is why the count of rows would not say the same thing; a Fog-shaped or
+-- counter-backed prevention does not appear here at all, having no amount on its
+-- row to report.
+shieldsLeft :: GameState.GameState -> [Natural.Natural]
+shieldsLeft gs =
+  let remaining re = case re of
+        ReplacementEffect.DamageR _ (DamageRewrite.PreventNext n) -> Just n
+        _ -> Nothing
+   in Maybe.mapMaybe (remaining . ActiveReplacement.effect) (GameState.replacements gs)
+
+-- Was CR 615.7's batch-order question raised at all? The elision half of every
+-- group below asserts the negative of this, so the boards that ask nothing are
+-- told apart from the boards that ask.
+wasAskedToOrderDamage :: [Response.Response] -> Bool
+wasAskedToOrderDamage =
+  let isOrder r = case r of
+        Response.OrderedDamage _ -> True
+        _ -> False
+   in any isOrder
+
 countersOn :: CounterKind.CounterKind Keyword.Keyword -> ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
 countersOn kind oid gs =
   maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
@@ -678,11 +700,6 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
           let key e = (DamageEvent.source e /= src, DamageEvent.source e)
            in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
         _ -> S.identityAnswer p
-      wasAskedToOrderDamage responses =
-        let isOrder r = case r of
-              Response.OrderedDamage _ -> True
-              _ -> False
-         in any isOrder responses
   -- CR 615.7's arithmetic, one event at a time: the shield takes what it can of
   -- each event and reduces by exactly that much. Three 3-damage events against a
   -- shield of 4 -- so the first is prevented whole, the second only partly, and
@@ -811,8 +828,7 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
 -- has both.
 testOfFaithSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
-  let shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
-      -- Put a board at declare attackers with alice active and bob defending,
+  let -- Put a board at declare attackers with alice active and bob defending,
       -- so S.runCombat drives the remaining steps -- S.combatBoardOf's shape,
       -- reached from a board that has already cast a spell.
       atCombat gs =
@@ -915,17 +931,6 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
   let hit src recipient n =
         DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
-      -- What each COUNTDOWN shield on the board has left (CR 615.7), read off
-      -- the rows themselves. An empty list is a shield spent to 0 and dropped,
-      -- which is why the count of rows would not say the same thing. A Fog-shaped
-      -- row would not appear here at all -- shieldRemaining answers Nothing for
-      -- one -- and none of these boards has one.
-      shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
-      wasAskedToOrderDamage responses =
-        let isOrder r = case r of
-              Response.OrderedDamage _ -> True
-              _ -> False
-         in any isOrder responses
       -- alice's Piker is shielded by a Mending Hands she really casts on it;
       -- bob's TWO Pikers are the sources of the hand-built events. Two of them
       -- rather than one because CR 615.7's choice clause is conditioned on
@@ -1234,7 +1239,6 @@ excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
   let hit src recipient n =
         DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
-      shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
       withBoard act = do
         plains <- S.printingOf s registry "Plains"
         pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -4037,6 +4041,18 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
       castAt victim printing gs =
         let (held, g1) = S.addHandCard printing S.alice gs
          in S.runPure (raceAnswer victim victim) g1 (S.cast S.alice held >> Stack.resolveTop)
+      -- One noncombat damage event, from `src`, at `n`.
+      hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      -- Spend the counter on `src`'s hit first (CR 101.4c), keyed on the SOURCE
+      -- id rather than on a batch position, so the assertion does not depend on
+      -- the order the batch was gathered in.
+      counterFirst src p = case p of
+        Prompt.OrderDamage _ _ events ->
+          let key e = (DamageEvent.source e /= src, DamageEvent.source e)
+           in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
+        _ -> S.identityAnswer p
   -- CR 122.6 / 614.16: the counter goes through the placement funnel, so the two
   -- replacements that scale a placement reach it. Three DISTINCT counts off one
   -- card -- doubled, unreplaced and halved -- which is what separates "the funnel
@@ -4171,6 +4187,78 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         after = S.settleSba (castAt pikerId doomBlade shielded)
     Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "the Piker survived the Doom Blade"
     Spec.assertEqWith s "spending the counter" (shields pikerId after) 0
+  -- CR 101.4c OVER CR 122.1c. One counter facing two simultaneous damage events is
+  -- a resource that covers one of them and not the other, so which one it covers is
+  -- a choice, and CR 101.4c gives it to the player making both CR 616.1 choices --
+  -- "if no order is specified, the player chooses the order". The unit is the EVENT
+  -- and not the amount: the counter prevents a whole event whatever its size, which
+  -- is why the shield of CR 615.7 and this one are contested in different units.
+  --
+  -- The two answers leave DIFFERENT BOARDS, which is what makes the choice observable
+  -- rather than bookkeeping: 5 and 2 at a 3/3 with one counter, so covering the 5
+  -- leaves a survivor with 2 marked and covering the 2 leaves 5 marked on a creature
+  -- CR 704.5g then destroys. Every number distinct -- 5, 2, toughness 3, one counter
+  -- -- so no two readings of the rule land on the same board.
+  --
+  -- The counter is written onto a Hill Giant rather than carried by Swooping
+  -- Protector for the reason the case above writes one onto a Piker, plus one more:
+  -- the bird's toughness of 1 makes "survived" unreachable, and survival is half of
+  -- what tells the two answers apart. Its arrival through a real card is proven by
+  -- the CR 122.6 case at the top of this group.
+  --
+  -- The DAMAGE BATCH is hand-built and the shield is a real rule's, for
+  -- mendingHandsSpec's reason -- and here the batch's gather order is itself the
+  -- input the choice has to beat, which only a hand-built batch can state.
+  Spec.it s "CR 101.4c one counter facing two simultaneous hits covers the one its controller says" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    giantPrinting <- S.printingOf s registry "Hill Giant"
+    let (giant, g1) = S.addCreature giantPrinting S.alice (S.landsInPlay plains 1)
+        (big, g2) = S.addCreature pikerPrinting S.bob g1
+        (small, g3) = S.addCreature pikerPrinting S.bob g2
+        shielded = S.addCounter CounterKind.Shield 1 giant g3
+        batch = [hit big (Recipient.ToCreature giant) 5, hit small (Recipient.ToCreature giant) 2]
+        tookTheBig = settleDamage (counterFirst big) shielded batch
+        tookTheSmall = settleDamage (counterFirst small) shielded batch
+    Spec.assertEqWith s "setup: one counter, and two events it cannot both cover" (shields giant shielded) 1
+    Spec.assertBool
+      s
+      (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch)))
+      "alice was asked which damage the counter prevents"
+    -- CR 615.6: a prevented event never happens, so the board says which of the two
+    -- the counter reached twice over -- in what was marked and in what survived.
+    Spec.assertEqWith s "the counter covers the 5: only the 2 happens" (amounts tookTheBig) [2]
+    Spec.assertEqWith s "so 2 is marked on the 3/3" (S.damageOf giant tookTheBig) (Just 2)
+    Spec.assertBool s (Set.member giant (GameState.battlefield (S.settleSba tookTheBig))) "and it survives"
+    Spec.assertEqWith s "the counter covers the 2 instead: only the 5 happens" (amounts tookTheSmall) [5]
+    Spec.assertEqWith s "so 5 is marked on the same 3/3" (S.damageOf giant tookTheSmall) (Just 5)
+    Spec.assertBool s (not (Set.member giant (GameState.battlefield (S.settleSba tookTheSmall)))) "and CR 704.5g destroys it"
+    -- CR 122.1c: one counter comes off per application either way, so the answer
+    -- changes which event was covered and never how much the pair could cover.
+    Spec.assertEqWith s "one counter spent either way" (shields giant tookTheBig) 0
+    Spec.assertEqWith s "one counter spent either way" (shields giant tookTheSmall) 0
+  -- The elision half, and the discriminating twin of the case above: two counters
+  -- cover two events in any order, so there is nothing to decide and nothing is
+  -- asked. One difference from that board -- the number of counters -- and the same
+  -- seats, sources and amounts.
+  Spec.it s "CR 122.1c two counters cover two simultaneous hits, and ask nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    giantPrinting <- S.printingOf s registry "Hill Giant"
+    let (giant, g1) = S.addCreature giantPrinting S.alice (S.landsInPlay plains 1)
+        (big, g2) = S.addCreature pikerPrinting S.bob g1
+        (small, g3) = S.addCreature pikerPrinting S.bob g2
+        shielded = S.addCounter CounterKind.Shield 2 giant g3
+        batch = [hit big (Recipient.ToCreature giant) 5, hit small (Recipient.ToCreature giant) 2]
+        after = settleDamage S.identityAnswer shielded batch
+    Spec.assertBool
+      s
+      (not (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch))))
+      "no OrderDamage was raised: two counters cover both events"
+    Spec.assertEqWith s "neither event happened" (amounts after) []
+    Spec.assertEqWith s "nothing is marked" (S.damageOf giant after) (Just 0)
+    Spec.assertEqWith s "and both counters paid for it" (shields giant after) 0
+    Spec.assertBool s (Set.member giant (GameState.battlefield (S.settleSba after))) "the Giant is untouched"
   -- CR 122.1c's "to THIS permanent": the pair protects the permanent its counters
   -- are on and no other recipient. Two Bolts off one board, one at bob and one at
   -- bob's Piker, so both shapes a wrongly scoped shield would reach are covered -- a
