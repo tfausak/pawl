@@ -405,12 +405,34 @@ permitsCastFromExile pid oid face gs =
   fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid
     && not (Card.isAdventure face)
 
+-- The objects in a castable zone that this player might cast, BEFORE any
+-- permission is consulted -- the membership half of the two questions
+-- castableZones asks, and the one list both castableSpells and inCastableZone
+-- read so the offer and the gate cannot disagree about where to look.
+--
+-- EXILE is the shared zone rather than Game.zoneMembers, which files it by
+-- OWNER. CR 601.3's permission names a PLAYER, and both writers of one --
+-- CR 715.3d's Adventure exile and Effect.GrantPlayFromExile -- name the
+-- controller of whatever granted it, so a player permitted to play a card
+-- somebody else owns has to be able to reach it (#668).
+-- Pawl.Engine.Cast.permitsCastFromExile is what keeps that from widening into an
+-- offer to the table: it answers False for every player the permission does not
+-- name, this one included.
+--
+-- Every other zone in castZones is one the rules scope by player anyway: a hand
+-- and a graveyard are per-player piles (CR 400.1), and CR 903.8 lets only a
+-- commander's owner cast it from the command zone.
+zoneCandidates :: Zone.Zone -> PlayerId -> GameState -> [ObjectId]
+zoneCandidates zone pid gs = case zone of
+  Zone.Exile -> Set.toList (GameState.exile gs)
+  _ -> Game.zoneMembers zone pid gs
+
 -- Is this object somewhere this player may cast it from?
 inCastableZone :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 inCastableZone pid oid name gs =
   case proposedFace oid name gs of
     Nothing -> False
-    Just face -> any (\zone -> elem oid (Game.zoneMembers zone pid gs)) (castableZones pid oid face gs)
+    Just face -> any (\zone -> elem oid (zoneCandidates zone pid gs)) (castableZones pid oid face gs)
 
 -- CR 205.4e: a legendary instant or sorcery can't be cast unless its caster
 -- controls a legendary creature or a legendary planeswalker.
@@ -608,7 +630,7 @@ castableSpells pid gs =
           facing <- facings face
         ]
       offered oid = filter (\(_, name, facing) -> castable pid oid name facing gs) (proposals oid)
-      inZone zone = concatMap offered (Game.zoneMembers zone pid gs)
+      inZone zone = concatMap offered (zoneCandidates zone pid gs)
    in concatMap inZone castZones
 
 -- CR 601.3 (Panglacial): may this card be cast from the library while its
@@ -858,8 +880,13 @@ castSpellWith applied pid oid name facing = do
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
       -- exists without it and every read of it -- inside the move as much as in
       -- CR 601.2b's announcements below -- sees that half alone (CR 709.3b)
-      -- rather than CR 709.4's combined view. Event.changeZoneShowing says what
+      -- rather than CR 709.4's combined view. Event.changeZoneCasting says what
       -- it costs and what can observe it.
+      --
+      -- `pid` rides along for the same reason and is the rest of that rule: "that
+      -- player becomes its controller" (CR 601.2a, CR 405.4). Fixed by the move
+      -- and never re-derived, which is what keeps a spell cast off someone else's
+      -- card resolving under its CASTER rather than its owner (#83).
       --
       -- `name` is the same name castable's gate stamped through asProposed, so
       -- the offer and the announcement cannot name different halves.
@@ -871,9 +898,7 @@ castSpellWith applied pid oid name facing = do
       -- CR 708.4 is the same claim about the other status: the object is turned
       -- face down BEFORE it is put onto the stack, so the move carries the
       -- facing too and no reader inside it sees a face-up incarnation.
-      moved <- case facing of
-        Facing.FaceUp -> Event.changeZoneShowing oid Zone.Stack (Just name)
-        Facing.FaceDown -> Event.changeZoneFaceDown oid Zone.Stack (Just name)
+      moved <- Event.changeZoneCasting pid oid Zone.Stack (Just name) facing
       case moved of
         Nothing -> State.put before
         Just sid -> castProposed pid sid face castFrom candidates before
