@@ -1418,6 +1418,16 @@ deathtouchSpec s registry =
           ratBit = any (\ev -> DamageEvent.source ev == ratId && DamageEvent.dealtByDeathtouch ev) (S.damageEventsOf fought)
       Spec.assertBool s (not ratBit) "no deathtouch at deal time under Humility"
 
+-- Both halves of CR 510.1e for ONE attacker assigning by itself: the damage every
+-- creature is assigning in the step is this creature's own answer, so the gates
+-- read exactly what they read before the step's total became their comparand. The
+-- cases where another creature's damage is what clears a gate are gameplay-level,
+-- in Pawl.CombatSpec's TrampleOverPlaneswalkers and SharedBlocker groups.
+assignedAlone :: Map.Map Recipient.Recipient Natural.Natural -> Natural.Natural -> Map.Map Recipient.Recipient Natural.Natural -> Bool
+assignedAlone thresholds power answer =
+  Damage.wellFormedAssignment thresholds power answer
+    && Damage.tiersCleared thresholds answer answer
+
 assignmentLegalitySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 assignmentLegalitySpec s =
   Spec.describe s "AssignmentLegality" $ do
@@ -1431,7 +1441,7 @@ assignmentLegalitySpec s =
               ]
           answer :: Map.Map Recipient.Recipient Natural.Natural
           answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 2)]
-       in Spec.assertBool s (Damage.legalAssignment thresholds 2 answer) "accepted"
+       in Spec.assertBool s (assignedAlone thresholds 2 answer) "accepted"
 
     Spec.it s "defender damage while a blocker is short is illegal" $
       let thresholds :: Map.Map Recipient.Recipient Natural.Natural
@@ -1446,7 +1456,7 @@ assignmentLegalitySpec s =
               [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 0),
                 (Recipient.ToPlayer S.bob, 3)
               ]
-       in Spec.assertBool s (not (Damage.legalAssignment thresholds 3 answer)) "rejected"
+       in Spec.assertBool s (not (assignedAlone thresholds 3 answer)) "rejected"
 
     Spec.it s "defender damage once the blocker has lethal is legal" $
       let thresholds :: Map.Map Recipient.Recipient Natural.Natural
@@ -1461,21 +1471,21 @@ assignmentLegalitySpec s =
               [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 1),
                 (Recipient.ToPlayer S.bob, 2)
               ]
-       in Spec.assertBool s (Damage.legalAssignment thresholds 3 answer) "accepted"
+       in Spec.assertBool s (assignedAlone thresholds 3 answer) "accepted"
 
     Spec.it s "an answer that does not total power is illegal" $
       let thresholds :: Map.Map Recipient.Recipient Natural.Natural
           thresholds = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 0)]
           answer :: Map.Map Recipient.Recipient Natural.Natural
           answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 1)]
-       in Spec.assertBool s (not (Damage.legalAssignment thresholds 2 answer)) "rejected"
+       in Spec.assertBool s (not (assignedAlone thresholds 2 answer)) "rejected"
 
     Spec.it s "an illegal recipient is rejected" $
       let thresholds :: Map.Map Recipient.Recipient Natural.Natural
           thresholds = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 1), 0)]
           answer :: Map.Map Recipient.Recipient Natural.Natural
           answer = Map.fromList [(Recipient.ToCreature (ObjectId.MkObjectId 2), 2)]
-       in Spec.assertBool s (not (Damage.legalAssignment thresholds 2 answer)) "rejected"
+       in Spec.assertBool s (not (assignedAlone thresholds 2 answer)) "rejected"
 
     -- The threshold gates the DEFENDER's share; it is not a cap on the
     -- blocker's. CR 702.19b lets the attacker assign past lethal and spill
@@ -1493,7 +1503,7 @@ assignmentLegalitySpec s =
               [ (Recipient.ToCreature (ObjectId.MkObjectId 1), 3),
                 (Recipient.ToPlayer S.bob, 2)
               ]
-       in Spec.assertBool s (Damage.legalAssignment thresholds 5 answer) "accepted"
+       in Spec.assertBool s (assignedAlone thresholds 5 answer) "accepted"
 
     -- CR 702.19b gates the defender on ALL blocking creatures having lethal,
     -- so this pair is the quantifier: one blocker short rejects the very same
@@ -1517,7 +1527,7 @@ assignmentLegalitySpec s =
                 (Recipient.ToCreature (ObjectId.MkObjectId 2), 1),
                 (Recipient.ToPlayer S.bob, 2)
               ]
-       in Spec.assertBool s (not (Damage.legalAssignment thresholds 5 answer)) "rejected"
+       in Spec.assertBool s (not (assignedAlone thresholds 5 answer)) "rejected"
 
     Spec.it s "two blockers: both at lethal frees the defender" $
       let thresholds :: Map.Map Recipient.Recipient Natural.Natural
@@ -1534,7 +1544,7 @@ assignmentLegalitySpec s =
                 (Recipient.ToCreature (ObjectId.MkObjectId 2), 2),
                 (Recipient.ToPlayer S.bob, 1)
               ]
-       in Spec.assertBool s (Damage.legalAssignment thresholds 5 answer) "accepted"
+       in Spec.assertBool s (assignedAlone thresholds 5 answer) "accepted"
 
     -- CR 702.19c's SECOND tier, the mirror of the blocker pair above: with
     -- trample over planeswalkers the map holds the attacked planeswalker at its
@@ -1555,7 +1565,7 @@ assignmentLegalitySpec s =
               [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 2),
                 (Recipient.ToPlayer S.bob, 5)
               ]
-       in Spec.assertBool s (not (Damage.legalAssignment thresholds 7 answer)) "rejected"
+       in Spec.assertBool s (not (assignedAlone thresholds 7 answer)) "rejected"
 
     Spec.it s "CR 702.19c the planeswalker at its loyalty frees its controller" $
       let thresholds :: Map.Map Recipient.Recipient Natural.Natural
@@ -1570,7 +1580,7 @@ assignmentLegalitySpec s =
               [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 3),
                 (Recipient.ToPlayer S.bob, 4)
               ]
-       in Spec.assertBool s (Damage.legalAssignment thresholds 7 answer) "accepted"
+       in Spec.assertBool s (assignedAlone thresholds 7 answer) "accepted"
 
     -- "At least equal to the loyalty" (CR 702.19c), so the threshold is a floor on
     -- the planeswalker's share and not a cap on it.
@@ -1587,7 +1597,7 @@ assignmentLegalitySpec s =
               [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 5),
                 (Recipient.ToPlayer S.bob, 2)
               ]
-       in Spec.assertBool s (Damage.legalAssignment thresholds 7 answer) "accepted"
+       in Spec.assertBool s (assignedAlone thresholds 7 answer) "accepted"
 
     -- Without trample the defending player is not among the thresholds at all
     -- (Damage.attackerAssignment adds that entry only for a trampler), so a
@@ -1606,7 +1616,7 @@ assignmentLegalitySpec s =
                 (Recipient.ToCreature (ObjectId.MkObjectId 2), 1),
                 (Recipient.ToPlayer S.bob, 1)
               ]
-       in Spec.assertBool s (not (Damage.legalAssignment thresholds 3 answer)) "rejected"
+       in Spec.assertBool s (not (assignedAlone thresholds 3 answer)) "rejected"
 
 -- Sends the whole assignment to the FIRST blocker when the defending player is
 -- asked, and to the SECOND when the attacker's controller is. Which creature
@@ -1985,9 +1995,9 @@ departedAttackerSpec s registry =
 -- spends the excess on a player recipient when one is offered.
 -- defenderOrBlockerAnswer assigns each blocker exactly its threshold and routes
 -- the leftover to a player recipient if the threshold map offers one, falling
--- back onto the blocker (over-lethal, still legal -- Damage.legalAssignment has
--- no upper bound) when it does not. That is what actually surfaces whether the
--- departed defender was offered.
+-- back onto the blocker (over-lethal, still legal -- a threshold is a floor and
+-- Damage.tiersCleared has no upper bound) when it does not. That is what actually
+-- surfaces whether the departed defender was offered.
 defenderOrBlockerAnswer :: Prompt.Prompt r -> r
 defenderOrBlockerAnswer p = case p of
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
