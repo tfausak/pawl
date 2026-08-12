@@ -96,7 +96,7 @@ data Effect card
     -- 605.3b: a mana ability never uses the stack), never by Resolve.applyEffect.
     AddMana ManaProduction.ManaProduction
   | -- | CR 701.23: the players the FIRST PlayerRef names each search the library
-    -- of each player the SECOND names, for up to Quantity cards matching the
+    -- of each player the SECOND names, for Quantity cards matching the
     -- Filter, put them where the SearchDestination says, then that library's
     -- owner shuffles. The Filter is evaluated over the PRINTED-card view
     -- (Projection.viewOfCardIn) -- a card in a library has no projection, only CR
