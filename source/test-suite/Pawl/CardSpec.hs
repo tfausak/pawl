@@ -1876,8 +1876,9 @@ objectRefFilters ref = case ref of
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it holds
-  -- no Filter either; its PlayerRef names players and never characteristics.
-  ObjectRef.TopOfLibrary _ -> []
+  -- no Filter either; its PlayerRef names players, and its depth counts cards --
+  -- neither is a characteristic.
+  ObjectRef.TopOfLibrary _ _ -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -3617,47 +3618,62 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- that prints one.
     Spec.assertBool s (any (anyFace (any moves . cardResolutionEffects) . Printing.card) ps) "the pool has a card returning itself transformed"
     Spec.assertEqWith s "a token is not a card, so no token is created transformed" (fmap (S.nameOf . Printing.card) offenders) []
-  -- MoveToZone's Maybe SlotName binds the ONE incarnation CR 400.7 mints at the
-  -- destination, which a swept set does not have -- so the combination is
-  -- rejected in card data rather than repaired by inventing a group binding
-  -- (#972). A lint rather than a type split for the reason the Create lint above
-  -- gives: every other field is common to both arms of the ObjectRef, so
-  -- splitting the opcode to keep one field off one arm would duplicate them.
-  Spec.it s "no MoveToZone binds an incarnation under a swept set (#972)" $ do
+  -- MoveToZone's Maybe SlotName binds what CR 400.7 minted at the destination, in
+  -- one of two shapes: ONE incarnation for a move of one card (Befriending the
+  -- Moths' "it"), and a GROUP for a move of several (Act on Impulse's "those
+  -- cards"). Pawl.Engine.Resolve picks by how many actually arrived, and only the
+  -- singular shape is visible to a SINGULAR READER -- Resolve.slotOne reads
+  -- Binding.targets, which a group never fills.
+  --
+  -- So the shape a card must not author is a singular read of a slot a move that
+  -- may take SEVERAL cards bound: it would silently name nothing rather than
+  -- fail. The two singular readers are Effect.OfferCast and a MoveToZone whose
+  -- own ref is an InSlot; every other reader goes through
+  -- Resolve.objectRefObjects, which reads the group.
+  Spec.it s "no card reads a slot a plural move bound with a singular reader" $ do
     ps <- S.allPrintings s
-    let -- The refs that move at most ONE object, and so have one incarnation to
-        -- bind. A TopOfLibrary is one card PER LIBRARY, so only a PlayerRef
-        -- naming a single library qualifies -- "each player's" and, in a game of
-        -- three, "each opponent's" both move several.
+    let -- The refs that move at most ONE object, and so bind the singular shape
+        -- whatever the board holds. A TopOfLibrary is `depth` cards PER LIBRARY,
+        -- so it qualifies only at a depth of one over a PlayerRef naming a single
+        -- library -- "each player's" and, in a game of three, "each opponent's"
+        -- both move several, and so does any depth above one.
         movesAtMostOne ref = case ref of
           ObjectRef.InSlot _ -> True
           ObjectRef.EachMatching _ -> False
           ObjectRef.EachCardInGraveyard _ _ -> False
           ObjectRef.EachPlayer -> False
-          ObjectRef.TopOfLibrary player -> case player of
-            PlayerRef.Relative PlayerRelation.You -> True
-            PlayerRef.Relative PlayerRelation.Opponent -> False
-            PlayerRef.InSlot _ -> True
-            PlayerRef.EachPlayer -> False
-            -- One seat, so one library -- InSlot's answer. Unreachable from card
-            -- data, which the sweep below is what enforces.
-            PlayerRef.Specific _ -> True
-        offends effect = case effect of
+          ObjectRef.TopOfLibrary player depth ->
+            depth <= 1 && case player of
+              PlayerRef.Relative PlayerRelation.You -> True
+              PlayerRef.Relative PlayerRelation.Opponent -> False
+              PlayerRef.InSlot _ -> True
+              PlayerRef.EachPlayer -> False
+              -- One seat, so one library -- InSlot's answer. Unreachable from
+              -- card data, which the sweep below is what enforces.
+              PlayerRef.Specific _ -> True
+        boundPlurally effect = case effect of
+          Effect.MoveToZone ref _ _ mSlot _ _ | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
+          _ -> []
+        readSingly effect = case effect of
+          Effect.OfferCast slot _ -> [slot]
+          Effect.MoveToZone (ObjectRef.InSlot slot) _ _ _ _ _ -> [slot]
+          _ -> []
+        clashes effects =
+          not
+            . Set.null
+            $ Set.intersection
+              (Set.fromList (concatMap boundPlurally effects))
+              (Set.fromList (concatMap readSingly effects))
+        offenders = filter (anyFace (clashes . cardResolutionEffects) . Printing.card) ps
+        binds effect = case effect of
           Effect.MoveToZone ref _ _ mSlot _ _ -> Maybe.isJust mSlot && not (movesAtMostOne ref)
           _ -> False
-        binds effect = case effect of
-          Effect.MoveToZone (ObjectRef.InSlot _) _ _ mSlot _ _ -> Maybe.isJust mSlot
-          _ -> False
-        sweeps effect = case effect of
-          Effect.MoveToZone (ObjectRef.EachMatching _) _ _ _ _ _ -> True
-          _ -> False
-        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Both halves of the rejected shape are in the pool separately, so the sweep
-    -- is not vacuous: Befriending the Moths binds an incarnation under a slot,
-    -- and Evacuation sweeps a set without binding one.
-    Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what its move minted"
-    Spec.assertBool s (any (anyFace (any sweeps . cardResolutionEffects) . Printing.card) ps) "and a card moving a swept set"
-    Spec.assertEqWith s "a set has no single incarnation to bind" (fmap (S.nameOf . Printing.card) offenders) []
+    -- is not vacuous: Act on Impulse binds a group, and Befriending the Moths
+    -- offers a cast from a slot its own move bound.
+    Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a plural move minted"
+    Spec.assertBool s (any (anyFace (not . all (null . readSingly) . cardResolutionEffects) . Printing.card) ps) "and a card reading a bound slot singly"
+    Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
   -- 401.2), and only a library HAS ends -- so on any other destination it would
   -- put a question on the wire with no board behind it. A stated position on a

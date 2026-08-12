@@ -217,16 +217,15 @@ data Effect card
     -- (CR 109.3: neither is a characteristic). They mean nothing for any other
     -- destination. Resolve reads them; it never cases on them.
     --
-    -- The Maybe SlotName BINDS the incarnation CR 400.7 mints at the DESTINATION,
-    -- as Create's minted-token slot does and for the same rule: a delayed ability
-    -- this resolution arms (CR 603.7c's "it") must name the object, and after a
-    -- zone change the old id is gone. Meandering Towershell is the producer, its
-    -- two "it"s two incarnations of one card. A DEFINITION, not a read: never a
-    -- target, never in targetSpecs. Meaningful only under a ref that moves at most
-    -- one object -- InSlot, or a TopOfLibrary naming ONE library, which is Count
-    -- on Luck: binding ONE arriving incarnation is meaningless for a set, and no
-    -- card in the pool asks for the group form. A CardSpec lint rejects the
-    -- combination rather than inventing a group binding (#972).
+    -- The Maybe SlotName BINDS the incarnations CR 400.7 mints at the
+    -- DESTINATION, as Create's minted-token slot does and for the same rules: CR
+    -- 400.7j lets the rest of this effect find what it moved to a public zone,
+    -- and a delayed ability this resolution arms (CR 603.7c's "it") must name the
+    -- object, since after a zone change the old id is gone. Meandering
+    -- Towershell's two "it"s are the singular producer; Act on Impulse's "those
+    -- cards" is the plural one, and Resolve binds a group for it exactly as
+    -- Create does for "those tokens". A DEFINITION, not a read: never a target,
+    -- never in targetSpecs.
     --
     -- The trailing Maybe Zone is the zone the effect's own words say the object
     -- is moved OUT of -- Reassembling Skeleton's "return this card FROM YOUR
