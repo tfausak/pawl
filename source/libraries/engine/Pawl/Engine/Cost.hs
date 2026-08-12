@@ -254,10 +254,10 @@ costsFor name oid gs = case Game.lookupObject oid gs of
 --
 -- CR 601.2f's LOCK-IN belongs to the caller and not to this function, which is
 -- only the totalling as a function of state. Pawl.Engine.Cast.castProposed and
--- Pawl.Engine.Activate.activateAbility each run it once per announcement
--- (through totalWith, over the adjustments CR 118.7e's prompt resolved) and hand
--- the resulting VALUE to `pay` below, which never re-reads the state for it --
--- so an effect that would change the total after that point does nothing.
+-- Pawl.Engine.Activate.activateAbility each total the cost ONCE per announcement
+-- -- through totalWith, over the adjustments CR 118.7e's prompt resolved -- and
+-- hand the resulting VALUE to `pay` below, which never re-reads the state for it
+-- -- so an effect that would change the total after that point does nothing.
 -- Pawl.CostSpec's Altar's Reap group is what proves it: the creature paying the
 -- additional cost is the cost reducer, so a total re-read after CR 601.2h's
 -- sacrifice costs a mana more.
