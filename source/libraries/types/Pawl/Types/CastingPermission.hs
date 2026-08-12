@@ -10,8 +10,9 @@ module Pawl.Types.CastingPermission where
 --
 -- OBJECT-scoped throughout: every arm is a permission a CARD grants about
 -- ITSELF. The player-scoped sibling -- a continuous effect that lets its player
--- cast any card from their graveyard (Yawgmoth's Will) -- is a different carrier
--- and still has none (#96).
+-- cast any card from their graveyard (Yawgmoth's Will) -- is a different
+-- carrier, and it is Pawl.Types.PlayerEffect.CastFromGraveyard.
+-- Pawl.Engine.Cast.permitsCastFromGraveyard reads the two beside each other.
 data CastingPermission
   = CastFromLibraryWhileSearching
   | -- | CR 702.34a's first static ability, the half functioning while the card is

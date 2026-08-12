@@ -344,14 +344,16 @@ rewritePlayerEffect pairs effect = case effect of
   -- The arms carrying a Filter, which is the only place in this type a subtype
   -- word can hide. Thalia's "noncreature spells", Vedalken Orrery's "spells",
   -- Prowling Serpopard's "creature spells", Heartstone's "activated abilities of
-  -- creatures" and Damping Engine's "artifact, creature, or enchantment spells"
-  -- name none today; Edgewalker's "Cleric spells" does.
+  -- creatures", Damping Engine's "artifact, creature, or enchantment spells" and
+  -- Yawgmoth's Will's "spells" name none today; Edgewalker's "Cleric spells"
+  -- does, and Haakon's "Knight spells" would.
   PlayerEffect.IncreaseSpellCost f n -> PlayerEffect.IncreaseSpellCost (Filter.rewrite pairs f) n
   PlayerEffect.ReduceSpellCost f cost -> PlayerEffect.ReduceSpellCost (Filter.rewrite pairs f) cost
   PlayerEffect.ReduceActivationCost f cost floor_ -> PlayerEffect.ReduceActivationCost (Filter.rewrite pairs f) cost floor_
   PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
+  PlayerEffect.CastFromGraveyard f -> PlayerEffect.CastFromGraveyard (Filter.rewrite pairs f)
   -- The rest name no word a subtype pair could reach. The two chosen-name arms
   -- carry nothing at all -- CR 201.4's names are read off the source's
   -- Object.chosenNames -- and CR 612.2's second sentence says a subtype swap
@@ -492,6 +494,10 @@ prohibitsCasting pid oid name gs =
         -- played and never cast, so the unrestricted play-side prohibition stops
         -- nothing here either.
         PlayerEffect.CantPlayLands -> False
+        -- CR 601.3's other half: this arm ALLOWS a cast the rules would refuse,
+        -- and no permission prohibits anything. mayCastFromGraveyard below is
+        -- where it is read.
+        PlayerEffect.CastFromGraveyard _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -521,6 +527,11 @@ prohibitsPlayingLand pid names gs =
         -- Damping Engine's "can't play lands", which narrows nothing: every land
         -- this player could play is stopped, so the name goes unread.
         PlayerEffect.CantPlayLands -> True
+        -- CR 305.1 once more: a permission naming the zone a SPELL may be cast
+        -- from stops no land play and allows none either, which is why
+        -- Yawgmoth's Will's "you may play lands ... from your graveyard" is not
+        -- this arm (#1364).
+        PlayerEffect.CastFromGraveyard _ -> False
         -- CR 305.1 again, in the other direction: a prohibition on CASTING says
         -- nothing about a special action, so Silence and Rule of Law leave a
         -- land play alone. CR 305.2's and CR 305.3's limits are the closed
@@ -592,6 +603,7 @@ prohibitsSearching pid gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CastFromGraveyard _ -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 725 / 101.2: is `pid` forbidden from becoming the monarch? CR 725.4 asks the
@@ -638,6 +650,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantSearchLibraries -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CastFromGraveyard _ -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
@@ -776,6 +789,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -798,6 +812,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
       effects = fmap snd (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
@@ -849,6 +864,7 @@ activationCostAdjustments pid srcId gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
       applicable = Maybe.mapMaybe (reductionOf . snd) (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = [],
@@ -910,6 +926,64 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CantPlayLands -> False
+        -- The other CR 601.3 permission on this axis, and the two do not
+        -- compose: that one names a ZONE and this question is about a TIME, so a
+        -- card in a graveyard still waits for its own window.
+        PlayerEffect.CastFromGraveyard _ -> False
+   in any (allows . snd) (applying pid gs)
+
+-- CR 601.3: may `pid` cast `oid` from a graveyard because an EFFECT says so?
+--
+-- The typed question Pawl.Engine.Cast.permitsCastFromGraveyard asks beside the
+-- object-scoped Pawl.Types.CastingPermission.CastFromGraveyard it already read,
+-- so that module never sees a PlayerEffect constructor and neither permission is
+-- expressed in terms of the other. One card carrying flashback and one player
+-- holding Yawgmoth's Will's grant are two rules (CR 702.34a, CR 601.3) reaching
+-- the same gate.
+--
+-- Asks nothing about WHOSE graveyard: Pawl.Engine.Cast.zoneCandidates hands this
+-- only the cards in `pid`'s own graveyard (CR 400.1's per-player zone), which is
+-- the "your graveyard" every printing of this permission says.
+--
+-- A DISJUNCTION, for the reason Pawl.Types.PlayerEffect.CastFromGraveyard gives:
+-- one applicable permission is enough, so CR 613.11's timestamp order has
+-- nothing to order.
+--
+-- matchesObject is called only from inside the arm that already matched, so a
+-- board with no such effect on it runs no projections at all -- the posture
+-- mayCastAsThoughItHadFlash takes above.
+--
+-- Takes the OBJECT and not the half being proposed, so a split card's filter is
+-- matched against CR 709.4's combined view rather than against the chosen half
+-- (#656) -- the same seam mayCastAsThoughItHadFlash has, through the same
+-- matchesObject.
+mayCastFromGraveyard :: PlayerId -> ObjectId -> GameState -> Bool
+mayCastFromGraveyard pid oid gs =
+  let allows effect = case effect of
+        PlayerEffect.CastFromGraveyard criterion -> matchesObject criterion oid gs
+        -- The other CR 601.3 permission on this axis names a TIME, and this
+        -- question is about a ZONE.
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.ReduceActivationCost {} -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantBecomeMonarch -> False
+        -- A PROHIBITION, and CR 601.3 asks the two halves separately:
+        -- prohibitsCasting above is where Damping Engine and Silence are read.
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CantPlayLands -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -969,6 +1043,7 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CastFromGraveyard _ -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -1022,6 +1097,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -1070,6 +1146,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantBecomeMonarch -> current
         PlayerEffect.CantCastMatching _ -> current
         PlayerEffect.CantPlayLands -> current
+        PlayerEffect.CastFromGraveyard _ -> current
    in List.foldl' (\current row -> apply current (snd row)) (Just defaultMaximumHandSize) (applying pid gs)
 
 -- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
@@ -1118,6 +1195,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
@@ -1177,6 +1255,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantBecomeMonarch -> False
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CantPlayLands -> False
+        PlayerEffect.CastFromGraveyard _ -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
@@ -1228,6 +1307,7 @@ unpreventable gs =
         PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantCastMatching _ -> Nothing
         PlayerEffect.CantPlayLands -> Nothing
+        PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing

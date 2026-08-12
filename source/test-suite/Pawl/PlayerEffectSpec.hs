@@ -3101,6 +3101,137 @@ abilityRun srcId ability stifleId gs =
    in (placed, S.runPure counteringAtAlice placed Stack.resolveTop)
 
 -- Spider-Punk {1}{R} Legendary Creature -- Spider Human Hero 2/1 (Marvel's
+-- ONE board for Yawgmoth's Will, built once and branched. alice has six untapped
+-- Swamps -- three for the Will's {2}{B} and three left over, so no assertion
+-- below can turn on mana -- the Will in hand, and a Sign in Blood ({B}{B}, no
+-- flashback and no casting permission of its own) in her graveyard. bob holds
+-- exactly the same six Swamps and the same card in HIS graveyard, which is what
+-- makes the CR 109.5 scope observable: the two seats differ in the grant and in
+-- nothing else. Both libraries are stocked, since Sign in Blood draws and CR
+-- 104.3c would otherwise decide the game before an assertion ran.
+--
+-- Returns the Will, alice's graveyard card, bob's, and the board.
+willBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+willBoard swamp will signInBlood =
+  let lands = S.landsFor swamp S.bob 6 (S.landsInPlay swamp 6)
+      stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard swamp pid g)) gs [1 :: Int .. 3]
+      stocked = stock S.bob (stock S.alice lands)
+      (willId, withWill) = S.addHandCard will S.alice stocked
+      (hers, withHers) = S.addGraveyardCard signInBlood S.alice withWill
+      (his, withHis) = S.addGraveyardCard signInBlood S.bob withHers
+   in ( willId,
+        hers,
+        his,
+        withHis
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The same board with the Will cast and resolved.
+willResolved :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+willResolved willId gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice willId)) Stack.resolveTop
+
+-- CR 601.3 / Yawgmoth's Will {2}{B} Sorcery: "Until end of turn, you may play
+-- lands and cast spells from your graveyard. If a card would be put into your
+-- graveyard from anywhere this turn, exile that card instead."
+--
+-- The PLAYER-scoped half of CR 601.3's allow clause, where flashback (CastSpec's
+-- Firebolt group) is the object-scoped half: the card that becomes castable
+-- carries no permission of its own and never learns one.
+--
+-- The play-lands half of the first sentence is NOT implemented -- a land is
+-- played and never cast (CR 305.1), and no effect can grant a zone permission on
+-- the play side (#1364). pawl's Yawgmoth's Will is therefore STRICTER than
+-- printed, which the last case here pins.
+yawgmothsWillSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+yawgmothsWillSpec s registry =
+  let board = do
+        swamp <- S.printingOf s registry "Swamp"
+        will <- S.printingOf s registry "Yawgmoth's Will"
+        signInBlood <- S.printingOf s registry "Sign in Blood"
+        pure (willBoard swamp will signInBlood)
+   in Spec.describe s "YawgmothsWill" $ do
+        -- The control. Without it every refusal below would also be true of a
+        -- board where Sign in Blood was simply unaffordable or the timing wrong.
+        Spec.it s "CR 601.3 before the Will resolves the graveyard card is not castable" $ do
+          (willId, hers, _, gs) <- board
+          Spec.assertBool s (S.castable S.alice willId gs) "the Will itself is castable"
+          Spec.assertBool s (not (S.castable S.alice hers gs)) "but the card in the graveyard is not"
+          Spec.assertBool s (not (any (S.isCastOf hers) (Action.legalActions S.alice gs))) "and not offered"
+
+        -- The whole card, end to end: graveyard -> stack -> EXILE. The exile is
+        -- the second sentence, and the card would be back in the graveyard
+        -- without it.
+        Spec.it s "CR 601.3 with the Will resolved the graveyard card is cast, resolves and is exiled" $ do
+          (willId, hers, _, gs) <- board
+          let after = willResolved willId gs
+          Spec.assertBool s (S.castable S.alice hers after) "castable from the graveyard"
+          Spec.assertBool s (any (S.isCastOf hers) (Action.legalActions S.alice after)) "and offered"
+          let cast = S.runPure S.identityAnswer after (S.cast S.alice hers)
+              resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+          Spec.assertEqWith s "it drew and cost 2 life" (S.lifeOf S.alice resolved) (Just 18)
+          Spec.assertEqWith s "it is not back in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
+          Spec.assertEqWith s "it was exiled instead, beside the Will" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 2
+
+        -- The ruling: "It will exile itself since it goes to the graveyard after
+        -- its effect starts." Both sentences of the card in one assertion --
+        -- the replacement is already in force when CR 608.2n moves the Will.
+        Spec.it s "CR 608.2n / 614.1a the Will exiles itself" $ do
+          (willId, hers, _, gs) <- board
+          will <- S.printingOf s registry "Yawgmoth's Will"
+          let after = willResolved willId gs
+          -- By NAME, not by id: CR 400.7 makes the card leaving the stack a new
+          -- object, so `willId` names nothing once it has moved.
+          Spec.assertEqWith s "the graveyard holds only what was already there" (Game.zoneMembers Zone.Graveyard S.alice after) [hers]
+          Spec.assertEqWith s "and the Will is in exile" (fmap (\o -> S.soleFaceName o after) (Game.zoneMembers Zone.Exile S.alice after)) [S.printingName will]
+
+        -- CR 109.5 / PlayerScope.You: alice's Will does nothing for bob, whose
+        -- board is hers in every other respect. Asked of the typed question as
+        -- well as of the gate, because CR 307.1's sorcery window is shut for bob
+        -- on alice's turn and would refuse his cast on its own.
+        Spec.it s "CR 109.5 the You scope does not reach bob's graveyard" $ do
+          (willId, hers, his, gs) <- board
+          let after = willResolved willId gs
+              bobsTurn = after {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice hers after) "alice has the permission"
+          Spec.assertBool s (not (PlayerEffect.mayCastFromGraveyard S.bob his after)) "bob does not"
+          Spec.assertBool s (not (S.castable S.bob his bobsTurn)) "and it is not castable even in his own main phase"
+          Spec.assertBool s (not (any (S.isCastOf his) (Action.legalActions S.bob bobsTurn))) "nor offered"
+
+        -- The permission names a ZONE, not a TIME, which is the flashback ruling
+        -- one rule over ("you can cast a sorcery using flashback only when you
+        -- could normally cast a sorcery"). Read beside Cast.instantSpeed rather
+        -- than inside it, so the sorcery window still has to be open.
+        Spec.it s "CR 117.1a the grant does not lift the sorcery timing restriction" $ do
+          (willId, hers, _, gs) <- board
+          let after = willResolved willId gs
+              upkeep = after {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+          Spec.assertBool s (S.castable S.alice hers after) "castable in her own main phase"
+          Spec.assertBool s (not (S.castable S.alice hers upkeep)) "not in her upkeep"
+
+        -- CR 514.2: "until end of turn" is the stored CR 611.2c carrier's expiry,
+        -- so the grant dies at cleanup and the same board refuses the same cast.
+        Spec.it s "CR 514.2 the permission ends at cleanup" $ do
+          (willId, hers, _, gs) <- board
+          let after = willResolved willId gs
+              ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+          Spec.assertEqWith s "one stored effect while it lasts" (length (GameState.playerEffects after)) 1
+          Spec.assertEqWith s "nothing stored afterwards" (GameState.playerEffects ended) []
+          Spec.assertBool s (not (PlayerEffect.mayCastFromGraveyard S.alice hers ended)) "the permission is gone"
+          Spec.assertBool s (not (S.castable S.alice hers ended)) "and the cast is refused again"
+
+        -- CR 305.1: the play-lands half of the same sentence has no carrier, so a
+        -- land in the graveyard stays unplayable (#1364). pawl's card is stricter
+        -- than printed here, and this is what says so.
+        Spec.it s "CR 305.1 a land in the graveyard is still not playable" $ do
+          (willId, _, _, gs) <- board
+          swamp <- S.printingOf s registry "Swamp"
+          let (landId, withLand) = S.addGraveyardCard swamp S.alice gs
+              after = willResolved willId withLand
+          Spec.assertBool s (notElem (Action.Type.Play landId Nothing) (Action.legalActions S.alice after)) "not offered as a land play"
+
 -- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
 -- counteringBoard above, with a Goblin Piker as the victim spell.
 --
@@ -3567,6 +3698,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
+  yawgmothsWillSpec s registry
   voidWinnowerSpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
