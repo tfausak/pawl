@@ -51,11 +51,11 @@ swampsYouControl =
   Count.Type.MkCount
     (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
     (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
-    Aggregation.Objects
+    Aggregation.Members
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
-  Spec.it s "Objects counts the matching members of a zone" $ do
+  Spec.it s "Members counts the matching members of a zone" $ do
     -- Two Swamps Alice controls, one Bob controls; ControlledBy You keeps
     -- Alice's two.
     swampPrinting <- S.printingOf s registry "Swamp"
@@ -109,7 +109,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
           Count.Type.MkCount
             (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
             (Filter.Type.HasSubtype Subtype.Swamp)
-            Aggregation.Objects
+            Aggregation.Members
     Spec.assertEqWith s "Alice's one" (S.countOf viewOf (Filter.contextFor (Just S.bob) Nothing) gs count) $ Just 1
 
   Spec.it s "CR 806.1 at three seats Relative Opponent folds BOTH opponents' zones" $ do
@@ -138,18 +138,17 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
           Count.Type.MkCount
             (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
             (Filter.Type.HasSubtype Subtype.Swamp)
-            Aggregation.Objects
+            Aggregation.Members
     Spec.assertEqWith s "bob's one plus carol's two, and none of alice's" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) $ Just 3
 
-  -- CR 102.1 / CR 800.4a (#279). Asserted against playersFor directly rather
-  -- than through Count.evaluate, because no count can tell the difference: a
-  -- departing player's objects leave the game with them (CR 800.4a), so
-  -- Game.zoneMembers already answered [] for every zone of theirs and a
-  -- departed seat folded to nothing whether or not it was named. The filter
-  -- is here so this reading of a PlayerRef and Resolve.playerRefPlayers's --
-  -- where it IS observable -- cannot disagree about who a PlayerRef names.
+  -- CR 102.1 / CR 800.4a (#279). Asserted against playersFor directly AND
+  -- through a Scope.OverPlayers count: through Scope.InZone the two cannot
+  -- disagree observably, since a departing player's objects leave the game
+  -- with them (CR 800.4a) and Game.zoneMembers already answered [] for every
+  -- zone of theirs, but a scope that folds the PLAYERS charges one apiece.
   Spec.it s "CR 800.4a neither EachPlayer nor Opponent names a player who has left the game" $ do
     let gs = Departure.depart Departure.Type.Conceded S.carol S.threePlayerGame
+        countOver ref = S.countOf (S.stubView []) (Filter.contextFor (Just S.alice) Nothing) gs (Count.Type.MkCount (Scope.OverPlayers ref) (Filter.Type.And []) Aggregation.Members)
     Spec.assertEqWith
       s
       "EachPlayer names the two still in the game"
@@ -160,6 +159,28 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
       "and from alice, carol is not an opponent either"
       (Count.playersFor (Filter.contextFor (Just S.alice) Nothing) gs (PlayerRef.Relative PlayerRelation.Opponent))
       (Just [S.bob])
+    -- The seating roster still has three (CR 800.5), so a count off it would
+    -- say 3 and 2. These are the numbers only the still-playing reading gives.
+    Spec.assertEqWith s "a count of the players in the game is 2" (countOver PlayerRef.EachPlayer) (Just 2)
+    Spec.assertEqWith s "and of alice's opponents, 1" (countOver (PlayerRef.Relative PlayerRelation.Opponent)) (Just 1)
+
+  Spec.it s "CR 102.1 OverPlayers folds the players themselves, not their objects" $ do
+    -- The same three seats with NOBODY departed, which is what makes the case
+    -- above a departure test rather than an arithmetic one: 3 and 2 here, 2
+    -- and 1 there. The board is deckless and empty, so an OverPlayers arm that
+    -- had folded a zone would answer 0 for every reference.
+    let gs = S.threePlayerGame
+        countOver ref = S.countOf (S.stubView []) (Filter.contextFor (Just S.alice) Nothing) gs (Count.Type.MkCount (Scope.OverPlayers ref) (Filter.Type.And []) Aggregation.Members)
+    Spec.assertEqWith s "three players in the game" (countOver PlayerRef.EachPlayer) (Just 3)
+    Spec.assertEqWith s "CR 806.1 two of them are alice's opponents" (countOver (PlayerRef.Relative PlayerRelation.Opponent)) (Just 2)
+    Spec.assertEqWith s "CR 109.5 and one of them is alice" (countOver (PlayerRef.Relative PlayerRelation.You)) (Just 1)
+    -- Nothing rather than 0, the posture the InZone arm takes for the same
+    -- unresolvable reference: who "you" are is unanswered, not answered empty.
+    Spec.assertEqWith
+      s
+      "CR 109.5 with no perspective the reference is undeterminable"
+      (S.countOf (S.stubView []) (Filter.contextFor Nothing Nothing) gs (Count.Type.MkCount (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.You)) (Filter.Type.And []) Aggregation.Members))
+      Nothing
 
   Spec.it s "CR 109.5 Relative with no perspective is undeterminable" $ do
     let gs = Setup.emptyGame S.bothPlayers
@@ -167,7 +188,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
           Count.Type.MkCount
             (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
             (Filter.Type.And [])
-            Aggregation.Objects
+            Aggregation.Members
     Spec.assertEq s (S.countOf (S.stubView []) (Filter.contextFor Nothing Nothing) gs count) Nothing
 
   Spec.it s "CR 700.4 InHistory counts deaths from the event snapshot" $ do
@@ -182,7 +203,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
           Count.Type.MkCount
             (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
             (Filter.Type.HasCardType CardType.Creature)
-            Aggregation.Objects
+            Aggregation.Members
     Spec.assertEqWith s "one death" (S.countOf (S.stubView []) (Filter.contextFor Nothing Nothing) gs count) $ Just 1
 
   Spec.it s "EachPlayer folds every player's copy" $ do
@@ -205,7 +226,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
           Count.Type.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
             (Filter.Type.HasSubtype Subtype.Swamp)
-            Aggregation.Objects
+            Aggregation.Members
     Spec.assertEqWith s "three" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) $ Just 3
 
   Spec.it s "Relative You resolves against the perspective" $ do
@@ -242,7 +263,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
           Count.Type.MkCount
             (Scope.InZone Zone.Hand (PlayerRef.InSlot slot))
             (Filter.Type.And [])
-            Aggregation.Objects
+            Aggregation.Members
     Spec.assertEqWith s "one card" (S.countOf viewOf (Filter.contextFor Nothing (Just srcId)) gs count) $ Just 1
 
   -- The three cases below are Aggregation.Greatest at the fold, where the
@@ -271,7 +292,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
             (Aggregation.Greatest Quantity.Type.ManaValue)
     -- Alice keeps none of Bob's one Swamp, so the fold has no members. The
-    -- same count with Aggregation.Objects is Just 0 -- a count of nothing IS
+    -- same count with Aggregation.Members is Just 0 -- a count of nothing IS
     -- zero -- which is exactly the answer a maximum must NOT borrow.
     Spec.assertEqWith s "no maximum" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) Nothing
     Spec.assertEqWith s "though counting the same empty set is 0" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs swampsYouControl) (Just 0)
@@ -322,6 +343,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   aetherfluxReservoirSpec s registry
   tobiasSpec s registry
   roothaSpec s registry
+  tyranidInvasionSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -643,3 +665,64 @@ isSpellCast :: GameEvent.GameEvent -> Bool
 isSpellCast event = case event of
   GameEvent.SpellCast {} -> True
   _ -> False
+
+-- CR 102.1 read as a NUMBER: the first count whose scope folds players rather
+-- than objects. GAMEPLAY LEVEL, for the reason the Aetherflux Reservoir group
+-- above is: what it proves is that a printed card reaches the fold and that the
+-- fold reaches the seats the engine actually has.
+--
+-- Tyranid Invasion, {3}{G} Sorcery: "Create a number of 3/3 green Tyranid
+-- Warrior creature tokens with trample equal to the number of opponents you
+-- have." The whole card is one Create whose count is the scope under test, so
+-- nothing else can move the answer.
+--
+-- THREE SEATS, and the number is OBSERVABLE as a pile of tokens rather than
+-- computed. Two seats would answer 1 for the reading under test, for the
+-- reading that ignores CR 800.4a, and for a literal alike. Three seats plus a
+-- departure separate all three, and no two of these columns agree on both
+-- rows:
+--
+--                      opponents still playing   players in the game   every seat but yours
+--   nobody departed              2                       3                     2
+--   carol conceded               1                       2                     2
+--
+-- So the two cases below differ in exactly one thing -- carol's concession --
+-- and only the still-playing reading of CR 800.4a gives 2 then 1. The second
+-- row is what a literal fails on, which is the mutation this pair was checked
+-- against.
+tyranidInvasionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tyranidInvasionSpec s registry =
+  let -- alice has four Forests and nothing else; bob and carol have empty
+      -- boards, so every token on the battlefield afterwards is the spell's.
+      board forest =
+        let withLands = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) S.threePlayerGame [1 .. (4 :: Int)]
+         in withLands
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castInvasion invasion gs =
+        let (oid, gs1) = S.addHandCard invasion S.alice gs
+            cast = S.runPure S.identityAnswer gs1 (S.cast S.alice oid)
+         in S.runPure S.identityAnswer cast Engine.priorityLoop
+   in Spec.describe s "Tyranid Invasion" $ do
+        Spec.it s "CR 102.1 at three seats the count is alice's two opponents" $ do
+          invasion <- S.printingOf s registry "Tyranid Invasion"
+          forest <- S.printingOf s registry "Forest"
+          let after = castInvasion invasion (board forest)
+              tokens = S.tokensOf after
+          Spec.assertEqWith s "one token per opponent" (length tokens) 2
+          Spec.assertEqWith s "the spell resolved" (GameState.stack after) []
+          Spec.assertEqWith s "each is a Tyranid Warrior" (fmap (\oid -> Set.toList (Projection.subtypesOf oid after)) tokens) [[Subtype.Tyranid, Subtype.Warrior], [Subtype.Tyranid, Subtype.Warrior]]
+          Spec.assertEqWith s "each is a 3/3" (fmap (`Projection.powerOf` after) tokens) [Just 3, Just 3]
+        -- The discriminating case for CR 800.4a. The seating roster is still
+        -- three (CR 800.5) and carol's Status.Departed is the only difference
+        -- from the board above, so a count that named seats rather than players
+        -- would mint two again.
+        Spec.it s "CR 800.4a a player who has conceded is not one of alice's opponents" $ do
+          invasion <- S.printingOf s registry "Tyranid Invasion"
+          forest <- S.printingOf s registry "Forest"
+          let base = Departure.depart Departure.Type.Conceded S.carol (board forest)
+              after = castInvasion invasion base
+          Spec.assertEqWith s "one opponent left, so one token" (length (S.tokensOf after)) 1
+          Spec.assertEqWith s "the spell resolved" (GameState.stack after) []

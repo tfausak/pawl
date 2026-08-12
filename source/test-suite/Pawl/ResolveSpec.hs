@@ -1297,7 +1297,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         after = snd (Engine.runGamePure atBobAnswer cast1 Stack.resolveTop)
     Spec.assertEqWith s "three damage" (S.lifeOf S.bob after) (fmap (subtract 3) before)
   Spec.it s "the same count with Relative You reads the caster's hand" $ do
-    -- The direct contrast: the SAME Count shape (InZone Hand, Objects) that
+    -- The direct contrast: the SAME Count shape (InZone Hand, Members) that
     -- Sudden Impact scopes with PlayerRef.InSlot also serves Inner Calm,
     -- Outer Strength's PlayerRef.Relative You -- one shape, two
     -- perspectives, neither welded into a constructor.
@@ -1309,7 +1309,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           Count.Type.MkCount
             (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
             (Filter.Type.And [])
-            Aggregation.Objects
+            Aggregation.Members
     Spec.assertEqWith
       s
       "Alice's five"

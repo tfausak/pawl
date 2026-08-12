@@ -87,13 +87,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             TriggeredAbility.intervening =
               Just
                 ( Condition.Compares
-                    (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Zombie) Aggregation.Objects))
+                    (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Zombie) Aggregation.Members))
                     Comparison.Exactly
                     (Quantity.Literal 0)
                 )
           }
       )
-      """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"intervening":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Objects"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":["you",{"type":"Literal","value":1}]}]}]}]}} """
+      """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"intervening":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":["you",{"type":"Literal","value":1}]}]}]}]}} """
   -- CR 603.7: Face.delayedAbilities is a name-keyed map, rendered as a sorted
   -- array of entries so the render is deterministic. The two entries are
   -- inserted in DESCENDING name order, so a trip that emitted the map's

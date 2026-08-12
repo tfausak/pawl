@@ -36,7 +36,7 @@ cardsInYourHand =
   Count.Type.MkCount
     (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
     (Filter.Type.And [])
-    Aggregation.Objects
+    Aggregation.Members
 
 -- CR 208.2a: the distinct card types among every graveyard (Tarmogoyf's shape).
 cardTypesInAllGraveyards :: Count.Type.Count Quantity.Type.Quantity

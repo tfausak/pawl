@@ -503,11 +503,13 @@ playerRefIsSlotless ref = case ref of
   PlayerRef.InSlot _ -> False
 
 -- CR 608.2i's look-back names no player and no slot; a zone scope names whose
--- zone it is.
+-- zone it is, and a player scope names the players themselves -- the same
+-- reference either way, so the same question.
 scopeIsSlotless :: Scope.Scope -> Bool
 scopeIsSlotless scope = case scope of
   Scope.InZone _ ref -> playerRefIsSlotless ref
   Scope.InHistory _ -> True
+  Scope.OverPlayers ref -> playerRefIsSlotless ref
 
 -- Does this quantity read CR 601.2b's announced X? Since #14 retired X's
 -- dedicated constructor, that read is a Quantity.InSlot naming

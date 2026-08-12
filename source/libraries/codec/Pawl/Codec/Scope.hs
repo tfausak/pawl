@@ -14,6 +14,7 @@ toJson :: Scope.Scope -> Value.Value
 toJson s = case s of
   Scope.InZone z r -> Common.tagged "InZone" . Just . Value.array $ [Codec.encode Zone.codec z, PlayerRef.toJson r]
   Scope.InHistory e -> Common.tagged "InHistory" . Just $ EventShape.toJson e
+  Scope.OverPlayers r -> Common.tagged "OverPlayers" . Just $ PlayerRef.toJson r
 
 fromJson :: Value.Value -> Either Text.Text Scope.Scope
 fromJson value = do
@@ -21,4 +22,5 @@ fromJson value = do
   case (t, mv) of
     ("InZone", Just (Value.Array (Array.MkArray [z, r]))) -> Scope.InZone <$> Codec.decode Zone.codec z <*> PlayerRef.fromJson r
     ("InHistory", Just v) -> Scope.InHistory <$> EventShape.fromJson v
+    ("OverPlayers", Just v) -> Scope.OverPlayers <$> PlayerRef.fromJson v
     _ -> Left . Text.pack $ "unknown Scope: " <> t
