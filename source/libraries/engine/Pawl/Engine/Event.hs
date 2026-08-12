@@ -1511,7 +1511,8 @@ resolveDamage de = do
 --     so one chooser: only a batch can present choices to two players at once.
 --     orderBatch settles that order before any of the batch is asked.
 --   * CR 615.7's ORDER, because the shield is a single resource allocated across
---     the whole batch and the rule gives that choice to the shielded side.
+--     the whole batch and the rule gives that choice to the shielded side -- CR
+--     101.4c saying the same of CR 122.1c's shield counters.
 --   * CR 615.13's GROUPING, because that rule fires an ability "each time a
 --     prevention effect is applied to one or more simultaneous damage events",
 --     so one instance reaching three of this batch's events is ONE prevention of
