@@ -404,12 +404,11 @@ viewOfObjectGiven pcs grants oid gs =
 
 -- CR 112.2 / 601.2a: the view of a SPELL on the stack, whose controller is "by
 -- default, the player who put it on the stack" -- the player casting it, which
--- CR 601.2a says the same way. `viewOfObject` above cannot answer that -- a
--- stack object carries no Object.enteredUnder (Event.changeZone stamps it for a
--- battlefield entry alone), so defaultControllerOf would hand back the card's
--- OWNER, a different player for anything cast from somebody else's zone. The
--- caster is what GameEvent.SpellCast records, so it is passed in rather than
--- rediscovered.
+-- CR 601.2a says the same way. The caster is passed in rather than rediscovered,
+-- because it is what GameEvent.SpellCast records and this view is built for that
+-- event's readers -- and because CR 601.2a's move is what stamps the caster onto
+-- the stack object, so a caller reading the arrival cannot be made to depend on
+-- having already seen it land.
 --
 -- Characteristics come from the live projection, which is CR 601.2i's own order:
 -- effects that modify the spell as it is cast are applied BEFORE it becomes cast,
@@ -3932,9 +3931,10 @@ controlOverrides gs =
 -- entered under (CR 110.2), and a card that has no controller at all uses its
 -- owner (CR 108.4a).
 --
--- Object.enteredUnder is written only for a BATTLEFIELD entry, and only by the
--- two writers CR 110.2a names (see Pawl.Types.Object), so it is Nothing on every
--- card outside the battlefield and this is the owner CR 108.4a asks for.
+-- Object.enteredUnder is written for the two zones CR 109.4 gives a controller
+-- -- CR 110.2a's entry controller on the battlefield, CR 405.4's caster on the
+-- stack (see Pawl.Types.Object) -- so it is Nothing everywhere else and this is
+-- the owner CR 108.4a asks for.
 --
 -- On the hot path: controllerOfGiven runs once per battlefield object inside
 -- `controls`, which the SBA sweep calls at every priority boundary. The one

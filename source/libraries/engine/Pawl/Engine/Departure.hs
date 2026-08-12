@@ -218,24 +218,29 @@ controlEffectsEnd pid gs =
 -- clause.
 --
 -- Empty by construction once the first two clauses have run, and the proof is
--- worth writing down rather than trusting. remainingControlledExiled reads it
--- for the STACK half of its own search -- but only that half, because source 1
--- below is where the two clauses stop asking the same question.
+-- worth writing down rather than trusting. It is a proof about the objects THIS
+-- clause reaches -- the non-cards -- and not about the stack as a whole:
+-- remainingControlledExiled searches the stack too, because source 1 below can
+-- answer `pid` for a stack object that IS a card.
 --
 -- Projection.controllerOf has THREE sources, and the claim is that after clauses
--- 1 and 2 none of them can answer `pid` for a surviving object ON THE STACK:
+-- 1 and 2 none of them can answer `pid` for a surviving NON-CARD object on the
+-- stack:
 --
 --   1. CR 110.2's DEFAULT controller (Projection.defaultControllerOf):
---      Object.enteredUnder where CR 110.2a recorded one, otherwise CR 108.4a's
+--      Object.enteredUnder where a rule recorded one, otherwise CR 108.4a's
 --      Object.owner. Object.owner is baked at creation and never mutated, and
 --      the first clause deleted every object `pid` owned. Object.enteredUnder is
---      written only for a BATTLEFIELD entry -- by Event.changeZoneAttaching for
---      the effect that put the permanent there, and by
---      Pawl.Engine.Replacement's entry loop for a CR 616.1b rewrite of it -- and
---      Event.changeZone clears it on every move, so no STACK object can carry
---      one. A battlefield permanent can (Meandering Towershell returned under a
---      thief who then leaves; Gather Specimens' victim), which is what clause 4
---      is for.
+--      written by three writers and no others (see Pawl.Types.Object):
+--      Event.changeZoneAttaching for the effect that put a permanent onto the
+--      battlefield (CR 110.2a), Pawl.Engine.Replacement's entry loop for a CR
+--      616.1b rewrite of that, and Event.changeZoneCasting for the caster of a
+--      spell (CR 405.4). Only the third writes a stack object, and what it
+--      writes is a CARD being cast -- which `notACard` excludes -- so no object
+--      this clause reaches can carry one. A battlefield permanent can
+--      (Meandering Towershell returned under a thief who then leaves; Gather
+--      Specimens' victim), and so can a spell cast off another player's card,
+--      which is what clause 4 is for.
 --   2. a stored layer-2 SetController, whose PlayerId is BAKED at resolution
 --      (CR 611.2c). The second clause deleted every stored effect whose payload
 --      is `pid`, whichever object it affects.
@@ -281,27 +286,26 @@ nonCardStackObjectsCease pid gs =
 -- Bribery is not in the pool.
 --
 -- CR 109.4 gives a controller only to objects on the stack or the battlefield,
--- so the search need only cover those two. The stack contributes nothing, and
--- NOT because "it was just swept" -- nonCardStackObjectsCease's sweep skips
--- cards, so a controlled SPELL would still be sitting there. The real reason is
--- that function's induction, which closes over the stack for spells too.
+-- so the search covers those two and needs no others.
 --
--- The BATTLEFIELD is a different matter, and this clause has real work to do
--- there: source 1 is CR 110.2's default controller, and Object.enteredUnder can
--- carry `pid` for a permanent `pid` neither owns nor holds by any stored effect
--- -- a Meandering Towershell a thief returned to the battlefield under their own
--- control (CR 110.2a), or Gather Specimens' victim (CR 616.1b), once that player
--- leaves. Clause 1 does not delete it (the owner is someone else) and clause 2
--- ends no effect (there is none), so it arrives here still controlled by the
--- departing player.
+-- Both have real work to do, and for the one reason: source 1 is the DEFAULT
+-- controller, and Object.enteredUnder can carry `pid` for an object `pid`
+-- neither owns nor holds by any stored effect. On the battlefield that is a
+-- Meandering Towershell a thief returned under their own control (CR 110.2a) or
+-- Gather Specimens' victim (CR 616.1b); on the stack it is a spell `pid` cast off
+-- a card somebody else owns (CR 405.4, Dire Fleet Daredevil). In both, clause 1
+-- does not delete it (the owner is someone else) and clause 2 ends no effect
+-- (there is none), so it arrives here still controlled by the departing player.
 --
--- Two premises of that induction live here, at the sites that would break them:
+-- Two premises of nonCardStackObjectsCease's induction live here, at the sites
+-- that would break them:
 --
 --   * Object.owner is baked in at creation for every kind of stack object and
 --     never mutated afterward (CR 113.8, CR 603.3a), so clause 1's deletion is
 --     exhaustive and stays so. Object.enteredUnder is the one thing that can make
 --     an object read as controlled by a non-owner without a stored effect saying
---     so, and it is unreachable on the stack.
+--     so, and on the stack only a CAST writes it -- which is why that clause's
+--     proof is about non-cards and this search is about everything.
 --   * Clause 2 recognizes a control-granting effect by its PAYLOAD, not by where
 --     it was built, so the NUMBER of construction sites is irrelevant and adding
 --     one cannot weaken the induction. What the induction needs is that every
@@ -326,8 +330,10 @@ nonCardStackObjectsCease pid gs =
 remainingControlledExiled :: PlayerId -> GameState -> GameState
 remainingControlledExiled pid gs =
   let -- Projection.controls already hoists the control-grant list once rather
-      -- than rebuilding it per battlefield object.
-      theirs = Projection.controls pid gs
+      -- than rebuilding it per battlefield object. The stack is short enough that
+      -- the plain query is not worth a second hoist.
+      onStack = filter (\oid -> Projection.controllerOf oid gs == Just pid) (GameState.stack gs)
+      theirs = Projection.controls pid gs <> onStack
       exileOne g oid = case Game.lookupObject oid g of
         Nothing -> g
         Just obj ->
