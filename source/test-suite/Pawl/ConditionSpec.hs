@@ -42,7 +42,7 @@ everyPermanent =
   Count.Type.MkCount
     (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
     (Filter.Type.And [])
-    Aggregation.Objects
+    Aggregation.Members
 
 -- n Swamps on the battlefield, and a ViewOf (via S.stubView, Pawl.Support's
 -- second consumer per Task 3) describing each of them.
@@ -168,7 +168,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
             Count.Type.MkCount
               (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
               (Filter.Type.And [])
-              Aggregation.Objects
+              Aggregation.Members
       Spec.assertBool
         s
         ( not $

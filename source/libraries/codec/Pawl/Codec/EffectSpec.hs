@@ -465,7 +465,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           (Just (Condition.Compares (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3)))
           (ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing) (DamageRewrite.SetAmount 4))
       )
-      """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"SelfReplacement"},{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Objects"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}},{"type":"DamageR","value":[{"whichSource":{"type":"TheSource"}},{"type":"SetAmount","value":4}]}]} """
+      """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"SelfReplacement"},{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}},{"type":"DamageR","value":[{"whichSource":{"type":"TheSource"}},{"type":"SetAmount","value":4}]}]} """
   -- CR 614.10a: a slot read, plus the whole-phase selector -- the arm a Phase
   -- alone cannot spell (CR 500.1).
   Spec.it s "SkipNextPhase" $ do
@@ -889,4 +889,4 @@ threeArtifacts =
   Count.MkCount
     (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
     (Filter.And [Filter.HasCardType CardType.Artifact, Filter.ControlledBy PlayerRelation.You])
-    Aggregation.Objects
+    Aggregation.Members

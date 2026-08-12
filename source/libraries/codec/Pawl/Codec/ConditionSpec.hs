@@ -66,4 +66,4 @@ zeroSwamps =
   Count.MkCount
     (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
     (Filter.HasSubtype Subtype.Swamp)
-    Aggregation.Objects
+    Aggregation.Members

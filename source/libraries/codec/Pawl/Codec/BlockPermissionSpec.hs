@@ -65,10 +65,10 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
                   Count.MkCount
                     { Count.scope = Scope.InZone Zone.Battlefield PlayerRef.EachPlayer,
                       Count.filter = Filter.And [Filter.HasSubtype Subtype.Equipment, Filter.IsAttachedToSource],
-                      Count.aggregation = Aggregation.Objects
+                      Count.aggregation = Aggregation.Members
                     }
               )
           )
           Nothing
       )
-      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Count","value":{"aggregation":{"type":"Objects"},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Equipment"}},{"type":"IsAttachedToSource"}]},"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]}}}} """
+      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Count","value":{"aggregation":{"type":"Members"},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Equipment"}},{"type":"IsAttachedToSource"}]},"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]}}}} """

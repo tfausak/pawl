@@ -11,10 +11,11 @@ import qualified Pawl.Types.Scope as Scope
 -- function -- and evaluated by one generic fold (Pawl.Engine.Count.evaluate)
 -- that never learns which effect or card produced it.
 --
--- Counts OBJECTS, and only objects. A count over a MANA POOL is
--- Pawl.Types.ManaCount, a parallel type rather than a second shape of this one;
--- its haddock says why neither the Scope, the Filter nor the Aggregation here
--- can reach a mana unit.
+-- Counts objects or PLAYERS, depending on the Scope (CR 109.1 makes those
+-- disjoint). A count over a MANA POOL is neither: that is
+-- Pawl.Types.ManaCount, a parallel type rather than a third shape of this one,
+-- and its haddock says why neither the Scope, the Filter nor the Aggregation
+-- here can reach a mana unit.
 --
 -- The `quantity` parameter is passed straight through to the Aggregation, where
 -- the reason for it is written. Every customer but Pawl.Types.Quantity

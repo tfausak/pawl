@@ -1889,7 +1889,7 @@ rewriteQuantity pairs quantity = case quantity of
 rewriteAggregation :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Aggregation.Aggregation Quantity.Type.Quantity -> Aggregation.Aggregation Quantity.Type.Quantity
 rewriteAggregation pairs aggregation = case aggregation of
   Aggregation.Greatest q -> Aggregation.Greatest (rewriteQuantity pairs q)
-  Aggregation.Objects -> aggregation
+  Aggregation.Members -> aggregation
   Aggregation.DistinctCardTypes -> aggregation
 
 -- Every continuous effect in the game: stored resolution effects, plus every
