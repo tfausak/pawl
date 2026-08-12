@@ -6,18 +6,19 @@ import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Scope as Scope
 
 toJson :: Scope.Scope -> Value.Value
 toJson s = case s of
-  Scope.InZone z r -> Common.tagged "InZone" . Just . Value.array $ [Zone.toJson z, PlayerRef.toJson r]
+  Scope.InZone z r -> Common.tagged "InZone" . Just . Value.array $ [Codec.encode Zone.codec z, PlayerRef.toJson r]
   Scope.InHistory e -> Common.tagged "InHistory" . Just $ EventShape.toJson e
 
 fromJson :: Value.Value -> Either Text.Text Scope.Scope
 fromJson value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
-    ("InZone", Just (Value.Array (Array.MkArray [z, r]))) -> Scope.InZone <$> Zone.fromJson z <*> PlayerRef.fromJson r
+    ("InZone", Just (Value.Array (Array.MkArray [z, r]))) -> Scope.InZone <$> Codec.decode Zone.codec z <*> PlayerRef.fromJson r
     ("InHistory", Just v) -> Scope.InHistory <$> EventShape.fromJson v
     _ -> Left . Text.pack $ "unknown Scope: " <> t

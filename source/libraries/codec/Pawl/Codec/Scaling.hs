@@ -1,21 +1,20 @@
 module Pawl.Codec.Scaling where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Scaling as Scaling
 
-toJson :: Scaling.Scaling -> Value.Value
-toJson s = case s of
-  Scaling.Multiply n -> Common.tagged "Multiply" . Just $ Common.encodeNatural n
-  Scaling.AddMore n -> Common.tagged "AddMore" . Just $ Common.encodeNatural n
-  Scaling.Halve -> Common.nullary "Halve"
-
-fromJson :: Value.Value -> Either Text.Text Scaling.Scaling
-fromJson value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("Multiply", Just v) -> Scaling.Multiply <$> Common.decodeNatural v
-    ("AddMore", Just v) -> Scaling.AddMore <$> Common.decodeNatural v
-    ("Halve", Nothing) -> Right Scaling.Halve
-    _ -> Left . Text.pack $ "unknown Scaling: " <> t
+codec :: Codec.Codec Scaling.Scaling
+codec =
+  Arm.tagged
+    encode
+    [ Arm.payload "Multiply" Common.natural Scaling.Multiply,
+      Arm.payload "AddMore" Common.natural Scaling.AddMore,
+      Arm.nullary "Halve" Scaling.Halve
+    ]
+  where
+    encode s = case s of
+      Scaling.Multiply n -> Common.tagged "Multiply" . Just $ Codec.encode Common.natural n
+      Scaling.AddMore n -> Common.tagged "AddMore" . Just $ Codec.encode Common.natural n
+      Scaling.Halve -> Common.nullary "Halve"

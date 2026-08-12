@@ -10,16 +10,16 @@ import qualified Pawl.Types.Optionality as Optionality
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Optionality" $ do
   Spec.it s "Mandatory" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Optionality.toJson
-      Optionality.fromJson
+      Optionality.codec
       Optionality.Mandatory
       """ {"type":"Mandatory"} """
   Spec.it s "Optional" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Optionality.toJson
-      Optionality.fromJson
+      Optionality.codec
       Optionality.Optional
       """ {"type":"Optional"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Optionality.codec

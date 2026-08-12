@@ -1,19 +1,18 @@
 module Pawl.Codec.DiscardCause where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.DiscardCause as DiscardCause
 
-toJson :: DiscardCause.DiscardCause -> Value.Value
-toJson c = Common.nullary $ case c of
-  DiscardCause.Ordinary -> "Ordinary"
-  DiscardCause.ToPayCyclingCost -> "ToPayCyclingCost"
-
-fromJson :: Value.Value -> Either Text.Text DiscardCause.DiscardCause
-fromJson =
-  Common.decodeNullary
-    "DiscardCause"
-    [ ("Ordinary", DiscardCause.Ordinary),
-      ("ToPayCyclingCost", DiscardCause.ToPayCyclingCost)
+codec :: Codec.Codec DiscardCause.DiscardCause
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "Ordinary" DiscardCause.Ordinary,
+      Arm.nullary "ToPayCyclingCost" DiscardCause.ToPayCyclingCost
     ]
+  where
+    encode c = Common.nullary $ case c of
+      DiscardCause.Ordinary -> "Ordinary"
+      DiscardCause.ToPayCyclingCost -> "ToPayCyclingCost"

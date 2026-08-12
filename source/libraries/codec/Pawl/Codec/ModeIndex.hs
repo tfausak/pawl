@@ -1,12 +1,8 @@
 module Pawl.Codec.ModeIndex where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ModeIndex as ModeIndex
 
-toJson :: ModeIndex.ModeIndex -> Value.Value
-toJson = Common.encodeNatural . ModeIndex.unwrap
-
-fromJson :: Value.Value -> Either Text.Text ModeIndex.ModeIndex
-fromJson = fmap ModeIndex.MkModeIndex . Common.decodeNatural
+codec :: Codec.Codec ModeIndex.ModeIndex
+codec = Common.wrapper Common.natural ModeIndex.MkModeIndex ModeIndex.unwrap

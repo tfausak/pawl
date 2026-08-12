@@ -28,17 +28,17 @@ defaultWhoseObject = ControllerRelation.Anyones
 toJson :: ZoneChangePattern.ZoneChangePattern -> Value.Value
 toJson p =
   Value.object
-    ( Common.requiredPair "whenDestination" Zone.toJson (ZoneChangePattern.whenDestination p)
+    ( Common.requiredPair "whenDestination" (Codec.encode Zone.codec) (ZoneChangePattern.whenDestination p)
         <> Common.optionalPair "whatObject" defaultWhatObject (Codec.encode (Filter.codec Keyword.codec)) (ZoneChangePattern.whatObject p)
-        <> Common.optionalPair "whoseObject" defaultWhoseObject ControllerRelation.toJson (ZoneChangePattern.whoseObject p)
+        <> Common.optionalPair "whoseObject" defaultWhoseObject (Codec.encode ControllerRelation.codec) (ZoneChangePattern.whoseObject p)
     )
 
 fromJson :: Value.Value -> Either Text.Text ZoneChangePattern.ZoneChangePattern
 fromJson value = do
   ps <- Common.asObject value
-  d <- Common.field "whenDestination" ps >>= Zone.fromJson
+  d <- Common.field "whenDestination" ps >>= Codec.decode Zone.codec
   o <- Common.defaultedField "whatObject" defaultWhatObject (Codec.decode (Filter.codec Keyword.codec)) ps
-  w <- Common.defaultedField "whoseObject" defaultWhoseObject ControllerRelation.fromJson ps
+  w <- Common.defaultedField "whoseObject" defaultWhoseObject (Codec.decode ControllerRelation.codec) ps
   pure
     ZoneChangePattern.MkZoneChangePattern
       { ZoneChangePattern.whenDestination = d,

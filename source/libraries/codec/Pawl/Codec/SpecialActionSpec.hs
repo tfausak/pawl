@@ -13,18 +13,16 @@ import qualified Pawl.Types.SpecialAction as SpecialAction
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.SpecialAction" $ do
   Spec.it s "DiscardThisAnyTime" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SpecialAction.toJson
-      SpecialAction.fromJson
+      SpecialAction.codec
       SpecialAction.DiscardThisAnyTime
       """ {"type":"DiscardThisAnyTime"} """
   -- Leonin Arbiter's {2}, which is the whole of its ignore cost.
   Spec.it s "IgnoreThisUntilEndOfTurn" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SpecialAction.toJson
-      SpecialAction.fromJson
+      SpecialAction.codec
       ( SpecialAction.IgnoreThisUntilEndOfTurn
           Cost.MkCost
             { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 2]),
@@ -32,3 +30,5 @@ spec s = Spec.describe s "Pawl.Codec.SpecialAction" $ do
             }
       )
       """ {"type":"IgnoreThisUntilEndOfTurn","value":{"mana":[{"type":"Generic","value":2}]}} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s SpecialAction.codec

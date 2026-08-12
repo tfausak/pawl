@@ -10,16 +10,16 @@ import qualified Pawl.Types.DamageKind as DamageKind
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DamageKind" $ do
   Spec.it s "Combat" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      DamageKind.toJson
-      DamageKind.fromJson
+      DamageKind.codec
       DamageKind.Combat
       """ {"type":"Combat"} """
   Spec.it s "Noncombat" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      DamageKind.toJson
-      DamageKind.fromJson
+      DamageKind.codec
       DamageKind.Noncombat
       """ {"type":"Noncombat"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s DamageKind.codec

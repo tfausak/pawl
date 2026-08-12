@@ -14,13 +14,13 @@ import qualified Pawl.Types.UnlessPaid as UnlessPaid
 toJson :: UnlessPaid.UnlessPaid -> Value.Value
 toJson u =
   Value.object
-    ( Common.requiredPair "payer" SlotName.toJson (UnlessPaid.payer u)
+    ( Common.requiredPair "payer" (Codec.encode SlotName.codec) (UnlessPaid.payer u)
         <> Common.requiredPair "cost" (Codec.encode (Cost.codec Keyword.codec)) (UnlessPaid.cost u)
     )
 
 fromJson :: Value.Value -> Either Text.Text UnlessPaid.UnlessPaid
 fromJson value = do
   ps <- Common.asObject value
-  p <- Common.field "payer" ps >>= SlotName.fromJson
+  p <- Common.field "payer" ps >>= Codec.decode SlotName.codec
   c <- Common.field "cost" ps >>= Codec.decode (Cost.codec Keyword.codec)
   pure UnlessPaid.MkUnlessPaid {UnlessPaid.payer = p, UnlessPaid.cost = c}

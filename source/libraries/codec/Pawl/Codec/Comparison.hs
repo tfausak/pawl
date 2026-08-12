@@ -1,21 +1,20 @@
 module Pawl.Codec.Comparison where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Comparison as Comparison
 
-toJson :: Comparison.Comparison -> Value.Value
-toJson c = Common.nullary $ case c of
-  Comparison.Exactly -> "Exactly"
-  Comparison.AtLeast -> "AtLeast"
-  Comparison.AtMost -> "AtMost"
-
-fromJson :: Value.Value -> Either Text.Text Comparison.Comparison
-fromJson =
-  Common.decodeNullary
-    "Comparison"
-    [ ("Exactly", Comparison.Exactly),
-      ("AtLeast", Comparison.AtLeast),
-      ("AtMost", Comparison.AtMost)
+codec :: Codec.Codec Comparison.Comparison
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "Exactly" Comparison.Exactly,
+      Arm.nullary "AtLeast" Comparison.AtLeast,
+      Arm.nullary "AtMost" Comparison.AtMost
     ]
+  where
+    encode c = Common.nullary $ case c of
+      Comparison.Exactly -> "Exactly"
+      Comparison.AtLeast -> "AtLeast"
+      Comparison.AtMost -> "AtMost"

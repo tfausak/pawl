@@ -10,23 +10,22 @@ import qualified Pawl.Types.Comparison as Comparison
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Comparison" $ do
   Spec.it s "Exactly" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Comparison.toJson
-      Comparison.fromJson
+      Comparison.codec
       Comparison.Exactly
       """ {"type":"Exactly"} """
   Spec.it s "AtLeast" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Comparison.toJson
-      Comparison.fromJson
+      Comparison.codec
       Comparison.AtLeast
       """ {"type":"AtLeast"} """
   Spec.it s "AtMost" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Comparison.toJson
-      Comparison.fromJson
+      Comparison.codec
       Comparison.AtMost
       """ {"type":"AtMost"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Comparison.codec

@@ -10,16 +10,16 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.SourceRelation" $ do
   Spec.it s "AnySource" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SourceRelation.toJson
-      SourceRelation.fromJson
+      SourceRelation.codec
       SourceRelation.AnySource
       """ {"type":"AnySource"} """
   Spec.it s "TheSource" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SourceRelation.toJson
-      SourceRelation.fromJson
+      SourceRelation.codec
       SourceRelation.TheSource
       """ {"type":"TheSource"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s SourceRelation.codec

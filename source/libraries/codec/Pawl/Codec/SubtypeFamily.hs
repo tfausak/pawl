@@ -1,19 +1,18 @@
 module Pawl.Codec.SubtypeFamily where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 
-toJson :: SubtypeFamily.SubtypeFamily -> Value.Value
-toJson f = Common.nullary $ case f of
-  SubtypeFamily.BasicLandType -> "BasicLandType"
-  SubtypeFamily.CreatureType -> "CreatureType"
-
-fromJson :: Value.Value -> Either Text.Text SubtypeFamily.SubtypeFamily
-fromJson =
-  Common.decodeNullary
-    "SubtypeFamily"
-    [ ("BasicLandType", SubtypeFamily.BasicLandType),
-      ("CreatureType", SubtypeFamily.CreatureType)
+codec :: Codec.Codec SubtypeFamily.SubtypeFamily
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "BasicLandType" SubtypeFamily.BasicLandType,
+      Arm.nullary "CreatureType" SubtypeFamily.CreatureType
     ]
+  where
+    encode f = Common.nullary $ case f of
+      SubtypeFamily.BasicLandType -> "BasicLandType"
+      SubtypeFamily.CreatureType -> "CreatureType"

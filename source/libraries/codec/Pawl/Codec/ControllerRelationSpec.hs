@@ -10,23 +10,22 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ControllerRelation" $ do
   Spec.it s "Yours" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ControllerRelation.toJson
-      ControllerRelation.fromJson
+      ControllerRelation.codec
       ControllerRelation.Yours
       """ {"type":"Yours"} """
   Spec.it s "Anyones" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ControllerRelation.toJson
-      ControllerRelation.fromJson
+      ControllerRelation.codec
       ControllerRelation.Anyones
       """ {"type":"Anyones"} """
   Spec.it s "Opponents" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ControllerRelation.toJson
-      ControllerRelation.fromJson
+      ControllerRelation.codec
       ControllerRelation.Opponents
       """ {"type":"Opponents"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s ControllerRelation.codec

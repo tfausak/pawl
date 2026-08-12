@@ -1,27 +1,30 @@
 module Pawl.Codec.TurnUpRewrite where
 
-import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Json.Array as Array
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 
-toJson :: TurnUpRewrite.TurnUpRewrite -> Value.Value
-toJson r = case r of
-  TurnUpRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Value.array $ [Codec.encode (CounterKind.codec Keyword.codec) kind, Common.encodeNatural n]
-  TurnUpRewrite.MayAttachTo f -> Common.tagged "MayAttachTo" . Just $ Codec.encode (Filter.codec Keyword.codec) f
+-- | The kind-and-count pair, named once so both directions read the same order
+-- out of the two-element array.
+counters :: Codec.Codec (CounterKind.CounterKind Keyword.Keyword, Natural.Natural)
+counters = Common.tuple (CounterKind.codec Keyword.codec) Common.natural
 
-fromJson :: Value.Value -> Either Text.Text TurnUpRewrite.TurnUpRewrite
-fromJson value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("WithCounters", Just (Value.Array (Array.MkArray [k, n]))) -> do
-      kind <- Codec.decode (CounterKind.codec Keyword.codec) k
-      count <- Common.decodeNatural n
-      pure (TurnUpRewrite.WithCounters kind count)
-    ("MayAttachTo", Just f) -> TurnUpRewrite.MayAttachTo <$> Codec.decode (Filter.codec Keyword.codec) f
-    _ -> Left . Text.pack $ "unknown TurnUpRewrite: " <> t
+codec :: Codec.Codec TurnUpRewrite.TurnUpRewrite
+codec =
+  Arm.tagged
+    encode
+    [ Arm.payload "WithCounters" counters (uncurry TurnUpRewrite.WithCounters),
+      Arm.payload "MayAttachTo" filterCodec TurnUpRewrite.MayAttachTo
+    ]
+  where
+    filterCodec = Filter.codec Keyword.codec
+    encode r = case r of
+      TurnUpRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just $ Codec.encode counters (kind, n)
+      TurnUpRewrite.MayAttachTo f -> Common.tagged "MayAttachTo" . Just $ Codec.encode filterCodec f

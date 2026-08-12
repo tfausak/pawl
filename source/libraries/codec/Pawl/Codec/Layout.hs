@@ -1,27 +1,26 @@
 module Pawl.Codec.Layout where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Layout as Layout
 
-toJson :: Layout.Layout -> Value.Value
-toJson l = Common.nullary $ case l of
-  Layout.Normal -> "Normal"
-  Layout.Split -> "Split"
-  Layout.Room -> "Room"
-  Layout.Adventure -> "Adventure"
-  Layout.Transforming -> "Transforming"
-  Layout.ModalDoubleFaced -> "ModalDoubleFaced"
-
-fromJson :: Value.Value -> Either Text.Text Layout.Layout
-fromJson =
-  Common.decodeNullary
-    "Layout"
-    [ ("Normal", Layout.Normal),
-      ("Split", Layout.Split),
-      ("Room", Layout.Room),
-      ("Adventure", Layout.Adventure),
-      ("Transforming", Layout.Transforming),
-      ("ModalDoubleFaced", Layout.ModalDoubleFaced)
+codec :: Codec.Codec Layout.Layout
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "Normal" Layout.Normal,
+      Arm.nullary "Split" Layout.Split,
+      Arm.nullary "Room" Layout.Room,
+      Arm.nullary "Adventure" Layout.Adventure,
+      Arm.nullary "Transforming" Layout.Transforming,
+      Arm.nullary "ModalDoubleFaced" Layout.ModalDoubleFaced
     ]
+  where
+    encode l = Common.nullary $ case l of
+      Layout.Normal -> "Normal"
+      Layout.Split -> "Split"
+      Layout.Room -> "Room"
+      Layout.Adventure -> "Adventure"
+      Layout.Transforming -> "Transforming"
+      Layout.ModalDoubleFaced -> "ModalDoubleFaced"

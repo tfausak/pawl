@@ -18,7 +18,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- those two apart -- one carries a payload after it, the other does not.
 toJson :: ObjectRef.ObjectRef -> Value.Value
 toJson r = case r of
-  ObjectRef.InSlot n -> SlotName.toJson n
+  ObjectRef.InSlot n -> Codec.encode SlotName.codec n
   ObjectRef.EachMatching f -> Codec.encode (Filter.codec Keyword.codec) f
   ObjectRef.EachPlayer -> Value.array [Value.text eachPlayer]
   ObjectRef.TopOfLibrary p -> Value.array [Value.text topOfLibrary, PlayerRef.toJson p]
@@ -40,7 +40,7 @@ fromJson value = case value of
           then ObjectRef.TopOfLibrary <$> PlayerRef.fromJson payload
           else Left . Text.pack $ "unknown ObjectRef position " <> show word
       _ -> Left . Text.pack $ "ObjectRef array expects a word, and a payload only where the word takes one"
-  _ -> ObjectRef.InSlot <$> SlotName.fromJson value
+  _ -> ObjectRef.InSlot <$> Codec.decode SlotName.codec value
 
 -- The words the array arms lead with, written once each so the encoder and the
 -- decoder cannot drift.

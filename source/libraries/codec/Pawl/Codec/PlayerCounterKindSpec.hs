@@ -10,30 +10,28 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PlayerCounterKind" $ do
   Spec.it s "Energy" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PlayerCounterKind.toJson
-      PlayerCounterKind.fromJson
+      PlayerCounterKind.codec
       PlayerCounterKind.Energy
       """ {"type":"Energy"} """
   Spec.it s "Poison" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PlayerCounterKind.toJson
-      PlayerCounterKind.fromJson
+      PlayerCounterKind.codec
       PlayerCounterKind.Poison
       """ {"type":"Poison"} """
   Spec.it s "Rad" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PlayerCounterKind.toJson
-      PlayerCounterKind.fromJson
+      PlayerCounterKind.codec
       PlayerCounterKind.Rad
       """ {"type":"Rad"} """
   Spec.it s "Experience" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PlayerCounterKind.toJson
-      PlayerCounterKind.fromJson
+      PlayerCounterKind.codec
       PlayerCounterKind.Experience
       """ {"type":"Experience"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s PlayerCounterKind.codec

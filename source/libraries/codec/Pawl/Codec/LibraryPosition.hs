@@ -1,19 +1,18 @@
 module Pawl.Codec.LibraryPosition where
 
-import qualified Data.Text as Text
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 
-toJson :: LibraryPosition.LibraryPosition -> Value.Value
-toJson p = Common.nullary $ case p of
-  LibraryPosition.Top -> "Top"
-  LibraryPosition.Bottom -> "Bottom"
-
-fromJson :: Value.Value -> Either Text.Text LibraryPosition.LibraryPosition
-fromJson =
-  Common.decodeNullary
-    "LibraryPosition"
-    [ ("Top", LibraryPosition.Top),
-      ("Bottom", LibraryPosition.Bottom)
+codec :: Codec.Codec LibraryPosition.LibraryPosition
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "Top" LibraryPosition.Top,
+      Arm.nullary "Bottom" LibraryPosition.Bottom
     ]
+  where
+    encode p = Common.nullary $ case p of
+      LibraryPosition.Top -> "Top"
+      LibraryPosition.Bottom -> "Bottom"

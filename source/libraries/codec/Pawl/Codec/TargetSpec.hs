@@ -26,14 +26,14 @@ toJson spec =
   Value.object $
     Common.requiredPair "pool" Pool.toJson (TargetSpec.pool spec)
       <> Common.optionalPair "filter" Nothing (Common.encodeMaybe (Codec.encode (Filter.codec Keyword.codec))) (TargetSpec.filter spec)
-      <> Common.optionalPair "count" TargetCount.one TargetCount.toJson (TargetSpec.count spec)
+      <> Common.optionalPair "count" TargetCount.one (Codec.encode TargetCount.codec) (TargetSpec.count spec)
 
 fromJson :: Value.Value -> Either Text.Text TargetSpec.TargetSpec
 fromJson value = do
   ps <- Common.asObject value
   p <- Common.field "pool" ps >>= Pool.fromJson
   f <- Common.defaultedField "filter" Nothing (Common.decodeMaybe (Codec.decode (Filter.codec Keyword.codec))) ps
-  c <- Common.defaultedField "count" TargetCount.one TargetCount.fromJson ps
+  c <- Common.defaultedField "count" TargetCount.one (Codec.decode TargetCount.codec) ps
   pure
     TargetSpec.MkTargetSpec
       { TargetSpec.pool = p,
@@ -46,14 +46,14 @@ fromJson value = do
 toJsonMap :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value.Value
 toJsonMap m =
   Common.encodeList
-    (\(k, v) -> Value.object [Value.pair "slot" (SlotName.toJson k), Value.pair "spec" (toJson v)])
+    (\(k, v) -> Value.object [Value.pair "slot" (Codec.encode SlotName.codec k), Value.pair "spec" (toJson v)])
     (Map.toAscList m)
 
 fromJsonMap :: Value.Value -> Either Text.Text (Map.Map SlotName.SlotName TargetSpec.TargetSpec)
 fromJsonMap value =
   let decodeEntry v = do
         ps <- Common.asObject v
-        k <- Common.field "slot" ps >>= SlotName.fromJson
+        k <- Common.field "slot" ps >>= Codec.decode SlotName.codec
         spec <- Common.field "spec" ps >>= fromJson
         pure (k, spec)
    in Map.fromList <$> Common.decodeList decodeEntry value

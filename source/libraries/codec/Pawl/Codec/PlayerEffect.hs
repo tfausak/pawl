@@ -25,8 +25,8 @@ toJson e = case e of
   PlayerEffect.PlayAdditionalLands n -> Common.tagged "PlayAdditionalLands" . Just $ Common.encodeNatural n
   PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
   PlayerEffect.SetMaximumHandSize n -> Common.tagged "SetMaximumHandSize" . Just $ Common.encodeNatural n
-  PlayerEffect.DontLoseUnspentMana f -> Common.tagged "DontLoseUnspentMana" . Just $ ManaFilter.toJson f
-  PlayerEffect.CantBeTargetedBy sc -> Common.tagged "CantBeTargetedBy" . Just $ PlayerScope.toJson sc
+  PlayerEffect.DontLoseUnspentMana f -> Common.tagged "DontLoseUnspentMana" . Just $ Codec.encode ManaFilter.codec f
+  PlayerEffect.CantBeTargetedBy sc -> Common.tagged "CantBeTargetedBy" . Just $ Codec.encode PlayerScope.codec sc
   PlayerEffect.CastAsThoughItHadFlash c -> Common.tagged "CastAsThoughItHadFlash" . Just $ Codec.encode (Filter.codec Keyword.codec) c
   PlayerEffect.CantBeCountered c -> Common.tagged "CantBeCountered" . Just $ Codec.encode (Filter.codec Keyword.codec) c
   PlayerEffect.DamageCantBePrevented p -> Common.tagged "DamageCantBePrevented" . Just $ DamagePattern.toJson p
@@ -49,8 +49,8 @@ fromJson value = do
     ("PlayAdditionalLands", Just v) -> PlayerEffect.PlayAdditionalLands <$> Common.decodeNatural v
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
     ("SetMaximumHandSize", Just v) -> PlayerEffect.SetMaximumHandSize <$> Common.decodeNatural v
-    ("DontLoseUnspentMana", Just v) -> PlayerEffect.DontLoseUnspentMana <$> ManaFilter.fromJson v
-    ("CantBeTargetedBy", Just v) -> PlayerEffect.CantBeTargetedBy <$> PlayerScope.fromJson v
+    ("DontLoseUnspentMana", Just v) -> PlayerEffect.DontLoseUnspentMana <$> Codec.decode ManaFilter.codec v
+    ("CantBeTargetedBy", Just v) -> PlayerEffect.CantBeTargetedBy <$> Codec.decode PlayerScope.codec v
     ("CastAsThoughItHadFlash", Just v) -> PlayerEffect.CastAsThoughItHadFlash <$> Codec.decode (Filter.codec Keyword.codec) v
     ("CantBeCountered", Just v) -> PlayerEffect.CantBeCountered <$> Codec.decode (Filter.codec Keyword.codec) v
     ("DamageCantBePrevented", Just v) -> PlayerEffect.DamageCantBePrevented <$> DamagePattern.fromJson v

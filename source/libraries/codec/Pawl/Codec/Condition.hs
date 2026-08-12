@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Comparison as Comparison
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Condition as Condition
 
@@ -22,7 +23,7 @@ toJson condition = case condition of
   Condition.Compares m c t ->
     Value.object . concat $
       [ Common.requiredPair "measured" Quantity.toJson m,
-        Common.requiredPair "comparison" Comparison.toJson c,
+        Common.requiredPair "comparison" (Codec.encode Comparison.codec) c,
         Common.requiredPair "threshold" Quantity.toJson t
       ]
   Condition.Any cs -> Value.object (Common.requiredPair "any" (Value.array . fmap toJson) cs)
@@ -34,6 +35,6 @@ fromJson value = do
     Just v -> Common.asArray v >>= fmap Condition.Any . traverse fromJson
     Nothing -> do
       m <- Common.field "measured" ps >>= Quantity.fromJson
-      c <- Common.field "comparison" ps >>= Comparison.fromJson
+      c <- Common.field "comparison" ps >>= Codec.decode Comparison.codec
       t <- Common.field "threshold" ps >>= Quantity.fromJson
       pure $ Condition.Compares m c t

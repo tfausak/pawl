@@ -10,16 +10,16 @@ import qualified Pawl.Types.Counterability as Counterability
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Counterability" $ do
   Spec.it s "Counterable" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Counterability.toJson
-      Counterability.fromJson
+      Counterability.codec
       Counterability.Counterable
       """ {"type":"Counterable"} """
   Spec.it s "CantBeCountered" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Counterability.toJson
-      Counterability.fromJson
+      Counterability.codec
       Counterability.CantBeCountered
       """ {"type":"CantBeCountered"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Counterability.codec

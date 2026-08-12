@@ -23,19 +23,19 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 toJson :: ReplacementEffect.ReplacementEffect -> Value.Value
 toJson re = case re of
   ReplacementEffect.ZoneChangeR p z ->
-    Common.tagged "ZoneChangeR" . Just . Value.array $ [ZoneChangePattern.toJson p, Zone.toJson z]
+    Common.tagged "ZoneChangeR" . Just . Value.array $ [ZoneChangePattern.toJson p, Codec.encode Zone.codec z]
   ReplacementEffect.EntryR p r ->
     Common.tagged "EntryR" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) p, EntryRewrite.toJson r]
   ReplacementEffect.DamageR p r ->
     Common.tagged "DamageR" . Just . Value.array $ [DamagePattern.toJson p, DamageRewrite.toJson r]
   ReplacementEffect.DestructionR r ->
-    Common.tagged "DestructionR" . Just $ DestructionRewrite.toJson r
+    Common.tagged "DestructionR" . Just $ Codec.encode DestructionRewrite.codec r
   ReplacementEffect.CounterR p sc ->
-    Common.tagged "CounterR" . Just . Value.array $ [CounterPattern.toJson p, Scaling.toJson sc]
+    Common.tagged "CounterR" . Just . Value.array $ [CounterPattern.toJson p, Codec.encode Scaling.codec sc]
   ReplacementEffect.TokenR p sc ->
-    Common.tagged "TokenR" . Just . Value.array $ [TokenPattern.toJson p, Scaling.toJson sc]
+    Common.tagged "TokenR" . Just . Value.array $ [TokenPattern.toJson p, Codec.encode Scaling.codec sc]
   ReplacementEffect.TurnUpR p r ->
-    Common.tagged "TurnUpR" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) p, TurnUpRewrite.toJson r]
+    Common.tagged "TurnUpR" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) p, Codec.encode TurnUpRewrite.codec r]
   ReplacementEffect.PhaseR p ->
     Common.tagged "PhaseR" . Just $ Codec.encode PhasePattern.codec p
 
@@ -45,7 +45,7 @@ fromJson value = do
   case (t, mv) of
     ("ZoneChangeR", Just (Value.Array (Array.MkArray [p, z]))) -> do
       pattern_ <- ZoneChangePattern.fromJson p
-      dest <- Zone.fromJson z
+      dest <- Codec.decode Zone.codec z
       pure (ReplacementEffect.ZoneChangeR pattern_ dest)
     ("EntryR", Just (Value.Array (Array.MkArray [p, r]))) -> do
       pattern_ <- Codec.decode (Filter.codec Keyword.codec) p
@@ -55,18 +55,18 @@ fromJson value = do
       pattern_ <- DamagePattern.fromJson p
       rewrite <- DamageRewrite.fromJson r
       pure (ReplacementEffect.DamageR pattern_ rewrite)
-    ("DestructionR", Just v) -> ReplacementEffect.DestructionR <$> DestructionRewrite.fromJson v
+    ("DestructionR", Just v) -> ReplacementEffect.DestructionR <$> Codec.decode DestructionRewrite.codec v
     ("CounterR", Just (Value.Array (Array.MkArray [p, sc]))) -> do
       pattern_ <- CounterPattern.fromJson p
-      scaling <- Scaling.fromJson sc
+      scaling <- Codec.decode Scaling.codec sc
       pure (ReplacementEffect.CounterR pattern_ scaling)
     ("TokenR", Just (Value.Array (Array.MkArray [p, sc]))) -> do
       pattern_ <- TokenPattern.fromJson p
-      scaling <- Scaling.fromJson sc
+      scaling <- Codec.decode Scaling.codec sc
       pure (ReplacementEffect.TokenR pattern_ scaling)
     ("TurnUpR", Just (Value.Array (Array.MkArray [p, r]))) -> do
       pattern_ <- Codec.decode (Filter.codec Keyword.codec) p
-      rewrite <- TurnUpRewrite.fromJson r
+      rewrite <- Codec.decode TurnUpRewrite.codec r
       pure (ReplacementEffect.TurnUpR pattern_ rewrite)
     ("PhaseR", Just v) -> ReplacementEffect.PhaseR <$> Codec.decode PhasePattern.codec v
     _ -> Left . Text.pack $ "unknown ReplacementEffect: " <> t

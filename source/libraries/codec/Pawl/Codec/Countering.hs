@@ -11,16 +11,16 @@ import qualified Pawl.Types.Countering as Countering
 toJson :: Countering.Countering -> Value.Value
 toJson c =
   Value.object . concat $
-    [ Common.requiredPair "spell" ObjectId.toJson (Countering.spell c),
-      Common.requiredPair "source" ObjectId.toJson (Countering.source c),
+    [ Common.requiredPair "spell" (Codec.encode ObjectId.codec) (Countering.spell c),
+      Common.requiredPair "source" (Codec.encode ObjectId.codec) (Countering.source c),
       Common.requiredPair "controller" (Codec.encode PlayerId.codec) (Countering.controller c)
     ]
 
 fromJson :: Value.Value -> Either Text.Text Countering.Countering
 fromJson value = do
   ps <- Common.asObject value
-  s <- Common.field "spell" ps >>= ObjectId.fromJson
-  o <- Common.field "source" ps >>= ObjectId.fromJson
+  s <- Common.field "spell" ps >>= Codec.decode ObjectId.codec
+  o <- Common.field "source" ps >>= Codec.decode ObjectId.codec
   c <- Common.field "controller" ps >>= Codec.decode PlayerId.codec
   pure
     Countering.MkCountering

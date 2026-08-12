@@ -10,16 +10,16 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.DiscardCause" $ do
   Spec.it s "Ordinary" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      DiscardCause.toJson
-      DiscardCause.fromJson
+      DiscardCause.codec
       DiscardCause.Ordinary
       """ {"type":"Ordinary"} """
   Spec.it s "ToPayCyclingCost" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      DiscardCause.toJson
-      DiscardCause.fromJson
+      DiscardCause.codec
       DiscardCause.ToPayCyclingCost
       """ {"type":"ToPayCyclingCost"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s DiscardCause.codec

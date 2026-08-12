@@ -10,6 +10,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Face as Face
 import qualified Pawl.Codec.Layout as Layout
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Layout as Layout
@@ -21,7 +22,7 @@ toJson c =
       -- CR 709-722: Normal is the absence of a card saying otherwise, so it is
       -- a default rather than a required key and 227 single-face files say
       -- nothing about it.
-      <> Common.optionalPair "layout" Layout.Normal Layout.toJson (Card.layout c)
+      <> Common.optionalPair "layout" Layout.Normal (Codec.encode Layout.codec) (Card.layout c)
 
 fromJson :: Value.Value -> Either Text.Text Card.Card
 fromJson value = do
@@ -30,5 +31,5 @@ fromJson value = do
   -- at-least-one-face invariant is enforced -- the UnsafeX posture
   -- Pawl.Types.Modal's modes field documents.
   faces <- Common.field "faces" ps >>= Common.decodeNonEmpty (Face.fromJson fromJson)
-  layout <- Common.defaultedField "layout" Layout.Normal Layout.fromJson ps
+  layout <- Common.defaultedField "layout" Layout.Normal (Codec.decode Layout.codec) ps
   pure Card.MkCard {Card.layout = layout, Card.faces = faces}

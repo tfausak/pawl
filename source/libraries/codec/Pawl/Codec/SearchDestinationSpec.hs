@@ -10,23 +10,22 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.SearchDestination" $ do
   Spec.it s "BattlefieldTapped" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SearchDestination.toJson
-      SearchDestination.fromJson
+      SearchDestination.codec
       SearchDestination.BattlefieldTapped
       """ {"type":"BattlefieldTapped"} """
   Spec.it s "RevealThenHand" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SearchDestination.toJson
-      SearchDestination.fromJson
+      SearchDestination.codec
       SearchDestination.RevealThenHand
       """ {"type":"RevealThenHand"} """
   Spec.it s "Exile" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      SearchDestination.toJson
-      SearchDestination.fromJson
+      SearchDestination.codec
       SearchDestination.Exile
       """ {"type":"Exile"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s SearchDestination.codec

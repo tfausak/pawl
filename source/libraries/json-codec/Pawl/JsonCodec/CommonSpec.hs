@@ -163,6 +163,30 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     . Spec.it s "round trips"
     $ Common.assertCodec s Common.natural 2 "2"
 
+  Spec.describe s "boolean" $ do
+    -- Both constructors, since a codec that ignored its argument and always
+    -- wrote 'false' would pass on 'False' alone.
+    Spec.it s "round trips true" $
+      Common.assertCodec s Common.boolean True "true"
+    Spec.it s "round trips false" $
+      Common.assertCodec s Common.boolean False "false"
+    Spec.it s "rejects a non-boolean" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode Common.boolean =<< Common.parse (Text.pack "1")))
+        "expected a decode failure"
+
+  Spec.describe s "text" $ do
+    -- An escape in the literal, so the case fails an implementation that went
+    -- through 'show' rather than the JSON string encoder.
+    Spec.it s "round trips" $
+      Common.assertCodec s Common.text (Text.pack "a\"b") "\"a\\\"b\""
+    Spec.it s "rejects a non-string" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode Common.text =<< Common.parse (Text.pack "1")))
+        "expected a decode failure"
+
   -- Descending and carrying a duplicate, unlike the ascending duplicate-free
   -- literals elsewhere in this file: 'list' preserves order and permits
   -- repeats, and an ascending duplicate-free case would still pass an

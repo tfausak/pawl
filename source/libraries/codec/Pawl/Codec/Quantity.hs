@@ -24,7 +24,7 @@ toJson q = case q of
   Quantity.ManaValue -> Common.nullary "ManaValue"
   Quantity.Power -> Common.nullary "Power"
   Quantity.Toughness -> Common.nullary "Toughness"
-  Quantity.InSlot s -> Common.tagged "InSlot" . Just $ SlotName.toJson s
+  Quantity.InSlot s -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec s
   Quantity.Star -> Common.nullary "Star"
   Quantity.Plus a b -> Common.tagged "Plus" . Just . Value.array $ [toJson a, toJson b]
   Quantity.Count c -> Common.tagged "Count" . Just $ Count.toJson toJson c
@@ -34,7 +34,7 @@ toJson q = case q of
   -- CR 725.1's designation, with only a PlayerRef on the wire: the answer is a
   -- 0/1 rather than a stored number, so there is nothing beside the reference.
   Quantity.IsMonarch p -> Common.tagged "IsMonarch" . Just $ PlayerRef.toJson p
-  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Value.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
+  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Value.array $ [PlayerRef.toJson p, Codec.encode PlayerCounterKind.codec k]
   -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
   -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
   Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ Codec.encode (CounterKind.codec Keyword.codec) k
@@ -57,7 +57,7 @@ toJson q = case q of
   Quantity.BlockersBeyondFirst -> Common.nullary "BlockersBeyondFirst"
   -- A slot and a whole Quantity, in that order: which object to aim at, then what
   -- to read off it.
-  Quantity.AgainstSlot s q_ -> Common.tagged "AgainstSlot" . Just . Value.array $ [SlotName.toJson s, toJson q_]
+  Quantity.AgainstSlot s q_ -> Common.tagged "AgainstSlot" . Just . Value.array $ [Codec.encode SlotName.codec s, toJson q_]
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -67,7 +67,7 @@ fromJson value = do
     ("ManaValue", _) -> Right Quantity.ManaValue
     ("Power", _) -> Right Quantity.Power
     ("Toughness", _) -> Right Quantity.Toughness
-    ("InSlot", Just v) -> Quantity.InSlot <$> SlotName.fromJson v
+    ("InSlot", Just v) -> Quantity.InSlot <$> Codec.decode SlotName.codec v
     ("Star", _) -> Right Quantity.Star
     ("Plus", Just (Value.Array (Array.MkArray [x, y]))) -> Quantity.Plus <$> fromJson x <*> fromJson y
     ("Count", Just v) -> Quantity.Count <$> Count.fromJson fromJson v
@@ -75,14 +75,14 @@ fromJson value = do
     ("LifeTotal", Just v) -> Quantity.LifeTotal <$> PlayerRef.fromJson v
     ("Speed", Just v) -> Quantity.Speed <$> PlayerRef.fromJson v
     ("IsMonarch", Just v) -> Quantity.IsMonarch <$> PlayerRef.fromJson v
-    ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
+    ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> Codec.decode PlayerCounterKind.codec k
     ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> Codec.decode (CounterKind.codec Keyword.codec) v
     ("HasDesignation", Just v) -> Quantity.HasDesignation <$> Designation.fromJson v
     ("WasKicked", _) -> Right Quantity.WasKicked
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
     ("CardsDiscardedThisTurn", Just v) -> Quantity.CardsDiscardedThisTurn <$> PlayerRef.fromJson v
     ("BlockersBeyondFirst", _) -> Right Quantity.BlockersBeyondFirst
-    ("AgainstSlot", Just (Value.Array (Array.MkArray [s, q]))) -> Quantity.AgainstSlot <$> SlotName.fromJson s <*> fromJson q
+    ("AgainstSlot", Just (Value.Array (Array.MkArray [s, q]))) -> Quantity.AgainstSlot <$> Codec.decode SlotName.codec s <*> fromJson q
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
 fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)
