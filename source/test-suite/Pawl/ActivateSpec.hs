@@ -21,7 +21,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -272,7 +272,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
         ability = theAbility evolvingWilds
         activated = snd (Engine.runGamePure findFirst g3 (Activate.activateAbility S.alice wildsId ability))
         resolved = snd (Engine.runGamePure findFirst activated Stack.resolveTop)
-    Spec.assertBool s (not (Mana.isManaAbility ability)) "Evolving Wilds' ability is NOT a mana ability"
+    Spec.assertBool s (not (ManaAbility.isManaAbility ability)) "Evolving Wilds' ability is NOT a mana ability"
     Spec.assertBool s (not (Set.member wildsId (GameState.battlefield resolved))) "Evolving Wilds sacrificed (gone from battlefield)"
     Spec.assertEqWith s "one permanent on the battlefield (the fetched land)" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
     Spec.assertEqWith s "the fetched land is tapped" (S.tappedCount S.alice resolved) 1
@@ -905,12 +905,13 @@ reinforceSpec s registry = Spec.describe s "Reinforce" $ do
 
   -- The zone gate, cycling's test one keyword over: a Mosquito Guard that
   -- resolved as a creature cannot be reinforced. Rule 702.77b keeps the ability
-  -- in existence there; what it does not do is make it activatable (#1207).
+  -- in existence there -- Projection.abilitiesOf reports it, which is what
+  -- Pawl.UntapRestrictionSpec proves with a Rustic Clachan -- and what rule
+  -- 702.77b does NOT do is make it activatable.
   --
-  -- A FENCE rather than a proof of where the ability is minted: minting it from
-  -- battlefieldAbilitiesFor instead leaves this green, because CR 113.6m already
-  -- withholds an ability whose cost discards the card from the battlefield
-  -- (Activate.functionsIn). Two rules answer here, and either alone suffices.
+  -- CR 113.6m is the gate that answers here (Activate.functionsIn, over the cost's
+  -- DiscardThis), and abilitiesFor is where it is applied, so the empty list below
+  -- is the existence/activation split rather than an absence of minting.
   Spec.it s "CR 702.77a reinforce is NOT offered from the battlefield" $ do
     guard <- S.printingOf s registry "Mosquito Guard"
     plains <- S.printingOf s registry "Plains"

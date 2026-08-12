@@ -1,0 +1,88 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "type": "OfType",
+                          "value": {
+                            "type": "Colored",
+                            "value": {
+                              "type": "White"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Reinforce",
+          "value": [
+            1,
+            {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 1
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "White"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "name": "Rustic Clachan",
+      "replacementEffects": [
+        {
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "Tapped"
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

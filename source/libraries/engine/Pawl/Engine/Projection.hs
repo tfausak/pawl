@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
@@ -625,7 +626,20 @@ viewOfCard face =
           -- describes a printed face. Not a lost distinction either: each of those
           -- rules gives its designation only to a permanent.
           Filter.designations = Set.empty,
-          Filter.kicked = False
+          Filter.kicked = False,
+          -- CR 602.1 / 605.1a off the PRINTED face, the posture `keywords` above
+          -- takes: nothing off the battlefield is projected (#160).
+          --
+          -- The card's printed abilities plus rule 702's HAND ones, which CR 702.29b
+          -- and CR 702.77b keep in existence in every zone. NOT the battlefield ones
+          -- (crew, CR 702.122a): those are minted from the post-layer keyword map for
+          -- a permanent, and CR 113.6's default already keeps them on the battlefield.
+          Filter.nonManaActivatedAbility =
+            not
+              ( all
+                  ManaAbility.isManaAbility
+                  (Face.activatedAbilities face <> Keyword.handAbilitiesOf (Face.keywords face))
+              )
         }
 
 -- viewOfCard for a card that IS an object in some zone, so a
@@ -842,7 +856,18 @@ viewOfCharacteristics oid pc controller counters gs =
       -- Nothing asks it there: the only reader is the kicked spell's own clause
       -- condition, gated while it is still on the stack
       -- (Pawl.Engine.Resolve.gateHolds).
-      Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs)
+      Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs),
+      -- CR 602.1 / 605.1a, off the PROJECTION like `keywords` above: abilities are
+      -- characteristics (CR 109.3) written by layer 6, so a land under Humility has
+      -- none and Tsabo's Web stops seeing it.
+      --
+      -- The whole list the object HAS, which abilitiesFromCharacteristics assembles
+      -- -- printed, rule 702's battlefield ones, and rule 702's hand ones, the last
+      -- of which CR 702.29b and CR 702.77b keep in existence here. Not the list it
+      -- can activate here: that is Activate.abilitiesForGiven's narrower question.
+      --
+      -- LAZY -- see the field's own comment in Pawl.Engine.Filter.
+      Filter.nonManaActivatedAbility = not (all ManaAbility.isManaAbility (abilitiesFromCharacteristics pc oid gs))
     }
 
 -- CR 122.1: the counters on an object right now, and none for an id that names
@@ -2552,6 +2577,10 @@ filterReads f = case f of
   Filter.Type.IsToken -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
   Filter.Type.IsTapped -> Set.empty
+  -- CR 109.3 counts abilities among the characteristics and CR 613.1f writes them,
+  -- so this reads the aspect LoseAllAbilities writes -- the same one HasKeyword
+  -- reads, Aspect having no finer grain than "the abilities".
+  Filter.Type.HasNonManaActivatedAbility -> Set.singleton Keywords
   -- Reads nothing, which is a claim about the rules and not a default: no
   -- Modification writes Object.ringBearerFor -- CR 701.54a's designation is made by
   -- a keyword action a resolution performs, and CR 701.54b keeps it off the
@@ -3150,9 +3179,22 @@ abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.
 abilitiesOf = abilitiesGiven Map.empty
 
 abilitiesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilitiesGiven pcs oid gs =
-  let pc = projectGiven pcs oid gs
-      granted ability = case ActivatedAbility.condition ability of
+abilitiesGiven pcs oid gs = abilitiesFromCharacteristics (projectGiven pcs oid gs) oid gs
+
+-- abilitiesGiven with the projection already in hand -- the half
+-- viewOfCharacteristics calls, which holds a ProjectedCharacteristics and no way
+-- to ask for another one.
+--
+-- CR 702.29b and CR 702.77b are why handAbilitiesOf is in this list: a cycling or
+-- reinforce ability "continues to exist while the object is on the battlefield
+-- and in all other zones", so the object HAS it here. What it cannot do here is
+-- be activated -- CR 113.6m gives its "Discard this card" cost the hand, and
+-- Pawl.Engine.Activate.abilitiesForGiven filters this list through functionsIn
+-- before offering anything. Pawl.Engine.Mana's reader is safe for the other
+-- reason: neither ability adds mana, so CR 605.1a excludes both.
+abilitiesFromCharacteristics :: ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+abilitiesFromCharacteristics pc oid gs =
+  let granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
         Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
    in -- Rule 702's own activated abilities are appended here, the shape
@@ -3160,7 +3202,12 @@ abilitiesGiven pcs oid gs =
       -- is the projection's, and Pawl.Engine.Keyword mints the rule's from the
       -- POST-LAYER keyword map, so Humility takes crew away with the rest. Every
       -- reader gets one flat list and never learns rule 702 wrote part of it.
-      filter granted (PC.activatedAbilities pc <> Keyword.battlefieldAbilitiesOf (PC.keywords pc))
+      filter
+        granted
+        ( PC.activatedAbilities pc
+            <> Keyword.battlefieldAbilitiesOf (PC.keywords pc)
+            <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords pc))
+        )
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none --

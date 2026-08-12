@@ -17,7 +17,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
-import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.SplitSecond as SplitSecond
@@ -74,9 +74,11 @@ sicknessOkGiven pcs pid srcId ability =
 --
 -- CR 702.29b and CR 702.77b are why this gates ACTIVATION and not existence: a
 -- cycling or reinforce ability keeps existing in every zone, so an effect
--- counting activated abilities sees it. Nothing in the pool asks that second
--- question yet (#1207); whatever does must ask the CARD rather than this
--- function, which answers a narrower one.
+-- depending on objects having activated abilities sees it. That second question
+-- is asked of Pawl.Engine.Projection.abilitiesGiven -- which mints those
+-- abilities on the battlefield too, and is what Tsabo's Web reads through
+-- Filter.HasNonManaActivatedAbility -- and this function then withholds them here
+-- through functionsIn.
 --
 -- This is the LONE-QUERY convenience wrapper: it precomputes nothing, so it
 -- reaches Projection.project for itself, as do sicknessOk above and
@@ -389,7 +391,7 @@ activatableGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCh
 activatableGiven grants pcs pid srcId ability gs =
   activatorOfGiven grants srcId gs == Just pid
     && elem ability (abilitiesForGiven pcs srcId gs)
-    && not (Mana.isManaAbility ability)
+    && not (ManaAbility.isManaAbility ability)
     -- CR 702.61a's other limb -- "players can't ... activate abilities that
     -- aren't mana abilities" -- and it sits AFTER the mana conjunct on purpose:
     -- CR 702.61b's exemption for mana abilities is then the same fact CR 605.3b

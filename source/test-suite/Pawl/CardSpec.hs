@@ -135,6 +135,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UntapRestriction as UntapRestriction
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified System.Directory as Directory
@@ -174,6 +175,7 @@ vanillaFace name typeLine =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
+      Face.untapRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
@@ -1576,6 +1578,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsAttachedToSource -> 0
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
+  Filter.Type.HasNonManaActivatedAbility -> 0
   Filter.Type.IsRingBearer -> 0
   Filter.Type.HasDesignation _ -> 0
 
@@ -2366,7 +2369,7 @@ activatedAbilityFilters ability =
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach
--- frames it. Twenty-two of Pawl.Types.Face's thirty-one fields can hold one, and
+-- frames it. Twenty-four of Pawl.Types.Face's thirty-three fields can hold one, and
 -- here is where each one's comes from:
 --
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
@@ -2383,8 +2386,9 @@ activatedAbilityFilters ability =
 --   * `playerAbilities` -- CR 613.11's cost modifiers and CR 601.3b's timing
 --     permission.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
---     701.21a / 101.2), `attackRequirements` (CR 508.1d), `blockRequirements`
---     (CR 509.1c) and `attackCosts` (CR 508.1h) -- five more affected sets.
+--     701.21a / 101.2), `untapRestrictions` (CR 502.3 / 101.2),
+--     `attackRequirements` (CR 508.1d), `blockRequirements`
+--     (CR 509.1c) and `attackCosts` (CR 508.1h) -- six more affected sets.
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target specs and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -2400,7 +2404,7 @@ activatedAbilityFilters ability =
 -- TriggerCondition, TurnUpRewrite and ZoneChangePattern -- and nothing those nine
 -- fields reach is one of them.
 --
--- Twenty-two and nine is thirty-one, the whole record.
+-- Twenty-four and nine is thirty-three, the whole record.
 --
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
@@ -2427,6 +2431,7 @@ cardFilters card =
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
         <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
+        <> concatMap (affectedFilters . UntapRestriction.affected) (Face.untapRestrictions card)
     )
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
