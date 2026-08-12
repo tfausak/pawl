@@ -104,13 +104,13 @@ data Effect card
     -- CR 702.29e's basic landcycling is the same filter with the other
     -- destination.
     --
-    -- The PlayerRef names ONE player and names them three times over: CR 701.23a's
-    -- looking, the CR 701.23e-silent placement, and the shuffle the card's own
-    -- next sentence instructs are all acts of the same player. Evolving Wilds'
-    -- "your library" is `Relative You`; Fertilid's Favor's "target player
-    -- searches their library" is `InSlot`, reading a slot TARGETING filled (CR
-    -- 601.2c). A PlayerRef rather than a Maybe SlotName, for the reason Draw's
-    -- comment gives one opcode over.
+    -- The PlayerRef names each searcher, and names them several times over: CR
+    -- 701.23a's looking, the CR 701.23e-silent placement, and the shuffle the
+    -- card's own next sentence instructs are all acts of that same player.
+    -- Evolving Wilds' "your library" is `Relative You`; Fertilid's Favor's
+    -- "target player searches their library" is `InSlot`, reading a slot
+    -- TARGETING filled (CR 601.2c). A PlayerRef rather than a Maybe SlotName, for
+    -- the reason Draw's comment gives.
     --
     -- Not implemented: a search of a library the searching player does not own --
     -- Extract's "search target player's library", where the CONTROLLER looks at
