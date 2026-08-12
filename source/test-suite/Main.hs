@@ -34,6 +34,7 @@ import qualified Pawl.Codec.CommonSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ConditionSpec
 import qualified Pawl.Codec.ControllerRelationSpec
+import qualified Pawl.Codec.CopyExceptionSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostSpec
 import qualified Pawl.Codec.CountSpec
@@ -295,6 +296,7 @@ spec s registry = do
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
+  Pawl.Codec.CopyExceptionSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostSpec.spec s
   Pawl.Codec.CounterKindSpec.spec s

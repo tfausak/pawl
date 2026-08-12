@@ -120,6 +120,8 @@ library codec
     Pawl.Codec.ConditionSpec
     Pawl.Codec.ControllerRelation
     Pawl.Codec.ControllerRelationSpec
+    Pawl.Codec.CopyException
+    Pawl.Codec.CopyExceptionSpec
     Pawl.Codec.Cost
     Pawl.Codec.CostComponent
     Pawl.Codec.CostComponentSpec
@@ -602,6 +604,7 @@ library types
     Pawl.Types.Condition
     Pawl.Types.ContinuousEffect
     Pawl.Types.ControllerRelation
+    Pawl.Types.CopyException
     Pawl.Types.Cost
     Pawl.Types.CostAdjustments
     Pawl.Types.CostComponent

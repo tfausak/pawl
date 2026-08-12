@@ -1,13 +1,15 @@
 module Pawl.Types.EntryRewrite where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 
 -- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
--- (CR 707.5, and a real "may" -- declining is legal); ChoiceOf is Primal Plasma
+-- (CR 707.5, and a real "may" -- declining is legal) and, with CR 707.9's
+-- exceptions attached, Quicksilver Gargantuan; ChoiceOf is Primal Plasma
 -- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c);
 -- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChooseCardNames is Null
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
@@ -16,7 +18,9 @@ import qualified Pawl.Types.Keyword as Keyword
 -- (CR 614.1c).
 --
 -- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
--- makes CR 707.2 fall out with no further machinery. CR 707.5's second half is
+-- makes CR 707.2 fall out with no further machinery -- and CR 707.9b puts
+-- AsCopy's exceptions in the same place, since the excepted value "becomes part
+-- of the copiable values of the copy". CR 707.5's second half is
 -- load-bearing here too: a copied "as [this] enters" ability takes effect, so a
 -- Clone of a Primal Plasma runs the COPIED choice rather than skipping it.
 --
@@ -25,7 +29,15 @@ import qualified Pawl.Types.Keyword as Keyword
 -- simultaneously is still not implemented -- the entry loop has no budget to
 -- measure a batch against (#72).
 data EntryRewrite
-  = AsCopy
+  = -- | CR 707.5 / 614.1c: "you may have this permanent enter as a copy of ...".
+    -- The list is CR 707.9's exceptions to the copying process -- the "except
+    -- ..." clause -- and is empty for a plain Clone.
+    --
+    -- The exceptions ride the rewrite rather than being a rewrite of their own,
+    -- because CR 707.9 makes them modifications OF the copying process: they
+    -- happen only when a copy is actually made, so declining the "may" leaves
+    -- the object its printed self and no exception applies.
+    AsCopy [CopyException.CopyException]
   | ChoiceOf [EntryOption.EntryOption]
   | -- | CR 614.1c's other choosing shape: choose a colour as this enters
     -- (Painter's Servant). Nullary -- CR 105.1's five colours are the offer, and

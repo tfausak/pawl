@@ -2157,7 +2157,10 @@ storedPlayerScope effect = case effect of
 entryRewriteFilters :: EntryRewrite.EntryRewrite -> [Filter.Type.Filter Keyword.Keyword]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> [f]
-  EntryRewrite.AsCopy -> []
+  -- CR 707.9's exceptions carry no Filter: an "except ..." clause states values,
+  -- never a criterion over objects (Pawl.Types.CopyException imports no Filter,
+  -- which is what keeps the count above honest).
+  EntryRewrite.AsCopy _ -> []
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
