@@ -2,8 +2,8 @@ module Pawl.Codec.ManaType where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Color as Color
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ManaType as ManaType
 
 toJson :: ManaType.ManaType -> Value.Value

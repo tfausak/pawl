@@ -3,11 +3,14 @@
 module Pawl.Json.Value where
 
 import qualified Data.ByteString.Builder as Builder
+import qualified Data.Text as Text
+import qualified Pawl.Decimal as Decimal
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Boolean as Boolean
 import qualified Pawl.Json.Null as Null
 import qualified Pawl.Json.Number as Number
 import qualified Pawl.Json.Object as Object
+import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.String as String
 import qualified Text.Parsec as Parsec
 
@@ -19,6 +22,33 @@ data Value
   | Array (Array.Array Value)
   | Object (Object.Object Value)
   deriving (Eq, Show)
+
+null :: Value
+null = Null $ Null.MkNull ()
+
+boolean :: Bool -> Value
+boolean = Boolean . Boolean.MkBoolean
+
+number :: Integer -> Integer -> Value
+number m = Number . Number.MkNumber . Decimal.mkDecimal m
+
+integer :: Integer -> Value
+integer = flip number 0
+
+text :: Text.Text -> Value
+text = String . String.MkString
+
+string :: Prelude.String -> Value
+string = text . Text.pack
+
+array :: [Value] -> Value
+array = Array . Array.MkArray
+
+pair :: String -> a -> Pair.Pair a
+pair = Pair.MkPair . String.MkString . Text.pack
+
+object :: [Pair.Pair Value] -> Value
+object = Object . Object.MkObject
 
 decode :: (Parsec.Stream s m Char) => Parsec.ParsecT s u m Value
 decode =

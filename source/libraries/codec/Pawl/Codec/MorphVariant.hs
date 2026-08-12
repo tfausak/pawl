@@ -1,8 +1,8 @@
 module Pawl.Codec.MorphVariant where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.MorphVariant as MorphVariant
 
 toJson :: MorphVariant.MorphVariant -> Value.Value

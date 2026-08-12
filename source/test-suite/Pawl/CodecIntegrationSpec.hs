@@ -9,7 +9,6 @@ module Pawl.CodecIntegrationSpec where
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.GameEvent as GameEvent.Codec
 import qualified Pawl.Codec.Printing as Printing.Codec
@@ -21,6 +20,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S

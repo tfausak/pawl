@@ -2,8 +2,8 @@
 
 module Pawl.Codec.PlayerRelationSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 

@@ -2,11 +2,11 @@ module Pawl.Codec.EntryRiders where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.TapState as TapState
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.TapState as TapState
 
@@ -17,15 +17,15 @@ defaultTapped = TapState.Untapped
 
 toJson :: EntryRiders.EntryRiders -> Value.Value
 toJson e =
-  Common.object
+  Value.object
     ( Common.optionalPair "tapped" defaultTapped TapState.toJson (EntryRiders.tapped e)
-        <> Common.optionalPair "attacking" False Common.boolean (EntryRiders.attacking e)
-        <> Common.optionalPair "transformed" False Common.boolean (EntryRiders.transformed e)
+        <> Common.optionalPair "attacking" False Value.boolean (EntryRiders.attacking e)
+        <> Common.optionalPair "transformed" False Value.boolean (EntryRiders.transformed e)
         -- A MULTISET, the shape ProjectedCharacteristics' keywords take: a kind
         -- repeated as many times as there are counters, ascending, so the
         -- encoding is canonical.
         <> Common.optionalPair "counters" Map.empty (Common.encodeMultiset (CounterKind.toJson Keyword.toJson)) (EntryRiders.counters e)
-        <> Common.optionalPair "underOwner" False Common.boolean (EntryRiders.underOwner e)
+        <> Common.optionalPair "underOwner" False Value.boolean (EntryRiders.underOwner e)
     )
 
 fromJson :: Value.Value -> Either Text.Text EntryRiders.EntryRiders

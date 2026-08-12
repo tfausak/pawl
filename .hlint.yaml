@@ -1,10 +1,12 @@
 - extensions:
   - default: false
   - name:
+    - ApplicativeDo
     - FlexibleContexts
     - GADTs
     - MultilineStrings
     - RankNTypes
+    - ScopedTypeVariables
 
 # Prefer `f . g $ h x` over `f $ g $ h x`.
 - group: {name: dollar, enabled: true}
@@ -30,6 +32,10 @@
 # HLint wants `\gs -> f x (g gs)` eta-reduced to `f x . g`. The project style
 # rule is the opposite: prefer explicit over point-free.
 - ignore: {name: "Avoid lambda"}
+
+# Same rule again: HLint wants `\x -> f x >>= g` eta-reduced to `f >=> g`. The
+# project style rule is still explicit over point-free.
+- ignore: {name: "Use >=>"}
 
 # HLint rewrites `if c then [] else [x]` into `[x | not c]`. The project style
 # rule bans list comprehensions outright, so this can never be applied.

@@ -3,8 +3,9 @@
 module Pawl.Codec.CountSpec where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Count as Count
+import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardType as CardType
@@ -26,7 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
   Spec.it s "MkCount, in a zone" $
     Common.assertJsonCodec
       s
-      (Count.toJson Common.integer)
+      (Count.toJson Value.integer)
       (Count.fromJson Common.asInteger)
       ( Count.MkCount
           (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
@@ -38,7 +39,7 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
   Spec.it s "MkCount, scoped to the event history" $
     Common.assertJsonCodec
       s
-      (Count.toJson Common.integer)
+      (Count.toJson Value.integer)
       (Count.fromJson Common.asInteger)
       ( Count.MkCount
           (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
@@ -49,7 +50,7 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
   Spec.it s "MkCount, scoped to a slot" $
     Common.assertJsonCodec
       s
-      (Count.toJson Common.integer)
+      (Count.toJson Value.integer)
       (Count.fromJson Common.asInteger)
       ( Count.MkCount
           (Scope.InZone Zone.Hand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))

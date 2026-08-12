@@ -2,8 +2,8 @@
 
 module Pawl.Codec.ConditionSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Comparison as Comparison

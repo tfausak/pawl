@@ -1,10 +1,10 @@
 module Pawl.Codec.CostComponent where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CostComponent as CostComponent
 
 -- | Tagged rather than bare-nullary from the start: this family grows
@@ -18,8 +18,8 @@ toJson encode c = case c of
   CostComponent.UntapThis -> Common.nullary "UntapThis"
   CostComponent.SacrificeThis -> Common.nullary "SacrificeThis"
   CostComponent.PayLife n -> Common.tagged "PayLife" . Just $ Common.encodeNatural n
-  CostComponent.Sacrifice n c_ -> Common.tagged "Sacrifice" . Just . Common.array $ [Common.encodeNatural n, Filter.toJson encode c_]
-  CostComponent.TapForTotalPower n c_ -> Common.tagged "TapForTotalPower" . Just . Common.array $ [Common.encodeNatural n, Filter.toJson encode c_]
+  CostComponent.Sacrifice n c_ -> Common.tagged "Sacrifice" . Just . Value.array $ [Common.encodeNatural n, Filter.toJson encode c_]
+  CostComponent.TapForTotalPower n c_ -> Common.tagged "TapForTotalPower" . Just . Value.array $ [Common.encodeNatural n, Filter.toJson encode c_]
   CostComponent.DiscardCards n -> Common.tagged "DiscardCards" . Just $ Common.encodeNatural n
   CostComponent.DiscardThis -> Common.nullary "DiscardThis"
   CostComponent.PayEnergy n -> Common.tagged "PayEnergy" . Just $ Common.encodeNatural n
@@ -27,7 +27,7 @@ toJson encode c = case c of
   CostComponent.RemoveLoyaltyFromThis n -> Common.tagged "RemoveLoyaltyFromThis" . Just $ Common.encodeNatural n
   CostComponent.PutPlusOneCountersOnThis n -> Common.tagged "PutPlusOneCountersOnThis" . Just $ Common.encodeNatural n
   CostComponent.ExileThisFromGraveyard -> Common.nullary "ExileThisFromGraveyard"
-  CostComponent.ExileCardsFromGraveyard n c_ -> Common.tagged "ExileCardsFromGraveyard" . Just . Common.array $ [Common.encodeNatural n, Filter.toJson encode c_]
+  CostComponent.ExileCardsFromGraveyard n c_ -> Common.tagged "ExileCardsFromGraveyard" . Just . Value.array $ [Common.encodeNatural n, Filter.toJson encode c_]
   CostComponent.ExileTopFromGraveyard c_ -> Common.tagged "ExileTopFromGraveyard" . Just $ Filter.toJson encode c_
 
 fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (CostComponent.CostComponent keyword)

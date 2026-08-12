@@ -6,10 +6,10 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -67,7 +67,7 @@ import qualified Pawl.Types.Zone as Zone
 -- 'Int' in the parametricity case). 'Effect.toJson'/'Effect.fromJson' reach it
 -- only through the supplied codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
-cardToJson = Common.text
+cardToJson = Value.text
 
 cardFromJson :: Value.Value -> Either Text.Text Text.Text
 cardFromJson = Common.asText
@@ -869,7 +869,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
 -- The stand-in a parametricity test hands over in place of a real card codec:
 -- any Value at all, so long as both instantiations are given the same one.
 sentinel :: Value.Value
-sentinel = Common.text (Text.pack "SENTINEL")
+sentinel = Value.text (Text.pack "SENTINEL")
 
 -- The artifact count the conditional self-replacement above (CR 614.15 / 616.1a)
 -- reads; its "three or more" threshold lives in the Condition at the use site.

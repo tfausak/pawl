@@ -2,8 +2,8 @@
 
 module Pawl.Codec.UsesSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Uses as Uses
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Uses as Uses
 

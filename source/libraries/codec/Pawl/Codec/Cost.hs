@@ -1,17 +1,17 @@
 module Pawl.Codec.Cost where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Cost as Cost
 
 -- | The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header. The 'Eq'
 -- constraint is only for 'Common.optionalPair' on 'components'.
 toJson :: (Eq keyword) => (keyword -> Value.Value) -> Cost.Cost keyword -> Value.Value
 toJson encode c =
-  Common.object
+  Value.object
     ( Common.requiredPair "mana" (Common.encodeMaybe ManaCost.toJson) (Cost.mana c)
         <> Common.optionalPair "components" [] (Common.encodeList (CostComponent.toJson encode)) (Cost.components c)
     )

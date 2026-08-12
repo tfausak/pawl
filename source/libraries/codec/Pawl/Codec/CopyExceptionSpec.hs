@@ -2,8 +2,8 @@
 
 module Pawl.Codec.CopyExceptionSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CopyException as CopyException
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CopyException as CopyException
 

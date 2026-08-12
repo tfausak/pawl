@@ -3,7 +3,7 @@
 module Pawl.Codec.CombatRestrictionSpec where
 
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation

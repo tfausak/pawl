@@ -1,17 +1,17 @@
 module Pawl.Codec.Scope where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EventShape as EventShape
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Scope as Scope
 
 toJson :: Scope.Scope -> Value.Value
 toJson s = case s of
-  Scope.InZone z r -> Common.tagged "InZone" . Just . Common.array $ [Zone.toJson z, PlayerRef.toJson r]
+  Scope.InZone z r -> Common.tagged "InZone" . Just . Value.array $ [Zone.toJson z, PlayerRef.toJson r]
   Scope.InHistory e -> Common.tagged "InHistory" . Just $ EventShape.toJson e
 
 fromJson :: Value.Value -> Either Text.Text Scope.Scope

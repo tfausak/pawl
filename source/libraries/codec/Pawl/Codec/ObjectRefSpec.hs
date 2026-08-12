@@ -4,8 +4,8 @@ module Pawl.Codec.ObjectRefSpec where
 
 import qualified Data.List as List
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ObjectRef as ObjectRef
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter

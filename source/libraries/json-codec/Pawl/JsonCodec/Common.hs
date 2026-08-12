@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- | The codec's base module: the tagged-object convention, the element-generic
 -- combinators, the field combinators, and the spec assertions every per-type
 -- module is written in terms of. Encoding and decoding themselves live in
@@ -9,15 +11,19 @@
 -- binding, or encoding a default value and decoding it back stops being the
 -- identity.
 --
--- Nothing here names a @Pawl.Types@ type, which is what keeps it below the
--- per-type modules rather than in a cycle with them.
+-- Nothing here names a @Pawl.Types@ type. Since the move to @pawl:json-codec@,
+-- that is guaranteed by the build graph rather than by discipline:
+-- @pawl:json-codec@ does not depend on @pawl:types@, so a @Pawl.Types@ import
+-- would fail to build, which is what keeps this module below the per-type
+-- modules rather than in a cycle with them.
 --
--- 'object' and 'asObject' trade in 'Pair.Pair' lists so fields can be written
+-- 'Value.object' and 'asObject' trade in 'Pair.Pair' lists so fields can be written
 -- in a readable order rather than an alphabetical one. That order is
 -- incidental: JSON objects are unordered, and 'sortKeys' exists to compare two
 -- values regardless of it.
-module Pawl.Codec.Common where
+module Pawl.JsonCodec.Common where
 
+import qualified Data.Either as Either
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -26,6 +32,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Data.Typeable as Typeable
 import qualified GHC.Stack as Stack
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Decimal as Decimal
@@ -33,53 +40,26 @@ import qualified Pawl.Extra.Builder as Builder
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Boolean as Boolean
-import qualified Pawl.Json.Null as Null
 import qualified Pawl.Json.Number as Number
 import qualified Pawl.Json.Object as Object
 import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonSchema.Define as Define
+import qualified Pawl.JsonSchema.Name as Name
+import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Spec as Spec
 import qualified Text.Parsec as Parsec
-
--- Construction ---------------------------------------------------------------
-
-null :: Value.Value
-null = Value.Null $ Null.MkNull ()
-
-boolean :: Bool -> Value.Value
-boolean = Value.Boolean . Boolean.MkBoolean
-
-number :: Integer -> Integer -> Value.Value
-number m = Value.Number . Number.MkNumber . Decimal.mkDecimal m
-
--- | The whole-number case of 'number', which is every number the codec writes.
-integer :: Integer -> Value.Value
-integer = flip number 0
-
-string :: String -> Value.Value
-string = text . Text.pack
-
-text :: Text.Text -> Value.Value
-text = Value.String . String.MkString
-
-array :: [Value.Value] -> Value.Value
-array = Value.Array . Array.MkArray
-
-pair :: String -> a -> Pair.Pair a
-pair = Pair.MkPair . String.MkString . Text.pack
-
-object :: [Pair.Pair Value.Value] -> Value.Value
-object = Value.Object . Object.MkObject
 
 -- Tagged objects -------------------------------------------------------------
 
 tagged :: String -> Maybe Value.Value -> Value.Value
 tagged t mv =
-  object $
-    pair "type" (string t) : case mv of
+  Value.object $
+    Value.pair "type" (Value.string t) : case mv of
       Nothing -> []
-      Just v -> [pair "value" v]
+      Just v -> [Value.pair "value" v]
 
 nullary :: String -> Value.Value
 nullary t = tagged t Nothing
@@ -171,16 +151,16 @@ withValue mv f = case mv of
   Nothing -> Left $ Text.pack "missing tagged value"
 
 -- | A field that is always written, whatever its value. The singleton list is
--- so that 'Common.object . concat' can take required and optional fields in one
+-- so that 'Value.object . concat' can take required and optional fields in one
 -- list, with which is which readable down the left edge.
 requiredPair :: String -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
-requiredPair k f x = [pair k (f x)]
+requiredPair k f x = [Value.pair k (f x)]
 
 -- | A field written only when it differs from the default that an absent key
 -- means. The default passed here and the one 'defaultedField' supplies must be
 -- the same binding.
 optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
-optionalPair k d f x = if x == d then [] else [pair k (f x)]
+optionalPair k d f x = if x == d then [] else [Value.pair k (f x)]
 
 -- | Reads a field that may be absent, supplying the default 'optionalPair'
 -- omits. A key that is present but null goes to the decoder rather than
@@ -207,8 +187,13 @@ decodeNullary tyName table value = do
     Just x -> Right x
     Nothing -> Left . Text.pack $ "unknown " <> tyName <> ": " <> t
 
+-- The pairs below (encodeList/decodeList and its siblings) are the last
+-- function-shaped combinators; each is waiting to collapse into one
+-- Codec-shaped replacement, e.g. a future Codec.list, during the full
+-- pawl:codec conversion (#1263).
+
 encodeList :: (a -> Value.Value) -> [a] -> Value.Value
-encodeList f = array . fmap f
+encodeList f = Value.array . fmap f
 
 decodeList :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text [a]
 decodeList f value = asArray value >>= traverse f
@@ -247,7 +232,7 @@ decodeMultiset :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value 
 decodeMultiset f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> decodeList f value
 
 encodeMaybe :: (a -> Value.Value) -> Maybe a -> Value.Value
-encodeMaybe = Maybe.maybe Pawl.Codec.Common.null
+encodeMaybe = Maybe.maybe Value.null
 
 decodeMaybe :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Maybe a)
 decodeMaybe f value = case value of
@@ -255,7 +240,7 @@ decodeMaybe f value = case value of
   _ -> Just <$> f value
 
 encodeNatural :: Natural.Natural -> Value.Value
-encodeNatural = integer . toInteger
+encodeNatural = Value.integer . toInteger
 
 decodeNatural :: Value.Value -> Either Text.Text Natural.Natural
 decodeNatural value = do
@@ -318,3 +303,71 @@ assertJson ::
 assertJson s j = case parse (Text.pack j) of
   Left e -> Spec.assertFailure s $ "invalid JSON: " <> show j <> ": " <> show e
   Right v -> pure v
+
+-- Bundles --------------------------------------------------------------------
+
+-- | The JSON scalars a wrapper is wrapped around. None of them is filed in
+-- @$defs@: a definition is named for a Pawl type, and @Integer@ is not one.
+integer :: Codec.Codec Integer
+integer = scalar Schema.integer Value.integer asInteger
+
+natural :: Codec.Codec Natural.Natural
+natural = scalar Schema.natural encodeNatural decodeNatural
+
+scalar ::
+  Schema.Schema ->
+  (a -> Value.Value) ->
+  (Value.Value -> Either Text.Text a) ->
+  Codec.Codec a
+scalar s enc dec = Codec.MkCodec {Codec.encode = enc, Codec.decode = dec, Codec.schema = pure s}
+
+-- | The shape every newtype over another codec's type takes: the same wire
+-- format, filed in @$defs@ under the wrapper's own name.
+wrapper ::
+  forall a b.
+  (Typeable.Typeable a) =>
+  Codec.Codec b ->
+  (b -> a) ->
+  (a -> b) ->
+  Codec.Codec a
+wrapper c inject project =
+  Codec.MkCodec
+    { Codec.encode = Codec.encode c . project,
+      Codec.decode = fmap inject . Codec.decode c,
+      Codec.schema = Define.define (Name.typeName (Typeable.Proxy :: Typeable.Proxy a)) (Codec.schema c)
+    }
+
+-- | Lifts a codec to one that also reads and writes null. Not filed in @$defs@:
+-- @Maybe@ is a structural wrapper rather than a type a reader wants named.
+maybe :: Codec.Codec a -> Codec.Codec (Maybe a)
+maybe c =
+  Codec.MkCodec
+    { Codec.encode = encodeMaybe (Codec.encode c),
+      Codec.decode = decodeMaybe (Codec.decode c),
+      Codec.schema = fmap Schema.nullable (Codec.schema c)
+    }
+
+-- | 'assertJsonCodec' against a bundle rather than a loose pair.
+assertCodec ::
+  (Stack.HasCallStack, Monad m, Eq a, Show a) =>
+  Spec.Spec m n ->
+  Codec.Codec a ->
+  a ->
+  String ->
+  m ()
+assertCodec s c = assertJsonCodec s (Codec.encode c) (Codec.decode c)
+
+-- | Forces a codec's schema and checks only that it is an object. It asserts
+-- nothing about the content, so editing a schema never edits a test -- but a
+-- bottom fails here, and a definition that fails to terminate fails on the
+-- suite's timeout. 'Define.run' applies 'Value.Object' before its list spine
+-- is demanded, so pattern-matching the value (as 'asObject' alone does) forces
+-- only the outer tag, not the @$defs@ bodies inside it; rendering to text and
+-- parsing it back walks the whole tree, which is what actually forces those.
+-- Not validated against the schema itself (#1264).
+assertHasSchema :: (Stack.HasCallStack, Applicative m) => Spec.Spec m n -> Codec.Codec a -> m ()
+assertHasSchema s c =
+  Spec.assertBool
+    s
+    (Either.isRight (asObject =<< parse (render (Define.run (Codec.schema c)))))
+    "expected the schema to be an object"

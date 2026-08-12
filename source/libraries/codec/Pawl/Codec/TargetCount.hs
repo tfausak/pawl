@@ -1,15 +1,15 @@
 module Pawl.Codec.TargetCount where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.TargetCount as TargetCount
 
 toJson :: TargetCount.TargetCount -> Value.Value
 toJson c =
-  Common.object
-    [ Common.pair "least" (Common.encodeNatural (TargetCount.least c)),
-      Common.pair "most" (Common.encodeNatural (TargetCount.most c))
+  Value.object
+    [ Value.pair "least" (Common.encodeNatural (TargetCount.least c)),
+      Value.pair "most" (Common.encodeNatural (TargetCount.most c))
     ]
 
 -- Both invariants Pawl.Types.TargetCount states are enforced HERE, this being

@@ -50,15 +50,13 @@ common executable
   import: library
   ghc-options: -rtsopts
 
--- JSON encoders and decoders for Pawl's types.
+-- A JSON codec for each type.
 library codec
   import: library
   build-depends:
     containers ^>=0.8,
-    parsec ^>=3.1.18,
-    pawl:decimal,
-    pawl:extra,
     pawl:json,
+    pawl:json-codec,
     pawl:spec,
     pawl:types,
     text ^>=2.1.3,
@@ -112,8 +110,6 @@ library codec
     Pawl.Codec.CombatRestrictionSpec
     Pawl.Codec.CombatStep
     Pawl.Codec.CombatStepSpec
-    Pawl.Codec.Common
-    Pawl.Codec.CommonSpec
     Pawl.Codec.Comparison
     Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
@@ -456,6 +452,8 @@ library extra
     Pawl.Extra.ParsecSpec
     Pawl.Extra.Semigroup
     Pawl.Extra.SemigroupSpec
+    Pawl.Extra.Word8
+    Pawl.Extra.Word8Spec
 
 -- RFC 8259 compliant JSON types, encoders, and decoders. Similar to aeson, but
 -- much simpler.
@@ -489,13 +487,36 @@ library json
     Pawl.Json.Value
     Pawl.Json.ValueSpec
 
+-- A JSON codec, which is an encoder, decoder, and schema bundled together.
+library json-codec
+  import: library
+  build-depends:
+    containers ^>=0.8,
+    parsec ^>=3.1.18,
+    pawl:decimal,
+    pawl:extra,
+    pawl:json,
+    pawl:json-schema,
+    pawl:spec,
+    text ^>=2.1.3,
+
+  hs-source-dirs: source/libraries/json-codec
+  -- cabal-gild: discover source/libraries/json-codec
+  exposed-modules:
+    Pawl.JsonCodec.Arm
+    Pawl.JsonCodec.ArmSpec
+    Pawl.JsonCodec.Codec
+    Pawl.JsonCodec.Common
+    Pawl.JsonCodec.CommonSpec
+    Pawl.JsonCodec.Fields
+    Pawl.JsonCodec.FieldsSpec
+
 -- RFC 6901 compliant JSON pointer types and evaluator.
 library json-pointer
   import: library
   build-depends:
     bytestring ^>=0.12.2,
     parsec ^>=3.1.18,
-    pawl:decimal,
     pawl:extra,
     pawl:json,
     pawl:spec,
@@ -511,6 +532,29 @@ library json-pointer
     Pawl.JsonPointer.Token
     Pawl.JsonPointer.TokenSpec
 
+-- JSON schemas, represented as plain JSON values.
+library json-schema
+  import: library
+  build-depends:
+    containers ^>=0.8,
+    pawl:extra,
+    pawl:json,
+    pawl:json-pointer,
+    pawl:spec,
+    pawl:uri,
+    text ^>=2.1.3,
+    transformers ^>=0.6.1,
+
+  hs-source-dirs: source/libraries/json-schema
+  -- cabal-gild: discover source/libraries/json-schema
+  exposed-modules:
+    Pawl.JsonSchema.Define
+    Pawl.JsonSchema.DefineSpec
+    Pawl.JsonSchema.Name
+    Pawl.JsonSchema.NameSpec
+    Pawl.JsonSchema.Schema
+    Pawl.JsonSchema.SchemaSpec
+
 -- The registry provides a way to load and cache card data from disk.
 library registry
   import: library
@@ -520,6 +564,7 @@ library registry
     directory ^>=1.3.10,
     pawl:codec,
     pawl:exceptions,
+    pawl:json-codec,
     pawl:slug,
     pawl:types,
     text ^>=2.1.3,
@@ -545,8 +590,8 @@ library slug
     Pawl.Slug
     Pawl.SlugSpec
 
--- An abstract testing interface, identical to the heck package. Base-only,
--- which is why every other sublibrary can afford to expose its specs.
+-- An abstract testing interface, similar to the heck package. Only depends on
+-- base which allows other sublibraries to afford to expose their specs.
 library spec
   import: library
   hs-source-dirs: source/libraries/spec
@@ -554,7 +599,7 @@ library spec
   exposed-modules:
     Pawl.Spec
 
--- All of Pawl's type definitions, without any associated behavior.
+-- All of the type definitions, without any associated behavior.
 library types
   import: library
   build-depends:
@@ -764,6 +809,20 @@ library types
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern
 
+-- URI components, and the encoding each of them takes.
+library uri
+  import: library
+  build-depends:
+    bytestring ^>=0.12.2,
+    pawl:extra,
+    pawl:spec,
+
+  hs-source-dirs: source/libraries/uri
+  -- cabal-gild: discover source/libraries/uri
+  exposed-modules:
+    Pawl.Uri.Fragment
+    Pawl.Uri.FragmentSpec
+
 executable pawl
   import: executable
   ghc-options: -threaded
@@ -782,11 +841,14 @@ test-suite pawl-test-suite
     pawl:exceptions,
     pawl:extra,
     pawl:json,
+    pawl:json-codec,
     pawl:json-pointer,
+    pawl:json-schema,
     pawl:registry,
     pawl:slug,
     pawl:spec,
     pawl:types,
+    pawl:uri,
     tasty ^>=1.5.4,
     tasty-hunit ^>=0.10.2,
     text ^>=2.1.3,

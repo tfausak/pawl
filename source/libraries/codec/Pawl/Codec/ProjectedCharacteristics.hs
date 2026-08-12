@@ -8,7 +8,6 @@ import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
@@ -18,21 +17,22 @@ import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 
 toJson :: PC.ProjectedCharacteristics -> Value.Value
 toJson pc =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.requiredPair "name" CardName.toJson (PC.name pc),
       Common.optionalPair "supertypes" Set.empty (Common.encodeSet Supertype.toJson) (PC.supertypes pc),
       Common.optionalPair "keywords" Map.empty (Common.encodeMultiset Keyword.toJson) (PC.keywords pc),
       Common.optionalPair "colors" Set.empty (Common.encodeSet Color.toJson) (PC.colors pc),
-      Common.optionalPair "manaValue" Nothing (Common.encodeMaybe Common.integer) (PC.manaValue pc),
-      Common.optionalPair "power" Nothing (Common.encodeMaybe Common.integer) (PC.power pc),
-      Common.optionalPair "toughness" Nothing (Common.encodeMaybe Common.integer) (PC.toughness pc),
+      Common.optionalPair "manaValue" Nothing (Common.encodeMaybe Value.integer) (PC.manaValue pc),
+      Common.optionalPair "power" Nothing (Common.encodeMaybe Value.integer) (PC.power pc),
+      Common.optionalPair "toughness" Nothing (Common.encodeMaybe Value.integer) (PC.toughness pc),
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe Loyalty.toJson) (PC.loyalty pc),
       Common.optionalPair "defense" Nothing (Common.encodeMaybe Defense.toJson) (PC.defense pc),
-      Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (\(p, t) -> Common.array [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc),
+      Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (\(p, t) -> Value.array [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc),
       Common.requiredPair "cardTypes" (Common.encodeSet CardType.toJson) (PC.cardTypes pc),
       Common.optionalPair "subtypes" Set.empty (Common.encodeSet Subtype.toJson) (PC.subtypes pc),
       Common.optionalPair "activatedAbilities" [] (Common.encodeList (ActivatedAbility.toJson Card.toJson)) (PC.activatedAbilities pc),

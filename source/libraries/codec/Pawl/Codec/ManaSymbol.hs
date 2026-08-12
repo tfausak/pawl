@@ -2,17 +2,17 @@ module Pawl.Codec.ManaSymbol where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Color as Color
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ManaType as ManaType
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 
 toJson :: ManaSymbol.ManaSymbol -> Value.Value
 toJson ms = case ms of
   ManaSymbol.Generic n -> Common.tagged "Generic" . Just $ Common.encodeNatural n
   ManaSymbol.OfType mt -> Common.tagged "OfType" . Just $ ManaType.toJson mt
-  ManaSymbol.Hybrid a b -> Common.tagged "Hybrid" . Just . Common.array $ [ManaType.toJson a, ManaType.toJson b]
+  ManaSymbol.Hybrid a b -> Common.tagged "Hybrid" . Just . Value.array $ [ManaType.toJson a, ManaType.toJson b]
   ManaSymbol.MonocoloredHybrid mt -> Common.tagged "MonocoloredHybrid" . Just $ ManaType.toJson mt
   -- A Color, not a ManaType: CR 107.4f's five Phyrexian symbols are all coloured.
   ManaSymbol.Phyrexian c -> Common.tagged "Phyrexian" . Just $ Color.toJson c

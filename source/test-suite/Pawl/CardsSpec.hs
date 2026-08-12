@@ -4,8 +4,8 @@ module Pawl.CardsSpec where
 import qualified Data.ByteString as ByteString
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Printing as Printing
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S

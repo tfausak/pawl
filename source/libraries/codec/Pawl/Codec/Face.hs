@@ -25,7 +25,6 @@ import qualified Pawl.Codec.CastingPermission as CastingPermission
 import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Counterability as Counterability
 import qualified Pawl.Codec.Defense as Defense
@@ -47,6 +46,7 @@ import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TypeLine as TypeLine
 import qualified Pawl.Codec.UntapRestriction as UntapRestriction
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Face as Face
 
@@ -54,7 +54,7 @@ import qualified Pawl.Types.Face as Face
 -- 'Common.optionalPair' omits a key by comparing its value to the default.
 toJson :: (Eq card) => (card -> Value.Value) -> Face.Face card -> Value.Value
 toJson encodeCard f =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.requiredPair "name" CardName.toJson (Face.name f),
       Common.requiredPair "typeLine" TypeLine.toJson (Face.typeLine f),
       Common.optionalPair "manaCost" Nothing (Common.encodeMaybe ManaCost.toJson) (Face.manaCost f),

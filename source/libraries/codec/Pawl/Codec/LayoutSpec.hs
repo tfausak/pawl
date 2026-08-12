@@ -4,8 +4,8 @@ module Pawl.Codec.LayoutSpec where
 
 import qualified Data.Either as Either
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Layout as Layout
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Layout as Layout
 

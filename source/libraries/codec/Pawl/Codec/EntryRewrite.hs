@@ -1,7 +1,6 @@
 module Pawl.Codec.EntryRewrite where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CopyException as CopyException
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryOption as EntryOption
@@ -9,6 +8,7 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 
 toJson :: EntryRewrite.EntryRewrite -> Value.Value
@@ -19,7 +19,7 @@ toJson r = case r of
   EntryRewrite.AsCopy [] -> Common.nullary "AsCopy"
   EntryRewrite.AsCopy exceptions -> Common.tagged "AsCopy" . Just $ Common.encodeList CopyException.toJson exceptions
   EntryRewrite.ChoiceOf options -> Common.tagged "ChoiceOf" . Just $ Common.encodeList EntryOption.toJson options
-  EntryRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Common.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
+  EntryRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Value.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
   EntryRewrite.ChooseColor -> Common.nullary "ChooseColor"
   EntryRewrite.ChooseBasicLandType -> Common.nullary "ChooseBasicLandType"
   EntryRewrite.ChooseCardNames f -> Common.tagged "ChooseCardNames" . Just $ Filter.toJson Keyword.toJson f
@@ -28,7 +28,7 @@ toJson r = case r of
   EntryRewrite.Unleash -> Common.nullary "Unleash"
   EntryRewrite.Tapped -> Common.nullary "Tapped"
   EntryRewrite.PayLifeOrTapped n -> Common.tagged "PayLifeOrTapped" . Just $ Common.encodeNatural n
-  EntryRewrite.SacrificeAnyNumber f kind -> Common.tagged "SacrificeAnyNumber" . Just . Common.array $ [Filter.toJson Keyword.toJson f, Common.encodeMaybe (CounterKind.toJson Keyword.toJson) kind]
+  EntryRewrite.SacrificeAnyNumber f kind -> Common.tagged "SacrificeAnyNumber" . Just . Value.array $ [Filter.toJson Keyword.toJson f, Common.encodeMaybe (CounterKind.toJson Keyword.toJson) kind]
 
 fromJson :: Value.Value -> Either Text.Text EntryRewrite.EntryRewrite
 fromJson value = do

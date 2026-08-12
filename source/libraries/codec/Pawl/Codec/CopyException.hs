@@ -1,14 +1,14 @@
 module Pawl.Codec.CopyException where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CopyException as CopyException
 
 toJson :: CopyException.CopyException -> Value.Value
 toJson e = case e of
-  CopyException.SetPowerToughness p t -> Common.tagged "SetPowerToughness" . Just . Common.array $ [Common.integer p, Common.integer t]
+  CopyException.SetPowerToughness p t -> Common.tagged "SetPowerToughness" . Just . Value.array $ [Value.integer p, Value.integer t]
 
 fromJson :: Value.Value -> Either Text.Text CopyException.CopyException
 fromJson value = do

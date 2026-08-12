@@ -1,11 +1,11 @@
 module Pawl.Codec.AlternativeCost where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 
 -- | 'cost' is required and 'condition' defaults to Nothing, which is the honest
@@ -17,7 +17,7 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 -- opinion about what a Cost looks like.
 toJson :: AlternativeCost.AlternativeCost -> Value.Value
 toJson a =
-  Common.object
+  Value.object
     ( Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (AlternativeCost.condition a)
         <> Common.requiredPair "cost" (Cost.toJson Keyword.toJson) (AlternativeCost.cost a)
     )

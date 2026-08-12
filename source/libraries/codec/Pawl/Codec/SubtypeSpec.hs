@@ -2,8 +2,8 @@
 
 module Pawl.Codec.SubtypeSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Subtype as Subtype
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Subtype as Subtype
 

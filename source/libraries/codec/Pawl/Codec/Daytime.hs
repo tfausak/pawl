@@ -1,8 +1,8 @@
 module Pawl.Codec.Daytime where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Daytime as Daytime
 
 toJson :: Daytime.Daytime -> Value.Value

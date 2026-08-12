@@ -1,11 +1,11 @@
 module Pawl.Codec.DamagePattern where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.SourceRelation as SourceRelation
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.SourceRelation as SourceRelation
 
@@ -22,7 +22,7 @@ defaultWhichSource = SourceRelation.AnySource
 -- `whosePhase`.
 toJson :: DamagePattern.DamagePattern -> Value.Value
 toJson p =
-  Common.object
+  Value.object
     ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe DamageKind.toJson) (DamagePattern.whichKind p)
         <> Common.optionalPair "whichSource" defaultWhichSource SourceRelation.toJson (DamagePattern.whichSource p)
         <> Common.optionalPair "whichRecipient" Nothing (Common.encodeMaybe Recipient.toJson) (DamagePattern.whichRecipient p)

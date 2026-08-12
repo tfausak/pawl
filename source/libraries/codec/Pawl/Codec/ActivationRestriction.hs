@@ -1,11 +1,12 @@
 module Pawl.Codec.ActivationRestriction where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.TurnScope as TurnScope
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 
 -- | Tagged rather than bare-nullary since CR 500.1's DuringPhase carries a
@@ -26,7 +27,7 @@ import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 toJson :: ActivationRestriction.ActivationRestriction -> Value.Value
 toJson t = case t of
   ActivationRestriction.SorcerySpeed -> Common.nullary "SorcerySpeed"
-  ActivationRestriction.DuringPhase sel sc -> Common.tagged "DuringPhase" . Just . Common.array $ [PhaseSelector.toJson sel, TurnScope.toJson sc]
+  ActivationRestriction.DuringPhase sel sc -> Common.tagged "DuringPhase" . Just . Value.array $ [Codec.encode PhaseSelector.codec sel, TurnScope.toJson sc]
   ActivationRestriction.AttackedThisStep -> Common.nullary "AttackedThisStep"
 
 fromJson :: Value.Value -> Either Text.Text ActivationRestriction.ActivationRestriction
@@ -34,6 +35,6 @@ fromJson value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
     ("SorcerySpeed", _) -> Right ActivationRestriction.SorcerySpeed
-    ("DuringPhase", Just (Value.Array (Array.MkArray [sel, sc]))) -> ActivationRestriction.DuringPhase <$> PhaseSelector.fromJson sel <*> TurnScope.fromJson sc
+    ("DuringPhase", Just (Value.Array (Array.MkArray [sel, sc]))) -> ActivationRestriction.DuringPhase <$> Codec.decode PhaseSelector.codec sel <*> TurnScope.fromJson sc
     ("AttackedThisStep", _) -> Right ActivationRestriction.AttackedThisStep
     _ -> Left . Text.pack $ "unknown ActivationRestriction: " <> t

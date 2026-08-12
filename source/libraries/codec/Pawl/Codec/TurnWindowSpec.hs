@@ -2,8 +2,8 @@
 
 module Pawl.Codec.TurnWindowSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.TurnWindow as TurnWindow
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.TurnWindow as TurnWindow
 

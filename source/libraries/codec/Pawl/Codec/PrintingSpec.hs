@@ -3,8 +3,8 @@
 module Pawl.Codec.PrintingSpec where
 
 import qualified Pawl.Codec.CardSpec as CardSpec
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Printing as Printing
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Printing as Printing
 

@@ -2,8 +2,8 @@
 
 module Pawl.Codec.RecipientSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Recipient as Recipient
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId

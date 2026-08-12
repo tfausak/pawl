@@ -3,10 +3,10 @@
 module Pawl.Codec.CostComponentSpec where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent

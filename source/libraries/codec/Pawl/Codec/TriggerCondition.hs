@@ -2,7 +2,6 @@ module Pawl.Codec.TriggerCondition where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CardName as CardName
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
@@ -15,13 +14,15 @@ import qualified Pawl.Codec.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Codec.TurnScope as TurnScope
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 
 toJson :: TriggerCondition.TriggerCondition -> Value.Value
 toJson c = case c of
   TriggerCondition.SelfEnters -> Common.nullary "SelfEnters"
   TriggerCondition.PermanentEnters f -> Common.tagged "PermanentEnters" . Just $ Filter.toJson Keyword.toJson f
-  TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Common.array $ [Phase.toJson p, TurnScope.toJson s]
+  TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Value.array $ [Codec.encode Phase.codec p, TurnScope.toJson s]
   TriggerCondition.StateIs c2 -> Common.tagged "StateIs" . Just $ Condition.toJson c2
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Common.nullary "SelfDealsCombatDamageToPlayer"
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> Common.tagged "PermanentDealsCombatDamageToPlayer" . Just $ Filter.toJson Keyword.toJson f
@@ -49,18 +50,18 @@ toJson c = case c of
   TriggerCondition.DamageToPlayerPrevented r -> Common.tagged "DamageToPlayerPrevented" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerGainsLife r -> Common.tagged "PlayerGainsLife" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerLosesLife r -> Common.tagged "PlayerLosesLife" . Just $ PlayerRelation.toJson r
-  TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Common.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
+  TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Value.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
   TriggerCondition.SelfLastCounterRemoved kind -> Common.tagged "SelfLastCounterRemoved" . Just $ CounterKind.toJson Keyword.toJson kind
-  TriggerCondition.SpellCast f s -> Common.tagged "SpellCast" . Just . Common.array $ [Filter.toJson Keyword.toJson f, TurnScope.toJson s]
+  TriggerCondition.SpellCast f s -> Common.tagged "SpellCast" . Just . Value.array $ [Filter.toJson Keyword.toJson f, TurnScope.toJson s]
   TriggerCondition.SelfCast -> Common.nullary "SelfCast"
   TriggerCondition.SelfHalfUnlocked n -> Common.tagged "SelfHalfUnlocked" . Just $ CardName.toJson n
   TriggerCondition.RoomFullyUnlocked r -> Common.tagged "RoomFullyUnlocked" . Just $ PlayerRelation.toJson r
   -- RECURSIVE, and the only condition that is: an AnyOf holds conditions, so both
   -- directions of this codec call themselves.
-  TriggerCondition.AnyOf cs -> Common.tagged "AnyOf" . Just . Common.array $ fmap toJson cs
+  TriggerCondition.AnyOf cs -> Common.tagged "AnyOf" . Just . Value.array $ fmap toJson cs
   TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
   TriggerCondition.PermanentTurnedFaceUp f -> Common.tagged "PermanentTurnedFaceUp" . Just $ Filter.toJson Keyword.toJson f
-  TriggerCondition.PermanentBecomesDesignated d f -> Common.tagged "PermanentBecomesDesignated" . Just . Common.array $ [Designation.toJson d, Filter.toJson Keyword.toJson f]
+  TriggerCondition.PermanentBecomesDesignated d f -> Common.tagged "PermanentBecomesDesignated" . Just . Value.array $ [Designation.toJson d, Filter.toJson Keyword.toJson f]
   TriggerCondition.SelfEvolves -> Common.nullary "SelfEvolves"
   TriggerCondition.AttachedCreatureMentors -> Common.nullary "AttachedCreatureMentors"
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
@@ -74,7 +75,7 @@ fromJson value = do
   case (t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> Filter.fromJson Keyword.fromJson v
-    ("StepBegins", Just (Value.Array (Array.MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Phase.fromJson p <*> TurnScope.fromJson s
+    ("StepBegins", Just (Value.Array (Array.MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Codec.decode Phase.codec p <*> TurnScope.fromJson s
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> Condition.fromJson v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("PermanentDealsCombatDamageToPlayer", Just v) -> TriggerCondition.PermanentDealsCombatDamageToPlayer <$> Filter.fromJson Keyword.fromJson v

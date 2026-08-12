@@ -8,7 +8,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName

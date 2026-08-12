@@ -1,15 +1,15 @@
 module Pawl.Codec.CastOffer where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CastOffer as CastOffer
 
 toJson :: CastOffer.CastOffer -> Value.Value
 toJson o =
-  Common.object
-    ( Common.optionalPair "transformed" False Common.boolean (CastOffer.transformed o)
-        <> Common.optionalPair "withoutPayingManaCost" False Common.boolean (CastOffer.withoutPayingManaCost o)
+  Value.object
+    ( Common.optionalPair "transformed" False Value.boolean (CastOffer.transformed o)
+        <> Common.optionalPair "withoutPayingManaCost" False Value.boolean (CastOffer.withoutPayingManaCost o)
     )
 
 fromJson :: Value.Value -> Either Text.Text CastOffer.CastOffer

@@ -3,7 +3,8 @@
 module Pawl.Codec.ColorSpec where
 
 import qualified Pawl.Codec.Color as Color
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Color as Color
 
@@ -45,4 +46,4 @@ spec s = Spec.describe s "Pawl.Codec.Color" $ do
       Color.Green
       """ {"type":"Green"} """
   Spec.it s "unknown tag fails" $
-    Spec.assertBool s (either (const True) (const False) (Color.fromJson (Common.object []))) "left"
+    Spec.assertBool s (either (const True) (const False) (Color.fromJson (Value.object []))) "left"
