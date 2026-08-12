@@ -558,7 +558,9 @@ effectCounts effect = case effect of
   Effect.ModifyTarget duration modification _ -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
-  Effect.Search {} -> []
+  -- The search's count is a Quantity like any other -- Explosive Vegetation's
+  -- "up to two" -- so its Counts are reachable from here.
+  Effect.Search _ _ quantity _ _ -> quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.TemptWithTheRing -> []
@@ -2329,7 +2331,7 @@ effectFilters effect = case effect of
     unframed (durationFilters duration <> modificationFilters modification <> objectRefFilters ref)
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
-  Effect.Search _ _ f _ -> unframed [f]
+  Effect.Search _ _ _ f _ -> unframed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.TemptWithTheRing -> []
@@ -4206,7 +4208,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "a Search filter",
-              base {Face.spell = spellOf [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) buried SearchDestination.RevealThenHand] Map.empty}
+              base {Face.spell = spellOf [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) buried SearchDestination.RevealThenHand] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
               base {Face.spell = spellOf [Effect.Destroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing] Map.empty}
@@ -4263,7 +4265,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Face.mulliganActions = [[Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) buried SearchDestination.RevealThenHand]]}
+              base {Face.mulliganActions = [[Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) buried SearchDestination.RevealThenHand]]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)

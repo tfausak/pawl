@@ -142,9 +142,9 @@ type PromptLog = State.State [String]
 
 searching :: (forall r. Prompt.Prompt r -> PromptLog r)
 searching prompt = case prompt of
-  Prompt.SearchLibrary _ _ candidates -> do
+  Prompt.SearchLibrary _ _ candidates cap -> do
     State.modify' (<> ["search"])
-    pure (case candidates of oid : _ -> Just oid; [] -> Nothing)
+    pure (List.genericTake cap candidates)
   Prompt.Shuffle ids -> do
     State.modify' (<> ["shuffle"])
     pure ids

@@ -96,13 +96,14 @@ data Effect card
     -- 605.3b: a mana ability never uses the stack), never by Resolve.applyEffect.
     AddMana ManaProduction.ManaProduction
   | -- | CR 701.23: the players the FIRST PlayerRef names each search the library
-    -- of each player the SECOND names, for a card matching the Filter, put it
-    -- where the SearchDestination says, then that library's owner shuffles. The
-    -- Filter is evaluated over the PRINTED-card view (Projection.viewOfCardIn) --
-    -- a card in a library has no projection, only CR 208.2a's
-    -- characteristic-defining power. Evolving Wilds' "basic land card" (CR
-    -- 701.23a / 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and CR
-    -- 702.29e's basic landcycling is the same filter with the other destination.
+    -- of each player the SECOND names, for up to Quantity cards matching the
+    -- Filter, put them where the SearchDestination says, then that library's
+    -- owner shuffles. The Filter is evaluated over the PRINTED-card view
+    -- (Projection.viewOfCardIn) -- a card in a library has no projection, only CR
+    -- 208.2a's characteristic-defining power. Evolving Wilds' "basic land card"
+    -- (CR 701.23a / 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and
+    -- CR 702.29e's basic landcycling is the same filter with the other
+    -- destination.
     --
     -- TWO refs, because CR 701.23a's looking and CR 400.1's ownership are
     -- genuinely independent and no card's text derives one from the other:
@@ -116,16 +117,20 @@ data Effect card
     -- read and shuffled. A PlayerRef rather than a Maybe SlotName, for the reason
     -- Draw's comment gives.
     --
-    -- Whether the find is MANDATORY is read off the Filter rather than stored: CR
-    -- 701.23b lets a search that states a quality find fewer or none, and CR
-    -- 701.23d forces a search for a bare quantity ("a card", Extract's whole
-    -- filter) to find one if it can. Filter.statesAQuality is the classification.
+    -- The Quantity is how many cards the search may find: Explosive Vegetation's
+    -- "up to two basic land cards" is `Literal 2`, and Rampant Growth's "a basic
+    -- land card" is `Literal 1`. Whether it is a CEILING or a QUOTA is read off
+    -- the Filter rather than stored, since the rule reads the search's own
+    -- description of what it looks for: CR 701.23b lets a search STATING A
+    -- QUALITY find fewer or none even when the library holds them, while CR
+    -- 701.23d makes a search for a bare quantity -- "a card", Extract's whole
+    -- filter -- find that many, or as many as the library can supply.
+    -- Filter.statesAQuality is that classification.
     --
-    -- Not implemented: a search of any zone but a library (#1318).
-    --
-    -- Finds at most one card, always: no card in the pool searches for two
-    -- (#283).
-    Search PlayerRef.PlayerRef PlayerRef.PlayerRef (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
+    -- Not implemented: a search of any zone but a library (#1318). Nor "up to N
+    -- cards" with no quality stated, which CR 701.23d does not force and this
+    -- pair of fields cannot tell from a bare "N cards" (#1379).
+    Search PlayerRef.PlayerRef PlayerRef.PlayerRef Quantity.Quantity (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk; a general exile-from-zone is future.
     ExileAllGraveyards

@@ -3,16 +3,20 @@
     {
       "manaCost": [
         {
+          "type": "Generic",
+          "value": 3
+        },
+        {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Blue"
+              "type": "Green"
             }
           }
         }
       ],
-      "name": "Extract",
+      "name": "Explosive Vegetation",
       "spell": {
         "modes": [
           {
@@ -29,32 +33,40 @@
                         }
                       },
                       {
-                        "type": "InSlot",
-                        "value": "player"
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
                       },
                       {
                         "type": "Literal",
-                        "value": 1
+                        "value": 2
                       },
                       {
                         "type": "And",
-                        "value": []
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          {
+                            "type": "HasSupertype",
+                            "value": {
+                              "type": "Basic"
+                            }
+                          }
+                        ]
                       },
                       {
-                        "type": "Exile"
+                        "type": "BattlefieldTapped"
                       }
                     ]
                   }
                 ]
               }
-            ],
-            "targetSpecs": {
-              "player": {
-                "pool": {
-                  "type": "Players"
-                }
-              }
-            }
+            ]
           }
         ]
       },

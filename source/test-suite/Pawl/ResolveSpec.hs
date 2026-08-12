@@ -742,7 +742,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -758,7 +758,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
@@ -781,7 +781,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -805,7 +805,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -913,6 +913,72 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "alice's library is untouched" (Game.zoneMembers Zone.Library S.alice settled) [aliceCard]
     Spec.assertEqWith s "bob's library is untouched" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
     Spec.assertEqWith s "carol's library kept only the card the filter rejected" (Game.zoneMembers Zone.Library S.carol settled) [carolPiker]
+  -- Explosive Vegetation -- "Search your library for up to two basic land cards,
+  -- put them onto the battlefield tapped, then shuffle." The whole-card proof
+  -- that a search's count is a MAXIMUM the searcher chooses within (CR 701.23a),
+  -- cast and resolved rather than assembled. Its whole printed text is
+  -- expressible, so nothing about pawl's copy runs weaker than the card.
+  --
+  -- THREE basic lands in the library against a cap of two, so the count is
+  -- observable rather than exhausted: a search that found three because only
+  -- three were there proves nothing about the "up to two". All three are
+  -- DIFFERENT basics, so which two were found is assertable -- and none of them
+  -- is the Forest the mana came from, which would otherwise make a fetched land
+  -- indistinguishable from one already in play. The Piker gives the filter a
+  -- nonland to reject.
+  --
+  -- The find is PINNED to specific ids rather than "the first n offered":
+  -- Support.addLibraryCard prepends, so the head of the library is the Piker and
+  -- then the Plains, and an engine that took the head of the candidate list
+  -- would fetch the Plains this answer never names.
+  --
+  -- The three cases below are the same board and the same mana, differing in
+  -- exactly one thing: how many of the two the searcher takes.
+  Spec.it s "CR 701.23a whole card: Explosive Vegetation finds both of its \"up to two\"" $ do
+    board <- vegetationBoard s registry
+    let settled = resolveVegetation (findPinned [vegetationMountain board, vegetationIsland board]) board
+    Spec.assertEqWith
+      s
+      "the Mountain and the Island she named are on the battlefield, beside her four Forests"
+      (List.sort (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Battlefield S.alice settled)))
+      (List.sort (fmap (CardName.MkCardName . Text.pack) ["Forest", "Forest", "Forest", "Forest", "Island", "Mountain"]))
+    -- Every Forest paid for the spell, so nothing on the battlefield is untapped
+    -- unless a fetched land entered that way -- which is the destination's whole
+    -- assertion. Rule 701.23 says only how to LOOK, so "onto the battlefield
+    -- tapped" is the card's own instruction.
+    Spec.assertEqWith s "and both entered TAPPED" (fmap (`S.soleFaceName` settled) (untappedOf S.alice settled)) []
+    Spec.assertEqWith
+      s
+      "the third basic and the nonland stayed in the library"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [vegetationPlains board, vegetationPiker board])
+  Spec.it s "CR 701.23b whole card: Explosive Vegetation may find FEWER than its \"up to two\"" $ do
+    board <- vegetationBoard s registry
+    let settled = resolveVegetation (findPinned [vegetationMountain board]) board
+    Spec.assertEqWith
+      s
+      "only the one basic she named is on the battlefield"
+      (List.sort (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Battlefield S.alice settled)))
+      (List.sort (fmap (CardName.MkCardName . Text.pack) ["Forest", "Forest", "Forest", "Forest", "Mountain"]))
+    Spec.assertEqWith s "and it entered tapped" (fmap (`S.soleFaceName` settled) (untappedOf S.alice settled)) []
+    Spec.assertEqWith
+      s
+      "the two basics she passed over are still in the library"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [vegetationIsland board, vegetationPlains board, vegetationPiker board])
+  Spec.it s "CR 701.23b whole card: Explosive Vegetation may decline to find at all" $ do
+    board <- vegetationBoard s registry
+    let settled = resolveVegetation (findPinned []) board
+    Spec.assertEqWith
+      s
+      "nothing was fetched -- only the Forests she paid with are on the battlefield"
+      (List.sort (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Battlefield S.alice settled)))
+      (replicate 4 (CardName.MkCardName (Text.pack "Forest")))
+    Spec.assertEqWith
+      s
+      "every library card is still there"
+      (Set.fromList (Game.zoneMembers Zone.Library S.alice settled))
+      (Set.fromList [vegetationMountain board, vegetationIsland board, vegetationPlains board, vegetationPiker board])
   -- Extract -- "{U} Sorcery: Search target player's library for a card and exile
   -- it. Then that player shuffles." The whole-card proof that the player LOOKING
   -- and the player whose library is looked at can be different seats (CR 701.23a),
@@ -1580,18 +1646,66 @@ basicLandFilter =
       Filter.Type.HasSupertype Supertype.Basic
     ]
 
+-- Explosive Vegetation's board, built once and shared by its three cases so
+-- they differ in the ANSWER alone. Four Forests pay the {3}{G} -- all of them,
+-- which is what makes "nothing untapped" an assertion about the fetch -- and the
+-- library holds three DIFFERENT basic lands against a cap of two, plus a nonland
+-- for the filter to reject.
+data VegetationBoard = MkVegetationBoard
+  { vegetationState :: GameState.GameState,
+    vegetationSpell :: ObjectId.ObjectId,
+    vegetationMountain :: ObjectId.ObjectId,
+    vegetationIsland :: ObjectId.ObjectId,
+    vegetationPlains :: ObjectId.ObjectId,
+    vegetationPiker :: ObjectId.ObjectId
+  }
+
+vegetationBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m VegetationBoard
+vegetationBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  mountain <- S.printingOf s registry "Mountain"
+  island <- S.printingOf s registry "Island"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  vegetation <- S.printingOf s registry "Explosive Vegetation"
+  let (mountainId, g1) = S.addLibraryCard mountain S.alice (S.landsInPlay forest 4)
+      (islandId, g2) = S.addLibraryCard island S.alice g1
+      (plainsId, g3) = S.addLibraryCard plains S.alice g2
+      (pikerId, g4) = S.addLibraryCard piker S.alice g3
+      (gs, spellId) = S.handOne vegetation g4
+  pure (MkVegetationBoard gs spellId mountainId islandId plainsId pikerId)
+
+resolveVegetation :: (forall r. Prompt.Prompt r -> r) -> VegetationBoard -> GameState.GameState
+resolveVegetation answer board =
+  let cast = snd (Engine.runGamePure answer (vegetationState board) (S.cast S.alice (vegetationSpell board)))
+   in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+
+-- Finds exactly the cards named and nothing else, whatever the engine offers.
+-- PINNED rather than picked out of the candidate list: an answerer that went
+-- looking for a legal choice would find one again after a mutation, and the
+-- assertion would stay green while the engine's own count was broken.
+findPinned :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+findPinned wanted p = case p of
+  Prompt.SearchLibrary {} -> wanted
+  _ -> S.identityAnswer p
+
+untappedOf :: PlayerId.PlayerId -> GameState.GameState -> [ObjectId.ObjectId]
+untappedOf pid gs =
+  let isUntapped oid = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
+   in filter isUntapped (Game.zoneMembers Zone.Battlefield pid gs)
+
+-- Finds as many as the search allows, taking them off the head of the offered
+-- list -- one card for the searches that ask for one.
 findFirst :: Prompt.Prompt r -> r
 findFirst p = case p of
-  Prompt.SearchLibrary _ _ matches -> case matches of
-    m : _ -> Just m
-    [] -> Nothing
+  Prompt.SearchLibrary _ _ matches cap -> List.genericTake cap matches
   _ -> S.identityAnswer p
 
 -- Names a card the search filter did NOT admit -- the lying interpreter #222 is
 -- about. Parameterised so the test can point it at a specific nonland.
 findForbidden :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 findForbidden wanted p = case p of
-  Prompt.SearchLibrary {} -> Just wanted
+  Prompt.SearchLibrary {} -> [wanted]
   _ -> S.identityAnswer p
 
 -- findFirst, plus CR 603.5's printed "may" taken. The pair below it declines the
@@ -1609,7 +1723,7 @@ findFirstDeclining p = case p of
 
 findNothing :: Prompt.Prompt r -> r
 findNothing p = case p of
-  Prompt.SearchLibrary {} -> Nothing
+  Prompt.SearchLibrary {} -> []
   _ -> S.identityAnswer p
 
 -- Fertilid's Favor's answerer, in three parts. CR 601.2c is announced at its
@@ -1628,12 +1742,10 @@ atCarolFinding p = case p of
     fmap
       (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
-  Prompt.SearchLibrary _ pid matches ->
+  Prompt.SearchLibrary _ pid matches cap ->
     if pid == S.carol
-      then case matches of
-        m : _ -> Just m
-        [] -> Nothing
-      else Nothing
+      then List.genericTake cap matches
+      else []
   _ -> S.identityAnswer p
 
 -- Extract's board, built once so the three cases below differ in exactly one
@@ -1675,9 +1787,9 @@ extractBoard island extract piker altar mountain forest plains =
 -- so the three boards below are one board with one variable each.
 --
 -- The find is pinned to a card id AND to the asking seat. Asking carol -- the
--- library's owner rather than the spell's controller -- gets Nothing, which under
--- CR 701.23d is not "nothing happens" but "the head is completed in", so the
--- pinned card is deliberately NOT the head.
+-- library's owner rather than the spell's controller -- gets an empty answer,
+-- which under CR 701.23d is not "nothing happens" but "the head is completed in",
+-- so the pinned card is deliberately NOT the head.
 atCarolTargeted :: Prompt.Prompt r -> r
 atCarolTargeted p = case p of
   Prompt.AnnounceTargets _ _ _ offers -> fmap (TargetCount.least . fst) offers
@@ -1689,12 +1801,12 @@ atCarolTargeted p = case p of
 
 aliceFinding :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aliceFinding wanted p = case p of
-  Prompt.SearchLibrary _ pid _ -> if pid == S.alice then Just wanted else Nothing
+  Prompt.SearchLibrary _ pid _ _ -> if pid == S.alice then [wanted] else []
   _ -> atCarolTargeted p
 
 aliceFindingNothing :: Prompt.Prompt r -> r
 aliceFindingNothing p = case p of
-  Prompt.SearchLibrary {} -> Nothing
+  Prompt.SearchLibrary {} -> []
   _ -> atCarolTargeted p
 
 -- aliceFinding, plus a shuffle that REVERSES the library it is offered. Game
