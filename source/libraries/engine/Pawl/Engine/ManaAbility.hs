@@ -81,6 +81,7 @@ manaProduced effect = case effect of
   Effect.Scry {} -> Nothing
   Effect.Surveil {} -> Nothing
   Effect.Fateseal {} -> Nothing
+  Effect.Explore {} -> Nothing
   Effect.Discard {} -> Nothing
   Effect.LoseLife {} -> Nothing
   Effect.GainLife {} -> Nothing

@@ -1527,6 +1527,10 @@ rewriteEffect pairs effect = case effect of
   Effect.Scry {} -> effect
   Effect.Surveil {} -> effect
   Effect.Fateseal {} -> effect
+  -- The ObjectRef alone, as CreateCopy and Tap below: an EachMatching's Filter is
+  -- a word a CR 612.1 swap reaches, and rule 701.44a's own text is the rulebook's
+  -- rather than the card's.
+  Effect.Explore ref -> Effect.Explore (rewriteObjectRef pairs ref)
   Effect.Discard {} -> effect
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect
