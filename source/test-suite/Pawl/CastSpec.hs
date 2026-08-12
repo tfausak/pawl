@@ -547,7 +547,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
               case GameState.stack after of
                 [] -> Spec.assertFailure s "expected the chosen half on the stack"
                 top : _ -> do
-                  Spec.assertEqWith s "the Volcanic half, not the Glacial one" (Projection.nameOf top after) volcanicHalf
+                  Spec.assertEqWith s "the Volcanic half, not the Glacial one" (Projection.namesOf top after) (Set.singleton volcanicHalf)
                   Spec.assertEqWith s "and CR 709.3b's 2/2, not the Glacial half's 1/1" (Projection.powerOf top after) (Just 2)
       [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
   -- CR 601.3's subject is "a spell or ability". The offer used to be made from
@@ -1709,8 +1709,8 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
         board = snd (S.addCreature piker S.alice withThalia)
         cast = S.runPure S.identityAnswer board (S.cast S.alice oid)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-        exiled = fmap (`Projection.nameOf` resolved) (Game.zoneMembers Zone.Exile S.alice resolved)
-    Spec.assertEqWith s "the nonlegendary nonland permanent is in exile" (length (filter (== S.printingName piker) exiled)) 1
+        exiled = fmap (`Projection.namesOf` resolved) (Game.zoneMembers Zone.Exile S.alice resolved)
+    Spec.assertEqWith s "the nonlegendary nonland permanent is in exile" (length (filter (Set.member (S.printingName piker)) exiled)) 1
     Spec.assertBool s (S.onBattlefield thaliaId resolved) "the legendary creature is still on the battlefield"
     Spec.assertEqWith s "and the lands are all still on the battlefield" (S.countOnBattlefieldByName (S.printingName plains) S.alice resolved) 6
 
@@ -2142,13 +2142,20 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName Facing.FaceUp))
-    -- CR 709.4a gives the card two names and no joined one, so the string a
-    -- single CardName can carry here is a stand-in (#650) rather than a name
-    -- the card has -- and it is emphatically not "Wax".
-    Spec.assertEqWith s "in hand, the combined view" (Projection.nameOf oid gs) (CardName.MkCardName (Text.pack "Wax//Wane"))
+    -- CR 709.4a: "Each split card has two names." BOTH of them, asked one at a
+    -- time, and the "Wax//Wane" the combined Face renders them as is not among
+    -- them -- that string is how the CR's own Examples write the pair and not a
+    -- name the card has.
+    Spec.assertEqWith s "in hand, the combined view has both names" (Projection.namesOf oid gs) (Set.fromList [waxName, waneName])
+    Spec.assertEqWith s "and has Wax" (Projection.hasName waxName oid gs) True
+    Spec.assertEqWith s "and has Wane" (Projection.hasName waneName oid gs) True
+    Spec.assertEqWith s "and does NOT have the two joined" (Projection.hasName (CardName.MkCardName (Text.pack "Wax//Wane")) oid gs) False
     case GameState.stack cast of
       [] -> Spec.assertFailure s "expected the spell on the stack"
-      top : _ -> Spec.assertEqWith s "on the stack, the half being cast" (Projection.nameOf top cast) waxName
+      top : _ -> do
+        -- CR 709.3b narrows the pair to one: the half being cast.
+        Spec.assertEqWith s "on the stack, the half being cast" (Projection.namesOf top cast) (Set.singleton waxName)
+        Spec.assertEqWith s "so the OTHER half's name is not one of the spell's" (Projection.hasName waneName top cast) False
   Spec.it s "CR 709.3a each half is offered and gated on its own" $ do
     waxWane <- S.printingOf s registry "Wax"
     forest <- S.printingOf s registry "Forest"
@@ -2218,7 +2225,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     Spec.assertEqWith s "the redirect fired, so nothing reached the stack" (length (GameState.stack after)) 0
     case Game.zoneMembers Zone.Exile S.alice after of
       [exiled] -> do
-        Spec.assertEqWith s "in exile, CR 709.4's combined view" (Projection.nameOf exiled after) (CardName.MkCardName (Text.pack "Wax//Wane"))
+        Spec.assertEqWith s "in exile, CR 709.4's combined view has both names" (Projection.namesOf exiled after) (Set.fromList [waxName, waneName])
         Spec.assertEqWith s "and CR 709.4b's combined colours" (Projection.colorsOf exiled after) (Set.fromList [Color.Green, Color.White])
       _ -> Spec.assertFailure s "expected the redirected card in exile"
 
@@ -2236,7 +2243,7 @@ benalishHeroName = CardName.MkCardName (Text.pack "Benalish Hero")
 -- permanent a cast produced, whose id is neither the card's in hand nor the
 -- spell's on the stack (CR 400.7).
 namedOnBattlefield :: CardName.CardName -> GameState.GameState -> [ObjectId.ObjectId]
-namedOnBattlefield name gs = filter (\o -> Projection.nameOf o gs == name) (Set.toList (GameState.battlefield gs))
+namedOnBattlefield name gs = filter (\o -> Projection.hasName name o gs) (Set.toList (GameState.battlefield gs))
 
 -- Six Plains, a Benalish Hero ({W} 1/1) in alice's graveyard, and Victor Mancha
 -- cast out of her hand and resolved, with his ETB waiting on the stack.
@@ -2342,7 +2349,7 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
         after = S.runPure S.identityAnswer dead Stack.resolveTop
     Spec.assertBool s (not (null (GameState.stack placed))) "the trigger really was on the stack"
     Spec.assertEqWith s "Victor died before it resolved" (namedOnBattlefield victorName after) []
-    case filter (\o -> Projection.nameOf o after == benalishHeroName) (Game.zoneMembers Zone.Exile S.alice after) of
+    case filter (\o -> Projection.hasName benalishHeroName o after) (Game.zoneMembers Zone.Exile S.alice after) of
       [exiledId] -> do
         Spec.assertEqWith
           s

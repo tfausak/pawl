@@ -264,8 +264,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
     Spec.assertEqWith
       s
       "and it really copied the Ring-bearer"
-      (fmap (\oid -> Projection.nameOf oid copied) newest)
-      (Just (Projection.nameOf bearer copied))
+      (fmap (\oid -> Projection.namesOf oid copied) newest)
+      (Just (Projection.namesOf bearer copied))
     Spec.assertEqWith s "the original is still the Ring-bearer" (markedFor S.alice copied) [bearer]
     Spec.assertEqWith s "and nothing else carries the designation" (length (markedFor S.alice copied)) 1
   -- CR 701.54c's base tier: the emblem has "Your Ring-bearer is legendary and can't

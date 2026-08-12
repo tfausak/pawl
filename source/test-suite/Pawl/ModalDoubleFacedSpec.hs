@@ -78,17 +78,17 @@ mountainName = CardName.MkCardName (Text.pack "Mountain")
 faceReadings ::
   ObjectId.ObjectId ->
   GameState.GameState ->
-  (CardName.CardName, Set.Set CardType.CardType, Maybe (Integer, Integer))
+  (Set.Set CardName.CardName, Set.Set CardType.CardType, Maybe (Integer, Integer))
 faceReadings oid gs =
-  ( Projection.nameOf oid gs,
+  ( Projection.namesOf oid gs,
     Projection.cardTypesOf oid gs,
     S.powerToughnessOf oid gs
   )
 
-birgiReadings, harnfelReadings, bloodbogReadings :: (CardName.CardName, Set.Set CardType.CardType, Maybe (Integer, Integer))
-birgiReadings = (birgiName, Set.singleton CardType.Creature, Just (3, 3))
-harnfelReadings = (harnfelName, Set.singleton CardType.Artifact, Nothing)
-bloodbogReadings = (bloodbogName, Set.singleton CardType.Land, Nothing)
+birgiReadings, harnfelReadings, bloodbogReadings :: (Set.Set CardName.CardName, Set.Set CardType.CardType, Maybe (Integer, Integer))
+birgiReadings = (Set.singleton birgiName, Set.singleton CardType.Creature, Just (3, 3))
+harnfelReadings = (Set.singleton harnfelName, Set.singleton CardType.Artifact, Nothing)
+bloodbogReadings = (Set.singleton bloodbogName, Set.singleton CardType.Land, Nothing)
 
 -- The play-side card's LAND face, the only one of its two names any case here
 -- asserts. Its other face is a SORCERY, which is what makes the card the
@@ -144,7 +144,7 @@ landPlays actions =
 -- rather than followed by id: the cast spell arrives on the battlefield as a NEW
 -- object (CR 400.7), so the id a case started with is gone by then.
 nonLand :: GameState.GameState -> [ObjectId.ObjectId]
-nonLand gs = [o | o <- Set.toList (GameState.battlefield gs), Projection.nameOf o gs /= mountainName]
+nonLand gs = [o | o <- Set.toList (GameState.battlefield gs), not (Projection.hasName mountainName o gs)]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "ModalDoubleFaced" $ do

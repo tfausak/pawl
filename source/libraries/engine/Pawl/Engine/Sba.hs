@@ -354,15 +354,24 @@ stillLegalEnchant pcs gs source spec recipient = case (spec, recipient) of
 --
 -- Grouped by name per controller, since the rule says "controlled by the same
 -- player": two players each with a Thalia is not its business.
+--
+-- ONE ENTRY PER NAME the permanent has, not one per permanent, which is CR
+-- 709.4a's "an object has the chosen name if ONE OF ITS NAMES is the chosen
+-- name" read through "the same name": a permanent with two names is same-named
+-- as anything sharing either. Nothing in the pool can make two such groups
+-- overlap -- no printed Room or split permanent is legendary -- and a permanent
+-- that landed in two would have its controller asked once per group (#1313).
 legendGroups :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> [(PlayerId, NonEmpty.NonEmpty ObjectId)]
 legendGroups pcs gs =
   let legendary oid = case Map.lookup oid pcs of
-        Nothing -> Nothing
+        Nothing -> []
         Just pc
           | Set.member Supertype.Legendary (PC.supertypes pc) ->
-              fmap (\controller -> ((controller, PC.name pc), [oid])) (Projection.controllerOf oid gs)
-          | otherwise -> Nothing
-      keyed = Maybe.mapMaybe legendary (Set.toList (GameState.battlefield gs))
+              case Projection.controllerOf oid gs of
+                Nothing -> []
+                Just controller -> [((controller, name), [oid]) | name <- Set.toList (PC.names pc)]
+          | otherwise -> []
+      keyed = concatMap legendary (Set.toList (GameState.battlefield gs))
       byKey = Map.fromListWith (<>) keyed
       -- Only a group of two or more is the legend rule's business, and the
       -- candidate list is sorted so the prompt's order is stable rather than an

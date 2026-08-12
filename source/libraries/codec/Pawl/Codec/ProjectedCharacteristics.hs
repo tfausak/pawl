@@ -24,7 +24,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 toJson :: PC.ProjectedCharacteristics -> Value.Value
 toJson pc =
   Value.object . concat $
-    [ Common.requiredPair "name" (Codec.encode CardName.codec) (PC.name pc),
+    [ Common.requiredPair "names" (Common.encodeSet (Codec.encode CardName.codec)) (PC.names pc),
       Common.optionalPair "supertypes" Set.empty (Common.encodeSet (Codec.encode Supertype.codec)) (PC.supertypes pc),
       Common.optionalPair "keywords" Map.empty (Common.encodeMultiset (Codec.encode Keyword.codec)) (PC.keywords pc),
       Common.optionalPair "colors" Set.empty (Common.encodeSet (Codec.encode Color.codec)) (PC.colors pc),
@@ -44,7 +44,7 @@ toJson pc =
 fromJson :: Value.Value -> Either Text.Text PC.ProjectedCharacteristics
 fromJson value = do
   ps <- Common.asObject value
-  nm <- Common.field "name" ps >>= Codec.decode CardName.codec
+  nms <- Common.field "names" ps >>= Common.decodeSet (Codec.decode CardName.codec)
   sups <- Common.defaultedField "supertypes" Set.empty (Common.decodeSet (Codec.decode Supertype.codec)) ps
   kws <- Common.defaultedField "keywords" Map.empty (Common.decodeMultiset (Codec.decode Keyword.codec)) ps
   cols <- Common.defaultedField "colors" Set.empty (Common.decodeSet (Codec.decode Color.codec)) ps
@@ -61,7 +61,7 @@ fromJson value = do
   trigs <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (TriggeredAbility.fromJson Card.fromJson)) ps
   pure
     PC.MkProjectedCharacteristics
-      { PC.name = nm,
+      { PC.names = nms,
         PC.supertypes = sups,
         PC.keywords = kws,
         PC.colors = cols,

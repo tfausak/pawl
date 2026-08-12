@@ -534,7 +534,7 @@ razorgrassBoard razorgrass warden =
 wardenOut :: GameState.GameState -> Int
 wardenOut gs =
   let wardenName = CardName.MkCardName (Text.pack "Soul Warden")
-   in length [o | o <- Set.toList (GameState.battlefield gs), Projection.nameOf o gs == wardenName]
+   in length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName wardenName o gs]
 
 -- Whether a life loss of exactly this size, by this player, was RECORDED -- the
 -- channel a card that watches for life loss reads, and the half of CR 119.4 a
@@ -2046,7 +2046,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         played = S.runPure S.playLandAnswer board Engine.priorityLoop
         untap oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)}
         ratsName = CardName.MkCardName (Text.pack "Typhoid Rats")
-        ratsOut gs = length [o | o <- Set.toList (GameState.battlefield gs), Projection.nameOf o gs == ratsName]
+        ratsOut gs = length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName ratsName o gs]
     case Set.toList (GameState.battlefield played) of
       [permId] -> do
         Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)

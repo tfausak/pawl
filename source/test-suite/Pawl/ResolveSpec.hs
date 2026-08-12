@@ -2401,7 +2401,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     (tokens, after) <- dragonFodderChain s registry Nothing
     Spec.assertEqWith s "two tokens" (length tokens) 2
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Goblin" (Projection.subtypesOf oid after) (Set.singleton Subtype.Goblin)) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Goblin Token" (Projection.nameOf oid after) (CardName.MkCardName (Text.pack "Goblin Token"))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Goblin Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Token")))) tokens
 
   -- And the point. BOTH halves of CR 612.2a: the type line, and the name those
   -- same words define.
@@ -2409,7 +2409,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     (tokens, after) <- dragonFodderChain s registry (Just (Subtype.Goblin, Subtype.Elf))
     Spec.assertEqWith s "two tokens" (length tokens) 2
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf" (Projection.subtypesOf oid after) (Set.singleton Subtype.Elf)) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Elf Token" (Projection.nameOf oid after) (CardName.MkCardName (Text.pack "Elf Token"))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Elf Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Token")))) tokens
 
   -- CR 612.2a's OTHER half: "or an object with such an ability". Bitterblossom
   -- {1}{B} Kindred Enchantment -- Faerie ("At the beginning of your upkeep, you
@@ -2422,13 +2422,13 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
     (tokens, after) <- bitterblossomChain s registry Nothing
     Spec.assertEqWith s "one token" (length tokens) 1
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Faerie Rogue" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Faerie, Subtype.Rogue])) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Faerie Rogue Token" (Projection.nameOf oid after) (CardName.MkCardName (Text.pack "Faerie Rogue Token"))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Faerie Rogue Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Faerie Rogue Token")))) tokens
 
   Spec.it s "CR 612.2a whole card: an evolved Bitterblossom's trigger mints an Elf Rogue Token" $ do
     (tokens, after) <- bitterblossomChain s registry (Just (Subtype.Faerie, Subtype.Elf))
     Spec.assertEqWith s "one token" (length tokens) 1
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf Rogue" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Elf, Subtype.Rogue])) tokens
-    mapM_ (\oid -> Spec.assertEqWith s "named Elf Rogue Token" (Projection.nameOf oid after) (CardName.MkCardName (Text.pack "Elf Rogue Token"))) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Elf Rogue Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Rogue Token")))) tokens
 
   -- The BOUNDARY the four tests above sit on, and the falsifier for reading them
   -- as "a text change rewrites names": CR 612.2's closing sentence -- "an effect
@@ -2456,7 +2456,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
           S.cast S.alice evolutionId
           Stack.resolveTop
     Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf pikerId after) (Set.fromList [Subtype.Elf, Subtype.Warrior])
-    Spec.assertEqWith s "and the name is untouched" (Projection.nameOf pikerId after) (CardName.MkCardName (Text.pack "Goblin Piker"))
+    Spec.assertEqWith s "and the name is untouched" (Projection.namesOf pikerId after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")))
 
 -- The one activated ability of a printing that declares exactly one -- Prodigal
 -- Sorcerer's {T}, which is all these fixtures reach for. Nothing for any other
@@ -3770,7 +3770,7 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     case cloneOfGargoyle True island gargoyle clone piker oneWithTheMachine of
       (_, [], _) -> Spec.assertFailure s "no copy on alice's battlefield"
       (source, copy : _, after) -> do
-        Spec.assertEqWith s "the copy is Stonewing Antagonizer" (Projection.nameOf copy after) antagonizerName
+        Spec.assertEqWith s "the copy is Stonewing Antagonizer" (Projection.namesOf copy after) (Set.singleton antagonizerName)
         Spec.assertEqWith s "an artifact creature alice controls" (Projection.cardTypesOf copy after, Projection.controllerOf copy after) (Set.fromList [CardType.Artifact, CardType.Creature], Just S.alice)
         Spec.assertEqWith s "with the back face's 4/2 body" (S.powerToughnessOf copy after) (Just (4, 2))
         Spec.assertEqWith s "CR 712.8e: bob's transformed permanent still reads its front face's 1" (Filter.manaValue (Projection.viewOfObject source after)) (Just 1)
@@ -3791,7 +3791,7 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
     case cloneOfGargoyle False island gargoyle clone piker oneWithTheMachine of
       (_, [], _) -> Spec.assertFailure s "no copy on alice's battlefield"
       (source, copy : _, after) -> do
-        Spec.assertEqWith s "the copy is Thraben Gargoyle" (Projection.nameOf copy after) gargoyleName
+        Spec.assertEqWith s "the copy is Thraben Gargoyle" (Projection.namesOf copy after) (Set.singleton gargoyleName)
         Spec.assertEqWith s "an artifact creature alice controls" (Projection.cardTypesOf copy after, Projection.controllerOf copy after) (Set.fromList [CardType.Artifact, CardType.Creature], Just S.alice)
         Spec.assertEqWith s "with the front face's 2/2 body" (S.powerToughnessOf copy after) (Just (2, 2))
         Spec.assertEqWith s "bob's permanent reads 1" (Filter.manaValue (Projection.viewOfObject source after)) (Just 1)

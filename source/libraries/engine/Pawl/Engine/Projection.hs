@@ -914,7 +914,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
     PC.MkProjectedCharacteristics
       { -- No card behind this object (an ability on the stack): nothing to seed
         -- from.
-        PC.name = CardName.MkCardName Text.empty,
+        PC.names = Set.empty,
         PC.supertypes = Set.empty,
         PC.keywords = Map.empty,
         PC.colors = Set.empty,
@@ -942,7 +942,11 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
     let seedViewOf = const Nothing
         seedContext = Filter.contextFor (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
-          { PC.name = Face.name face,
+          { -- CR 709.4a: the names the object shows, which the `face` bound
+            -- above cannot carry -- its own name is the halves' joined
+            -- rendering. Game.namesOf is resolveFaceFor's plural companion and
+            -- decides which halves show by the same arms.
+            PC.names = Game.namesOf oid gs,
             PC.supertypes = TypeLine.supertypes (Face.typeLine face),
             -- CR 702: a printed keyword appears once, so the seed's count is 1
             -- apiece; layer-6 grants add multiplicity on top (CR 702.164b).
@@ -3478,10 +3482,19 @@ subtypesOf = subtypesGiven Map.empty
 subtypesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Set Subtype.Type.Subtype
 subtypesGiven pcs oid gs = PC.subtypes (projectGiven pcs oid gs)
 
--- CR 201.1 / 707.2: the object's projected name -- a Clone's is the name it
--- copied, not "Clone".
-nameOf :: ObjectId -> GameState -> CardName.CardName
-nameOf oid = PC.name . project oid
+-- CR 201.1 / 707.2: the object's projected names -- a Clone's is the name it
+-- copied, not "Clone". Plural for the objects rule 709 gives several names, and
+-- EMPTY for one CR 708.2a gives none.
+namesOf :: ObjectId -> GameState -> Set CardName.CardName
+namesOf oid = PC.names . project oid
+
+-- CR 709.4a: "An object has the chosen name if one of its names is the chosen
+-- name." The one question the rules ask about a name, and the only reader every
+-- name comparison in the engine should go through -- a Room with both doors open
+-- has "Roaring Furnace" and "Steaming Sauna" and does NOT have the
+-- "Roaring Furnace//Steaming Sauna" its combined Face renders them as.
+hasName :: CardName.CardName -> ObjectId -> GameState -> Bool
+hasName name oid gs = Set.member name (namesOf oid gs)
 
 -- CR 205.4: the object's projected supertypes, the sibling of subtypesOf.
 supertypesOf :: ObjectId -> GameState -> Set Supertype.Supertype

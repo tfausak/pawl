@@ -149,7 +149,7 @@ restrictionSpec s registry = Spec.describe s "TransformRestriction" $ do
   --
   -- The face AND the projected name are asserted, not the power and toughness
   -- alone: 3/3 against 4/4 is a two-value difference an unrelated bug could
-  -- reproduce, while Object.face and Projection.nameOf disagreeing about which
+  -- reproduce, while Object.face and Projection.namesOf disagreeing about which
   -- face is up cannot be anything else. The P/T rides along as the reader's
   -- half.
   Spec.it s "CR 702.145b a daybound permanent refuses a spell's transform" $ do
@@ -161,7 +161,7 @@ restrictionSpec s registry = Spec.describe s "TransformRestriction" $ do
     Spec.assertEqWith s "it was day before the spell" (GameState.daytime board) (Just Daytime.Day)
     Spec.assertEqWith s "and still is" (GameState.daytime after) (Just Daytime.Day)
     Spec.assertEqWith s "Tovolar is still front face up" (faceNameOf tovolarId after) (Just frontName)
-    Spec.assertEqWith s "every reader still sees the front face's name" (Projection.nameOf tovolarId after) frontName
+    Spec.assertEqWith s "every reader still sees the front face's name" (Projection.namesOf tovolarId after) (Set.singleton frontName)
     Spec.assertEqWith s "a 3/3" (S.powerToughnessOf tovolarId after) (Just (3, 3))
   -- The positive control, and the reason the case above is not vacuous: the same
   -- board with Humility on it. CR 613.1f strips the daybound ability at layer 6
@@ -191,7 +191,7 @@ restrictionSpec s registry = Spec.describe s "TransformRestriction" $ do
     -- why nothing here could have been turned over by CR 702.145c instead.
     Spec.assertEqWith s "so it is neither day nor night" (GameState.daytime board) Nothing
     Spec.assertEqWith s "so Moonmist turns him over" (faceNameOf tovolarId after) (Just backName)
-    Spec.assertEqWith s "and every reader sees the back face's name" (Projection.nameOf tovolarId after) backName
+    Spec.assertEqWith s "and every reader sees the back face's name" (Projection.namesOf tovolarId after) (Set.singleton backName)
 
 designationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 designationSpec s registry = Spec.describe s "Designation" $ do

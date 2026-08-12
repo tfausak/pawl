@@ -400,10 +400,12 @@ castsThisTurn pid gs =
 -- need them for (Null Chamber's "spells with the chosen names", Damping Engine's
 -- "artifact, creature, or enchantment spells").
 --
--- ONE name rather than the set CR 201.2a asks about ("at least one name in
--- common"). Every spell in this pool has exactly one name at this moment: the
--- proposal has already fixed the half, and nothing else has several names
--- (#650).
+-- ONE name rather than the set the play-side twin below takes, and by RULE
+-- rather than for want of one: CR 709.3b leaves a spell on the stack the
+-- characteristics of the half being cast alone, and the proposal has already
+-- fixed that half. CR 709.4a's "one of its names" therefore has one candidate
+-- here, which is why naming "Wax" stops Wax and leaves Wane castable (CR
+-- 709.3a).
 --
 -- BOTH the object and the name, because CR 601.3a's qualities come in two kinds
 -- and neither argument answers the other's. A name is compared AS A NAME, and the
@@ -493,10 +495,12 @@ prohibitsCasting pid oid name gs =
 -- never uses the stack, so a land is never a spell and none of the cast-side
 -- prohibitions reaches it (Silence stops no land).
 --
--- Takes a name for prohibitsCasting's reason, and one more of its own: the
--- caller has already asked whether the card is a land at all, off the same face
--- this name comes from. A land with several names would want the set CR 201.2a
--- asks about (#650), and none exists.
+-- Takes the card's NAMES rather than one name, where prohibitsCasting above
+-- takes one: nothing has singled out a half here, so what the player is playing
+-- is the card as their hand shows it -- CR 709.4's combined view, which has a
+-- name per half. CR 709.4a is then a membership test, and a chosen name stops
+-- the land if it is ONE of them. No printed land has two, so the set is a
+-- singleton in this pool.
 --
 -- And takes NO object, where prohibitsCasting above does: the two prohibitions
 -- read here narrow by a name or by nothing at all, and no printed sentence
@@ -505,10 +509,10 @@ prohibitsCasting pid oid name gs =
 -- it.
 --
 -- A DISJUNCTION for CR 101.2's reason.
-prohibitsPlayingLand :: PlayerId -> CardName -> GameState -> Bool
-prohibitsPlayingLand pid name gs =
+prohibitsPlayingLand :: PlayerId -> Set.Set CardName -> GameState -> Bool
+prohibitsPlayingLand pid names gs =
   let prohibits (source, effect) = case effect of
-        PlayerEffect.CantPlayLandChosenName -> Set.member name (chosenNamesOf source gs)
+        PlayerEffect.CantPlayLandChosenName -> not (Set.disjoint names (chosenNamesOf source gs))
         -- Damping Engine's "can't play lands", which narrows nothing: every land
         -- this player could play is stopped, so the name goes unread.
         PlayerEffect.CantPlayLands -> True

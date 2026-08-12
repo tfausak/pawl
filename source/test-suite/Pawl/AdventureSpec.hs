@@ -37,7 +37,10 @@ import qualified Pawl.Types.Zone as Zone
 
 -- The two names the card prints (CR 715.2). The first is the card's own name
 -- under CR 715.4; the second names only the alternative characteristics, and CR
--- 715.5 is what lets a player choose it where a name is asked for (#650).
+-- 715.5 is what lets a player choose it where a name is asked for --
+-- Prompt.ChooseCardName offers no candidate list, so it is the answerer's to
+-- pick. What the CARD has is CR 715.4's normal name alone off the stack, which
+-- is what the first case here asserts.
 shieldbreakerName, battleDisplayName :: CardName.CardName
 shieldbreakerName = CardName.MkCardName (Text.pack "Embereth Shieldbreaker")
 battleDisplayName = CardName.MkCardName (Text.pack "Battle Display")
@@ -57,7 +60,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     case Game.faceOf oid gs of
       Nothing -> Spec.assertFailure s "expected a card in hand"
       Just face -> do
-        Spec.assertEqWith s "named for the creature alone" (Projection.nameOf oid gs) shieldbreakerName
+        Spec.assertEqWith s "named for the creature alone" (Projection.namesOf oid gs) (Set.singleton shieldbreakerName)
         Spec.assertEqWith s "mana value 2, not the two halves' 3" (Quantity.manaValueOf face) 2
         Spec.assertBool s (Set.member CardType.Creature (Projection.cardTypesOf oid gs)) "a creature card"
         Spec.assertBool s (not (Set.member CardType.Sorcery (Projection.cardTypesOf oid gs))) "and not a sorcery"
@@ -145,13 +148,13 @@ spec s registry = Spec.describe s "Adventure" $ do
     Spec.assertEqWith
       s
       "the adventurer card is the one in exile"
-      (fmap (\o -> Projection.nameOf o resolved) (Game.zoneMembers Zone.Exile S.alice resolved))
-      [shieldbreakerName]
+      (fmap (\o -> Projection.namesOf o resolved) (Game.zoneMembers Zone.Exile S.alice resolved))
+      [Set.singleton shieldbreakerName]
     Spec.assertEqWith
       s
       "and the graveyard holds only its target"
-      (fmap (\o -> Projection.nameOf o resolved) (Game.zoneMembers Zone.Graveyard S.alice resolved))
-      [CardName.MkCardName (Text.pack "Bonesplitter")]
+      (fmap (\o -> Projection.namesOf o resolved) (Game.zoneMembers Zone.Graveyard S.alice resolved))
+      [Set.singleton (CardName.MkCardName (Text.pack "Bonesplitter"))]
   -- CR 715.3d's second and third sentences, which are one question asked of the
   -- same exiled card: "For as long as that card remains exiled, that player may
   -- play it. It can't be cast as an Adventure this way."
@@ -213,7 +216,7 @@ spec s registry = Spec.describe s "Adventure" $ do
             -- CR 715.4 again, on the far side of the loop: what entered is the
             -- 2/1 creature and not the sorcery it was cast through.
             Spec.assertEqWith s "a 2/1 on the battlefield" (S.powerToughnessOf knightId entered) (Just (2, 1))
-            Spec.assertEqWith s "named for the creature" (Projection.nameOf knightId entered) shieldbreakerName
+            Spec.assertEqWith s "named for the creature" (Projection.namesOf knightId entered) (Set.singleton shieldbreakerName)
           other -> Spec.assertFailure s ("expected exactly one Knight, got " <> show (length other))
       other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
   -- The mechanic's own ruling: "If an adventurer card ends up in exile for any
