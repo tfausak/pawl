@@ -17,8 +17,9 @@ module Pawl.Types.CopyException where
 --
 -- Not implemented: CR 707.9a's exception that makes the copy GAIN an ability
 -- ("except it has changeling"), CR 707.9c's exception that declines to copy a
--- characteristic, and CR 707.9d's "in addition to its other types" carve-out
--- (#1292).
+-- characteristic, CR 707.9d's "in addition to its other types" carve-out, and
+-- CR 707.9e's exception that is an additional effect rather than a
+-- characteristic (#1292).
 data CopyException
   = -- | CR 707.9b: the copy's power and toughness are these numbers instead of
     -- the copied object's ("except it's 7/7").

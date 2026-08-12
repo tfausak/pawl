@@ -35,8 +35,8 @@ data EntryRewrite
     --
     -- The exceptions ride the rewrite rather than being a rewrite of their own,
     -- because CR 707.9 makes them modifications OF the copying process: they
-    -- apply only when a copy is actually made, and a declined copy leaves the
-    -- object its printed self exceptions and all.
+    -- happen only when a copy is actually made, so declining the "may" leaves
+    -- the object its printed self and no exception applies.
     AsCopy [CopyException.CopyException]
   | ChoiceOf [EntryOption.EntryOption]
   | -- | CR 614.1c's other choosing shape: choose a colour as this enters

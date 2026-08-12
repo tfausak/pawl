@@ -932,7 +932,9 @@ applyEntryOption oid option gs =
 -- Into the SNAPSHOT and not onto the object, which is CR 707.9b: the excepted
 -- value "becomes part of the copiable values of the copy", so a token copy of
 -- the copy inherits it (CR 707.2) where a CR 613 layer-7b write would be left
--- behind. Pawl.CopySpec's Cackling Counterpart case is what proves the two apart.
+-- behind. Pawl.CopySpec's "a token copy of an excepted copy keeps the exception"
+-- is what proves the two apart: it reads 7/7 here and the copied Tarmogoyf's CDA
+-- under the layer reading.
 applyCopyExceptions :: [CopyException.CopyException] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
 applyCopyExceptions exceptions snapshot = List.foldl' applyCopyException snapshot exceptions
 
