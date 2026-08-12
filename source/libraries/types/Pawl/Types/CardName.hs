@@ -14,7 +14,9 @@ newtype CardName = MkCardName
   }
   deriving (Eq, Ord, Show)
 
--- CR 709.4a as far as a single name can carry it (#650): docs/rules.txt's own
+-- A RENDERING of several names as one string, and never a name an object has --
+-- CR 709.4a's plural axis is Pawl.Types.ProjectedCharacteristics.names, which
+-- every rules question about a name goes through. docs/rules.txt's own
 -- Examples write a split card's name joined by "//", unspaced -- "Fire//Ice"
 -- (lines 3882, 5747) and "Assault//Battery" (line 5746). CR 709.4a itself
 -- gives no example.

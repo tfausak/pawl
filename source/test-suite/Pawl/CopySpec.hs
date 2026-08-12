@@ -141,8 +141,8 @@ rites decision victim p = case p of
 -- What each token on the battlefield IS -- its name and its projected P/T --
 -- rather than how many there are. A batch that minted the right NUMBER of the
 -- wrong things fails on this where a length check would not.
-mintedTokens :: GameState.GameState -> [(CardName.CardName, Maybe (Integer, Integer))]
-mintedTokens gs = fmap (\oid -> (PC.name (Projection.project oid gs), S.powerToughnessOf oid gs)) (tokensOnBattlefield gs)
+mintedTokens :: GameState.GameState -> [(Set.Set CardName.CardName, Maybe (Integer, Integer))]
+mintedTokens gs = fmap (\oid -> (Projection.namesOf oid gs, S.powerToughnessOf oid gs)) (tokensOnBattlefield gs)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
@@ -302,7 +302,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the copy without the exception is the bare CDA" (S.powerToughnessOf cloneId resolved) $ Just (1, 2)
         Spec.assertEqWith s "the copy with it is 7/7" (S.powerToughnessOf gargantuanId resolved) $ Just (7, 7)
         -- CR 707.2 still ran: only P/T is excepted.
-        Spec.assertEqWith s "and is otherwise the Goyf" (PC.name (Projection.project gargantuanId resolved)) $ CardName.MkCardName (Text.pack "Tarmogoyf")
+        Spec.assertEqWith s "and is otherwise the Goyf" (Projection.namesOf gargantuanId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Tarmogoyf"
         Spec.assertBool s (Set.member Subtype.Lhurgoyf (PC.subtypes (Projection.project gargantuanId resolved))) "the Gargantuan copied the Goyf's subtype"
         -- CR 707.9d: the CDA defining the excepted characteristic was not copied,
         -- so the Gargantuan alone does not move when the graveyards do.
@@ -336,7 +336,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         (_, later) = S.addGraveyardCard piker S.bob resolved
     case tokensOnBattlefield resolved of
       [tokenId] -> do
-        Spec.assertEqWith s "the token is named for the Goyf, not the Gargantuan" (PC.name (Projection.project tokenId resolved)) $ CardName.MkCardName (Text.pack "Tarmogoyf")
+        Spec.assertEqWith s "the token is named for the Goyf, not the Gargantuan" (Projection.namesOf tokenId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Tarmogoyf"
         Spec.assertEqWith s "and is 7/7, the excepted value" (S.powerToughnessOf tokenId resolved) $ Just (7, 7)
         Spec.assertEqWith s "the Goyf itself moves with the graveyards" (S.powerToughnessOf goyfId later) $ Just (2, 3)
         Spec.assertEqWith s "the token does not" (S.powerToughnessOf tokenId later) $ Just (7, 7)
@@ -350,7 +350,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         resolved = castAndResolve declineCopy counterpart board
     case tokensOnBattlefield resolved of
       [tokenId] -> do
-        Spec.assertEqWith s "the token's name is the copied creature's" (PC.name (Projection.project tokenId resolved)) $ CardName.MkCardName (Text.pack "Goblin Piker")
+        Spec.assertEqWith s "the token's name is the copied creature's" (Projection.namesOf tokenId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
         Spec.assertEqWith s "the token's power is the copied creature's" (Projection.powerOf tokenId resolved) $ Just 2
         Spec.assertEqWith s "the token's toughness is the copied creature's" (Projection.toughnessOf tokenId resolved) $ Just 1
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
@@ -373,7 +373,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         resolved = castAndResolve declineCopy counterpart withClone
     case tokensOnBattlefield resolved of
       [tokenId] -> do
-        Spec.assertEqWith s "the token is named for the Piker, not the Clone" (PC.name (Projection.project tokenId resolved)) $ CardName.MkCardName (Text.pack "Goblin Piker")
+        Spec.assertEqWith s "the token is named for the Piker, not the Clone" (Projection.namesOf tokenId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Goblin Piker"
         Spec.assertEqWith s "the token is a 2, not a 0" (Projection.powerOf tokenId resolved) $ Just 2
         Spec.assertEqWith s "the token is a 1, not a 0" (Projection.toughnessOf tokenId resolved) $ Just 1
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
@@ -413,7 +413,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "the Radstag evolved, so it is a 3/3" (S.powerToughnessOf radstagId after) $ Just (3, 3)
     case tokensOnBattlefield after of
       [tokenId] -> do
-        Spec.assertEqWith s "the token is a Radstag" (PC.name (Projection.project tokenId after)) $ CardName.MkCardName (Text.pack "Watchful Radstag")
+        Spec.assertEqWith s "the token is a Radstag" (Projection.namesOf tokenId after) . Set.singleton . CardName.MkCardName $ Text.pack "Watchful Radstag"
         Spec.assertEqWith s "and a 2/2, not the counter-boosted 3/3" (S.powerToughnessOf tokenId after) $ Just (2, 2)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
@@ -437,7 +437,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     Spec.assertEqWith s "and the Radstag is gone before it resolves" (Set.member radstagId (GameState.battlefield dead)) False
     case tokensOnBattlefield after of
       [tokenId] -> do
-        Spec.assertEqWith s "the token is a Radstag all the same" (PC.name (Projection.project tokenId after)) $ CardName.MkCardName (Text.pack "Watchful Radstag")
+        Spec.assertEqWith s "the token is a Radstag all the same" (Projection.namesOf tokenId after) . Set.singleton . CardName.MkCardName $ Text.pack "Watchful Radstag"
         Spec.assertEqWith s "at its copiable 2/2, not the -2/-2 it died at" (S.powerToughnessOf tokenId after) $ Just (2, 2)
       tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
@@ -451,7 +451,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     rite <- S.printingOf s registry "Rite of Replication"
     let (pikerId, board) = S.addCreature piker S.alice (S.landsInPlay island 9)
         resolved = castAndResolve (rites KickerDecision.Declines pikerId) rite board
-    Spec.assertEqWith s "one token, and it is the Piker" (mintedTokens resolved) [(CardName.MkCardName (Text.pack "Goblin Piker"), Just (2, 1))]
+    Spec.assertEqWith s "one token, and it is the Piker" (mintedTokens resolved) [(Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just (2, 1))]
 
   Spec.it s "kicked Rite of Replication mints five instead (CR 702.33d, CR 707.1)" $ do
     island <- S.printingOf s registry "Island"
@@ -459,7 +459,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     rite <- S.printingOf s registry "Rite of Replication"
     let (pikerId, board) = S.addCreature piker S.alice (S.landsInPlay island 9)
         resolved = castAndResolve (rites KickerDecision.Kicks pikerId) rite board
-    Spec.assertEqWith s "five tokens, and every one of them is the Piker" (mintedTokens resolved) (replicate 5 (CardName.MkCardName (Text.pack "Goblin Piker"), Just (2, 1)))
+    Spec.assertEqWith s "five tokens, and every one of them is the Piker" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")), Just (2, 1)))
 
   -- THE PROVING TEST for CR 614.12's batch exclusion and for CR 616.1g's
   -- containment. Five token Clones enter at ONE moment, each with its own
@@ -487,5 +487,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         -- later still, is wrongly offered.
         (_, board) = S.addCreature giant S.bob board1
         resolved = castAndResolve (rites KickerDecision.Kicks cloneId) rite board
-    Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (CardName.MkCardName (Text.pack "Hill Giant"), Just (3, 3)))
+    Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (Set.singleton (CardName.MkCardName (Text.pack "Hill Giant")), Just (3, 3)))
     Spec.assertEqWith s "the copied Clone itself still copied nothing" (S.powerToughnessOf cloneId resolved) (Just (1, 1))

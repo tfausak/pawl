@@ -75,9 +75,9 @@ antagonizerName = CardName.MkCardName (Text.pack "Stonewing Antagonizer")
 faceReadings ::
   ObjectId.ObjectId ->
   GameState.GameState ->
-  (CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Bool, Bool, Int)
+  (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Bool, Bool, Int)
 faceReadings oid gs =
-  ( Projection.nameOf oid gs,
+  ( Projection.namesOf oid gs,
     S.powerToughnessOf oid gs,
     Projection.subtypesOf oid gs,
     Projection.hasKeyword Keyword.Defender oid gs,
@@ -85,9 +85,9 @@ faceReadings oid gs =
     length (Projection.abilitiesOf oid gs)
   )
 
-frontFace, backFace :: (CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Bool, Bool, Int)
-frontFace = (gargoyleName, Just (2, 2), Set.singleton Subtype.Gargoyle, True, False, 1)
-backFace = (antagonizerName, Just (4, 2), Set.fromList [Subtype.Gargoyle, Subtype.Horror], False, True, 0)
+frontFace, backFace :: (Set.Set CardName.CardName, Maybe (Integer, Integer), Set.Set Subtype.Subtype, Bool, Bool, Int)
+frontFace = (Set.singleton gargoyleName, Just (2, 2), Set.singleton Subtype.Gargoyle, True, False, 1)
+backFace = (Set.singleton antagonizerName, Just (4, 2), Set.fromList [Subtype.Gargoyle, Subtype.Horror], False, True, 0)
 
 -- "Transform all creatures", the shape CR 701.27a takes when a spell rather than
 -- the permanent's own ability asks -- Moonmist's "transform all Humans" with a
@@ -162,7 +162,7 @@ spec s registry = Spec.describe s "Transform" $ do
   -- Played out from the card's own text: six Islands pay the {6}, the ability
   -- goes on the stack and resolves, and every characteristic reader is asked
   -- before and after. Each half of `faceReadings` is a different reader --
-  -- Projection.nameOf, the layer 7b power/toughness fold, the layer 4 subtype
+  -- Projection.namesOf, the layer 7b power/toughness fold, the layer 4 subtype
   -- set, the layer 6 keyword map, and Activate's own ability list -- so an
   -- engine that turned the permanent over for some of them and not others fails
   -- here rather than in one narrow assertion.
@@ -275,7 +275,7 @@ spec s registry = Spec.describe s "Transform" $ do
         (pikerId, before) = S.addCreature piker S.alice g0
         after = sweep before
     Spec.assertEqWith s "the Gargoyle turned over" (faceReadings gargoyleId after) backFace
-    Spec.assertEqWith s "the Goblin Piker did not" (Projection.nameOf pikerId after) (CardName.MkCardName (Text.pack "Goblin Piker"))
+    Spec.assertEqWith s "the Goblin Piker did not" (Projection.namesOf pikerId after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker")))
     Spec.assertEqWith
       s
       "and nothing was written on it: a one-faced card shows no face"
@@ -317,7 +317,7 @@ spec s registry = Spec.describe s "Transform" $ do
         counted = g0 {GameState.objects = Map.adjust (\o -> o {Object.counters = Map.insert CounterKind.PlusOnePlusOne 1 (Object.counters o)}) oid (GameState.objects g0)}
         before = S.markDamage oid 1 counted
         after = sweep before
-    Spec.assertEqWith s "the back face is up" (Projection.nameOf oid after) antagonizerName
+    Spec.assertEqWith s "the back face is up" (Projection.namesOf oid after) (Set.singleton antagonizerName)
     Spec.assertEqWith s "the 1 damage marked on the Gargoyle is still marked" (S.damageOf oid after) (Just 1)
     Spec.assertEqWith s "and its +1/+1 counter survived the turn" (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid after)) (Just 1)
     -- 4/2 from the back face plus the counter layer 7d still applies (CR 712.18).
@@ -377,7 +377,7 @@ enterTransformedSpec s registry = Spec.describe s "Entering the battlefield tran
     Spec.assertBool s (not (S.onBattlefield sagaId after)) "the Saga's own object is gone"
     case Game.zoneMembers Zone.Battlefield S.alice after of
       [oid] -> do
-        Spec.assertEqWith s "the permanent is the BACK face" (Projection.nameOf oid after) mothName
+        Spec.assertEqWith s "the permanent is the BACK face" (Projection.namesOf oid after) (Set.singleton mothName)
         Spec.assertEqWith s "recorded as the face it shows" (fmap Object.face (Game.lookupObject oid after)) (Just (Just mothName))
         Spec.assertEqWith s "a 2/4, where the Saga face has no P/T box at all" (S.powerToughnessOf oid after) (Just (2, 4))
         Spec.assertEqWith s "an Insect, and no longer a Saga" (Projection.subtypesOf oid after) (Set.singleton Subtype.Insect)
@@ -405,5 +405,5 @@ enterTransformedSpec s registry = Spec.describe s "Entering the battlefield tran
         (_, turned) = put transformed gargoyle
     Spec.assertEqWith s "the single-faced card is the same object, still in hand" (fmap Object.zone (Game.lookupObject refusedId refused)) (Just Zone.Hand)
     Spec.assertEqWith s "so nothing entered the battlefield" (Game.zoneMembers Zone.Battlefield S.alice refused) []
-    Spec.assertEqWith s "the same card put there UNtransformed does enter" (fmap (\oid -> Projection.nameOf oid entered) (Game.zoneMembers Zone.Battlefield S.alice entered)) [CardName.MkCardName (Text.pack "Goblin Piker")]
-    Spec.assertEqWith s "and a double-faced card enters showing its back face" (fmap (\oid -> Projection.nameOf oid turned) (Game.zoneMembers Zone.Battlefield S.alice turned)) [antagonizerName]
+    Spec.assertEqWith s "the same card put there UNtransformed does enter" (fmap (\oid -> Projection.namesOf oid entered) (Game.zoneMembers Zone.Battlefield S.alice entered)) [Set.singleton (CardName.MkCardName (Text.pack "Goblin Piker"))]
+    Spec.assertEqWith s "and a double-faced card enters showing its back face" (fmap (\oid -> Projection.namesOf oid turned) (Game.zoneMembers Zone.Battlefield S.alice turned)) [Set.singleton antagonizerName]

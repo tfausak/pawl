@@ -659,7 +659,7 @@ angelOn :: GameState.GameState -> Maybe (ObjectId.ObjectId, PC.ProjectedCharacte
 angelOn gs =
   let wanted = CardName.MkCardName (Text.pack "Serra Faithkeeper")
       pcs = Projection.projectAll gs
-      hit oid = fmap ((,) oid) (List.find ((== wanted) . PC.name) (Map.lookup oid pcs))
+      hit oid = fmap ((,) oid) (List.find (Set.member wanted . PC.names) (Map.lookup oid pcs))
    in case Maybe.mapMaybe hit (Set.toAscList (GameState.battlefield gs)) of
         [found] -> Just found
         _ -> Nothing

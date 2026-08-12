@@ -348,6 +348,29 @@ resolveFaceFor mObj card = case mObj of
         Card.roomFace (Object.unlockedHalves obj) card
   _ -> resolveFace (mObj >>= Object.face) card
 
+-- CR 709.4a: the NAMES the object shows, the plural companion of resolveFaceFor
+-- above -- one arm for each of that function's, in the same order, because the
+-- two answer the same question about the same object and must not disagree
+-- about which halves are showing.
+--
+-- Separate from resolveFaceFor rather than folded into it because a Face has one
+-- name by construction: the combined view Face.name carries is the halves'
+-- names joined for rendering (Pawl.Engine.Card.merge2), which is not a name the
+-- object has. The set is what CR 709.4a's "one of its names" asks about.
+namesFor :: Maybe Object.Object -> Card -> Set.Set CardName.CardName
+namesFor mObj card = case mObj of
+  Just obj
+    | Card.hasSharedTypeLine card && Object.zone obj == Zone.Battlefield ->
+        Card.roomNames (Object.unlockedHalves obj) card
+  _ -> case mObj >>= Object.face of
+    -- CR 709.4 / 712.8a / 715.4: the layout's own view, whose names are its
+    -- contributing halves'.
+    Nothing -> Card.combinedNames card
+    -- CR 709.3b: a spell on the stack has only the named half's
+    -- characteristics, so only that half's name -- with resolveFace's fallback
+    -- to the combined view for a name that resolves to no face.
+    Just n -> maybe (Card.combinedNames card) (Set.singleton . Face.name) (Card.faceNamed n card)
+
 -- The face of the card an object is showing. Nothing when the id is unknown or
 -- the object has no card behind it (an ability on the stack, CR 113.7a).
 --
@@ -368,6 +391,18 @@ faceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just Facing.FaceDown -> Just Card.faceDownFace
   _ -> faceUpFaceOf oid gs
+
+-- CR 201.1 / 709.4a: the names of the object an id names -- `faceOf`'s plural
+-- companion, and the value Pawl.Engine.Projection.baseCharacteristics seeds
+-- ProjectedCharacteristics.names from.
+--
+-- EMPTY for a face-down object, which is CR 708.2a's "no name" said in the one
+-- way a set can say it, and empty again for an id that names nothing or an
+-- object with no card behind it (CR 113.7a: an ability on the stack).
+namesOf :: ObjectId -> GameState -> Set.Set CardName.CardName
+namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
+  Just Facing.FaceDown -> Set.empty
+  _ -> maybe Set.empty (namesFor (lookupObject oid gs)) (cardOf oid gs)
 
 -- `faceOf` IGNORING CR 708.2's substitution: what the object's own card shows,
 -- whichever way up the object is -- CR 709.3b's chosen half, CR 709.4's combined

@@ -1,12 +1,15 @@
 -- Covers CR 709.5's Room cards end to end: Pawl.Types.Layout's Room arm and the
 -- Pawl.Engine.Card functions that read it (CR 709.4's combined view, CR 709.3's
 -- castable halves, CR 709.5's roomFace subtraction, CR 709.5d's entering
--- designation), plus the four modules those classifications reach --
+-- designation), plus the modules those classifications reach --
 -- Pawl.Engine.Game.faceOf substitutes the subtracted view,
 -- Pawl.Engine.Event.changeZoneAttaching writes the entering designation and
 -- records CR 709.5h's event, Pawl.Engine.Room offers and carries out CR
 -- 116.2m/709.5e's special action, and Pawl.Engine.Action/Pawl.Engine.Engine put
--- it on the menu. CR 709.5i's "fully unlocks" is here too, which reaches
+-- it on the menu. Pawl.Engine.Projection.namesOf gives the permanent one name
+-- per UNLOCKED door (CR 709.4a), which makes a Room with both doors open the
+-- pool's only permanent with two names at once. CR 709.5i's "fully unlocks" is
+-- here too, which reaches
 -- Event.fullyUnlockedAfter at both writers of an unlocked designation and
 -- Event.matchesTrigger's RoomFullyUnlocked and AnyOf arms.
 --
@@ -140,7 +143,10 @@ roomPermanent :: GameState.GameState -> [ObjectId.ObjectId]
 roomPermanent gs =
   [ o
   | o <- Set.toList (GameState.battlefield gs),
-    elem (Projection.nameOf o gs) [furnaceName, saunaName, joinedName, CardName.MkCardName Text.empty]
+    let names = Projection.namesOf o gs,
+    -- A door's name, or NO name at all -- which is what a Room with both doors
+    -- shut has (CR 709.5).
+    Set.null names || not (Set.disjoint names (Set.fromList [furnaceName, saunaName]))
   ]
 
 -- The riders an effect that merely puts a permanent onto the battlefield asks
@@ -230,7 +236,7 @@ spec s registry = Spec.describe s "Room" $ do
           "and it shows no single face"
           (fmap Object.face (Game.lookupObject permId after))
           (Just Nothing)
-        Spec.assertEqWith s "the locked door's NAME is subtracted" (Projection.nameOf permId after) furnaceName
+        Spec.assertEqWith s "the locked door's NAME is subtracted" (Projection.namesOf permId after) (Set.singleton furnaceName)
         Spec.assertEqWith
           s
           "the locked door's MANA COST is subtracted"
@@ -276,7 +282,16 @@ spec s registry = Spec.describe s "Room" $ do
           "CR 709.5c: both designations now"
           (fmap Object.unlockedHalves (Game.lookupObject permId opened))
           (Just (Set.fromList [furnaceName, saunaName]))
-        Spec.assertEqWith s "both names" (Projection.nameOf permId opened) joinedName
+        -- CR 709.4a, THE PLURAL CASE: with both doors open the permanent has
+        -- TWO names, and "has this name" is a membership test rather than a
+        -- comparison. Each half answers True on its own; the joined string the
+        -- combined Face renders them as answers False, which is the reading a
+        -- single CardName gets wrong -- it would match "Roaring
+        -- Furnace//Steaming Sauna" and neither door.
+        Spec.assertEqWith s "both names" (Projection.namesOf permId opened) (Set.fromList [furnaceName, saunaName])
+        Spec.assertEqWith s "the left door's name is one of them" (Projection.hasName furnaceName permId opened) True
+        Spec.assertEqWith s "the right door's name is one of them" (Projection.hasName saunaName permId opened) True
+        Spec.assertEqWith s "and the two joined is NOT a name it has" (Projection.hasName joinedName permId opened) False
         Spec.assertEqWith
           s
           "both mana costs"
@@ -456,7 +471,7 @@ spec s registry = Spec.describe s "Room" $ do
           "no unlocked designation"
           (fmap Object.unlockedHalves (Game.lookupObject permId put))
           (Just Set.empty)
-        Spec.assertEqWith s "and so no name" (Projection.nameOf permId put) (CardName.MkCardName Text.empty)
+        Spec.assertEqWith s "and so no name" (Projection.namesOf permId put) Set.empty
         Spec.assertEqWith s "and no rules text" (length (Projection.triggeredAbilitiesOf permId put)) 0
         -- CR 709.5a: "Each half of a split card with a shared type line shares
         -- the types and subtypes listed on that card's shared type line." CR

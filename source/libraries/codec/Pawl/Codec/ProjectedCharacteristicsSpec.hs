@@ -33,7 +33,7 @@ import qualified Pawl.Types.Supertype as Supertype
 testCharacteristics :: PC.ProjectedCharacteristics
 testCharacteristics =
   PC.MkProjectedCharacteristics
-    { PC.name = CardName.MkCardName $ Text.pack "Test Creature",
+    { PC.names = Set.singleton . CardName.MkCardName $ Text.pack "Test Creature",
       PC.supertypes = Set.singleton Supertype.Legendary,
       PC.keywords = Map.singleton Keyword.Flying 1,
       PC.colors = Set.singleton Color.Blue,
@@ -52,7 +52,7 @@ testCharacteristics =
 
 testCharacteristicsJson :: String
 testCharacteristicsJson =
-  "{\"name\":\"Test Creature\",\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"type\":\"Flying\"}],"
+  "{\"names\":[\"Test Creature\"],\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"type\":\"Flying\"}],"
     <> "\"colors\":[{\"type\":\"Blue\"}],\"manaValue\":3,\"power\":1,\"toughness\":2,"
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
@@ -62,7 +62,7 @@ testCharacteristicsJson =
 minimalCharacteristics :: PC.ProjectedCharacteristics
 minimalCharacteristics =
   PC.MkProjectedCharacteristics
-    { PC.name = CardName.MkCardName (Text.pack "Mountain"),
+    { PC.names = Set.singleton (CardName.MkCardName (Text.pack "Mountain")),
       PC.supertypes = Set.empty,
       PC.keywords = Map.empty,
       PC.colors = Set.empty,
@@ -89,4 +89,4 @@ spec s = Spec.describe s "Pawl.Codec.ProjectedCharacteristics" $ do
       PC.toJson
       PC.fromJson
       minimalCharacteristics
-      """ {"name":"Mountain","cardTypes":[{"type":"Land"}]} """
+      """ {"names":["Mountain"],"cardTypes":[{"type":"Land"}]} """
