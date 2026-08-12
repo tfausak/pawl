@@ -58,12 +58,15 @@
                         "value": [
                           {
                             "type": "TopOfLibrary",
-                            "value": {
-                              "type": "Relative",
-                              "value": {
-                                "type": "You"
-                              }
-                            }
+                            "value": [
+                              {
+                                "type": "Relative",
+                                "value": {
+                                  "type": "You"
+                                }
+                              },
+                              1
+                            ]
                           },
                           {
                             "type": "Exile"

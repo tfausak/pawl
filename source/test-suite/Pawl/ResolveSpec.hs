@@ -6256,6 +6256,99 @@ countOnLuckSpec s registry =
           Spec.assertBool s (S.onBattlefield luckId after) "and alice is still in the game with her enchantment"
           Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
 
+-- The DEPTH on ObjectRef.TopOfLibrary, and the group binding a move of several
+-- cards owes its second sentence.
+--
+-- Act on Impulse {2}{R} Sorcery -- "Exile the top three cards of your library.
+-- Until end of turn, you may play those cards." (name, cost, type line and Oracle
+-- text checked against api.scryfall.com). Its whole printed text is those two
+-- sentences, so nothing else on the card can be what these assertions read.
+--
+-- alice casts it off three Mountains and the priority loop resolves it, which is
+-- what makes this gameplay-level rather than an applyEffect call.
+--
+-- The board tells the readings apart that a wrong depth or a wrong binding would
+-- take:
+--
+--   * THREE versus one, and versus all of them. Her library holds FIVE distinct
+--     cards, so "the top card" leaves four behind and "her library" leaves none;
+--     both the exiled three and the two left are asserted, in the pile's order
+--     for the two that stay (CR 401.2).
+--   * THE TOP three versus the bottom three. The five are distinct printings, so
+--     the two answers name disjoint sets.
+--   * YOUR library versus each player's. bob's library is stocked with a
+--     printing alice never has, and it must be untouched.
+--   * THOSE CARDS versus one of them. All three exiled cards must carry the play
+--     permission: a MoveToZone that bound only the last incarnation it minted
+--     leaves two of the three without one.
+actOnImpulseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+actOnImpulseSpec s registry =
+  let -- alice's library holds `stock`, DEEPEST FIRST -- S.addLibraryCard puts
+      -- each card on top, so the last name given is the top card. bob's library
+      -- holds one Ogre Sentry, a printing alice never has.
+      board stock = do
+        mountain <- S.printingOf s registry "Mountain"
+        actOnImpulse <- S.printingOf s registry "Act on Impulse"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        stocked <- mapM (S.printingOf s registry) stock
+        let g1 = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) (S.landsInPlay mountain 3) stocked
+            g2 = snd (S.addLibraryCard sentry S.bob g1)
+            (withSpell, spell) = S.handOne actOnImpulse g2
+            afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+        pure (S.runPure S.identityAnswer afterCast Engine.priorityLoop)
+      named = Just . CardName.MkCardName . Text.pack
+      -- SORTED, because exile is a holding area with no order of its own (CR
+      -- 406.1) -- unlike the library below, whose order CR 401.2 fixes.
+      exiledNames pid = List.sort . namesIn Zone.Exile pid
+      permissionsIn pid gs = fmap (Maybe.isJust . Object.playableFromExile) (Maybe.mapMaybe (\oid -> Game.lookupObject oid gs) (Game.zoneMembers Zone.Exile pid gs))
+   in Spec.describe s "ActOnImpulse" $ do
+        Spec.it s "CR 401.2 the top three cards of your library are exiled, and the rest stay put" $ do
+          after <- board ["Goblin Piker", "Bird Maiden", "Benalish Hero", "Hill Giant", "Sabretooth Tiger"]
+          Spec.assertEqWith
+            s
+            "the top three are in exile and the two under them are still in the library, in order"
+            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
+            ( List.sort [named "Sabretooth Tiger", named "Hill Giant", named "Benalish Hero"],
+              [named "Bird Maiden", named "Goblin Piker"]
+            )
+          Spec.assertEqWith
+            s
+            "bob's library is untouched, so this is not each player's library"
+            (namesIn Zone.Library S.bob after, namesIn Zone.Exile S.bob after)
+            ([named "Ogre Sentry"], [])
+          Spec.assertEqWith
+            s
+            "ALL THREE exiled cards carry the play permission, so the move bound the whole group and not one incarnation of it"
+            (permissionsIn S.alice after)
+            [True, True, True]
+        -- Fewer cards than the depth: CR 609.3 does only as much as possible, and
+        -- CR 104.3c takes nobody out of the game for it -- an empty library only
+        -- loses when its owner would DRAW from it, and this spell draws nothing.
+        Spec.it s "CR 609.3 a library shorter than the depth gives up what it has" $ do
+          after <- board ["Goblin Piker", "Bird Maiden"]
+          Spec.assertEqWith
+            s
+            "both cards were exiled and the library is empty"
+            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
+            (List.sort [named "Goblin Piker", named "Bird Maiden"], [])
+          Spec.assertEqWith s "and both carry the permission" (permissionsIn S.alice after) [True, True]
+          Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
+        -- ONE card, which is the other binding shape: a single arrival binds the
+        -- singular slot, and the permission still reaches it.
+        Spec.it s "CR 609.3 a one-card library gives up its one card" $ do
+          after <- board ["Goblin Piker"]
+          Spec.assertEqWith s "the one card is exiled" (exiledNames S.alice after) [named "Goblin Piker"]
+          Spec.assertEqWith s "and carries the permission" (permissionsIn S.alice after) [True]
+        Spec.it s "CR 401.2 an empty library has no top cards, so the exile does nothing" $ do
+          after <- board []
+          Spec.assertEqWith
+            s
+            "nothing at all was exiled, by either player"
+            (namesIn Zone.Exile S.alice after, namesIn Zone.Exile S.bob after)
+            ([], [])
+          Spec.assertEqWith s "bob's library is still untouched" (namesIn Zone.Library S.bob after) [named "Ogre Sentry"]
+          Spec.assertEqWith s "the game has no result" (GameState.result after) Nothing
+
 -- alice is mid-combat with one creature per printing in `mine`, bob defends with
 -- one per printing in `theirs`, and alice holds a Trumpet Blast plus exactly the
 -- three Mountains that pay for it. The board sits at the declare attackers step
@@ -7232,6 +7325,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   multiTargetSpec s registry
   supportSpec s registry
   countOnLuckSpec s registry
+  actOnImpulseSpec s registry
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.
