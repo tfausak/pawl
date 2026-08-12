@@ -2,8 +2,8 @@
 
 module Pawl.Codec.PlayerEffectSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color

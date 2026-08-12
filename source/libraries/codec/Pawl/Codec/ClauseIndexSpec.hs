@@ -3,7 +3,7 @@
 module Pawl.Codec.ClauseIndexSpec where
 
 import qualified Pawl.Codec.ClauseIndex as ClauseIndex
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 

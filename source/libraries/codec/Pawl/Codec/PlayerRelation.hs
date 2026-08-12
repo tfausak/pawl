@@ -1,19 +1,18 @@
 module Pawl.Codec.PlayerRelation where
 
-import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 
-toJson :: PlayerRelation.PlayerRelation -> Value.Value
-toJson r = Common.nullary $ case r of
-  PlayerRelation.You -> "You"
-  PlayerRelation.Opponent -> "Opponent"
-
-fromJson :: Value.Value -> Either Text.Text PlayerRelation.PlayerRelation
-fromJson =
-  Common.decodeNullary
-    "PlayerRelation"
-    [ ("You", PlayerRelation.You),
-      ("Opponent", PlayerRelation.Opponent)
+codec :: Codec.Codec PlayerRelation.PlayerRelation
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "You" PlayerRelation.You,
+      Arm.nullary "Opponent" PlayerRelation.Opponent
     ]
+  where
+    encode r = Common.nullary $ case r of
+      PlayerRelation.You -> "You"
+      PlayerRelation.Opponent -> "Opponent"

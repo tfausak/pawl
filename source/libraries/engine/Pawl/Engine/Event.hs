@@ -643,7 +643,7 @@ apply batch candidate event =
     -- outer pattern would let a new EntryRewrite constructor fall through
     -- silently whenever it happened to pair with WouldEnter.
     (ReplacementEffect.EntryR _ rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
-      EntryRewrite.AsCopy -> do
+      EntryRewrite.AsCopy exceptions -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         case Projection.controllerOf oid gs of
@@ -666,7 +666,13 @@ apply batch candidate event =
               Nothing -> pure (Just event)
               Just src2 -> do
                 State.modify' $ \g ->
-                  let stamp o = o {Object.bindings = Binding.setCopy (copiedSnapshot src2 g) (Object.bindings o)}
+                  -- CR 707.9: the exceptions are applied to the snapshot on the
+                  -- way in, so they are part of the copy's own copiable values
+                  -- (CR 707.9b) rather than an effect layered over them. Only on
+                  -- this branch: a declined copy is no copying process, so its
+                  -- exceptions do not happen either.
+                  let stamped = Replacement.applyCopyExceptions exceptions (copiedSnapshot src2 g)
+                      stamp o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 pure (Just event)
       -- CR 614.1c / 208.2b: Primal Plasma's choice of which printed

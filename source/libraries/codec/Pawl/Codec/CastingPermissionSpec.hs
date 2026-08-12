@@ -3,7 +3,7 @@
 module Pawl.Codec.CastingPermissionSpec where
 
 import qualified Pawl.Codec.CastingPermission as CastingPermission
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CastingPermission as CastingPermission
 

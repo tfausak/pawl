@@ -3,8 +3,8 @@
 module Pawl.Codec.EntryOptionSpec where
 
 import qualified Data.Set as Set
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EntryOption as EntryOption
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.Keyword as Keyword

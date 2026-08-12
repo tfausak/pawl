@@ -8,9 +8,9 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Face as Face
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -202,7 +202,7 @@ populatedFace =
     { Face.keywords = Set.singleton Keyword.Deathtouch,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
       Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing],
-      Face.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy],
+      Face.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.AsCopy [])],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       Face.loyalty = Just (Loyalty.MkLoyalty 3),

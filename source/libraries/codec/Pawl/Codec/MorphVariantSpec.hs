@@ -2,24 +2,24 @@
 
 module Pawl.Codec.MorphVariantSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.MorphVariant as MorphVariant
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.MorphVariant as MorphVariant
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.MorphVariant" $ do
   Spec.it s "Plain (CR 702.37a)" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      MorphVariant.toJson
-      MorphVariant.fromJson
+      MorphVariant.codec
       MorphVariant.Plain
       """ {"type":"Plain"} """
   Spec.it s "Mega (CR 702.37b)" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      MorphVariant.toJson
-      MorphVariant.fromJson
+      MorphVariant.codec
       MorphVariant.Mega
       """ {"type":"Mega"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s MorphVariant.codec

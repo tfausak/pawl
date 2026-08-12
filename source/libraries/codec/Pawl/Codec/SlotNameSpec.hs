@@ -3,8 +3,8 @@
 module Pawl.Codec.SlotNameSpec where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.SlotName as SlotName
 

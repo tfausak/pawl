@@ -2,8 +2,8 @@
 
 module Pawl.Codec.SpecialActionSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.SpecialAction as SpecialAction
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.ManaCost as ManaCost

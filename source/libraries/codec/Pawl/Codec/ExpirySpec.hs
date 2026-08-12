@@ -2,8 +2,8 @@
 
 module Pawl.Codec.ExpirySpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Expiry as Expiry
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison

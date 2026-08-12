@@ -1,12 +1,13 @@
 module Pawl.Codec.ZoneChangePattern where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ControllerRelation as ControllerRelation
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -26,9 +27,9 @@ defaultWhoseObject = ControllerRelation.Anyones
 
 toJson :: ZoneChangePattern.ZoneChangePattern -> Value.Value
 toJson p =
-  Common.object
+  Value.object
     ( Common.requiredPair "whenDestination" Zone.toJson (ZoneChangePattern.whenDestination p)
-        <> Common.optionalPair "whatObject" defaultWhatObject (Filter.toJson Keyword.toJson) (ZoneChangePattern.whatObject p)
+        <> Common.optionalPair "whatObject" defaultWhatObject (Codec.encode (Filter.codec Keyword.codec)) (ZoneChangePattern.whatObject p)
         <> Common.optionalPair "whoseObject" defaultWhoseObject ControllerRelation.toJson (ZoneChangePattern.whoseObject p)
     )
 
@@ -36,7 +37,7 @@ fromJson :: Value.Value -> Either Text.Text ZoneChangePattern.ZoneChangePattern
 fromJson value = do
   ps <- Common.asObject value
   d <- Common.field "whenDestination" ps >>= Zone.fromJson
-  o <- Common.defaultedField "whatObject" defaultWhatObject (Filter.fromJson Keyword.fromJson) ps
+  o <- Common.defaultedField "whatObject" defaultWhatObject (Codec.decode (Filter.codec Keyword.codec)) ps
   w <- Common.defaultedField "whoseObject" defaultWhoseObject ControllerRelation.fromJson ps
   pure
     ZoneChangePattern.MkZoneChangePattern

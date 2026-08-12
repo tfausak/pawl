@@ -1,7 +1,6 @@
 module Pawl.Codec.Quantity where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
@@ -12,6 +11,8 @@ import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Quantity as Quantity
 
 -- | Quantity.Count's arm is tagged HERE, like every other arm. Pawl.Codec.Count
@@ -19,13 +20,13 @@ import qualified Pawl.Types.Quantity as Quantity
 -- dispatching type, which is this one.
 toJson :: Quantity.Quantity -> Value.Value
 toJson q = case q of
-  Quantity.Literal n -> Common.tagged "Literal" . Just $ Common.integer n
+  Quantity.Literal n -> Common.tagged "Literal" . Just $ Value.integer n
   Quantity.ManaValue -> Common.nullary "ManaValue"
   Quantity.Power -> Common.nullary "Power"
   Quantity.Toughness -> Common.nullary "Toughness"
   Quantity.InSlot s -> Common.tagged "InSlot" . Just $ SlotName.toJson s
   Quantity.Star -> Common.nullary "Star"
-  Quantity.Plus a b -> Common.tagged "Plus" . Just . Common.array $ [toJson a, toJson b]
+  Quantity.Plus a b -> Common.tagged "Plus" . Just . Value.array $ [toJson a, toJson b]
   Quantity.Count c -> Common.tagged "Count" . Just $ Count.toJson toJson c
   Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ ManaCount.toJson c
   Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ PlayerRef.toJson p
@@ -33,10 +34,10 @@ toJson q = case q of
   -- CR 725.1's designation, with only a PlayerRef on the wire: the answer is a
   -- 0/1 rather than a stored number, so there is nothing beside the reference.
   Quantity.IsMonarch p -> Common.tagged "IsMonarch" . Just $ PlayerRef.toJson p
-  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Common.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
+  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Value.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
   -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
   -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
-  Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ CounterKind.toJson Keyword.toJson k
+  Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ Codec.encode (CounterKind.codec Keyword.codec) k
   -- CR 702.112b's designation, with nothing on the wire: the object is whichever
   -- one the quantity is evaluated against, and the answer is a 0/1 rather than a
   -- stored number, so there is neither a reference nor a payload.
@@ -56,7 +57,7 @@ toJson q = case q of
   Quantity.BlockersBeyondFirst -> Common.nullary "BlockersBeyondFirst"
   -- A slot and a whole Quantity, in that order: which object to aim at, then what
   -- to read off it.
-  Quantity.AgainstSlot s q_ -> Common.tagged "AgainstSlot" . Just . Common.array $ [SlotName.toJson s, toJson q_]
+  Quantity.AgainstSlot s q_ -> Common.tagged "AgainstSlot" . Just . Value.array $ [SlotName.toJson s, toJson q_]
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -75,7 +76,7 @@ fromJson value = do
     ("Speed", Just v) -> Quantity.Speed <$> PlayerRef.fromJson v
     ("IsMonarch", Just v) -> Quantity.IsMonarch <$> PlayerRef.fromJson v
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
-    ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson Keyword.fromJson v
+    ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> Codec.decode (CounterKind.codec Keyword.codec) v
     ("HasDesignation", Just v) -> Quantity.HasDesignation <$> Designation.fromJson v
     ("WasKicked", _) -> Right Quantity.WasKicked
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v

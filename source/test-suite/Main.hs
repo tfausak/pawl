@@ -30,10 +30,10 @@ import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.ColorSpec
 import qualified Pawl.Codec.CombatRestrictionSpec
 import qualified Pawl.Codec.CombatStepSpec
-import qualified Pawl.Codec.CommonSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ConditionSpec
 import qualified Pawl.Codec.ControllerRelationSpec
+import qualified Pawl.Codec.CopyExceptionSpec
 import qualified Pawl.Codec.CostComponentSpec
 import qualified Pawl.Codec.CostSpec
 import qualified Pawl.Codec.CountSpec
@@ -163,6 +163,7 @@ import qualified Pawl.Extra.NaturalSpec
 import qualified Pawl.Extra.OrdSpec
 import qualified Pawl.Extra.ParsecSpec
 import qualified Pawl.Extra.SemigroupSpec
+import qualified Pawl.Extra.Word8Spec
 import qualified Pawl.FaceDownSpec
 import qualified Pawl.FilterSpec
 import qualified Pawl.GameSpec
@@ -174,9 +175,15 @@ import qualified Pawl.Json.ObjectSpec
 import qualified Pawl.Json.PairSpec
 import qualified Pawl.Json.StringSpec
 import qualified Pawl.Json.ValueSpec
+import qualified Pawl.JsonCodec.ArmSpec
+import qualified Pawl.JsonCodec.CommonSpec
+import qualified Pawl.JsonCodec.FieldsSpec
 import qualified Pawl.JsonPointer.EvaluateSpec
 import qualified Pawl.JsonPointer.PointerSpec
 import qualified Pawl.JsonPointer.TokenSpec
+import qualified Pawl.JsonSchema.DefineSpec
+import qualified Pawl.JsonSchema.NameSpec
+import qualified Pawl.JsonSchema.SchemaSpec
 import qualified Pawl.ManaSpec
 import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
@@ -208,6 +215,7 @@ import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
 import qualified Pawl.UntapRestrictionSpec
+import qualified Pawl.Uri.FragmentSpec
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -291,10 +299,10 @@ spec s registry = do
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
   Pawl.Codec.CombatStepSpec.spec s
-  Pawl.Codec.CommonSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
+  Pawl.Codec.CopyExceptionSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostSpec.spec s
   Pawl.Codec.CounterKindSpec.spec s
@@ -423,6 +431,7 @@ spec s registry = do
   Pawl.Extra.OrdSpec.spec s
   Pawl.Extra.ParsecSpec.spec s
   Pawl.Extra.SemigroupSpec.spec s
+  Pawl.Extra.Word8Spec.spec s
   Pawl.FaceDownSpec.spec s registry
   Pawl.FilterSpec.spec s
   Pawl.GameSpec.spec s registry
@@ -434,9 +443,15 @@ spec s registry = do
   Pawl.Json.PairSpec.spec s
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
+  Pawl.JsonCodec.ArmSpec.spec s
+  Pawl.JsonCodec.CommonSpec.spec s
+  Pawl.JsonCodec.FieldsSpec.spec s
   Pawl.JsonPointer.EvaluateSpec.spec s
   Pawl.JsonPointer.PointerSpec.spec s
   Pawl.JsonPointer.TokenSpec.spec s
+  Pawl.JsonSchema.DefineSpec.spec s
+  Pawl.JsonSchema.NameSpec.spec s
+  Pawl.JsonSchema.SchemaSpec.spec s
   Pawl.ManaSpec.spec s registry
   Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
@@ -465,3 +480,4 @@ spec s registry = do
   Pawl.TriggerSpec.spec s registry
   Pawl.TurnSpec.spec s registry
   Pawl.UntapRestrictionSpec.spec s registry
+  Pawl.Uri.FragmentSpec.spec s

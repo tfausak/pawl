@@ -2,8 +2,8 @@
 
 module Pawl.Codec.DiscardCauseSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.DiscardCause as DiscardCause
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DiscardCause as DiscardCause
 

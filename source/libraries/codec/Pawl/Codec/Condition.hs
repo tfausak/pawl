@@ -1,10 +1,10 @@
 module Pawl.Codec.Condition where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Comparison as Comparison
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Condition as Condition
 
 -- | TWO BARE OBJECT shapes, told apart by their keys rather than by
@@ -20,12 +20,12 @@ import qualified Pawl.Types.Condition as Condition
 toJson :: Condition.Condition -> Value.Value
 toJson condition = case condition of
   Condition.Compares m c t ->
-    Common.object . concat $
+    Value.object . concat $
       [ Common.requiredPair "measured" Quantity.toJson m,
         Common.requiredPair "comparison" Comparison.toJson c,
         Common.requiredPair "threshold" Quantity.toJson t
       ]
-  Condition.Any cs -> Common.object (Common.requiredPair "any" (Common.array . fmap toJson) cs)
+  Condition.Any cs -> Value.object (Common.requiredPair "any" (Value.array . fmap toJson) cs)
 
 fromJson :: Value.Value -> Either Text.Text Condition.Condition
 fromJson value = do

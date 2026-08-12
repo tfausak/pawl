@@ -2,8 +2,8 @@
 
 module Pawl.Codec.ManaProductionSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ManaProduction as ManaProduction
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ManaProduction as ManaProduction

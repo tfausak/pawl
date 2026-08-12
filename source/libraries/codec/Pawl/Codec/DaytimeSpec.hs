@@ -2,8 +2,8 @@
 
 module Pawl.Codec.DaytimeSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Daytime as Daytime
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Daytime as Daytime
 

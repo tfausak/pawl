@@ -46,6 +46,7 @@ import qualified Pawl.Types.CandidateId as CandidateId
 import Pawl.Types.Card (Card)
 import Pawl.Types.ControllerRelation (ControllerRelation)
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
+import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
@@ -625,7 +626,9 @@ bucketOfEffect re = case re of
   -- already-applied AsCopy. Gather Specimens racing an entering Clone is a real
   -- same-iteration race, but CR 616.1b's bucket outranks this one, so it
   -- exercises that arm instead.
-  ReplacementEffect.EntryR _ EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
+  -- CR 707.9's exceptions do not move the bucket: rule 616.1c asks whether the
+  -- object is entering as a copy, which an excepted copy still is.
+  ReplacementEffect.EntryR _ (EntryRewrite.AsCopy _) -> ReplacementBucket.CopyOnEntry
   -- CR 616.1a-d name self-replacement, entering under a control effect, entering
   -- as a copy and entering with the back face up. None of the next four arms is
   -- any of those, so CR 616.1e is what applies to each.
@@ -689,8 +692,9 @@ readsApplier re = case re of
   ReplacementEffect.ZoneChangeR _ _ -> False
   -- CR 707.5 / 109.5: Clone's "you" is the ENTERING object's controller, read
   -- live off the board at CR 614.12a's moment, not the candidate's -- so two
-  -- such rows offer the same player the same legal set.
-  ReplacementEffect.EntryR _ EntryRewrite.AsCopy -> False
+  -- such rows offer the same player the same legal set. CR 707.9's exceptions
+  -- ride the effect, so two rows carrying the same ones are still the same offer.
+  ReplacementEffect.EntryR _ (EntryRewrite.AsCopy _) -> False
   -- Same chooser, and the options ride the effect: CR 614.1c's "enters as"
   -- (Primal Plasma).
   ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> False
@@ -919,6 +923,38 @@ applyEntryOption oid option gs =
           }
       write o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
    in gs {GameState.objects = Map.adjust write oid (GameState.objects gs)}
+
+-- CR 707.9: fold a copy effect's "except ..." clauses into the snapshot the copy
+-- is about to be stamped with. Left fold, so a later clause overrides an earlier
+-- one on the same characteristic -- no printed card writes two that collide, and
+-- the printed order is the order the sentence reads in.
+--
+-- Into the SNAPSHOT and not onto the object, which is CR 707.9b: the excepted
+-- value "becomes part of the copiable values of the copy", so a token copy of
+-- the copy inherits it (CR 707.2) where a CR 613 layer-7b write would be left
+-- behind. Pawl.CopySpec's "a token copy of an excepted copy keeps the exception"
+-- is what proves the two apart: it reads 7/7 here and the copied Tarmogoyf's CDA
+-- under the layer reading.
+applyCopyExceptions :: [CopyException.CopyException] -> PC.ProjectedCharacteristics -> PC.ProjectedCharacteristics
+applyCopyExceptions exceptions snapshot = List.foldl' applyCopyException snapshot exceptions
+
+-- One arm per CopyException constructor, no wildcard, for Event.apply's reason: a
+-- new exception shape must break the build here rather than silently copy without
+-- it.
+applyCopyException :: PC.ProjectedCharacteristics -> CopyException.CopyException -> PC.ProjectedCharacteristics
+applyCopyException snapshot exception = case exception of
+  -- CR 707.9b sets the pair; CR 707.9d is the second write -- an exception that
+  -- "provides a specific set of values for a certain characteristic" does not
+  -- copy the characteristic-defining ability that defines it, and leaving the CDA
+  -- in the snapshot would let layer 7a overwrite the pair
+  -- (Projection.applyCharacteristicPT). Not defensive, unlike applyEntryOption's
+  -- same write: Quicksilver Gargantuan copying a Tarmogoyf is exactly this case.
+  CopyException.SetPowerToughness p t ->
+    snapshot
+      { PC.power = Just p,
+        PC.toughness = Just t,
+        PC.characteristicPT = Nothing
+      }
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- creatures other than itself, minus anything entering in the same batch (see

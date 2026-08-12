@@ -3,30 +3,29 @@
 module Pawl.Codec.BeginningStepSpec where
 
 import qualified Pawl.Codec.BeginningStep as BeginningStep
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.BeginningStep as BeginningStep
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.BeginningStep" $ do
   Spec.it s "Untap" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      BeginningStep.toJson
-      BeginningStep.fromJson
+      BeginningStep.codec
       BeginningStep.Untap
       """ {"type":"Untap"} """
   Spec.it s "Upkeep" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      BeginningStep.toJson
-      BeginningStep.fromJson
+      BeginningStep.codec
       BeginningStep.Upkeep
       """ {"type":"Upkeep"} """
   Spec.it s "DrawStep" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      BeginningStep.toJson
-      BeginningStep.fromJson
+      BeginningStep.codec
       BeginningStep.DrawStep
       """ {"type":"DrawStep"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s BeginningStep.codec

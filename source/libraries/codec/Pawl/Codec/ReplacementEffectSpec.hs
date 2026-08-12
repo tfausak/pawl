@@ -3,8 +3,8 @@
 module Pawl.Codec.ReplacementEffectSpec where
 
 import qualified Data.Set as Set
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
@@ -65,13 +65,13 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       )
       """ {"type":"ZoneChangeR","value":[{"whenDestination":{"type":"Graveyard"},"whoseObject":{"type":"Opponents"}},{"type":"Exile"}]} """
   -- CR 614.1c: EntryR's pattern is a bare Filter, and "as this permanent
-  -- enters" is Filter.IsSource. AsCopy pins the payload-free rewrite beside it.
+  -- enters" is Filter.IsSource. AsCopy pins the exception-free rewrite beside it.
   Spec.it s "EntryR (Clone, IsSource + AsCopy)" $
     Common.assertJsonCodec
       s
       ReplacementEffect.toJson
       ReplacementEffect.fromJson
-      (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy)
+      (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.AsCopy []))
       """ {"type":"EntryR","value":[{"type":"IsSource"},{"type":"AsCopy"}]} """
   -- CR 208.2b: Primal Plasma's ChoiceOf, carrying P/T and keywords.
   Spec.it s "EntryR (Primal Plasma, ChoiceOf)" $

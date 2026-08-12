@@ -1,11 +1,12 @@
 module Pawl.Codec.ObjectRef where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- An ObjectRef is told apart by JSON TYPE rather than by a tag, the shape
@@ -16,12 +17,12 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 toJson :: ObjectRef.ObjectRef -> Value.Value
 toJson r = case r of
   ObjectRef.InSlot n -> SlotName.toJson n
-  ObjectRef.EachMatching f -> Filter.toJson Keyword.toJson f
-  ObjectRef.EachPlayer -> Common.array [Common.text eachPlayer]
+  ObjectRef.EachMatching f -> Codec.encode (Filter.codec Keyword.codec) f
+  ObjectRef.EachPlayer -> Value.array [Value.text eachPlayer]
 
 fromJson :: Value.Value -> Either Text.Text ObjectRef.ObjectRef
 fromJson value = case value of
-  Value.Object _ -> ObjectRef.EachMatching <$> Filter.fromJson Keyword.fromJson value
+  Value.Object _ -> ObjectRef.EachMatching <$> Codec.decode (Filter.codec Keyword.codec) value
   Value.Array _ -> do
     values <- Common.asArray value
     case values of

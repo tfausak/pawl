@@ -1,1103 +1,1102 @@
 module Pawl.Codec.Subtype where
 
-import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Subtype as Subtype
 
-toJson :: Subtype.Subtype -> Value.Value
-toJson s = Common.nullary $ case s of
-  Subtype.Adventure -> "Adventure"
-  Subtype.Advisor -> "Advisor"
-  Subtype.Aetherborn -> "Aetherborn"
-  Subtype.Ajani -> "Ajani"
-  Subtype.Alara -> "Alara"
-  Subtype.AlfavaMetraxis -> "AlfavaMetraxis"
-  Subtype.Alien -> "Alien"
-  Subtype.Ally -> "Ally"
-  Subtype.Aminatou -> "Aminatou"
-  Subtype.Amonkhet -> "Amonkhet"
-  Subtype.AndrozaniMinor -> "AndrozaniMinor"
-  Subtype.Angel -> "Angel"
-  Subtype.Angrath -> "Angrath"
-  Subtype.Antausia -> "Antausia"
-  Subtype.Antelope -> "Antelope"
-  Subtype.Apalapucia -> "Apalapucia"
-  Subtype.Ape -> "Ape"
-  Subtype.Arcane -> "Arcane"
-  Subtype.Arcavios -> "Arcavios"
-  Subtype.Archer -> "Archer"
-  Subtype.Archon -> "Archon"
-  Subtype.Arkhos -> "Arkhos"
-  Subtype.Arlinn -> "Arlinn"
-  Subtype.Armadillo -> "Armadillo"
-  Subtype.Army -> "Army"
-  Subtype.Artificer -> "Artificer"
-  Subtype.Ashiok -> "Ashiok"
-  Subtype.Assassin -> "Assassin"
-  Subtype.AssemblyWorker -> "AssemblyWorker"
-  Subtype.Astartes -> "Astartes"
-  Subtype.Atog -> "Atog"
-  Subtype.Attraction -> "Attraction"
-  Subtype.Aura -> "Aura"
-  Subtype.Aurochs -> "Aurochs"
-  Subtype.Avatar -> "Avatar"
-  Subtype.Avishkar -> "Avishkar"
-  Subtype.Azgol -> "Azgol"
-  Subtype.Azra -> "Azra"
-  Subtype.Background -> "Background"
-  Subtype.Badger -> "Badger"
-  Subtype.Bahamut -> "Bahamut"
-  Subtype.Balloon -> "Balloon"
-  Subtype.Barbarian -> "Barbarian"
-  Subtype.Bard -> "Bard"
-  Subtype.Basilisk -> "Basilisk"
-  Subtype.Basri -> "Basri"
-  Subtype.Bat -> "Bat"
-  Subtype.Bear -> "Bear"
-  Subtype.Beast -> "Beast"
-  Subtype.Beaver -> "Beaver"
-  Subtype.Beeble -> "Beeble"
-  Subtype.Beholder -> "Beholder"
-  Subtype.Belenon -> "Belenon"
-  Subtype.Berserker -> "Berserker"
-  Subtype.Bird -> "Bird"
-  Subtype.Bison -> "Bison"
-  Subtype.Blinkmoth -> "Blinkmoth"
-  Subtype.Blood -> "Blood"
-  Subtype.Boar -> "Boar"
-  Subtype.Bobblehead -> "Bobblehead"
-  Subtype.Bolas -> "Bolas"
-  Subtype.BolassMeditationRealm -> "BolassMeditationRealm"
-  Subtype.Book -> "Book"
-  Subtype.Bringer -> "Bringer"
-  Subtype.Brushwagg -> "Brushwagg"
-  Subtype.Calix -> "Calix"
-  Subtype.Camarid -> "Camarid"
-  Subtype.Camel -> "Camel"
-  Subtype.Capenna -> "Capenna"
-  Subtype.Capybara -> "Capybara"
-  Subtype.Caribou -> "Caribou"
-  Subtype.Carrier -> "Carrier"
-  Subtype.Cartouche -> "Cartouche"
-  Subtype.Case -> "Case"
-  Subtype.Cat -> "Cat"
-  Subtype.Cave -> "Cave"
-  Subtype.Centaur -> "Centaur"
-  Subtype.Chandra -> "Chandra"
-  Subtype.Child -> "Child"
-  Subtype.Chimera -> "Chimera"
-  Subtype.Citizen -> "Citizen"
-  Subtype.Class -> "Class"
-  Subtype.Cleric -> "Cleric"
-  Subtype.Clown -> "Clown"
-  Subtype.Clue -> "Clue"
-  Subtype.Cockatrice -> "Cockatrice"
-  Subtype.Comet -> "Comet"
-  Subtype.Construct -> "Construct"
-  Subtype.Contraption -> "Contraption"
-  Subtype.Coward -> "Coward"
-  Subtype.Coyote -> "Coyote"
-  Subtype.Crab -> "Crab"
-  Subtype.Cridhe -> "Cridhe"
-  Subtype.Crocodile -> "Crocodile"
-  Subtype.Ctan -> "Ctan"
-  Subtype.Curse -> "Curse"
-  Subtype.Custodes -> "Custodes"
-  Subtype.Cyberman -> "Cyberman"
-  Subtype.Cyclops -> "Cyclops"
-  Subtype.Dack -> "Dack"
-  Subtype.Dakkon -> "Dakkon"
-  Subtype.Dalek -> "Dalek"
-  Subtype.Daretti -> "Daretti"
-  Subtype.Darillium -> "Darillium"
-  Subtype.Dauthi -> "Dauthi"
-  Subtype.Davriel -> "Davriel"
-  Subtype.Dellian -> "Dellian"
-  Subtype.Demigod -> "Demigod"
-  Subtype.Demon -> "Demon"
-  Subtype.Desert -> "Desert"
-  Subtype.Deserter -> "Deserter"
-  Subtype.Detective -> "Detective"
-  Subtype.Devil -> "Devil"
-  Subtype.Dihada -> "Dihada"
-  Subtype.Dinosaur -> "Dinosaur"
-  Subtype.Djinn -> "Djinn"
-  Subtype.Doctor -> "Doctor"
-  Subtype.Dog -> "Dog"
-  Subtype.Dominaria -> "Dominaria"
-  Subtype.Domri -> "Domri"
-  Subtype.Dovin -> "Dovin"
-  Subtype.Dragon -> "Dragon"
-  Subtype.Drake -> "Drake"
-  Subtype.Dreadnought -> "Dreadnought"
-  Subtype.Drix -> "Drix"
-  Subtype.Drone -> "Drone"
-  Subtype.Druid -> "Druid"
-  Subtype.Dryad -> "Dryad"
-  Subtype.Dwarf -> "Dwarf"
-  Subtype.Earth -> "Earth"
-  Subtype.Echidna -> "Echidna"
-  Subtype.Echoir -> "Echoir"
-  Subtype.Efreet -> "Efreet"
-  Subtype.Egg -> "Egg"
-  Subtype.Elder -> "Elder"
-  Subtype.Eldraine -> "Eldraine"
-  Subtype.Eldrazi -> "Eldrazi"
-  Subtype.Elemental -> "Elemental"
-  Subtype.Elephant -> "Elephant"
-  Subtype.Elf -> "Elf"
-  Subtype.Elk -> "Elk"
-  Subtype.Ellywick -> "Ellywick"
-  Subtype.Elminster -> "Elminster"
-  Subtype.Elspeth -> "Elspeth"
-  Subtype.Employee -> "Employee"
-  Subtype.Equilor -> "Equilor"
-  Subtype.Equipment -> "Equipment"
-  Subtype.Ergamon -> "Ergamon"
-  Subtype.Estrid -> "Estrid"
-  Subtype.Eternal -> "Eternal"
-  Subtype.Eye -> "Eye"
-  Subtype.Fabacin -> "Fabacin"
-  Subtype.Faerie -> "Faerie"
-  Subtype.Ferret -> "Ferret"
-  Subtype.Fiora -> "Fiora"
-  Subtype.Fish -> "Fish"
-  Subtype.Flagbearer -> "Flagbearer"
-  Subtype.Food -> "Food"
-  Subtype.Forest -> "Forest"
-  Subtype.Fortification -> "Fortification"
-  Subtype.Fox -> "Fox"
-  Subtype.Fractal -> "Fractal"
-  Subtype.Freyalise -> "Freyalise"
-  Subtype.Frog -> "Frog"
-  Subtype.Fungus -> "Fungus"
-  Subtype.Gallifrey -> "Gallifrey"
-  Subtype.Gamer -> "Gamer"
-  Subtype.Gamma -> "Gamma"
-  Subtype.Gargantikar -> "Gargantikar"
-  Subtype.Gargoyle -> "Gargoyle"
-  Subtype.Garruk -> "Garruk"
-  Subtype.Gate -> "Gate"
-  Subtype.Germ -> "Germ"
-  Subtype.Giant -> "Giant"
-  Subtype.Gideon -> "Gideon"
-  Subtype.Giraffe -> "Giraffe"
-  Subtype.Gith -> "Gith"
-  Subtype.Glimmer -> "Glimmer"
-  Subtype.Gnoll -> "Gnoll"
-  Subtype.Gnome -> "Gnome"
-  Subtype.Goat -> "Goat"
-  Subtype.Gobakhan -> "Gobakhan"
-  Subtype.Goblin -> "Goblin"
-  Subtype.God -> "God"
-  Subtype.Gold -> "Gold"
-  Subtype.Golem -> "Golem"
-  Subtype.Gorgon -> "Gorgon"
-  Subtype.Graveborn -> "Graveborn"
-  Subtype.Gremlin -> "Gremlin"
-  Subtype.Griffin -> "Griffin"
-  Subtype.Grist -> "Grist"
-  Subtype.Guest -> "Guest"
-  Subtype.Guff -> "Guff"
-  Subtype.Hag -> "Hag"
-  Subtype.Halfling -> "Halfling"
-  Subtype.Hamster -> "Hamster"
-  Subtype.Harpy -> "Harpy"
-  Subtype.Hedgehog -> "Hedgehog"
-  Subtype.Hellion -> "Hellion"
-  Subtype.Hero -> "Hero"
-  Subtype.Hippo -> "Hippo"
-  Subtype.Hippogriff -> "Hippogriff"
-  Subtype.Homarid -> "Homarid"
-  Subtype.Homunculus -> "Homunculus"
-  Subtype.Horror -> "Horror"
-  Subtype.Horse -> "Horse"
-  Subtype.HorseheadNebula -> "HorseheadNebula"
-  Subtype.Huatli -> "Huatli"
-  Subtype.Human -> "Human"
-  Subtype.Hydra -> "Hydra"
-  Subtype.Hyena -> "Hyena"
-  Subtype.Ikoria -> "Ikoria"
-  Subtype.Illusion -> "Illusion"
-  Subtype.Imp -> "Imp"
-  Subtype.Incarnation -> "Incarnation"
-  Subtype.Incubator -> "Incubator"
-  Subtype.Infinity -> "Infinity"
-  Subtype.Inhuman -> "Inhuman"
-  Subtype.Inkling -> "Inkling"
-  Subtype.Innistrad -> "Innistrad"
-  Subtype.Inquisitor -> "Inquisitor"
-  Subtype.Insect -> "Insect"
-  Subtype.Iquatana -> "Iquatana"
-  Subtype.Ir -> "Ir"
-  Subtype.Island -> "Island"
-  Subtype.Ixalan -> "Ixalan"
-  Subtype.Jace -> "Jace"
-  Subtype.Jackal -> "Jackal"
-  Subtype.Jared -> "Jared"
-  Subtype.Jaya -> "Jaya"
-  Subtype.Jellyfish -> "Jellyfish"
-  Subtype.Jeska -> "Jeska"
-  Subtype.Juggernaut -> "Juggernaut"
-  Subtype.Junk -> "Junk"
-  Subtype.Kaito -> "Kaito"
-  Subtype.Kaldheim -> "Kaldheim"
-  Subtype.Kamigawa -> "Kamigawa"
-  Subtype.Kandoka -> "Kandoka"
-  Subtype.Kangaroo -> "Kangaroo"
-  Subtype.Karn -> "Karn"
-  Subtype.Karsus -> "Karsus"
-  Subtype.Kasmina -> "Kasmina"
-  Subtype.Kavu -> "Kavu"
-  Subtype.Kaya -> "Kaya"
-  Subtype.Kephalai -> "Kephalai"
-  Subtype.Kinshala -> "Kinshala"
-  Subtype.Kiora -> "Kiora"
-  Subtype.Kirin -> "Kirin"
-  Subtype.Kithkin -> "Kithkin"
-  Subtype.Knight -> "Knight"
-  Subtype.Kobold -> "Kobold"
-  Subtype.Kolbahan -> "Kolbahan"
-  Subtype.Kor -> "Kor"
-  Subtype.Koth -> "Koth"
-  Subtype.Kraken -> "Kraken"
-  Subtype.Kree -> "Kree"
-  Subtype.Kylem -> "Kylem"
-  Subtype.Kyneth -> "Kyneth"
-  Subtype.Lair -> "Lair"
-  Subtype.Lamia -> "Lamia"
-  Subtype.Lammasu -> "Lammasu"
-  Subtype.Lander -> "Lander"
-  Subtype.Leech -> "Leech"
-  Subtype.Lemur -> "Lemur"
-  Subtype.Lesson -> "Lesson"
-  Subtype.Leviathan -> "Leviathan"
-  Subtype.Lhurgoyf -> "Lhurgoyf"
-  Subtype.Licid -> "Licid"
-  Subtype.Liliana -> "Liliana"
-  Subtype.Lizard -> "Lizard"
-  Subtype.Llama -> "Llama"
-  Subtype.Lobster -> "Lobster"
-  Subtype.Locus -> "Locus"
-  Subtype.Lolth -> "Lolth"
-  Subtype.Lorwyn -> "Lorwyn"
-  Subtype.Lukka -> "Lukka"
-  Subtype.Luvion -> "Luvion"
-  Subtype.Manticore -> "Manticore"
-  Subtype.Map -> "Map"
-  Subtype.Mars -> "Mars"
-  Subtype.Masticore -> "Masticore"
-  Subtype.Mercadia -> "Mercadia"
-  Subtype.Mercenary -> "Mercenary"
-  Subtype.Merfolk -> "Merfolk"
-  Subtype.Metathran -> "Metathran"
-  Subtype.Mine -> "Mine"
-  Subtype.Minion -> "Minion"
-  Subtype.Minotaur -> "Minotaur"
-  Subtype.Minsc -> "Minsc"
-  Subtype.Mirrodin -> "Mirrodin"
-  Subtype.Mite -> "Mite"
-  Subtype.Moag -> "Moag"
-  Subtype.Mole -> "Mole"
-  Subtype.Monger -> "Monger"
-  Subtype.Mongoose -> "Mongoose"
-  Subtype.Mongseng -> "Mongseng"
-  Subtype.Monk -> "Monk"
-  Subtype.Monkey -> "Monkey"
-  Subtype.Moogle -> "Moogle"
-  Subtype.Moon -> "Moon"
-  Subtype.Moonfolk -> "Moonfolk"
-  Subtype.Mordenkainen -> "Mordenkainen"
-  Subtype.Mount -> "Mount"
-  Subtype.Mountain -> "Mountain"
-  Subtype.Mouse -> "Mouse"
-  Subtype.Muraganda -> "Muraganda"
-  Subtype.Mutagen -> "Mutagen"
-  Subtype.Mutant -> "Mutant"
-  Subtype.Myr -> "Myr"
-  Subtype.Mystic -> "Mystic"
-  Subtype.Nahiri -> "Nahiri"
-  Subtype.Narset -> "Narset"
-  Subtype.Nautilus -> "Nautilus"
-  Subtype.Necron -> "Necron"
-  Subtype.Necros -> "Necros"
-  Subtype.Nephilim -> "Nephilim"
-  Subtype.NewEarth -> "NewEarth"
-  Subtype.NewPhyrexia -> "NewPhyrexia"
-  Subtype.Nightmare -> "Nightmare"
-  Subtype.Nightstalker -> "Nightstalker"
-  Subtype.Niko -> "Niko"
-  Subtype.Ninja -> "Ninja"
-  Subtype.Nissa -> "Nissa"
-  Subtype.Nixilis -> "Nixilis"
-  Subtype.Noble -> "Noble"
-  Subtype.Noggle -> "Noggle"
-  Subtype.Nomad -> "Nomad"
-  Subtype.Nymph -> "Nymph"
-  Subtype.Octopus -> "Octopus"
-  Subtype.Ogre -> "Ogre"
-  Subtype.Oko -> "Oko"
-  Subtype.Omen -> "Omen"
-  Subtype.Ooze -> "Ooze"
-  Subtype.Orb -> "Orb"
-  Subtype.Orc -> "Orc"
-  Subtype.Orgg -> "Orgg"
-  Subtype.Otter -> "Otter"
-  Subtype.Ouphe -> "Ouphe"
-  Subtype.OutsideMuttersSpiral -> "OutsideMuttersSpiral"
-  Subtype.Ox -> "Ox"
-  Subtype.Oyster -> "Oyster"
-  Subtype.Pangolin -> "Pangolin"
-  Subtype.Peasant -> "Peasant"
-  Subtype.Pegasus -> "Pegasus"
-  Subtype.Pentavite -> "Pentavite"
-  Subtype.Performer -> "Performer"
-  Subtype.Pest -> "Pest"
-  Subtype.Phelddagrif -> "Phelddagrif"
-  Subtype.Phoenix -> "Phoenix"
-  Subtype.Phyrexia -> "Phyrexia"
-  Subtype.Phyrexian -> "Phyrexian"
-  Subtype.Pilot -> "Pilot"
-  Subtype.Pincher -> "Pincher"
-  Subtype.Pirate -> "Pirate"
-  Subtype.Plains -> "Plains"
-  Subtype.Plan -> "Plan"
-  Subtype.Planet -> "Planet"
-  Subtype.Plant -> "Plant"
-  Subtype.Platypus -> "Platypus"
-  Subtype.Porcupine -> "Porcupine"
-  Subtype.Possum -> "Possum"
-  Subtype.PowerPlant -> "PowerPlant"
-  Subtype.Powerstone -> "Powerstone"
-  Subtype.Praetor -> "Praetor"
-  Subtype.Primarch -> "Primarch"
-  Subtype.Prism -> "Prism"
-  Subtype.Processor -> "Processor"
-  Subtype.Pyrulea -> "Pyrulea"
-  Subtype.Qu -> "Qu"
-  Subtype.Quintorius -> "Quintorius"
-  Subtype.Rabbit -> "Rabbit"
-  Subtype.Rabiah -> "Rabiah"
-  Subtype.Raccoon -> "Raccoon"
-  Subtype.Ral -> "Ral"
-  Subtype.Ranger -> "Ranger"
-  Subtype.Rat -> "Rat"
-  Subtype.Rath -> "Rath"
-  Subtype.Ravnica -> "Ravnica"
-  Subtype.Rebel -> "Rebel"
-  Subtype.Reflection -> "Reflection"
-  Subtype.Regatha -> "Regatha"
-  Subtype.Rhino -> "Rhino"
-  Subtype.Rigger -> "Rigger"
-  Subtype.Robot -> "Robot"
-  Subtype.Rogue -> "Rogue"
-  Subtype.Role -> "Role"
-  Subtype.Room -> "Room"
-  Subtype.Rowan -> "Rowan"
-  Subtype.Rune -> "Rune"
-  Subtype.Sable -> "Sable"
-  Subtype.Saga -> "Saga"
-  Subtype.Saheeli -> "Saheeli"
-  Subtype.Salamander -> "Salamander"
-  Subtype.Samurai -> "Samurai"
-  Subtype.Samut -> "Samut"
-  Subtype.Sand -> "Sand"
-  Subtype.Saproling -> "Saproling"
-  Subtype.Sarkhan -> "Sarkhan"
-  Subtype.Satyr -> "Satyr"
-  Subtype.Scarecrow -> "Scarecrow"
-  Subtype.Scientist -> "Scientist"
-  Subtype.Scion -> "Scion"
-  Subtype.Scorpion -> "Scorpion"
-  Subtype.Scout -> "Scout"
-  Subtype.Sculpture -> "Sculpture"
-  Subtype.Seal -> "Seal"
-  Subtype.Segovia -> "Segovia"
-  Subtype.Serf -> "Serf"
-  Subtype.Serpent -> "Serpent"
-  Subtype.Serra -> "Serra"
-  Subtype.SerrasRealm -> "SerrasRealm"
-  Subtype.Servo -> "Servo"
-  Subtype.Shade -> "Shade"
-  Subtype.Shadowmoor -> "Shadowmoor"
-  Subtype.Shaman -> "Shaman"
-  Subtype.Shandalar -> "Shandalar"
-  Subtype.Shapeshifter -> "Shapeshifter"
-  Subtype.Shard -> "Shard"
-  Subtype.Shark -> "Shark"
-  Subtype.Sheep -> "Sheep"
-  Subtype.Shenmeng -> "Shenmeng"
-  Subtype.Shiar -> "Shiar"
-  Subtype.Shrine -> "Shrine"
-  Subtype.Siege -> "Siege"
-  Subtype.Siren -> "Siren"
-  Subtype.Sivitri -> "Sivitri"
-  Subtype.Skaro -> "Skaro"
-  Subtype.Skeleton -> "Skeleton"
-  Subtype.Skrull -> "Skrull"
-  Subtype.Skunk -> "Skunk"
-  Subtype.Slith -> "Slith"
-  Subtype.Sliver -> "Sliver"
-  Subtype.Sloth -> "Sloth"
-  Subtype.Slug -> "Slug"
-  Subtype.Snail -> "Snail"
-  Subtype.Snake -> "Snake"
-  Subtype.Soldier -> "Soldier"
-  Subtype.Soltari -> "Soltari"
-  Subtype.Sorcerer -> "Sorcerer"
-  Subtype.Sorin -> "Sorin"
-  Subtype.Spacecraft -> "Spacecraft"
-  Subtype.Spawn -> "Spawn"
-  Subtype.Specter -> "Specter"
-  Subtype.Spellshaper -> "Spellshaper"
-  Subtype.Sphere -> "Sphere"
-  Subtype.Sphinx -> "Sphinx"
-  Subtype.Spider -> "Spider"
-  Subtype.Spike -> "Spike"
-  Subtype.Spirit -> "Spirit"
-  Subtype.Splinter -> "Splinter"
-  Subtype.Sponge -> "Sponge"
-  Subtype.Spy -> "Spy"
-  Subtype.Squid -> "Squid"
-  Subtype.Squirrel -> "Squirrel"
-  Subtype.Starfish -> "Starfish"
-  Subtype.Stone -> "Stone"
-  Subtype.Surrakar -> "Surrakar"
-  Subtype.Survivor -> "Survivor"
-  Subtype.Swamp -> "Swamp"
-  Subtype.Symbiote -> "Symbiote"
-  Subtype.Synth -> "Synth"
-  Subtype.Szat -> "Szat"
-  Subtype.Tamiyo -> "Tamiyo"
-  Subtype.Tarkir -> "Tarkir"
-  Subtype.Tasha -> "Tasha"
-  Subtype.Teferi -> "Teferi"
-  Subtype.Tentacle -> "Tentacle"
-  Subtype.Tetravite -> "Tetravite"
-  Subtype.Teyo -> "Teyo"
-  Subtype.Tezzeret -> "Tezzeret"
-  Subtype.Thalakos -> "Thalakos"
-  Subtype.TheAbyss -> "TheAbyss"
-  Subtype.TheDalekAsylum -> "TheDalekAsylum"
-  Subtype.TheLibrary -> "TheLibrary"
-  Subtype.Theros -> "Theros"
-  Subtype.Thopter -> "Thopter"
-  Subtype.Thrull -> "Thrull"
-  Subtype.Tibalt -> "Tibalt"
-  Subtype.Tiefling -> "Tiefling"
-  Subtype.Time -> "Time"
-  Subtype.TimeLord -> "TimeLord"
-  Subtype.Tower -> "Tower"
-  Subtype.Town -> "Town"
-  Subtype.Toy -> "Toy"
-  Subtype.Trap -> "Trap"
-  Subtype.Treasure -> "Treasure"
-  Subtype.Treefolk -> "Treefolk"
-  Subtype.Trenzalore -> "Trenzalore"
-  Subtype.Trilobite -> "Trilobite"
-  Subtype.Triskelavite -> "Triskelavite"
-  Subtype.Troll -> "Troll"
-  Subtype.Turtle -> "Turtle"
-  Subtype.Tyranid -> "Tyranid"
-  Subtype.Tyvar -> "Tyvar"
-  Subtype.Ugin -> "Ugin"
-  Subtype.Ulgrotha -> "Ulgrotha"
-  Subtype.Undercity -> "Undercity"
-  Subtype.Unicorn -> "Unicorn"
-  Subtype.UnknownPlanet -> "UnknownPlanet"
-  Subtype.Urza -> "Urza"
-  Subtype.Urzas -> "Urzas"
-  Subtype.Utrom -> "Utrom"
-  Subtype.Valla -> "Valla"
-  Subtype.Vampire -> "Vampire"
-  Subtype.Varmint -> "Varmint"
-  Subtype.Vedalken -> "Vedalken"
-  Subtype.Vehicle -> "Vehicle"
-  Subtype.Venser -> "Venser"
-  Subtype.Vibranium -> "Vibranium"
-  Subtype.Villain -> "Villain"
-  Subtype.Vivien -> "Vivien"
-  Subtype.Volver -> "Volver"
-  Subtype.Vraska -> "Vraska"
-  Subtype.Vronos -> "Vronos"
-  Subtype.Vryn -> "Vryn"
-  Subtype.Wall -> "Wall"
-  Subtype.Walrus -> "Walrus"
-  Subtype.Warlock -> "Warlock"
-  Subtype.Warrior -> "Warrior"
-  Subtype.Weasel -> "Weasel"
-  Subtype.Weird -> "Weird"
-  Subtype.Werewolf -> "Werewolf"
-  Subtype.Whale -> "Whale"
-  Subtype.Wildfire -> "Wildfire"
-  Subtype.Will -> "Will"
-  Subtype.Windgrace -> "Windgrace"
-  Subtype.Wizard -> "Wizard"
-  Subtype.Wolf -> "Wolf"
-  Subtype.Wolverine -> "Wolverine"
-  Subtype.Wombat -> "Wombat"
-  Subtype.Worm -> "Worm"
-  Subtype.Wraith -> "Wraith"
-  Subtype.Wrenn -> "Wrenn"
-  Subtype.Wurm -> "Wurm"
-  Subtype.Xenagos -> "Xenagos"
-  Subtype.Xerex -> "Xerex"
-  Subtype.Yanggu -> "Yanggu"
-  Subtype.Yanling -> "Yanling"
-  Subtype.Yeti -> "Yeti"
-  Subtype.Zariel -> "Zariel"
-  Subtype.Zendikar -> "Zendikar"
-  Subtype.Zhalfir -> "Zhalfir"
-  Subtype.Zombie -> "Zombie"
-  Subtype.Zubera -> "Zubera"
-
-fromJson :: Value.Value -> Either Text.Text Subtype.Subtype
-fromJson =
-  Common.decodeNullary
-    "Subtype"
-    [ ("Adventure", Subtype.Adventure),
-      ("Advisor", Subtype.Advisor),
-      ("Aetherborn", Subtype.Aetherborn),
-      ("Ajani", Subtype.Ajani),
-      ("Alara", Subtype.Alara),
-      ("AlfavaMetraxis", Subtype.AlfavaMetraxis),
-      ("Alien", Subtype.Alien),
-      ("Ally", Subtype.Ally),
-      ("Aminatou", Subtype.Aminatou),
-      ("Amonkhet", Subtype.Amonkhet),
-      ("AndrozaniMinor", Subtype.AndrozaniMinor),
-      ("Angel", Subtype.Angel),
-      ("Angrath", Subtype.Angrath),
-      ("Antausia", Subtype.Antausia),
-      ("Antelope", Subtype.Antelope),
-      ("Apalapucia", Subtype.Apalapucia),
-      ("Ape", Subtype.Ape),
-      ("Arcane", Subtype.Arcane),
-      ("Arcavios", Subtype.Arcavios),
-      ("Archer", Subtype.Archer),
-      ("Archon", Subtype.Archon),
-      ("Arkhos", Subtype.Arkhos),
-      ("Arlinn", Subtype.Arlinn),
-      ("Armadillo", Subtype.Armadillo),
-      ("Army", Subtype.Army),
-      ("Artificer", Subtype.Artificer),
-      ("Ashiok", Subtype.Ashiok),
-      ("Assassin", Subtype.Assassin),
-      ("AssemblyWorker", Subtype.AssemblyWorker),
-      ("Astartes", Subtype.Astartes),
-      ("Atog", Subtype.Atog),
-      ("Attraction", Subtype.Attraction),
-      ("Aura", Subtype.Aura),
-      ("Aurochs", Subtype.Aurochs),
-      ("Avatar", Subtype.Avatar),
-      ("Avishkar", Subtype.Avishkar),
-      ("Azgol", Subtype.Azgol),
-      ("Azra", Subtype.Azra),
-      ("Background", Subtype.Background),
-      ("Badger", Subtype.Badger),
-      ("Bahamut", Subtype.Bahamut),
-      ("Balloon", Subtype.Balloon),
-      ("Barbarian", Subtype.Barbarian),
-      ("Bard", Subtype.Bard),
-      ("Basilisk", Subtype.Basilisk),
-      ("Basri", Subtype.Basri),
-      ("Bat", Subtype.Bat),
-      ("Bear", Subtype.Bear),
-      ("Beast", Subtype.Beast),
-      ("Beaver", Subtype.Beaver),
-      ("Beeble", Subtype.Beeble),
-      ("Beholder", Subtype.Beholder),
-      ("Belenon", Subtype.Belenon),
-      ("Berserker", Subtype.Berserker),
-      ("Bird", Subtype.Bird),
-      ("Bison", Subtype.Bison),
-      ("Blinkmoth", Subtype.Blinkmoth),
-      ("Blood", Subtype.Blood),
-      ("Boar", Subtype.Boar),
-      ("Bobblehead", Subtype.Bobblehead),
-      ("Bolas", Subtype.Bolas),
-      ("BolassMeditationRealm", Subtype.BolassMeditationRealm),
-      ("Book", Subtype.Book),
-      ("Bringer", Subtype.Bringer),
-      ("Brushwagg", Subtype.Brushwagg),
-      ("Calix", Subtype.Calix),
-      ("Camarid", Subtype.Camarid),
-      ("Camel", Subtype.Camel),
-      ("Capenna", Subtype.Capenna),
-      ("Capybara", Subtype.Capybara),
-      ("Caribou", Subtype.Caribou),
-      ("Carrier", Subtype.Carrier),
-      ("Cartouche", Subtype.Cartouche),
-      ("Case", Subtype.Case),
-      ("Cat", Subtype.Cat),
-      ("Cave", Subtype.Cave),
-      ("Centaur", Subtype.Centaur),
-      ("Chandra", Subtype.Chandra),
-      ("Child", Subtype.Child),
-      ("Chimera", Subtype.Chimera),
-      ("Citizen", Subtype.Citizen),
-      ("Class", Subtype.Class),
-      ("Cleric", Subtype.Cleric),
-      ("Clown", Subtype.Clown),
-      ("Clue", Subtype.Clue),
-      ("Cockatrice", Subtype.Cockatrice),
-      ("Comet", Subtype.Comet),
-      ("Construct", Subtype.Construct),
-      ("Contraption", Subtype.Contraption),
-      ("Coward", Subtype.Coward),
-      ("Coyote", Subtype.Coyote),
-      ("Crab", Subtype.Crab),
-      ("Cridhe", Subtype.Cridhe),
-      ("Crocodile", Subtype.Crocodile),
-      ("Ctan", Subtype.Ctan),
-      ("Curse", Subtype.Curse),
-      ("Custodes", Subtype.Custodes),
-      ("Cyberman", Subtype.Cyberman),
-      ("Cyclops", Subtype.Cyclops),
-      ("Dack", Subtype.Dack),
-      ("Dakkon", Subtype.Dakkon),
-      ("Dalek", Subtype.Dalek),
-      ("Daretti", Subtype.Daretti),
-      ("Darillium", Subtype.Darillium),
-      ("Dauthi", Subtype.Dauthi),
-      ("Davriel", Subtype.Davriel),
-      ("Dellian", Subtype.Dellian),
-      ("Demigod", Subtype.Demigod),
-      ("Demon", Subtype.Demon),
-      ("Desert", Subtype.Desert),
-      ("Deserter", Subtype.Deserter),
-      ("Detective", Subtype.Detective),
-      ("Devil", Subtype.Devil),
-      ("Dihada", Subtype.Dihada),
-      ("Dinosaur", Subtype.Dinosaur),
-      ("Djinn", Subtype.Djinn),
-      ("Doctor", Subtype.Doctor),
-      ("Dog", Subtype.Dog),
-      ("Dominaria", Subtype.Dominaria),
-      ("Domri", Subtype.Domri),
-      ("Dovin", Subtype.Dovin),
-      ("Dragon", Subtype.Dragon),
-      ("Drake", Subtype.Drake),
-      ("Dreadnought", Subtype.Dreadnought),
-      ("Drix", Subtype.Drix),
-      ("Drone", Subtype.Drone),
-      ("Druid", Subtype.Druid),
-      ("Dryad", Subtype.Dryad),
-      ("Dwarf", Subtype.Dwarf),
-      ("Earth", Subtype.Earth),
-      ("Echidna", Subtype.Echidna),
-      ("Echoir", Subtype.Echoir),
-      ("Efreet", Subtype.Efreet),
-      ("Egg", Subtype.Egg),
-      ("Elder", Subtype.Elder),
-      ("Eldraine", Subtype.Eldraine),
-      ("Eldrazi", Subtype.Eldrazi),
-      ("Elemental", Subtype.Elemental),
-      ("Elephant", Subtype.Elephant),
-      ("Elf", Subtype.Elf),
-      ("Elk", Subtype.Elk),
-      ("Ellywick", Subtype.Ellywick),
-      ("Elminster", Subtype.Elminster),
-      ("Elspeth", Subtype.Elspeth),
-      ("Employee", Subtype.Employee),
-      ("Equilor", Subtype.Equilor),
-      ("Equipment", Subtype.Equipment),
-      ("Ergamon", Subtype.Ergamon),
-      ("Estrid", Subtype.Estrid),
-      ("Eternal", Subtype.Eternal),
-      ("Eye", Subtype.Eye),
-      ("Fabacin", Subtype.Fabacin),
-      ("Faerie", Subtype.Faerie),
-      ("Ferret", Subtype.Ferret),
-      ("Fiora", Subtype.Fiora),
-      ("Fish", Subtype.Fish),
-      ("Flagbearer", Subtype.Flagbearer),
-      ("Food", Subtype.Food),
-      ("Forest", Subtype.Forest),
-      ("Fortification", Subtype.Fortification),
-      ("Fox", Subtype.Fox),
-      ("Fractal", Subtype.Fractal),
-      ("Freyalise", Subtype.Freyalise),
-      ("Frog", Subtype.Frog),
-      ("Fungus", Subtype.Fungus),
-      ("Gallifrey", Subtype.Gallifrey),
-      ("Gamer", Subtype.Gamer),
-      ("Gamma", Subtype.Gamma),
-      ("Gargantikar", Subtype.Gargantikar),
-      ("Gargoyle", Subtype.Gargoyle),
-      ("Garruk", Subtype.Garruk),
-      ("Gate", Subtype.Gate),
-      ("Germ", Subtype.Germ),
-      ("Giant", Subtype.Giant),
-      ("Gideon", Subtype.Gideon),
-      ("Giraffe", Subtype.Giraffe),
-      ("Gith", Subtype.Gith),
-      ("Glimmer", Subtype.Glimmer),
-      ("Gnoll", Subtype.Gnoll),
-      ("Gnome", Subtype.Gnome),
-      ("Goat", Subtype.Goat),
-      ("Gobakhan", Subtype.Gobakhan),
-      ("Goblin", Subtype.Goblin),
-      ("God", Subtype.God),
-      ("Gold", Subtype.Gold),
-      ("Golem", Subtype.Golem),
-      ("Gorgon", Subtype.Gorgon),
-      ("Graveborn", Subtype.Graveborn),
-      ("Gremlin", Subtype.Gremlin),
-      ("Griffin", Subtype.Griffin),
-      ("Grist", Subtype.Grist),
-      ("Guest", Subtype.Guest),
-      ("Guff", Subtype.Guff),
-      ("Hag", Subtype.Hag),
-      ("Halfling", Subtype.Halfling),
-      ("Hamster", Subtype.Hamster),
-      ("Harpy", Subtype.Harpy),
-      ("Hedgehog", Subtype.Hedgehog),
-      ("Hellion", Subtype.Hellion),
-      ("Hero", Subtype.Hero),
-      ("Hippo", Subtype.Hippo),
-      ("Hippogriff", Subtype.Hippogriff),
-      ("Homarid", Subtype.Homarid),
-      ("Homunculus", Subtype.Homunculus),
-      ("Horror", Subtype.Horror),
-      ("Horse", Subtype.Horse),
-      ("HorseheadNebula", Subtype.HorseheadNebula),
-      ("Huatli", Subtype.Huatli),
-      ("Human", Subtype.Human),
-      ("Hydra", Subtype.Hydra),
-      ("Hyena", Subtype.Hyena),
-      ("Ikoria", Subtype.Ikoria),
-      ("Illusion", Subtype.Illusion),
-      ("Imp", Subtype.Imp),
-      ("Incarnation", Subtype.Incarnation),
-      ("Incubator", Subtype.Incubator),
-      ("Infinity", Subtype.Infinity),
-      ("Inhuman", Subtype.Inhuman),
-      ("Inkling", Subtype.Inkling),
-      ("Innistrad", Subtype.Innistrad),
-      ("Inquisitor", Subtype.Inquisitor),
-      ("Insect", Subtype.Insect),
-      ("Iquatana", Subtype.Iquatana),
-      ("Ir", Subtype.Ir),
-      ("Island", Subtype.Island),
-      ("Ixalan", Subtype.Ixalan),
-      ("Jace", Subtype.Jace),
-      ("Jackal", Subtype.Jackal),
-      ("Jared", Subtype.Jared),
-      ("Jaya", Subtype.Jaya),
-      ("Jellyfish", Subtype.Jellyfish),
-      ("Jeska", Subtype.Jeska),
-      ("Juggernaut", Subtype.Juggernaut),
-      ("Junk", Subtype.Junk),
-      ("Kaito", Subtype.Kaito),
-      ("Kaldheim", Subtype.Kaldheim),
-      ("Kamigawa", Subtype.Kamigawa),
-      ("Kandoka", Subtype.Kandoka),
-      ("Kangaroo", Subtype.Kangaroo),
-      ("Karn", Subtype.Karn),
-      ("Karsus", Subtype.Karsus),
-      ("Kasmina", Subtype.Kasmina),
-      ("Kavu", Subtype.Kavu),
-      ("Kaya", Subtype.Kaya),
-      ("Kephalai", Subtype.Kephalai),
-      ("Kinshala", Subtype.Kinshala),
-      ("Kiora", Subtype.Kiora),
-      ("Kirin", Subtype.Kirin),
-      ("Kithkin", Subtype.Kithkin),
-      ("Knight", Subtype.Knight),
-      ("Kobold", Subtype.Kobold),
-      ("Kolbahan", Subtype.Kolbahan),
-      ("Kor", Subtype.Kor),
-      ("Koth", Subtype.Koth),
-      ("Kraken", Subtype.Kraken),
-      ("Kree", Subtype.Kree),
-      ("Kylem", Subtype.Kylem),
-      ("Kyneth", Subtype.Kyneth),
-      ("Lair", Subtype.Lair),
-      ("Lamia", Subtype.Lamia),
-      ("Lammasu", Subtype.Lammasu),
-      ("Lander", Subtype.Lander),
-      ("Leech", Subtype.Leech),
-      ("Lemur", Subtype.Lemur),
-      ("Lesson", Subtype.Lesson),
-      ("Leviathan", Subtype.Leviathan),
-      ("Lhurgoyf", Subtype.Lhurgoyf),
-      ("Licid", Subtype.Licid),
-      ("Liliana", Subtype.Liliana),
-      ("Lizard", Subtype.Lizard),
-      ("Llama", Subtype.Llama),
-      ("Lobster", Subtype.Lobster),
-      ("Locus", Subtype.Locus),
-      ("Lolth", Subtype.Lolth),
-      ("Lorwyn", Subtype.Lorwyn),
-      ("Lukka", Subtype.Lukka),
-      ("Luvion", Subtype.Luvion),
-      ("Manticore", Subtype.Manticore),
-      ("Map", Subtype.Map),
-      ("Mars", Subtype.Mars),
-      ("Masticore", Subtype.Masticore),
-      ("Mercadia", Subtype.Mercadia),
-      ("Mercenary", Subtype.Mercenary),
-      ("Merfolk", Subtype.Merfolk),
-      ("Metathran", Subtype.Metathran),
-      ("Mine", Subtype.Mine),
-      ("Minion", Subtype.Minion),
-      ("Minotaur", Subtype.Minotaur),
-      ("Minsc", Subtype.Minsc),
-      ("Mirrodin", Subtype.Mirrodin),
-      ("Mite", Subtype.Mite),
-      ("Moag", Subtype.Moag),
-      ("Mole", Subtype.Mole),
-      ("Monger", Subtype.Monger),
-      ("Mongoose", Subtype.Mongoose),
-      ("Mongseng", Subtype.Mongseng),
-      ("Monk", Subtype.Monk),
-      ("Monkey", Subtype.Monkey),
-      ("Moogle", Subtype.Moogle),
-      ("Moon", Subtype.Moon),
-      ("Moonfolk", Subtype.Moonfolk),
-      ("Mordenkainen", Subtype.Mordenkainen),
-      ("Mount", Subtype.Mount),
-      ("Mountain", Subtype.Mountain),
-      ("Mouse", Subtype.Mouse),
-      ("Muraganda", Subtype.Muraganda),
-      ("Mutagen", Subtype.Mutagen),
-      ("Mutant", Subtype.Mutant),
-      ("Myr", Subtype.Myr),
-      ("Mystic", Subtype.Mystic),
-      ("Nahiri", Subtype.Nahiri),
-      ("Narset", Subtype.Narset),
-      ("Nautilus", Subtype.Nautilus),
-      ("Necron", Subtype.Necron),
-      ("Necros", Subtype.Necros),
-      ("Nephilim", Subtype.Nephilim),
-      ("NewEarth", Subtype.NewEarth),
-      ("NewPhyrexia", Subtype.NewPhyrexia),
-      ("Nightmare", Subtype.Nightmare),
-      ("Nightstalker", Subtype.Nightstalker),
-      ("Niko", Subtype.Niko),
-      ("Ninja", Subtype.Ninja),
-      ("Nissa", Subtype.Nissa),
-      ("Nixilis", Subtype.Nixilis),
-      ("Noble", Subtype.Noble),
-      ("Noggle", Subtype.Noggle),
-      ("Nomad", Subtype.Nomad),
-      ("Nymph", Subtype.Nymph),
-      ("Octopus", Subtype.Octopus),
-      ("Ogre", Subtype.Ogre),
-      ("Oko", Subtype.Oko),
-      ("Omen", Subtype.Omen),
-      ("Ooze", Subtype.Ooze),
-      ("Orb", Subtype.Orb),
-      ("Orc", Subtype.Orc),
-      ("Orgg", Subtype.Orgg),
-      ("Otter", Subtype.Otter),
-      ("Ouphe", Subtype.Ouphe),
-      ("OutsideMuttersSpiral", Subtype.OutsideMuttersSpiral),
-      ("Ox", Subtype.Ox),
-      ("Oyster", Subtype.Oyster),
-      ("Pangolin", Subtype.Pangolin),
-      ("Peasant", Subtype.Peasant),
-      ("Pegasus", Subtype.Pegasus),
-      ("Pentavite", Subtype.Pentavite),
-      ("Performer", Subtype.Performer),
-      ("Pest", Subtype.Pest),
-      ("Phelddagrif", Subtype.Phelddagrif),
-      ("Phoenix", Subtype.Phoenix),
-      ("Phyrexia", Subtype.Phyrexia),
-      ("Phyrexian", Subtype.Phyrexian),
-      ("Pilot", Subtype.Pilot),
-      ("Pincher", Subtype.Pincher),
-      ("Pirate", Subtype.Pirate),
-      ("Plains", Subtype.Plains),
-      ("Plan", Subtype.Plan),
-      ("Planet", Subtype.Planet),
-      ("Plant", Subtype.Plant),
-      ("Platypus", Subtype.Platypus),
-      ("Porcupine", Subtype.Porcupine),
-      ("Possum", Subtype.Possum),
-      ("PowerPlant", Subtype.PowerPlant),
-      ("Powerstone", Subtype.Powerstone),
-      ("Praetor", Subtype.Praetor),
-      ("Primarch", Subtype.Primarch),
-      ("Prism", Subtype.Prism),
-      ("Processor", Subtype.Processor),
-      ("Pyrulea", Subtype.Pyrulea),
-      ("Qu", Subtype.Qu),
-      ("Quintorius", Subtype.Quintorius),
-      ("Rabbit", Subtype.Rabbit),
-      ("Rabiah", Subtype.Rabiah),
-      ("Raccoon", Subtype.Raccoon),
-      ("Ral", Subtype.Ral),
-      ("Ranger", Subtype.Ranger),
-      ("Rat", Subtype.Rat),
-      ("Rath", Subtype.Rath),
-      ("Ravnica", Subtype.Ravnica),
-      ("Rebel", Subtype.Rebel),
-      ("Reflection", Subtype.Reflection),
-      ("Regatha", Subtype.Regatha),
-      ("Rhino", Subtype.Rhino),
-      ("Rigger", Subtype.Rigger),
-      ("Robot", Subtype.Robot),
-      ("Rogue", Subtype.Rogue),
-      ("Role", Subtype.Role),
-      ("Room", Subtype.Room),
-      ("Rowan", Subtype.Rowan),
-      ("Rune", Subtype.Rune),
-      ("Sable", Subtype.Sable),
-      ("Saga", Subtype.Saga),
-      ("Saheeli", Subtype.Saheeli),
-      ("Salamander", Subtype.Salamander),
-      ("Samurai", Subtype.Samurai),
-      ("Samut", Subtype.Samut),
-      ("Sand", Subtype.Sand),
-      ("Saproling", Subtype.Saproling),
-      ("Sarkhan", Subtype.Sarkhan),
-      ("Satyr", Subtype.Satyr),
-      ("Scarecrow", Subtype.Scarecrow),
-      ("Scientist", Subtype.Scientist),
-      ("Scion", Subtype.Scion),
-      ("Scorpion", Subtype.Scorpion),
-      ("Scout", Subtype.Scout),
-      ("Sculpture", Subtype.Sculpture),
-      ("Seal", Subtype.Seal),
-      ("Segovia", Subtype.Segovia),
-      ("Serf", Subtype.Serf),
-      ("Serpent", Subtype.Serpent),
-      ("Serra", Subtype.Serra),
-      ("SerrasRealm", Subtype.SerrasRealm),
-      ("Servo", Subtype.Servo),
-      ("Shade", Subtype.Shade),
-      ("Shadowmoor", Subtype.Shadowmoor),
-      ("Shaman", Subtype.Shaman),
-      ("Shandalar", Subtype.Shandalar),
-      ("Shapeshifter", Subtype.Shapeshifter),
-      ("Shard", Subtype.Shard),
-      ("Shark", Subtype.Shark),
-      ("Sheep", Subtype.Sheep),
-      ("Shenmeng", Subtype.Shenmeng),
-      ("Shiar", Subtype.Shiar),
-      ("Shrine", Subtype.Shrine),
-      ("Siege", Subtype.Siege),
-      ("Siren", Subtype.Siren),
-      ("Sivitri", Subtype.Sivitri),
-      ("Skaro", Subtype.Skaro),
-      ("Skeleton", Subtype.Skeleton),
-      ("Skrull", Subtype.Skrull),
-      ("Skunk", Subtype.Skunk),
-      ("Slith", Subtype.Slith),
-      ("Sliver", Subtype.Sliver),
-      ("Sloth", Subtype.Sloth),
-      ("Slug", Subtype.Slug),
-      ("Snail", Subtype.Snail),
-      ("Snake", Subtype.Snake),
-      ("Soldier", Subtype.Soldier),
-      ("Soltari", Subtype.Soltari),
-      ("Sorcerer", Subtype.Sorcerer),
-      ("Sorin", Subtype.Sorin),
-      ("Spacecraft", Subtype.Spacecraft),
-      ("Spawn", Subtype.Spawn),
-      ("Specter", Subtype.Specter),
-      ("Spellshaper", Subtype.Spellshaper),
-      ("Sphere", Subtype.Sphere),
-      ("Sphinx", Subtype.Sphinx),
-      ("Spider", Subtype.Spider),
-      ("Spike", Subtype.Spike),
-      ("Spirit", Subtype.Spirit),
-      ("Splinter", Subtype.Splinter),
-      ("Sponge", Subtype.Sponge),
-      ("Spy", Subtype.Spy),
-      ("Squid", Subtype.Squid),
-      ("Squirrel", Subtype.Squirrel),
-      ("Starfish", Subtype.Starfish),
-      ("Stone", Subtype.Stone),
-      ("Surrakar", Subtype.Surrakar),
-      ("Survivor", Subtype.Survivor),
-      ("Swamp", Subtype.Swamp),
-      ("Symbiote", Subtype.Symbiote),
-      ("Synth", Subtype.Synth),
-      ("Szat", Subtype.Szat),
-      ("Tamiyo", Subtype.Tamiyo),
-      ("Tarkir", Subtype.Tarkir),
-      ("Tasha", Subtype.Tasha),
-      ("Teferi", Subtype.Teferi),
-      ("Tentacle", Subtype.Tentacle),
-      ("Tetravite", Subtype.Tetravite),
-      ("Teyo", Subtype.Teyo),
-      ("Tezzeret", Subtype.Tezzeret),
-      ("Thalakos", Subtype.Thalakos),
-      ("TheAbyss", Subtype.TheAbyss),
-      ("TheDalekAsylum", Subtype.TheDalekAsylum),
-      ("TheLibrary", Subtype.TheLibrary),
-      ("Theros", Subtype.Theros),
-      ("Thopter", Subtype.Thopter),
-      ("Thrull", Subtype.Thrull),
-      ("Tibalt", Subtype.Tibalt),
-      ("Tiefling", Subtype.Tiefling),
-      ("Time", Subtype.Time),
-      ("TimeLord", Subtype.TimeLord),
-      ("Tower", Subtype.Tower),
-      ("Town", Subtype.Town),
-      ("Toy", Subtype.Toy),
-      ("Trap", Subtype.Trap),
-      ("Treasure", Subtype.Treasure),
-      ("Treefolk", Subtype.Treefolk),
-      ("Trenzalore", Subtype.Trenzalore),
-      ("Trilobite", Subtype.Trilobite),
-      ("Triskelavite", Subtype.Triskelavite),
-      ("Troll", Subtype.Troll),
-      ("Turtle", Subtype.Turtle),
-      ("Tyranid", Subtype.Tyranid),
-      ("Tyvar", Subtype.Tyvar),
-      ("Ugin", Subtype.Ugin),
-      ("Ulgrotha", Subtype.Ulgrotha),
-      ("Undercity", Subtype.Undercity),
-      ("Unicorn", Subtype.Unicorn),
-      ("UnknownPlanet", Subtype.UnknownPlanet),
-      ("Urza", Subtype.Urza),
-      ("Urzas", Subtype.Urzas),
-      ("Utrom", Subtype.Utrom),
-      ("Valla", Subtype.Valla),
-      ("Vampire", Subtype.Vampire),
-      ("Varmint", Subtype.Varmint),
-      ("Vedalken", Subtype.Vedalken),
-      ("Vehicle", Subtype.Vehicle),
-      ("Venser", Subtype.Venser),
-      ("Vibranium", Subtype.Vibranium),
-      ("Villain", Subtype.Villain),
-      ("Vivien", Subtype.Vivien),
-      ("Volver", Subtype.Volver),
-      ("Vraska", Subtype.Vraska),
-      ("Vronos", Subtype.Vronos),
-      ("Vryn", Subtype.Vryn),
-      ("Wall", Subtype.Wall),
-      ("Walrus", Subtype.Walrus),
-      ("Warlock", Subtype.Warlock),
-      ("Warrior", Subtype.Warrior),
-      ("Weasel", Subtype.Weasel),
-      ("Weird", Subtype.Weird),
-      ("Werewolf", Subtype.Werewolf),
-      ("Whale", Subtype.Whale),
-      ("Wildfire", Subtype.Wildfire),
-      ("Will", Subtype.Will),
-      ("Windgrace", Subtype.Windgrace),
-      ("Wizard", Subtype.Wizard),
-      ("Wolf", Subtype.Wolf),
-      ("Wolverine", Subtype.Wolverine),
-      ("Wombat", Subtype.Wombat),
-      ("Worm", Subtype.Worm),
-      ("Wraith", Subtype.Wraith),
-      ("Wrenn", Subtype.Wrenn),
-      ("Wurm", Subtype.Wurm),
-      ("Xenagos", Subtype.Xenagos),
-      ("Xerex", Subtype.Xerex),
-      ("Yanggu", Subtype.Yanggu),
-      ("Yanling", Subtype.Yanling),
-      ("Yeti", Subtype.Yeti),
-      ("Zariel", Subtype.Zariel),
-      ("Zendikar", Subtype.Zendikar),
-      ("Zhalfir", Subtype.Zhalfir),
-      ("Zombie", Subtype.Zombie),
-      ("Zubera", Subtype.Zubera)
+codec :: Codec.Codec Subtype.Subtype
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "Adventure" Subtype.Adventure,
+      Arm.nullary "Advisor" Subtype.Advisor,
+      Arm.nullary "Aetherborn" Subtype.Aetherborn,
+      Arm.nullary "Ajani" Subtype.Ajani,
+      Arm.nullary "Alara" Subtype.Alara,
+      Arm.nullary "AlfavaMetraxis" Subtype.AlfavaMetraxis,
+      Arm.nullary "Alien" Subtype.Alien,
+      Arm.nullary "Ally" Subtype.Ally,
+      Arm.nullary "Aminatou" Subtype.Aminatou,
+      Arm.nullary "Amonkhet" Subtype.Amonkhet,
+      Arm.nullary "AndrozaniMinor" Subtype.AndrozaniMinor,
+      Arm.nullary "Angel" Subtype.Angel,
+      Arm.nullary "Angrath" Subtype.Angrath,
+      Arm.nullary "Antausia" Subtype.Antausia,
+      Arm.nullary "Antelope" Subtype.Antelope,
+      Arm.nullary "Apalapucia" Subtype.Apalapucia,
+      Arm.nullary "Ape" Subtype.Ape,
+      Arm.nullary "Arcane" Subtype.Arcane,
+      Arm.nullary "Arcavios" Subtype.Arcavios,
+      Arm.nullary "Archer" Subtype.Archer,
+      Arm.nullary "Archon" Subtype.Archon,
+      Arm.nullary "Arkhos" Subtype.Arkhos,
+      Arm.nullary "Arlinn" Subtype.Arlinn,
+      Arm.nullary "Armadillo" Subtype.Armadillo,
+      Arm.nullary "Army" Subtype.Army,
+      Arm.nullary "Artificer" Subtype.Artificer,
+      Arm.nullary "Ashiok" Subtype.Ashiok,
+      Arm.nullary "Assassin" Subtype.Assassin,
+      Arm.nullary "AssemblyWorker" Subtype.AssemblyWorker,
+      Arm.nullary "Astartes" Subtype.Astartes,
+      Arm.nullary "Atog" Subtype.Atog,
+      Arm.nullary "Attraction" Subtype.Attraction,
+      Arm.nullary "Aura" Subtype.Aura,
+      Arm.nullary "Aurochs" Subtype.Aurochs,
+      Arm.nullary "Avatar" Subtype.Avatar,
+      Arm.nullary "Avishkar" Subtype.Avishkar,
+      Arm.nullary "Azgol" Subtype.Azgol,
+      Arm.nullary "Azra" Subtype.Azra,
+      Arm.nullary "Background" Subtype.Background,
+      Arm.nullary "Badger" Subtype.Badger,
+      Arm.nullary "Bahamut" Subtype.Bahamut,
+      Arm.nullary "Balloon" Subtype.Balloon,
+      Arm.nullary "Barbarian" Subtype.Barbarian,
+      Arm.nullary "Bard" Subtype.Bard,
+      Arm.nullary "Basilisk" Subtype.Basilisk,
+      Arm.nullary "Basri" Subtype.Basri,
+      Arm.nullary "Bat" Subtype.Bat,
+      Arm.nullary "Bear" Subtype.Bear,
+      Arm.nullary "Beast" Subtype.Beast,
+      Arm.nullary "Beaver" Subtype.Beaver,
+      Arm.nullary "Beeble" Subtype.Beeble,
+      Arm.nullary "Beholder" Subtype.Beholder,
+      Arm.nullary "Belenon" Subtype.Belenon,
+      Arm.nullary "Berserker" Subtype.Berserker,
+      Arm.nullary "Bird" Subtype.Bird,
+      Arm.nullary "Bison" Subtype.Bison,
+      Arm.nullary "Blinkmoth" Subtype.Blinkmoth,
+      Arm.nullary "Blood" Subtype.Blood,
+      Arm.nullary "Boar" Subtype.Boar,
+      Arm.nullary "Bobblehead" Subtype.Bobblehead,
+      Arm.nullary "Bolas" Subtype.Bolas,
+      Arm.nullary "BolassMeditationRealm" Subtype.BolassMeditationRealm,
+      Arm.nullary "Book" Subtype.Book,
+      Arm.nullary "Bringer" Subtype.Bringer,
+      Arm.nullary "Brushwagg" Subtype.Brushwagg,
+      Arm.nullary "Calix" Subtype.Calix,
+      Arm.nullary "Camarid" Subtype.Camarid,
+      Arm.nullary "Camel" Subtype.Camel,
+      Arm.nullary "Capenna" Subtype.Capenna,
+      Arm.nullary "Capybara" Subtype.Capybara,
+      Arm.nullary "Caribou" Subtype.Caribou,
+      Arm.nullary "Carrier" Subtype.Carrier,
+      Arm.nullary "Cartouche" Subtype.Cartouche,
+      Arm.nullary "Case" Subtype.Case,
+      Arm.nullary "Cat" Subtype.Cat,
+      Arm.nullary "Cave" Subtype.Cave,
+      Arm.nullary "Centaur" Subtype.Centaur,
+      Arm.nullary "Chandra" Subtype.Chandra,
+      Arm.nullary "Child" Subtype.Child,
+      Arm.nullary "Chimera" Subtype.Chimera,
+      Arm.nullary "Citizen" Subtype.Citizen,
+      Arm.nullary "Class" Subtype.Class,
+      Arm.nullary "Cleric" Subtype.Cleric,
+      Arm.nullary "Clown" Subtype.Clown,
+      Arm.nullary "Clue" Subtype.Clue,
+      Arm.nullary "Cockatrice" Subtype.Cockatrice,
+      Arm.nullary "Comet" Subtype.Comet,
+      Arm.nullary "Construct" Subtype.Construct,
+      Arm.nullary "Contraption" Subtype.Contraption,
+      Arm.nullary "Coward" Subtype.Coward,
+      Arm.nullary "Coyote" Subtype.Coyote,
+      Arm.nullary "Crab" Subtype.Crab,
+      Arm.nullary "Cridhe" Subtype.Cridhe,
+      Arm.nullary "Crocodile" Subtype.Crocodile,
+      Arm.nullary "Ctan" Subtype.Ctan,
+      Arm.nullary "Curse" Subtype.Curse,
+      Arm.nullary "Custodes" Subtype.Custodes,
+      Arm.nullary "Cyberman" Subtype.Cyberman,
+      Arm.nullary "Cyclops" Subtype.Cyclops,
+      Arm.nullary "Dack" Subtype.Dack,
+      Arm.nullary "Dakkon" Subtype.Dakkon,
+      Arm.nullary "Dalek" Subtype.Dalek,
+      Arm.nullary "Daretti" Subtype.Daretti,
+      Arm.nullary "Darillium" Subtype.Darillium,
+      Arm.nullary "Dauthi" Subtype.Dauthi,
+      Arm.nullary "Davriel" Subtype.Davriel,
+      Arm.nullary "Dellian" Subtype.Dellian,
+      Arm.nullary "Demigod" Subtype.Demigod,
+      Arm.nullary "Demon" Subtype.Demon,
+      Arm.nullary "Desert" Subtype.Desert,
+      Arm.nullary "Deserter" Subtype.Deserter,
+      Arm.nullary "Detective" Subtype.Detective,
+      Arm.nullary "Devil" Subtype.Devil,
+      Arm.nullary "Dihada" Subtype.Dihada,
+      Arm.nullary "Dinosaur" Subtype.Dinosaur,
+      Arm.nullary "Djinn" Subtype.Djinn,
+      Arm.nullary "Doctor" Subtype.Doctor,
+      Arm.nullary "Dog" Subtype.Dog,
+      Arm.nullary "Dominaria" Subtype.Dominaria,
+      Arm.nullary "Domri" Subtype.Domri,
+      Arm.nullary "Dovin" Subtype.Dovin,
+      Arm.nullary "Dragon" Subtype.Dragon,
+      Arm.nullary "Drake" Subtype.Drake,
+      Arm.nullary "Dreadnought" Subtype.Dreadnought,
+      Arm.nullary "Drix" Subtype.Drix,
+      Arm.nullary "Drone" Subtype.Drone,
+      Arm.nullary "Druid" Subtype.Druid,
+      Arm.nullary "Dryad" Subtype.Dryad,
+      Arm.nullary "Dwarf" Subtype.Dwarf,
+      Arm.nullary "Earth" Subtype.Earth,
+      Arm.nullary "Echidna" Subtype.Echidna,
+      Arm.nullary "Echoir" Subtype.Echoir,
+      Arm.nullary "Efreet" Subtype.Efreet,
+      Arm.nullary "Egg" Subtype.Egg,
+      Arm.nullary "Elder" Subtype.Elder,
+      Arm.nullary "Eldraine" Subtype.Eldraine,
+      Arm.nullary "Eldrazi" Subtype.Eldrazi,
+      Arm.nullary "Elemental" Subtype.Elemental,
+      Arm.nullary "Elephant" Subtype.Elephant,
+      Arm.nullary "Elf" Subtype.Elf,
+      Arm.nullary "Elk" Subtype.Elk,
+      Arm.nullary "Ellywick" Subtype.Ellywick,
+      Arm.nullary "Elminster" Subtype.Elminster,
+      Arm.nullary "Elspeth" Subtype.Elspeth,
+      Arm.nullary "Employee" Subtype.Employee,
+      Arm.nullary "Equilor" Subtype.Equilor,
+      Arm.nullary "Equipment" Subtype.Equipment,
+      Arm.nullary "Ergamon" Subtype.Ergamon,
+      Arm.nullary "Estrid" Subtype.Estrid,
+      Arm.nullary "Eternal" Subtype.Eternal,
+      Arm.nullary "Eye" Subtype.Eye,
+      Arm.nullary "Fabacin" Subtype.Fabacin,
+      Arm.nullary "Faerie" Subtype.Faerie,
+      Arm.nullary "Ferret" Subtype.Ferret,
+      Arm.nullary "Fiora" Subtype.Fiora,
+      Arm.nullary "Fish" Subtype.Fish,
+      Arm.nullary "Flagbearer" Subtype.Flagbearer,
+      Arm.nullary "Food" Subtype.Food,
+      Arm.nullary "Forest" Subtype.Forest,
+      Arm.nullary "Fortification" Subtype.Fortification,
+      Arm.nullary "Fox" Subtype.Fox,
+      Arm.nullary "Fractal" Subtype.Fractal,
+      Arm.nullary "Freyalise" Subtype.Freyalise,
+      Arm.nullary "Frog" Subtype.Frog,
+      Arm.nullary "Fungus" Subtype.Fungus,
+      Arm.nullary "Gallifrey" Subtype.Gallifrey,
+      Arm.nullary "Gamer" Subtype.Gamer,
+      Arm.nullary "Gamma" Subtype.Gamma,
+      Arm.nullary "Gargantikar" Subtype.Gargantikar,
+      Arm.nullary "Gargoyle" Subtype.Gargoyle,
+      Arm.nullary "Garruk" Subtype.Garruk,
+      Arm.nullary "Gate" Subtype.Gate,
+      Arm.nullary "Germ" Subtype.Germ,
+      Arm.nullary "Giant" Subtype.Giant,
+      Arm.nullary "Gideon" Subtype.Gideon,
+      Arm.nullary "Giraffe" Subtype.Giraffe,
+      Arm.nullary "Gith" Subtype.Gith,
+      Arm.nullary "Glimmer" Subtype.Glimmer,
+      Arm.nullary "Gnoll" Subtype.Gnoll,
+      Arm.nullary "Gnome" Subtype.Gnome,
+      Arm.nullary "Goat" Subtype.Goat,
+      Arm.nullary "Gobakhan" Subtype.Gobakhan,
+      Arm.nullary "Goblin" Subtype.Goblin,
+      Arm.nullary "God" Subtype.God,
+      Arm.nullary "Gold" Subtype.Gold,
+      Arm.nullary "Golem" Subtype.Golem,
+      Arm.nullary "Gorgon" Subtype.Gorgon,
+      Arm.nullary "Graveborn" Subtype.Graveborn,
+      Arm.nullary "Gremlin" Subtype.Gremlin,
+      Arm.nullary "Griffin" Subtype.Griffin,
+      Arm.nullary "Grist" Subtype.Grist,
+      Arm.nullary "Guest" Subtype.Guest,
+      Arm.nullary "Guff" Subtype.Guff,
+      Arm.nullary "Hag" Subtype.Hag,
+      Arm.nullary "Halfling" Subtype.Halfling,
+      Arm.nullary "Hamster" Subtype.Hamster,
+      Arm.nullary "Harpy" Subtype.Harpy,
+      Arm.nullary "Hedgehog" Subtype.Hedgehog,
+      Arm.nullary "Hellion" Subtype.Hellion,
+      Arm.nullary "Hero" Subtype.Hero,
+      Arm.nullary "Hippo" Subtype.Hippo,
+      Arm.nullary "Hippogriff" Subtype.Hippogriff,
+      Arm.nullary "Homarid" Subtype.Homarid,
+      Arm.nullary "Homunculus" Subtype.Homunculus,
+      Arm.nullary "Horror" Subtype.Horror,
+      Arm.nullary "Horse" Subtype.Horse,
+      Arm.nullary "HorseheadNebula" Subtype.HorseheadNebula,
+      Arm.nullary "Huatli" Subtype.Huatli,
+      Arm.nullary "Human" Subtype.Human,
+      Arm.nullary "Hydra" Subtype.Hydra,
+      Arm.nullary "Hyena" Subtype.Hyena,
+      Arm.nullary "Ikoria" Subtype.Ikoria,
+      Arm.nullary "Illusion" Subtype.Illusion,
+      Arm.nullary "Imp" Subtype.Imp,
+      Arm.nullary "Incarnation" Subtype.Incarnation,
+      Arm.nullary "Incubator" Subtype.Incubator,
+      Arm.nullary "Infinity" Subtype.Infinity,
+      Arm.nullary "Inhuman" Subtype.Inhuman,
+      Arm.nullary "Inkling" Subtype.Inkling,
+      Arm.nullary "Innistrad" Subtype.Innistrad,
+      Arm.nullary "Inquisitor" Subtype.Inquisitor,
+      Arm.nullary "Insect" Subtype.Insect,
+      Arm.nullary "Iquatana" Subtype.Iquatana,
+      Arm.nullary "Ir" Subtype.Ir,
+      Arm.nullary "Island" Subtype.Island,
+      Arm.nullary "Ixalan" Subtype.Ixalan,
+      Arm.nullary "Jace" Subtype.Jace,
+      Arm.nullary "Jackal" Subtype.Jackal,
+      Arm.nullary "Jared" Subtype.Jared,
+      Arm.nullary "Jaya" Subtype.Jaya,
+      Arm.nullary "Jellyfish" Subtype.Jellyfish,
+      Arm.nullary "Jeska" Subtype.Jeska,
+      Arm.nullary "Juggernaut" Subtype.Juggernaut,
+      Arm.nullary "Junk" Subtype.Junk,
+      Arm.nullary "Kaito" Subtype.Kaito,
+      Arm.nullary "Kaldheim" Subtype.Kaldheim,
+      Arm.nullary "Kamigawa" Subtype.Kamigawa,
+      Arm.nullary "Kandoka" Subtype.Kandoka,
+      Arm.nullary "Kangaroo" Subtype.Kangaroo,
+      Arm.nullary "Karn" Subtype.Karn,
+      Arm.nullary "Karsus" Subtype.Karsus,
+      Arm.nullary "Kasmina" Subtype.Kasmina,
+      Arm.nullary "Kavu" Subtype.Kavu,
+      Arm.nullary "Kaya" Subtype.Kaya,
+      Arm.nullary "Kephalai" Subtype.Kephalai,
+      Arm.nullary "Kinshala" Subtype.Kinshala,
+      Arm.nullary "Kiora" Subtype.Kiora,
+      Arm.nullary "Kirin" Subtype.Kirin,
+      Arm.nullary "Kithkin" Subtype.Kithkin,
+      Arm.nullary "Knight" Subtype.Knight,
+      Arm.nullary "Kobold" Subtype.Kobold,
+      Arm.nullary "Kolbahan" Subtype.Kolbahan,
+      Arm.nullary "Kor" Subtype.Kor,
+      Arm.nullary "Koth" Subtype.Koth,
+      Arm.nullary "Kraken" Subtype.Kraken,
+      Arm.nullary "Kree" Subtype.Kree,
+      Arm.nullary "Kylem" Subtype.Kylem,
+      Arm.nullary "Kyneth" Subtype.Kyneth,
+      Arm.nullary "Lair" Subtype.Lair,
+      Arm.nullary "Lamia" Subtype.Lamia,
+      Arm.nullary "Lammasu" Subtype.Lammasu,
+      Arm.nullary "Lander" Subtype.Lander,
+      Arm.nullary "Leech" Subtype.Leech,
+      Arm.nullary "Lemur" Subtype.Lemur,
+      Arm.nullary "Lesson" Subtype.Lesson,
+      Arm.nullary "Leviathan" Subtype.Leviathan,
+      Arm.nullary "Lhurgoyf" Subtype.Lhurgoyf,
+      Arm.nullary "Licid" Subtype.Licid,
+      Arm.nullary "Liliana" Subtype.Liliana,
+      Arm.nullary "Lizard" Subtype.Lizard,
+      Arm.nullary "Llama" Subtype.Llama,
+      Arm.nullary "Lobster" Subtype.Lobster,
+      Arm.nullary "Locus" Subtype.Locus,
+      Arm.nullary "Lolth" Subtype.Lolth,
+      Arm.nullary "Lorwyn" Subtype.Lorwyn,
+      Arm.nullary "Lukka" Subtype.Lukka,
+      Arm.nullary "Luvion" Subtype.Luvion,
+      Arm.nullary "Manticore" Subtype.Manticore,
+      Arm.nullary "Map" Subtype.Map,
+      Arm.nullary "Mars" Subtype.Mars,
+      Arm.nullary "Masticore" Subtype.Masticore,
+      Arm.nullary "Mercadia" Subtype.Mercadia,
+      Arm.nullary "Mercenary" Subtype.Mercenary,
+      Arm.nullary "Merfolk" Subtype.Merfolk,
+      Arm.nullary "Metathran" Subtype.Metathran,
+      Arm.nullary "Mine" Subtype.Mine,
+      Arm.nullary "Minion" Subtype.Minion,
+      Arm.nullary "Minotaur" Subtype.Minotaur,
+      Arm.nullary "Minsc" Subtype.Minsc,
+      Arm.nullary "Mirrodin" Subtype.Mirrodin,
+      Arm.nullary "Mite" Subtype.Mite,
+      Arm.nullary "Moag" Subtype.Moag,
+      Arm.nullary "Mole" Subtype.Mole,
+      Arm.nullary "Monger" Subtype.Monger,
+      Arm.nullary "Mongoose" Subtype.Mongoose,
+      Arm.nullary "Mongseng" Subtype.Mongseng,
+      Arm.nullary "Monk" Subtype.Monk,
+      Arm.nullary "Monkey" Subtype.Monkey,
+      Arm.nullary "Moogle" Subtype.Moogle,
+      Arm.nullary "Moon" Subtype.Moon,
+      Arm.nullary "Moonfolk" Subtype.Moonfolk,
+      Arm.nullary "Mordenkainen" Subtype.Mordenkainen,
+      Arm.nullary "Mount" Subtype.Mount,
+      Arm.nullary "Mountain" Subtype.Mountain,
+      Arm.nullary "Mouse" Subtype.Mouse,
+      Arm.nullary "Muraganda" Subtype.Muraganda,
+      Arm.nullary "Mutagen" Subtype.Mutagen,
+      Arm.nullary "Mutant" Subtype.Mutant,
+      Arm.nullary "Myr" Subtype.Myr,
+      Arm.nullary "Mystic" Subtype.Mystic,
+      Arm.nullary "Nahiri" Subtype.Nahiri,
+      Arm.nullary "Narset" Subtype.Narset,
+      Arm.nullary "Nautilus" Subtype.Nautilus,
+      Arm.nullary "Necron" Subtype.Necron,
+      Arm.nullary "Necros" Subtype.Necros,
+      Arm.nullary "Nephilim" Subtype.Nephilim,
+      Arm.nullary "NewEarth" Subtype.NewEarth,
+      Arm.nullary "NewPhyrexia" Subtype.NewPhyrexia,
+      Arm.nullary "Nightmare" Subtype.Nightmare,
+      Arm.nullary "Nightstalker" Subtype.Nightstalker,
+      Arm.nullary "Niko" Subtype.Niko,
+      Arm.nullary "Ninja" Subtype.Ninja,
+      Arm.nullary "Nissa" Subtype.Nissa,
+      Arm.nullary "Nixilis" Subtype.Nixilis,
+      Arm.nullary "Noble" Subtype.Noble,
+      Arm.nullary "Noggle" Subtype.Noggle,
+      Arm.nullary "Nomad" Subtype.Nomad,
+      Arm.nullary "Nymph" Subtype.Nymph,
+      Arm.nullary "Octopus" Subtype.Octopus,
+      Arm.nullary "Ogre" Subtype.Ogre,
+      Arm.nullary "Oko" Subtype.Oko,
+      Arm.nullary "Omen" Subtype.Omen,
+      Arm.nullary "Ooze" Subtype.Ooze,
+      Arm.nullary "Orb" Subtype.Orb,
+      Arm.nullary "Orc" Subtype.Orc,
+      Arm.nullary "Orgg" Subtype.Orgg,
+      Arm.nullary "Otter" Subtype.Otter,
+      Arm.nullary "Ouphe" Subtype.Ouphe,
+      Arm.nullary "OutsideMuttersSpiral" Subtype.OutsideMuttersSpiral,
+      Arm.nullary "Ox" Subtype.Ox,
+      Arm.nullary "Oyster" Subtype.Oyster,
+      Arm.nullary "Pangolin" Subtype.Pangolin,
+      Arm.nullary "Peasant" Subtype.Peasant,
+      Arm.nullary "Pegasus" Subtype.Pegasus,
+      Arm.nullary "Pentavite" Subtype.Pentavite,
+      Arm.nullary "Performer" Subtype.Performer,
+      Arm.nullary "Pest" Subtype.Pest,
+      Arm.nullary "Phelddagrif" Subtype.Phelddagrif,
+      Arm.nullary "Phoenix" Subtype.Phoenix,
+      Arm.nullary "Phyrexia" Subtype.Phyrexia,
+      Arm.nullary "Phyrexian" Subtype.Phyrexian,
+      Arm.nullary "Pilot" Subtype.Pilot,
+      Arm.nullary "Pincher" Subtype.Pincher,
+      Arm.nullary "Pirate" Subtype.Pirate,
+      Arm.nullary "Plains" Subtype.Plains,
+      Arm.nullary "Plan" Subtype.Plan,
+      Arm.nullary "Planet" Subtype.Planet,
+      Arm.nullary "Plant" Subtype.Plant,
+      Arm.nullary "Platypus" Subtype.Platypus,
+      Arm.nullary "Porcupine" Subtype.Porcupine,
+      Arm.nullary "Possum" Subtype.Possum,
+      Arm.nullary "PowerPlant" Subtype.PowerPlant,
+      Arm.nullary "Powerstone" Subtype.Powerstone,
+      Arm.nullary "Praetor" Subtype.Praetor,
+      Arm.nullary "Primarch" Subtype.Primarch,
+      Arm.nullary "Prism" Subtype.Prism,
+      Arm.nullary "Processor" Subtype.Processor,
+      Arm.nullary "Pyrulea" Subtype.Pyrulea,
+      Arm.nullary "Qu" Subtype.Qu,
+      Arm.nullary "Quintorius" Subtype.Quintorius,
+      Arm.nullary "Rabbit" Subtype.Rabbit,
+      Arm.nullary "Rabiah" Subtype.Rabiah,
+      Arm.nullary "Raccoon" Subtype.Raccoon,
+      Arm.nullary "Ral" Subtype.Ral,
+      Arm.nullary "Ranger" Subtype.Ranger,
+      Arm.nullary "Rat" Subtype.Rat,
+      Arm.nullary "Rath" Subtype.Rath,
+      Arm.nullary "Ravnica" Subtype.Ravnica,
+      Arm.nullary "Rebel" Subtype.Rebel,
+      Arm.nullary "Reflection" Subtype.Reflection,
+      Arm.nullary "Regatha" Subtype.Regatha,
+      Arm.nullary "Rhino" Subtype.Rhino,
+      Arm.nullary "Rigger" Subtype.Rigger,
+      Arm.nullary "Robot" Subtype.Robot,
+      Arm.nullary "Rogue" Subtype.Rogue,
+      Arm.nullary "Role" Subtype.Role,
+      Arm.nullary "Room" Subtype.Room,
+      Arm.nullary "Rowan" Subtype.Rowan,
+      Arm.nullary "Rune" Subtype.Rune,
+      Arm.nullary "Sable" Subtype.Sable,
+      Arm.nullary "Saga" Subtype.Saga,
+      Arm.nullary "Saheeli" Subtype.Saheeli,
+      Arm.nullary "Salamander" Subtype.Salamander,
+      Arm.nullary "Samurai" Subtype.Samurai,
+      Arm.nullary "Samut" Subtype.Samut,
+      Arm.nullary "Sand" Subtype.Sand,
+      Arm.nullary "Saproling" Subtype.Saproling,
+      Arm.nullary "Sarkhan" Subtype.Sarkhan,
+      Arm.nullary "Satyr" Subtype.Satyr,
+      Arm.nullary "Scarecrow" Subtype.Scarecrow,
+      Arm.nullary "Scientist" Subtype.Scientist,
+      Arm.nullary "Scion" Subtype.Scion,
+      Arm.nullary "Scorpion" Subtype.Scorpion,
+      Arm.nullary "Scout" Subtype.Scout,
+      Arm.nullary "Sculpture" Subtype.Sculpture,
+      Arm.nullary "Seal" Subtype.Seal,
+      Arm.nullary "Segovia" Subtype.Segovia,
+      Arm.nullary "Serf" Subtype.Serf,
+      Arm.nullary "Serpent" Subtype.Serpent,
+      Arm.nullary "Serra" Subtype.Serra,
+      Arm.nullary "SerrasRealm" Subtype.SerrasRealm,
+      Arm.nullary "Servo" Subtype.Servo,
+      Arm.nullary "Shade" Subtype.Shade,
+      Arm.nullary "Shadowmoor" Subtype.Shadowmoor,
+      Arm.nullary "Shaman" Subtype.Shaman,
+      Arm.nullary "Shandalar" Subtype.Shandalar,
+      Arm.nullary "Shapeshifter" Subtype.Shapeshifter,
+      Arm.nullary "Shard" Subtype.Shard,
+      Arm.nullary "Shark" Subtype.Shark,
+      Arm.nullary "Sheep" Subtype.Sheep,
+      Arm.nullary "Shenmeng" Subtype.Shenmeng,
+      Arm.nullary "Shiar" Subtype.Shiar,
+      Arm.nullary "Shrine" Subtype.Shrine,
+      Arm.nullary "Siege" Subtype.Siege,
+      Arm.nullary "Siren" Subtype.Siren,
+      Arm.nullary "Sivitri" Subtype.Sivitri,
+      Arm.nullary "Skaro" Subtype.Skaro,
+      Arm.nullary "Skeleton" Subtype.Skeleton,
+      Arm.nullary "Skrull" Subtype.Skrull,
+      Arm.nullary "Skunk" Subtype.Skunk,
+      Arm.nullary "Slith" Subtype.Slith,
+      Arm.nullary "Sliver" Subtype.Sliver,
+      Arm.nullary "Sloth" Subtype.Sloth,
+      Arm.nullary "Slug" Subtype.Slug,
+      Arm.nullary "Snail" Subtype.Snail,
+      Arm.nullary "Snake" Subtype.Snake,
+      Arm.nullary "Soldier" Subtype.Soldier,
+      Arm.nullary "Soltari" Subtype.Soltari,
+      Arm.nullary "Sorcerer" Subtype.Sorcerer,
+      Arm.nullary "Sorin" Subtype.Sorin,
+      Arm.nullary "Spacecraft" Subtype.Spacecraft,
+      Arm.nullary "Spawn" Subtype.Spawn,
+      Arm.nullary "Specter" Subtype.Specter,
+      Arm.nullary "Spellshaper" Subtype.Spellshaper,
+      Arm.nullary "Sphere" Subtype.Sphere,
+      Arm.nullary "Sphinx" Subtype.Sphinx,
+      Arm.nullary "Spider" Subtype.Spider,
+      Arm.nullary "Spike" Subtype.Spike,
+      Arm.nullary "Spirit" Subtype.Spirit,
+      Arm.nullary "Splinter" Subtype.Splinter,
+      Arm.nullary "Sponge" Subtype.Sponge,
+      Arm.nullary "Spy" Subtype.Spy,
+      Arm.nullary "Squid" Subtype.Squid,
+      Arm.nullary "Squirrel" Subtype.Squirrel,
+      Arm.nullary "Starfish" Subtype.Starfish,
+      Arm.nullary "Stone" Subtype.Stone,
+      Arm.nullary "Surrakar" Subtype.Surrakar,
+      Arm.nullary "Survivor" Subtype.Survivor,
+      Arm.nullary "Swamp" Subtype.Swamp,
+      Arm.nullary "Symbiote" Subtype.Symbiote,
+      Arm.nullary "Synth" Subtype.Synth,
+      Arm.nullary "Szat" Subtype.Szat,
+      Arm.nullary "Tamiyo" Subtype.Tamiyo,
+      Arm.nullary "Tarkir" Subtype.Tarkir,
+      Arm.nullary "Tasha" Subtype.Tasha,
+      Arm.nullary "Teferi" Subtype.Teferi,
+      Arm.nullary "Tentacle" Subtype.Tentacle,
+      Arm.nullary "Tetravite" Subtype.Tetravite,
+      Arm.nullary "Teyo" Subtype.Teyo,
+      Arm.nullary "Tezzeret" Subtype.Tezzeret,
+      Arm.nullary "Thalakos" Subtype.Thalakos,
+      Arm.nullary "TheAbyss" Subtype.TheAbyss,
+      Arm.nullary "TheDalekAsylum" Subtype.TheDalekAsylum,
+      Arm.nullary "TheLibrary" Subtype.TheLibrary,
+      Arm.nullary "Theros" Subtype.Theros,
+      Arm.nullary "Thopter" Subtype.Thopter,
+      Arm.nullary "Thrull" Subtype.Thrull,
+      Arm.nullary "Tibalt" Subtype.Tibalt,
+      Arm.nullary "Tiefling" Subtype.Tiefling,
+      Arm.nullary "Time" Subtype.Time,
+      Arm.nullary "TimeLord" Subtype.TimeLord,
+      Arm.nullary "Tower" Subtype.Tower,
+      Arm.nullary "Town" Subtype.Town,
+      Arm.nullary "Toy" Subtype.Toy,
+      Arm.nullary "Trap" Subtype.Trap,
+      Arm.nullary "Treasure" Subtype.Treasure,
+      Arm.nullary "Treefolk" Subtype.Treefolk,
+      Arm.nullary "Trenzalore" Subtype.Trenzalore,
+      Arm.nullary "Trilobite" Subtype.Trilobite,
+      Arm.nullary "Triskelavite" Subtype.Triskelavite,
+      Arm.nullary "Troll" Subtype.Troll,
+      Arm.nullary "Turtle" Subtype.Turtle,
+      Arm.nullary "Tyranid" Subtype.Tyranid,
+      Arm.nullary "Tyvar" Subtype.Tyvar,
+      Arm.nullary "Ugin" Subtype.Ugin,
+      Arm.nullary "Ulgrotha" Subtype.Ulgrotha,
+      Arm.nullary "Undercity" Subtype.Undercity,
+      Arm.nullary "Unicorn" Subtype.Unicorn,
+      Arm.nullary "UnknownPlanet" Subtype.UnknownPlanet,
+      Arm.nullary "Urza" Subtype.Urza,
+      Arm.nullary "Urzas" Subtype.Urzas,
+      Arm.nullary "Utrom" Subtype.Utrom,
+      Arm.nullary "Valla" Subtype.Valla,
+      Arm.nullary "Vampire" Subtype.Vampire,
+      Arm.nullary "Varmint" Subtype.Varmint,
+      Arm.nullary "Vedalken" Subtype.Vedalken,
+      Arm.nullary "Vehicle" Subtype.Vehicle,
+      Arm.nullary "Venser" Subtype.Venser,
+      Arm.nullary "Vibranium" Subtype.Vibranium,
+      Arm.nullary "Villain" Subtype.Villain,
+      Arm.nullary "Vivien" Subtype.Vivien,
+      Arm.nullary "Volver" Subtype.Volver,
+      Arm.nullary "Vraska" Subtype.Vraska,
+      Arm.nullary "Vronos" Subtype.Vronos,
+      Arm.nullary "Vryn" Subtype.Vryn,
+      Arm.nullary "Wall" Subtype.Wall,
+      Arm.nullary "Walrus" Subtype.Walrus,
+      Arm.nullary "Warlock" Subtype.Warlock,
+      Arm.nullary "Warrior" Subtype.Warrior,
+      Arm.nullary "Weasel" Subtype.Weasel,
+      Arm.nullary "Weird" Subtype.Weird,
+      Arm.nullary "Werewolf" Subtype.Werewolf,
+      Arm.nullary "Whale" Subtype.Whale,
+      Arm.nullary "Wildfire" Subtype.Wildfire,
+      Arm.nullary "Will" Subtype.Will,
+      Arm.nullary "Windgrace" Subtype.Windgrace,
+      Arm.nullary "Wizard" Subtype.Wizard,
+      Arm.nullary "Wolf" Subtype.Wolf,
+      Arm.nullary "Wolverine" Subtype.Wolverine,
+      Arm.nullary "Wombat" Subtype.Wombat,
+      Arm.nullary "Worm" Subtype.Worm,
+      Arm.nullary "Wraith" Subtype.Wraith,
+      Arm.nullary "Wrenn" Subtype.Wrenn,
+      Arm.nullary "Wurm" Subtype.Wurm,
+      Arm.nullary "Xenagos" Subtype.Xenagos,
+      Arm.nullary "Xerex" Subtype.Xerex,
+      Arm.nullary "Yanggu" Subtype.Yanggu,
+      Arm.nullary "Yanling" Subtype.Yanling,
+      Arm.nullary "Yeti" Subtype.Yeti,
+      Arm.nullary "Zariel" Subtype.Zariel,
+      Arm.nullary "Zendikar" Subtype.Zendikar,
+      Arm.nullary "Zhalfir" Subtype.Zhalfir,
+      Arm.nullary "Zombie" Subtype.Zombie,
+      Arm.nullary "Zubera" Subtype.Zubera
     ]
+  where
+    encode s = Common.nullary $ case s of
+      Subtype.Adventure -> "Adventure"
+      Subtype.Advisor -> "Advisor"
+      Subtype.Aetherborn -> "Aetherborn"
+      Subtype.Ajani -> "Ajani"
+      Subtype.Alara -> "Alara"
+      Subtype.AlfavaMetraxis -> "AlfavaMetraxis"
+      Subtype.Alien -> "Alien"
+      Subtype.Ally -> "Ally"
+      Subtype.Aminatou -> "Aminatou"
+      Subtype.Amonkhet -> "Amonkhet"
+      Subtype.AndrozaniMinor -> "AndrozaniMinor"
+      Subtype.Angel -> "Angel"
+      Subtype.Angrath -> "Angrath"
+      Subtype.Antausia -> "Antausia"
+      Subtype.Antelope -> "Antelope"
+      Subtype.Apalapucia -> "Apalapucia"
+      Subtype.Ape -> "Ape"
+      Subtype.Arcane -> "Arcane"
+      Subtype.Arcavios -> "Arcavios"
+      Subtype.Archer -> "Archer"
+      Subtype.Archon -> "Archon"
+      Subtype.Arkhos -> "Arkhos"
+      Subtype.Arlinn -> "Arlinn"
+      Subtype.Armadillo -> "Armadillo"
+      Subtype.Army -> "Army"
+      Subtype.Artificer -> "Artificer"
+      Subtype.Ashiok -> "Ashiok"
+      Subtype.Assassin -> "Assassin"
+      Subtype.AssemblyWorker -> "AssemblyWorker"
+      Subtype.Astartes -> "Astartes"
+      Subtype.Atog -> "Atog"
+      Subtype.Attraction -> "Attraction"
+      Subtype.Aura -> "Aura"
+      Subtype.Aurochs -> "Aurochs"
+      Subtype.Avatar -> "Avatar"
+      Subtype.Avishkar -> "Avishkar"
+      Subtype.Azgol -> "Azgol"
+      Subtype.Azra -> "Azra"
+      Subtype.Background -> "Background"
+      Subtype.Badger -> "Badger"
+      Subtype.Bahamut -> "Bahamut"
+      Subtype.Balloon -> "Balloon"
+      Subtype.Barbarian -> "Barbarian"
+      Subtype.Bard -> "Bard"
+      Subtype.Basilisk -> "Basilisk"
+      Subtype.Basri -> "Basri"
+      Subtype.Bat -> "Bat"
+      Subtype.Bear -> "Bear"
+      Subtype.Beast -> "Beast"
+      Subtype.Beaver -> "Beaver"
+      Subtype.Beeble -> "Beeble"
+      Subtype.Beholder -> "Beholder"
+      Subtype.Belenon -> "Belenon"
+      Subtype.Berserker -> "Berserker"
+      Subtype.Bird -> "Bird"
+      Subtype.Bison -> "Bison"
+      Subtype.Blinkmoth -> "Blinkmoth"
+      Subtype.Blood -> "Blood"
+      Subtype.Boar -> "Boar"
+      Subtype.Bobblehead -> "Bobblehead"
+      Subtype.Bolas -> "Bolas"
+      Subtype.BolassMeditationRealm -> "BolassMeditationRealm"
+      Subtype.Book -> "Book"
+      Subtype.Bringer -> "Bringer"
+      Subtype.Brushwagg -> "Brushwagg"
+      Subtype.Calix -> "Calix"
+      Subtype.Camarid -> "Camarid"
+      Subtype.Camel -> "Camel"
+      Subtype.Capenna -> "Capenna"
+      Subtype.Capybara -> "Capybara"
+      Subtype.Caribou -> "Caribou"
+      Subtype.Carrier -> "Carrier"
+      Subtype.Cartouche -> "Cartouche"
+      Subtype.Case -> "Case"
+      Subtype.Cat -> "Cat"
+      Subtype.Cave -> "Cave"
+      Subtype.Centaur -> "Centaur"
+      Subtype.Chandra -> "Chandra"
+      Subtype.Child -> "Child"
+      Subtype.Chimera -> "Chimera"
+      Subtype.Citizen -> "Citizen"
+      Subtype.Class -> "Class"
+      Subtype.Cleric -> "Cleric"
+      Subtype.Clown -> "Clown"
+      Subtype.Clue -> "Clue"
+      Subtype.Cockatrice -> "Cockatrice"
+      Subtype.Comet -> "Comet"
+      Subtype.Construct -> "Construct"
+      Subtype.Contraption -> "Contraption"
+      Subtype.Coward -> "Coward"
+      Subtype.Coyote -> "Coyote"
+      Subtype.Crab -> "Crab"
+      Subtype.Cridhe -> "Cridhe"
+      Subtype.Crocodile -> "Crocodile"
+      Subtype.Ctan -> "Ctan"
+      Subtype.Curse -> "Curse"
+      Subtype.Custodes -> "Custodes"
+      Subtype.Cyberman -> "Cyberman"
+      Subtype.Cyclops -> "Cyclops"
+      Subtype.Dack -> "Dack"
+      Subtype.Dakkon -> "Dakkon"
+      Subtype.Dalek -> "Dalek"
+      Subtype.Daretti -> "Daretti"
+      Subtype.Darillium -> "Darillium"
+      Subtype.Dauthi -> "Dauthi"
+      Subtype.Davriel -> "Davriel"
+      Subtype.Dellian -> "Dellian"
+      Subtype.Demigod -> "Demigod"
+      Subtype.Demon -> "Demon"
+      Subtype.Desert -> "Desert"
+      Subtype.Deserter -> "Deserter"
+      Subtype.Detective -> "Detective"
+      Subtype.Devil -> "Devil"
+      Subtype.Dihada -> "Dihada"
+      Subtype.Dinosaur -> "Dinosaur"
+      Subtype.Djinn -> "Djinn"
+      Subtype.Doctor -> "Doctor"
+      Subtype.Dog -> "Dog"
+      Subtype.Dominaria -> "Dominaria"
+      Subtype.Domri -> "Domri"
+      Subtype.Dovin -> "Dovin"
+      Subtype.Dragon -> "Dragon"
+      Subtype.Drake -> "Drake"
+      Subtype.Dreadnought -> "Dreadnought"
+      Subtype.Drix -> "Drix"
+      Subtype.Drone -> "Drone"
+      Subtype.Druid -> "Druid"
+      Subtype.Dryad -> "Dryad"
+      Subtype.Dwarf -> "Dwarf"
+      Subtype.Earth -> "Earth"
+      Subtype.Echidna -> "Echidna"
+      Subtype.Echoir -> "Echoir"
+      Subtype.Efreet -> "Efreet"
+      Subtype.Egg -> "Egg"
+      Subtype.Elder -> "Elder"
+      Subtype.Eldraine -> "Eldraine"
+      Subtype.Eldrazi -> "Eldrazi"
+      Subtype.Elemental -> "Elemental"
+      Subtype.Elephant -> "Elephant"
+      Subtype.Elf -> "Elf"
+      Subtype.Elk -> "Elk"
+      Subtype.Ellywick -> "Ellywick"
+      Subtype.Elminster -> "Elminster"
+      Subtype.Elspeth -> "Elspeth"
+      Subtype.Employee -> "Employee"
+      Subtype.Equilor -> "Equilor"
+      Subtype.Equipment -> "Equipment"
+      Subtype.Ergamon -> "Ergamon"
+      Subtype.Estrid -> "Estrid"
+      Subtype.Eternal -> "Eternal"
+      Subtype.Eye -> "Eye"
+      Subtype.Fabacin -> "Fabacin"
+      Subtype.Faerie -> "Faerie"
+      Subtype.Ferret -> "Ferret"
+      Subtype.Fiora -> "Fiora"
+      Subtype.Fish -> "Fish"
+      Subtype.Flagbearer -> "Flagbearer"
+      Subtype.Food -> "Food"
+      Subtype.Forest -> "Forest"
+      Subtype.Fortification -> "Fortification"
+      Subtype.Fox -> "Fox"
+      Subtype.Fractal -> "Fractal"
+      Subtype.Freyalise -> "Freyalise"
+      Subtype.Frog -> "Frog"
+      Subtype.Fungus -> "Fungus"
+      Subtype.Gallifrey -> "Gallifrey"
+      Subtype.Gamer -> "Gamer"
+      Subtype.Gamma -> "Gamma"
+      Subtype.Gargantikar -> "Gargantikar"
+      Subtype.Gargoyle -> "Gargoyle"
+      Subtype.Garruk -> "Garruk"
+      Subtype.Gate -> "Gate"
+      Subtype.Germ -> "Germ"
+      Subtype.Giant -> "Giant"
+      Subtype.Gideon -> "Gideon"
+      Subtype.Giraffe -> "Giraffe"
+      Subtype.Gith -> "Gith"
+      Subtype.Glimmer -> "Glimmer"
+      Subtype.Gnoll -> "Gnoll"
+      Subtype.Gnome -> "Gnome"
+      Subtype.Goat -> "Goat"
+      Subtype.Gobakhan -> "Gobakhan"
+      Subtype.Goblin -> "Goblin"
+      Subtype.God -> "God"
+      Subtype.Gold -> "Gold"
+      Subtype.Golem -> "Golem"
+      Subtype.Gorgon -> "Gorgon"
+      Subtype.Graveborn -> "Graveborn"
+      Subtype.Gremlin -> "Gremlin"
+      Subtype.Griffin -> "Griffin"
+      Subtype.Grist -> "Grist"
+      Subtype.Guest -> "Guest"
+      Subtype.Guff -> "Guff"
+      Subtype.Hag -> "Hag"
+      Subtype.Halfling -> "Halfling"
+      Subtype.Hamster -> "Hamster"
+      Subtype.Harpy -> "Harpy"
+      Subtype.Hedgehog -> "Hedgehog"
+      Subtype.Hellion -> "Hellion"
+      Subtype.Hero -> "Hero"
+      Subtype.Hippo -> "Hippo"
+      Subtype.Hippogriff -> "Hippogriff"
+      Subtype.Homarid -> "Homarid"
+      Subtype.Homunculus -> "Homunculus"
+      Subtype.Horror -> "Horror"
+      Subtype.Horse -> "Horse"
+      Subtype.HorseheadNebula -> "HorseheadNebula"
+      Subtype.Huatli -> "Huatli"
+      Subtype.Human -> "Human"
+      Subtype.Hydra -> "Hydra"
+      Subtype.Hyena -> "Hyena"
+      Subtype.Ikoria -> "Ikoria"
+      Subtype.Illusion -> "Illusion"
+      Subtype.Imp -> "Imp"
+      Subtype.Incarnation -> "Incarnation"
+      Subtype.Incubator -> "Incubator"
+      Subtype.Infinity -> "Infinity"
+      Subtype.Inhuman -> "Inhuman"
+      Subtype.Inkling -> "Inkling"
+      Subtype.Innistrad -> "Innistrad"
+      Subtype.Inquisitor -> "Inquisitor"
+      Subtype.Insect -> "Insect"
+      Subtype.Iquatana -> "Iquatana"
+      Subtype.Ir -> "Ir"
+      Subtype.Island -> "Island"
+      Subtype.Ixalan -> "Ixalan"
+      Subtype.Jace -> "Jace"
+      Subtype.Jackal -> "Jackal"
+      Subtype.Jared -> "Jared"
+      Subtype.Jaya -> "Jaya"
+      Subtype.Jellyfish -> "Jellyfish"
+      Subtype.Jeska -> "Jeska"
+      Subtype.Juggernaut -> "Juggernaut"
+      Subtype.Junk -> "Junk"
+      Subtype.Kaito -> "Kaito"
+      Subtype.Kaldheim -> "Kaldheim"
+      Subtype.Kamigawa -> "Kamigawa"
+      Subtype.Kandoka -> "Kandoka"
+      Subtype.Kangaroo -> "Kangaroo"
+      Subtype.Karn -> "Karn"
+      Subtype.Karsus -> "Karsus"
+      Subtype.Kasmina -> "Kasmina"
+      Subtype.Kavu -> "Kavu"
+      Subtype.Kaya -> "Kaya"
+      Subtype.Kephalai -> "Kephalai"
+      Subtype.Kinshala -> "Kinshala"
+      Subtype.Kiora -> "Kiora"
+      Subtype.Kirin -> "Kirin"
+      Subtype.Kithkin -> "Kithkin"
+      Subtype.Knight -> "Knight"
+      Subtype.Kobold -> "Kobold"
+      Subtype.Kolbahan -> "Kolbahan"
+      Subtype.Kor -> "Kor"
+      Subtype.Koth -> "Koth"
+      Subtype.Kraken -> "Kraken"
+      Subtype.Kree -> "Kree"
+      Subtype.Kylem -> "Kylem"
+      Subtype.Kyneth -> "Kyneth"
+      Subtype.Lair -> "Lair"
+      Subtype.Lamia -> "Lamia"
+      Subtype.Lammasu -> "Lammasu"
+      Subtype.Lander -> "Lander"
+      Subtype.Leech -> "Leech"
+      Subtype.Lemur -> "Lemur"
+      Subtype.Lesson -> "Lesson"
+      Subtype.Leviathan -> "Leviathan"
+      Subtype.Lhurgoyf -> "Lhurgoyf"
+      Subtype.Licid -> "Licid"
+      Subtype.Liliana -> "Liliana"
+      Subtype.Lizard -> "Lizard"
+      Subtype.Llama -> "Llama"
+      Subtype.Lobster -> "Lobster"
+      Subtype.Locus -> "Locus"
+      Subtype.Lolth -> "Lolth"
+      Subtype.Lorwyn -> "Lorwyn"
+      Subtype.Lukka -> "Lukka"
+      Subtype.Luvion -> "Luvion"
+      Subtype.Manticore -> "Manticore"
+      Subtype.Map -> "Map"
+      Subtype.Mars -> "Mars"
+      Subtype.Masticore -> "Masticore"
+      Subtype.Mercadia -> "Mercadia"
+      Subtype.Mercenary -> "Mercenary"
+      Subtype.Merfolk -> "Merfolk"
+      Subtype.Metathran -> "Metathran"
+      Subtype.Mine -> "Mine"
+      Subtype.Minion -> "Minion"
+      Subtype.Minotaur -> "Minotaur"
+      Subtype.Minsc -> "Minsc"
+      Subtype.Mirrodin -> "Mirrodin"
+      Subtype.Mite -> "Mite"
+      Subtype.Moag -> "Moag"
+      Subtype.Mole -> "Mole"
+      Subtype.Monger -> "Monger"
+      Subtype.Mongoose -> "Mongoose"
+      Subtype.Mongseng -> "Mongseng"
+      Subtype.Monk -> "Monk"
+      Subtype.Monkey -> "Monkey"
+      Subtype.Moogle -> "Moogle"
+      Subtype.Moon -> "Moon"
+      Subtype.Moonfolk -> "Moonfolk"
+      Subtype.Mordenkainen -> "Mordenkainen"
+      Subtype.Mount -> "Mount"
+      Subtype.Mountain -> "Mountain"
+      Subtype.Mouse -> "Mouse"
+      Subtype.Muraganda -> "Muraganda"
+      Subtype.Mutagen -> "Mutagen"
+      Subtype.Mutant -> "Mutant"
+      Subtype.Myr -> "Myr"
+      Subtype.Mystic -> "Mystic"
+      Subtype.Nahiri -> "Nahiri"
+      Subtype.Narset -> "Narset"
+      Subtype.Nautilus -> "Nautilus"
+      Subtype.Necron -> "Necron"
+      Subtype.Necros -> "Necros"
+      Subtype.Nephilim -> "Nephilim"
+      Subtype.NewEarth -> "NewEarth"
+      Subtype.NewPhyrexia -> "NewPhyrexia"
+      Subtype.Nightmare -> "Nightmare"
+      Subtype.Nightstalker -> "Nightstalker"
+      Subtype.Niko -> "Niko"
+      Subtype.Ninja -> "Ninja"
+      Subtype.Nissa -> "Nissa"
+      Subtype.Nixilis -> "Nixilis"
+      Subtype.Noble -> "Noble"
+      Subtype.Noggle -> "Noggle"
+      Subtype.Nomad -> "Nomad"
+      Subtype.Nymph -> "Nymph"
+      Subtype.Octopus -> "Octopus"
+      Subtype.Ogre -> "Ogre"
+      Subtype.Oko -> "Oko"
+      Subtype.Omen -> "Omen"
+      Subtype.Ooze -> "Ooze"
+      Subtype.Orb -> "Orb"
+      Subtype.Orc -> "Orc"
+      Subtype.Orgg -> "Orgg"
+      Subtype.Otter -> "Otter"
+      Subtype.Ouphe -> "Ouphe"
+      Subtype.OutsideMuttersSpiral -> "OutsideMuttersSpiral"
+      Subtype.Ox -> "Ox"
+      Subtype.Oyster -> "Oyster"
+      Subtype.Pangolin -> "Pangolin"
+      Subtype.Peasant -> "Peasant"
+      Subtype.Pegasus -> "Pegasus"
+      Subtype.Pentavite -> "Pentavite"
+      Subtype.Performer -> "Performer"
+      Subtype.Pest -> "Pest"
+      Subtype.Phelddagrif -> "Phelddagrif"
+      Subtype.Phoenix -> "Phoenix"
+      Subtype.Phyrexia -> "Phyrexia"
+      Subtype.Phyrexian -> "Phyrexian"
+      Subtype.Pilot -> "Pilot"
+      Subtype.Pincher -> "Pincher"
+      Subtype.Pirate -> "Pirate"
+      Subtype.Plains -> "Plains"
+      Subtype.Plan -> "Plan"
+      Subtype.Planet -> "Planet"
+      Subtype.Plant -> "Plant"
+      Subtype.Platypus -> "Platypus"
+      Subtype.Porcupine -> "Porcupine"
+      Subtype.Possum -> "Possum"
+      Subtype.PowerPlant -> "PowerPlant"
+      Subtype.Powerstone -> "Powerstone"
+      Subtype.Praetor -> "Praetor"
+      Subtype.Primarch -> "Primarch"
+      Subtype.Prism -> "Prism"
+      Subtype.Processor -> "Processor"
+      Subtype.Pyrulea -> "Pyrulea"
+      Subtype.Qu -> "Qu"
+      Subtype.Quintorius -> "Quintorius"
+      Subtype.Rabbit -> "Rabbit"
+      Subtype.Rabiah -> "Rabiah"
+      Subtype.Raccoon -> "Raccoon"
+      Subtype.Ral -> "Ral"
+      Subtype.Ranger -> "Ranger"
+      Subtype.Rat -> "Rat"
+      Subtype.Rath -> "Rath"
+      Subtype.Ravnica -> "Ravnica"
+      Subtype.Rebel -> "Rebel"
+      Subtype.Reflection -> "Reflection"
+      Subtype.Regatha -> "Regatha"
+      Subtype.Rhino -> "Rhino"
+      Subtype.Rigger -> "Rigger"
+      Subtype.Robot -> "Robot"
+      Subtype.Rogue -> "Rogue"
+      Subtype.Role -> "Role"
+      Subtype.Room -> "Room"
+      Subtype.Rowan -> "Rowan"
+      Subtype.Rune -> "Rune"
+      Subtype.Sable -> "Sable"
+      Subtype.Saga -> "Saga"
+      Subtype.Saheeli -> "Saheeli"
+      Subtype.Salamander -> "Salamander"
+      Subtype.Samurai -> "Samurai"
+      Subtype.Samut -> "Samut"
+      Subtype.Sand -> "Sand"
+      Subtype.Saproling -> "Saproling"
+      Subtype.Sarkhan -> "Sarkhan"
+      Subtype.Satyr -> "Satyr"
+      Subtype.Scarecrow -> "Scarecrow"
+      Subtype.Scientist -> "Scientist"
+      Subtype.Scion -> "Scion"
+      Subtype.Scorpion -> "Scorpion"
+      Subtype.Scout -> "Scout"
+      Subtype.Sculpture -> "Sculpture"
+      Subtype.Seal -> "Seal"
+      Subtype.Segovia -> "Segovia"
+      Subtype.Serf -> "Serf"
+      Subtype.Serpent -> "Serpent"
+      Subtype.Serra -> "Serra"
+      Subtype.SerrasRealm -> "SerrasRealm"
+      Subtype.Servo -> "Servo"
+      Subtype.Shade -> "Shade"
+      Subtype.Shadowmoor -> "Shadowmoor"
+      Subtype.Shaman -> "Shaman"
+      Subtype.Shandalar -> "Shandalar"
+      Subtype.Shapeshifter -> "Shapeshifter"
+      Subtype.Shard -> "Shard"
+      Subtype.Shark -> "Shark"
+      Subtype.Sheep -> "Sheep"
+      Subtype.Shenmeng -> "Shenmeng"
+      Subtype.Shiar -> "Shiar"
+      Subtype.Shrine -> "Shrine"
+      Subtype.Siege -> "Siege"
+      Subtype.Siren -> "Siren"
+      Subtype.Sivitri -> "Sivitri"
+      Subtype.Skaro -> "Skaro"
+      Subtype.Skeleton -> "Skeleton"
+      Subtype.Skrull -> "Skrull"
+      Subtype.Skunk -> "Skunk"
+      Subtype.Slith -> "Slith"
+      Subtype.Sliver -> "Sliver"
+      Subtype.Sloth -> "Sloth"
+      Subtype.Slug -> "Slug"
+      Subtype.Snail -> "Snail"
+      Subtype.Snake -> "Snake"
+      Subtype.Soldier -> "Soldier"
+      Subtype.Soltari -> "Soltari"
+      Subtype.Sorcerer -> "Sorcerer"
+      Subtype.Sorin -> "Sorin"
+      Subtype.Spacecraft -> "Spacecraft"
+      Subtype.Spawn -> "Spawn"
+      Subtype.Specter -> "Specter"
+      Subtype.Spellshaper -> "Spellshaper"
+      Subtype.Sphere -> "Sphere"
+      Subtype.Sphinx -> "Sphinx"
+      Subtype.Spider -> "Spider"
+      Subtype.Spike -> "Spike"
+      Subtype.Spirit -> "Spirit"
+      Subtype.Splinter -> "Splinter"
+      Subtype.Sponge -> "Sponge"
+      Subtype.Spy -> "Spy"
+      Subtype.Squid -> "Squid"
+      Subtype.Squirrel -> "Squirrel"
+      Subtype.Starfish -> "Starfish"
+      Subtype.Stone -> "Stone"
+      Subtype.Surrakar -> "Surrakar"
+      Subtype.Survivor -> "Survivor"
+      Subtype.Swamp -> "Swamp"
+      Subtype.Symbiote -> "Symbiote"
+      Subtype.Synth -> "Synth"
+      Subtype.Szat -> "Szat"
+      Subtype.Tamiyo -> "Tamiyo"
+      Subtype.Tarkir -> "Tarkir"
+      Subtype.Tasha -> "Tasha"
+      Subtype.Teferi -> "Teferi"
+      Subtype.Tentacle -> "Tentacle"
+      Subtype.Tetravite -> "Tetravite"
+      Subtype.Teyo -> "Teyo"
+      Subtype.Tezzeret -> "Tezzeret"
+      Subtype.Thalakos -> "Thalakos"
+      Subtype.TheAbyss -> "TheAbyss"
+      Subtype.TheDalekAsylum -> "TheDalekAsylum"
+      Subtype.TheLibrary -> "TheLibrary"
+      Subtype.Theros -> "Theros"
+      Subtype.Thopter -> "Thopter"
+      Subtype.Thrull -> "Thrull"
+      Subtype.Tibalt -> "Tibalt"
+      Subtype.Tiefling -> "Tiefling"
+      Subtype.Time -> "Time"
+      Subtype.TimeLord -> "TimeLord"
+      Subtype.Tower -> "Tower"
+      Subtype.Town -> "Town"
+      Subtype.Toy -> "Toy"
+      Subtype.Trap -> "Trap"
+      Subtype.Treasure -> "Treasure"
+      Subtype.Treefolk -> "Treefolk"
+      Subtype.Trenzalore -> "Trenzalore"
+      Subtype.Trilobite -> "Trilobite"
+      Subtype.Triskelavite -> "Triskelavite"
+      Subtype.Troll -> "Troll"
+      Subtype.Turtle -> "Turtle"
+      Subtype.Tyranid -> "Tyranid"
+      Subtype.Tyvar -> "Tyvar"
+      Subtype.Ugin -> "Ugin"
+      Subtype.Ulgrotha -> "Ulgrotha"
+      Subtype.Undercity -> "Undercity"
+      Subtype.Unicorn -> "Unicorn"
+      Subtype.UnknownPlanet -> "UnknownPlanet"
+      Subtype.Urza -> "Urza"
+      Subtype.Urzas -> "Urzas"
+      Subtype.Utrom -> "Utrom"
+      Subtype.Valla -> "Valla"
+      Subtype.Vampire -> "Vampire"
+      Subtype.Varmint -> "Varmint"
+      Subtype.Vedalken -> "Vedalken"
+      Subtype.Vehicle -> "Vehicle"
+      Subtype.Venser -> "Venser"
+      Subtype.Vibranium -> "Vibranium"
+      Subtype.Villain -> "Villain"
+      Subtype.Vivien -> "Vivien"
+      Subtype.Volver -> "Volver"
+      Subtype.Vraska -> "Vraska"
+      Subtype.Vronos -> "Vronos"
+      Subtype.Vryn -> "Vryn"
+      Subtype.Wall -> "Wall"
+      Subtype.Walrus -> "Walrus"
+      Subtype.Warlock -> "Warlock"
+      Subtype.Warrior -> "Warrior"
+      Subtype.Weasel -> "Weasel"
+      Subtype.Weird -> "Weird"
+      Subtype.Werewolf -> "Werewolf"
+      Subtype.Whale -> "Whale"
+      Subtype.Wildfire -> "Wildfire"
+      Subtype.Will -> "Will"
+      Subtype.Windgrace -> "Windgrace"
+      Subtype.Wizard -> "Wizard"
+      Subtype.Wolf -> "Wolf"
+      Subtype.Wolverine -> "Wolverine"
+      Subtype.Wombat -> "Wombat"
+      Subtype.Worm -> "Worm"
+      Subtype.Wraith -> "Wraith"
+      Subtype.Wrenn -> "Wrenn"
+      Subtype.Wurm -> "Wurm"
+      Subtype.Xenagos -> "Xenagos"
+      Subtype.Xerex -> "Xerex"
+      Subtype.Yanggu -> "Yanggu"
+      Subtype.Yanling -> "Yanling"
+      Subtype.Yeti -> "Yeti"
+      Subtype.Zariel -> "Zariel"
+      Subtype.Zendikar -> "Zendikar"
+      Subtype.Zhalfir -> "Zhalfir"
+      Subtype.Zombie -> "Zombie"
+      Subtype.Zubera -> "Zubera"

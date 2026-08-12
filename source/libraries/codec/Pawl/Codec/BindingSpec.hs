@@ -7,8 +7,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Binding as Binding
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.ModeIndex as ModeIndex

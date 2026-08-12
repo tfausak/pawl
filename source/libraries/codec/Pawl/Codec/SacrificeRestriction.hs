@@ -2,8 +2,8 @@ module Pawl.Codec.SacrificeRestriction where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 
 -- | An object with one named key, the shape Pawl.Codec.AttackRequirement has and
@@ -16,7 +16,7 @@ import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 -- where a requirement's "subject" is opposed to an object it acts on.
 toJson :: SacrificeRestriction.SacrificeRestriction -> Value.Value
 toJson sr =
-  Common.object (Common.requiredPair "affected" Affected.toJson (SacrificeRestriction.affected sr))
+  Value.object (Common.requiredPair "affected" Affected.toJson (SacrificeRestriction.affected sr))
 
 fromJson :: Value.Value -> Either Text.Text SacrificeRestriction.SacrificeRestriction
 fromJson value = do

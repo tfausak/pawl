@@ -5,9 +5,9 @@ module Pawl.Codec.ModeSpec where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Mode as Mode
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Effect as Effect
@@ -23,7 +23,7 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- 'Mode.toJson'/'Mode.fromJson' reach it only through the supplied Effect
 -- codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
-cardToJson = Common.text
+cardToJson = Value.text
 
 cardFromJson :: Value.Value -> Either Text.Text Text.Text
 cardFromJson = Common.asText

@@ -3,8 +3,8 @@
 module Pawl.Codec.MonarchTargetSpec where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.SlotName as SlotName

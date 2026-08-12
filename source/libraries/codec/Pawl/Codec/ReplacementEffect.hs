@@ -1,7 +1,6 @@
 module Pawl.Codec.ReplacementEffect where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CounterPattern as CounterPattern
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.DamageRewrite as DamageRewrite
@@ -17,26 +16,28 @@ import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Codec.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 
 toJson :: ReplacementEffect.ReplacementEffect -> Value.Value
 toJson re = case re of
   ReplacementEffect.ZoneChangeR p z ->
-    Common.tagged "ZoneChangeR" . Just . Common.array $ [ZoneChangePattern.toJson p, Zone.toJson z]
+    Common.tagged "ZoneChangeR" . Just . Value.array $ [ZoneChangePattern.toJson p, Zone.toJson z]
   ReplacementEffect.EntryR p r ->
-    Common.tagged "EntryR" . Just . Common.array $ [Filter.toJson Keyword.toJson p, EntryRewrite.toJson r]
+    Common.tagged "EntryR" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) p, EntryRewrite.toJson r]
   ReplacementEffect.DamageR p r ->
-    Common.tagged "DamageR" . Just . Common.array $ [DamagePattern.toJson p, DamageRewrite.toJson r]
+    Common.tagged "DamageR" . Just . Value.array $ [DamagePattern.toJson p, DamageRewrite.toJson r]
   ReplacementEffect.DestructionR r ->
     Common.tagged "DestructionR" . Just $ DestructionRewrite.toJson r
   ReplacementEffect.CounterR p sc ->
-    Common.tagged "CounterR" . Just . Common.array $ [CounterPattern.toJson p, Scaling.toJson sc]
+    Common.tagged "CounterR" . Just . Value.array $ [CounterPattern.toJson p, Scaling.toJson sc]
   ReplacementEffect.TokenR p sc ->
-    Common.tagged "TokenR" . Just . Common.array $ [TokenPattern.toJson p, Scaling.toJson sc]
+    Common.tagged "TokenR" . Just . Value.array $ [TokenPattern.toJson p, Scaling.toJson sc]
   ReplacementEffect.TurnUpR p r ->
-    Common.tagged "TurnUpR" . Just . Common.array $ [Filter.toJson Keyword.toJson p, TurnUpRewrite.toJson r]
+    Common.tagged "TurnUpR" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) p, TurnUpRewrite.toJson r]
   ReplacementEffect.PhaseR p ->
-    Common.tagged "PhaseR" . Just $ PhasePattern.toJson p
+    Common.tagged "PhaseR" . Just $ Codec.encode PhasePattern.codec p
 
 fromJson :: Value.Value -> Either Text.Text ReplacementEffect.ReplacementEffect
 fromJson value = do
@@ -47,7 +48,7 @@ fromJson value = do
       dest <- Zone.fromJson z
       pure (ReplacementEffect.ZoneChangeR pattern_ dest)
     ("EntryR", Just (Value.Array (Array.MkArray [p, r]))) -> do
-      pattern_ <- Filter.fromJson Keyword.fromJson p
+      pattern_ <- Codec.decode (Filter.codec Keyword.codec) p
       rewrite <- EntryRewrite.fromJson r
       pure (ReplacementEffect.EntryR pattern_ rewrite)
     ("DamageR", Just (Value.Array (Array.MkArray [p, r]))) -> do
@@ -64,8 +65,8 @@ fromJson value = do
       scaling <- Scaling.fromJson sc
       pure (ReplacementEffect.TokenR pattern_ scaling)
     ("TurnUpR", Just (Value.Array (Array.MkArray [p, r]))) -> do
-      pattern_ <- Filter.fromJson Keyword.fromJson p
+      pattern_ <- Codec.decode (Filter.codec Keyword.codec) p
       rewrite <- TurnUpRewrite.fromJson r
       pure (ReplacementEffect.TurnUpR pattern_ rewrite)
-    ("PhaseR", Just v) -> ReplacementEffect.PhaseR <$> PhasePattern.fromJson v
+    ("PhaseR", Just v) -> ReplacementEffect.PhaseR <$> Codec.decode PhasePattern.codec v
     _ -> Left . Text.pack $ "unknown ReplacementEffect: " <> t

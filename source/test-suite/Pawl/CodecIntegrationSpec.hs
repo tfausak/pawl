@@ -9,7 +9,6 @@ module Pawl.CodecIntegrationSpec where
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.GameEvent as GameEvent.Codec
 import qualified Pawl.Codec.Printing as Printing.Codec
@@ -21,6 +20,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -223,8 +223,13 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
 -- sort order, lives in Pawl.Codec.TriggeredAbilitySpec now.
 
 -- Binding's own per-constructor coverage (the empty binding, and every field
--- populated at once, exercising Subtype.fromJsonPair) and its toJsonMap/
--- fromJsonMap sort-by-slot-name proof live in Pawl.Codec.BindingSpec now.
+-- populated at once) and its toJsonMap/fromJsonMap sort-by-slot-name proof
+-- live in Pawl.Codec.BindingSpec now. Quantity.fromJsonPair -- the
+-- characteristicPT pair's decoder -- is exercised directly in
+-- Pawl.Codec.QuantitySpec, not here: BindingSpec's "every field populated"
+-- case sets Binding.copy from ProjectedCharacteristicsSpec.testCharacteristics,
+-- whose characteristicPT is Nothing, so the key is absent and
+-- Common.defaultedField never calls the decoder.
 -- DelayedTrigger's own per-constructor coverage (CR 603.7a/603.7b's default,
 -- and each of a restricted window and a stated expiry) lives in
 -- Pawl.Codec.DelayedTriggerSpec now. Neither needed a registry fixture -- a synthetic Binding/Card stand-in

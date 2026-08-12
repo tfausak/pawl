@@ -3,8 +3,9 @@
 module Pawl.Codec.StaticAbilitySpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.StaticAbility as StaticAbility
+import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -93,7 +94,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           (const True)
           (const False)
           ( StaticAbility.fromJson
-              (Common.object [Common.pair "affected" (Common.tagged "Attached" Nothing), Common.pair "modifications" (Common.array [])])
+              (Value.object [Value.pair "affected" (Common.tagged "Attached" Nothing), Value.pair "modifications" (Value.array [])])
           )
       )
       "an empty array does not decode"

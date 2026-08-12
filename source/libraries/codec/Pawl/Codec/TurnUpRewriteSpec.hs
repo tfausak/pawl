@@ -2,8 +2,8 @@
 
 module Pawl.Codec.TurnUpRewriteSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind

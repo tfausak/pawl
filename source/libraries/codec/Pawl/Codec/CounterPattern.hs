@@ -1,12 +1,13 @@
 module Pawl.Codec.CounterPattern where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ControllerRelation as ControllerRelation
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterPattern as CounterPattern
 
@@ -17,21 +18,21 @@ defaultWhose = ControllerRelation.Anyones
 
 toJson :: CounterPattern.CounterPattern -> Value.Value
 toJson p =
-  Common.object
-    ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (CounterKind.toJson Keyword.toJson)) (CounterPattern.whichKind p)
+  Value.object
+    ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (Codec.encode (CounterKind.codec Keyword.codec))) (CounterPattern.whichKind p)
         <> Common.optionalPair "byWhom" Nothing (Common.encodeMaybe ControllerRelation.toJson) (CounterPattern.byWhom p)
         <> Common.optionalPair "whose" defaultWhose ControllerRelation.toJson (CounterPattern.whose p)
-        <> Common.requiredPair "onWhat" (Filter.toJson Keyword.toJson) (CounterPattern.onWhat p)
+        <> Common.requiredPair "onWhat" (Codec.encode (Filter.codec Keyword.codec)) (CounterPattern.onWhat p)
         <> Common.optionalPair "onWho" Nothing (Common.encodeMaybe ControllerRelation.toJson) (CounterPattern.onWho p)
     )
 
 fromJson :: Value.Value -> Either Text.Text CounterPattern.CounterPattern
 fromJson value = do
   ps <- Common.asObject value
-  k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe (CounterKind.fromJson Keyword.fromJson)) ps
+  k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe (Codec.decode (CounterKind.codec Keyword.codec))) ps
   b <- Common.defaultedField "byWhom" Nothing (Common.decodeMaybe ControllerRelation.fromJson) ps
   w <- Common.defaultedField "whose" defaultWhose ControllerRelation.fromJson ps
-  o <- Common.field "onWhat" ps >>= Filter.fromJson Keyword.fromJson
+  o <- Common.field "onWhat" ps >>= Codec.decode (Filter.codec Keyword.codec)
   p <- Common.defaultedField "onWho" Nothing (Common.decodeMaybe ControllerRelation.fromJson) ps
   pure
     CounterPattern.MkCounterPattern

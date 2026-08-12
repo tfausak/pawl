@@ -2,18 +2,18 @@ module Pawl.Codec.Clause where
 
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Optionality as Optionality
 import qualified Pawl.Codec.UnlessPaid as UnlessPaid
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Optionality as Optionality
 
 toJson :: (Eq card) => (card -> Value.Value) -> Clause.Clause card -> Value.Value
 toJson codec c =
-  Common.object . concat $
+  Value.object . concat $
     [ -- R2 again: CR 701.46a's "if" is the marked case, and stating no gate is
       -- what every other card in the corpus does.
       Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (Clause.condition c),

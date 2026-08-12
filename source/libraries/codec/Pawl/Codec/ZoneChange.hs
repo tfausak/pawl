@@ -1,15 +1,15 @@
 module Pawl.Codec.ZoneChange where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 toJson :: ZoneChange.ZoneChange -> Value.Value
 toJson zc =
-  Common.object . concat $
+  Value.object . concat $
     [ Common.requiredPair "departed" ObjectId.toJson (ZoneChange.departed zc),
       Common.requiredPair "object" ObjectId.toJson (ZoneChange.object zc),
       Common.requiredPair "from" Zone.toJson (ZoneChange.from zc),

@@ -2,8 +2,8 @@
 
 module Pawl.Codec.DesignationSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Designation as Designation
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Designation as Designation
 

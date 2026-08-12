@@ -2,49 +2,47 @@
 
 module Pawl.Codec.SupertypeSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Supertype as Supertype
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Supertype as Supertype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Supertype" $ do
   Spec.it s "Basic" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Supertype.toJson
-      Supertype.fromJson
+      Supertype.codec
       Supertype.Basic
       """ {"type":"Basic"} """
 
   Spec.it s "Legendary" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Supertype.toJson
-      Supertype.fromJson
+      Supertype.codec
       Supertype.Legendary
       """ {"type":"Legendary"} """
 
   Spec.it s "Ongoing" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Supertype.toJson
-      Supertype.fromJson
+      Supertype.codec
       Supertype.Ongoing
       """ {"type":"Ongoing"} """
 
   Spec.it s "Snow" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Supertype.toJson
-      Supertype.fromJson
+      Supertype.codec
       Supertype.Snow
       """ {"type":"Snow"} """
 
   Spec.it s "World" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Supertype.toJson
-      Supertype.fromJson
+      Supertype.codec
       Supertype.World
       """ {"type":"World"} """
+
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s Supertype.codec

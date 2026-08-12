@@ -3,7 +3,7 @@
 module Pawl.Codec.AlternativeCostSpec where
 
 import qualified Pawl.Codec.AlternativeCost as AlternativeCost
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Color as Color

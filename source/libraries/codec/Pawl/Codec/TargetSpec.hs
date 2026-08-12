@@ -2,13 +2,14 @@ module Pawl.Codec.TargetSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TargetCount as TargetCount
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -22,16 +23,16 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- counts spend a key.
 toJson :: TargetSpec.TargetSpec -> Value.Value
 toJson spec =
-  Common.object $
+  Value.object $
     Common.requiredPair "pool" Pool.toJson (TargetSpec.pool spec)
-      <> Common.optionalPair "filter" Nothing (Common.encodeMaybe (Filter.toJson Keyword.toJson)) (TargetSpec.filter spec)
+      <> Common.optionalPair "filter" Nothing (Common.encodeMaybe (Codec.encode (Filter.codec Keyword.codec))) (TargetSpec.filter spec)
       <> Common.optionalPair "count" TargetCount.one TargetCount.toJson (TargetSpec.count spec)
 
 fromJson :: Value.Value -> Either Text.Text TargetSpec.TargetSpec
 fromJson value = do
   ps <- Common.asObject value
   p <- Common.field "pool" ps >>= Pool.fromJson
-  f <- Common.defaultedField "filter" Nothing (Common.decodeMaybe (Filter.fromJson Keyword.fromJson)) ps
+  f <- Common.defaultedField "filter" Nothing (Common.decodeMaybe (Codec.decode (Filter.codec Keyword.codec))) ps
   c <- Common.defaultedField "count" TargetCount.one TargetCount.fromJson ps
   pure
     TargetSpec.MkTargetSpec
@@ -45,7 +46,7 @@ fromJson value = do
 toJsonMap :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value.Value
 toJsonMap m =
   Common.encodeList
-    (\(k, v) -> Common.object [Common.pair "slot" (SlotName.toJson k), Common.pair "spec" (toJson v)])
+    (\(k, v) -> Value.object [Value.pair "slot" (SlotName.toJson k), Value.pair "spec" (toJson v)])
     (Map.toAscList m)
 
 fromJsonMap :: Value.Value -> Either Text.Text (Map.Map SlotName.SlotName TargetSpec.TargetSpec)
