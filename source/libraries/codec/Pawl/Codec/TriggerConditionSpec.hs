@@ -19,6 +19,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -532,3 +533,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")))
       """ {"type":"LoseControlOfBound","value":"target"} """
+  -- CR 309.4c. No dungeon card prints this condition -- Pawl.Engine.Dungeon mints
+  -- one per room -- but it round-trips like every other arm.
+  Spec.it s "RoomEntered round-trips its room" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.RoomEntered (RoomIndex.MkRoomIndex 3))
+      """ {"type":"RoomEntered","value":3} """

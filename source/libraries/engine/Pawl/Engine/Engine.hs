@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
@@ -667,6 +668,11 @@ placePendingTriggers = do
       -- reason as the three above. At most one entry, and only for the active
       -- player, who is the only one with a precombat main phase this turn.
       irradiated = Rad.inherentPending evs gs
+      -- CR 309.4c's room abilities, gathered separately for the reason the four
+      -- above are: a dungeon card is in the command zone, which Event.gatherTriggers
+      -- does not scan (#348). Unlike them these DO have a source, so they carry
+      -- TriggerSource.OfObject and go on the stack through placeBorne.
+      entered = Dungeon.roomPending evs gs
   State.put
     gs
       { GameState.scannedThrough = Natural.length (GameState.events gs),
@@ -682,7 +688,7 @@ placePendingTriggers = do
         GameState.controlWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
-  gathered <- reactions (pending <> inherent <> revving <> irradiated)
+  gathered <- reactions (pending <> inherent <> revving <> irradiated <> entered)
   -- CR 603.3b's two sentences, run one after the other rather than ordered
   -- together and placed at the end. The rule's first sentence PUTS its abilities
   -- on the stack before its second is reached, and that is observable twice over:
@@ -846,6 +852,7 @@ placeBorne srcId pending = do
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
+            Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False

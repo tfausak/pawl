@@ -40,6 +40,7 @@ import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetCount as TargetCount
@@ -174,6 +175,18 @@ data Prompt r where
   -- omission: the player is tempted anyway, so Pawl.Engine.Ring.tempt still counts
   -- the temptation and still gives them the emblem.
   ChooseRingBearer :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The ObjectId is
+  -- the dungeon card their marker is on; the NonEmpty is the rooms the arrows out
+  -- of their current room lead to, and the answer is the ONE they move into.
+  --
+  -- CHOOSE, not target, ChooseRingBearer's posture: rule 701.49b says "they choose
+  -- one of them to follow", so nothing is declared as a target and nothing is
+  -- re-checked at resolution.
+  --
+  -- Raised only for TWO OR MORE arrows, ChooseRingBearer's shape and for its
+  -- reason: CR 309.5a makes the choice conditional on there being several ("if
+  -- there are MULTIPLE arrows"), so a room with one arrow leaves nothing to ask.
+  ChooseRoom :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty RoomIndex.RoomIndex -> Prompt RoomIndex.RoomIndex
   -- | CR 704.5j: which of two or more same-named legendary permanents its
   -- controller keeps. The NonEmpty is the whole same-named group; the answer is the
   -- ONE that survives.

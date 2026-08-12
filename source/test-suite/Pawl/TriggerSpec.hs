@@ -270,6 +270,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -7459,6 +7460,10 @@ representativeEvents cond =
         -- arbitrary -- this condition binds nothing from the log, which is what
         -- Event.eventBindingSlots claims for it.
         TriggerCondition.LoseControlOfBound _ -> one (GameEvent.ControlChanged departed S.alice S.bob)
+        -- CR 309.4c's own event. The dungeon id and the room are arbitrary: this
+        -- condition binds nothing from the log, which is what
+        -- Event.eventBindingSlots claims for it.
+        TriggerCondition.RoomEntered _ -> one (GameEvent.VentureMarkerEntered S.alice departed RoomIndex.topmost)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -7527,7 +7532,8 @@ everyTriggerCondition =
     -- player -- which is the claim this list exists to keep honest.
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.You,
     TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent,
-    TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target"))
+    TriggerCondition.LoseControlOfBound (SlotName.MkSlotName (Text.pack "target")),
+    TriggerCondition.RoomEntered RoomIndex.topmost
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something

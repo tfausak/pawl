@@ -29,10 +29,25 @@ data Deck = MkDeck
   { cards :: Map.Map Printing.Printing Natural.Natural,
     -- | CR 903.3: the card designated as this deck's commander, which CR 903.6
     -- starts in the command zone.
-    commander :: Maybe Printing.Printing
+    commander :: Maybe Printing.Printing,
+    -- | CR 309.2: a dungeon card this player owns from OUTSIDE the game, which CR
+    -- 701.49a brings into the command zone the first time they venture.
+    --
+    -- Here for the commander's reason and not the same one. CR 309.2 keeps dungeon
+    -- cards out of the deck and the sideboard both, so this is not one of `cards`
+    -- either -- but outside the game is not a zone (CR 400.11), so unlike the
+    -- commander there is nowhere for it to sit until it is needed. Setup records it
+    -- on the player and mints no object; Pawl.Engine.Dungeon.venture is what brings
+    -- it into the game.
+    --
+    -- ONE dungeon, where CR 309.2a says "a dungeon card they own" out of however
+    -- many they brought and CR 701.49a therefore asks them to choose. With one there
+    -- is nothing to ask. The multi-dungeon choice is unimplemented (#1335).
+    dungeon :: Maybe Printing.Printing
   }
   deriving (Eq, Show)
 
--- | A deck with no commander -- every format but Commander.
+-- | A deck with no commander and no dungeon -- every format but Commander, and
+-- every game nobody ventures in.
 fromCards :: Map.Map Printing.Printing Natural.Natural -> Deck
-fromCards m = MkDeck {cards = m, commander = Nothing}
+fromCards m = MkDeck {cards = m, commander = Nothing, dungeon = Nothing}

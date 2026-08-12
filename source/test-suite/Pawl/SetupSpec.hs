@@ -194,7 +194,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     let build commander =
           S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) $
-            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = commander}
+            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = commander, Deck.dungeon = Nothing}
     Spec.assertEqWith s "forty with a commander" (S.lifeOf S.alice (build (Just shimatsu))) (Just 40)
     Spec.assertEqWith s "twenty without" (S.lifeOf S.alice (build Nothing)) (Just 20)
     Spec.assertEqWith s "and bob, whose deck was never built, keeps CR 103.4's twenty" (S.lifeOf S.bob (build (Just shimatsu))) (Just 20)

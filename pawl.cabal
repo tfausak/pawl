@@ -152,6 +152,8 @@ library codec
     Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.DiscardCause
     Pawl.Codec.DiscardCauseSpec
+    Pawl.Codec.DungeonRoom
+    Pawl.Codec.DungeonRoomSpec
     Pawl.Codec.Duration
     Pawl.Codec.DurationSpec
     Pawl.Codec.Effect
@@ -266,6 +268,8 @@ library codec
     Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.ReplacementOrigin
     Pawl.Codec.ReplacementOriginSpec
+    Pawl.Codec.RoomIndex
+    Pawl.Codec.RoomIndexSpec
     Pawl.Codec.SacrificeRestriction
     Pawl.Codec.SacrificeRestrictionSpec
     Pawl.Codec.Scaling
@@ -372,6 +376,7 @@ library engine
     Pawl.Engine.Decide
     Pawl.Engine.Defender
     Pawl.Engine.Departure
+    Pawl.Engine.Dungeon
     Pawl.Engine.EffectZone
     Pawl.Engine.Engine
     Pawl.Engine.Event
@@ -675,6 +680,7 @@ library types
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
     Pawl.Types.DiscardCause
+    Pawl.Types.DungeonRoom
     Pawl.Types.Duration
     Pawl.Types.Effect
     Pawl.Types.EndingStep
@@ -773,6 +779,7 @@ library types
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.Result
+    Pawl.Types.RoomIndex
     Pawl.Types.SacrificeRestriction
     Pawl.Types.Scaling
     Pawl.Types.Scope
@@ -881,6 +888,7 @@ test-suite pawl-test-suite
     Pawl.DaytimeSpec
     Pawl.DecideSpec
     Pawl.DepartureSpec
+    Pawl.DungeonSpec
     Pawl.EngineSpec
     Pawl.EventSpec
     Pawl.ExpirySpec

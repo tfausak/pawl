@@ -14,6 +14,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -557,6 +558,13 @@ performStateBasedActions = Event.simultaneously $ do
       -- Pawl.Engine.Monarch keeps rule 725's settle-loop work: this module owns
       -- WHEN a state-based action is checked, not what each one means.
       revving = Speed.startingEngines pcs gs
+      -- CR 704.5t / 309.6, from the SAME pre-pass state. Lives in
+      -- Pawl.Engine.Dungeon with the rest of rule 309, the way CR 704.5z lives in
+      -- Pawl.Engine.Speed. Like CR 704.5s it reads the unscanned event log, and for
+      -- the same reason: the rule exempts a dungeon whose room ability has
+      -- triggered but not yet left the stack, and a trigger this settle has not
+      -- scanned is on no stack yet.
+      finishedDungeons = Dungeon.finished gs
       -- CR 704.5s / 714.4, from the SAME pre-pass state as everything above.
       -- Lives in Pawl.Engine.Saga with the rest of rule 714, the way CR 704.5z
       -- lives in Pawl.Engine.Speed.
@@ -761,14 +769,18 @@ performStateBasedActions = Event.simultaneously $ do
       -- action in this pass, so a permanent this same pass destroyed still starts
       -- its controller's engines -- CR 704.3 makes the whole check one event.
       revved = List.foldl' (flip Speed.startEngines) balanced revving
+      -- CR 704.5t / 309.6: "the dungeon card's owner removes it from the game",
+      -- applied to the dungeons classified from the pre-pass board. Applied late
+      -- like every other action in this pass.
+      undungeoned = List.foldl' (flip Dungeon.remove) revved finishedDungeons
       -- A state-based action was performed iff any of the classifications above
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders) || not (null finishedDungeons)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as
   -- Departure.leaveGame -- the two doors that write GameState.result agree.
-  State.put revved {GameState.result = GameState.result revved <|> outcome}
+  State.put undungeoned {GameState.result = GameState.result undungeoned <|> outcome}
   pure acted

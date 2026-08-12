@@ -65,6 +65,7 @@ toJson codec e = case e of
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
   Effect.Proliferate -> Common.nullary "Proliferate"
   Effect.TemptWithTheRing -> Common.nullary "TemptWithTheRing"
+  Effect.Venture -> Common.nullary "Venture"
   Effect.ExileHandThenDraw -> Common.nullary "ExileHandThenDraw"
   Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Value.array [Codec.encode SlotName.codec slot, Codec.encode (Filter.codec Keyword.codec) f, Quantity.toJson q]))
   Effect.RestartGame -> Common.nullary "RestartGame"
@@ -254,6 +255,7 @@ fromJson decode value = do
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
     "TemptWithTheRing" -> Right Effect.TemptWithTheRing
+    "Venture" -> Right Effect.Venture
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
       Just (Value.Array (Array.MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> Codec.decode SlotName.codec sv <*> Codec.decode (Filter.codec Keyword.codec) fv <*> Quantity.fromJson qv

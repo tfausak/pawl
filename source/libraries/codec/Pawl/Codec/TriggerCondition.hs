@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
+import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Codec.TurnScope as TurnScope
@@ -68,6 +69,7 @@ toJson c = case c of
   TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ Codec.encode PlayerRelation.codec r
   TriggerCondition.PlayerBecomesMonarch r -> Common.tagged "PlayerBecomesMonarch" . Just $ Codec.encode PlayerRelation.codec r
   TriggerCondition.LoseControlOfBound s -> Common.tagged "LoseControlOfBound" . Just $ Codec.encode SlotName.codec s
+  TriggerCondition.RoomEntered r -> Common.tagged "RoomEntered" . Just $ Codec.encode RoomIndex.codec r
 
 fromJson :: Value.Value -> Either Text.Text TriggerCondition.TriggerCondition
 fromJson value = do
@@ -120,4 +122,5 @@ fromJson value = do
     ("SagaFinalChapterTriggers", Just v) -> TriggerCondition.SagaFinalChapterTriggers <$> Codec.decode PlayerRelation.codec v
     ("PlayerBecomesMonarch", Just v) -> TriggerCondition.PlayerBecomesMonarch <$> Codec.decode PlayerRelation.codec v
     ("LoseControlOfBound", Just v) -> TriggerCondition.LoseControlOfBound <$> Codec.decode SlotName.codec v
+    ("RoomEntered", Just v) -> TriggerCondition.RoomEntered <$> Codec.decode RoomIndex.codec v
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t

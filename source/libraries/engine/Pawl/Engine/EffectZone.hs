@@ -63,6 +63,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
   Effect.TemptWithTheRing -> Nothing
+  Effect.Venture -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame -> Nothing

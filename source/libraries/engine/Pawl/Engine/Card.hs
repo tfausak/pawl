@@ -109,6 +109,7 @@ faceDownFace =
       Face.replacementEffects = [],
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
+      Face.rooms = Seq.empty,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.enchant = [],
@@ -256,6 +257,13 @@ merge2 l r =
       -- AbilityName do not both survive here, and the right half's is the one
       -- lost (#652).
       Face.delayedAbilities = Map.union (Face.delayedAbilities l) (Face.delayedAbilities r),
+      -- Unreachable rather than merged: CR 709.4's combined view is a Room's, and
+      -- CR 309.2c keeps a dungeon card out of every zone but the command zone, so
+      -- no card has both halves and rooms. Concatenating would be wrong if one ever
+      -- did -- a RoomIndex counts within one face, so the right half's arrows would
+      -- point into the left half's rooms -- but with one side always empty this
+      -- picks whichever side has them.
+      Face.rooms = Face.rooms l <> Face.rooms r,
       Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
       Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
       Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
@@ -829,6 +837,7 @@ subtractHalf face =
       Face.replacementEffects = [],
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
+      Face.rooms = Seq.empty,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.enchant = [],

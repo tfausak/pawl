@@ -1,0 +1,332 @@
+{
+  "faces": [
+    {
+      "name": "Lost Mine of Phandelver",
+      "rooms": [
+        {
+          "exits": [
+            1,
+            2
+          ],
+          "name": "Cave Entrance"
+        },
+        {
+          "ability": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
+                              {
+                                "colorIndicator": [
+                                  {
+                                    "type": "Red"
+                                  }
+                                ],
+                                "name": "Goblin Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Goblin"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "exits": [
+            3,
+            4
+          ],
+          "name": "Goblin Lair"
+        },
+        {
+          "ability": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
+                              {
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
+                                        {
+                                          "type": "TapThis"
+                                        },
+                                        {
+                                          "type": "SacrificeThis"
+                                        }
+                                      ],
+                                      "mana": []
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "AddMana",
+                                                  "value": {
+                                                    "type": "AnyColor"
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                ],
+                                "name": "Treasure Token",
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Treasure"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Artifact"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "exits": [
+            4,
+            5
+          ],
+          "name": "Mine Tunnels"
+        },
+        {
+          "ability": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PutCounters",
+                        "value": [
+                          {
+                            "type": "PlusOnePlusOne"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "target"
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "exits": [
+            6
+          ],
+          "name": "Storeroom"
+        },
+        {
+          "ability": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "LoseLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "Opponent"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
+                      },
+                      {
+                        "type": "GainLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "exits": [
+            6
+          ],
+          "name": "Dark Pool"
+        },
+        {
+          "ability": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "UntilYourNextTurn"
+                          },
+                          {
+                            "type": "ModifyPowerToughness",
+                            "value": [
+                              {
+                                "type": "Literal",
+                                "value": -4
+                              },
+                              {
+                                "type": "Literal",
+                                "value": 0
+                              }
+                            ]
+                          },
+                          "target"
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "exits": [
+            6
+          ],
+          "name": "Fungi Cavern"
+        },
+        {
+          "ability": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Draw",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "name": "Temple of Dumathoin"
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Dungeon"
+          }
+        ]
+      }
+    }
+  ]
+}

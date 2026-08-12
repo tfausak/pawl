@@ -13,6 +13,7 @@ import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
+import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.Codec.ZoneChange as ZoneChange
 import qualified Pawl.Json.Array as Array
@@ -54,6 +55,8 @@ toJson e = case e of
     Common.tagged "AbilityTriggered" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode PlayerId.codec pid, TriggerCondition.toJson cond]
   GameEvent.ControlChanged oid before after ->
     Common.tagged "ControlChanged" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode PlayerId.codec before, Codec.encode PlayerId.codec after]
+  GameEvent.VentureMarkerEntered pid oid room ->
+    Common.tagged "VentureMarkerEntered" . Just . Value.array $ [Codec.encode PlayerId.codec pid, Codec.encode ObjectId.codec oid, Codec.encode RoomIndex.codec room]
 
 fromJson :: Value.Value -> Either Text.Text GameEvent.GameEvent
 fromJson value = do
@@ -92,4 +95,6 @@ fromJson value = do
       GameEvent.AbilityTriggered <$> Codec.decode ObjectId.codec oid <*> Codec.decode PlayerId.codec pid <*> TriggerCondition.fromJson cond
     ("ControlChanged", Just (Value.Array (Array.MkArray [oid, before, after]))) ->
       GameEvent.ControlChanged <$> Codec.decode ObjectId.codec oid <*> Codec.decode PlayerId.codec before <*> Codec.decode PlayerId.codec after
+    ("VentureMarkerEntered", Just (Value.Array (Array.MkArray [pid, oid, room]))) ->
+      GameEvent.VentureMarkerEntered <$> Codec.decode PlayerId.codec pid <*> Codec.decode ObjectId.codec oid <*> Codec.decode RoomIndex.codec room
     _ -> Left . Text.pack $ "unknown GameEvent: " <> t

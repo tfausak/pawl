@@ -1507,6 +1507,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.TemptWithTheRing -> effect
+  Effect.Venture -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
   Effect.RestartGame -> effect
@@ -1830,6 +1831,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- text change may well have rewritten, and that is read off the projection rather
   -- than out of the condition.
   TriggerCondition.LoseControlOfBound _ -> condition
+  TriggerCondition.RoomEntered _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

@@ -25,6 +25,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Decide as Decide
@@ -105,6 +106,7 @@ theRingEmblem =
               Face.replacementEffects = [],
               Face.triggeredAbilities = [],
               Face.delayedAbilities = Map.empty,
+              Face.rooms = Seq.empty,
               Face.castingPermissions = [],
               Face.castingRestrictions = [],
               Face.enchant = [],
