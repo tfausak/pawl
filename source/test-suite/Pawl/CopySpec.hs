@@ -5,7 +5,8 @@
 -- from inside Pawl.Engine.Event's changeZone) and its CR 707.9 exceptions
 -- (Replacement.applyCopyExceptions, Quicksilver Gargantuan), the P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
--- Counterpart and Watchful Radstag). Gameplay-level: Clone enters via the
+-- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
+-- count buys, kicked Rite of Replication). Gameplay-level: Clone enters via the
 -- zone-change funnel, the Counterpart is cast and resolved and the Radstag
 -- evolves, and their projected characteristics are asserted.
 module Pawl.CopySpec where
@@ -421,9 +422,28 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
   -- -2/-2 and CR 704.5f buries it. The token is still created, and is the
   -- Radstag's COPIABLE values -- so a fallback onto the last known PROJECTION
   -- would mint a -2/-2 that dies at once and leave no token at all.
+  Spec.it s "a Radstag killed in response still mints its token copy (CR 608.2h)" $ do
+    radstag <- S.printingOf s registry "Watchful Radstag"
+    giant <- S.printingOf s registry "Hill Giant"
+    let (radstagId, board) = S.addCreature radstag S.alice (Setup.emptyGame S.bothPlayers)
+        (_, entered) = S.entersWithTrigger giant S.alice board
+        -- The evolve ability resolves; the settle that follows puts the
+        -- Radstag's own "whenever this creature evolves" on the stack.
+        onStack = resolveAndSettle declineCopy (settle declineCopy entered)
+        shrunk = S.withEffect radstagId (Modification.ModifyPowerToughness (Quantity.Type.Literal (-5)) (Quantity.Type.Literal (-5))) onStack
+        dead = settle declineCopy shrunk
+        after = resolveAll declineCopy dead
+    Spec.assertBool s (not (null (GameState.stack onStack))) "the Radstag's trigger really was on the stack"
+    Spec.assertEqWith s "and the Radstag is gone before it resolves" (Set.member radstagId (GameState.battlefield dead)) False
+    case tokensOnBattlefield after of
+      [tokenId] -> do
+        Spec.assertEqWith s "the token is a Radstag all the same" (PC.name (Projection.project tokenId after)) $ CardName.MkCardName (Text.pack "Watchful Radstag")
+        Spec.assertEqWith s "at its copiable 2/2, not the -2/-2 it died at" (S.powerToughnessOf tokenId after) $ Just (2, 2)
+      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
   -- CR 707.1's count. Nine Islands is the KICKED cost ({2}{U}{U} plus {5}), and
-  -- the unkicked test below is the same board, the same answerer and the same
-  -- pinned target but for the one kicker answer -- so the count is the only
+  -- the kicked test that follows is the same board, the same answerer and the
+  -- same pinned target but for the one kicker answer -- so the count is the only
   -- thing the two boards disagree about.
   Spec.it s "unkicked Rite of Replication mints one token copy (CR 707.1)" $ do
     island <- S.printingOf s registry "Island"
@@ -469,22 +489,3 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         resolved = castAndResolve (rites KickerDecision.Kicks cloneId) rite board
     Spec.assertEqWith s "five tokens entered, and every one copied the Giant rather than an entering sibling" (mintedTokens resolved) (replicate 5 (CardName.MkCardName (Text.pack "Hill Giant"), Just (3, 3)))
     Spec.assertEqWith s "the copied Clone itself still copied nothing" (S.powerToughnessOf cloneId resolved) (Just (1, 1))
-
-  Spec.it s "a Radstag killed in response still mints its token copy (CR 608.2h)" $ do
-    radstag <- S.printingOf s registry "Watchful Radstag"
-    giant <- S.printingOf s registry "Hill Giant"
-    let (radstagId, board) = S.addCreature radstag S.alice (Setup.emptyGame S.bothPlayers)
-        (_, entered) = S.entersWithTrigger giant S.alice board
-        -- The evolve ability resolves; the settle that follows puts the
-        -- Radstag's own "whenever this creature evolves" on the stack.
-        onStack = resolveAndSettle declineCopy (settle declineCopy entered)
-        shrunk = S.withEffect radstagId (Modification.ModifyPowerToughness (Quantity.Type.Literal (-5)) (Quantity.Type.Literal (-5))) onStack
-        dead = settle declineCopy shrunk
-        after = resolveAll declineCopy dead
-    Spec.assertBool s (not (null (GameState.stack onStack))) "the Radstag's trigger really was on the stack"
-    Spec.assertEqWith s "and the Radstag is gone before it resolves" (Set.member radstagId (GameState.battlefield dead)) False
-    case tokensOnBattlefield after of
-      [tokenId] -> do
-        Spec.assertEqWith s "the token is a Radstag all the same" (PC.name (Projection.project tokenId after)) $ CardName.MkCardName (Text.pack "Watchful Radstag")
-        Spec.assertEqWith s "at its copiable 2/2, not the -2/-2 it died at" (S.powerToughnessOf tokenId after) $ Just (2, 2)
-      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
