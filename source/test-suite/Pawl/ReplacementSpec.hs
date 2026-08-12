@@ -4256,10 +4256,10 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
   -- -- so no two readings of the rule land on the same board.
   --
   -- The counter is written onto a Hill Giant rather than carried by Swooping
-  -- Protector for the reason the case above writes one onto a Piker, plus one more:
-  -- the bird's toughness of 1 makes "survived" unreachable, and survival is half of
-  -- what tells the two answers apart. Its arrival through a real card is proven by
-  -- the CR 122.6 case at the top of this group.
+  -- Protector because the bird's toughness of 1 makes "survived" unreachable, and
+  -- survival is half of what tells the two answers apart. What is under test is
+  -- which event the counter reaches and not how it got there; a real card putting
+  -- it there is the CR 122.6 case at the top of this group.
   --
   -- The DAMAGE BATCH is hand-built and the shield is a real rule's, for
   -- mendingHandsSpec's reason -- and here the batch's gather order is itself the
