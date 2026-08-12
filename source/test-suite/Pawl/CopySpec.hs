@@ -2,7 +2,8 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers: Pawl.Engine.Replacement's EntryR AsCopy arm (the CR 614.12a copy choice, run
--- from inside Pawl.Engine.Event's changeZone), the P2 copy gate (Clone), and
+-- from inside Pawl.Engine.Event's changeZone) and its CR 707.9 exceptions
+-- (Replacement.applyCopyExceptions, Quicksilver Gargantuan), the P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
 -- Counterpart and Watchful Radstag). Gameplay-level: Clone enters via the
 -- zone-change funnel, the Counterpart is cast and resolved and the Radstag
@@ -35,13 +36,17 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Subtype as Subtype
 
--- The battlefield objects whose printed card is named "Clone" (their source is
--- unchanged by copying -- only their projected characteristics change).
-clonesOnBattlefield :: GameState.GameState -> [ObjectId]
-clonesOnBattlefield gs = filter isClone (Set.toList (GameState.battlefield gs))
+-- The battlefield objects whose PRINTED card has this name (a printed card is
+-- unchanged by copying -- only the object's projected characteristics change).
+printedOnBattlefield :: String -> GameState.GameState -> [ObjectId]
+printedOnBattlefield name gs = filter isIt (Set.toList (GameState.battlefield gs))
   where
-    isClone oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Clone")) (Game.faceOf oid gs)
+    isIt oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack name)) (Game.faceOf oid gs)
+
+clonesOnBattlefield :: GameState.GameState -> [ObjectId]
+clonesOnBattlefield = printedOnBattlefield "Clone"
 
 cloneOnBattlefield :: GameState.GameState -> Maybe ObjectId
 cloneOnBattlefield = Maybe.listToMaybe . clonesOnBattlefield
@@ -51,14 +56,17 @@ cloneOnBattlefield = Maybe.listToMaybe . clonesOnBattlefield
 newest :: [ObjectId] -> Maybe ObjectId
 newest = Maybe.listToMaybe . List.sortOn Ord.Down
 
--- Answers the as-enters copy choice with the highest-id legal target (the most
--- recently entered creature), declining only when none is legal. Delegates every
--- other prompt to S.identityAnswer.
--- Names a copy target that was never offered -- the lying interpreter #222 is
--- about. legalCopyTargets is the ONLY thing enforcing CR 614.12a's same-batch
--- exclusion, so an unchecked answer would let a Clone copy something it may not.
-copyForbidden :: ObjectId -> Prompt.Prompt r -> r
-copyForbidden wanted p = case p of
+-- Answers the as-enters copy choice with ONE NAMED object, whatever else is
+-- legal, and delegates every other prompt to S.identityAnswer. Pinned rather
+-- than searched (copyNewest's posture below) so that a mutation cannot be
+-- repaired by the answerer finding some other legal source.
+--
+-- The same function serves the #222 case with an id that is not legal at all --
+-- the lying interpreter. legalCopyTargets is the ONLY thing enforcing CR
+-- 614.12a's same-batch exclusion, so an unchecked answer would let a Clone copy
+-- something it may not.
+copyNamed :: ObjectId -> Prompt.Prompt r -> r
+copyNamed wanted p = case p of
   Prompt.ChooseCopyTarget {} -> Just wanted
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -145,7 +153,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
     let gs0 = Setup.emptyGame S.bothPlayers
         (_, staged) = S.spellOnStack clone S.alice gs0
         phantom = ObjectId.MkObjectId 9999
-        resolved = resolveAndSettle (copyForbidden phantom) staged
+        resolved = resolveAndSettle (copyNamed phantom) staged
     Spec.assertEqWith s "the Clone copied nothing and died as a 0/0" (cloneOnBattlefield resolved) Nothing
 
   Spec.it s "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $ do
@@ -236,6 +244,78 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the source moves to 2" (Projection.powerOf goyfId later) $ Just 2
         Spec.assertEqWith s "and so does the COPY" (Projection.powerOf cloneId later) $ Just 2
         Spec.assertEqWith s "the copy's toughness moves too" (Projection.toughnessOf cloneId later) $ Just 3
+
+  -- THE PROVING TEST for CR 707.9's exceptions. Quicksilver Gargantuan is CR
+  -- 707.9d's own worked example: "except it's 7/7".
+  --
+  -- Three readings of the same Tarmogoyf on one board, and all three differ. The
+  -- ORIGINAL carries a +1/+1 counter, so it projects one above its CDA; a Clone
+  -- is the copy WITHOUT the exception, so it recomputes the CDA (CR 707.2a) at
+  -- the counter-free value; the Gargantuan is the copy WITH it. Both copies are
+  -- pinned to the Goyf rather than to each other, so neither reading can borrow
+  -- the other's.
+  Spec.it s "Quicksilver Gargantuan copies a Tarmogoyf but is 7/7 (CR 707.9b, CR 707.9d)" $ do
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    clone <- S.printingOf s registry "Clone"
+    gargantuan <- S.printingOf s registry "Quicksilver Gargantuan"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        -- One card type in a graveyard: the Goyf's CDA is 1/2.
+        (_, withBolt) = S.addGraveyardCard lightningBolt S.alice gs0
+        (goyfId, board0) = S.addCreature tarmogoyf S.alice withBolt
+        board = S.addCounter CounterKind.PlusOnePlusOne 1 goyfId board0
+        (_, stagedClone) = S.spellOnStack clone S.alice board
+        withClone = resolveAndSettle (copyNamed goyfId) stagedClone
+        (_, stagedGargantuan) = S.spellOnStack gargantuan S.alice withClone
+        resolved = resolveAndSettle (copyNamed goyfId) stagedGargantuan
+        -- A second card type reaches a graveyard AFTER both copies entered.
+        (_, later) = S.addGraveyardCard piker S.bob resolved
+    case (cloneOnBattlefield resolved, newest (printedOnBattlefield "Quicksilver Gargantuan" resolved)) of
+      (Just cloneId, Just gargantuanId) -> do
+        Spec.assertEqWith s "the original is its CDA plus the counter" (S.powerToughnessOf goyfId resolved) $ Just (2, 3)
+        Spec.assertEqWith s "the copy without the exception is the bare CDA" (S.powerToughnessOf cloneId resolved) $ Just (1, 2)
+        Spec.assertEqWith s "the copy with it is 7/7" (S.powerToughnessOf gargantuanId resolved) $ Just (7, 7)
+        -- CR 707.2 still ran: only P/T is excepted.
+        Spec.assertEqWith s "and is otherwise the Goyf" (PC.name (Projection.project gargantuanId resolved)) $ CardName.MkCardName (Text.pack "Tarmogoyf")
+        Spec.assertBool s (Set.member Subtype.Lhurgoyf (PC.subtypes (Projection.project gargantuanId resolved))) "the Gargantuan copied the Goyf's subtype"
+        -- CR 707.9d: the CDA defining the excepted characteristic was not copied,
+        -- so the Gargantuan alone does not move when the graveyards do.
+        Spec.assertEqWith s "the original moves with the graveyards" (S.powerToughnessOf goyfId later) $ Just (3, 4)
+        Spec.assertEqWith s "so does the copy that took the CDA" (S.powerToughnessOf cloneId later) $ Just (2, 3)
+        Spec.assertEqWith s "the excepted copy does not" (S.powerToughnessOf gargantuanId later) $ Just (7, 7)
+      _ -> Spec.assertFailure s "the Clone and the Gargantuan should both be on the battlefield"
+
+  -- THE PROVING TEST for WHERE the exception lands: in the copy's own COPIABLE
+  -- values (CR 707.9b), not in a CR 613 layer over them. A token copy of the
+  -- Gargantuan reads the copiable values (CR 707.2), so it is a Tarmogoyf at 7/7
+  -- that ignores the graveyards. Had the exception been layered on the object
+  -- instead, the token would have copied the Goyf's CDA and read 1/2, then 2/3;
+  -- had the token fallen back on its own printed card it would be 7/7 but named
+  -- Quicksilver Gargantuan. The name and the pair together separate all three.
+  --
+  -- The Goyf is BOB's, so the Gargantuan is the Counterpart's only legal target
+  -- ("target creature you control").
+  Spec.it s "a token copy of an excepted copy keeps the exception (CR 707.9b)" $ do
+    island <- S.printingOf s registry "Island"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    tarmogoyf <- S.printingOf s registry "Tarmogoyf"
+    gargantuan <- S.printingOf s registry "Quicksilver Gargantuan"
+    piker <- S.printingOf s registry "Goblin Piker"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    let (_, withBolt) = S.addGraveyardCard lightningBolt S.alice (S.landsInPlay island 3)
+        (goyfId, board) = S.addCreature tarmogoyf S.bob withBolt
+        (_, staged) = S.spellOnStack gargantuan S.alice board
+        withGargantuan = resolveAndSettle (copyNamed goyfId) staged
+        resolved = castAndResolve declineCopy counterpart withGargantuan
+        (_, later) = S.addGraveyardCard piker S.bob resolved
+    case tokensOnBattlefield resolved of
+      [tokenId] -> do
+        Spec.assertEqWith s "the token is named for the Goyf, not the Gargantuan" (PC.name (Projection.project tokenId resolved)) $ CardName.MkCardName (Text.pack "Tarmogoyf")
+        Spec.assertEqWith s "and is 7/7, the excepted value" (S.powerToughnessOf tokenId resolved) $ Just (7, 7)
+        Spec.assertEqWith s "the Goyf itself moves with the graveyards" (S.powerToughnessOf goyfId later) $ Just (2, 3)
+        Spec.assertEqWith s "the token does not" (S.powerToughnessOf tokenId later) $ Just (7, 7)
+      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
 
   Spec.it s "Cackling Counterpart mints a token copy of the targeted creature (CR 707.2, CR 111.3)" $ do
     island <- S.printingOf s registry "Island"
