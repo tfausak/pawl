@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -45,8 +46,8 @@ spec s = Spec.describe s "Pawl.Codec.TargetSpec" $ do
       s
       TargetSpec.toJson
       TargetSpec.fromJson
-      (TargetSpec.required (Pool.CardsInGraveyard PlayerScope.You) (Just (Filter.HasCardType CardType.Creature)))
-      """ {"pool":{"type":"CardsInGraveyard","value":{"type":"You"}},"filter":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      (TargetSpec.required (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You)) (Just (Filter.HasCardType CardType.Creature)))
+      """ {"pool":{"type":"CardsInGraveyard","value":{"type":"Scoped","value":{"type":"You"}}},"filter":{"type":"HasCardType","value":{"type":"Creature"}}} """
   -- CR 115.2 clause (a)'s other zone: no PlayerScope (CR 400.1's shared zone)
   -- and no Filter.
   Spec.it s "a required spec: over exile, scopeless and unfiltered" $

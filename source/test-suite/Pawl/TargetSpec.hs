@@ -11,10 +11,10 @@
 -- a group of them covers rule 702.11's "hexproof from [quality]" variant (CR
 -- 702.11d and 702.11e), the only restriction here that reads what the SOURCE is
 -- rather than who controls it, ending on Knight of Grace's printing -- and the
--- last ten cover CR 115.2's two escape hatches from "only permanents are legal
+-- rest cover CR 115.2's two escape hatches from "only permanents are legal
 -- targets": its clause (b) as Cancel and Stifle, its clause (a) as Raise Dead,
--- Withered Wretch and Riftsweeper. (Those letters are prose inside rule 115.2,
--- not subrule numbers; there is no CR 115.2a.)
+-- Withered Wretch, Riftsweeper and Dwell on the Past. (Those letters are prose
+-- inside rule 115.2, not subrule numbers; there is no CR 115.2a.)
 --
 -- Raise Dead and Withered Wretch are the two halves of CR 400.1's per-player
 -- axis -- "in your graveyard" against "from a graveyard" -- and the case that
@@ -25,6 +25,11 @@
 -- 400.1 says are "shared by all players", so its pool has no per-player axis at
 -- all, and the case that reads it reads Withered Wretch's off the same board so
 -- neither off-battlefield pool can swallow the other.
+--
+-- Dwell on the Past is the third reading of that axis, and the only one no
+-- perspective answers: "their graveyard" is whoever the spell's OTHER slot
+-- targets, so its case is about CR 601.2c's one announcement over two slots
+-- rather than about the pool alone.
 --
 -- The last case is hexproof's other axis: not who is targeting but WHETHER THE
 -- KEYWORD IS THERE AT ALL. Dawnglade Regent grants it through a CR 604.2 "as
@@ -50,6 +55,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -68,6 +74,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -121,6 +128,27 @@ aimAtCardShuffling :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCardShuffling oid p = case p of
   Prompt.Shuffle ids -> reverse ids
   _ -> aimAtCard oid p
+
+-- CR 601.2c's whole announcement for Dwell on the Past: bob in the player slot
+-- and `oids` in the card slot, with as many cards announced as there are.
+--
+-- PINNED rather than searched, and pinned to a set the offer may not contain:
+-- the case's point is a card that WAS offered (the union over both graveyards)
+-- and is still an illegal answer beside bob, so an answerer that filtered
+-- against `legal` would hand back an empty slot and the announcement would fail
+-- on its COUNT instead -- passing for a reason the case is not about.
+aimingDwell :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+aimingDwell oids p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const (Natural.length oids)) offers
+  Prompt.ChooseTargets _ _ _ asked ->
+    Map.mapWithKey
+      ( \slot _ ->
+          if slot == SlotName.MkSlotName (Text.pack "player")
+            then Set.singleton (Recipient.ToPlayer S.bob)
+            else Set.fromList (fmap Recipient.ToObject oids)
+      )
+      asked
+  _ -> S.identityAnswer p
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
@@ -837,7 +865,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- mistake and any of them alone would pass against a pool that stayed empty:
   --
   --   * CR 400.1's per-player zone -- "each player has their own library, hand,
-  --     and graveyard" -- is why the pool carries a PlayerScope at all, and
+  --     and graveyard" -- is why the pool carries a GraveyardScope at all, and
   --     bob's copy of the very same card is what proves the axis is real rather
   --     than decorative. It cannot be a Filter: CR 108.4 says "a card doesn't
   --     have a controller unless that card represents a permanent or spell", so
@@ -1182,6 +1210,67 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "with exile empty when the trigger resolved (the card was shuffled in)" (Set.size (GameState.exile shuffledIn)) 0
     Spec.assertEqWith s "and empty when it fizzled too (the card was taken to hand)" (Set.size (GameState.exile fizzled)) 0
     Spec.assertEqWith s "with the ability off the stack" (length (GameState.stack fizzled)) 0
+
+  -- CR 601.2c: "the player announces their choice of an appropriate object or
+  -- player for each target the spell requires." ONE announcement over every
+  -- slot, not one slot at a time -- and Dwell on the Past is the first card in
+  -- the pool whose slots are not independent. "Target player shuffles up to four
+  -- target cards from THEIR graveyard into their library" scopes the card slot's
+  -- pool, CR 400.1's per-player graveyard, to whoever the player slot names.
+  --
+  -- The engine offers the UNION over the player slot's own candidates, which is
+  -- what the first assertion pins, and judges the announcement WHOLE
+  -- (Target.selectionLegal). That is the rule's "all at once" without inventing
+  -- an order between the slots -- and the union is why the second run's card has
+  -- to be rejected by the joint check rather than by never having been offered.
+  --
+  -- THREE SEATS, because two collapse the reading under test: with alice and bob
+  -- alone, "bob's graveyard" and "not the caster's graveyard" pick out the same
+  -- cards, so a pool that had scoped itself to PlayerScope.Opponents would pass.
+  -- carol's card is the one only the slot scoping can exclude.
+  --
+  -- The three runs differ in EXACTLY ONE thing apiece: which graveyard the
+  -- chosen cards sit in, and how many of them. All three name bob in the player
+  -- slot and pay the same {G} off the same Forest, off one board.
+  --
+  -- The two-card run is CR 601.2c's "up to four" reaching the opcode: the slot
+  -- is read as an ObjectRef (SlotArity.Many), so a reader that took one would
+  -- leave the second card in the graveyard, and CR 701.24's plural is what makes
+  -- one shuffle serve both.
+  Spec.it s "CR 601.2c Dwell on the Past's card slot is scoped to the player its other slot targets" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    dwell <- S.printingOf s registry "Dwell on the Past"
+    let (_, g1) = S.addCreature forest S.alice S.threePlayerGame
+        (hisId, g2) = S.addGraveyardCard piker S.bob g1
+        (hisOtherId, g3) = S.addGraveyardCard bolt S.bob g2
+        (hersId, g4) = S.addGraveyardCard bolt S.carol g3
+        (board, dwellId) = S.handOne dwell g4
+        specs = Modal.allTargetSpecs (Face.spell (S.combinedFace dwell))
+        offered = Target.legalSets (Just S.alice) S.noSource specs board
+        slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
+        run oids =
+          let cast = S.runPure (aimingDwell oids) board (S.cast S.alice dwellId)
+           in (cast, S.runPure (aimingDwell oids) cast Stack.resolveTop)
+        (castAtBob, atBob) = run [hisId]
+        (_, atBoth) = run [hisId, hisOtherId]
+        (castAtCarol, _) = run [hersId]
+    Spec.assertEqWith
+      s
+      "the card slot is offered the UNION over the player slot: every graveyard"
+      (slotNamed "cards")
+      (Set.fromList (fmap Recipient.ToObject [hisId, hisOtherId, hersId]))
+    Spec.assertEqWith s "and the player slot every player" (slotNamed "player") (Set.fromList (fmap Recipient.ToPlayer [S.alice, S.bob, S.carol]))
+    Spec.assertEqWith s "naming bob and a card in BOB's graveyard, the spell is cast" (length (GameState.stack castAtBob)) 1
+    Spec.assertBool s (notElem hisId (Game.zoneMembers Zone.Graveyard S.bob atBob)) "and on resolution his card leaves his graveyard"
+    Spec.assertEqWith s "arriving in HIS library (CR 400.3), which was empty" (length (Game.zoneMembers Zone.Library S.bob atBob)) 1
+    Spec.assertEqWith s "leaving his other card behind, unnamed" (Game.zoneMembers Zone.Graveyard S.bob atBob) [hisOtherId]
+    Spec.assertEqWith s "with carol's graveyard untouched" (Game.zoneMembers Zone.Graveyard S.carol atBob) [hersId]
+    Spec.assertEqWith s "naming TWO of his cards, both leave the graveyard" (Game.zoneMembers Zone.Graveyard S.bob atBoth) []
+    Spec.assertEqWith s "and both arrive in his library" (length (Game.zoneMembers Zone.Library S.bob atBoth)) 2
+    Spec.assertEqWith s "naming bob and a card in CAROL's graveyard, the cast is reversed (CR 601.2)" (length (GameState.stack castAtCarol)) 0
+    Spec.assertBool s (elem dwellId (Game.zoneMembers Zone.Hand S.alice castAtCarol)) "and the spell is back in alice's hand"
 
   -- CR 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
   -- a number." Flensing Raptor's enters trigger reads "another target creature

@@ -75,6 +75,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -101,6 +102,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.PreventionRider as PreventionRider
@@ -122,6 +124,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.UnlessPaid as UnlessPaid
@@ -310,7 +313,7 @@ slotsOf effect = case effect of
   Effect.PlaySubgame _ -> Map.empty
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
   Effect.TakeExtraTurn ref _ -> playerRefSlots ref
-  Effect.ShuffleIntoLibrary slot -> oneSlot slot
+  Effect.ShuffleIntoLibrary ref -> objectRefSlots ref
   -- OfferCast's slot is a READ: it names the object being offered, bound by an
   -- earlier effect of the same list (CR 400.7).
   Effect.OfferCast slot _ -> oneSlot slot
@@ -330,21 +333,48 @@ durationSlots duration = case duration of
   Duration.UntilEndOfCombat -> Map.empty
 
 -- Every slot a whole MODE reads: every clause's effects', plus every payer CR
--- 118.12a's "unless [a player] pays" names. What the D4 dataflow lint asks,
--- since a payer slot no effect ALSO reads would otherwise dangle unnoticed. Mana
--- Leak's Counter happens to read the very slot its "unless" names, so the lint's
--- answer is the same either way for the one card in the pool; a card whose payer
--- and target differ is what this exists for.
+-- 118.12a's "unless [a player] pays" names, plus every slot a TARGET SPEC's own
+-- pool names. What the D4 dataflow lint asks, since a payer slot no effect ALSO
+-- reads would otherwise dangle unnoticed. Mana Leak's Counter happens to read
+-- the very slot its "unless" names, so the lint's answer is the same either way
+-- for the one card in the pool; a card whose payer and target differ is what
+-- this exists for.
+--
+-- The third source is Dwell on the Past's: its "target player" slot is read by
+-- no effect at all, only by the other slot's GraveyardScope. That is a read
+-- like any other -- CR 601.2c's announcement is what fills it, and the pool
+-- would be empty without it -- so the lint counts it and the card declares no
+-- unused slot.
 modeSlots :: Mode.Mode Card.Type.Card -> Map.Map SlotName SlotArity
 modeSlots mode =
-  joinTwo
-    (joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))))
-    (joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))))
+  joinSlots
+    [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
+      joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
+      joinSlots (fmap (poolSlot . TargetSpec.pool) (Map.elems (Mode.targetSpecs mode)))
+    ]
   where
     -- Every clause's payer, not just one: CR 118.12a scopes an "unless" to the
     -- clause it is printed on, so a mode may state more than one and each names
     -- a slot the card owes a declaration for.
     payerSlot = maybe Map.empty (oneSlot . UnlessPaid.payer) . Clause.unlessPaid
+
+-- The slot a target pool draws its candidates from, if it draws them from one
+-- (CR 400.1's per-player graveyard). SlotArity.One: "their graveyard" is one
+-- player's, and Target.graveyardRecipients folding several would still be one
+-- slot read singly per player named.
+poolSlot :: Pool.Pool -> Map.Map SlotName SlotArity
+poolSlot pool = case pool of
+  Pool.Creatures -> Map.empty
+  Pool.Players -> Map.empty
+  Pool.AnyTarget -> Map.empty
+  Pool.Permanents -> Map.empty
+  Pool.Spells -> Map.empty
+  Pool.Abilities -> Map.empty
+  Pool.SpellsAndPermanents -> Map.empty
+  Pool.CardsInGraveyard scope -> case scope of
+    GraveyardScope.Scoped _ -> Map.empty
+    GraveyardScope.InSlot slot -> oneSlot slot
+  Pool.CardsInExile -> Map.empty
 
 -- Both sides of a comparison are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Map.Map SlotName SlotArity
@@ -877,7 +907,7 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
             Nothing -> recipients
             -- CR 608.2b's perspective is the SPELL's controller (CR 405.4), read
             -- through the same function resolveSpellWith uses for execution.
-            Just spec -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs) recipients
+            Just spec -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) chosen oid recipient spec gs) recipients
           legal = Map.mapWithKey legalSlot chosen
           targeted = Map.restrictKeys legal (Map.keysSet specs)
        in -- Measured on the TARGETS actually chosen, not on the slots declared: CR
@@ -913,6 +943,9 @@ resolveSpellWith runSubgame oid = do
         -- resolution's legality question.
         let chosenSelection = Binding.modesOf (Object.bindings obj)
             specs = Card.modesTargetSpecs chosenSelection face
+            -- The slots as FILLED, which a slot-scoped pool is re-derived
+            -- against (Target.stillLegal).
+            chosen = Binding.targetsOf (Object.bindings obj)
             -- CR 700.2d: the slots the MODES own, which is `specs` minus CR
             -- 303.4a's enchant slot -- the one the card itself declares, and so
             -- the one every chosen instance can still read.
@@ -925,7 +958,7 @@ resolveSpellWith runSubgame oid = do
               -- Per RECIPIENT and not per slot: CR 608.2b's "illegal targets, if
               -- any, won't be affected" leaves the slot's surviving targets to be
               -- affected as usual.
-              Just spec -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) oid recipient spec gs) recipients
+              Just spec -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) chosen oid recipient spec gs) recipients
          in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
@@ -1076,7 +1109,7 @@ resolveModes stackId srcId modes = do
             -- and may well be gone -- exactly the case this rule is about, and why
             -- the perspective is not read from it. Judged per RECIPIENT, the spell
             -- path's reason.
-            Just spec -> Set.filter (\recipient -> Target.stillLegal (Just effectController) srcId recipient spec gs) recipients
+            Just spec -> Set.filter (\recipient -> Target.stillLegal (Just effectController) chosen srcId recipient spec gs) recipients
           legal = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
           -- reserved slots above cannot rescue an ability whose every target is
@@ -2376,25 +2409,30 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- library still has to be shuffled.
   --
   -- An id that no longer resolves shuffles NOTHING, the one place this falls short
-  -- of rule 701.24c (#558). Unreachable from the pool's card, whose single target
-  -- makes CR 608.2b fizzle the ability first.
+  -- of rule 701.24c (#558). Dwell on the Past reaches it: its player slot keeps
+  -- CR 608.2b from fizzling the spell once every targeted card has left the
+  -- graveyard, where Riftsweeper's single target made the ability fizzle first.
+  --
+  -- CR 608.2f: the objects are moved as ONE action and each named library is then
+  -- shuffled ONCE, however many of the objects it received. Rule 701.24's own
+  -- words are plural ("one or more specific objects"), so a card naming four is
+  -- one shuffle per owner and not four.
   --
   -- CR 701.24a's "so that no player knows their order" makes WHO shuffles
   -- unobservable, which is why the card's "its owner shuffles" needs nothing
   -- here: Prompt.Shuffle deliberately carries no Decider (randomness is not a
   -- choice), so there is no player for it to be asked of.
-  Effect.ShuffleIntoLibrary slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure () -- a player recipient is not a card to shuffle
-        Just target -> do
-          gs <- State.get
-          case Game.lookupObject target gs of
-            Nothing -> pure ()
-            Just obj -> do
-              Monad.void (Event.changeZoneReturning target Zone.Library)
-              Mulligan.shuffleLibrary (Object.owner obj)
-      _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.ShuffleIntoLibrary ref -> do
+    gs <- State.get
+    let targets = objectRefObjects legal resolving controller source gs ref
+        -- The owners are read from the PRE-MOVE objects, for rule 701.24c's
+        -- reason above; an id that no longer resolves contributes no owner.
+        owners = Set.fromList (Maybe.mapMaybe (\target -> fmap Object.owner (Game.lookupObject target gs)) targets)
+    Monad.forM_ targets $ \target -> Monad.void (Event.changeZoneReturning target Zone.Library)
+    -- APNAP (CR 608.2f), which is what makes the ORDER of the Prompt.Shuffle
+    -- calls a transcript can replay a fact about the rules rather than about
+    -- PlayerId's Ord.
+    Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Mulligan.shuffleLibrary
   Effect.OfferCast slot offer -> offerCast resolving controller slot offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef
   -- names, as CR 109.5's "you" and the stated duration.

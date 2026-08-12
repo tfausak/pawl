@@ -5,6 +5,7 @@ module Pawl.Codec.PoolSpec where
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 
@@ -67,8 +68,8 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       s
       Pool.toJson
       Pool.fromJson
-      (Pool.CardsInGraveyard PlayerScope.You)
-      """ {"type":"CardsInGraveyard","value":{"type":"You"}} """
+      (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You))
+      """ {"type":"CardsInGraveyard","value":{"type":"Scoped","value":{"type":"You"}}} """
   -- CR 406.1: the cards in the exile zone. Nullary, since exile has no
   -- per-player copy.
   Spec.it s "CardsInExile" $

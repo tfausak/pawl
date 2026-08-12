@@ -2340,7 +2340,7 @@ effectFilters effect = case effect of
   Effect.Attach _ -> []
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn _ _ -> []
-  Effect.ShuffleIntoLibrary _ -> []
+  Effect.ShuffleIntoLibrary ref -> unframed (objectRefFilters ref)
   Effect.OfferCast {} -> []
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would

@@ -1,13 +1,13 @@
 module Pawl.Codec.Pool where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.PlayerScope as PlayerScope
+import qualified Pawl.Codec.GraveyardScope as GraveyardScope
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Pool as Pool
 
 -- | Tagged rather than nullary-only, because CR 400.1's per-player graveyard
--- makes one arm carry a payload: the PlayerScope saying whose. The nullary arms
+-- makes one arm carry a payload: the GraveyardScope saying whose. The nullary arms
 -- are unaffected, since Common.nullary IS Common.tagged with no value.
 toJson :: Pool.Pool -> Value.Value
 toJson p = case p of
@@ -18,7 +18,7 @@ toJson p = case p of
   Pool.Spells -> Common.nullary "Spells"
   Pool.Abilities -> Common.nullary "Abilities"
   Pool.SpellsAndPermanents -> Common.nullary "SpellsAndPermanents"
-  Pool.CardsInGraveyard scope -> Common.tagged "CardsInGraveyard" . Just $ PlayerScope.toJson scope
+  Pool.CardsInGraveyard scope -> Common.tagged "CardsInGraveyard" . Just $ GraveyardScope.toJson scope
   -- Nullary: CR 400.1's shared zones have no per-player copy for a payload to
   -- select among.
   Pool.CardsInExile -> Common.nullary "CardsInExile"
@@ -37,6 +37,6 @@ fromJson value = do
     -- Common.withValue, not a `Just v` pattern with a fallthrough: a
     -- CardsInGraveyard with no value is a malformed known constructor, and a
     -- fallthrough would report it as an unknown one.
-    ("CardsInGraveyard", _) -> Common.withValue mv (fmap Pool.CardsInGraveyard . PlayerScope.fromJson)
+    ("CardsInGraveyard", _) -> Common.withValue mv (fmap Pool.CardsInGraveyard . GraveyardScope.fromJson)
     ("CardsInExile", _) -> Right Pool.CardsInExile
     _ -> Left . Text.pack $ "unknown Pool: " <> t

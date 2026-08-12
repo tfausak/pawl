@@ -36,7 +36,10 @@
                       "pool": {
                         "type": "CardsInGraveyard",
                         "value": {
-                          "type": "EachPlayer"
+                          "type": "Scoped",
+                          "value": {
+                            "type": "EachPlayer"
+                          }
                         }
                       }
                     }

@@ -530,14 +530,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Counter (SlotName.MkSlotName (Text.pack "spell")))
       """ {"type":"Counter","value":"spell"} """
-  -- CR 701.24: a bare slot name, not an array -- the library is derived from
-  -- the object the slot names (CR 400.3), so there is no second field to write.
+  -- CR 701.24: an ObjectRef, which for a slot is written as the bare slot name
+  -- -- the library is derived from the objects it names (CR 400.3), so there is
+  -- no second field to write.
   Spec.it s "ShuffleIntoLibrary" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ShuffleIntoLibrary (SlotName.MkSlotName (Text.pack "target")))
+      (Effect.ShuffleIntoLibrary (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"ShuffleIntoLibrary","value":"target"} """
   Spec.it s "PutCounters" $
     Common.assertJsonCodec

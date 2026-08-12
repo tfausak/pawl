@@ -178,6 +178,8 @@ library codec
     Pawl.Codec.FilterSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
+    Pawl.Codec.GraveyardScope
+    Pawl.Codec.GraveyardScopeSpec
     Pawl.Codec.Keyword
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
@@ -695,6 +697,7 @@ library types
     Pawl.Types.Game
     Pawl.Types.GameEvent
     Pawl.Types.GameState
+    Pawl.Types.GraveyardScope
     Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
     Pawl.Types.HybridPayment
