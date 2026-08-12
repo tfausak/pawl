@@ -634,6 +634,36 @@ combatReplaySpec s =
             "everything back on top, in the order it was looked at"
             (Replay.defaultAnswer (Prompt.ChooseScry decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 9]))
             ([], [ObjectId.MkObjectId 7, ObjectId.MkObjectId 9])
+        -- CR 701.25a and CR 701.29a: the other two look-and-split partitions,
+        -- which carry the same payload as a scry's and must not be confused with
+        -- it -- one sends cards to a graveyard, the other reorders somebody
+        -- else's library.
+        Spec.it s "ChooseSurveil and ChooseFateseal round-trip, and neither decodes as a scry" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              surveil = Prompt.ChooseSurveil decider S.alice [a, b]
+              fateseal = Prompt.ChooseFateseal decider S.alice S.bob [a, b]
+              split = ([a], [b])
+          Spec.assertEqWith s "a surveil split round trips" (Replay.decode surveil (Replay.encode surveil split)) (Just split)
+          Spec.assertEqWith s "a fateseal split round trips" (Replay.decode fateseal (Replay.encode fateseal split)) (Just split)
+          -- Discriminating: these fail if either prompt reuses Response.ChoseScry
+          -- rather than getting its own constructor.
+          Spec.assertEqWith s "a scry response is not a surveil answer" (Replay.decode surveil (Response.ChoseScry split)) Nothing
+          Spec.assertEqWith s "a scry response is not a fateseal answer" (Replay.decode fateseal (Response.ChoseScry split)) Nothing
+          Spec.assertEqWith s "and a surveil response is not a fateseal answer" (Replay.decode fateseal (Response.ChoseSurveil split)) Nothing
+        Spec.it s "a short transcript surveils and fateseals nothing" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+          Spec.assertEqWith
+            s
+            "nothing to the graveyard, everything back on top"
+            (Replay.defaultAnswer (Prompt.ChooseSurveil decider S.alice [a, b]))
+            ([], [a, b])
+          Spec.assertEqWith
+            s
+            "nothing under the opponent's library either"
+            (Replay.defaultAnswer (Prompt.ChooseFateseal decider S.alice S.bob [a, b]))
+            ([], [a, b])
         -- CR 704.5j: which legend its controller kept is a decision, so it has to
         -- survive a transcript like any other.
         Spec.it s "ChooseLegend round-trips through the transcript" $ do

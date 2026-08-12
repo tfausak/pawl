@@ -1525,6 +1525,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Mill ref quantity mTally ->
     Effect.Mill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally)
   Effect.Scry {} -> effect
+  Effect.Surveil {} -> effect
+  Effect.Fateseal {} -> effect
   Effect.Discard {} -> effect
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect

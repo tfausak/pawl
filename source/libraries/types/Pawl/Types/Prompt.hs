@@ -94,6 +94,34 @@ data Prompt r where
   -- leaves nothing to ask -- CR 701.22b's scry 0, an empty library, and the lone
   -- card that IS the whole library, for which top and bottom are one position.
   ChooseScry :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt ([ObjectId.ObjectId], [ObjectId.ObjectId])
+  -- | CR 701.25a: how a surveilling player splits the cards they just looked at.
+  -- ChooseScry's payload and ChooseScry's look, with the FIRST list going to the
+  -- player's GRAVEYARD rather than to the bottom of their library, in the order
+  -- they are put there (so the first named ends up deepest, CR 404.1's pile).
+  --
+  -- Its own constructor and not ChooseScry reused, by ChooseExilesFromGraveyard's
+  -- argument: a responder that knows which prompt it is answering knows where the
+  -- cards it names are going, and a graveyard is not the bottom of a library.
+  --
+  -- Elided only for an empty library. A lone card that is the whole library is
+  -- STILL asked, where ChooseScry above elides it: graveyard and library are two
+  -- places, so the two answers differ.
+  ChooseSurveil :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt ([ObjectId.ObjectId], [ObjectId.ObjectId])
+  -- | CR 701.29a: how a fatesealing player splits the cards they just looked at
+  -- on top of an OPPONENT'S library. The first PlayerId is the fatesealer -- the
+  -- seat asked, and the only seat shown the cards -- and the second is the
+  -- library's owner, who is asked nothing. The answer is (bottom, top), read
+  -- exactly as ChooseScry's is.
+  --
+  -- TWO PlayerIds is what makes this prompt different from ChooseScry, and the
+  -- reason it is not that constructor reused: every other look-and-split prompt
+  -- shows a player their own library, so a responder handed one PlayerId would
+  -- have no way to know whose cards these are.
+  --
+  -- Elided for ChooseScry's cases: an empty library, and the lone card whose top
+  -- and bottom are one position. CR 701.29 states no zero case of its own, so a
+  -- fateseal 0 reaches no library and raises nothing.
+  ChooseFateseal :: Decider.Decider -> PlayerId.PlayerId -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt ([ObjectId.ObjectId], [ObjectId.ObjectId])
   -- | CR 507.1 / 703.4h: the active player chooses one of their opponents to be
   -- the defending player. The NonEmpty is the candidates; the answer is the one
   -- chosen.
@@ -585,23 +613,31 @@ data Prompt r where
   -- name". ADVISORY, like ChooseX's bound -- the answer is filtered against it
   -- nowhere (#663), and for the same reason there is no candidate list.
   ChooseCardName :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Filter.Filter Keyword.Keyword -> Prompt CardName.CardName
-  -- | Which opponent an as-enters choice names -- Null Chamber's "you and AN
-  -- OPPONENT each choose a card name". The PlayerId is the chooser, the ObjectId
-  -- is the entering object, and the NonEmpty is that player's opponents. CR
-  -- 614.12a is what puts the ask before the permanent enters: "If a replacement
-  -- effect that modifies how a permanent enters the battlefield requires a
-  -- choice, that choice is made before the permanent enters the battlefield."
+  -- | Which opponent a card's text names -- Null Chamber's "you and AN OPPONENT
+  -- each choose a card name". The PlayerId is the chooser, the ObjectId is the
+  -- object whose text names the opponent, and the NonEmpty is that player's
+  -- opponents.
+  --
+  -- TWO MOMENTS reach it, being the same question: as a permanent enters, where
+  -- CR 614.12a puts the ask before it does ("If a replacement effect that
+  -- modifies how a permanent enters the battlefield requires a choice, that
+  -- choice is made before the permanent enters the battlefield"); and at
+  -- resolution, where CR 701.29a's fateseal picks the opponent whose library is
+  -- looked at (Spin into Myth). One constructor rather than two, since a
+  -- responder told the chooser and the candidates has been told the whole
+  -- question either way, and the ObjectId already distinguishes the cards.
   --
   -- Its own prompt rather than a reuse of ChooseDefender, which also answers with
   -- an opponent: that prompt asks CR 507.1's question, whom to attack, and a
   -- responder that knows which prompt it is answering knows which question it was
   -- asked.
   --
-  -- WHO is asked is pawl's reading rather than a rule's: the card leaves "an
+  -- WHO is asked is pawl's reading at the entry moment: Null Chamber leaves "an
   -- opponent" open and no rule assigns the pick, so it goes to the ability's
   -- controller -- CR 109.5's "you", the player the card's other half already
-  -- names. Asked only when there are two or more: CR 102.2's two-player game
-  -- leaves exactly one opponent and nothing to ask.
+  -- names. At the fateseal moment it is the rule's own: rule 701.29a's actor is
+  -- the player doing the looking. Asked only when there are two or more: CR
+  -- 102.2's two-player game leaves exactly one opponent and nothing to ask.
   ChooseOpponent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 310.8a: which player protects a battle. The PlayerId is the chooser --
   -- CR 310.8a assigns it to the battle's controller, so this one is the rule's
