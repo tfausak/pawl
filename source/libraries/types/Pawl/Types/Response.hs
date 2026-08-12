@@ -50,6 +50,13 @@ data Response
     -- going to the bottom, then the ones staying on top, each in the order the
     -- player put them there.
     ChoseScry ([ObjectId.ObjectId], [ObjectId.ObjectId])
+  | -- | CR 701.25a: the ordered partition a surveilling player chose -- the cards
+    -- going to their graveyard, then the ones staying on top of their library.
+    ChoseSurveil ([ObjectId.ObjectId], [ObjectId.ObjectId])
+  | -- | CR 701.29a: the ordered partition a fatesealing player chose over an
+    -- opponent's library -- the cards going to the bottom, then the ones staying
+    -- on top.
+    ChoseFateseal ([ObjectId.ObjectId], [ObjectId.ObjectId])
   | -- | CR 701.44a: whether the exploring permanent's controller binned the
     -- revealed nonland card.
     ChoseExplore OptionalDecision.OptionalDecision

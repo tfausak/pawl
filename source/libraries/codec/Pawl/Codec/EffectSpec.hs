@@ -342,6 +342,26 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Scry (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
       """ {"type":"Scry","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":2}]} """
+  -- Curate's "Surveil 2", and a distinct tag from Scry's above: the two carry the
+  -- same payload and differ only in where the unwanted cards go, so a shared tag
+  -- would decode one card's text as the other's.
+  Spec.it s "Surveil" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Surveil (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
+      """ {"type":"Surveil","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2}]} """
+  -- Spin into Myth's "then fateseal 2". The PlayerRef is the FATESEALER, so the
+  -- controller spelling is the one a card writes; the opponent whose library is
+  -- looked at is chosen as the effect applies and appears nowhere in the data.
+  Spec.it s "Fateseal" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Fateseal (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
+      """ {"type":"Fateseal","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2}]} """
   -- Merfolk Branchwalker's "it explores", against the trigger-source slot, and
   -- the swept-set shape the ObjectRef also admits.
   Spec.it s "Explore" $ do

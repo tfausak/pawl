@@ -785,22 +785,28 @@ spellTargetSpec printing =
     (SlotName.MkSlotName (Text.pack "target"))
     (Modal.allTargetSpecs (Face.spell (Card.combined (Printing.card printing))))
 
--- alice controls n untapped basic lands of one printing, nothing else.
+-- alice controls n untapped basic lands of one printing, nothing else. The
+-- two-seat board; landsFor below is the same lands on a board a caller supplies,
+-- which is how a three-seat case gets mana.
 landsInPlay :: Printing.Printing -> Int -> GameState.GameState
-landsInPlay land n =
+landsInPlay land n = landsFor land alice n (Setup.emptyGame bothPlayers)
+
+-- n untapped basic lands of one printing under pid, added to an existing board.
+landsFor :: Printing.Printing -> PlayerId.PlayerId -> Int -> GameState.GameState -> GameState.GameState
+landsFor land pid n base =
   let add gs _ =
         let (oid, gs1) = Game.freshObjectId gs
             (ts, gs2) = Game.freshTimestamp gs1
             obj =
               Object.MkObject
-                { Object.owner = alice,
+                { Object.owner = pid,
                   Object.enteredUnder = Nothing,
                   Object.source = Source.OfCard land,
                   Object.zone = Zone.Battlefield,
                   Object.tapped = TapState.Untapped,
                   Object.facing = Facing.FaceUp,
                   Object.damage = 0,
-                  Object.sickness = Sickness.Settled alice,
+                  Object.sickness = Sickness.Settled pid,
                   Object.bindings = Map.empty,
                   Object.counters = Map.empty,
                   Object.attachedTo = Nothing,
@@ -823,7 +829,7 @@ landsInPlay land n =
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
                 GameState.battlefield = Set.insert oid (GameState.battlefield gs2)
               }
-   in List.foldl' add (Setup.emptyGame bothPlayers) [1 .. n]
+   in List.foldl' add base [1 .. n]
 
 -- Put one card of a printing into alice's hand in a main phase with priority.
 handOne :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)

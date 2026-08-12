@@ -317,6 +317,48 @@ data Effect card
     -- look-at-the-top-card opcode (#1338), and CR 701.22d's "whenever a player
     -- scries" trigger (#1339).
     Scry PlayerRef.PlayerRef Quantity.Quantity
+  | -- | CR 701.25a: the players the PlayerRef names each surveil this many -- look
+    -- at the top N of their own library, then put any number of them into their
+    -- GRAVEYARD and the rest back on top in any order.
+    --
+    -- Scry's shape and Scry's PlayerRef argument, but not Scry: rule 701.25a
+    -- sends the unwanted cards to a different zone, so the two differ in the
+    -- board they produce and in what the player is being asked. Curate's "Surveil
+    -- 2. Draw a card." is the producer, and is `Relative You`.
+    --
+    -- CROSSES A ZONE BOUNDARY, where Scry does not: the graveyard half is
+    -- funnelled through Event.changeZone, so each card put there mints a CR 400.7
+    -- incarnation, and only the kept half is a library rewrite.
+    --
+    -- The ELISION is Scry's minus one case, and the missing case is the point:
+    -- CR 701.25c's surveil 0 and an empty library ask nothing, but a lone card
+    -- that is the whole library IS a real question here -- the graveyard and the
+    -- top of the library are different places, where scry's top and bottom of a
+    -- one-card library are the same position.
+    --
+    -- Not implemented: CR 701.25b's "additional cards" rider (#1343), and CR
+    -- 701.25d's "whenever a player surveils" trigger (#1342).
+    Surveil PlayerRef.PlayerRef Quantity.Quantity
+  | -- | CR 701.29a: the players the PlayerRef names each fateseal this many -- look
+    -- at the top N cards of AN OPPONENT'S library, then put any number of them on
+    -- the bottom of that library in any order and the rest on top in any order.
+    --
+    -- The PlayerRef names the FATESEALER, not the victim, which is how rule
+    -- 701.29a is worded and how both printings read: Spin into Myth's "then
+    -- fateseal 2" is `Relative You`. WHICH opponent is a second choice, made by
+    -- the fatesealer as the effect applies and asked as Prompt.ChooseOpponent --
+    -- naming every opponent instead would be a stronger card than the one
+    -- printed.
+    --
+    -- Scry's library rewrite (no zone boundary is crossed) over SOMEBODY ELSE'S
+    -- library, and the asymmetry is the whole rule: the fatesealer is shown the
+    -- cards and answers Prompt.ChooseFateseal, while the library's owner is
+    -- shown nothing and decides nothing.
+    --
+    -- Rule 701.29 is one sentence, so there is no zero case, no "even if
+    -- impossible" trigger clause and no additional-cards rider to defer, unlike
+    -- CR 701.22 and CR 701.25.
+    Fateseal PlayerRef.PlayerRef Quantity.Quantity
   | -- | CR 701.44a: the permanents the ObjectRef names each explore. Each one's
     -- controller reveals the top card of their library; a land card goes to
     -- their hand, and otherwise a +1/+1 counter goes on the exploring permanent
@@ -337,10 +379,10 @@ data Effect card
     --
     -- The REVEAL is public (CR 701.20a) and rides Event.reveal, unlike scry's
     -- private look. The CHOICE is the player's, through Prompt.ChooseExplore
-    -- routed by Decide.deciderFor: it is a CR 603.5 "may" with two distinguishable
-    -- outcomes -- the card on top or in the graveyard -- so it is asked whenever
-    -- there is a revealed nonland card to ask about, and only an empty library or
-    -- a land card leaves nothing to ask.
+    -- routed by Decide.deciderFor: rule 701.44a's own "may", with two
+    -- distinguishable outcomes -- the card on top or in the graveyard -- so it is
+    -- asked whenever there is a revealed nonland card to ask about, and only an
+    -- empty library or a land card leaves nothing to ask.
     --
     -- CR 701.44b: the permanent explores even where the actions were impossible,
     -- which is why an empty library still reaches the counter, and CR 701.44c

@@ -50,6 +50,8 @@ encode p answer = case p of
   Prompt.Concede _ -> Response.Conceded answer
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
   Prompt.ChooseScry {} -> Response.ChoseScry answer
+  Prompt.ChooseSurveil {} -> Response.ChoseSurveil answer
+  Prompt.ChooseFateseal {} -> Response.ChoseFateseal answer
   Prompt.ChooseExplore {} -> Response.ChoseExplore answer
   Prompt.ChooseDefender {} -> Response.ChoseDefender answer
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
@@ -137,6 +139,12 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseScry {} -> case response of
     Response.ChoseScry split -> Just split
+    _ -> Nothing
+  Prompt.ChooseSurveil {} -> case response of
+    Response.ChoseSurveil split -> Just split
+    _ -> Nothing
+  Prompt.ChooseFateseal {} -> case response of
+    Response.ChoseFateseal split -> Just split
     _ -> Nothing
   Prompt.ChooseExplore {} -> case response of
     Response.ChoseExplore d -> Just d
@@ -344,6 +352,13 @@ defaultAnswer p = case p of
   -- top in the order it was already in is legal -- and it is the one answer that
   -- leaves the library exactly as it was.
   Prompt.ChooseScry _ _ looked -> ([], looked)
+  -- CR 701.25a's "any number" reaches none too, so putting nothing into the
+  -- graveyard and keeping the whole look on top in the order it was found leaves
+  -- the board exactly as it was -- the least eventful legal answer, and the one
+  -- that moves no card between zones.
+  Prompt.ChooseSurveil _ _ looked -> ([], looked)
+  -- ChooseScry's answer over the opponent's library, for the same reason.
+  Prompt.ChooseFateseal _ _ _ looked -> ([], looked)
   -- CR 701.44a: declining, for ChooseRiot's reason -- leaving the revealed card
   -- on top is the half that moves nothing.
   Prompt.ChooseExplore {} -> OptionalDecision.Declines
