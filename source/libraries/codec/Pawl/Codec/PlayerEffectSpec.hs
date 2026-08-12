@@ -264,3 +264,19 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       PlayerEffect.CantPlayLands
       """ {"type":"CantPlayLands"} """
+  -- CR 601.3 / Yawgmoth's Will, whose sentence names no quality of the spell.
+  Spec.it s "CastFromGraveyard, an empty filter" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.CastFromGraveyard (Filter.And []))
+      """ {"type":"CastFromGraveyard","value":{"type":"And","value":[]}} """
+  -- CR 601.3 narrowed / Haakon, Stromgald Scourge's "Knight spells".
+  Spec.it s "CastFromGraveyard, a filter that names qualities" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.CastFromGraveyard (Filter.HasCardType CardType.Creature))
+      """ {"type":"CastFromGraveyard","value":{"type":"HasCardType","value":{"type":"Creature"}}} """

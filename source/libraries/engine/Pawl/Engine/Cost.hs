@@ -147,10 +147,13 @@ faceDownCost =
 --
 -- The candidates depend on the ZONE the object is being cast from, because CR
 -- 702.34a's permission and its cost are one sentence. From a graveyard the
--- flashback cost is the ONLY candidate -- nothing permits casting the card from
--- there for its printed mana cost -- and a card with no flashback yields no
--- candidate at all, which is CR 601.3's default prohibition arriving through
--- Cast.castable's affordability gate as well as through its permission gate.
+-- keyword costs are the only ones a card can carry on its own, so a card with no
+-- flashback, aftermath or jump-start yields no candidate at all -- CR 601.3's
+-- default prohibition arriving through Cast.castable's affordability gate as
+-- well as through its permission gate. A PLAYER-scoped permission (Yawgmoth's
+-- Will) is the exception, and it is one because the permission and the cost are
+-- NOT one sentence there: the effect says nothing about what the spell costs, so
+-- the printed cost is offered exactly as a hand would offer it.
 --
 -- They also depend on WHICH FACE is being cast (CR 709.3a: "Only the chosen
 -- half is evaluated to see if it can be cast"), which is why the name arrives
@@ -188,8 +191,13 @@ costsFor name oid gs = case Game.lookupObject oid gs of
           --
           -- CR 109.5's "you" is the OWNER, as Activate.graveyardAbilitiesOf reads it
           -- for a condition on a card outside the battlefield: pawl has no way to
-          -- cast a card from another player's hand, so the owner and the caster are
-          -- the same player wherever this is asked (#96).
+          -- cast a card from another player's HAND or GRAVEYARD -- CR 400.1 files
+          -- both by player and Cast.zoneCandidates hands out only the caster's own
+          -- -- so the owner and the caster are the same player wherever this is
+          -- asked. That holds for the CR 601.3 permission read in the graveyard arm
+          -- below as well, which is the other reader of the owner here. Exile is
+          -- the one zone whose candidates are not filed by owner, and no permission
+          -- in the pool aims a player at a card there that somebody else owns.
           --
           -- Projection.fullView for that function's reason too -- nothing here is
           -- inside the layer fold, so there is no circularity to bound against --
@@ -230,12 +238,22 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             --
             -- One discard however many jump-start abilities the card has: see
             -- Pawl.Engine.Keyword.hasJumpStart.
+            --
+            -- CR 601.3 / Yawgmoth's Will is the fourth shape, and the one that
+            -- is not a keyword: an EFFECT that permits the cast supplies no cost
+            -- with it, so what the card asks for is what it asks for anywhere --
+            -- the printed cost and the card's own alternatives, exactly the
+            -- hand's list. Offered BESIDE the three above rather than instead of
+            -- them, which is the rules answer for a flashback card in a
+            -- graveyard under such an effect: both costs are available and CR
+            -- 601.2b picks one.
             Zone.Graveyard ->
               fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
                 <> [printed | Keyword.hasAftermath (Face.keywords face)]
                 <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
                    | Keyword.hasJumpStart (Face.keywords face)
                    ]
+                <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
             _ -> printed : alternatives
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []

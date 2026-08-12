@@ -370,7 +370,7 @@ castableZones pid oid face gs =
         -- half" scoping comes out right -- Dusk is castable from a hand and Dawn
         -- is not, off the same card.
         Zone.Hand -> not (Keyword.hasAftermath (Face.keywords face))
-        Zone.Graveyard -> permitsCastFromGraveyard face
+        Zone.Graveyard -> permitsCastFromGraveyard pid oid face gs
         Zone.Exile -> permitsCastFromExile pid oid face gs
         -- CR 903.8: "a commander's owner may cast it from the command zone". A
         -- FORMAT's permission, not a card's, which is why it is asked of
@@ -640,11 +640,24 @@ permitsCastWhileSearching :: Face.Face Card.Type.Card -> Bool
 permitsCastWhileSearching face =
   elem CastingPermission.CastFromLibraryWhileSearching (permissionsOf face)
 
--- CR 601.3 / 702.34a: may this card be cast from its owner's graveyard? The
--- flashback half of the same membership test.
-permitsCastFromGraveyard :: Face.Face Card.Type.Card -> Bool
-permitsCastFromGraveyard face =
+-- CR 601.3 / 702.34a: may this card be cast from its owner's graveyard?
+--
+-- TWO permissions read beside each other, because CR 601.3's "a rule or effect
+-- allows that player" is reached from two directions and neither is expressible
+-- as the other. The first is the flashback half of permitsCastWhileSearching's
+-- membership test -- a permission the CARD carries about ITSELF. The second is a
+-- CR 613.11 continuous effect a player has (Yawgmoth's Will), which no function
+-- of a Face could answer: it is nowhere on the card being cast, and it names a
+-- player.
+--
+-- Folding the second into the first would say the effect printed flashback onto
+-- every card in the graveyard, which is neither CR 702.34a's meaning nor a thing
+-- any timestamp could order; the object-scoped list is deliberately left unable
+-- to say "for this player".
+permitsCastFromGraveyard :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
+permitsCastFromGraveyard pid oid face gs =
   elem CastingPermission.CastFromGraveyard (permissionsOf face)
+    || PlayerEffect.mayCastFromGraveyard pid oid gs
 
 -- Every casting permission a card has: the ones it PRINTS (Panglacial Wurm) plus
 -- the ones rule 702 gives it for a keyword it holds (flashback). Read off the
