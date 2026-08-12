@@ -1607,6 +1607,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.ControlledByBound _ -> 0
   Filter.Type.ControlledByPlayer _ -> 0
   Filter.Type.ManaValueAtMost _ -> 0
+  Filter.Type.ManaValueIsEven -> 0
   Filter.Type.ControlledBy _ -> 0
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
   -- PlayerRelation, which holds no Filter for a card author to reach.
@@ -2072,6 +2073,9 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.CantCastMatching f -> [f]
   -- CR 305.1's unrestricted prohibition narrows nothing: every land is stopped.
   PlayerEffect.CantPlayLands -> []
+  -- CR 601.3's zone permission, narrowed by the card's own qualities exactly as
+  -- the timing permission beside it is (Yawgmoth's Will's is `And []`).
+  PlayerEffect.CastFromGraveyard f -> [f]
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
@@ -2119,6 +2123,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantBeCountered _ -> False
   PlayerEffect.CantCastMatching _ -> False
   PlayerEffect.CantPlayLands -> False
+  PlayerEffect.CastFromGraveyard _ -> False
 
 -- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
 -- DamagePattern: does this card author a field of that pattern the engine bakes?
@@ -2156,6 +2161,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantBeCountered _ -> False
   PlayerEffect.CantCastMatching _ -> False
   PlayerEffect.CantPlayLands -> False
+  PlayerEffect.CastFromGraveyard _ -> False
 
 -- The non-vacuity half of both lints above: is this CR 615.12's effect at all?
 -- A wildcard is right here, where it is not above -- this asks "did the sweep

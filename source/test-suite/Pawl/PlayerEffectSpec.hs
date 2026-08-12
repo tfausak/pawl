@@ -37,6 +37,10 @@
 -- which is where pawl's order used to come apart (Reliquary Tower is the third
 -- card in the group, and its ruling is the authority for the reading).
 --
+-- Void Winnower brings CR 601.3a's LOOKAHEAD, and Molten Disaster is the second
+-- half of that pair: a prohibition on even mana values, against an {X} spell
+-- whose mana value is even only while it sits in a hand (CR 202.3e).
+--
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
@@ -3097,6 +3101,137 @@ abilityRun srcId ability stifleId gs =
    in (placed, S.runPure counteringAtAlice placed Stack.resolveTop)
 
 -- Spider-Punk {1}{R} Legendary Creature -- Spider Human Hero 2/1 (Marvel's
+-- ONE board for Yawgmoth's Will, built once and branched. alice has six untapped
+-- Swamps -- three for the Will's {2}{B} and three left over, so no assertion
+-- below can turn on mana -- the Will in hand, and a Sign in Blood ({B}{B}, no
+-- flashback and no casting permission of its own) in her graveyard. bob holds
+-- exactly the same six Swamps and the same card in HIS graveyard, which is what
+-- makes the CR 109.5 scope observable: the two seats differ in the grant and in
+-- nothing else. Both libraries are stocked, since Sign in Blood draws and CR
+-- 104.3c would otherwise decide the game before an assertion ran.
+--
+-- Returns the Will, alice's graveyard card, bob's, and the board.
+willBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+willBoard swamp will signInBlood =
+  let lands = S.landsFor swamp S.bob 6 (S.landsInPlay swamp 6)
+      stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard swamp pid g)) gs [1 :: Int .. 3]
+      stocked = stock S.bob (stock S.alice lands)
+      (willId, withWill) = S.addHandCard will S.alice stocked
+      (hers, withHers) = S.addGraveyardCard signInBlood S.alice withWill
+      (his, withHis) = S.addGraveyardCard signInBlood S.bob withHers
+   in ( willId,
+        hers,
+        his,
+        withHis
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The same board with the Will cast and resolved.
+willResolved :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+willResolved willId gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice willId)) Stack.resolveTop
+
+-- CR 601.3 / Yawgmoth's Will {2}{B} Sorcery: "Until end of turn, you may play
+-- lands and cast spells from your graveyard. If a card would be put into your
+-- graveyard from anywhere this turn, exile that card instead."
+--
+-- The PLAYER-scoped half of CR 601.3's allow clause, where flashback (CastSpec's
+-- Firebolt group) is the object-scoped half: the card that becomes castable
+-- carries no permission of its own and never learns one.
+--
+-- The play-lands half of the first sentence is NOT implemented -- a land is
+-- played and never cast (CR 305.1), and no effect can grant a zone permission on
+-- the play side (#1364). pawl's Yawgmoth's Will is therefore STRICTER than
+-- printed, which the last case here pins.
+yawgmothsWillSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+yawgmothsWillSpec s registry =
+  let board = do
+        swamp <- S.printingOf s registry "Swamp"
+        will <- S.printingOf s registry "Yawgmoth's Will"
+        signInBlood <- S.printingOf s registry "Sign in Blood"
+        pure (willBoard swamp will signInBlood)
+   in Spec.describe s "YawgmothsWill" $ do
+        -- The control. Without it every refusal below would also be true of a
+        -- board where Sign in Blood was simply unaffordable or the timing wrong.
+        Spec.it s "CR 601.3 before the Will resolves the graveyard card is not castable" $ do
+          (willId, hers, _, gs) <- board
+          Spec.assertBool s (S.castable S.alice willId gs) "the Will itself is castable"
+          Spec.assertBool s (not (S.castable S.alice hers gs)) "but the card in the graveyard is not"
+          Spec.assertBool s (not (any (S.isCastOf hers) (Action.legalActions S.alice gs))) "and not offered"
+
+        -- The whole card, end to end: graveyard -> stack -> EXILE. The exile is
+        -- the second sentence, and the card would be back in the graveyard
+        -- without it.
+        Spec.it s "CR 601.3 with the Will resolved the graveyard card is cast, resolves and is exiled" $ do
+          (willId, hers, _, gs) <- board
+          let after = willResolved willId gs
+          Spec.assertBool s (S.castable S.alice hers after) "castable from the graveyard"
+          Spec.assertBool s (any (S.isCastOf hers) (Action.legalActions S.alice after)) "and offered"
+          let cast = S.runPure S.identityAnswer after (S.cast S.alice hers)
+              resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+          Spec.assertEqWith s "it drew and cost 2 life" (S.lifeOf S.alice resolved) (Just 18)
+          Spec.assertEqWith s "it is not back in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
+          Spec.assertEqWith s "it was exiled instead, beside the Will" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 2
+
+        -- The ruling: "It will exile itself since it goes to the graveyard after
+        -- its effect starts." Both sentences of the card in one assertion --
+        -- the replacement is already in force when CR 608.2n moves the Will.
+        Spec.it s "CR 608.2n / 614.1a the Will exiles itself" $ do
+          (willId, hers, _, gs) <- board
+          will <- S.printingOf s registry "Yawgmoth's Will"
+          let after = willResolved willId gs
+          -- By NAME, not by id: CR 400.7 makes the card leaving the stack a new
+          -- object, so `willId` names nothing once it has moved.
+          Spec.assertEqWith s "the graveyard holds only what was already there" (Game.zoneMembers Zone.Graveyard S.alice after) [hers]
+          Spec.assertEqWith s "and the Will is in exile" (fmap (\o -> S.soleFaceName o after) (Game.zoneMembers Zone.Exile S.alice after)) [S.printingName will]
+
+        -- CR 109.5 / PlayerScope.You: alice's Will does nothing for bob, whose
+        -- board is hers in every other respect. Asked of the typed question as
+        -- well as of the gate, because CR 307.1's sorcery window is shut for bob
+        -- on alice's turn and would refuse his cast on its own.
+        Spec.it s "CR 109.5 the You scope does not reach bob's graveyard" $ do
+          (willId, hers, his, gs) <- board
+          let after = willResolved willId gs
+              bobsTurn = after {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+          Spec.assertBool s (PlayerEffect.mayCastFromGraveyard S.alice hers after) "alice has the permission"
+          Spec.assertBool s (not (PlayerEffect.mayCastFromGraveyard S.bob his after)) "bob does not"
+          Spec.assertBool s (not (S.castable S.bob his bobsTurn)) "and it is not castable even in his own main phase"
+          Spec.assertBool s (not (any (S.isCastOf his) (Action.legalActions S.bob bobsTurn))) "nor offered"
+
+        -- The permission names a ZONE, not a TIME, which is the flashback ruling
+        -- one rule over ("you can cast a sorcery using flashback only when you
+        -- could normally cast a sorcery"). Read beside Cast.instantSpeed rather
+        -- than inside it, so the sorcery window still has to be open.
+        Spec.it s "CR 117.1a the grant does not lift the sorcery timing restriction" $ do
+          (willId, hers, _, gs) <- board
+          let after = willResolved willId gs
+              upkeep = after {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+          Spec.assertBool s (S.castable S.alice hers after) "castable in her own main phase"
+          Spec.assertBool s (not (S.castable S.alice hers upkeep)) "not in her upkeep"
+
+        -- CR 514.2: "until end of turn" is the stored CR 611.2c carrier's expiry,
+        -- so the grant dies at cleanup and the same board refuses the same cast.
+        Spec.it s "CR 514.2 the permission ends at cleanup" $ do
+          (willId, hers, _, gs) <- board
+          let after = willResolved willId gs
+              ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+          Spec.assertEqWith s "one stored effect while it lasts" (length (GameState.playerEffects after)) 1
+          Spec.assertEqWith s "nothing stored afterwards" (GameState.playerEffects ended) []
+          Spec.assertBool s (not (PlayerEffect.mayCastFromGraveyard S.alice hers ended)) "the permission is gone"
+          Spec.assertBool s (not (S.castable S.alice hers ended)) "and the cast is refused again"
+
+        -- CR 305.1: the play-lands half of the same sentence has no carrier, so a
+        -- land in the graveyard stays unplayable (#1364). pawl's card is stricter
+        -- than printed here, and this is what says so.
+        Spec.it s "CR 305.1 a land in the graveyard is still not playable" $ do
+          (willId, _, _, gs) <- board
+          swamp <- S.printingOf s registry "Swamp"
+          let (landId, withLand) = S.addGraveyardCard swamp S.alice gs
+              after = willResolved willId withLand
+          Spec.assertBool s (notElem (Action.Type.Play landId Nothing) (Action.legalActions S.alice after)) "not offered as a land play"
+
 -- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
 -- counteringBoard above, with a Goblin Piker as the victim spell.
 --
@@ -3443,6 +3578,104 @@ jaredSpec s registry =
           Spec.assertEqWith s "bob was crowned by Jared's own trigger" (GameState.monarch restricted) (Just S.bob)
           Spec.assertEqWith s "and keeps the crown through alice's combat damage" (GameState.monarch (damageToTheMonarch pikerId restricted)) (Just S.bob)
 
+-- CR 601.3a / Void Winnower {9} Creature -- Eldrazi: "Your opponents can't cast
+-- spells with even mana values. (Zero is even.)"
+--
+-- ONE board, built twice, and `extra` is the only thing the two ever differ by.
+-- alice and bob each have nine untapped Mountains, so mana is never why a cast is
+-- missing, and each holds a Goblin Piker ({1}{R}, mana value 2 -- EVEN). bob also
+-- holds a Lightning Bolt ({R}, mana value 1 -- ODD) and a Molten Disaster
+-- ({X}{R}{R}), whose mana value is 2 in his hand by CR 202.3e and either parity
+-- once X is chosen.
+--
+-- The three cards bob holds are the discriminating set: the Bolt differs from the
+-- Piker in PARITY alone, and the Disaster differs from the Piker in the VARIABLE
+-- alone -- same seat, same mana, same moment, same even mana value. alice's own
+-- Piker is the SCOPE control, since no EachPlayer reading of the ability could
+-- leave it castable.
+--
+-- Returns (alice's Piker, bob's Piker, bob's Bolt, bob's Disaster, board).
+voidWinnowerBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  [Printing.Printing] ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+voidWinnowerBoard mountain piker bolt disaster extra =
+  let base = S.landsInPlay mountain 9
+      withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) base [1 .. 9 :: Int]
+      (alicesPiker, gs1) = S.addHandCard piker S.alice withBobsLands
+      (bobsPiker, gs2) = S.addHandCard piker S.bob gs1
+      (bobsBolt, gs3) = S.addHandCard bolt S.bob gs2
+      (bobsDisaster, gs4) = S.addHandCard disaster S.bob gs3
+      put g printing = snd (S.addCreature printing S.alice g)
+   in ( alicesPiker,
+        bobsPiker,
+        bobsBolt,
+        bobsDisaster,
+        (List.foldl' put gs4 extra) {GameState.phase = Phase.PrecombatMain}
+      )
+
+-- Whatever that player may do, asked in their own precombat main phase with an
+-- empty stack -- so a sorcery, a creature spell and an instant are all inside CR
+-- 307.1's window and timing is never the reason one is missing.
+askedOf :: PlayerId.PlayerId -> GameState.GameState -> [Action.Type.Action]
+askedOf pid gs = Action.legalActions pid (gs {GameState.activePlayer = pid, GameState.priority = Just pid})
+
+voidWinnowerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+voidWinnowerSpec s registry =
+  Spec.describe s "VoidWinnower" $ do
+    -- CR 601.3a's quality-bearing prohibition on the axis a NAME cannot answer:
+    -- the two cards refused and allowed here are told apart by their mana value
+    -- and by nothing else.
+    Spec.it s "CR 601.3a an opponent's even spell is refused and their odd one is not" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      disaster <- S.printingOf s registry "Molten Disaster"
+      winnower <- S.printingOf s registry "Void Winnower"
+      let (alicesPiker, bobsPiker, bobsBolt, _, board) = voidWinnowerBoard mountain piker bolt disaster [winnower]
+          (_, barePiker, _, _, bare) = voidWinnowerBoard mountain piker bolt disaster []
+      Spec.assertBool s (not (any (S.isCastOf bobsPiker) (askedOf S.bob board))) "the mana value 2 spell is refused"
+      Spec.assertBool s (any (S.isCastOf bobsBolt) (askedOf S.bob board)) "the mana value 1 spell, off the same lands, is not"
+      Spec.assertBool s (any (S.isCastOf alicesPiker) (askedOf S.alice board)) "and the Winnower's own controller may cast that same card"
+      Spec.assertBool s (any (S.isCastOf barePiker) (askedOf S.bob bare)) "the pair: with the Winnower gone bob's Piker is castable"
+
+    -- CR 601.3a's LOOKAHEAD, and the pair is the whole case: both spells have a
+    -- mana value of 2 in bob's hand (CR 202.3e), both are refused by a reading
+    -- that stops at the board, and the {X} one is offered anyway because a choice
+    -- bob has not yet made could take it out of the prohibited class.
+    Spec.it s "CR 601.3a an {X} spell with an even mana value in hand may still be begun" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      disaster <- S.printingOf s registry "Molten Disaster"
+      winnower <- S.printingOf s registry "Void Winnower"
+      let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster [winnower]
+      Spec.assertBool s (PlayerEffect.matchesObject Filter.Type.ManaValueIsEven bobsPiker board) "the fixed spell's mana value is even"
+      Spec.assertBool s (PlayerEffect.matchesObject Filter.Type.ManaValueIsEven bobsDisaster board) "and so is the {X} spell's, while it sits in hand"
+      Spec.assertBool s (not (any (S.isCastOf bobsPiker) (askedOf S.bob board))) "the fixed one is refused"
+      Spec.assertBool s (any (S.isCastOf bobsDisaster) (askedOf S.bob board)) "and the {X} one is offered"
+
+    -- The search's REACH, which no card in the pool pins: Void Winnower's own
+    -- criterion is answered at the second sample, so a lookahead that only ever
+    -- looked one step would pass every case above. A threshold criterion is the
+    -- shape that needs the climb -- an {X}{R}{R} card escapes "mana value 5 or
+    -- less" only at X = 4 -- and Pawl.Engine.Filter.manaValueThresholds is what
+    -- tells the search how far to walk. Asked of the same real card in the same
+    -- hand; only the criterion is written by the test.
+    Spec.it s "CR 601.3a the search walks past every literal the criterion names" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      disaster <- S.printingOf s registry "Molten Disaster"
+      let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster []
+          cheap = Filter.Type.ManaValueAtMost 5
+      Spec.assertBool s (PlayerEffect.matchesObject cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
+      Spec.assertBool s (PlayerEffect.choiceCouldEscape cheap bobsDisaster board) "and a large enough X takes it out"
+      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape cheap bobsPiker board)) "while the fixed spell beside it has no choice to make"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -3465,6 +3698,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
+  yawgmothsWillSpec s registry
+  voidWinnowerSpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
   jaredSpec s registry

@@ -38,7 +38,9 @@ data PlayerEffect
     --
     -- The quality is the SPELL's name, which makes this CR 601.3a's shape rather
     -- than CantCastSpells' -- see Pawl.Engine.PlayerEffect.prohibitsCasting for
-    -- what that costs and what is still missing (#95).
+    -- what that costs. CR 601.3a's lookahead reaches this arm not at all: a
+    -- spell's name is fixed by the half and the facing, and both are chosen
+    -- before the prohibition is asked.
     CantCastChosenName
   | -- | CR 305.1 / Null Chamber: this player can't PLAY a land whose name is one
     -- of the names chosen as this effect's source entered ("lands with the
@@ -377,4 +379,42 @@ data PlayerEffect
     -- narrows WHICH land beyond a name, and a card that said "can't play
     -- nonbasic lands" would want a Filter here rather than a third arm.
     CantPlayLands
+  | -- | CR 601.3 / Yawgmoth's Will: this player may cast a matching card from
+    -- their graveyard.
+    --
+    -- CR 601.3's ALLOW half on the PLAYER axis, where every arm of
+    -- Pawl.Types.CastingPermission is that same half on the OBJECT axis: those
+    -- are permissions a card grants about ITSELF (flashback's "cast this card
+    -- from your graveyard"), and this is a permission an effect grants a player
+    -- about whatever their graveyard happens to hold. The two are read BESIDE
+    -- each other in Pawl.Engine.Cast.permitsCastFromGraveyard, and neither is
+    -- folded into the other -- widening the object-scoped one instead would say
+    -- Yawgmoth's Will printed flashback onto every card in the graveyard, which
+    -- CR 702.34a does not mean.
+    --
+    -- A ZONE, where CastAsThoughItHadFlash beside it names a TIME. Both are CR
+    -- 601.3 permissions on the CR 613.11 player axis and both carry a Filter,
+    -- but nothing composes them: a card cast from a graveyard still waits for
+    -- its own timing window, which is the flashback ruling ("you can cast a
+    -- sorcery using flashback only when you could normally cast a sorcery") and
+    -- what keeps this arm out of Pawl.Engine.Cast.timingOk.
+    --
+    -- The Filter is the axis that separates the producers, as it is for
+    -- CastAsThoughItHadFlash: Yawgmoth's Will says "spells" and so matches
+    -- everything (`And []`), while Haakon, Stromgald Scourge's "Knight spells"
+    -- and Liliana, Untouched by Death's "Zombie spells" would narrow it. Read
+    -- through Pawl.Engine.PlayerEffect.matchesObject, the same read
+    -- CantCastMatching makes of a card in a hand. What a NARROWING filter sees
+    -- of a card in a graveyard is unobserved, since the one producer writes the
+    -- predicate that is true of everything -- pawl's projection does not reach
+    -- that zone (#160).
+    --
+    -- A PERMISSION, folded as a disjunction for CastAsThoughItHadFlash's reason:
+    -- there is nothing for a second permission to outvote.
+    --
+    -- Not implemented: the PLAY-LANDS half of the same sentence ("you may play
+    -- lands and cast spells from your graveyard"). A land is played and never
+    -- cast (CR 305.1), so this arm reaches no land however its Filter reads, and
+    -- the play side has no zone permission at all (#1364).
+    CastFromGraveyard (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

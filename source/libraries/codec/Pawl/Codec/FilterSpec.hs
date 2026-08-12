@@ -121,6 +121,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.ManaValueAtMost 2)
       """ {"type":"ManaValueAtMost","value":2} """
+  Spec.it s "ManaValueIsEven" $
+    Common.assertCodec
+      s
+      codec
+      Filter.ManaValueIsEven
+      """ {"type":"ManaValueIsEven"} """
   Spec.it s "ControlledBy" $
     Common.assertCodec
       s
