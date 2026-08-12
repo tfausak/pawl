@@ -4088,7 +4088,9 @@ newestBattlefieldOf _ before after =
     newId : _ -> Just newId
     [] -> Nothing
 
--- Write the shuffled order back to a player's library.
+-- Write a whole new order back to a player's library. Two callers: the shuffle
+-- after a CR 701.23 search, and CR 701.22a's scry, which reorders one library
+-- rather than moving anything between zones.
 reorderLibrary :: PlayerId -> [ObjectId] -> GameState -> GameState
 reorderLibrary pid order gs =
   gs {GameState.library = Map.insert pid (Seq.fromList order) (GameState.library gs)}
@@ -4131,5 +4133,4 @@ scryOne n pid = do
         toBottom = keep bottom
         onTop = filter (\c -> List.notElem c toBottom) (keep top)
         unnamed = filter (\c -> List.notElem c toBottom && List.notElem c onTop) looked
-        rebuilt = Seq.fromList (onTop <> unnamed <> beneath <> toBottom)
-    State.modify' (\g -> g {GameState.library = Map.insert pid rebuilt (GameState.library g)})
+    State.modify' (reorderLibrary pid (onTop <> unnamed <> beneath <> toBottom))

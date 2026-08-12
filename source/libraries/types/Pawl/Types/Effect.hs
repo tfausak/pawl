@@ -287,13 +287,16 @@ data Effect card
     Mill PlayerRef.PlayerRef Quantity.Quantity (Maybe MillTally.MillTally)
   | -- | CR 701.22a: the players the PlayerRef names each scry this many -- look at
     -- the top N of their own library, then put any number of them on the bottom
-    -- in any order and the rest back on top in any order. Crystal Ball's "{1},
-    -- {T}: Scry 2" is `Relative You`, which is every printed scry: rule 701.22a
-    -- says "your library", so the scrying player is always the one the effect
-    -- speaks to. A PlayerRef and not a nullary opcode for the reason Draw's
-    -- comment gives, and because CR 701.22c contemplates several players scrying
-    -- at once -- a nullary spelling would force a sibling at the first card that
-    -- writes "each player scries".
+    -- in any order and the rest back on top in any order.
+    --
+    -- A PlayerRef and not a bare "you", for the reason Draw's comment gives:
+    -- Crystal Ball's "{1}, {T}: Scry 2" is `Relative You`, while Kozilek's
+    -- Command's "target player scries 2" is `InSlot`, reading a slot TARGETING
+    -- filled (CR 601.2c). One opcode covers both, where a controller-only
+    -- spelling would force a sibling; CR 701.22c contemplates several players
+    -- scrying at once besides. Crystal Ball is the producer in the pool, so
+    -- `Relative You` is the arm a card exercises -- the others ride
+    -- Resolve.playerRefPlayers, which Draw and Mill already prove.
     --
     -- The ORDERED PARTITION is the player's, not the engine's:
     -- Prompt.ChooseScry asks for both ends and both orders, routed through
