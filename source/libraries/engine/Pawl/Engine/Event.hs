@@ -1863,6 +1863,22 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requ
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
 changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceDown
 
+-- CR 601.2a's move: the card goes onto the stack and "that player becomes its
+-- controller". The caster is carried BY THE MOVE, for the reason CR 709.3a
+-- states about the chosen half above -- the CR 400.7 incarnation must never exist
+-- without it, or a reader inside the move (a CR 616.1 replacement, a trigger
+-- scanned over the arrival) would see a spell controlled by whoever happens to
+-- own the card.
+--
+-- The one door that stamps Object.enteredUnder for a NON-battlefield
+-- destination, and the one caller is Pawl.Engine.Cast. A cast is the only way a
+-- card reaches the stack, and CR 405.4 fixes the controller there and then; a
+-- redirect that lands the move somewhere else drops the stamp, exactly as it
+-- drops the face, because CR 109.4 gives an object in that zone no controller to
+-- record.
+changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
+changeZoneCasting caster oid requestedDest = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster)
+
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
 -- a larger simultaneous event, that event's -- and is what its members' CR 616.1
@@ -1894,9 +1910,11 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- 110.5b's status, Untapped for every door but changeZoneEntering. `entering` is
 -- CR 122.6a's counters the object enters the battlefield with, empty for every
 -- door but that one and inert for every destination but the battlefield.
--- `under` is CR 110.2a's entry controller, Nothing for every door but changeZoneEntering --
--- and Nothing there too for a move whose effect names no player, which by CR
--- 110.2 and CR 108.4a leaves the owner answering. `shown` is CR 709.3's chosen
+-- `under` is the arriving incarnation's default controller -- CR 110.2a's entry
+-- controller on the battlefield, CR 405.4's caster on the stack -- Nothing for
+-- every door but changeZoneEntering and changeZoneCasting, and Nothing on the
+-- first of those too for a move whose effect names no player, which by CR 110.2
+-- and CR 108.4a leaves the owner answering. `shown` is CR 709.3's chosen
 -- half or CR 712.13's carried face, Nothing for every door but
 -- changeZoneShowing. `facing` is CR 110.5's face-up/face-down status, FaceUp for
 -- every door but changeZoneFaceDown (CR 110.5b). `position` is CR 401.2's end of
@@ -2071,7 +2089,12 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                     Object.timestamp = ts,
                     Object.tapped = tapped,
                     Object.attachedTo = seed,
-                    Object.enteredUnder = if dest == Zone.Battlefield then under else Nothing,
+                    -- CR 109.4: only the stack and the battlefield give an object
+                    -- a controller, so those are the two destinations that keep
+                    -- the caller's player and every other clears it. The stack
+                    -- arm is CR 405.4's, written by changeZoneCasting alone; the
+                    -- battlefield arm is CR 110.2a's.
+                    Object.enteredUnder = if dest == Zone.Battlefield || dest == Zone.Stack then under else Nothing,
                     -- `unlocking` is what excludes a Room here: CR 709.5c gives
                     -- a permanent with a shared type line designations rather
                     -- than a face that is up, and both halves go on being halves

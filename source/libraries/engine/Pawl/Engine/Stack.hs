@@ -77,19 +77,14 @@ resolveTopWith runSubgame = do
               -- record of which half is up and not the face a fallback resolved
               -- to.
               entering = Card.enteringFace (Printing.card printing) (Object.face obj)
-              -- CR 708.4's last sentence: "the permanent the spell becomes will
-              -- be a face-down permanent". A STATUS carried across a zone change,
-              -- which CR 400.7 otherwise forgets -- so it is read off the
-              -- resolving spell and handed to the move, exactly as `entering` is.
-              -- A closed-half read: rule 110.5's status, never the card's
-              -- identity.
-              --
-              -- The Aura branch below does not carry it, and cannot need to: CR
-              -- 708.2a gives a face-down permanent no subtypes, so `face` here is
-              -- Card.faceDownFace and Card.isAura is False.
-              ontoBattlefield = case Object.facing obj of
-                Facing.FaceDown -> Event.changeZoneFaceDown
-                Facing.FaceUp -> Event.changeZoneShowing
+              -- CR 110.2b: "a permanent spell's controller becomes the
+              -- permanent's controller", so the entry controller both moves
+              -- below carry is the SPELL's -- Resolve.spellController, the same
+              -- CR 405.4 read its own effects would have run under. It is
+              -- Object.owner for a spell nobody stole and nobody cast off
+              -- another player's card, which is why this argument was Nothing
+              -- until a card made the two differ (#83).
+              controller = Resolve.spellController obj oid gs
            in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid
                 else
@@ -98,7 +93,18 @@ resolveTopWith runSubgame = do
                   -- permanent it becomes, and an Aura back face would carry its
                   -- face for the same reason a creature one does.
                   if not (Card.isAura face)
-                    then carryOver oid =<< ontoBattlefield oid Zone.Battlefield entering
+                    then -- CR 708.4's last sentence: "the permanent the spell becomes
+                    -- will be a face-down permanent". A STATUS carried across a
+                    -- zone change, which CR 400.7 otherwise forgets -- so it is
+                    -- read off the resolving spell and handed to the move,
+                    -- exactly as `entering` is. A closed-half read: rule 110.5's
+                    -- status, never the card's identity.
+                    --
+                    -- The Aura branch below carries FaceUp instead, and cannot
+                    -- need this: CR 708.2a gives a face-down permanent no
+                    -- subtypes, so `face` there is Card.faceDownFace and
+                    -- Card.isAura is False.
+                      carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj)
                     else -- CR 303.4a made this spell target, so CR 608.2b applies
                     -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
                     -- the type line (CR 205.3h), the same closed-half
@@ -109,14 +115,7 @@ resolveTopWith runSubgame = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          --
-                          -- No entry controller, here or in the non-Aura branch
-                          -- above: CR 110.2b makes a permanent spell's default
-                          -- controller the player who put it onto the stack, and
-                          -- that is Object.owner for every spell in the pool --
-                          -- nothing here lets a player cast a card they do not
-                          -- own, so the two readings coincide (#83).
-                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty Nothing entering Facing.FaceUp
+                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}

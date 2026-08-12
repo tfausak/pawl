@@ -2360,6 +2360,115 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
         Spec.assertBool s (not (offeredCast exiledId benalishHeroName after)) "and it is not castable from exile"
       other -> Spec.assertFailure s ("expected exactly one exiled Hero, got " <> show (length other))
 
+-- Dire Fleet Daredevil {1}{R} Creature -- Human Pirate 2/1: "First strike. When
+-- this creature enters, exile target instant or sorcery card from an opponent's
+-- graveyard. You may cast it this turn ..." The pool's only card that lets a
+-- player cast a card somebody else OWNS, which is the one board where CR 405.4's
+-- controller and CR 108.3's owner name different players (#83).
+--
+-- Two clauses of the printed card are not expressed. "Mana of any type can be
+-- spent to cast that spell" (#1359) -- the board below pays with the colours the
+-- spell actually asks for, so nothing here leans on it. "If that spell would be
+-- put into a graveyard, exile it instead" (#1360) -- a floating CR 614.1a
+-- redirect naming one object, which card data cannot write. Both leave pawl's
+-- card STRICTER than printed.
+daredevilName, renewedFaithName :: CardName.CardName
+daredevilName = CardName.MkCardName (Text.pack "Dire Fleet Daredevil")
+renewedFaithName = CardName.MkCardName (Text.pack "Renewed Faith")
+
+-- Three seats, because "its controller" and "its owner" collapse onto the two
+-- seats of a duel: carol holds nothing and is asked for nothing, so an engine
+-- that credited the spell to any player but alice is visible whichever wrong
+-- player it picked.
+--
+-- alice holds the Daredevil and five lands -- two Mountains for its {1}{R} and
+-- three Plains for Renewed Faith's {2}{W}. Two Mountains is the whole answer to
+-- the cast-gate vacuity trap: {R} can only come from a Mountain, so the worst
+-- payment for the Daredevil leaves a Mountain and two Plains, which pays {2}{W}
+-- on any split. bob's graveyard holds Renewed Faith ({2}{W} Instant, "You gain 6
+-- life") and nothing else, so CR 603.3d's target choice is forced and
+-- S.identityAnswer cannot re-find a different one after a mutation.
+--
+-- Returns the board with the Daredevil's enters trigger already resolved: the
+-- Faith exiled, and alice permitted to cast it until end of turn.
+daredevilExiled :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+daredevilExiled mountain plains daredevil faith =
+  let lands = S.landsFor plains S.alice 3 (S.landsFor mountain S.alice 2 S.threePlayerGame)
+      (_, stocked) = S.addGraveyardCard faith S.bob lands
+      (handId, board) = S.addHandCard daredevil S.alice stocked
+      cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice handId daredevilName Facing.FaceUp)
+      entered = S.runPure S.identityAnswer cast Stack.resolveTop
+      -- CR 603.3b/603.3d: the enters trigger goes onto the stack the next time a
+      -- player would receive priority, and its target is chosen there.
+      placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+   in S.runPure S.identityAnswer placed Stack.resolveTop
+
+-- The one object named `name` in the shared exile zone. Not Game.zoneMembers,
+-- which files exile by OWNER -- the whole point of this board is that the owner
+-- is not the player doing anything with the card.
+exiledNamed :: CardName.CardName -> GameState.GameState -> [ObjectId.ObjectId]
+exiledNamed name gs = filter (\o -> Projection.hasName name o gs) (Set.toList (GameState.exile gs))
+
+-- daredevilExiled with the Faith cast and still on the stack: alice's SPELL off
+-- bob's CARD. Exported because Pawl.DepartureSpec wants the same board -- CR
+-- 800.4a's fourth clause is about an object whose controller is not its owner,
+-- and this is the only one in the pool that is on the stack.
+daredevilFaithCast :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> GameState.GameState
+daredevilFaithCast mountain plains daredevil faith =
+  let exiled = daredevilExiled mountain plains daredevil faith
+   in case exiledNamed renewedFaithName exiled of
+        [exiledId] -> S.runPure S.identityAnswer exiled (Cast.castSpell S.alice exiledId renewedFaithName Facing.FaceUp)
+        -- Left to the caller's own assertion about the stack: a board that never
+        -- exiled the card is one where nothing was cast either.
+        _ -> exiled
+
+direFleetDaredevilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
+  -- CR 601.3: the permission names a player, so the search for castable cards in
+  -- exile has to consult it rather than filtering the zone by owner first (#668).
+  Spec.it s "CR 601.3 a player is offered a card in exile that an opponent owns" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    daredevil <- S.printingOf s registry "Dire Fleet Daredevil"
+    faith <- S.printingOf s registry "Renewed Faith"
+    let after = daredevilExiled mountain plains daredevil faith
+    Spec.assertEqWith s "bob's graveyard is empty" (Game.zoneMembers Zone.Graveyard S.bob after) []
+    case exiledNamed renewedFaithName after of
+      [exiledId] -> do
+        Spec.assertEqWith s "CR 108.3: bob still owns it" (fmap Object.owner (Game.lookupObject exiledId after)) (Just S.bob)
+        -- The ACTION LIST, not the permission field: a field read would pass
+        -- against an engine that never let alice reach the card.
+        Spec.assertBool s (offeredCast exiledId renewedFaithName after) "alice is offered the cast"
+        case Game.faceOf exiledId after of
+          Nothing -> Spec.assertFailure s "expected a face on the exiled card"
+          Just face -> do
+            -- CR 109.5: the permission names the granting ability's controller
+            -- and nobody else -- asked of the gate directly, because bob's cast
+            -- would also fail for want of mana on this board and a gameplay-level
+            -- negative would discriminate nothing.
+            Spec.assertBool s (Cast.permitsCastFromExile S.alice exiledId face after) "alice is permitted"
+            Spec.assertBool s (not (Cast.permitsCastFromExile S.bob exiledId face after)) "its owner is not"
+      other -> Spec.assertFailure s ("expected exactly one exiled Faith, got " <> show (length other))
+  -- CR 405.4: "the controller of a spell is the player who cast it". The spell
+  -- says "YOU gain 6 life" (CR 109.5), so the life total that moves is the whole
+  -- assertion -- and it moves on a board where the caster and the owner are
+  -- different players, which is the only board the two readings disagree on.
+  Spec.it s "CR 405.4 a spell cast off an opponent's card resolves under its caster" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    daredevil <- S.printingOf s registry "Dire Fleet Daredevil"
+    faith <- S.printingOf s registry "Renewed Faith"
+    let cast = daredevilFaithCast mountain plains daredevil faith
+        after = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertBool s (not (null (GameState.stack cast))) "the Faith really was cast"
+    Spec.assertEqWith s "alice cast it, so alice gains the life" (S.lifeOf S.alice after) (Just 26)
+    Spec.assertEqWith s "its owner gains nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and the third seat is untouched" (S.lifeOf S.carol after) (Just 20)
+    -- CR 608.2n sends the card to its OWNER's graveyard, which is what keeps the
+    -- life assertion above from being readable as "owner and controller are the
+    -- same player after all".
+    Spec.assertEqWith s "CR 608.2n: the card goes to bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
@@ -2385,6 +2494,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   printedCastingRestrictionSpec s registry
   flashSpec s registry
   victorManchaSpec s registry
+  direFleetDaredevilSpec s registry
   upToOneTargetSpec s registry
   multiTargetCastSpec s registry
 
