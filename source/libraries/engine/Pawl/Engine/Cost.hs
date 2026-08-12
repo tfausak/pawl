@@ -1374,8 +1374,8 @@ pay pid oid cost = do
 -- CR 601.2h: the parts are paid "in any order", and the ORDER IS THE PAYER'S --
 -- so this asks for it rather than fixing it. Which order is chosen is
 -- observable: Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a Forest" beside
--- one Bayou and one plain Swamp is payable, and only in the order that spends
--- the Bayou on the Forest half first.
+-- one Bayou and one plain Swamp is payable, and a payer who spends the Bayou on
+-- the Swamp half loses it -- which paying the Forest half first denies them.
 --
 -- Asked ONCE for the whole cost rather than once per part. Nothing is lost:
 -- each component's own prompts are still issued as that component is paid, so a
@@ -1391,12 +1391,12 @@ pay pid oid cost = do
 -- order for an answer that is not a permutation of the offered indices.
 payComponents :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payComponents pid oid components =
-  if not (orderObservable components)
-    then payInOrder pid oid components
-    else do
+  if orderObservable components
+    then do
       gs <- State.get
       answer <- Game.choose (Prompt.OrderCostComponents (Decide.deciderFor pid gs) pid oid components)
       payInOrder pid oid (Game.permute components answer)
+    else payInOrder pid oid components
 
 payInOrder :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> Game Payment.Payment
 payInOrder pid oid components = case components of
