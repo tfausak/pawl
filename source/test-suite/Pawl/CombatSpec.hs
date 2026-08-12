@@ -4472,6 +4472,26 @@ trampleOverPlaneswalkersSpec s registry = Spec.describe s "TrampleOverPlaneswalk
     -- only the Piker's 2 lands.
     Spec.assertEqWith s "with the Piker at bob, only its own 2 reaches him" (S.lifeOf S.bob alone) (Just 18)
     Spec.assertBool s (Set.member jaceId (GameState.battlefield alone)) "and Jace is untouched"
+  -- CR 702.2c is about a CREATURE: "any nonzero amount of combat damage assigned
+  -- to a creature by a source with deathtouch". A planeswalker's bar is CR
+  -- 702.19c's count of loyalty counters, which deathtouch says nothing about, so
+  -- Typhoid Rats' 1 in the Piker's seat pays 1 of Jace's 3 and no more -- leaving
+  -- Thrasta's 1 + 6 short, and rejected.
+  --
+  -- The pair with the Piker case above is one difference, the 1/1 deathtouch Rats
+  -- for the 2/1 Piker: an engine that read CR 702.2c on every recipient rather
+  -- than on creatures alone lets the whole 6 through here.
+  Spec.it s "CR 702.2c does not clear a planeswalker's loyalty bar" $ do
+    thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, mine, jaceId) = jaceBoard jace [rats, thrasta]
+        thrastaId = case mine of [_, t] -> t; _ -> S.noSource
+        answer = Map.fromList [(Recipient.ToPlaneswalker jaceId, 1), (Recipient.ToPlayer S.bob, 6)]
+        (after, offered) = runCombatLogging (pinnedAssignments attackThePlaneswalker [(thrastaId, answer)]) gs
+    Spec.assertEqWith s "Jace is offered at his loyalty, as ever" offered [Map.fromList [(Recipient.ToPlaneswalker jaceId, 3), (Recipient.ToPlayer S.bob, 0)]]
+    Spec.assertEqWith s "the Rats' deathtouch 1 counts as 1, so Thrasta's division is rejected" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "CR 306.8: only the Rats' 1 came off Jace" (S.counterOf CounterKind.Loyalty jaceId after) 2
   -- CR 702.19e, the exception to CR 506.4c: two 2/1 first strikers bury Jace in the
   -- FIRST combat damage step (CR 510.4), and Thrasta -- still recorded as attacking
   -- it -- assigns to the defending player in the second. The control is the same
@@ -4590,6 +4610,85 @@ sharedBlockerSpec s registry = Spec.describe s "SharedBlocker" $ do
     -- the unblocked Wurm has nothing to divide either (CR 510.1b).
     Spec.assertEqWith s "blocked alone, no division is asked for at all" aloneOffered []
     Spec.assertEqWith s "so bob takes the Wurm's whole 9 and none of the Maulers' 4" (S.lifeOf S.bob alone) (Just 11)
+  -- CR 702.2c inside CR 702.19b's last sentence: the OTHER creature's damage is
+  -- deathtouch damage, so it counts toward the shared Guard's bar as LETHAL and
+  -- not as its face value of 1. Typhoid Rats (1/1 deathtouch) and Panglacial Wurm
+  -- (9/5 trample) into the 1/4 Guard: the Rats' 1 is all the bar the Wurm has to
+  -- wait on, so the Wurm's whole 9 may spill past.
+  --
+  -- The pair is ONE difference -- whether the first attacker has deathtouch --
+  -- with Llanowar Elves as the 1/1 that does not (its mana ability is out of
+  -- reach: an attacking creature is tapped). Same seats, same blocks, the same
+  -- pinned division for the Wurm, and the same offer asserted on both, so what
+  -- moves is the CHECK.
+  --
+  -- The two readings differ by exactly the Guard's remaining toughness: 9 through
+  -- against 6, since without deathtouch the Wurm owes the Guard 4 - 1 = 3 first.
+  -- The third board below spends that 3 to show it, so the negative's 20 is not
+  -- the only thing separating them and no board is a coincidence of the others.
+  Spec.it s "CR 702.2c another creature's deathtouch damage is lethal on the shared blocker" $ do
+    rats <- S.printingOf s registry "Typhoid Rats"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    wurm <- S.printingOf s registry "Panglacial Wurm"
+    guard <- S.printingOf s registry "Palace Guard"
+    let board first =
+          let (gs, mine, theirs) = S.combatBoardOf [first, wurm] [guard]
+              (firstId, wurmId) = case mine of [f, w] -> (f, w); _ -> (S.noSource, S.noSource)
+              guardId = case theirs of [g] -> g; _ -> S.noSource
+           in (gs, firstId, wurmId, guardId)
+        (deadly, ratsId, deadlyWurm, deadlyGuard) = board rats
+        (plain, elvesId, plainWurm, plainGuard) = board elves
+        -- Nothing at all on the Guard from the Wurm: with the bar met by the
+        -- Rats' deathtouch there is no floor left to pay, which is the whole
+        -- difference between the readings.
+        spillItAll wurmId guardId =
+          [ (wurmId, Map.fromList [(Recipient.ToCreature guardId, 0), (Recipient.ToPlayer S.bob, 9)]),
+            -- CR 510.1d: the Guard's own 1 power, pinned onto the Wurm, which
+            -- survives it either way -- so the Guard's fate is the only creature
+            -- the boards can disagree about.
+            (guardId, Map.singleton (Recipient.ToCreature wurmId) 1)
+          ]
+        -- The same board, paying the bar down by the numbers instead: 1 + 3 is the
+        -- Guard's whole 4 and 6 is what is left to spill.
+        payTheBar =
+          [ (plainWurm, Map.fromList [(Recipient.ToCreature plainGuard, 3), (Recipient.ToPlayer S.bob, 6)]),
+            (plainGuard, Map.singleton (Recipient.ToCreature plainWurm) 1)
+          ]
+        -- Both divisions the step asks for, in the order it asks them: the Wurm
+        -- over the Guard and bob (CR 702.19b), then the Guard's own 1 over the two
+        -- creatures it blocks (CR 510.1d).
+        offers firstId wurmId guardId =
+          [ Map.fromList [(Recipient.ToCreature guardId, 4), (Recipient.ToPlayer S.bob, 0)],
+            Map.fromList [(Recipient.ToCreature firstId, 0), (Recipient.ToCreature wurmId, 0)]
+          ]
+        (withDeathtouch, deadlyOffered) =
+          runCombatLogging (pinnedAssignments (blockingAll [ratsId, deadlyWurm]) (spillItAll deadlyWurm deadlyGuard)) deadly
+        (without, plainOffered) =
+          runCombatLogging (pinnedAssignments (blockingAll [elvesId, plainWurm]) (spillItAll plainWurm plainGuard)) plain
+        (paid, _) = runCombatLogging (pinnedAssignments (blockingAll [elvesId, plainWurm]) payTheBar) plain
+    -- The OFFER is unchanged: a threshold is the blocker's own toughness-minus-
+    -- marked bar (Damage.blockerThreshold), and CR 702.2c reaches the CHECK, which
+    -- is not settled until the whole step is announced.
+    Spec.assertEqWith
+      s
+      "the Wurm is offered the Guard's whole bar of 4"
+      deadlyOffered
+      (offers ratsId deadlyWurm deadlyGuard)
+    Spec.assertEqWith
+      s
+      "and the same offer without deathtouch"
+      plainOffered
+      (offers elvesId plainWurm plainGuard)
+    Spec.assertEqWith s "CR 702.2c: the Rats' 1 is lethal, so all 9 reach bob" (S.lifeOf S.bob withDeathtouch) (Just 11)
+    Spec.assertBool s (not (Set.member deadlyGuard (GameState.battlefield withDeathtouch))) "CR 704.5h: the Guard took deathtouch damage"
+    Spec.assertBool s (Set.member ratsId (GameState.battlefield withDeathtouch)) "the Rats took none of the Guard's damage and live"
+    -- Without deathtouch the Rats' place is a plain 1, the Guard is 3 short, and
+    -- the Wurm's division is rejected outright -- it assigns nothing at all.
+    Spec.assertEqWith s "1 of plain damage leaves the bar unmet, so the Wurm assigns nothing" (S.lifeOf S.bob without) (Just 20)
+    Spec.assertBool s (Set.member plainGuard (GameState.battlefield without)) "and the Guard survives on 1 damage"
+    -- The same board paying that 3: the most that can reach bob without deathtouch.
+    Spec.assertEqWith s "paying the bar by the numbers costs the Wurm exactly 3" (S.lifeOf S.bob paid) (Just 14)
+    Spec.assertBool s (not (Set.member plainGuard (GameState.battlefield paid))) "CR 704.5g: 1 + 3 is the Guard's whole toughness"
 
 -- Aim a spell's every target slot at one object, whatever Recipient arm names it.
 -- The filter rather than a built Recipient, so the answer is drawn from what the
