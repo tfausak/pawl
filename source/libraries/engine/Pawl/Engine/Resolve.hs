@@ -71,6 +71,7 @@ import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -121,7 +122,6 @@ import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
-import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -1816,10 +1816,14 @@ installDamageRow players controller source duration kind rewrite rider g recipie
                       DamagePattern.whichKind = kind,
                       -- Nor does either name a source, which is CR 615.7's own
                       -- "the number of events or sources dealing it doesn't
-                      -- matter". CR 615.9's shields against a source of a chosen
-                      -- quality are a different rule, and have no producer
-                      -- (#588).
-                      DamagePattern.whichSource = SourceRelation.AnySource,
+                      -- matter" -- so the trivial predicate, admitting every
+                      -- source.
+                      --
+                      -- Not implemented: CR 615.9's shield against a source of a
+                      -- player's CHOICE, which CR 609.7a has chosen when the
+                      -- effect is created and which this arm would have to bake
+                      -- the way it bakes the recipient (#1327).
+                      DamagePattern.whatSource = Filter.Type.And [],
                       DamagePattern.whichRecipient = Just recipient
                     }
                   rewrite,

@@ -70,7 +70,6 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -3293,7 +3292,7 @@ shieldOf oid gs =
         ReplacementEffect.DamageR
           DamagePattern.MkDamagePattern
             { DamagePattern.whichKind = Nothing,
-              DamagePattern.whichSource = SourceRelation.AnySource,
+              DamagePattern.whatSource = Filter.Type.And [],
               DamagePattern.whichRecipient = Nothing
             }
           DamageRewrite.PreventRemovingShieldCounter

@@ -123,7 +123,6 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
@@ -2023,11 +2022,11 @@ playerEffectFilters playerEffect = case playerEffect of
   -- exactly as a cost modifier's is (Spider-Punk's is `And []`, Prowling
   -- Serpopard's is HasCardType Creature).
   PlayerEffect.CantBeCountered f -> [f]
-  -- CR 615.12 carries no Filter: what it narrows by is a DamagePattern, whose
-  -- own axes are a kind, a source relation and a recipient rather than a
-  -- predicate over an object (Excruciator's "by this creature"). The pattern's
-  -- authorability is linted by unpreventablePatternOffends below.
-  PlayerEffect.DamageCantBePrevented _ -> []
+  -- CR 615.12 narrows by a DamagePattern, one of whose three axes IS a Filter
+  -- over the damage's source (Excruciator's "by this creature", `IsSource`); the
+  -- kind and the recipient beside it are not predicates over an object. The
+  -- pattern's authorability is linted by unpreventablePatternOffends below.
+  PlayerEffect.DamageCantBePrevented pattern_ -> [DamagePattern.whatSource pattern_]
   -- CR 701.23 names no quality of the libraries it stops being searched.
   PlayerEffect.CantSearchLibraries -> []
   -- CR 725 names no quality either: the designation has no parts (Jared
@@ -2093,7 +2092,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
 -- cannot name an ObjectId or a PlayerId. Whippoorwill's "damage that would be
 -- dealt to THAT CREATURE" does name a recipient, but the creature is the one its
 -- resolution chose, so the pattern is the engine's to bake and never the card
--- file's to write. `whichKind` and `whichSource` are both authorable here and
+-- file's to write. `whichKind` and `whatSource` are both authorable here and
 -- are exactly what Frenzied Baloth and Excruciator print.
 --
 -- Not implemented: no resolution bakes a recipient into THIS pattern, the way
@@ -2137,7 +2136,7 @@ anyDamage :: DamagePattern.DamagePattern
 anyDamage =
   DamagePattern.MkDamagePattern
     { DamagePattern.whichKind = Nothing,
-      DamagePattern.whichSource = SourceRelation.AnySource,
+      DamagePattern.whatSource = Filter.Type.And [],
       DamagePattern.whichRecipient = Nothing
     }
 
@@ -2202,13 +2201,15 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
   TurnUpRewrite.WithCounters _ _ -> []
   TurnUpRewrite.MayAttachTo f -> [f]
 
--- CR 614.1c-e: three replacement patterns narrow by a Filter. CounterPattern.onWhat
+-- CR 614.1c-e: four replacement patterns narrow by a Filter. CounterPattern.onWhat
 -- is "one or more counters would be put on a creature YOU control"; EntryR's
 -- whole pattern is one -- CR 614.1c's "as [THIS PERMANENT] enters" (Filter.IsSource)
 -- and CR 614.1d's "[Objects] enter [the battlefield] . . ." (Gather Specimens'
 -- creature clause) -- and TurnUpR's is CR 614.1e's "as [THIS PERMANENT] is turned
--- face up". The other four narrow by zone, damage, destruction, token or
--- phase, none of which holds one.
+-- face up"; and DamagePattern.whatSource is CR 615.1's shield naming the source it
+-- watches, by characteristic (Luminesce) or by identity (Galvanic Blast). The
+-- other three narrow by zone, destruction, token or phase, none of which holds
+-- one.
 --
 -- EntryR's and TurnUpR's REWRITES hold one too, on a second axis: each pattern
 -- says which objects the replacement applies to, and entryRewriteFilters and
@@ -2220,7 +2221,10 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
   ReplacementEffect.ZoneChangeR zoneChangePattern _ -> [ZoneChangePattern.whatObject zoneChangePattern]
   ReplacementEffect.EntryR entryPattern entryRewrite -> entryPattern : entryRewriteFilters entryRewrite
-  ReplacementEffect.DamageR _ _ -> []
+  -- CR 615.1's shields narrow by their source, which is a Filter over the object
+  -- dealing the damage (Luminesce's "black sources and red sources", Galvanic
+  -- Blast's `IsSource`). The kind and recipient beside it are not Filters.
+  ReplacementEffect.DamageR damagePattern _ -> [DamagePattern.whatSource damagePattern]
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR _ _ -> []
   ReplacementEffect.TurnUpR turnUpPattern turnUpRewrite -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
@@ -3741,7 +3745,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- the sweep has both a permissive and a narrowed pattern to look at.
     Spec.assertBool s (any isUnpreventable patterns) "the pool has a card printing unpreventable damage"
     Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage) patterns) "Spider-Punk's pattern narrows nothing"
-    Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage {DamagePattern.whichSource = SourceRelation.TheSource}) patterns) "Excruciator's names its own source"
+    Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage {DamagePattern.whatSource = Filter.Type.IsSource}) patterns) "Excruciator's names its own source"
     Spec.assertEqWith s "CR 615.7's recipient is baked, never printed" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against Excruciator restated rather than
   -- against a card file, exactly as the cases above are.

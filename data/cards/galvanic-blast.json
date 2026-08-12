@@ -80,8 +80,8 @@
                         "type": "DamageR",
                         "value": [
                           {
-                            "whichSource": {
-                              "type": "TheSource"
+                            "whatSource": {
+                              "type": "IsSource"
                             }
                           },
                           {

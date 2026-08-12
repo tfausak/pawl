@@ -1,0 +1,79 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Luminesce",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Replace",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "Unlimited"
+                      },
+                      {
+                        "type": "Other"
+                      },
+                      null,
+                      {
+                        "type": "DamageR",
+                        "value": [
+                          {
+                            "whatSource": {
+                              "type": "Or",
+                              "value": [
+                                {
+                                  "type": "HasColor",
+                                  "value": {
+                                    "type": "Black"
+                                  }
+                                },
+                                {
+                                  "type": "HasColor",
+                                  "value": {
+                                    "type": "Red"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          {
+                            "type": "PreventAll"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
