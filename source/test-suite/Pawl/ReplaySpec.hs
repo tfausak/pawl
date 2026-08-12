@@ -664,6 +664,23 @@ combatReplaySpec s =
             "nothing under the opponent's library either"
             (Replay.defaultAnswer (Prompt.ChooseFateseal decider S.alice S.bob [a, b]))
             ([], [a, b])
+        -- CR 701.44a: whether the explorer's controller binned the revealed card
+        -- is a decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseExplore round-trips through the transcript" $ do
+          let p = Prompt.ChooseExplore decider S.alice (ObjectId.MkObjectId 7) (ObjectId.MkObjectId 9)
+          Spec.assertEqWith s "binning it round trips" (Replay.decode p (Replay.encode p OptionalDecision.Exercises)) (Just OptionalDecision.Exercises)
+          Spec.assertEqWith s "so does leaving it on top" (Replay.decode p (Replay.encode p OptionalDecision.Declines)) (Just OptionalDecision.Declines)
+        Spec.it s "an explore choice does not decode as a riot choice" $ do
+          -- Discriminating: this fails if ChooseExplore reuses another
+          -- OptionalDecision response instead of getting its own constructor.
+          let p = Prompt.ChooseRiot decider S.alice (ObjectId.MkObjectId 7)
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseExplore OptionalDecision.Exercises)) Nothing
+        Spec.it s "a short transcript leaves the revealed card on top" $
+          Spec.assertEqWith
+            s
+            "declines"
+            (Replay.defaultAnswer (Prompt.ChooseExplore decider S.alice (ObjectId.MkObjectId 7) (ObjectId.MkObjectId 9)))
+            OptionalDecision.Declines
         -- CR 704.5j: which legend its controller kept is a decision, so it has to
         -- survive a transcript like any other.
         Spec.it s "ChooseLegend round-trips through the transcript" $ do

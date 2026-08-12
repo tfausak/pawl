@@ -103,6 +103,7 @@ toJson codec e = case e of
   Effect.Scry r q -> Common.tagged "Scry" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.Surveil r q -> Common.tagged "Surveil" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.Fateseal r q -> Common.tagged "Fateseal" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
+  Effect.Explore r -> Common.tagged "Explore" (Just (ObjectRef.toJson r))
   -- The tally is ELIDED when absent, as Destroy's bound-count slot is, so a mill
   -- nothing looks back at keeps its two-element payload.
   Effect.Mill r q mt ->
@@ -293,6 +294,7 @@ fromJson decode value = do
     "Fateseal" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Fateseal <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Fateseal expects [playerRef, quantity]"
+    "Explore" -> Common.withValue mv (fmap Effect.Explore . ObjectRef.fromJson)
     "Mill" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Mill <$> PlayerRef.fromJson r <*> Quantity.fromJson q <*> pure Nothing
       Just (Value.Array (Array.MkArray [r, q, tv])) -> Effect.Mill <$> PlayerRef.fromJson r <*> Quantity.fromJson q <*> (Just <$> MillTally.fromJson tv)
