@@ -26,16 +26,13 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "ability",
-                "spec": {
-                  "pool": {
-                    "type": "Abilities"
-                  }
+            "targetSpecs": {
+              "ability": {
+                "pool": {
+                  "type": "Abilities"
                 }
               }
-            ]
+            }
           }
         ]
       },

@@ -244,8 +244,8 @@ populatedFaceJson =
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"
     <> "\"loyalty\":3,\"colorIndicator\":[{\"type\":\"White\"}],\"characteristicPT\":{\"type\":\"ManaValue\"},"
-    <> "\"delayedAbilities\":[{\"name\":\"trigger\",\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{}]}}}],"
+    <> "\"delayedAbilities\":{\"trigger\":{\"condition\":{\"type\":\"SelfEnters\"},"
+    <> "\"modal\":{\"modes\":[{}]}}},"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
     <> "\"blockPermissions\":[{\"affected\":{\"type\":\"Attached\"},\"additional\":{\"type\":\"Literal\",\"value\":1}}],"
@@ -375,8 +375,8 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility}
         ( init baseFaceJson
-            <> ",\"delayedAbilities\":[{\"name\":\"trigger\",\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},"
-            <> "\"modal\":{\"modes\":[{}]}}}]}"
+            <> ",\"delayedAbilities\":{\"trigger\":{\"condition\":{\"type\":\"SelfEnters\"},"
+            <> "\"modal\":{\"modes\":[{}]}}}}"
         )
     Spec.it s "playerAbilities" $
       Common.assertJsonCodec
@@ -513,5 +513,5 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Common.assertFromJson
       s
       decodeFace
-      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"clauses":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}} """
+      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"clauses":[],"targetSpecs":{}}],"selection":{"type":"ChooseExactly","value":1}}} """
       mountainFace

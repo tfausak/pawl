@@ -31,7 +31,7 @@ entry =
 entryJson :: String
 entryJson =
   "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
-    <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
+    <> "\"bindings\":{\"token\":{\"amount\":9}},"
     <> "\"window\":{\"type\":\"AnyTurn\"}}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -47,7 +47,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       DelayedTrigger.fromJson
       entry {DelayedTrigger.expiry = Just Expiry.AtCleanup}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
-          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
+          <> "\"bindings\":{\"token\":{\"amount\":9}},"
           <> "\"window\":{\"type\":\"AnyTurn\"},\"expiry\":{\"type\":\"AtCleanup\"}}"
       )
   -- CR 603.7a: an onset gate. Pawl.Codec.TurnWindowSpec covers the other arms.
@@ -58,7 +58,7 @@ spec s = Spec.describe s "Pawl.Codec.DelayedTrigger" $ do
       DelayedTrigger.fromJson
       entry {DelayedTrigger.window = TurnWindow.ControllersNextTurn}
       ( "{\"ability\":{\"condition\":{\"type\":\"SelfEnters\"},\"modal\":{\"modes\":[{}]}},\"source\":4,\"controller\":0,"
-          <> "\"bindings\":[{\"slot\":\"token\",\"binding\":{\"amount\":9}}],"
+          <> "\"bindings\":{\"token\":{\"amount\":9}},"
           <> "\"window\":{\"type\":\"ControllersNextTurn\"}}"
       )
   -- 'bindings' at its default and no stated 'expiry'. 'window' stays a required

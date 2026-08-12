@@ -32,22 +32,19 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "pool": {
-                        "type": "CardsInGraveyard",
+                "targetSpecs": {
+                  "target": {
+                    "pool": {
+                      "type": "CardsInGraveyard",
+                      "value": {
+                        "type": "Scoped",
                         "value": {
-                          "type": "Scoped",
-                          "value": {
-                            "type": "EachPlayer"
-                          }
+                          "type": "EachPlayer"
                         }
                       }
                     }
                   }
-                ]
+                }
               }
             ]
           }

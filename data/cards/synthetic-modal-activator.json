@@ -33,16 +33,13 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "damaged",
-                    "spec": {
-                      "pool": {
-                        "type": "Creatures"
-                      }
+                "targetSpecs": {
+                  "damaged": {
+                    "pool": {
+                      "type": "Creatures"
                     }
                   }
-                ]
+                }
               },
               {
                 "clauses": [
@@ -67,16 +64,13 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "strengthened",
-                    "spec": {
-                      "pool": {
-                        "type": "Creatures"
-                      }
+                "targetSpecs": {
+                  "strengthened": {
+                    "pool": {
+                      "type": "Creatures"
                     }
                   }
-                ]
+                }
               }
             ]
           }

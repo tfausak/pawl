@@ -69,39 +69,36 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "Or",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Instant"
-                            }
-                          },
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Sorcery"
-                            }
-                          }
-                        ]
-                      },
-                      "pool": {
-                        "type": "CardsInGraveyard",
-                        "value": {
-                          "type": "Scoped",
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "Or",
+                      "value": [
+                        {
+                          "type": "HasCardType",
                           "value": {
-                            "type": "Opponents"
+                            "type": "Instant"
                           }
+                        },
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Sorcery"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "CardsInGraveyard",
+                      "value": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "Opponents"
                         }
                       }
                     }
                   }
-                ]
+                }
               }
             ]
           }

@@ -51,22 +51,19 @@
                 ]
               }
             ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "filter": {
-                    "type": "HasKeywordFamily",
-                    "value": {
-                      "type": "Morph"
-                    }
-                  },
-                  "pool": {
-                    "type": "Creatures"
+            "targetSpecs": {
+              "target": {
+                "filter": {
+                  "type": "HasKeywordFamily",
+                  "value": {
+                    "type": "Morph"
                   }
+                },
+                "pool": {
+                  "type": "Creatures"
                 }
               }
-            ]
+            }
           }
         ]
       },

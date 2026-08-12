@@ -126,7 +126,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             )
           ]
       )
-      """ [{"name":"each combat","ability":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Untap","value":{"type":"EachMatching","value":{"type":"AttackedThisTurn"}}}]}]}]}}},{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}]}}}] """
+      """ {"each combat":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Untap","value":{"type":"EachMatching","value":{"type":"AttackedThisTurn"}}}]}]}]}},"sacrifice it":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}]}}} """
   -- CR 603.4: an ability stating no intervening "if" leaves only the two
   -- required keys.
   Spec.it s "an all-default value omits every optional key" $

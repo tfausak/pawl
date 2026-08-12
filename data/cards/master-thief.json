@@ -105,22 +105,19 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Artifact"
-                        }
-                      },
-                      "pool": {
-                        "type": "Permanents"
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Artifact"
                       }
+                    },
+                    "pool": {
+                      "type": "Permanents"
                     }
                   }
-                ]
+                }
               }
             ]
           }

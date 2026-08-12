@@ -75,22 +75,19 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "ControlledBy",
-                        "value": {
-                          "type": "Opponent"
-                        }
-                      },
-                      "pool": {
-                        "type": "Creatures"
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "Opponent"
                       }
+                    },
+                    "pool": {
+                      "type": "Creatures"
                     }
                   }
-                ]
+                }
               }
             ]
           }

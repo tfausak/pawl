@@ -48,10 +48,11 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> ",\"objects\":[7,4]}"
       )
-  -- A name-keyed map is a sorted array of entries so the render is
-  -- deterministic. The two entries are inserted in DESCENDING slot-name order,
-  -- so a trip that emitted the map's incidental traversal order rather than
-  -- Map.toAscList fails this case.
+  -- A name-keyed map is a JSON OBJECT keyed by the slot name, written in
+  -- ascending key order. The two entries are inserted in DESCENDING slot-name
+  -- order, so a trip that emitted the map's incidental traversal order rather
+  -- than Map.toAscList fails this case -- Pawl.Json.Object is a list of pairs,
+  -- so the order written is the order rendered.
   Spec.it s "toJsonMap/fromJsonMap sorts by slot name" $
     Common.assertJsonCodec
       s
@@ -62,6 +63,6 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
             (SlotName.MkSlotName (Text.pack "a-slot"), Binding.empty {Binding.amount = Just 2})
           ]
       )
-      ( "[{\"slot\":\"a-slot\",\"binding\":{\"amount\":2}},"
-          <> "{\"slot\":\"z-slot\",\"binding\":{\"amount\":1}}]"
+      ( "{\"a-slot\":{\"amount\":2},"
+          <> "\"z-slot\":{\"amount\":1}}"
       )

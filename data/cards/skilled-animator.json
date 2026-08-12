@@ -202,33 +202,30 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
-                            }
-                          },
-                          {
-                            "type": "ControlledBy",
-                            "value": {
-                              "type": "You"
-                            }
+                "targetSpecs": {
+                  "target": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Artifact"
                           }
-                        ]
-                      },
-                      "pool": {
-                        "type": "Permanents"
-                      }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
                     }
                   }
-                ]
+                }
               }
             ]
           }

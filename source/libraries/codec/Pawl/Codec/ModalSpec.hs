@@ -56,7 +56,7 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
           )
           (ModeSelection.ChooseExactly 1)
       )
-      """ {"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]} """
+      """ {"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}}]} """
   Spec.it s "omits a ChooseExactly 1 selection" $
     Common.assertJsonCodec
       s

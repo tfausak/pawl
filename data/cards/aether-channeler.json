@@ -100,36 +100,33 @@
                     ]
                   }
                 ],
-                "targetSpecs": [
-                  {
-                    "slot": "permanent",
-                    "spec": {
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "Not",
+                "targetSpecs": {
+                  "permanent": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "HasCardType",
                             "value": {
-                              "type": "HasCardType",
-                              "value": {
-                                "type": "Land"
-                              }
-                            }
-                          },
-                          {
-                            "type": "Not",
-                            "value": {
-                              "type": "IsSource"
+                              "type": "Land"
                             }
                           }
-                        ]
-                      },
-                      "pool": {
-                        "type": "Permanents"
-                      }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsSource"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
                     }
                   }
-                ]
+                }
               },
               {
                 "clauses": [
