@@ -25,48 +25,51 @@
                       {
                         "type": "ForAsLongAs",
                         "value": {
-                          "comparison": {
-                            "type": "AtLeast"
-                          },
-                          "measured": {
-                            "type": "Count",
-                            "value": {
-                              "aggregation": {
-                                "type": "Members"
-                              },
-                              "filter": {
-                                "type": "And",
-                                "value": [
-                                  {
-                                    "type": "HasSubtype",
-                                    "value": {
-                                      "type": "Swamp"
+                          "type": "Compares",
+                          "value": {
+                            "comparison": {
+                              "type": "AtLeast"
+                            },
+                            "measured": {
+                              "type": "Count",
+                              "value": {
+                                "aggregation": {
+                                  "type": "Members"
+                                },
+                                "filter": {
+                                  "type": "And",
+                                  "value": [
+                                    {
+                                      "type": "HasSubtype",
+                                      "value": {
+                                        "type": "Swamp"
+                                      }
+                                    },
+                                    {
+                                      "type": "ControlledBy",
+                                      "value": {
+                                        "type": "You"
+                                      }
                                     }
-                                  },
-                                  {
-                                    "type": "ControlledBy",
-                                    "value": {
-                                      "type": "You"
+                                  ]
+                                },
+                                "scope": {
+                                  "type": "InZone",
+                                  "value": [
+                                    {
+                                      "type": "Battlefield"
+                                    },
+                                    {
+                                      "type": "EachPlayer"
                                     }
-                                  }
-                                ]
-                              },
-                              "scope": {
-                                "type": "InZone",
-                                "value": [
-                                  {
-                                    "type": "Battlefield"
-                                  },
-                                  {
-                                    "type": "EachPlayer"
-                                  }
-                                ]
+                                  ]
+                                }
                               }
+                            },
+                            "threshold": {
+                              "type": "Literal",
+                              "value": 1
                             }
-                          },
-                          "threshold": {
-                            "type": "Literal",
-                            "value": 1
                           }
                         }
                       },
