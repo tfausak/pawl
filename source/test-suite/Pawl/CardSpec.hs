@@ -1823,6 +1823,8 @@ objectRefFilters ref = case ref of
   ObjectRef.InSlot _ -> []
   -- Day of Judgment's "all creatures", Boil's "all Islands".
   ObjectRef.EachMatching f -> [f]
+  -- Molten Disaster's "each player" holds no Filter to lint.
+  ObjectRef.EachPlayer -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
