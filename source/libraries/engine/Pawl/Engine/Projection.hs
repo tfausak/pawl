@@ -172,10 +172,10 @@ applyModification lyr src cands gs oid m pc =
         Modification.AddCreatureSubtype s ->
           pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
         -- The same add over CR 205.3m's whole list. Identical to what
-        -- applySubtypeDefining does one call earlier in this layer, and
-        -- deliberately so: rule 702.73a says one thing, and the two sites differ
-        -- only in WHEN they run -- the CDA at the start of layer 4 (CR 613.3),
-        -- this in timestamp order (CR 613.7).
+        -- applySubtypeDefining writes at the start of this layer, and deliberately
+        -- so: rule 702.73a says one thing, and the two sites differ only in WHEN
+        -- they run -- the CDA first (CR 613.3), this in timestamp order (CR
+        -- 613.7).
         Modification.AddEveryCreatureSubtype ->
           pc {PC.subtypes = Set.union Subtype.everyCreatureType (PC.subtypes pc)}
         Modification.AddCardType t ->
