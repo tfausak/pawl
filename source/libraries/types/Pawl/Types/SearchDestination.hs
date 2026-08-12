@@ -17,4 +17,10 @@ data SearchDestination
     -- Tutor) is a DIFFERENT sentence and gets its own arm, not this one with a
     -- flag.
     RevealThenHand
+  | -- | Hoarding Dragon's "exile it". No reveal: CR 701.23e leaves a found card
+    -- unrevealed unless the card says otherwise, and this sentence does not --
+    -- what makes the card public afterwards is CR 400.2's exile zone, not a
+    -- reveal, so the two are not the same act and this arm is not RevealThenHand
+    -- pointed at another zone.
+    Exile
   deriving (Eq, Ord, Show)

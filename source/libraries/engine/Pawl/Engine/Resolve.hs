@@ -3853,6 +3853,13 @@ putFound searcher destination cardId = case destination of
   SearchDestination.RevealThenHand -> do
     Event.reveal searcher cardId
     Event.changeZone cardId Zone.Hand
+  -- Hoarding Dragon's "exile it": the move alone, with NO Event.reveal ahead of
+  -- it. CR 701.23e is what makes that right rather than an omission -- the card
+  -- says only "exile it", so nothing is revealed, and the exiled card being
+  -- visible afterwards is CR 400.2 making exile a public zone. Which card was
+  -- exiled by this instruction is not recorded (#968), so no later ability can
+  -- name it.
+  SearchDestination.Exile -> Event.changeZone cardId Zone.Exile
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds
 -- shape). changeZone mints a new object; tap it by id after the move.

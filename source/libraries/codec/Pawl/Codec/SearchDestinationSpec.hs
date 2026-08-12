@@ -23,3 +23,10 @@ spec s = Spec.describe s "Pawl.Codec.SearchDestination" $ do
       SearchDestination.fromJson
       SearchDestination.RevealThenHand
       """ {"type":"RevealThenHand"} """
+  Spec.it s "Exile" $
+    Common.assertJsonCodec
+      s
+      SearchDestination.toJson
+      SearchDestination.fromJson
+      SearchDestination.Exile
+      """ {"type":"Exile"} """
