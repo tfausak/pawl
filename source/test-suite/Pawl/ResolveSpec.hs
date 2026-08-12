@@ -742,7 +742,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -758,7 +758,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
@@ -781,7 +781,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -805,7 +805,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -913,6 +913,89 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "alice's library is untouched" (Game.zoneMembers Zone.Library S.alice settled) [aliceCard]
     Spec.assertEqWith s "bob's library is untouched" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
     Spec.assertEqWith s "carol's library kept only the card the filter rejected" (Game.zoneMembers Zone.Library S.carol settled) [carolPiker]
+  -- Extract -- "{U} Sorcery: Search target player's library for a card and exile
+  -- it. Then that player shuffles." The whole-card proof that the player LOOKING
+  -- and the player whose library is looked at can be different seats (CR 701.23a),
+  -- and that a search stating no quality must find (CR 701.23d).
+  --
+  -- Its filter is `And []`, the trivial predicate: "a card" states nothing about
+  -- what may be found, so every card in the library is a candidate and no
+  -- assertion here can pass because a filter quietly rejected something.
+  Spec.it s "CR 701.23a whole card: Extract's controller searches the TARGET player's library" $ do
+    island <- S.printingOf s registry "Island"
+    extract <- S.printingOf s registry "Extract"
+    piker <- S.printingOf s registry "Goblin Piker"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    let (gs, spellId, aliceLib, bobCard, carolLib) = extractBoard island extract piker altar mountain forest plains
+        pinned = case carolLib of
+          _ : middle : _ -> middle
+          _ -> ObjectId.MkObjectId 0
+        cast = snd (Engine.runGamePure (aliceFinding pinned) gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure (aliceFinding pinned) cast Engine.priorityLoop)
+    Spec.assertEqWith s "carol's library starts in the order the pins assume" (Game.zoneMembers Zone.Library S.carol gs) carolLib
+    Spec.assertEqWith
+      s
+      "the card alice named, and only it, is in exile"
+      (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Exile S.carol settled))
+      [CardName.MkCardName $ Text.pack "Forest"]
+    Spec.assertEqWith s "carol keeps the other two, in order" (Game.zoneMembers Zone.Library S.carol settled) (filter (/= pinned) carolLib)
+    Spec.assertEqWith s "the searcher's own library is untouched -- she read carol's" (Game.zoneMembers Zone.Library S.alice settled) aliceLib
+    Spec.assertEqWith s "and so is the third seat's" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
+    Spec.assertEqWith s "nothing of alice's was exiled" (Game.zoneMembers Zone.Exile S.alice settled) []
+    Spec.assertEqWith s "nor of bob's" (Game.zoneMembers Zone.Exile S.bob settled) []
+    Spec.assertEqWith s "the found card was exiled, not fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Forest") S.carol settled) 0
+    Spec.assertEqWith s "nor put into a hand" (S.handSize S.carol settled) 0
+  -- The same board, with the search answered "nothing". CR 701.23b's permission
+  -- does NOT apply -- it is for a search stating a quality, and Extract states
+  -- none -- so CR 701.23d makes the find mandatory and the answer is completed.
+  -- The paired negative is "CR 701.23b Search may fail to find" above: same
+  -- declining answer, a filter that states a quality, nothing found.
+  Spec.it s "CR 701.23d whole card: Extract must find, so declining still exiles a card" $ do
+    island <- S.printingOf s registry "Island"
+    extract <- S.printingOf s registry "Extract"
+    piker <- S.printingOf s registry "Goblin Piker"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    let (gs, spellId, aliceLib, bobCard, carolLib) = extractBoard island extract piker altar mountain forest plains
+        cast = snd (Engine.runGamePure aliceFindingNothing gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure aliceFindingNothing cast Engine.priorityLoop)
+    Spec.assertEqWith
+      s
+      "a card was exiled anyway, and it is the head of the library the engine completed with"
+      (fmap (`S.soleFaceName` settled) (Game.zoneMembers Zone.Exile S.carol settled))
+      [CardName.MkCardName $ Text.pack "Plains"]
+    Spec.assertEqWith s "carol's library lost exactly that one" (Game.zoneMembers Zone.Library S.carol settled) (drop 1 carolLib)
+    Spec.assertEqWith s "alice's library is still untouched" (Game.zoneMembers Zone.Library S.alice settled) aliceLib
+    Spec.assertEqWith s "and bob's" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
+  -- The same board again, with the shuffle answered by reversing whatever library
+  -- it is offered. Which library gets shuffled is the CARD's sentence -- "then
+  -- that player shuffles", its target -- rather than rule 701.24's, which says
+  -- only what shuffling does (CR 701.24a). So carol's order changes and nobody
+  -- else's does. An engine that shuffled the SEARCHER's library instead would
+  -- overwrite alice's with carol's cards, which the last two assertions read
+  -- directly.
+  Spec.it s "CR 701.24a whole card: Extract shuffles the library it searched, the TARGET player's" $ do
+    island <- S.printingOf s registry "Island"
+    extract <- S.printingOf s registry "Extract"
+    piker <- S.printingOf s registry "Goblin Piker"
+    altar <- S.printingOf s registry "Ashnod's Altar"
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    let (gs, spellId, aliceLib, bobCard, carolLib) = extractBoard island extract piker altar mountain forest plains
+        pinned = case carolLib of
+          _ : middle : _ -> middle
+          _ -> ObjectId.MkObjectId 0
+        cast = snd (Engine.runGamePure (aliceFindingReversing pinned) gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure (aliceFindingReversing pinned) cast Engine.priorityLoop)
+    Spec.assertEqWith s "carol's remaining cards came back reversed" (Game.zoneMembers Zone.Library S.carol settled) (reverse (filter (/= pinned) carolLib))
+    Spec.assertEqWith s "alice's library kept its order -- hers was never shuffled" (Game.zoneMembers Zone.Library S.alice settled) aliceLib
+    Spec.assertEqWith s "nor was bob's" (Game.zoneMembers Zone.Library S.bob settled) [bobCard]
   Spec.it s "CR 603/608.2n Rest in Peace's ETB exiles graveyards and ceases" $ do
     restInPeace <- S.printingOf s registry "Rest in Peace"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1552,6 +1635,75 @@ atCarolFinding p = case p of
         [] -> Nothing
       else Nothing
   _ -> S.identityAnswer p
+
+-- Extract's board, built once so the three cases below differ in exactly one
+-- thing: the answer. Three seats, because two collapse "target player" onto "the
+-- one opponent" and the whole point of the card is that the searcher and the
+-- library's owner are different players.
+--
+-- Every library is stocked, and alice's with TWO cards, so "which library was
+-- read" and "which library was shuffled" are both observable: a single-card
+-- library cannot show a reordering. The printings, in argument order: the Island
+-- alice taps, the Extract in her hand, the Goblin Piker she has two of, bob's
+-- Ashnod's Altar, then carol's Mountain, Forest and Plains -- added in that
+-- order, so Support.addLibraryCard's prepending leaves the Plains at the head and
+-- the Forest in the middle. The first case below asserts that order before
+-- casting anything, since the pins rest on it.
+extractBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId, [ObjectId.ObjectId])
+extractBoard island extract piker altar mountain forest plains =
+  let g0 = S.landsFor island S.alice 1 S.threePlayerGame
+      (aliceOne, g1) = S.addLibraryCard piker S.alice g0
+      (aliceTwo, g2) = S.addLibraryCard piker S.alice g1
+      (bobCard, g3) = S.addLibraryCard altar S.bob g2
+      (carolMountain, g4) = S.addLibraryCard mountain S.carol g3
+      (carolForest, g5) = S.addLibraryCard forest S.carol g4
+      (carolPlains, g6) = S.addLibraryCard plains S.carol g5
+      (gs, spellId) = S.handOne extract g6
+   in (gs, spellId, [aliceTwo, aliceOne], bobCard, [carolPlains, carolForest, carolMountain])
+
+-- Extract's answerers, sharing one targeting half with atCarolFinding above:
+-- carol is preferred wherever a target is offered, so the spell's one slot names
+-- her. They differ ONLY in what the search is answered and how the shuffle is,
+-- so the three boards below are one board with one variable each.
+--
+-- The find is pinned to a card id AND to the asking seat. Asking carol -- the
+-- library's owner rather than the spell's controller -- gets Nothing, which under
+-- CR 701.23d is not "nothing happens" but "the head is completed in", so the
+-- pinned card is deliberately NOT the head.
+atCarolTargeted :: Prompt.Prompt r -> r
+atCarolTargeted p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (TargetCount.least . fst) offers
+  Prompt.ChooseTargets _ _ _ sets ->
+    fmap
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer S.carol) (Set.toAscList legal) <> Set.toAscList legal))))
+      sets
+  _ -> S.identityAnswer p
+
+aliceFinding :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aliceFinding wanted p = case p of
+  Prompt.SearchLibrary _ pid _ -> if pid == S.alice then Just wanted else Nothing
+  _ -> atCarolTargeted p
+
+aliceFindingNothing :: Prompt.Prompt r -> r
+aliceFindingNothing p = case p of
+  Prompt.SearchLibrary {} -> Nothing
+  _ -> atCarolTargeted p
+
+-- aliceFinding, plus a shuffle that REVERSES the library it is offered. Game
+-- .honourShuffle accepts any permutation of what was offered, so the reversal is
+-- honoured and names which library the shuffle read and wrote.
+aliceFindingReversing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aliceFindingReversing wanted p = case p of
+  Prompt.Shuffle offered -> reverse offered
+  _ -> aliceFinding wanted p
 
 -- Casts every castable spell (targets via lookupMin: creatures first),
 -- otherwise passes. Drives the Bolt-vs-Bolt integration falsifier.

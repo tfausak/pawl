@@ -60,6 +60,12 @@
                             }
                           },
                           {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
                             "type": "HasCardType",
                             "value": {
                               "type": "Artifact"

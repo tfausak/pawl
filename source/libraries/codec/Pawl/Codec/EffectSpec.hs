@@ -145,8 +145,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Search (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Filter.HasCardType CardType.Land) SearchDestination.BattlefieldTapped)
-      """ {"type":"Search","value":[{"type":"InSlot","value":"target"},{"type":"HasCardType","value":{"type":"Land"}},{"type":"BattlefieldTapped"}]} """
+      (Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Filter.HasCardType CardType.Land) SearchDestination.BattlefieldTapped)
+      """ {"type":"Search","value":[{"type":"Relative","value":{"type":"You"}},{"type":"InSlot","value":"target"},{"type":"HasCardType","value":{"type":"Land"}},{"type":"BattlefieldTapped"}]} """
   Spec.it s "ExileAllGraveyards" $
     Common.assertJsonCodec
       s

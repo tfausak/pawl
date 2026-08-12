@@ -3,20 +3,16 @@
     {
       "manaCost": [
         {
-          "type": "Generic",
-          "value": 1
-        },
-        {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Green"
+              "type": "Blue"
             }
           }
         }
       ],
-      "name": "Rampant Growth",
+      "name": "Extract",
       "spell": {
         "modes": [
           {
@@ -33,36 +29,28 @@
                         }
                       },
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
+                        "type": "InSlot",
+                        "value": "player"
                       },
                       {
                         "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Land"
-                            }
-                          },
-                          {
-                            "type": "HasSupertype",
-                            "value": {
-                              "type": "Basic"
-                            }
-                          }
-                        ]
+                        "value": []
                       },
                       {
-                        "type": "BattlefieldTapped"
+                        "type": "Exile"
                       }
                     ]
                   }
                 ]
               }
-            ]
+            ],
+            "targetSpecs": {
+              "player": {
+                "pool": {
+                  "type": "Players"
+                }
+              }
+            }
           }
         ]
       },
