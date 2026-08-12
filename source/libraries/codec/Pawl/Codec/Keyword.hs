@@ -86,6 +86,7 @@ codec =
       Arm.payload "Renown" Common.natural Keyword.Renown,
       Arm.nullary "Changeling" Keyword.Changeling,
       Arm.nullary "Devoid" Keyword.Devoid,
+      Arm.nullary "Ingest" Keyword.Ingest,
       Arm.nullary "Skulk" Keyword.Skulk,
       Arm.nullary "Melee" Keyword.Melee,
       Arm.payload "Crew" Common.natural Keyword.Crew,
@@ -167,6 +168,7 @@ codec =
       Keyword.Renown n -> Common.tagged "Renown" . Just $ Common.encodeNatural n
       Keyword.Changeling -> Common.nullary "Changeling"
       Keyword.Devoid -> Common.nullary "Devoid"
+      Keyword.Ingest -> Common.nullary "Ingest"
       Keyword.Skulk -> Common.nullary "Skulk"
       Keyword.Melee -> Common.nullary "Melee"
       Keyword.Crew n -> Common.tagged "Crew" . Just $ Common.encodeNatural n

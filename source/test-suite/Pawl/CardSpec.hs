@@ -1732,6 +1732,9 @@ keywordFilters keyword = case keyword of
   Keyword.Renown _ -> []
   Keyword.Changeling -> []
   Keyword.Devoid -> []
+  -- CR 702.115a names no quality: which card moves and where it goes are the
+  -- rule's own words, written into the ability Pawl.Engine.Keyword mints.
+  Keyword.Ingest -> []
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
   -- ability is built with lives in Pawl.Engine.Keyword and is not card data.
   Keyword.Crew _ -> []
