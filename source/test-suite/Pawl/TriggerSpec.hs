@@ -26,6 +26,9 @@
 -- 702.70 poisonous, the first keyword whose rule text IS a triggered ability,
 -- and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousSpec`. CR
+-- 702.115 ingest, the same event and the same slot over a payload that moves a
+-- card out of a library nobody targeted, with Culling Drone at two seats and
+-- three -- `ingestSpec`. CR
 -- 702.86 annihilator, whose "defending player" (CR
 -- 508.5) rides the declaration event through the same reserved slot, at three
 -- seats so that player is not the attacker's only opponent --
@@ -2170,6 +2173,111 @@ poisonousSpec s registry =
               Spec.assertBool s (Projection.hasKeyword (Keyword.Type.Poisonous 3) attacker resolved) "the Aura granted poisonous 3"
               Spec.assertEqWith s "bob has three poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
               Spec.assertEqWith s "and took the Piker's two" (S.lifeOf S.bob after) (Just 18)
+
+-- CR 702.115a: "Ingest is a triggered ability. 'Ingest' means 'Whenever this
+-- creature deals combat damage to a player, that player exiles the top card of
+-- their library.'" Poisonous' condition and poisonous' reserved "that player"
+-- slot over a different payload, so what is new here is the PAYLOAD: a zone move
+-- whose source is a library nobody targeted.
+--
+-- Culling Drone is the card -- {1}{B} 2/2 with devoid and ingest and nothing
+-- else, so nothing else on it can produce the exile the assertions read.
+--
+-- Every board stocks the libraries with TWO DISTINCT printings, top and second,
+-- and reads the exile zone by NAME. That is what tells "the top card" apart from
+-- "a card": an implementation that exiled the bottom, or two, or the wrong
+-- player's, puts a different name in exile rather than the same one.
+ingestSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ingestSpec s registry =
+  let -- addLibraryCard puts each card ON TOP, so the deeper card is added first
+      -- and `top` ends up as CR 401.2's head.
+      stock deeper top pid gs = snd (S.addLibraryCard top pid (snd (S.addLibraryCard deeper pid gs)))
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+      nameOfCard = CardName.MkCardName . Text.pack
+   in Spec.describe s "Ingest" $ do
+        -- CR 702.115b: "If a creature has multiple instances of ingest, each
+        -- triggers separately." So the count is a MULTIPLICITY, poisonous'
+        -- reading rather than shadow's redundancy. The falsifier is a mint that
+        -- collapses the count to one ability.
+        Spec.it s "CR 702.115b each instance of ingest is its own ability" $ do
+          Spec.assertEqWith s "ingest held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Ingest 2)) [Keyword.ingest, Keyword.ingest]
+          Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Ingest 1)) [Keyword.ingest]
+        -- The proving test. Unblocked combat damage to bob exiles bob's top card
+        -- and leaves the card under it where it was. alice's library is stocked
+        -- with two OTHER printings and is asserted untouched, which is what
+        -- separates rule 702.115a's "that player" from the ability's controller:
+        -- a payload built on Binding.you rather than Binding.triggerPlayer would
+        -- exile the Island.
+        Spec.it s "CR 702.115a whole card: Culling Drone exiles the damaged player's top card" $ do
+          drone <- S.printingOf s registry "Culling Drone"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          mountain <- S.printingOf s registry "Mountain"
+          case S.combatBoardOf [drone] [] of
+            (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
+            (base, attacker : _, _) -> do
+              let gs = stock island mountain S.alice (stock swamp piker S.bob base)
+                  after = S.runCombat S.aggressiveAnswer gs
+              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Ingest attacker gs) "the Drone has ingest"
+              Spec.assertEqWith s "the Piker, bob's top card, is in exile" (namesIn Zone.Exile S.bob after) (Set.singleton (nameOfCard "Goblin Piker"))
+              Spec.assertEqWith s "and the Swamp under it stayed in the library" (namesIn Zone.Library S.bob after) (Set.singleton (nameOfCard "Swamp"))
+              Spec.assertEqWith s "alice, who controls the ability, exiles nothing" (namesIn Zone.Exile S.alice after) Set.empty
+              Spec.assertEqWith s "and keeps both her cards" (namesIn Zone.Library S.alice after) (Set.fromList [nameOfCard "Island", nameOfCard "Mountain"])
+              -- Ingest is not a replacement for the damage: rule 702.115a's
+              -- ability is additional, so the two life still goes.
+              Spec.assertEqWith s "bob took the Drone's two" (S.lifeOf S.bob after) (Just 18)
+        -- The negative, on the SAME board but for one blocker: rule 702.115a is
+        -- scoped to combat damage dealt TO A PLAYER, and a blocked creature
+        -- assigns its damage to the creatures blocking it (CR 510.1c).
+        Spec.it s "CR 702.115a a blocked Culling Drone exiles nothing" $ do
+          drone <- S.printingOf s registry "Culling Drone"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          case S.combatBoardOf [drone] [piker] of
+            (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
+            (base, _, _) -> do
+              let gs = stock swamp mountain S.bob base
+                  after = S.runCombat S.aggressiveAnswer gs
+              -- The Piker blocked and took the Drone's two, which is what keeps
+              -- this from passing on a board where no damage was dealt at all.
+              Spec.assertEqWith s "the blocking Piker died" (namesIn Zone.Graveyard S.bob after) (Set.singleton (nameOfCard "Goblin Piker"))
+              Spec.assertEqWith s "nothing is exiled" (namesIn Zone.Exile S.bob after) Set.empty
+              Spec.assertEqWith s "both cards stayed in the library" (namesIn Zone.Library S.bob after) (Set.fromList [nameOfCard "Mountain", nameOfCard "Swamp"])
+              Spec.assertEqWith s "and bob lost no life" (S.lifeOf S.bob after) (Just 20)
+        -- CR 702.115a says nothing about a shortfall, so an empty library exiles
+        -- nothing and costs nothing: CR 104.3c's loss is on DRAWING, and this is
+        -- a move. The same board as the proving test, one thing different.
+        Spec.it s "CR 702.115a an empty library exiles nothing and loses nobody" $ do
+          drone <- S.printingOf s registry "Culling Drone"
+          case S.combatBoardOf [drone] [] of
+            (_, [], _) -> Spec.assertFailure s "fixture should have an attacker"
+            (base, _, _) -> do
+              let after = S.runCombat S.aggressiveAnswer base
+              Spec.assertEqWith s "nothing is exiled" (namesIn Zone.Exile S.bob after) Set.empty
+              Spec.assertEqWith s "bob is still in the game" (S.lifeOf S.bob after) (Just 18)
+        -- CR 800.1 at three seats, the poisonous spec's shape: rule 702.115a's
+        -- "that player" is whoever was DEALT the damage, and at two players that
+        -- is indistinguishable from "the attacker's one opponent". The two runs
+        -- differ only in the answer to Prompt.ChooseDefender.
+        Spec.it s "CR 702.115a the exile follows whichever opponent was attacked" $ do
+          drone <- S.printingOf s registry "Culling Drone"
+          piker <- S.printingOf s registry "Goblin Piker"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          mountain <- S.printingOf s registry "Mountain"
+          case S.threePlayerCombat [drone] [] [] of
+            (_, [], _, _) -> Spec.assertFailure s "fixture should have an attacker"
+            (base0, _, _, _) -> do
+              let base = stock swamp piker S.bob (stock island mountain S.carol base0)
+                  hitBob = S.runCombat (S.attackTo S.bob) base
+                  hitCarol = S.runCombat (S.attackTo S.carol) base
+              Spec.assertEqWith s "bob, attacked, exiles his Piker" (namesIn Zone.Exile S.bob hitBob) (Set.singleton (nameOfCard "Goblin Piker"))
+              Spec.assertEqWith s "carol, untouched, exiles nothing" (namesIn Zone.Exile S.carol hitBob) Set.empty
+              Spec.assertEqWith s "and the other way round" (namesIn Zone.Exile S.carol hitCarol) (Set.singleton (nameOfCard "Mountain"))
+              Spec.assertEqWith s "bob untouched this time" (namesIn Zone.Exile S.bob hitCarol) Set.empty
 
 -- CR 702.86a: "Annihilator is a triggered ability. 'Annihilator N' means
 -- 'Whenever this creature attacks, defending player sacrifices N permanents.'"
@@ -9987,6 +10095,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   monarchOrderingSpec s registry
   interveningSpec s registry
   poisonousSpec s registry
+  ingestSpec s registry
   annihilatorSpec s registry
   battleCrySpec s registry
   prowessSpec s registry

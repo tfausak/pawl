@@ -563,6 +563,12 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Devoid
       """ {"type":"Devoid"} """
+  Spec.it s "Ingest" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Ingest
+      """ {"type":"Ingest"} """
   Spec.it s "Skulk" $
     Common.assertCodec
       s

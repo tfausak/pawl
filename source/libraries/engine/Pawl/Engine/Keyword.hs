@@ -188,6 +188,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Renown n -> List.genericReplicate count (renown n)
   Keyword.Persist -> List.genericReplicate count persist
   Keyword.Undying -> List.genericReplicate count undying
+  -- CR 702.115b says each instance triggers separately, so two instances exile
+  -- two cards -- poisonous' multiplicity.
+  Keyword.Ingest -> List.genericReplicate count ingest
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -309,6 +312,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Provoke -> []
   Keyword.Changeling -> []
   Keyword.Devoid -> []
+  Keyword.Ingest -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -493,6 +497,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Changeling -> []
   Keyword.Reinforce _ _ -> []
   Keyword.Devoid -> []
+  Keyword.Ingest -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -750,6 +755,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Changeling -> []
   Keyword.Reinforce _ _ -> []
   Keyword.Devoid -> []
+  Keyword.Ingest -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1112,6 +1118,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Changeling -> []
   Keyword.Reinforce _ _ -> []
   Keyword.Devoid -> []
+  Keyword.Ingest -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1240,6 +1247,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Devoid -> []
+  Keyword.Ingest -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
@@ -1342,6 +1350,7 @@ familyOf keyword = case keyword of
   Keyword.Changeling -> Nothing
   Keyword.SplitSecond -> Nothing
   Keyword.Devoid -> Nothing
+  Keyword.Ingest -> Nothing
   Keyword.Skulk -> Nothing
   -- CR 702.121a takes no parameter, so there is no variant for a card to name.
   Keyword.Melee -> Nothing
@@ -1388,6 +1397,53 @@ poisonous n =
         (PlayerRef.InSlot Binding.triggerPlayer)
         PlayerCounterKind.Poison
         (Quantity.Literal (toInteger n))
+
+-- CR 702.115a: whenever this creature deals combat damage to a player, that
+-- player exiles the top card of their library. Poisonous' condition and
+-- poisonous' "that player" -- the same Binding.triggerPlayer slot the scan
+-- stamps -- over a different payload.
+--
+-- The payload is a zone move rather than a mint of its own: CR 400.7's funnel
+-- takes ObjectRef.TopOfLibrary, whose PlayerRef is WHOSE library, so "that
+-- player exiles the top card of their library" is one MoveToZone and needs no
+-- opcode. An empty library exiles nothing, which is what rule 702.115a's silence
+-- about a shortfall asks for -- objectRefObjects takes 1 of an empty pile.
+--
+-- Face up, and no rider says otherwise: CR 406.3 makes an exiled card face up by
+-- default and rule 702.115a states no exception. The EntryRiders and the
+-- LibraryPlacement are both inert for an exile destination, no slot is bound
+-- because nothing later reads what arrived --
+-- rule 702.115a has no second sentence -- and the origin zone is Nothing because
+-- the REF states it: TopOfLibrary can only name a card already in that library,
+-- so CR 113.6m has nothing left to read off the field.
+--
+-- Single mode, no targets (CR 115.10a: the top card of a library is never one),
+-- ChooseExactly 1, no intervening "if": rule 702.115a leaves nothing to ask.
+ingest :: TriggeredAbility Card
+ingest =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.MoveToZone
+        (ObjectRef.TopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer))
+        Zone.Exile
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Untapped,
+            EntryRiders.attacking = False,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.empty,
+            EntryRiders.underOwner = False
+          }
+        Nothing
+        Nothing
+        LibraryPlacement.defaultValue
 
 -- CR 702.86a: whenever this creature attacks, defending player sacrifices N
 -- permanents. Rule 702 states it as a triggered ability, minted exactly as rule
