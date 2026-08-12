@@ -665,6 +665,23 @@ data Keyword
     -- the Ring-bearer designation and a battle's protector.
     Renown Natural.Natural
   | Devoid -- 702.114
+  | -- | 702.115a: whenever this creature deals combat damage to a player, that
+    -- player exiles the top card of their library. A TRIGGERED ability, minted by
+    -- Pawl.Engine.Keyword.ingest and handed to the ordinary CR 603 machinery, as
+    -- rule 702.70a's poisonous is -- the same event and the same reserved "that
+    -- player" slot, over a different payload.
+    --
+    -- FACE UP, because rule 702.115a says only "exiles": CR 406.3 makes an exiled
+    -- card face up unless the effect says otherwise, and this one does not.
+    -- Culling Drone's printed reminder text is rule 702.115a verbatim and says
+    -- nothing about face down either, so pawl's lack of a face-down exile (#557)
+    -- is not in this keyword's way.
+    --
+    -- Payload-free, because rule 702.115a takes no parameter, so no
+    -- Pawl.Types.KeywordFamily constructor is owed. CR 702.115b says each instance
+    -- triggers separately, so its mint reads the per-keyword COUNT -- poisonous'
+    -- multiplicity rather than shadow's redundancy.
+    Ingest
   | -- | 702.118b: a creature with skulk can't be blocked by creatures with greater
     -- power.
     --
