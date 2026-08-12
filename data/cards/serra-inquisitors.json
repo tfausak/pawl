@@ -97,7 +97,10 @@
                               }
                             ]
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       }
                     ]

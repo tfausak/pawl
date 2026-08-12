@@ -31,15 +31,18 @@
             "type": "SelfDies"
           },
           "intervening": {
-            "comparison": {
-              "type": "AtLeast"
-            },
-            "measured": {
-              "type": "Power"
-            },
-            "threshold": {
-              "type": "Literal",
-              "value": 3
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "Power"
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 3
+              }
             }
           },
           "modal": {

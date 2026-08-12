@@ -12,37 +12,40 @@
               }
             },
             "unless": {
-              "comparison": {
-                "type": "AtLeast"
-              },
-              "measured": {
-                "type": "Count",
-                "value": {
-                  "aggregation": {
-                    "type": "Members"
-                  },
-                  "filter": {
-                    "type": "HasSubtype",
-                    "value": {
-                      "type": "Mountain"
-                    }
-                  },
-                  "scope": {
-                    "type": "InZone",
-                    "value": [
-                      {
-                        "type": "Battlefield"
-                      },
-                      {
-                        "type": "EachPlayer"
+              "type": "Compares",
+              "value": {
+                "comparison": {
+                  "type": "AtLeast"
+                },
+                "measured": {
+                  "type": "Count",
+                  "value": {
+                    "aggregation": {
+                      "type": "Members"
+                    },
+                    "filter": {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Mountain"
                       }
-                    ]
+                    },
+                    "scope": {
+                      "type": "InZone",
+                      "value": [
+                        {
+                          "type": "Battlefield"
+                        },
+                        {
+                          "type": "EachPlayer"
+                        }
+                      ]
+                    }
                   }
+                },
+                "threshold": {
+                  "type": "Literal",
+                  "value": 1
                 }
-              },
-              "threshold": {
-                "type": "Literal",
-                "value": 1
               }
             }
           }

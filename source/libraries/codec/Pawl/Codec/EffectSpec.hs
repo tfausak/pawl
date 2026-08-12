@@ -79,40 +79,40 @@ fromJson = Effect.fromJson cardFromJson
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Effect" $ do
-  -- ObjectRef is untagged, so every arm has to survive.
+  -- Every ObjectRef arm has to survive the trip through the payload.
   Spec.it s "DealDamage round-trips all three ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3))
-      """ {"type":"DealDamage","value":["target",{"type":"Literal","value":3}]} """
+      """ {"type":"DealDamage","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":3}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.DealDamage (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) (Quantity.Literal 1))
-      """ {"type":"DealDamage","value":[{"type":"HasKeyword","value":{"type":"Flying"}},{"type":"Literal","value":1}]} """
+      """ {"type":"DealDamage","value":[{"type":"EachMatching","value":{"type":"HasKeyword","value":{"type":"Flying"}}},{"type":"Literal","value":1}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.DealDamage ObjectRef.EachPlayer (Quantity.Literal 2))
-      """ {"type":"DealDamage","value":[["EachPlayer"],{"type":"Literal","value":2}]} """
-  -- ModifyTarget's ObjectRef is untagged, so both arms have to survive.
+      """ {"type":"DealDamage","value":[{"type":"EachPlayer"},{"type":"Literal","value":2}]} """
+  -- Both ObjectRef arms have to survive the trip through the payload.
   Spec.it s "ModifyTarget round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))))
-      """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},"t"]} """
+      """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},{"type":"InSlot","value":"t"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking])))
-      """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"IsAttacking"}]}]} """
+      """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},{"type":"EachMatching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"IsAttacking"}]}}]} """
   Spec.it s "ChangeText, a basic land type swap that forbids nothing" $
     Common.assertJsonCodec
       s
@@ -177,19 +177,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing)
-      """ {"type":"Destroy","value":["t",{"type":"Regenerable"}]} """
+      """ {"type":"Destroy","value":[{"type":"InSlot","value":"t"},{"type":"Regenerable"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing)
-      """ {"type":"Destroy","value":["t",{"type":"CantBeRegenerated"}]} """
+      """ {"type":"Destroy","value":[{"type":"InSlot","value":"t"},{"type":"CantBeRegenerated"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.Destroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing)
-      """ {"type":"Destroy","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Regenerable"}]} """
+      """ {"type":"Destroy","value":[{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}},{"type":"Regenerable"}]} """
   -- The third element is the slot the sweep binds its count into, ELIDED when
   -- absent, so a Destroy already on disk keeps its two-element payload.
   Spec.it s "Destroy's bound-count slot round-trips and is written only when present" $
@@ -198,7 +198,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.Destroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed"))))
-      """ {"type":"Destroy","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"Regenerable"},"destroyed"]} """
+      """ {"type":"Destroy","value":[{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Artifact"}}},{"type":"Regenerable"},"destroyed"]} """
   Spec.it s "Sacrifice" $
     Common.assertJsonCodec
       s
@@ -229,9 +229,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
   -- origin zone or the library position if it decodes as one and the riders
   -- otherwise, which is why the cases below put those objects side by side.
   --
-  -- The ObjectRef in first position is told apart the same way -- a string is
-  -- InSlot, an object is EachMatching -- so every case below but the last emits
-  -- the bare slot string a card wrote before the field widened.
+  -- The ObjectRef in first position is a tagged object at every arm since
+  -- #1304, so it takes no part in that reckoning: it is positional, and the
+  -- tail begins after it.
   Spec.it s "MoveToZone round-trips every shape, and elides the defaults" $ do
     let slot = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
         bound = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))
@@ -242,25 +242,25 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
-      """ {"type":"MoveToZone","value":["target",{"type":"Hand"}]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"target"},{"type":"Hand"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.MoveToZone slot Zone.Exile EntryRiders.defaultValue (Just boundSlot) Nothing LibraryPlacement.defaultValue)
-      """ {"type":"MoveToZone","value":["target",{"type":"Exile"},"exiled"]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"target"},{"type":"Exile"},"exiled"]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.MoveToZone bound Zone.Battlefield attacking Nothing Nothing LibraryPlacement.defaultValue)
-      """ {"type":"MoveToZone","value":["exiled",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true}]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"exiled"},{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.MoveToZone bound Zone.Battlefield attacking (Just boundSlot) Nothing LibraryPlacement.defaultValue)
-      """ {"type":"MoveToZone","value":["exiled",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled"]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"exiled"},{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled"]} """
     -- CR 113.6m's origin zone alone, the shape a card states when its effect
     -- moves its own source out of a named zone with nothing else to say.
     Common.assertJsonCodec
@@ -268,7 +268,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing (Just Zone.Graveyard) LibraryPlacement.defaultValue)
-      """ {"type":"MoveToZone","value":["target",{"type":"Hand"},{"type":"Graveyard"}]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"target"},{"type":"Hand"},{"type":"Graveyard"}]} """
     -- Reassembling Skeleton's own shape: riders AND an origin, two objects in a
     -- row, which only the type-directed read tells apart.
     Common.assertJsonCodec
@@ -276,7 +276,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone slot Zone.Battlefield attacking Nothing (Just Zone.Graveyard) LibraryPlacement.defaultValue)
-      """ {"type":"MoveToZone","value":["target",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},{"type":"Graveyard"}]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"target"},{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},{"type":"Graveyard"}]} """
     -- All four extras at once, so the encoder's order is pinned and the reader
     -- is shown to need none of it. The origin zone and the library position sit
     -- next to each other here, which is the pair only their disjoint tags tell
@@ -286,7 +286,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone slot Zone.Battlefield attacking (Just boundSlot) (Just Zone.Exile) (LibraryPlacement.Stated LibraryPosition.Top))
-      """ {"type":"MoveToZone","value":["target",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled",{"type":"Exile"},{"type":"Top"}]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"target"},{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled",{"type":"Exile"},{"type":"Stated","value":{"type":"Top"}}]} """
     -- Griptide's shape: a library destination with the end it arrives at, and
     -- nothing else. The position is the only extra, so this is what proves it is
     -- not read positionally as the riders.
@@ -295,7 +295,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone slot Zone.Library EntryRiders.defaultValue Nothing Nothing (LibraryPlacement.Stated LibraryPosition.Top))
-      """ {"type":"MoveToZone","value":["target",{"type":"Library"},{"type":"Top"}]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"target"},{"type":"Library"},{"type":"Stated","value":{"type":"Top"}}]} """
     -- And the default end is ELIDED, so Unsummon's two-element payload is
     -- unchanged by the field's arrival. Decoding that payload is what fills it
     -- back in.
@@ -304,7 +304,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone slot Zone.Library EntryRiders.defaultValue Nothing Nothing (LibraryPlacement.Stated LibraryPosition.Bottom))
-      """ {"type":"MoveToZone","value":["target",{"type":"Library"}]} """
+      """ {"type":"MoveToZone","value":[{"type":"InSlot","value":"target"},{"type":"Library"}]} """
     -- Evacuation's shape: an EachMatching ref in first position, which is an
     -- object where every case above is a string.
     Common.assertJsonCodec
@@ -312,7 +312,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.MoveToZone (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
-      """ {"type":"MoveToZone","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Hand"}]} """
+      """ {"type":"MoveToZone","value":[{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}},{"type":"Hand"}]} """
   -- Both of Draw's PlayerRef shapes: a controller draw and a targeted one.
   Spec.it s "Draw" $ do
     Common.assertJsonCodec
@@ -370,13 +370,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.Explore (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
-      """ {"type":"Explore","value":"self"} """
+      """ {"type":"Explore","value":{"type":"InSlot","value":"self"}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.Explore (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
-      """ {"type":"Explore","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      """ {"type":"Explore","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   Spec.it s "Mill" $
     Common.assertJsonCodec
       s
@@ -468,21 +468,21 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Create (Quantity.Literal 1) card attacking (Just slot))
       """ {"type":"Create","value":[{"type":"Literal","value":1},"Goblin Piker",{"tapped":{"type":"Tapped"},"attacking":true},"token"]} """
-  -- CreateCopy's ObjectRef is untagged, so both arms have to survive. A count of
-  -- one is elided, so the bare-ref form is what both of these write.
+  -- Both ObjectRef arms have to survive. A count of one is elided, so the
+  -- lone-ref form is what both of these write.
   Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.CreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"CreateCopy","value":"target"} """
+      """ {"type":"CreateCopy","value":{"type":"InSlot","value":"target"}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.CreateCopy (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)))
-      """ {"type":"CreateCopy","value":{"type":"HasKeyword","value":{"type":"Flying"}}} """
+      """ {"type":"CreateCopy","value":{"type":"EachMatching","value":{"type":"HasKeyword","value":{"type":"Flying"}}}} """
   -- Kicked Rite of Replication's five: the pair form, which the decoder tells
   -- from a ref by length.
   Spec.it s "CreateCopy round-trips a count above one" $
@@ -491,7 +491,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.CreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"CreateCopy","value":[{"type":"Literal","value":5},"target"]} """
+      """ {"type":"CreateCopy","value":[{"type":"Literal","value":5},{"type":"InSlot","value":"target"}]} """
   Spec.it s "Replace" $
     Common.assertJsonCodec
       s
@@ -514,7 +514,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           (Just (Condition.Compares (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3)))
           (ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing) (DamageRewrite.SetAmount 4))
       )
-      """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"SelfReplacement"},{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}},{"type":"DamageR","value":[{"whatSource":{"type":"IsSource"}},{"type":"SetAmount","value":4}]}]} """
+      """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"SelfReplacement"},{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},{"type":"DamageR","value":[{"whatSource":{"type":"IsSource"}},{"type":"SetAmount","value":4}]}]} """
   -- CR 614.10a: a slot read, plus the whole-phase selector -- the arm a Phase
   -- alone cannot spell (CR 500.1).
   Spec.it s "SkipNextPhase" $ do
@@ -537,7 +537,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.PreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4) Seq.empty)
-      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},"target",{"type":"Literal","value":4}]} """
+      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"target"},{"type":"Literal","value":4}]} """
   -- CR 615.5's additional effect, the fourth element (Test of Faith). Elided
   -- above, where it is empty; nested here, so the recursion into an effect
   -- inside an effect is round-tripped.
@@ -552,7 +552,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           (Quantity.Literal 3)
           (Seq.singleton (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
       )
-      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},"target",{"type":"Literal","value":3},[{"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"InSlot","value":"thatMuch"},"target"]}]]} """
+      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"target"},{"type":"Literal","value":3},[{"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"InSlot","value":"thatMuch"},{"type":"InSlot","value":"target"}]}]]} """
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
   Spec.it s "PreventAllDamage" $
     Common.assertJsonCodec
@@ -560,7 +560,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.PreventAllDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))))
-      """ {"type":"PreventAllDamage","value":[{"type":"UntilEndOfTurn"},"you"]} """
+      """ {"type":"PreventAllDamage","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"you"}]} """
   -- CR 614.9: Turn the Tables, whose kind field is PRINTED ("all combat
   -- damage") and whose two refs are the source side then the destination.
   Spec.it s "RedirectDamage" $
@@ -569,7 +569,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.RedirectDamage Duration.UntilEndOfTurn (Just DamageKind.Combat) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"RedirectDamage","value":[{"type":"UntilEndOfTurn"},{"type":"Combat"},"you","target"]} """
+      """ {"type":"RedirectDamage","value":[{"type":"UntilEndOfTurn"},{"type":"Combat"},{"type":"InSlot","value":"you"},{"type":"InSlot","value":"target"}]} """
   -- CR 113.9: this opcode counters an ability as well as a spell, with the type
   -- unchanged, so the wire shape is too.
   Spec.it s "Counter" $
@@ -579,7 +579,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Counter (SlotName.MkSlotName (Text.pack "spell")))
       """ {"type":"Counter","value":"spell"} """
-  -- CR 701.24: an ObjectRef, which for a slot is written as the bare slot name.
+  -- CR 701.24: an ObjectRef, tagged InSlot around the slot name.
   -- Riftsweeper's shape -- the library is derived from the objects it names (CR
   -- 400.3), so there is no second field to write.
   Spec.it s "ShuffleIntoLibrary" $
@@ -588,10 +588,10 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.ShuffleIntoLibrary Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"ShuffleIntoLibrary","value":"target"} """
+      """ {"type":"ShuffleIntoLibrary","value":{"type":"InSlot","value":"target"}} """
   -- CR 701.24c's named library (Dwell on the Past's "their library"): the pair
-  -- form, whose PlayerRef is an OBJECT where a bare ObjectRef is a string or an
-  -- array led by its constructor's name -- which is what tells the two apart.
+  -- form, an ARRAY where a lone ObjectRef is a tagged object -- which is what
+  -- tells the two apart.
   Spec.it s "ShuffleIntoLibrary naming the library" $
     Common.assertJsonCodec
       s
@@ -601,14 +601,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           (Just (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player"))))
           (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "cards")))
       )
-      """ {"type":"ShuffleIntoLibrary","value":[{"type":"InSlot","value":"player"},"cards"]} """
+      """ {"type":"ShuffleIntoLibrary","value":[{"type":"InSlot","value":"player"},{"type":"InSlot","value":"cards"}]} """
   Spec.it s "PutCounters" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "creature"))))
-      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},"creature"]} """
+      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},{"type":"InSlot","value":"creature"}]} """
   -- The ObjectRef's other arm: a Filter is an object where a slot is a string, so
   -- the widening left every card's spelling alone (Pawl.Codec.ObjectRef).
   Spec.it s "PutCounters over a swept set" $
@@ -617,7 +617,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasDesignation Designation.Renowned)))
-      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},{"type":"HasDesignation","value":{"type":"Renowned"}}]} """
+      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},{"type":"EachMatching","value":{"type":"HasDesignation","value":{"type":"Renowned"}}}]} """
   -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
   -- tag would make the two indistinguishable in a card file.
   Spec.it s "RemoveCounters" $
@@ -659,7 +659,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"Tap","value":"target"} """
+      """ {"type":"Tap","value":{"type":"InSlot","value":"target"}} """
     Spec.assertBool
       s
       ( toJson (Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
@@ -672,13 +672,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.Untap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"Untap","value":"target"} """
+      """ {"type":"Untap","value":{"type":"InSlot","value":"target"}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.Untap (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
-      """ {"type":"Untap","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      """ {"type":"Untap","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   -- CR 701.27a. Both ObjectRef arms, since the pool prints one of each shape's
   -- twin: Thraben Gargoyle's "transform this creature" is the slot, and a
   -- "transform all X" sweep is the filter.
@@ -688,13 +688,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.Transform (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
-      """ {"type":"Transform","value":"self"} """
+      """ {"type":"Transform","value":{"type":"InSlot","value":"self"}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.Transform (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
-      """ {"type":"Transform","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      """ {"type":"Transform","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   -- CR 708.2a. One slot and no ObjectRef, since Backslide names a target and
   -- nothing in the pool sweeps a set face down.
   Spec.it s "TurnFaceDown" $
@@ -731,26 +731,26 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"GainControl","value":[{"type":"UntilEndOfTurn"},"target"]} """
+      """ {"type":"GainControl","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"target"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment)))
-      """ {"type":"GainControl","value":[{"type":"Indefinite"},{"type":"HasCardType","value":{"type":"Enchantment"}}]} """
+      """ {"type":"GainControl","value":[{"type":"Indefinite"},{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Enchantment"}}}]} """
   Spec.it s "GrantPlayFromExile round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.GrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
-      """ {"type":"GrantPlayFromExile","value":[{"type":"UntilEndOfTurn"},"exiled"]} """
+      """ {"type":"GrantPlayFromExile","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"exiled"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.GrantPlayFromExile Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
-      """ {"type":"GrantPlayFromExile","value":[{"type":"Indefinite"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
+      """ {"type":"GrantPlayFromExile","value":[{"type":"Indefinite"},{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}]} """
   -- The shapes the encoder can emit, told apart by LENGTH: a bare ability name
   -- (CR 603.7a/b's defaults), a two-element form (a stated duration, onset
   -- still the default), and a three-element form (a stated onset, whose last
@@ -796,7 +796,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.RequireBlock Duration.UntilEndOfCombat (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
-      """ {"type":"RequireBlock","value":[{"type":"UntilEndOfCombat"},"target",{"type":"HasCardType","value":{"type":"Creature"}}]} """
+      """ {"type":"RequireBlock","value":[{"type":"UntilEndOfCombat"},{"type":"InSlot","value":"target"},{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}]} """
   Spec.it s "CreateEmblem" $
     Common.assertJsonCodec
       s
@@ -841,15 +841,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Designate Designation.Suspected (SlotName.MkSlotName (Text.pack "self")))
       """ {"type":"Designate","value":[{"type":"Suspected"},"self"]} """
-  -- CR 701.60a's ending, with an ObjectRef on the wire where Designate above has a
-  -- bare slot: Eliminate the Impossible names a set rather than one permanent.
+  -- CR 701.60a's ending, with an ObjectRef on the wire where Designate above
+  -- writes a slot name directly: Eliminate the Impossible names a set rather
+  -- than one permanent.
   Spec.it s "Unsuspect" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.Unsuspect (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
-      """ {"type":"Unsuspect","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+      """ {"type":"Unsuspect","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   Spec.it s "Evolve" $
     Common.assertJsonCodec
       s

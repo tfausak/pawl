@@ -12,54 +12,57 @@
               }
             },
             "unless": {
-              "comparison": {
-                "type": "AtLeast"
-              },
-              "measured": {
-                "type": "Count",
-                "value": {
-                  "aggregation": {
-                    "type": "Members"
-                  },
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "HasSubtype",
-                        "value": {
-                          "type": "Giant"
+              "type": "Compares",
+              "value": {
+                "comparison": {
+                  "type": "AtLeast"
+                },
+                "measured": {
+                  "type": "Count",
+                  "value": {
+                    "aggregation": {
+                      "type": "Members"
+                    },
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasSubtype",
+                          "value": {
+                            "type": "Giant"
+                          }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsSource"
+                          }
                         }
-                      },
-                      {
-                        "type": "ControlledBy",
-                        "value": {
-                          "type": "You"
+                      ]
+                    },
+                    "scope": {
+                      "type": "InZone",
+                      "value": [
+                        {
+                          "type": "Battlefield"
+                        },
+                        {
+                          "type": "EachPlayer"
                         }
-                      },
-                      {
-                        "type": "Not",
-                        "value": {
-                          "type": "IsSource"
-                        }
-                      }
-                    ]
-                  },
-                  "scope": {
-                    "type": "InZone",
-                    "value": [
-                      {
-                        "type": "Battlefield"
-                      },
-                      {
-                        "type": "EachPlayer"
-                      }
-                    ]
+                      ]
+                    }
                   }
+                },
+                "threshold": {
+                  "type": "Literal",
+                  "value": 1
                 }
-              },
-              "threshold": {
-                "type": "Literal",
-                "value": 1
               }
             }
           }
@@ -74,54 +77,57 @@
               }
             },
             "unless": {
-              "comparison": {
-                "type": "AtLeast"
-              },
-              "measured": {
-                "type": "Count",
-                "value": {
-                  "aggregation": {
-                    "type": "Members"
-                  },
-                  "filter": {
-                    "type": "And",
-                    "value": [
-                      {
-                        "type": "HasSubtype",
-                        "value": {
-                          "type": "Giant"
+              "type": "Compares",
+              "value": {
+                "comparison": {
+                  "type": "AtLeast"
+                },
+                "measured": {
+                  "type": "Count",
+                  "value": {
+                    "aggregation": {
+                      "type": "Members"
+                    },
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasSubtype",
+                          "value": {
+                            "type": "Giant"
+                          }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        },
+                        {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsSource"
+                          }
                         }
-                      },
-                      {
-                        "type": "ControlledBy",
-                        "value": {
-                          "type": "You"
+                      ]
+                    },
+                    "scope": {
+                      "type": "InZone",
+                      "value": [
+                        {
+                          "type": "Battlefield"
+                        },
+                        {
+                          "type": "EachPlayer"
                         }
-                      },
-                      {
-                        "type": "Not",
-                        "value": {
-                          "type": "IsSource"
-                        }
-                      }
-                    ]
-                  },
-                  "scope": {
-                    "type": "InZone",
-                    "value": [
-                      {
-                        "type": "Battlefield"
-                      },
-                      {
-                        "type": "EachPlayer"
-                      }
-                    ]
+                      ]
+                    }
                   }
+                },
+                "threshold": {
+                  "type": "Literal",
+                  "value": 1
                 }
-              },
-              "threshold": {
-                "type": "Literal",
-                "value": 1
               }
             }
           }

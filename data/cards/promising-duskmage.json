@@ -31,18 +31,21 @@
             "type": "SelfDies"
           },
           "intervening": {
-            "comparison": {
-              "type": "AtLeast"
-            },
-            "measured": {
-              "type": "ObjectCounters",
-              "value": {
-                "type": "PlusOnePlusOne"
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "ObjectCounters",
+                "value": {
+                  "type": "PlusOnePlusOne"
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
               }
-            },
-            "threshold": {
-              "type": "Literal",
-              "value": 1
             }
           },
           "modal": {

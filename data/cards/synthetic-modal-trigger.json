@@ -30,7 +30,10 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          "bounced",
+                          {
+                            "type": "InSlot",
+                            "value": "bounced"
+                          },
                           {
                             "type": "Hand"
                           }
@@ -77,7 +80,10 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          "exiled",
+                          {
+                            "type": "InSlot",
+                            "value": "exiled"
+                          },
                           {
                             "type": "Exile"
                           }

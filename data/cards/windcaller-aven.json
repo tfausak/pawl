@@ -81,7 +81,10 @@
                               "type": "Flying"
                             }
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       }
                     ]

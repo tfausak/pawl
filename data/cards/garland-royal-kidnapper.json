@@ -175,23 +175,29 @@
                           {
                             "type": "ForAsLongAs",
                             "value": {
-                              "comparison": {
-                                "type": "AtLeast"
-                              },
-                              "measured": {
-                                "type": "IsMonarch",
-                                "value": {
-                                  "type": "InSlot",
-                                  "value": "thatPlayer"
+                              "type": "Compares",
+                              "value": {
+                                "comparison": {
+                                  "type": "AtLeast"
+                                },
+                                "measured": {
+                                  "type": "IsMonarch",
+                                  "value": {
+                                    "type": "InSlot",
+                                    "value": "thatPlayer"
+                                  }
+                                },
+                                "threshold": {
+                                  "type": "Literal",
+                                  "value": 1
                                 }
-                              },
-                              "threshold": {
-                                "type": "Literal",
-                                "value": 1
                               }
                             }
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       }
                     ]

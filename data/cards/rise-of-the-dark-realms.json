@@ -35,18 +35,20 @@
                   {
                     "type": "MoveToZone",
                     "value": [
-                      [
-                        "EachCardInGraveyard",
-                        {
-                          "type": "EachPlayer"
-                        },
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Creature"
+                      {
+                        "type": "EachCardInGraveyard",
+                        "value": [
+                          {
+                            "type": "EachPlayer"
+                          },
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
                           }
-                        }
-                      ],
+                        ]
+                      },
                       {
                         "type": "Battlefield"
                       }

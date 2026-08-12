@@ -22,7 +22,10 @@
                   {
                     "type": "MoveToZone",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Hand"
                       }

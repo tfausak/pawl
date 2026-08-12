@@ -47,7 +47,10 @@
                           {
                             "type": "UntilEndOfTurn"
                           },
-                          "you"
+                          {
+                            "type": "InSlot",
+                            "value": "you"
+                          }
                         ]
                       }
                     ]
@@ -80,7 +83,10 @@
                             "type": "InSlot",
                             "value": "thatMuch"
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       }
                     ]

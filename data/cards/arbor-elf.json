@@ -19,7 +19,10 @@
                     "effects": [
                       {
                         "type": "Untap",
-                        "value": "target"
+                        "value": {
+                          "type": "InSlot",
+                          "value": "target"
+                        }
                       }
                     ]
                   }

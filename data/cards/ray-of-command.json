@@ -16,7 +16,10 @@
                       "effects": [
                         {
                           "type": "Tap",
-                          "value": "target"
+                          "value": {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         }
                       ]
                     }
@@ -52,7 +55,10 @@
                 "effects": [
                   {
                     "type": "Untap",
-                    "value": "target"
+                    "value": {
+                      "type": "InSlot",
+                      "value": "target"
+                    }
                   },
                   {
                     "type": "GainControl",
@@ -60,7 +66,10 @@
                       {
                         "type": "UntilEndOfTurn"
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {
@@ -75,7 +84,10 @@
                           "type": "Haste"
                         }
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   },
                   {

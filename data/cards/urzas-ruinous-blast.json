@@ -27,27 +27,30 @@
                     "type": "MoveToZone",
                     "value": [
                       {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "Not",
-                            "value": {
-                              "type": "HasCardType",
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "Not",
                               "value": {
-                                "type": "Land"
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
+                              }
+                            },
+                            {
+                              "type": "Not",
+                              "value": {
+                                "type": "HasSupertype",
+                                "value": {
+                                  "type": "Legendary"
+                                }
                               }
                             }
-                          },
-                          {
-                            "type": "Not",
-                            "value": {
-                              "type": "HasSupertype",
-                              "value": {
-                                "type": "Legendary"
-                              }
-                            }
-                          }
-                        ]
+                          ]
+                        }
                       },
                       {
                         "type": "Exile"

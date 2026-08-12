@@ -26,9 +26,12 @@
                   {
                     "type": "Transform",
                     "value": {
-                      "type": "HasSubtype",
+                      "type": "EachMatching",
                       "value": {
-                        "type": "Human"
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Human"
+                        }
                       }
                     }
                   }

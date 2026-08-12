@@ -38,7 +38,10 @@
                     "effects": [
                       {
                         "type": "Explore",
-                        "value": "self"
+                        "value": {
+                          "type": "InSlot",
+                          "value": "self"
+                        }
                       }
                     ]
                   }

@@ -29,7 +29,10 @@
                         "type": "SetColor",
                         "value": []
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]

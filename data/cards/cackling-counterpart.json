@@ -65,7 +65,10 @@
                 "effects": [
                   {
                     "type": "CreateCopy",
-                    "value": "target"
+                    "value": {
+                      "type": "InSlot",
+                      "value": "target"
+                    }
                   }
                 ]
               }

@@ -53,24 +53,27 @@
                     "type": "DealDamage",
                     "value": [
                       {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          },
-                          {
-                            "type": "Not",
-                            "value": {
-                              "type": "HasKeyword",
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
                               "value": {
-                                "type": "Flying"
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "Not",
+                              "value": {
+                                "type": "HasKeyword",
+                                "value": {
+                                  "type": "Flying"
+                                }
                               }
                             }
-                          }
-                        ]
+                          ]
+                        }
                       },
                       {
                         "type": "InSlot",
@@ -81,9 +84,9 @@
                   {
                     "type": "DealDamage",
                     "value": [
-                      [
-                        "EachPlayer"
-                      ],
+                      {
+                        "type": "EachPlayer"
+                      },
                       {
                         "type": "InSlot",
                         "value": "X"
@@ -105,15 +108,18 @@
             }
           },
           "condition": {
-            "comparison": {
-              "type": "AtLeast"
-            },
-            "measured": {
-              "type": "WasKicked"
-            },
-            "threshold": {
-              "type": "Literal",
-              "value": 1
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "WasKicked"
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
             }
           },
           "modifications": [

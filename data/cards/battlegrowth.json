@@ -29,7 +29,10 @@
                         "type": "Literal",
                         "value": 1
                       },
-                      "target"
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     ]
                   }
                 ]

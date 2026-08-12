@@ -4,21 +4,24 @@
       "activatedAbilities": [
         {
           "condition": {
-            "comparison": {
-              "type": "Exactly"
-            },
-            "measured": {
-              "type": "Speed",
-              "value": {
-                "type": "Relative",
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "Exactly"
+              },
+              "measured": {
+                "type": "Speed",
                 "value": {
-                  "type": "You"
+                  "type": "Relative",
+                  "value": {
+                    "type": "You"
+                  }
                 }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 4
               }
-            },
-            "threshold": {
-              "type": "Literal",
-              "value": 4
             }
           },
           "cost": {

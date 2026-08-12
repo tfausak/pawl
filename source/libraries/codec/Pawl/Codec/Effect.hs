@@ -89,9 +89,10 @@ toJson codec e = case e of
   -- placement are tagged objects with disjoint tags, and the riders are an
   -- object that is neither. `moveTail` is the decoding half.
   --
-  -- The two POSITIONAL elements are exempt from that: an ObjectRef is itself
-  -- told apart by JSON type (a string is InSlot, an object is EachMatching), so
-  -- every card written before the ref widened still emits the same bare string.
+  -- The two POSITIONAL elements are exempt from that, and since #1304 the
+  -- ObjectRef among them is a tagged object like any other sum -- which is what
+  -- keeps it out of the tail's reckoning entirely rather than merely distinct
+  -- from it.
   Effect.MoveToZone r z riders ms mo p ->
     Common.tagged "MoveToZone" . Just . Value.array $
       [ObjectRef.toJson r, Codec.encode Zone.codec z]
@@ -180,9 +181,11 @@ toJson codec e = case e of
   -- Riftsweeper's derived owner (CR 701.24) keeps the bare ObjectRef it has
   -- always had, and only a card naming the library spells the pair out.
   --
-  -- Told apart on decode by JSON TYPE, as Create's riders are: a PlayerRef is an
-  -- object, and a bare ObjectRef is either a string (InSlot) or an array whose
-  -- head is the constructor's name, so the pair form can never be read as one.
+  -- Told apart on decode by JSON TYPE, as Create's riders are: the pair form is
+  -- an ARRAY and a lone ObjectRef is a tagged object, so neither can be read as
+  -- the other. Before #1304 an ObjectRef could itself be a two-element array,
+  -- and the decode below had to guard on its head being an object to tell the
+  -- two apart; now that no ObjectRef is ever an array, the arity alone decides.
   Effect.ShuffleIntoLibrary mp r -> case mp of
     Nothing -> Common.tagged "ShuffleIntoLibrary" (Just (ObjectRef.toJson r))
     Just p -> Common.tagged "ShuffleIntoLibrary" (Just (Value.array [PlayerRef.toJson p, ObjectRef.toJson r]))
@@ -412,7 +415,7 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [r, skips])) -> Effect.TakeExtraTurn <$> PlayerRef.fromJson r <*> Common.decodeSet (Codec.decode PhaseSelector.codec) skips
       _ -> Left . Text.pack $ "TakeExtraTurn expects [playerRef, phaseSelectors]"
     "ShuffleIntoLibrary" -> case mv of
-      Just (Value.Array (Array.MkArray [p@(Value.Object _), r])) ->
+      Just (Value.Array (Array.MkArray [p, r])) ->
         Effect.ShuffleIntoLibrary <$> fmap Just (PlayerRef.fromJson p) <*> ObjectRef.fromJson r
       _ -> Common.withValue mv (fmap (Effect.ShuffleIntoLibrary Nothing) . ObjectRef.fromJson)
     "OfferCast" -> case mv of

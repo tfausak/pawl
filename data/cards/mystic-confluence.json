@@ -68,7 +68,10 @@
                   {
                     "type": "MoveToZone",
                     "value": [
-                      "creature",
+                      {
+                        "type": "InSlot",
+                        "value": "creature"
+                      },
                       {
                         "type": "Hand"
                       }

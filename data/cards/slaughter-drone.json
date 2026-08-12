@@ -31,7 +31,10 @@
                               "type": "Deathtouch"
                             }
                           },
-                          "self"
+                          {
+                            "type": "InSlot",
+                            "value": "self"
+                          }
                         ]
                       }
                     ]

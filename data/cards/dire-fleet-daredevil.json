@@ -44,7 +44,10 @@
                       {
                         "type": "MoveToZone",
                         "value": [
-                          "target",
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
                           {
                             "type": "Exile"
                           },
@@ -57,7 +60,10 @@
                           {
                             "type": "UntilEndOfTurn"
                           },
-                          "exiled"
+                          {
+                            "type": "InSlot",
+                            "value": "exiled"
+                          }
                         ]
                       }
                     ]

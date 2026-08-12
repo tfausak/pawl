@@ -116,59 +116,62 @@
             ]
           },
           "intervening": {
-            "comparison": {
-              "type": "AtLeast"
-            },
-            "measured": {
-              "type": "Count",
-              "value": {
-                "aggregation": {
-                  "type": "Members"
-                },
-                "filter": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "Or",
-                      "value": [
-                        {
-                          "type": "HasSubtype",
-                          "value": {
-                            "type": "Wolf"
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "Count",
+                "value": {
+                  "aggregation": {
+                    "type": "Members"
+                  },
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "Or",
+                        "value": [
+                          {
+                            "type": "HasSubtype",
+                            "value": {
+                              "type": "Wolf"
+                            }
+                          },
+                          {
+                            "type": "HasSubtype",
+                            "value": {
+                              "type": "Werewolf"
+                            }
                           }
-                        },
-                        {
-                          "type": "HasSubtype",
-                          "value": {
-                            "type": "Werewolf"
-                          }
+                        ]
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
                         }
-                      ]
-                    },
-                    {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "You"
                       }
-                    }
-                  ]
-                },
-                "scope": {
-                  "type": "InZone",
-                  "value": [
-                    {
-                      "type": "Battlefield"
-                    },
-                    {
-                      "type": "EachPlayer"
-                    }
-                  ]
+                    ]
+                  },
+                  "scope": {
+                    "type": "InZone",
+                    "value": [
+                      {
+                        "type": "Battlefield"
+                      },
+                      {
+                        "type": "EachPlayer"
+                      }
+                    ]
+                  }
                 }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 3
               }
-            },
-            "threshold": {
-              "type": "Literal",
-              "value": 3
             }
           },
           "modal": {
@@ -265,7 +268,10 @@
                               }
                             ]
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       },
                       {
@@ -280,7 +286,10 @@
                               "type": "Trample"
                             }
                           },
-                          "target"
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
                         ]
                       }
                     ]

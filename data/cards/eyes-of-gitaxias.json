@@ -51,7 +51,10 @@
                                           "effects": [
                                             {
                                               "type": "Transform",
-                                              "value": "self"
+                                              "value": {
+                                                "type": "InSlot",
+                                                "value": "self"
+                                              }
                                             }
                                           ]
                                         }
