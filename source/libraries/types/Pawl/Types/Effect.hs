@@ -95,17 +95,31 @@ data Effect card
     -- list as one activation's yield. Executed by Cost.tapForMana at payment (CR
     -- 605.3b: a mana ability never uses the stack), never by Resolve.applyEffect.
     AddMana ManaProduction.ManaProduction
-  | -- | CR 701.23: search the controller's library for a card matching the Filter,
-    -- put it where the SearchDestination says, then shuffle. The Filter is
-    -- evaluated over the PRINTED-card view (Projection.viewOfCardIn) -- a card in
-    -- a library has no projection, only CR 208.2a's characteristic-defining
-    -- power. Evolving Wilds' "basic land card" (CR 701.23a / 205.4c) is
-    -- `And [HasCardType Land, HasSupertype Basic]`, and CR 702.29e's basic
-    -- landcycling is the same filter with the other destination.
+  | -- | CR 701.23: the players the PlayerRef names each search THEIR OWN library
+    -- for a card matching the Filter, put it where the SearchDestination says,
+    -- then shuffle. The Filter is evaluated over the PRINTED-card view
+    -- (Projection.viewOfCardIn) -- a card in a library has no projection, only CR
+    -- 208.2a's characteristic-defining power. Evolving Wilds' "basic land card"
+    -- (CR 701.23a / 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and
+    -- CR 702.29e's basic landcycling is the same filter with the other
+    -- destination.
+    --
+    -- The PlayerRef names ONE player and names them three times over: CR 701.23a's
+    -- looking, the CR 701.23e-silent placement, and the shuffle the card's own
+    -- next sentence instructs are all acts of the same player. Evolving Wilds'
+    -- "your library" is `Relative You`; Fertilid's Favor's "target player
+    -- searches their library" is `InSlot`, reading a slot TARGETING filled (CR
+    -- 601.2c). A PlayerRef rather than a Maybe SlotName, for the reason Draw's
+    -- comment gives one opcode over.
+    --
+    -- Not implemented: a search of a library the searching player does not own --
+    -- Extract's "search target player's library", where the CONTROLLER looks at
+    -- someone else's hidden zone (#1317). Nor a search of any zone but a library
+    -- (#1318).
     --
     -- Finds at most one card, always: no card in the pool searches for two
     -- (#283).
-    Search (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
+    Search PlayerRef.PlayerRef (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk; a general exile-from-zone is future.
     ExileAllGraveyards

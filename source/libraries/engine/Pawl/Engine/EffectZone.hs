@@ -59,7 +59,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
   Effect.AddMana _ -> Nothing
-  Effect.Search _ _ -> Nothing
+  Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
   Effect.TemptWithTheRing -> Nothing

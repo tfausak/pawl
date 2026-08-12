@@ -364,12 +364,13 @@ cycling cost searchFor =
     -- player who activated it -- so You, the perspective Pawl.Engine.Resolve
     -- evaluates a PlayerRef against.
     --
-    -- CR 702.29e searches instead. The reveal is part of the destination because
-    -- it is part of that same sentence -- see Pawl.Types.SearchDestination, and CR
-    -- 701.23e for why a search does not reveal on its own.
+    -- CR 702.29e searches instead, and rule 702.29e prints "your library", so it
+    -- is the same You. The reveal is part of the destination because it is part of
+    -- that same sentence -- see Pawl.Types.SearchDestination, and CR 701.23e for
+    -- why a search does not reveal on its own.
     effect = case searchFor of
       Nothing -> Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
-      Just filter_ -> Effect.Search filter_ SearchDestination.RevealThenHand
+      Just filter_ -> Effect.Search (PlayerRef.Relative PlayerRelation.You) filter_ SearchDestination.RevealThenHand
 
 -- CR 702.77a: "reinforce N-[cost]" means "[cost], Discard this card: Put N +1/+1
 -- counters on target creature." Cycling's ability one clause over, and the first
