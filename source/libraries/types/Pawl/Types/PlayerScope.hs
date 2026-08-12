@@ -10,9 +10,11 @@ module Pawl.Types.PlayerScope where
 --
 --   * Pawl.Types.PlayerStaticAbility / ActivePlayerEffect -- which players a
 --     Pawl.Types.PlayerEffect applies to, against the effect's CONTROLLER.
---   * Pawl.Types.Pool.CardsInGraveyard -- whose graveyards a target slot draws
---     from (CR 400.1). That carrier is why this is not Pawl.Types.PlayerRef,
---     whose InSlot arm names a target slot CR 601.2c has not filled yet.
+--   * Pawl.Types.GraveyardScope.Scoped -- whose graveyards a target slot draws
+--     from (CR 400.1), for the readings CR 109.5 answers. That type's OTHER arm
+--     names a slot, which is why this is not Pawl.Types.PlayerRef and why the
+--     pool carries a GraveyardScope rather than this type: the two PlayerEffect
+--     carriers above have no slots for an InSlot arm to be resolved against.
 --   * Pawl.Types.PlayerEffect.CantBeTargetedBy -- whose spells and abilities
 --     cannot target the player the effect applies to (CR 702.18a's shroud, CR
 --     702.11c's hexproof). Its perspective is that PROTECTED player, which is

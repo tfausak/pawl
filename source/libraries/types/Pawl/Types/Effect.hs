@@ -917,8 +917,8 @@ data Effect card
     -- means the obvious reference -- SkipNextPhase's CR 614.10a "next" -- names a
     -- DIFFERENT turn as soon as another extra-turn effect resolves afterwards.
     TakeExtraTurn PlayerRef.PlayerRef (Set.Set PhaseSelector.PhaseSelector)
-  | -- | CR 701.24: the slot's target object is shuffled into its OWNER's library --
-    -- Riftsweeper's "choose target face-up exiled card. Its owner shuffles it into
+  | -- | CR 701.24: the referenced objects are shuffled into their OWNERS' libraries
+    -- -- Riftsweeper's "choose target face-up exiled card. Its owner shuffles it into
     -- their library." The move goes through the changeZone funnel (CR 400.7's new
     -- incarnation), landing in the OWNER's library by CR 400.3 -- the rule the
     -- card's own "its owner" restates -- and that library is then shuffled (CR
@@ -935,14 +935,20 @@ data Effect card
     -- trigger when a library is shuffled, which a library move alone does not fire.
     --
     -- No PlayerRef saying whose library, and none is expressible: the answer is
-    -- the OWNER of the object the slot names, which PlayerRef's three arms cannot
-    -- read off a bound OBJECT. Derived rather than named is what the card says,
-    -- and it is what makes this one opcode rather than a move plus a shuffle: CR
-    -- 701.24c shuffles the library even when the move did not happen, which a
-    -- second effect reading the first one's result could not say. A pair CAN be
-    -- written -- OfferCast reads a slot MoveToZone bound in the same list -- so
-    -- the reason is the rule and not a limit of the DSL.
-    ShuffleIntoLibrary SlotName.SlotName
+    -- the OWNER of the object the reference names, which PlayerRef's three arms
+    -- cannot read off a bound OBJECT. Derived rather than named is what the card
+    -- says, and it is what makes this one opcode rather than a move plus a
+    -- shuffle: CR 701.24c shuffles the library even when the move did not
+    -- happen, which a second effect reading the first one's result could not
+    -- say. A pair CAN be written -- OfferCast reads a slot MoveToZone bound in
+    -- the same list -- so the reason is the rule and not a limit of the DSL.
+    --
+    -- An ObjectRef and not a bare slot, so that CR 601.2c's "up to four target
+    -- cards" (Dwell on the Past) can be read out of one slot -- rule 701.24's
+    -- "one or more specific objects" is plural in the rule's own words, and the
+    -- batch is one CR 608.2f action. A library named by more than one of them is
+    -- still shuffled once.
+    ShuffleIntoLibrary ObjectRef.ObjectRef
   | -- | CR 608.2g: offer this effect's controller the cast of the object the slot
     -- names -- "if an effect specifically instructs or allows a player to cast a
     -- spell during resolution, they do so by following the steps in rules

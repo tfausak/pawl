@@ -1,6 +1,6 @@
 module Pawl.Types.Pool where
 
-import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.GraveyardScope as GraveyardScope
 
 -- | CR 115: the closed set of recipient kinds a target slot may draw from, fixing
 -- both WHICH objects are candidates and HOW they are referenced
@@ -45,22 +45,17 @@ data Pool
     -- untagged card, exactly as it is for Permanents, and the pool is DISJOINT
     -- from Creatures rather than a widening of it.
     --
-    -- The PlayerScope is the axis no battlefield pool needs and this one cannot
-    -- do without: CR 400.1 gives each player their own graveyard, so "your
-    -- graveyard" (Raise Dead), "an opponent's" and "a graveyard" (Withered
-    -- Wretch) are different candidate sets. It cannot be pushed down into the
-    -- Filter, because CR 108.4 gives a card in a graveyard no controller at all
-    -- -- Filter.ControlledBy is vacuously False for every one of them.
-    --
-    -- PlayerScope, and NOT Pawl.Types.PlayerRef, though that type also has an
-    -- every-player arm: PlayerRef's third arm is InSlot, and a target pool is
-    -- the one place it cannot be resolved -- CR 601.2c (and CR 602.2b for an
-    -- ability) reads this pool while the slots are still being FILLED, so
-    -- nothing is bound yet.
+    -- The GraveyardScope is the axis no battlefield pool needs and this one
+    -- cannot do without: CR 400.1 gives each player their own graveyard, so
+    -- "your graveyard" (Raise Dead), "an opponent's", "a graveyard" (Withered
+    -- Wretch) and "their graveyard" (Dwell on the Past) are different candidate
+    -- sets. It cannot be pushed down into the Filter, because CR 108.4 gives a
+    -- card in a graveyard no controller at all -- Filter.ControlledBy is
+    -- vacuously False for every one of them.
     --
     -- No pool reaches a hand or a library, so a graveyard and exile below are
     -- the only other zones clause (a) can name here (#559).
-    CardsInGraveyard PlayerScope.PlayerScope
+    CardsInGraveyard GraveyardScope.GraveyardScope
   | -- | CR 406.1: the cards in the exile zone (ToObject) -- Riftsweeper's "choose
     -- target face-up exiled card". Clause (a)'s other-zone half again. Public
     -- (CR 400.2), so every candidate is visible to the chooser.

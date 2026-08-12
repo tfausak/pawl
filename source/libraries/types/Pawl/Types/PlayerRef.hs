@@ -10,10 +10,10 @@ import qualified Pawl.Types.SlotName as SlotName
 --
 -- Deliberately NOT Pawl.Types.PlayerScope, which looks like the same type.
 -- PlayerScope is resolved against a perspective and nothing else; this can also
--- name a binding slot, which PlayerEffect's evaluator has no way to resolve. The
--- split cuts the other way at Pawl.Types.Pool.CardsInGraveyard: a target pool
--- folds over graveyards while CR 601.2c is still choosing targets, so InSlot
--- would read a slot nothing has bound yet. Neither type subsumes the other.
+-- name a binding slot, which PlayerEffect's evaluator has no way to resolve. A
+-- target pool needs BOTH readings and neither type whole, which is what
+-- Pawl.Types.GraveyardScope is: this type's Relative arm cannot say CR 806.1's
+-- "each opponent" as one value, and PlayerScope has no slot.
 data PlayerRef
   = -- | Every player's copy of the zone. For a SHARED zone (CR 400.1: battlefield,
     -- stack, exile, command) this is the only meaningful value; the pairing is

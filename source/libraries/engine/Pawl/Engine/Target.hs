@@ -19,6 +19,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -81,8 +82,17 @@ import qualified Pawl.Types.Zone as Zone
 -- Maybe, not PlayerId, matching Filter.MkContext's own field: Nothing is a
 -- genuinely absent perspective, which leaves a player-referencing filter
 -- vacuously False.
+--
+-- NO SLOT BINDINGS, which is what makes this the wrapper rather than the
+-- primitive: a GraveyardScope.InSlot pool asks what another slot holds, and this
+-- entry point answers that it holds nothing. Empty is the honest answer for a
+-- slot map that was never supplied, and it is the vacuous posture every
+-- player-referencing question here takes. legalSets below is where the bindings
+-- come from at CR 601.2c, and Pawl.Engine.Resolve's stillLegal calls are where
+-- they come from at CR 608.2b; a caller with a slot-scoped spec and neither must
+-- use legalRecipientsGiven directly.
 legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-legalRecipients perspective source spec gs = legalRecipientsGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective source spec gs
+legalRecipients perspective source spec gs = legalRecipientsGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective Map.empty source spec gs
 
 -- The same set given a board the CALLER has already walked. `pcs` and `grants`
 -- are one whole-board projection and one control-grant walk, and threading them
@@ -96,8 +106,11 @@ legalRecipients perspective source spec gs = legalRecipientsGiven (Projection.pr
 --
 -- Both stay THUNKS here. `pcs` the caller has usually already forced, but
 -- `sourceView` below must not become strict -- see its own note.
-legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-legalRecipientsGiven pcs grants perspective source spec gs =
+--
+-- `bindings` is what the OTHER slots of the same announcement hold -- the map a
+-- GraveyardScope.InSlot pool is resolved against. See graveyardRecipients.
+legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> TargetSpec -> GameState -> Set Recipient
+legalRecipientsGiven pcs grants perspective bindings source spec gs =
   -- The SAME thunk both halves read, so the whole-board projection is taken at
   -- most once per slot even when this is reached through the wrapper above, and
   -- once per enumeration when it is not (admittedGiven's own note).
@@ -122,7 +135,7 @@ legalRecipientsGiven pcs grants perspective source spec gs =
       keep recipient =
         not (sourceOnStack && Recipient.objectOf recipient == Just source)
           && targetable pcs perspective source sourceView gs recipient
-   in Set.filter keep (admittedGiven pcs grants perspective source spec gs)
+   in Set.filter keep (admittedGiven pcs grants perspective bindings source spec gs)
 
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SPEC itself admits -- its
 -- Pool's base candidate set (CR 115.4's "any target" is creatures, planeswalkers
@@ -140,11 +153,15 @@ legalRecipientsGiven pcs grants perspective source spec gs =
 -- Sba.stillLegalEnchant's general path (CR 303.4c) and Attach.attachmentFor (CR
 -- 701.3a). Both ask what the enchant SPEC admits; neither is a player choosing a
 -- target.
+--
+-- No slot bindings, and neither caller can want any: both ask what an ENCHANT
+-- spec admits, and CR 303.4a's spec draws from the battlefield, which no
+-- GraveyardScope reaches.
 admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-admittedRecipients perspective source spec gs = admittedGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective source spec gs
+admittedRecipients perspective source spec gs = admittedGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective Map.empty source spec gs
 
-admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-admittedGiven pcs grants perspective source spec gs =
+admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> TargetSpec -> GameState -> Set Recipient
+admittedGiven pcs grants perspective bindings source spec gs =
   let pool = TargetSpec.pool spec
       narrowing = TargetSpec.filter spec
       -- THE one site that fills Filter.sourcePower and Filter.defendingPlayer,
@@ -194,7 +211,7 @@ admittedGiven pcs grants perspective source spec gs =
       against view = case narrowing of
         Nothing -> True
         Just f -> Filter.matches context view f
-   in Set.filter keep (basePoolGiven pcs context pool gs)
+   in Set.filter keep (basePoolGiven pcs context bindings pool gs)
 
 -- CR 702.18a (shroud) and CR 702.11b/702.11d (hexproof): THE
 -- targeting-restriction gate, the one every restriction rule 702 states lands
@@ -349,13 +366,14 @@ hexproofQuality keyword = case keyword of
 -- per-recipient builders below and nothing else.
 --
 -- The Context is the SAME one the Filter is matched against, and only the
--- graveyard arm reads it: CR 400.1's per-player zones make a pool that names one
--- have to say whose, and the Context's perspective is what answers. CR 109.5's
--- would-be controller is why that is the right frame -- the player CR 601.2c has
--- choosing targets. Every battlefield, stack and EXILE arm ignores it, because
--- those zones are shared by all players (CR 400.1 again).
-basePoolGiven :: Map ObjectId PC.ProjectedCharacteristics -> Filter.Context -> Pool.Pool -> GameState -> Set Recipient
-basePoolGiven pcs context pool gs = case pool of
+-- graveyard arm reads it -- along with `bindings`, which only that arm reads
+-- either: CR 400.1's per-player zones make a pool that names one have to say
+-- whose, and a GraveyardScope answers with either the Context's perspective (CR
+-- 109.5's would-be controller, the player CR 601.2c has choosing targets) or
+-- another slot's own answer. Every battlefield, stack and EXILE arm ignores
+-- both, because those zones are shared by all players (CR 400.1 again).
+basePoolGiven :: Map ObjectId PC.ProjectedCharacteristics -> Filter.Context -> Map SlotName (Set Recipient) -> Pool.Pool -> GameState -> Set Recipient
+basePoolGiven pcs context bindings pool gs = case pool of
   Pool.Creatures -> creatureRecipientsGiven pcs gs
   Pool.Players -> playerRecipients gs
   Pool.AnyTarget ->
@@ -371,7 +389,7 @@ basePoolGiven pcs context pool gs = case pool of
   Pool.Spells -> spellRecipients gs
   Pool.Abilities -> abilityRecipients gs
   Pool.SpellsAndPermanents -> Set.union (spellRecipients gs) (permanentRecipients gs)
-  Pool.CardsInGraveyard scope -> graveyardRecipients context scope gs
+  Pool.CardsInGraveyard scope -> graveyardRecipients context bindings scope gs
   Pool.CardsInExile -> exileRecipients gs
 
 -- CR 115.2 (only permanents are legal targets, save for the exceptions the
@@ -509,24 +527,59 @@ abilityRecipients gs = Set.fromList (fmap Recipient.ToObject (filter (\oid -> Ga
 -- the scope answerable at all -- CR 108.4 gives a card in a graveyard no
 -- controller to ask about.
 --
--- Whose graveyard is PlayerEffect.playersInScope's answer rather than a second
--- reading of CR 109.5 written here: that function folds the one membership test,
--- which is where PlayerScope.Opponents' CR 806.1 argument lives. NOT
--- Count.playersFor, which answers for a PlayerRef, whose InSlot arm names a slot
--- CR 601.2c has not filled at the moment this pool is read.
+-- Whose graveyard is the GraveyardScope's answer, in two readings:
 --
--- Nothing -> empty, playersInScope's report of an absent perspective -- the
--- vacuous posture every player-referencing Filter atom takes.
--- PlayerScope.EachPlayer never reaches it: "a graveyard" names the whole table
--- with no perspective to lack.
-graveyardRecipients :: Filter.Context -> PlayerScope.PlayerScope -> GameState -> Set Recipient
-graveyardRecipients context scope gs =
-  case PlayerEffect.playersInScope (Filter.perspective context) gs scope of
-    Nothing -> Set.empty
-    Just pids ->
-      Set.fromList
-        . fmap Recipient.ToObject
-        $ concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) pids
+--   * Scoped is PlayerEffect.playersInScope's, rather than a second reading of
+--     CR 109.5 written here: that function folds the one membership test, which
+--     is where PlayerScope.Opponents' CR 806.1 argument lives. Nothing -> empty
+--     is its report of an absent perspective -- the vacuous posture every
+--     player-referencing Filter atom takes. PlayerScope.EachPlayer never reaches
+--     it: "a graveyard" names the whole table with no perspective to lack.
+--
+--   * InSlot is the PLAYER recipients another slot of the same announcement
+--     holds -- Dwell on the Past's "their graveyard". Deliberately the same
+--     lookup at both of CR 115's moments, and the moments differ only in what
+--     the caller passes:
+--
+--       - CR 601.2c chooses every target AT ONCE, so nothing has been announced
+--         yet and legalSets passes the named slot's own LEGAL SET. The union
+--         over it is every card the announcement could reach -- a superset of
+--         any one coherent answer, which selectionLegal then judges whole. No
+--         order between the two slots is invented, which is what a
+--         one-slot-at-a-time prompt would have to do.
+--       - CR 608.2b re-checks a spell whose slots are FILLED, so Resolve passes
+--         the chosen targets and the union is over the one player named.
+--
+--     A slot holding an object rather than a player contributes nothing, the
+--     same empty answer ObjectRef gives for a slot holding a player. A slot that
+--     is itself InSlot-scoped is answerable but not usefully so: legalSets fills
+--     `bindings` from a pass that gave it no bindings of its own, so it holds
+--     nothing and this is empty -- which terminates rather than recurring.
+graveyardRecipients :: Filter.Context -> Map SlotName (Set Recipient) -> GraveyardScope.GraveyardScope -> GameState -> Set Recipient
+graveyardRecipients context bindings scope gs = case scope of
+  GraveyardScope.Scoped playerScope ->
+    case PlayerEffect.playersInScope (Filter.perspective context) gs playerScope of
+      Nothing -> Set.empty
+      Just pids -> graveyardsOf pids gs
+  GraveyardScope.InSlot slot ->
+    graveyardsOf (Maybe.mapMaybe playerOf (Set.toList (Map.findWithDefault Set.empty slot bindings))) gs
+
+-- CR 404.1 over a list of players, deduplicated by the Set the caller gets back.
+graveyardsOf :: [PlayerId] -> GameState -> Set Recipient
+graveyardsOf pids gs =
+  Set.fromList
+    . fmap Recipient.ToObject
+    $ concatMap (\pid -> Game.zoneMembers Zone.Graveyard pid gs) pids
+
+-- The player a Recipient names, if it names one. Recipient.objectOf's twin on
+-- the CR 115.1 player side.
+playerOf :: Recipient -> Maybe PlayerId
+playerOf recipient = case recipient of
+  Recipient.ToPlayer pid -> Just pid
+  Recipient.ToCreature _ -> Nothing
+  Recipient.ToPlaneswalker _ -> Nothing
+  Recipient.ToBattle _ -> Nothing
+  Recipient.ToObject _ -> Nothing
 
 -- CR 406.1: the cards in the exile zone, tagged ToObject -- Riftsweeper's
 -- "choose target face-up exiled card". CR 115.2's clause (a) again, the same
@@ -560,8 +613,15 @@ exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameStat
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
 -- otherwise re-judged against the spec in the current state.
-stillLegal :: Maybe PlayerId -> ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
-stillLegal perspective source recipient spec gs = Set.member recipient (legalRecipients perspective source spec gs)
+--
+-- `bindings` is the resolving object's OWN chosen targets, which is what makes
+-- CR 608.2b exact where CR 601.2c could only be a superset: a
+-- GraveyardScope.InSlot pool re-derived here reads the one player the spell
+-- actually named, so a card that has since moved to somebody else's graveyard is
+-- no longer a legal target for it.
+stillLegal :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
+stillLegal perspective bindings source recipient spec gs =
+  Set.member recipient (legalRecipientsGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective bindings source spec gs)
 
 -- CR 303.4c: is `recipient` still one the spec ADMITS -- the same membership
 -- question stillLegal asks, minus rule 702's targeting restrictions. See
@@ -581,8 +641,47 @@ legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState 
 legalSets perspective source specs gs = legalSetsGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective source specs gs
 
 -- The same map on a board the caller already walked -- see legalRecipientsGiven.
+--
+-- TWO PASSES, because CR 601.2c makes one slot's legal set depend on another's:
+-- a GraveyardScope.InSlot pool names a slot, so the first pass answers every
+-- slot with no bindings at all and the second re-answers only the slots that
+-- name one, against the first pass. The rule chooses every target AT ONCE, so
+-- there is no order to consult -- what a dependent slot is offered is the UNION
+-- over the answers the slot it names could still take, and selectionLegal is
+-- where the announcement is judged as one act.
+--
+-- The second pass reads the FIRST pass's map and not its own, which is what
+-- makes a chain of dependent slots terminate rather than recur: a slot naming
+-- another dependent slot reads that slot's first-pass answer, which is empty.
+-- No card writes one, and nothing here would loop if one did.
+--
+-- Ordinary cards pay nothing: `dependent` is empty for every spec map with no
+-- slot-scoped pool in it, so the second pass is a Map.filter over a map with at
+-- most a handful of keys.
 legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
-legalSetsGiven pcs grants perspective source specs gs = fmap (\spec -> legalRecipientsGiven pcs grants perspective source spec gs) specs
+legalSetsGiven pcs grants perspective source specs gs =
+  let answer bindings spec = legalRecipientsGiven pcs grants perspective bindings source spec gs
+      independent = fmap (answer Map.empty) specs
+      dependent = fmap (answer independent) (Map.filter (dependsOnSlot . TargetSpec.pool) specs)
+   in -- Map.union is left-biased, so the second pass wins wherever it answered.
+      Map.union dependent independent
+
+-- Does this pool's candidate set depend on what another target slot is answered
+-- with (CR 601.2c)? The graveyard pool's InSlot scope is the one axis that does;
+-- every other pool draws from a zone no slot names.
+dependsOnSlot :: Pool.Pool -> Bool
+dependsOnSlot pool = case pool of
+  Pool.Creatures -> False
+  Pool.Players -> False
+  Pool.AnyTarget -> False
+  Pool.Permanents -> False
+  Pool.Spells -> False
+  Pool.Abilities -> False
+  Pool.SpellsAndPermanents -> False
+  Pool.CardsInGraveyard scope -> case scope of
+    GraveyardScope.Scoped _ -> False
+    GraveyardScope.InSlot _ -> True
+  Pool.CardsInExile -> False
 
 -- CR 601.2c: the range of numbers this slot may be answered with on this board
 -- -- the printed count, narrowed by how many legal recipients there actually
@@ -634,10 +733,26 @@ chooseTargets decider pid oid specs sets = do
 -- Measured against the BOARD-NARROWED range, the one chooseTargets offered: a
 -- caster who could not find three legal targets has not announced an illegal
 -- number, they were never offered it.
-selectionLegal :: Map SlotName TargetSpec -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> Bool
-selectionLegal specs sets chosen =
+--
+-- THE JOINT CHECK is the second conjunct, and it is what makes CR 601.2c's "all
+-- at once" a whole answer rather than an order: a slot whose pool names another
+-- slot was OFFERED the union over that slot's candidates (legalSetsGiven), so
+-- membership in `sets` alone would let a caster take a card from one player's
+-- graveyard while targeting another. Re-deriving the dependent slots against
+-- `chosen` -- exactly the derivation CR 608.2b will make at resolution -- judges
+-- the announcement as the single act the rule makes it, with neither slot
+-- resolved before the other.
+--
+-- An announced COUNT is still measured against the union: a caster who announces
+-- four targets and then cannot name four coherent ones fails here and CR 601.2
+-- returns the game to before the spell was proposed, the same posture CR 601.2b's
+-- unaffordable X announcement already takes (#417). Narrowing the offered count
+-- to what a coherent answer could reach is not implemented (#1296).
+selectionLegal :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
+selectionLegal perspective source specs sets chosen gs =
   Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
     && and (Map.elems (Map.mapWithKey slotLegal specs))
+    && and (Map.elems (Map.mapWithKey coherent (Map.filter (dependsOnSlot . TargetSpec.pool) specs)))
   where
     slotLegal slot spec =
       let legal = Map.findWithDefault Set.empty slot sets
@@ -645,6 +760,10 @@ selectionLegal specs sets chosen =
           (lo, hi) = announcedRange spec legal
           size = Natural.length picked
        in Set.isSubsetOf picked legal && size >= lo && size <= hi
+    coherent slot spec =
+      Set.isSubsetOf
+        (Map.findWithDefault Set.empty slot chosen)
+        (legalRecipientsGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective chosen source spec gs)
 
 -- CR 700.2a: the mode indices every one of whose target slots can be filled --
 -- that is, has at least as many legal recipients as its count demands (a mode
