@@ -37,6 +37,10 @@
 -- which is where pawl's order used to come apart (Reliquary Tower is the third
 -- card in the group, and its ruling is the authority for the reading).
 --
+-- Void Winnower brings CR 601.3a's LOOKAHEAD, and Molten Disaster is the second
+-- half of that pair: a prohibition on even mana values, against an {X} spell
+-- whose mana value is even only while it sits in a hand (CR 202.3e).
+--
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
 -- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
@@ -3443,6 +3447,104 @@ jaredSpec s registry =
           Spec.assertEqWith s "bob was crowned by Jared's own trigger" (GameState.monarch restricted) (Just S.bob)
           Spec.assertEqWith s "and keeps the crown through alice's combat damage" (GameState.monarch (damageToTheMonarch pikerId restricted)) (Just S.bob)
 
+-- CR 601.3a / Void Winnower {9} Creature -- Eldrazi: "Your opponents can't cast
+-- spells with even mana values. (Zero is even.)"
+--
+-- ONE board, built twice, and `extra` is the only thing the two ever differ by.
+-- alice and bob each have nine untapped Mountains, so mana is never why a cast is
+-- missing, and each holds a Goblin Piker ({1}{R}, mana value 2 -- EVEN). bob also
+-- holds a Lightning Bolt ({R}, mana value 1 -- ODD) and a Molten Disaster
+-- ({X}{R}{R}), whose mana value is 2 in his hand by CR 202.3e and either parity
+-- once X is chosen.
+--
+-- The three cards bob holds are the discriminating set: the Bolt differs from the
+-- Piker in PARITY alone, and the Disaster differs from the Piker in the VARIABLE
+-- alone -- same seat, same mana, same moment, same even mana value. alice's own
+-- Piker is the SCOPE control, since no EachPlayer reading of the ability could
+-- leave it castable.
+--
+-- Returns (alice's Piker, bob's Piker, bob's Bolt, bob's Disaster, board).
+voidWinnowerBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  [Printing.Printing] ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+voidWinnowerBoard mountain piker bolt disaster extra =
+  let base = S.landsInPlay mountain 9
+      withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) base [1 .. 9 :: Int]
+      (alicesPiker, gs1) = S.addHandCard piker S.alice withBobsLands
+      (bobsPiker, gs2) = S.addHandCard piker S.bob gs1
+      (bobsBolt, gs3) = S.addHandCard bolt S.bob gs2
+      (bobsDisaster, gs4) = S.addHandCard disaster S.bob gs3
+      put g printing = snd (S.addCreature printing S.alice g)
+   in ( alicesPiker,
+        bobsPiker,
+        bobsBolt,
+        bobsDisaster,
+        (List.foldl' put gs4 extra) {GameState.phase = Phase.PrecombatMain}
+      )
+
+-- Whatever that player may do, asked in their own precombat main phase with an
+-- empty stack -- so a sorcery, a creature spell and an instant are all inside CR
+-- 307.1's window and timing is never the reason one is missing.
+askedOf :: PlayerId.PlayerId -> GameState.GameState -> [Action.Type.Action]
+askedOf pid gs = Action.legalActions pid (gs {GameState.activePlayer = pid, GameState.priority = Just pid})
+
+voidWinnowerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+voidWinnowerSpec s registry =
+  Spec.describe s "VoidWinnower" $ do
+    -- CR 601.3a's quality-bearing prohibition on the axis a NAME cannot answer:
+    -- the two cards refused and allowed here are told apart by their mana value
+    -- and by nothing else.
+    Spec.it s "CR 601.3a an opponent's even spell is refused and their odd one is not" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      disaster <- S.printingOf s registry "Molten Disaster"
+      winnower <- S.printingOf s registry "Void Winnower"
+      let (alicesPiker, bobsPiker, bobsBolt, _, board) = voidWinnowerBoard mountain piker bolt disaster [winnower]
+          (_, barePiker, _, _, bare) = voidWinnowerBoard mountain piker bolt disaster []
+      Spec.assertBool s (not (any (S.isCastOf bobsPiker) (askedOf S.bob board))) "the mana value 2 spell is refused"
+      Spec.assertBool s (any (S.isCastOf bobsBolt) (askedOf S.bob board)) "the mana value 1 spell, off the same lands, is not"
+      Spec.assertBool s (any (S.isCastOf alicesPiker) (askedOf S.alice board)) "and the Winnower's own controller may cast that same card"
+      Spec.assertBool s (any (S.isCastOf barePiker) (askedOf S.bob bare)) "the pair: with the Winnower gone bob's Piker is castable"
+
+    -- CR 601.3a's LOOKAHEAD, and the pair is the whole case: both spells have a
+    -- mana value of 2 in bob's hand (CR 202.3e), both are refused by a reading
+    -- that stops at the board, and the {X} one is offered anyway because a choice
+    -- bob has not yet made could take it out of the prohibited class.
+    Spec.it s "CR 601.3a an {X} spell with an even mana value in hand may still be begun" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      disaster <- S.printingOf s registry "Molten Disaster"
+      winnower <- S.printingOf s registry "Void Winnower"
+      let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster [winnower]
+      Spec.assertBool s (PlayerEffect.matchesObject Filter.Type.ManaValueIsEven bobsPiker board) "the fixed spell's mana value is even"
+      Spec.assertBool s (PlayerEffect.matchesObject Filter.Type.ManaValueIsEven bobsDisaster board) "and so is the {X} spell's, while it sits in hand"
+      Spec.assertBool s (not (any (S.isCastOf bobsPiker) (askedOf S.bob board))) "the fixed one is refused"
+      Spec.assertBool s (any (S.isCastOf bobsDisaster) (askedOf S.bob board)) "and the {X} one is offered"
+
+    -- The search's REACH, which no card in the pool pins: Void Winnower's own
+    -- criterion is answered at the second sample, so a lookahead that only ever
+    -- looked one step would pass every case above. A threshold criterion is the
+    -- shape that needs the climb -- an {X}{R}{R} card escapes "mana value 5 or
+    -- less" only at X = 4 -- and Pawl.Engine.Filter.manaValueThresholds is what
+    -- tells the search how far to walk. Asked of the same real card in the same
+    -- hand; only the criterion is written by the test.
+    Spec.it s "CR 601.3a the search walks past every literal the criterion names" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      disaster <- S.printingOf s registry "Molten Disaster"
+      let (_, bobsPiker, _, bobsDisaster, board) = voidWinnowerBoard mountain piker bolt disaster []
+          cheap = Filter.Type.ManaValueAtMost 5
+      Spec.assertBool s (PlayerEffect.matchesObject cheap bobsDisaster board) "the {X} spell is inside the class as it sits in hand"
+      Spec.assertBool s (PlayerEffect.choiceCouldEscape cheap bobsDisaster board) "and a large enough X takes it out"
+      Spec.assertBool s (not (PlayerEffect.choiceCouldEscape cheap bobsPiker board)) "while the fixed spell beside it has no choice to make"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -3465,6 +3567,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   extraLandDropsSpec s registry
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
+  voidWinnowerSpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry
   jaredSpec s registry

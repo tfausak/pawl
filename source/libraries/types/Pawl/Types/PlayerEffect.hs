@@ -38,7 +38,9 @@ data PlayerEffect
     --
     -- The quality is the SPELL's name, which makes this CR 601.3a's shape rather
     -- than CantCastSpells' -- see Pawl.Engine.PlayerEffect.prohibitsCasting for
-    -- what that costs and what is still missing (#95).
+    -- what that costs. CR 601.3a's lookahead reaches this arm not at all: a
+    -- spell's name is fixed by the half and the facing, and both are chosen
+    -- before the prohibition is asked.
     CantCastChosenName
   | -- | CR 305.1 / Null Chamber: this player can't PLAY a land whose name is one
     -- of the names chosen as this effect's source entered ("lands with the
