@@ -1,9 +1,3 @@
--- | A JSON schema, modelled as a plain JSON value. There is more structure
--- available in the specification, but nothing downstream would read it.
---
--- The vocabulary here is generic JSON Schema and knows nothing of Pawl's
--- tagged-object convention, which is composed from these pieces in
--- @Pawl.JsonCodec.Arm@.
 module Pawl.JsonSchema.Schema where
 
 import qualified Data.Text as Text
@@ -11,6 +5,7 @@ import qualified Pawl.Json.Object as Object
 import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.Value as Value
 
+-- | A JSON schema, modelled as a plain JSON value.
 newtype Schema = MkSchema
   { unwrap :: Value.Value
   }
@@ -26,23 +21,23 @@ fromPairs = MkSchema . Value.object
 keywords :: Schema -> [Pair.Pair Value.Value]
 keywords s = case unwrap s of
   Value.Object o -> Object.unwrap o
-  v -> [Value.pair "allOf" (Value.array [v])]
+  v -> [Value.pair "allOf" $ Value.array [v]]
 
 string :: Schema
-string = fromPairs [Value.pair "type" (Value.text (Text.pack "string"))]
+string = fromPairs [Value.pair "type" $ Value.string "string"]
 
 integer :: Schema
-integer = fromPairs [Value.pair "type" (Value.text (Text.pack "integer"))]
+integer = fromPairs [Value.pair "type" $ Value.string "integer"]
 
 natural :: Schema
 natural =
   fromPairs
-    [ Value.pair "type" (Value.text (Text.pack "integer")),
-      Value.pair "minimum" (Value.integer 0)
+    [ Value.pair "type" $ Value.string "integer",
+      Value.pair "minimum" $ Value.integer 0
     ]
 
 null :: Schema
-null = fromPairs [Value.pair "type" (Value.text (Text.pack "null"))]
+null = fromPairs [Value.pair "type" $ Value.string "null"]
 
 constant :: Text.Text -> Schema
 constant = fromPairs . pure . Value.pair "const" . Value.text
@@ -50,9 +45,9 @@ constant = fromPairs . pure . Value.pair "const" . Value.text
 object :: [Pair.Pair Value.Value] -> [Text.Text] -> Schema
 object properties required =
   fromPairs
-    [ Value.pair "type" (Value.text (Text.pack "object")),
-      Value.pair "properties" (Value.object properties),
-      Value.pair "required" (Value.array (fmap Value.text required))
+    [ Value.pair "type" $ Value.string "object",
+      Value.pair "properties" $ Value.object properties,
+      Value.pair "required" . Value.array $ fmap Value.text required
     ]
 
 oneOf :: [Schema] -> Schema

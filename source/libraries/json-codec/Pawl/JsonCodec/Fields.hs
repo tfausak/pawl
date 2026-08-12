@@ -30,30 +30,30 @@ import qualified Pawl.JsonSchema.Schema as Schema
 -- dedupe either, so a duplicate emits two identical JSON object members --
 -- the first of which wins on the next decode.
 data Fields o a = MkFields
-  { encodeFields :: o -> [Pair.Pair Value.Value],
-    decodeFields :: [Pair.Pair Value.Value] -> Either Text.Text a,
-    schemaFields :: Define.SchemaM ([Pair.Pair Value.Value], [Text.Text])
+  { encode :: o -> [Pair.Pair Value.Value],
+    decode :: [Pair.Pair Value.Value] -> Either Text.Text a,
+    schema :: Define.SchemaM ([Pair.Pair Value.Value], [Text.Text])
   }
 
 -- | Only the decoding side mentions @a@, so this is a type-changing record
 -- update rather than a rebuild.
 instance Functor (Fields o) where
-  fmap f fields = fields {decodeFields = fmap f . decodeFields fields}
+  fmap f fields = fields {decode = fmap f . decode fields}
 
 instance Applicative (Fields o) where
   pure x =
     MkFields
-      { encodeFields = const [],
-        decodeFields = const (Right x),
-        schemaFields = pure ([], [])
+      { encode = const [],
+        decode = const (Right x),
+        schema = pure ([], [])
       }
   f <*> x =
     MkFields
-      { encodeFields = \o -> encodeFields f o <> encodeFields x o,
-        decodeFields = \ps -> decodeFields f ps <*> decodeFields x ps,
-        schemaFields = do
-          (fp, fr) <- schemaFields f
-          (xp, xr) <- schemaFields x
+      { encode = \o -> encode f o <> encode x o,
+        decode = \ps -> decode f ps <*> decode x ps,
+        schema = do
+          (fp, fr) <- schema f
+          (xp, xr) <- schema x
           pure (fp <> xp, fr <> xr)
       }
 
@@ -61,9 +61,9 @@ instance Applicative (Fields o) where
 required :: String -> Codec.Codec a -> (o -> a) -> Fields o a
 required key c get =
   MkFields
-    { encodeFields = \o -> [Value.pair key (Codec.encode c (get o))],
-      decodeFields = \ps -> Common.field key ps >>= Codec.decode c,
-      schemaFields = do
+    { encode = \o -> [Value.pair key (Codec.encode c (get o))],
+      decode = \ps -> Common.field key ps >>= Codec.decode c,
+      schema = do
         s <- Codec.schema c
         pure ([Value.pair key (Schema.unwrap s)], [Text.pack key])
     }
@@ -78,11 +78,11 @@ required key c get =
 defaulted :: (Eq a) => String -> a -> Codec.Codec a -> (o -> a) -> Fields o a
 defaulted key d c get =
   MkFields
-    { encodeFields = \o ->
+    { encode = \o ->
         let x = get o
          in if x == d then [] else [Value.pair key (Codec.encode c x)],
-      decodeFields = Common.defaultedField key d (Codec.decode c),
-      schemaFields = do
+      decode = Common.defaultedField key d (Codec.decode c),
+      schema = do
         s <- Codec.schema c
         pure ([Value.pair key (Schema.unwrap (Schema.withDefault (Codec.encode c d) s))], [])
     }
@@ -93,9 +93,9 @@ defaulted key d c get =
 object :: forall o. (Typeable.Typeable o) => Fields o o -> Codec.Codec o
 object fields =
   Codec.MkCodec
-    { Codec.encode = Value.object . encodeFields fields,
-      Codec.decode = \v -> Common.asObject v >>= decodeFields fields,
+    { Codec.encode = Value.object . encode fields,
+      Codec.decode = \v -> Common.asObject v >>= decode fields,
       Codec.schema = Define.define (Name.typeName (Typeable.Proxy :: Typeable.Proxy o)) $ do
-        (properties, req) <- schemaFields fields
+        (properties, req) <- schema fields
         pure (Schema.object properties req)
     }

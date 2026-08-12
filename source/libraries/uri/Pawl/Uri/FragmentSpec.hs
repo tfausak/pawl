@@ -23,16 +23,16 @@ spec s = Spec.describe s "Pawl.Uri.Fragment" $ do
       Spec.assertEq s (encode "c%d") "c%25d"
 
     Spec.it s "percent encodes caret" $ do
-      Spec.assertEq s (encode "e^f") "e%5Ef"
+      Spec.assertEq s (encode "e^f") "e%5ef"
 
     Spec.it s "percent encodes pipe" $ do
-      Spec.assertEq s (encode "g|h") "g%7Ch"
+      Spec.assertEq s (encode "g|h") "g%7ch"
 
     Spec.it s "percent encodes backslash" $ do
-      Spec.assertEq s (encode "i\\j") "i%5Cj"
+      Spec.assertEq s (encode "i\\j") "i%5cj"
 
     Spec.it s "percent encodes space" $ do
       Spec.assertEq s (encode " ") "%20"
 
     Spec.it s "percent encodes non-ASCII as UTF-8 octets" $ do
-      Spec.assertEq s (encode "é") "%C3%A9"
+      Spec.assertEq s (encode "é") "%c3%a9"
