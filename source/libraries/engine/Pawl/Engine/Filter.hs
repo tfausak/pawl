@@ -425,6 +425,14 @@ matches context view predicate = case predicate of
   Filter.ManaValueAtMost n -> case manaValue view of
     Nothing -> False
     Just mv -> mv <= n
+  -- CR 202.3 again, read for parity. Void Winnower's reminder text is the
+  -- boundary case in the rulebook's own words -- "(Zero is even.)" -- and `even
+  -- 0` agrees, which is also CR 202.3a's answer for an object with no mana cost:
+  -- an animated land has a mana value of 0 and so an EVEN one.
+  --
+  -- Vacuously False where there is no mana value at all, exactly as the atom
+  -- above is: a player, or an object with no card behind it.
+  Filter.ManaValueIsEven -> maybe False even (manaValue view)
   -- Every other player is an Opponent by construction: CR 806.1 has a
   -- free-for-all's players compete as individuals against each other, and CR
   -- 102.2 says the same for two players -- one predicate, `c /= p`, serves both.
@@ -597,6 +605,7 @@ rewrite pairs predicate = case predicate of
   Filter.PowerLessThanSource -> predicate
   Filter.PowerGreaterThanSource -> predicate
   Filter.ManaValueAtMost _ -> predicate
+  Filter.ManaValueIsEven -> predicate
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason.
   Filter.ControlledByDefendingPlayer -> predicate
@@ -873,6 +882,7 @@ bakeBound players predicate = case predicate of
   Filter.PowerLessThanSource -> predicate
   Filter.PowerGreaterThanSource -> predicate
   Filter.ManaValueAtMost _ -> predicate
+  Filter.ManaValueIsEven -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
@@ -891,6 +901,63 @@ bakeBound players predicate = case predicate of
   Filter.HasDesignation _ -> predicate
   Filter.HasCounters _ -> predicate
   Filter.HasNonManaActivatedAbility -> predicate
+
+-- The mana-value LITERALS a Filter compares against: every `n` in a
+-- ManaValueAtMost atom inside it, at any depth.
+--
+-- CR 601.3a's lookahead is the one caller (Pawl.Engine.PlayerEffect
+-- prohibitsCasting). Asking whether some choice of X could take a spell out of a
+-- prohibition means asking one Filter at more than one mana value, and this is
+-- what BOUNDS that search: ManaValueAtMost and ManaValueIsEven are the whole of
+-- this language's mana-value vocabulary, so above every literal returned here the
+-- only distinction a Filter can still draw is parity, and a sample running two
+-- past the greatest literal has already seen every verdict the Filter can give.
+--
+-- Exhaustive rather than a catch-all, bakeBound's posture and for a sharper
+-- reason: an atom reading the mana value some other way -- a multiple-of-three
+-- test -- would break that argument, so it must break this build instead of
+-- silently narrowing the search.
+--
+-- Polymorphic in the keyword, since no arm reads one.
+manaValueThresholds :: Filter.Filter keyword -> [Integer]
+manaValueThresholds predicate = case predicate of
+  Filter.ManaValueAtMost n -> [n]
+  Filter.And fs -> concatMap manaValueThresholds fs
+  Filter.Or fs -> concatMap manaValueThresholds fs
+  Filter.Not f -> manaValueThresholds f
+  -- Reads the mana value and compares it against NO literal, so it bounds
+  -- nothing: parity is what the sample's two-past-the-greatest tail is for.
+  Filter.ManaValueIsEven -> []
+  Filter.HasCardType _ -> []
+  Filter.HasSupertype _ -> []
+  Filter.HasColor _ -> []
+  Filter.HasSubtype _ -> []
+  Filter.HasKeyword _ -> []
+  Filter.HasKeywordFamily _ -> []
+  Filter.PowerAtLeast _ -> []
+  Filter.PowerAtMost _ -> []
+  Filter.PowerLessThanSource -> []
+  Filter.PowerGreaterThanSource -> []
+  Filter.ControlledBy _ -> []
+  Filter.ControlledByDefendingPlayer -> []
+  Filter.ControlledByBound _ -> []
+  Filter.ControlledByPlayer _ -> []
+  Filter.OwnedBy _ -> []
+  Filter.IsSource -> []
+  Filter.IsPlayer _ -> []
+  Filter.IsAttacking -> []
+  Filter.IsBlocking -> []
+  Filter.AttackedThisTurn -> []
+  Filter.IsAttachedToCreature -> []
+  Filter.IsAttachedToPermanent -> []
+  Filter.IsAttachedToSource -> []
+  Filter.CanHostSubject -> []
+  Filter.IsToken -> []
+  Filter.IsTapped -> []
+  Filter.IsRingBearer -> []
+  Filter.HasDesignation _ -> []
+  Filter.HasCounters _ -> []
+  Filter.HasNonManaActivatedAbility -> []
 
 -- The slots a Filter READS -- today exactly the ControlledByBound atoms in it.
 -- Pawl.Engine.Resolve.modeSlots folds this over a mode's target specs, which is

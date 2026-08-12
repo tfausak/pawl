@@ -2486,6 +2486,25 @@ combatRestrictionSpec s registry = Spec.describe s "CombatRestrictions" $ do
         Spec.assertEqWith s "with it, the attacker connects" (S.lifeOf S.bob after) (Just 18)
         Spec.assertEqWith s "and bob's creature is alive, having blocked nothing" (S.creaturesInPlay S.bob after) 1
       _ -> Spec.assertFailure s "fixture should have one blocker"
+  -- CR 509.1b narrowed by a MANA VALUE rather than by an attachment, and pointed
+  -- at the OTHER seat: Void Winnower's "your opponents can't block with creatures
+  -- with even mana values". The two blockers differ in parity alone -- a Goblin
+  -- Piker ({1}{R}, 2) and an Uthden Troll ({1}{R}{R}, 3) -- and the Winnower
+  -- controller's own Goblin Piker is the possessive control: same card, same even
+  -- mana value, other side of "your opponents", and it may still block.
+  Spec.it s "CR 509.1b Void Winnower stops an opponent blocking with an even mana value creature" $ do
+    winnower <- S.printingOf s registry "Void Winnower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    troll <- S.printingOf s registry "Uthden Troll"
+    let (gs, mine, theirs) = S.combatBoardOf [piker, winnower] [piker, troll]
+    case (mine, theirs) of
+      ([alicesPiker, winnowerId], [evenBlocker, oddBlocker]) -> do
+        let bare = S.runPure S.identityAnswer gs (Event.changeZone winnowerId Zone.Graveyard)
+        Spec.assertBool s (not (Combat.canBlock S.bob evenBlocker gs)) "the mana value 2 creature cannot block"
+        Spec.assertBool s (Combat.canBlock S.bob oddBlocker gs) "the mana value 3 creature beside it can"
+        Spec.assertBool s (Combat.canBlock S.alice alicesPiker gs) "and the same card under the Winnower's own controller may block"
+        Spec.assertBool s (Combat.canBlock S.bob evenBlocker bare) "the pair: with the Winnower gone the even creature may block again"
+      _ -> Spec.assertFailure s "fixture should have two creatures a side"
 
 -- CR 508.1c's and CR 509.1b's SECOND clause -- "or that it can't attack unless
 -- some condition is met" -- proved by Blind-Spot Giant ("This creature can't

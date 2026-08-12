@@ -53,6 +53,7 @@ codec keywordCodec =
       -- Modification.SetController's baked PlayerId gets.
       Arm.payload "ControlledByPlayer" PlayerId.codec Filter.ControlledByPlayer,
       Arm.payload "ManaValueAtMost" Common.integer Filter.ManaValueAtMost,
+      Arm.nullary "ManaValueIsEven" Filter.ManaValueIsEven,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy,
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy,
       Arm.payload "IsPlayer" PlayerRelation.codec Filter.IsPlayer,
@@ -90,6 +91,7 @@ codec keywordCodec =
       Filter.ControlledByBound slot -> Common.tagged "ControlledByBound" . Just $ Codec.encode SlotName.codec slot
       Filter.ControlledByPlayer pid -> Common.tagged "ControlledByPlayer" . Just $ Codec.encode PlayerId.codec pid
       Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Value.integer n
+      Filter.ManaValueIsEven -> Common.nullary "ManaValueIsEven"
       Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ Codec.encode PlayerRelation.codec r
       Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ Codec.encode PlayerRelation.codec r
       Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ Codec.encode PlayerRelation.codec r

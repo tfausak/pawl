@@ -139,6 +139,22 @@ data Filter keyword
     -- other zone half, via Pool.CardsInGraveyard). No Modification writes a mana
     -- cost, so there is nothing projected to read instead.
     ManaValueAtMost Integer
+  | -- | CR 202.3 read for its PARITY rather than against a bound -- Void
+    -- Winnower's "spells with even mana values", whose own reminder text settles
+    -- the boundary case: "(Zero is even.)"
+    --
+    -- Payload-free, where the atom above carries a literal, because the printed
+    -- sentence has no number in it: the parity is the whole of the test, and
+    -- "odd" is Not of this rather than a second arm (nothing in the pool asks
+    -- for odd).
+    --
+    -- Answerable off the battlefield for ManaValueAtMost's reason, and CR 202.3e
+    -- is what makes it INTERESTING off the stack: a variable in the cost counts
+    -- as zero anywhere but the stack, so an {X}{R}{R} card has an even mana
+    -- value in a hand and either parity once X is chosen. That is the one axis a
+    -- proposal choice moves, and it is why CR 601.3a's lookahead exists --
+    -- Pawl.Engine.PlayerEffect.prohibitsCasting is where the rule is read.
+    ManaValueIsEven
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the
     -- object the evaluation comes from -- CR 702.39a's "target creature defending

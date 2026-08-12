@@ -1,0 +1,96 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Yawgmoth's Will",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "AffectPlayers",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "You"
+                      },
+                      {
+                        "type": "CastFromGraveyard",
+                        "value": {
+                          "type": "And",
+                          "value": []
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Replace",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "Unlimited"
+                      },
+                      {
+                        "type": "Other"
+                      },
+                      null,
+                      {
+                        "type": "ZoneChangeR",
+                        "value": [
+                          {
+                            "whatObject": {
+                              "type": "Not",
+                              "value": {
+                                "type": "IsToken"
+                              }
+                            },
+                            "whenDestination": {
+                              "type": "Graveyard"
+                            },
+                            "whoseObject": {
+                              "type": "Yours"
+                            }
+                          },
+                          {
+                            "type": "Exile"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

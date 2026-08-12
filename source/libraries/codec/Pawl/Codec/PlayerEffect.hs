@@ -34,6 +34,7 @@ toJson e = case e of
   PlayerEffect.CantBecomeMonarch -> Common.nullary "CantBecomeMonarch"
   PlayerEffect.CantCastMatching c -> Common.tagged "CantCastMatching" . Just $ Codec.encode (Filter.codec Keyword.codec) c
   PlayerEffect.CantPlayLands -> Common.nullary "CantPlayLands"
+  PlayerEffect.CastFromGraveyard c -> Common.tagged "CastFromGraveyard" . Just $ Codec.encode (Filter.codec Keyword.codec) c
 
 fromJson :: Value.Value -> Either Text.Text PlayerEffect.PlayerEffect
 fromJson value = do
@@ -58,4 +59,5 @@ fromJson value = do
     ("CantBecomeMonarch", _) -> Right PlayerEffect.CantBecomeMonarch
     ("CantCastMatching", Just v) -> PlayerEffect.CantCastMatching <$> Codec.decode (Filter.codec Keyword.codec) v
     ("CantPlayLands", _) -> Right PlayerEffect.CantPlayLands
+    ("CastFromGraveyard", Just v) -> PlayerEffect.CastFromGraveyard <$> Codec.decode (Filter.codec Keyword.codec) v
     _ -> Left . Text.pack $ "unknown PlayerEffect: " <> t

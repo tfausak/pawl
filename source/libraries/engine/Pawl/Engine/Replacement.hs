@@ -292,7 +292,7 @@ applies gs event candidate =
         -- "a nontoken creature") what the moving object IS.
         (ReplacementEffect.ZoneChangeR pat _, ProposedEvent.WouldChangeZone zc) ->
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
-            && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
+            && matchesZoneOwner gs (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
         -- plus the one fact about the ROW rather than the event -- a shield
@@ -483,14 +483,29 @@ matchesDamagePattern gs context pat de =
 -- graveyard where an opponent's is exiled. What is NOT exercised is the owner /
 -- controller difference itself -- no test steals a creature and then kills it --
 -- so the argument for reading the owner stays the rules one above.
-matchesZoneOwner :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
-matchesZoneOwner gs src rel oid =
+--
+-- CR 109.5's "you" comes from the CANDIDATE and not from a fresh
+-- Projection.controllerOf on the source, because the two segments answer it
+-- differently and only the candidate knows which it is: a permanent's row is
+-- derived live off the board, while a FLOATING row baked its controller at
+-- installation precisely because its source is a spell CR 608.2n has already
+-- moved to another zone as a new object. Deriving it here instead silently
+-- unscoped every floating "your graveyard" redirect the moment its own source
+-- left the stack -- Yawgmoth's Will's second sentence, whose proof is
+-- Pawl.PlayerEffectSpec's YawgmothsWill group.
+matchesZoneOwner :: GameState -> Maybe PlayerId -> ControllerRelation -> ObjectId -> Bool
+matchesZoneOwner gs you rel oid =
   let ownerOf o = fmap Object.owner (Game.lookupObject o gs)
    in case rel of
         ControllerRelation.Anyones -> True
-        ControllerRelation.Yours -> ownerOf oid == Projection.controllerOf src gs
-        ControllerRelation.Opponents -> case (ownerOf oid, Projection.controllerOf src gs) of
-          (Just owner, Just you) -> owner /= you
+        ControllerRelation.Yours -> case (ownerOf oid, you) of
+          (Just owner, Just mine) -> owner == mine
+          -- An unknown owner or a sourceless effect admits nothing rather than
+          -- everything, exactly as the Opponents arm below does: two absent
+          -- answers are not a match.
+          _ -> False
+        ControllerRelation.Opponents -> case (ownerOf oid, you) of
+          (Just owner, Just mine) -> owner /= mine
           -- An unknown owner or a sourceless effect admits nothing rather than
           -- everything: a redirect with no controller has no opponents.
           _ -> False
