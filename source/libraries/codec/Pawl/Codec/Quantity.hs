@@ -29,12 +29,12 @@ toJson q = case q of
   Quantity.Plus a b -> Common.tagged "Plus" . Just . Value.array $ [toJson a, toJson b]
   Quantity.Count c -> Common.tagged "Count" . Just $ Count.toJson toJson c
   Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ ManaCount.toJson c
-  Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ PlayerRef.toJson p
-  Quantity.Speed p -> Common.tagged "Speed" . Just $ PlayerRef.toJson p
+  Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ Codec.encode PlayerRef.codec p
+  Quantity.Speed p -> Common.tagged "Speed" . Just $ Codec.encode PlayerRef.codec p
   -- CR 725.1's designation, with only a PlayerRef on the wire: the answer is a
   -- 0/1 rather than a stored number, so there is nothing beside the reference.
-  Quantity.IsMonarch p -> Common.tagged "IsMonarch" . Just $ PlayerRef.toJson p
-  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Value.array $ [PlayerRef.toJson p, Codec.encode PlayerCounterKind.codec k]
+  Quantity.IsMonarch p -> Common.tagged "IsMonarch" . Just $ Codec.encode PlayerRef.codec p
+  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Value.array $ [Codec.encode PlayerRef.codec p, Codec.encode PlayerCounterKind.codec k]
   -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
   -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
   Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ Codec.encode (CounterKind.codec Keyword.codec) k
@@ -45,12 +45,12 @@ toJson q = case q of
   Quantity.WasKicked -> Common.nullary "WasKicked"
   -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted comes
   -- from the combat record rather than from anything the card names.
-  Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ PlayerRef.toJson p
+  Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ Codec.encode PlayerRef.codec p
   -- CR 701.9a's tally, with only a PlayerRef on the wire for OpponentsAttacked's
   -- reason: what is counted comes from the event log rather than from anything the
   -- card names, and the turn is the log's extent rather than a window a card could
   -- state.
-  Quantity.CardsDiscardedThisTurn p -> Common.tagged "CardsDiscardedThisTurn" . Just $ PlayerRef.toJson p
+  Quantity.CardsDiscardedThisTurn p -> Common.tagged "CardsDiscardedThisTurn" . Just $ Codec.encode PlayerRef.codec p
   -- CR 509.1h's declaration read against the object the quantity is aimed at, so
   -- there is nothing on the wire at all -- Power's shape rather than
   -- ObjectCounters'.
@@ -72,15 +72,15 @@ fromJson value = do
     ("Plus", Just (Value.Array (Array.MkArray [x, y]))) -> Quantity.Plus <$> fromJson x <*> fromJson y
     ("Count", Just v) -> Quantity.Count <$> Count.fromJson fromJson v
     ("ManaCount", Just v) -> Quantity.ManaCount <$> ManaCount.fromJson v
-    ("LifeTotal", Just v) -> Quantity.LifeTotal <$> PlayerRef.fromJson v
-    ("Speed", Just v) -> Quantity.Speed <$> PlayerRef.fromJson v
-    ("IsMonarch", Just v) -> Quantity.IsMonarch <$> PlayerRef.fromJson v
-    ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> Codec.decode PlayerCounterKind.codec k
+    ("LifeTotal", Just v) -> Quantity.LifeTotal <$> Codec.decode PlayerRef.codec v
+    ("Speed", Just v) -> Quantity.Speed <$> Codec.decode PlayerRef.codec v
+    ("IsMonarch", Just v) -> Quantity.IsMonarch <$> Codec.decode PlayerRef.codec v
+    ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> Codec.decode PlayerRef.codec p <*> Codec.decode PlayerCounterKind.codec k
     ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> Codec.decode (CounterKind.codec Keyword.codec) v
     ("HasDesignation", Just v) -> Quantity.HasDesignation <$> Designation.fromJson v
     ("WasKicked", _) -> Right Quantity.WasKicked
-    ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
-    ("CardsDiscardedThisTurn", Just v) -> Quantity.CardsDiscardedThisTurn <$> PlayerRef.fromJson v
+    ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> Codec.decode PlayerRef.codec v
+    ("CardsDiscardedThisTurn", Just v) -> Quantity.CardsDiscardedThisTurn <$> Codec.decode PlayerRef.codec v
     ("BlockersBeyondFirst", _) -> Right Quantity.BlockersBeyondFirst
     ("AgainstSlot", Just (Value.Array (Array.MkArray [s, q]))) -> Quantity.AgainstSlot <$> Codec.decode SlotName.codec s <*> fromJson q
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
