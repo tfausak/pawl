@@ -98,6 +98,12 @@ combatReplaySpec s =
         [ DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.alice) 5 False False False 0 Nothing DamageKind.Combat,
           DamageEvent.MkDamageEvent (ObjectId.MkObjectId 8) (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Combat
         ]
+      -- CR 601.2h: Jarad, Golgari Lich Lord's two halves, the printed cost whose
+      -- payment order is the payer's.
+      orderComponents =
+        [ CostComponent.Sacrifice 1 (Filter.Type.HasSubtype Subtype.Swamp),
+          CostComponent.Sacrifice 1 (Filter.Type.HasSubtype Subtype.Forest)
+        ]
    in Spec.describe s "CombatReplay" $ do
         Spec.it s "attackers round-trip through the transcript" $
           Spec.assertEqWith s "round trip" (Replay.decode attackPrompt (Replay.encode attackPrompt [oid])) (Just [oid])
@@ -440,6 +446,25 @@ combatReplaySpec s =
             s
             "identity permutation"
             (Replay.defaultAnswer (Prompt.OrderDamage decider S.alice orderDamageEvents))
+            [0, 1 :: Natural.Natural]
+        -- CR 601.2h's payment order, the third prompt carrying a [Natural]
+        -- permutation, and discriminating against the two above for their own
+        -- stated reason: a shared Response constructor would let a trigger
+        -- batch's transcript entry reorder a cost payment.
+        Spec.it s "OrderCostComponents records and replays a permutation" $ do
+          let p = Prompt.OrderCostComponents decider S.alice oid orderComponents
+              answer = [1, 0] :: [Natural.Natural]
+          Spec.assertEqWith s "round-trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "an OrderTriggers transcript entry does not answer an OrderCostComponents"
+            (Replay.decode p (Replay.encode (Prompt.OrderTriggers decider S.alice orderEntries) answer))
+            Nothing
+        Spec.it s "defaultAnswer keeps the cost's printed order" $
+          Spec.assertEqWith
+            s
+            "identity permutation"
+            (Replay.defaultAnswer (Prompt.OrderCostComponents decider S.alice oid orderComponents))
             [0, 1 :: Natural.Natural]
         Spec.it s "ChooseSacrifices records and replays a Set ObjectId" $ do
           let p = Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1

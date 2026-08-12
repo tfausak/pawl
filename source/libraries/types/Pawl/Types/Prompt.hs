@@ -15,6 +15,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -827,6 +828,25 @@ data Prompt r where
   -- CR 118.9b makes an alternative cost optional, so a player who can afford both
   -- is genuinely choosing. Asked only when two or more candidates are payable.
   ChooseCost :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Cost.Cost Keyword.Keyword] -> Prompt (Cost.Cost Keyword.Keyword)
+  -- | CR 601.2h: the player pays the total cost's non-mana parts "in any order",
+  -- so which part is paid first is theirs to choose. The ObjectId is the spell
+  -- being cast or the permanent whose ability is being activated; the
+  -- [CostComponent] is that cost's components in PRINTED order; the answer is a
+  -- permutation of their indices, first-named paid first. OrderTriggers' shape.
+  --
+  -- Asked ONCE for the whole cost rather than once per part, and no information
+  -- is lost by that: each component's own choices (ChooseSacrifices and the
+  -- rest) are still asked when that component is paid, against the board the
+  -- earlier ones left.
+  --
+  -- One prompt, not two, because CR 601.2h's second pass is empty in this
+  -- vocabulary: no component involves a random element or moves an object from a
+  -- library to a public zone, so every part is paid in the rule's first pass.
+  --
+  -- Asked only where the order is observable, which
+  -- Pawl.Engine.Cost.orderObservable decides: two or more parts that touch
+  -- objects, and not all of them equal.
+  OrderCostComponents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [CostComponent.CostComponent Keyword.Keyword] -> Prompt [Natural.Natural]
   -- | CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
   -- both halves of what a player at a table can see -- how many mulligans they
   -- have already taken, and how many cards taking another would bottom. Those
