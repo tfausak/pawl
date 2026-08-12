@@ -71,6 +71,8 @@ library codec
     Pawl.Codec.ActivationRestriction
     Pawl.Codec.ActivationRestrictionSpec
     Pawl.Codec.Affected
+    Pawl.Codec.AffectedPlayers
+    Pawl.Codec.AffectedPlayersSpec
     Pawl.Codec.AffectedSpec
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
@@ -624,6 +626,7 @@ library types
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected
+    Pawl.Types.AffectedPlayers
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost
     Pawl.Types.Asked

@@ -33,6 +33,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -1322,7 +1323,7 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     let armed =
           S.addPlayerEffect
             (Expiry.Type.AtTurnOf S.bob)
-            PlayerScope.Opponents
+            (AffectedPlayers.Scoped PlayerScope.Opponents)
             PlayerEffect.Type.CantCastSpells
             S.bob
             (S.threePlayerGame {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})

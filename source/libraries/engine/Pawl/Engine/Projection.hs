@@ -1568,6 +1568,8 @@ rewriteEffect pairs effect = case effect of
   Effect.AddPhases _ -> effect
   Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
   Effect.ArmDelayedTrigger {} -> effect
+  -- Not implemented: the Filter inside the PlayerEffect keeps its printed word
+  -- while the spell is on the stack (#1370).
   Effect.AffectPlayers {} -> effect
   -- CR 612.1 swaps a WORD, and both refs can carry one: an EachMatching's
   -- Filter is subtype-shaped exactly as Untap's is.
