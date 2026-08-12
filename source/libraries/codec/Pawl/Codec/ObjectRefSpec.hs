@@ -2,9 +2,11 @@
 
 module Pawl.Codec.ObjectRefSpec where
 
+import qualified Data.Either as Either
 import qualified Data.List as List
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ObjectRef as ObjectRef
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
@@ -18,44 +20,55 @@ import qualified Pawl.Types.SlotName as SlotName
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "InSlot" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ObjectRef.toJson
-      ObjectRef.fromJson
+      ObjectRef.codec
       (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
       """ {"type":"InSlot","value":"target"} """
   Spec.it s "EachMatching" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ObjectRef.toJson
-      ObjectRef.fromJson
+      ObjectRef.codec
       (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))
       """ {"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
   -- The one arm with two payloads, so it keeps an array -- inside the tag's
-  -- value now, rather than being the array that carried the tag.
+  -- value now, rather than being the array that carried the tag. Common.tuple
+  -- writes the same two elements the hand-written pair did.
   Spec.it s "EachCardInGraveyard" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ObjectRef.toJson
-      ObjectRef.fromJson
+      ObjectRef.codec
       (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
       """ {"type":"EachCardInGraveyard","value":[{"type":"EachPlayer"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
-  Spec.it s "EachPlayer" $
-    Common.assertJsonCodec
+  -- Common.tuple rejects any other length, which is what makes the schema's
+  -- prefixItems/minItems/maxItems a claim rather than a description. The TOO
+  -- LONG case is the discriminating one: a decoder that read the first two
+  -- elements and ignored the rest would still reject the short payload, so
+  -- testing only that proves nothing about the arm's use of Common.tuple.
+  Spec.it s "EachCardInGraveyard rejects a too-short payload" $
+    Spec.assertBool
       s
-      ObjectRef.toJson
-      ObjectRef.fromJson
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"EachCardInGraveyard","value":[{"type":"EachPlayer"}]} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
+  Spec.it s "EachCardInGraveyard rejects a too-long payload" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"EachCardInGraveyard","value":[{"type":"EachPlayer"},{"type":"HasCardType","value":{"type":"Creature"}},{"type":"EachPlayer"}]} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
+  Spec.it s "EachPlayer" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
       ObjectRef.EachPlayer
       """ {"type":"EachPlayer"} """
   Spec.it s "TopOfLibrary" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ObjectRef.toJson
-      ObjectRef.fromJson
+      ObjectRef.codec
       (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You))
       """ {"type":"TopOfLibrary","value":{"type":"Relative","value":{"type":"You"}}} """
   -- Guards against a decoder that read every payload as one arm. The arms are
-  -- now all objects, so only the tag separates them, and a duplicated tag would
+  -- all objects, so only the tag separates them, and a duplicated tag would
   -- collapse two of these.
   Spec.it s "the five arms carry five distinct tags" $
     Spec.assertEqWith
@@ -63,11 +76,11 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       "a slot, a battlefield sweep, a graveyard sweep, the player sweep and a library's top card all encode differently"
       ( length
           ( List.nub
-              [ ObjectRef.toJson (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
-                ObjectRef.toJson (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
-                ObjectRef.toJson (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)),
-                ObjectRef.toJson ObjectRef.EachPlayer,
-                ObjectRef.toJson (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You))
+              [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
+                Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)),
+                Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
+                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You))
               ]
           )
       )
@@ -76,13 +89,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool
       s
-      (either (const True) (const False) (Common.parse (Text.pack """ {"type":"EachOpponent"} """) >>= ObjectRef.fromJson))
-      "the decoder refuses a tag it does not define"
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"EachOpponent"} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
   -- A bare string was the slot arm's whole spelling before #1304. It is not a
   -- ref at all now, which is what stops a card file written against the old
   -- shape from decoding into something plausible.
   Spec.it s "a bare slot name is rejected" $
     Spec.assertBool
       s
-      (either (const True) (const False) (Common.parse (Text.pack """ "target" """) >>= ObjectRef.fromJson))
-      "the decoder refuses an untagged slot name"
+      (Either.isLeft (Common.parse (Text.pack """ "target" """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
+  Spec.it s "has a schema" $ Common.assertHasSchema s ObjectRef.codec

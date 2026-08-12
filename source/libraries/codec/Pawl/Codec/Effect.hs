@@ -55,13 +55,13 @@ import qualified Pawl.Types.Zone as Zone
 
 toJson :: (card -> Value.Value) -> Effect.Effect card -> Value.Value
 toJson codec e = case e of
-  Effect.DealDamage r q -> Common.tagged "DealDamage" (Just (Value.array [ObjectRef.toJson r, Quantity.toJson q]))
-  Effect.ModifyTarget d m r -> Common.tagged "ModifyTarget" (Just (Value.array [Duration.toJson d, Modification.toJson m, ObjectRef.toJson r]))
+  Effect.DealDamage r q -> Common.tagged "DealDamage" (Just (Value.array [Codec.encode ObjectRef.codec r, Quantity.toJson q]))
+  Effect.ModifyTarget d m r -> Common.tagged "ModifyTarget" (Just (Value.array [Duration.toJson d, Modification.toJson m, Codec.encode ObjectRef.codec r]))
   Effect.ChangeText family forbidden s ->
     Common.tagged "ChangeText" . Just . Value.array $
       [Codec.encode SubtypeFamily.codec family, Common.encodeSet (Codec.encode Subtype.codec) forbidden, Codec.encode SlotName.codec s]
   Effect.AddMana production -> Common.tagged "AddMana" (Just (Codec.encode ManaProduction.codec production))
-  Effect.Search r f d -> Common.tagged "Search" (Just (Value.array [PlayerRef.toJson r, Codec.encode (Filter.codec Keyword.codec) f, Codec.encode SearchDestination.codec d]))
+  Effect.Search r f d -> Common.tagged "Search" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode (Filter.codec Keyword.codec) f, Codec.encode SearchDestination.codec d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
   Effect.Proliferate -> Common.nullary "Proliferate"
   Effect.TemptWithTheRing -> Common.nullary "TemptWithTheRing"
@@ -74,7 +74,7 @@ toJson codec e = case e of
   -- about counting its sweep keeps its two-element payload.
   Effect.Destroy s r ms ->
     Common.tagged "Destroy" . Just . Value.array $
-      [ObjectRef.toJson s, Codec.encode Regenerability.codec r] <> fmap (Codec.encode SlotName.codec) (Maybe.maybeToList ms)
+      [Codec.encode ObjectRef.codec s, Codec.encode Regenerability.codec r] <> fmap (Codec.encode SlotName.codec) (Maybe.maybeToList ms)
   Effect.Sacrifice s -> Common.tagged "Sacrifice" (Just (Codec.encode SlotName.codec s))
   Effect.TurnFaceDown s -> Common.tagged "TurnFaceDown" (Just (Codec.encode SlotName.codec s))
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (Codec.encode SlotName.codec s))
@@ -95,26 +95,26 @@ toJson codec e = case e of
   -- from it.
   Effect.MoveToZone r z riders ms mo p ->
     Common.tagged "MoveToZone" . Just . Value.array $
-      [ObjectRef.toJson r, Codec.encode Zone.codec z]
+      [Codec.encode ObjectRef.codec r, Codec.encode Zone.codec z]
         <> (if riders == EntryRiders.defaultValue then [] else [EntryRiders.toJson riders])
         <> fmap (Codec.encode SlotName.codec) (Maybe.maybeToList ms)
         <> fmap (Codec.encode Zone.codec) (Maybe.maybeToList mo)
         <> (if p == LibraryPlacement.defaultValue then [] else [Codec.encode LibraryPlacement.codec p])
-  Effect.Draw r q -> Common.tagged "Draw" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
-  Effect.Scry r q -> Common.tagged "Scry" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
-  Effect.Surveil r q -> Common.tagged "Surveil" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
-  Effect.Fateseal r q -> Common.tagged "Fateseal" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
-  Effect.Explore r -> Common.tagged "Explore" (Just (ObjectRef.toJson r))
+  Effect.Draw r q -> Common.tagged "Draw" (Just (Value.array [Codec.encode PlayerRef.codec r, Quantity.toJson q]))
+  Effect.Scry r q -> Common.tagged "Scry" (Just (Value.array [Codec.encode PlayerRef.codec r, Quantity.toJson q]))
+  Effect.Surveil r q -> Common.tagged "Surveil" (Just (Value.array [Codec.encode PlayerRef.codec r, Quantity.toJson q]))
+  Effect.Fateseal r q -> Common.tagged "Fateseal" (Just (Value.array [Codec.encode PlayerRef.codec r, Quantity.toJson q]))
+  Effect.Explore r -> Common.tagged "Explore" (Just (Codec.encode ObjectRef.codec r))
   -- The tally is ELIDED when absent, as Destroy's bound-count slot is, so a mill
   -- nothing looks back at keeps its two-element payload.
   Effect.Mill r q mt ->
     Common.tagged "Mill" . Just . Value.array $
-      [PlayerRef.toJson r, Quantity.toJson q] <> fmap MillTally.toJson (Maybe.maybeToList mt)
+      [Codec.encode PlayerRef.codec r, Quantity.toJson q] <> fmap MillTally.toJson (Maybe.maybeToList mt)
   Effect.Discard s q -> Common.tagged "Discard" (Just (Value.array [Codec.encode SlotName.codec s, Quantity.toJson q]))
-  Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
-  Effect.GainLife r q -> Common.tagged "GainLife" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
+  Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Value.array [Codec.encode PlayerRef.codec r, Quantity.toJson q]))
+  Effect.GainLife r q -> Common.tagged "GainLife" (Just (Value.array [Codec.encode PlayerRef.codec r, Quantity.toJson q]))
   Effect.ExchangeLifeTotals sides -> Common.tagged "ExchangeLifeTotals" (Just (ExchangeSides.toJson sides))
-  Effect.IncreaseSpeed r q -> Common.tagged "IncreaseSpeed" (Just (Value.array [PlayerRef.toJson r, Quantity.toJson q]))
+  Effect.IncreaseSpeed r q -> Common.tagged "IncreaseSpeed" (Just (Value.array [Codec.encode PlayerRef.codec r, Quantity.toJson q]))
   -- Create's payload is positional, and the EntryRiders are ELIDED when they
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
   -- told apart on decode by JSON TYPE rather than by position: a slot name is a
@@ -129,30 +129,30 @@ toJson codec e = case e of
   -- ObjectRef it has always had, and only a card that mints several spells the
   -- pair out.
   Effect.CreateCopy q r
-    | q == Quantity.Literal 1 -> Common.tagged "CreateCopy" (Just (ObjectRef.toJson r))
-    | otherwise -> Common.tagged "CreateCopy" (Just (Value.array [Quantity.toJson q, ObjectRef.toJson r]))
+    | q == Quantity.Literal 1 -> Common.tagged "CreateCopy" (Just (Codec.encode ObjectRef.codec r))
+    | otherwise -> Common.tagged "CreateCopy" (Just (Value.array [Quantity.toJson q, Codec.encode ObjectRef.codec r]))
   Effect.Replace d u o c re ->
     Common.tagged "Replace" . Just . Value.array $
       [Duration.toJson d, Codec.encode Uses.codec u, Codec.encode ReplacementOrigin.codec o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
-  Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Value.array [PlayerRef.toJson r, Codec.encode PhaseSelector.codec sel]))
+  Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode PhaseSelector.codec sel]))
   -- CR 615.5's additional effect is ELIDED when it is empty, which is Create's
   -- posture above and every other prevention in the corpus: a shield with no
   -- rider stays the three-element form it has always had.
   Effect.PreventNextDamage d r q rider ->
     Common.tagged "PreventNextDamage" . Just . Value.array $
-      [Duration.toJson d, ObjectRef.toJson r, Quantity.toJson q]
+      [Duration.toJson d, Codec.encode ObjectRef.codec r, Quantity.toJson q]
         <> [Common.encodeSeq (toJson codec) rider | not (Seq.null rider)]
-  Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Value.array [Duration.toJson d, ObjectRef.toJson r]))
-  Effect.RedirectDamage d k f t -> Common.tagged "RedirectDamage" (Just (Value.array [Duration.toJson d, Common.encodeMaybe (Codec.encode DamageKind.codec) k, ObjectRef.toJson f, ObjectRef.toJson t]))
-  Effect.PutCounters k q r -> Common.tagged "PutCounters" (Just (Value.array [Codec.encode (CounterKind.codec Keyword.codec) k, Quantity.toJson q, ObjectRef.toJson r]))
+  Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Value.array [Duration.toJson d, Codec.encode ObjectRef.codec r]))
+  Effect.RedirectDamage d k f t -> Common.tagged "RedirectDamage" (Just (Value.array [Duration.toJson d, Common.encodeMaybe (Codec.encode DamageKind.codec) k, Codec.encode ObjectRef.codec f, Codec.encode ObjectRef.codec t]))
+  Effect.PutCounters k q r -> Common.tagged "PutCounters" (Just (Value.array [Codec.encode (CounterKind.codec Keyword.codec) k, Quantity.toJson q, Codec.encode ObjectRef.codec r]))
   Effect.RemoveCounters k q s -> Common.tagged "RemoveCounters" (Just (Value.array [Codec.encode (CounterKind.codec Keyword.codec) k, Quantity.toJson q, Codec.encode SlotName.codec s]))
-  Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Value.array [PlayerRef.toJson r, Codec.encode PlayerCounterKind.codec k, Quantity.toJson q]))
-  Effect.RemovePlayerCounters r k q -> Common.tagged "RemovePlayerCounters" (Just (Value.array [PlayerRef.toJson r, Codec.encode PlayerCounterKind.codec k, Quantity.toJson q]))
-  Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
-  Effect.Untap r -> Common.tagged "Untap" (Just (ObjectRef.toJson r))
-  Effect.Transform r -> Common.tagged "Transform" (Just (ObjectRef.toJson r))
+  Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode PlayerCounterKind.codec k, Quantity.toJson q]))
+  Effect.RemovePlayerCounters r k q -> Common.tagged "RemovePlayerCounters" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode PlayerCounterKind.codec k, Quantity.toJson q]))
+  Effect.Tap r -> Common.tagged "Tap" (Just (Codec.encode ObjectRef.codec r))
+  Effect.Untap r -> Common.tagged "Untap" (Just (Codec.encode ObjectRef.codec r))
+  Effect.Transform r -> Common.tagged "Transform" (Just (Codec.encode ObjectRef.codec r))
   Effect.AddPhases ps -> Common.tagged "AddPhases" (Just (Value.array (fmap (Codec.encode ExtraPhase.codec) ps)))
-  Effect.GainControl d r -> Common.tagged "GainControl" (Just (Value.array [Duration.toJson d, ObjectRef.toJson r]))
+  Effect.GainControl d r -> Common.tagged "GainControl" (Just (Value.array [Duration.toJson d, Codec.encode ObjectRef.codec r]))
   -- The duration is ELIDED when absent (CR 603.7b's default) and the onset when
   -- it is CR 603.7a's default, so a one-shot entry stays a bare ability name
   -- and a stated duration alone writes the two-element form. A stated onset
@@ -164,11 +164,11 @@ toJson codec e = case e of
     (Onset.Immediately, Just d) -> Value.array [Codec.encode AbilityName.codec n, Duration.toJson d]
     _ -> Value.array [Codec.encode AbilityName.codec n, Codec.encode Onset.codec o, Common.encodeMaybe Duration.toJson md]
   Effect.AffectPlayers d s pe -> Common.tagged "AffectPlayers" (Just (Value.array [Duration.toJson d, Codec.encode PlayerScope.codec s, PlayerEffect.toJson pe]))
-  Effect.RequireBlock d b a -> Common.tagged "RequireBlock" (Just (Value.array [Duration.toJson d, ObjectRef.toJson b, ObjectRef.toJson a]))
+  Effect.RequireBlock d b a -> Common.tagged "RequireBlock" (Just (Value.array [Duration.toJson d, Codec.encode ObjectRef.codec b, Codec.encode ObjectRef.codec a]))
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (MonarchTarget.toJson t))
   Effect.Designate d s -> Common.tagged "Designate" (Just (Value.array [Designation.toJson d, Codec.encode SlotName.codec s]))
-  Effect.Unsuspect r -> Common.tagged "Unsuspect" (Just (ObjectRef.toJson r))
+  Effect.Unsuspect r -> Common.tagged "Unsuspect" (Just (Codec.encode ObjectRef.codec r))
   Effect.Evolve s -> Common.tagged "Evolve" (Just (Codec.encode SlotName.codec s))
   Effect.Mentor s -> Common.tagged "Mentor" (Just (Codec.encode SlotName.codec s))
   Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Codec.encode Daytime.codec d))
@@ -176,7 +176,7 @@ toJson codec e = case e of
   Effect.Attach s -> Common.tagged "Attach" (Just (Codec.encode SlotName.codec s))
   Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Value.array [Codec.encode SlotName.codec s, Codec.encode (Filter.codec Keyword.codec) f]))
   Effect.PlaySubgame s -> Common.tagged "PlaySubgame" (Just (Codec.encode SlotName.codec s))
-  Effect.TakeExtraTurn r skips -> Common.tagged "TakeExtraTurn" (Just (Value.array [PlayerRef.toJson r, Common.encodeSet (Codec.encode PhaseSelector.codec) skips]))
+  Effect.TakeExtraTurn r skips -> Common.tagged "TakeExtraTurn" (Just (Value.array [Codec.encode PlayerRef.codec r, Common.encodeSet (Codec.encode PhaseSelector.codec) skips]))
   -- The library-naming PlayerRef is ELIDED when absent, Mill's tally posture:
   -- Riftsweeper's derived owner (CR 701.24) keeps the bare ObjectRef it has
   -- always had, and only a card naming the library spells the pair out.
@@ -187,8 +187,8 @@ toJson codec e = case e of
   -- and the decode below had to guard on its head being an object to tell the
   -- two apart; now that no ObjectRef is ever an array, the arity alone decides.
   Effect.ShuffleIntoLibrary mp r -> case mp of
-    Nothing -> Common.tagged "ShuffleIntoLibrary" (Just (ObjectRef.toJson r))
-    Just p -> Common.tagged "ShuffleIntoLibrary" (Just (Value.array [PlayerRef.toJson p, ObjectRef.toJson r]))
+    Nothing -> Common.tagged "ShuffleIntoLibrary" (Just (Codec.encode ObjectRef.codec r))
+    Just p -> Common.tagged "ShuffleIntoLibrary" (Just (Value.array [Codec.encode PlayerRef.codec p, Codec.encode ObjectRef.codec r]))
   -- The slot alone when the offer carries neither of CR 310.11b's riders, which
   -- is an ordinary cast of the card; the pair otherwise. Elided the way
   -- MoveToZone's EntryRiders are, and told apart on decode by JSON TYPE.
@@ -197,7 +197,7 @@ toJson codec e = case e of
       if offer == CastOffer.defaultValue
         then Codec.encode SlotName.codec s
         else Value.array [Codec.encode SlotName.codec s, Codec.encode CastOffer.codec offer]
-  Effect.GrantPlayFromExile d r -> Common.tagged "GrantPlayFromExile" (Just (Value.array [Duration.toJson d, ObjectRef.toJson r]))
+  Effect.GrantPlayFromExile d r -> Common.tagged "GrantPlayFromExile" (Just (Value.array [Duration.toJson d, Codec.encode ObjectRef.codec r]))
 
 -- Everything a MoveToZone payload may carry after its ObjectRef and its
 -- destination zone: the EntryRiders (CR 110.5b), the slot binding the destination
@@ -253,10 +253,10 @@ fromJson decode value = do
   (t, mv) <- Common.asTagged value
   case t of
     "DealDamage" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.DealDamage <$> ObjectRef.fromJson r <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.DealDamage <$> Codec.decode ObjectRef.codec r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "DealDamage expects [objectRef, quantity]"
     "ModifyTarget" -> case mv of
-      Just (Value.Array (Array.MkArray [d, m, r])) -> Effect.ModifyTarget <$> Duration.fromJson d <*> Modification.fromJson m <*> ObjectRef.fromJson r
+      Just (Value.Array (Array.MkArray [d, m, r])) -> Effect.ModifyTarget <$> Duration.fromJson d <*> Modification.fromJson m <*> Codec.decode ObjectRef.codec r
       _ -> Left . Text.pack $ "ModifyTarget expects [duration, modification, objectRef]"
     "ChangeText" -> case mv of
       Just (Value.Array (Array.MkArray [fv, xv, sv])) ->
@@ -264,7 +264,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "ChangeText expects [subtypeFamily, forbiddenSubtypes, slot]"
     "AddMana" -> Common.withValue mv (fmap Effect.AddMana . Codec.decode ManaProduction.codec)
     "Search" -> case mv of
-      Just (Value.Array (Array.MkArray [r, f, d])) -> Effect.Search <$> PlayerRef.fromJson r <*> Codec.decode (Filter.codec Keyword.codec) f <*> Codec.decode SearchDestination.codec d
+      Just (Value.Array (Array.MkArray [r, f, d])) -> Effect.Search <$> Codec.decode PlayerRef.codec r <*> Codec.decode (Filter.codec Keyword.codec) f <*> Codec.decode SearchDestination.codec d
       _ -> Left . Text.pack $ "Search expects [player, filter, destination]"
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
@@ -277,8 +277,8 @@ fromJson decode value = do
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> Common.withValue mv (fmap Effect.ControlPlayerNextTurn . Codec.decode SlotName.codec)
     "Destroy" -> case mv of
-      Just (Value.Array (Array.MkArray [sv, rv])) -> Effect.Destroy <$> ObjectRef.fromJson sv <*> Codec.decode Regenerability.codec rv <*> pure Nothing
-      Just (Value.Array (Array.MkArray [sv, rv, nv])) -> Effect.Destroy <$> ObjectRef.fromJson sv <*> Codec.decode Regenerability.codec rv <*> (Just <$> Codec.decode SlotName.codec nv)
+      Just (Value.Array (Array.MkArray [sv, rv])) -> Effect.Destroy <$> Codec.decode ObjectRef.codec sv <*> Codec.decode Regenerability.codec rv <*> pure Nothing
+      Just (Value.Array (Array.MkArray [sv, rv, nv])) -> Effect.Destroy <$> Codec.decode ObjectRef.codec sv <*> Codec.decode Regenerability.codec rv <*> (Just <$> Codec.decode SlotName.codec nv)
       _ -> Left . Text.pack $ "Destroy expects [objectRef, regenerability], optionally with a slot"
     "Sacrifice" -> Common.withValue mv (fmap Effect.Sacrifice . Codec.decode SlotName.codec)
     "TurnFaceDown" -> Common.withValue mv (fmap Effect.TurnFaceDown . Codec.decode SlotName.codec)
@@ -290,37 +290,37 @@ fromJson decode value = do
     "MoveToZone" -> case mv of
       Just (Value.Array (Array.MkArray (r : z : rest))) -> do
         (riders, mSlot, mOrigin, placement) <- moveTail rest
-        Effect.MoveToZone <$> ObjectRef.fromJson r <*> Codec.decode Zone.codec z <*> pure riders <*> pure mSlot <*> pure mOrigin <*> pure placement
+        Effect.MoveToZone <$> Codec.decode ObjectRef.codec r <*> Codec.decode Zone.codec z <*> pure riders <*> pure mSlot <*> pure mOrigin <*> pure placement
       _ -> Left . Text.pack $ "MoveToZone expects [objectRef, zone], optionally with EntryRiders, a slot, an origin zone and/or a library placement"
     "Draw" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Draw <$> PlayerRef.fromJson r <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Draw <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Draw expects [playerRef, quantity]"
     "Scry" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Scry <$> PlayerRef.fromJson r <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Scry <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Scry expects [playerRef, quantity]"
     "Surveil" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Surveil <$> PlayerRef.fromJson r <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Surveil <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Surveil expects [playerRef, quantity]"
     "Fateseal" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Fateseal <$> PlayerRef.fromJson r <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Fateseal <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Fateseal expects [playerRef, quantity]"
-    "Explore" -> Common.withValue mv (fmap Effect.Explore . ObjectRef.fromJson)
+    "Explore" -> Common.withValue mv (fmap Effect.Explore . Codec.decode ObjectRef.codec)
     "Mill" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Mill <$> PlayerRef.fromJson r <*> Quantity.fromJson q <*> pure Nothing
-      Just (Value.Array (Array.MkArray [r, q, tv])) -> Effect.Mill <$> PlayerRef.fromJson r <*> Quantity.fromJson q <*> (Just <$> MillTally.fromJson tv)
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Mill <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q <*> pure Nothing
+      Just (Value.Array (Array.MkArray [r, q, tv])) -> Effect.Mill <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q <*> (Just <$> MillTally.fromJson tv)
       _ -> Left . Text.pack $ "Mill expects [playerRef, quantity], optionally with a tally"
     "Discard" -> case mv of
       Just (Value.Array (Array.MkArray [s, q])) -> Effect.Discard <$> Codec.decode SlotName.codec s <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Discard expects [slot, quantity]"
     "LoseLife" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.LoseLife <$> PlayerRef.fromJson r <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.LoseLife <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "LoseLife expects [playerRef, quantity]"
     "GainLife" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.GainLife <$> PlayerRef.fromJson r <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.GainLife <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "GainLife expects [playerRef, quantity]"
     "ExchangeLifeTotals" -> Common.withValue mv (fmap Effect.ExchangeLifeTotals . ExchangeSides.fromJson)
     "IncreaseSpeed" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.IncreaseSpeed <$> PlayerRef.fromJson r <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.IncreaseSpeed <$> Codec.decode PlayerRef.codec r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "IncreaseSpeed expects [playerRef, quantity]"
     -- The three-element form is read by JSON type: an Object is the
     -- EntryRiders, anything else is the slot name, which is what lets the
@@ -337,8 +337,8 @@ fromJson decode value = do
     -- one -- ObjectRef.EachCardInGraveyard -- falls through to the bare-ref
     -- branch and is unaffected.
     "CreateCopy" -> case mv of
-      Just (Value.Array (Array.MkArray [q, r])) -> Effect.CreateCopy <$> Quantity.fromJson q <*> ObjectRef.fromJson r
-      _ -> Common.withValue mv (fmap (Effect.CreateCopy (Quantity.Literal 1)) . ObjectRef.fromJson)
+      Just (Value.Array (Array.MkArray [q, r])) -> Effect.CreateCopy <$> Quantity.fromJson q <*> Codec.decode ObjectRef.codec r
+      _ -> Common.withValue mv (fmap (Effect.CreateCopy (Quantity.Literal 1)) . Codec.decode ObjectRef.codec)
     -- The three shapes the encoder above can emit, told apart by LENGTH.
     "ArmDelayedTrigger" -> case mv of
       Just (Value.Array (Array.MkArray [n, o, d])) ->
@@ -356,52 +356,52 @@ fromJson decode value = do
         pure (Effect.Replace duration uses origin condition effect)
       _ -> Left . Text.pack $ "Replace expects [Duration, Uses, ReplacementOrigin, Maybe Condition, ReplacementEffect]"
     "SkipNextPhase" -> case mv of
-      Just (Value.Array (Array.MkArray [r, sel])) -> Effect.SkipNextPhase <$> PlayerRef.fromJson r <*> Codec.decode PhaseSelector.codec sel
+      Just (Value.Array (Array.MkArray [r, sel])) -> Effect.SkipNextPhase <$> Codec.decode PlayerRef.codec r <*> Codec.decode PhaseSelector.codec sel
       _ -> Left . Text.pack $ "SkipNextPhase expects [playerRef, phaseSelector]"
     "PreventNextDamage" -> case mv of
-      Just (Value.Array (Array.MkArray [d, r, q])) -> Effect.PreventNextDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r <*> Quantity.fromJson q <*> pure Seq.empty
+      Just (Value.Array (Array.MkArray [d, r, q])) -> Effect.PreventNextDamage <$> Duration.fromJson d <*> Codec.decode ObjectRef.codec r <*> Quantity.fromJson q <*> pure Seq.empty
       Just (Value.Array (Array.MkArray [d, r, q, rider])) ->
-        Effect.PreventNextDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r <*> Quantity.fromJson q <*> Common.decodeSeq (fromJson decode) rider
+        Effect.PreventNextDamage <$> Duration.fromJson d <*> Codec.decode ObjectRef.codec r <*> Quantity.fromJson q <*> Common.decodeSeq (fromJson decode) rider
       _ -> Left . Text.pack $ "PreventNextDamage expects [Duration, ObjectRef, Quantity], optionally with a CR 615.5 rider"
     "PreventAllDamage" -> case mv of
-      Just (Value.Array (Array.MkArray [d, r])) -> Effect.PreventAllDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r
+      Just (Value.Array (Array.MkArray [d, r])) -> Effect.PreventAllDamage <$> Duration.fromJson d <*> Codec.decode ObjectRef.codec r
       _ -> Left . Text.pack $ "PreventAllDamage expects [Duration, ObjectRef]"
     "RedirectDamage" -> case mv of
-      Just (Value.Array (Array.MkArray [d, k, from, to])) -> Effect.RedirectDamage <$> Duration.fromJson d <*> Common.decodeMaybe (Codec.decode DamageKind.codec) k <*> ObjectRef.fromJson from <*> ObjectRef.fromJson to
+      Just (Value.Array (Array.MkArray [d, k, from, to])) -> Effect.RedirectDamage <$> Duration.fromJson d <*> Common.decodeMaybe (Codec.decode DamageKind.codec) k <*> Codec.decode ObjectRef.codec from <*> Codec.decode ObjectRef.codec to
       _ -> Left . Text.pack $ "RedirectDamage expects [Duration, Maybe DamageKind, ObjectRef, ObjectRef]"
     "PutCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [k, q, r])) -> Effect.PutCounters <$> Codec.decode (CounterKind.codec Keyword.codec) k <*> Quantity.fromJson q <*> ObjectRef.fromJson r
+      Just (Value.Array (Array.MkArray [k, q, r])) -> Effect.PutCounters <$> Codec.decode (CounterKind.codec Keyword.codec) k <*> Quantity.fromJson q <*> Codec.decode ObjectRef.codec r
       _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, objectRef]"
     "RemoveCounters" -> case mv of
       Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.RemoveCounters <$> Codec.decode (CounterKind.codec Keyword.codec) k <*> Quantity.fromJson q <*> Codec.decode SlotName.codec s
       _ -> Left . Text.pack $ "RemoveCounters expects [counterKind, quantity, slot]"
     "GainPlayerCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> PlayerRef.fromJson r <*> Codec.decode PlayerCounterKind.codec k <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> Codec.decode PlayerRef.codec r <*> Codec.decode PlayerCounterKind.codec k <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]"
     "RemovePlayerCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.RemovePlayerCounters <$> PlayerRef.fromJson r <*> Codec.decode PlayerCounterKind.codec k <*> Quantity.fromJson q
+      Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.RemovePlayerCounters <$> Codec.decode PlayerRef.codec r <*> Codec.decode PlayerCounterKind.codec k <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "RemovePlayerCounters expects [playerRef, playerCounterKind, quantity]"
-    "Tap" -> Common.withValue mv (fmap Effect.Tap . ObjectRef.fromJson)
-    "Untap" -> Common.withValue mv (fmap Effect.Untap . ObjectRef.fromJson)
-    "Transform" -> Common.withValue mv (fmap Effect.Transform . ObjectRef.fromJson)
+    "Tap" -> Common.withValue mv (fmap Effect.Tap . Codec.decode ObjectRef.codec)
+    "Untap" -> Common.withValue mv (fmap Effect.Untap . Codec.decode ObjectRef.codec)
+    "Transform" -> Common.withValue mv (fmap Effect.Transform . Codec.decode ObjectRef.codec)
     "AddPhases" -> case mv of
       Just (Value.Array (Array.MkArray ps)) -> Effect.AddPhases <$> traverse (Codec.decode ExtraPhase.codec) ps
       _ -> Left . Text.pack $ "AddPhases expects [ExtraPhase]"
     "GainControl" -> case mv of
-      Just (Value.Array (Array.MkArray [d, r])) -> Effect.GainControl <$> Duration.fromJson d <*> ObjectRef.fromJson r
+      Just (Value.Array (Array.MkArray [d, r])) -> Effect.GainControl <$> Duration.fromJson d <*> Codec.decode ObjectRef.codec r
       _ -> Left . Text.pack $ "GainControl expects [duration, objectRef]"
     "AffectPlayers" -> case mv of
       Just (Value.Array (Array.MkArray [d, s, pe])) -> Effect.AffectPlayers <$> Duration.fromJson d <*> Codec.decode PlayerScope.codec s <*> PlayerEffect.fromJson pe
       _ -> Left . Text.pack $ "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]"
     "RequireBlock" -> case mv of
-      Just (Value.Array (Array.MkArray [d, b, a])) -> Effect.RequireBlock <$> Duration.fromJson d <*> ObjectRef.fromJson b <*> ObjectRef.fromJson a
+      Just (Value.Array (Array.MkArray [d, b, a])) -> Effect.RequireBlock <$> Duration.fromJson d <*> Codec.decode ObjectRef.codec b <*> Codec.decode ObjectRef.codec a
       _ -> Left . Text.pack $ "RequireBlock expects [Duration, ObjectRef, ObjectRef]"
     "CreateEmblem" -> Common.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Common.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)
     "Designate" -> case mv of
       Just (Value.Array (Array.MkArray [d, s])) -> Effect.Designate <$> Designation.fromJson d <*> Codec.decode SlotName.codec s
       _ -> Left . Text.pack $ "Designate expects [designation, slot]"
-    "Unsuspect" -> Common.withValue mv (fmap Effect.Unsuspect . ObjectRef.fromJson)
+    "Unsuspect" -> Common.withValue mv (fmap Effect.Unsuspect . Codec.decode ObjectRef.codec)
     "Evolve" -> Common.withValue mv (fmap Effect.Evolve . Codec.decode SlotName.codec)
     "Mentor" -> Common.withValue mv (fmap Effect.Mentor . Codec.decode SlotName.codec)
     "ItBecomes" -> Common.withValue mv (fmap Effect.ItBecomes . Codec.decode Daytime.codec)
@@ -412,16 +412,16 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "AttachTarget expects [slot, filter]"
     "PlaySubgame" -> Common.withValue mv (fmap Effect.PlaySubgame . Codec.decode SlotName.codec)
     "TakeExtraTurn" -> case mv of
-      Just (Value.Array (Array.MkArray [r, skips])) -> Effect.TakeExtraTurn <$> PlayerRef.fromJson r <*> Common.decodeSet (Codec.decode PhaseSelector.codec) skips
+      Just (Value.Array (Array.MkArray [r, skips])) -> Effect.TakeExtraTurn <$> Codec.decode PlayerRef.codec r <*> Common.decodeSet (Codec.decode PhaseSelector.codec) skips
       _ -> Left . Text.pack $ "TakeExtraTurn expects [playerRef, phaseSelectors]"
     "ShuffleIntoLibrary" -> case mv of
       Just (Value.Array (Array.MkArray [p, r])) ->
-        Effect.ShuffleIntoLibrary <$> fmap Just (PlayerRef.fromJson p) <*> ObjectRef.fromJson r
-      _ -> Common.withValue mv (fmap (Effect.ShuffleIntoLibrary Nothing) . ObjectRef.fromJson)
+        Effect.ShuffleIntoLibrary <$> fmap Just (Codec.decode PlayerRef.codec p) <*> Codec.decode ObjectRef.codec r
+      _ -> Common.withValue mv (fmap (Effect.ShuffleIntoLibrary Nothing) . Codec.decode ObjectRef.codec)
     "OfferCast" -> case mv of
       Just (Value.Array (Array.MkArray [s, o])) -> Effect.OfferCast <$> Codec.decode SlotName.codec s <*> Codec.decode CastOffer.codec o
       _ -> Common.withValue mv (fmap (\s -> Effect.OfferCast s CastOffer.defaultValue) . Codec.decode SlotName.codec)
     "GrantPlayFromExile" -> case mv of
-      Just (Value.Array (Array.MkArray [d, r])) -> Effect.GrantPlayFromExile <$> Duration.fromJson d <*> ObjectRef.fromJson r
+      Just (Value.Array (Array.MkArray [d, r])) -> Effect.GrantPlayFromExile <$> Duration.fromJson d <*> Codec.decode ObjectRef.codec r
       _ -> Left . Text.pack $ "GrantPlayFromExile expects [duration, objectRef]"
     _ -> Left . Text.pack $ "unknown Effect: " <> t
