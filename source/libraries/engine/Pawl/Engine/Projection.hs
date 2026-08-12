@@ -1592,13 +1592,15 @@ swapWordIn family pairs word = List.foldl' step word pairs
     step s (from, to) = if s == from && Subtype.inFamily family from then to else s
 
 -- CR 612.1 through an ObjectRef. InSlot names an object chosen at cast time
--- rather than a word on the card; EachMatching's Filter is card text like any
--- other. EachPlayer and TopOfLibrary carry no word at all -- CR 612.1 changes
+-- rather than a word on the card; the two sweeping arms' Filters are card text
+-- like any other, and a graveyard sweep's PlayerScope names players rather than
+-- subtypes. EachPlayer and TopOfLibrary carry no word at all -- CR 612.1 changes
 -- subtype words, and "each player" and "the top card of your library" have none.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
+  ObjectRef.EachCardInGraveyard s f -> ObjectRef.EachCardInGraveyard s (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
   ObjectRef.TopOfLibrary _ -> ref
 
