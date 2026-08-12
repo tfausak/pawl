@@ -21,6 +21,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -280,3 +281,10 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.ControlChanged (ObjectId.MkObjectId 8) (PlayerId.MkPlayerId 2) (PlayerId.MkPlayerId 3))
       """ {"type":"ControlChanged","value":[8,2,3]} """
+  Spec.it s "VentureMarkerEntered" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.VentureMarkerEntered (PlayerId.MkPlayerId 1) (ObjectId.MkObjectId 4) (RoomIndex.MkRoomIndex 2))
+      """ {"type":"VentureMarkerEntered","value":[1,4,2]} """

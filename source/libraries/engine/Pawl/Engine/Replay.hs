@@ -55,6 +55,7 @@ encode p answer = case p of
   Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
   Prompt.ChooseRingBearer {} -> Response.ChoseRingBearer answer
+  Prompt.ChooseRoom {} -> Response.ChoseRoom answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.ChooseAttackTarget {} -> Response.ChoseAttackTarget answer
@@ -149,6 +150,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseRingBearer {} -> case response of
     Response.ChoseRingBearer oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseRoom {} -> case response of
+    Response.ChoseRoom room -> Just room
     _ -> Nothing
   Prompt.ChooseLegend {} -> case response of
     Response.ChoseLegend oid -> Just oid
@@ -345,6 +349,9 @@ defaultAnswer p = case p of
   -- CR 701.54a: the prompt is only raised with two or more creatures the player
   -- controls, and every one of them is a legal Ring-bearer.
   Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
+  -- CR 309.5a: the prompt is only raised where two or more arrows leave the
+  -- room, and every one of them is a room the marker may move into.
+  Prompt.ChooseRoom _ _ _ candidates -> NonEmpty.head candidates
   -- CR 704.5j: every candidate is a legal thing to keep.
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   -- Declining to ATTACK is not always legal -- a CR 508.1d requirement (Curse

@@ -847,6 +847,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.TemptWithTheRing
       """ {"type":"TemptWithTheRing"} """
+  -- CR 701.49: nullary for TemptWithTheRing's reason -- rule 701.49 fixes the
+  -- venturer and which dungeon, leaving an author nothing to write.
+  Spec.it s "Venture" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.Venture
+      """ {"type":"Venture"} """
   Spec.it s "PlayerSacrifices" $
     Common.assertJsonCodec
       s

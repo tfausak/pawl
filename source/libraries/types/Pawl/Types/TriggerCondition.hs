@@ -9,6 +9,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -978,4 +979,18 @@ data TriggerCondition
     -- spending CR 603.7b's one shot -- unobservable, since the ability could only
     -- act on an object CR 400.7 has already replaced with a new one.
     LoseControlOfBound SlotName.SlotName
+  | -- | CR 309.4c: "When you move your venture marker into this room" -- the
+    -- trigger condition every room ability has and no dungeon card prints. Fires
+    -- against GameEvent.VentureMarkerEntered naming the bearer and this room.
+    --
+    -- Self-scoped through the bearer AND the room index, SelfHalfUnlocked's shape
+    -- and for its reason: a dungeon has one ability per room, all of them borne by
+    -- the same card, and only the room separates them. "This room" is what the
+    -- index names.
+    --
+    -- Never written by card data -- Pawl.Codec.TriggerCondition round-trips it like
+    -- any other, but no dungeon prints it. Pawl.Engine.Dungeon mints one per room
+    -- of Pawl.Types.Face.rooms, which is why Pawl.Types.DungeonRoom carries a bare
+    -- Modal rather than a whole TriggeredAbility.
+    RoomEntered RoomIndex.RoomIndex
   deriving (Eq, Ord, Show)

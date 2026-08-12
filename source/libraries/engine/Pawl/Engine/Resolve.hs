@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
@@ -219,6 +220,7 @@ slotsOf effect = case effect of
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
   Effect.TemptWithTheRing -> Map.empty
+  Effect.Venture -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
   Effect.PlayerSacrifices slot _ quantity -> insertOne slot (quantitySlots quantity)
   Effect.RestartGame -> Map.empty
@@ -434,6 +436,7 @@ slotsAreExhaustive effect = case effect of
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.TemptWithTheRing -> True
+  Effect.Venture -> True
   Effect.ExileHandThenDraw -> True
   Effect.PlayerSacrifices _ _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.RestartGame -> True
@@ -552,6 +555,7 @@ readsX = any effectReadsX
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       Effect.TemptWithTheRing -> False
+      Effect.Venture -> False
       Effect.ExileHandThenDraw -> False
       Effect.PlayerSacrifices _ _ quantity -> Quantity.readsX quantity
       Effect.RestartGame -> False
@@ -615,6 +619,7 @@ searchesLibrary effect = case effect of
   Effect.Search {} -> True
   Effect.Proliferate -> False
   Effect.TemptWithTheRing -> False
+  Effect.Venture -> False
   Effect.PlayerSacrifices {} -> False
   Effect.DealDamage _ _ -> False
   Effect.ModifyTarget {} -> False
@@ -756,6 +761,7 @@ boundSlots effect = case effect of
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
+  Effect.Venture -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty
   Effect.RestartGame -> Set.empty
@@ -3583,6 +3589,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- this arm knows only that some effect asked for it, exactly as the arms around
   -- it know only that some effect asked for a counter or a card.
   Effect.TemptWithTheRing -> Ring.tempt controller
+  -- CR 701.49: the whole keyword action, which Pawl.Engine.Dungeon owns.
+  Effect.Venture -> Dungeon.venture controller
   Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

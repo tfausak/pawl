@@ -483,6 +483,7 @@ activateAbility pid srcId ability = do
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
+            Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False

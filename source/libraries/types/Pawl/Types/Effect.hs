@@ -899,6 +899,23 @@ data Effect card
     -- those actions were impossible" is why that is one procedure ending in a
     -- count rather than a chain that can stop early.
     TemptWithTheRing
+  | -- | CR 701.49: the resolving controller ventures into the dungeon -- they enter
+    -- the dungeon they own if they are in none (CR 701.49a), and otherwise move
+    -- their venture marker along one arrow to the next room (CR 701.49b).
+    --
+    -- CHOOSE, not target, TemptWithTheRing's posture and for its reason: CR 701.49b
+    -- has the player choose an arrow on RESOLUTION, via Prompt.ChooseRoom, so
+    -- nothing here is subject to CR 608.2b's illegal-target check and no SlotName is
+    -- carried.
+    --
+    -- Nullary, because rule 701.49 fixes everything an author could vary: the
+    -- venturer is "you", and which dungeon is answered by CR 701.49a from the cards
+    -- that player owns rather than by the card that says to venture. CR 701.49d's
+    -- "venture into [quality]" -- the variant that names a particular dungeon --
+    -- would be the one payload, and has no producer here (#1334).
+    --
+    -- Performed by Pawl.Engine.Dungeon.venture.
+    Venture
   | -- | CR 701.21a: the slot's target PLAYER sacrifices this many permanents
     -- matching the Filter, chosen by that player. Diabolic Edict's exact shape.
     --

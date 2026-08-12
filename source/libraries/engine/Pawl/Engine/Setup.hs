@@ -85,7 +85,10 @@ emptyGame order =
               -- CR 903.10a counts "over the course of the game", and no
               -- commander has dealt anybody anything in one that has not
               -- started.
-              Player.commanderDamage = Map.empty
+              Player.commanderDamage = Map.empty,
+              -- CR 309.2: dungeon cards begin outside the game, and which one a
+              -- player brought is their deck's business -- createDeck below.
+              Player.dungeon = Nothing
             }
         )
    in GameState.MkGameState
@@ -170,6 +173,7 @@ createCard pid printing = do
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
+            Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
             Object.kicked = False
@@ -201,7 +205,11 @@ createDeck pid deck = do
   State.modify' $ \gs ->
     gs
       { GameState.players =
-          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck)}) pid (GameState.players gs)
+          -- CR 309.2: the dungeon card is recorded on the player and no object is
+          -- minted for it, because dungeon cards begin OUTSIDE the game and
+          -- outside the game is not a zone (CR 400.11). CR 701.49a is what brings
+          -- it in; Pawl.Engine.Dungeon.enter is that rule.
+          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeon = Deck.dungeon deck}) pid (GameState.players gs)
       }
   Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printing)

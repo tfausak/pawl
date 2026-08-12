@@ -89,6 +89,20 @@ data Player = MkPlayer
     -- printing per player (CR 903.3 designates one card), so the owner names
     -- exactly one commander today. Partner and background decks, which give a
     -- player two, would need a finer key (#939).
-    commanderDamage :: Map.Map PlayerId.PlayerId Natural.Natural
+    commanderDamage :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- | CR 309.2 \/ 309.2a: the dungeon card this player owns from outside the
+    -- game, or Nothing for a player who brought none. Deck.dungeon is where it
+    -- comes from and Pawl.Engine.Setup.createDeck copies it here.
+    --
+    -- A PRINTING and not an ObjectId, for `commander`'s reason turned inside out:
+    -- there is no object at all until CR 701.49a brings the card into the command
+    -- zone, and CR 309.5b removes it from the game and lets the SAME card be
+    -- brought back in as a new object. What persists across both is the printing.
+    --
+    -- Read only by Pawl.Engine.Dungeon. It is not emptied when the dungeon enters
+    -- the game: CR 309.5b has the player put a dungeon they own back into the
+    -- command zone after finishing one, so the card outside the game is a supply
+    -- rather than a stock of one.
+    dungeon :: Maybe Printing.Printing
   }
   deriving (Eq, Show)

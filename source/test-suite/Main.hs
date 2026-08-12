@@ -51,6 +51,7 @@ import qualified Pawl.Codec.DelayedTriggerSpec
 import qualified Pawl.Codec.DesignationSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
+import qualified Pawl.Codec.DungeonRoomSpec
 import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
@@ -108,6 +109,7 @@ import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
+import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
@@ -151,6 +153,7 @@ import qualified Pawl.DaytimeSpec
 import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec
+import qualified Pawl.DungeonSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EventSpec
 import qualified Pawl.ExpirySpec
@@ -320,6 +323,7 @@ spec s registry = do
   Pawl.Codec.DelayedTriggerSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
+  Pawl.Codec.DungeonRoomSpec.spec s
   Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
@@ -375,6 +379,7 @@ spec s registry = do
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
+  Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
@@ -416,6 +421,7 @@ spec s registry = do
   Pawl.CountSpec.spec s registry
   Pawl.CrewSpec.spec s registry
   Pawl.DamageSpec.spec s registry
+  Pawl.DungeonSpec.spec s registry
   Pawl.DaytimeSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s

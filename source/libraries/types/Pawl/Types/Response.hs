@@ -28,6 +28,7 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 
@@ -63,6 +64,8 @@ data Response
     ChoseProliferation (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)
   | -- | CR 701.54a: the creature a tempted player chose as their Ring-bearer.
     ChoseRingBearer ObjectId.ObjectId
+  | -- | CR 309.5a: the room a venturing player chose to move their marker into.
+    ChoseRoom RoomIndex.RoomIndex
   | -- | CR 704.5j: the legendary permanent its controller kept.
     ChoseLegend ObjectId.ObjectId
   | DeclaredAttackers [ObjectId.ObjectId]

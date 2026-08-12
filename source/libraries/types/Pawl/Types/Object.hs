@@ -13,6 +13,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -358,6 +359,24 @@ data Object = MkObject
     -- to the battlefield is a new battle and chooses a protector afresh (CR
     -- 310.8a).
     protector :: Maybe PlayerId.PlayerId,
+    -- | CR 309.4: the room this object's venture marker is on, for a dungeon card
+    -- in the command zone. Nothing for everything else, which is every object but a
+    -- dungeon.
+    --
+    -- On the OBJECT rather than on the player, because that is where CR 309.4 puts
+    -- it -- "a venture marker placed on the dungeon card they own". The marker is
+    -- the player's (CR 701.49b says "their venture marker") but it sits on the card,
+    -- and CR 309.3's one-dungeon-per-player makes the two readings agree; the
+    -- object's `owner` is the player whose marker this is. Storing it on the player
+    -- instead would leave CR 309.6's state-based action -- whose subject is the
+    -- dungeon card -- reading a field on something else.
+    --
+    -- Per-incarnation state, cleared by newIncarnation like every neighbour here.
+    -- Never actually exercised: CR 309.2c forbids a dungeon card leaving the command
+    -- zone except as it leaves the game, so no dungeon ever gets a second
+    -- incarnation. Cleared anyway, because the reset set is the rule and an
+    -- exception would have to be argued rather than assumed.
+    ventureRoom :: Maybe RoomIndex.RoomIndex,
     -- | CR 709.5c: the UNLOCKED DESIGNATIONS this permanent has. "'Left half
     -- unlocked' and 'right half unlocked' are designations that a permanent on
     -- the battlefield can have. Together, they are called the unlocked
@@ -494,6 +513,7 @@ newIncarnation object =
       playableFromExile = Nothing,
       ringBearerFor = Nothing,
       protector = Nothing,
+      ventureRoom = Nothing,
       unlockedHalves = Set.empty,
       designations = Set.empty,
       kicked = False

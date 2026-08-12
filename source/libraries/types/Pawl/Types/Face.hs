@@ -29,6 +29,7 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Defense as Defense
+import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -132,6 +133,19 @@ data Face card = MkFace
     -- ability is not ON the source object -- CR 603.7d gives it no source
     -- permanent to lose, so layer 6 cannot strip it.
     delayedAbilities :: Map.Map AbilityName.AbilityName (TriggeredAbility.TriggeredAbility card),
+    -- | CR 309.4: this face's rooms, topmost first -- the room graph of a dungeon
+    -- card, and empty for every card that is not a dungeon. The CardSpec lint
+    -- family holds that biconditional in both directions, as it does for loyalty
+    -- and defense above.
+    --
+    -- ORDERED, where every other ability list here is ordered only by printing:
+    -- CR 309.4a starts the venture marker on the topmost room and CR 309.6 ends the
+    -- dungeon on the bottommost, so position is the rule's own handle on a room
+    -- (Pawl.Types.RoomIndex).
+    --
+    -- Card DATA and not rulebook text, unlike the emblem Pawl.Engine.Ring mints:
+    -- CR 309.1 makes a dungeon a card, and rooms are what is printed on it.
+    rooms :: Seq.Seq (DungeonRoom.DungeonRoom card),
     -- | CR 601.3: this face's PRINTED casting permissions -- zone or condition
     -- exceptions to normal timing (Panglacial Wurm). Read directly from the card
     -- and NOT the projection: the permission functions in the library (CR 113.6),

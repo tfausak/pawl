@@ -12,6 +12,7 @@
 module Pawl.Codec.Face where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
@@ -28,6 +29,7 @@ import qualified Pawl.Codec.CombatRestriction as CombatRestriction
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Counterability as Counterability
 import qualified Pawl.Codec.Defense as Defense
+import qualified Pawl.Codec.DungeonRoom as DungeonRoom
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
@@ -73,6 +75,8 @@ toJson encodeCard f =
       Common.optionalPair "replacementEffects" [] (Common.encodeList ReplacementEffect.toJson) (Face.replacementEffects f),
       Common.optionalPair "triggeredAbilities" [] (Common.encodeList (TriggeredAbility.toJson encodeCard)) (Face.triggeredAbilities f),
       Common.optionalPair "delayedAbilities" Map.empty (TriggeredAbility.toJsonDelayed encodeCard) (Face.delayedAbilities f),
+      -- CR 309.4: the rooms of a dungeon card, topmost first.
+      Common.optionalPair "rooms" Seq.empty (Common.encodeSeq (DungeonRoom.toJson encodeCard)) (Face.rooms f),
       Common.optionalPair "castingPermissions" [] (Common.encodeList (Codec.encode CastingPermission.codec)) (Face.castingPermissions f),
       Common.optionalPair "castingRestrictions" [] (Common.encodeList (Codec.encode CastingRestriction.codec)) (Face.castingRestrictions f),
       Common.optionalPair "playerAbilities" [] (Common.encodeList PlayerStaticAbility.toJson) (Face.playerAbilities f),
@@ -117,6 +121,7 @@ fromJson decodeCard value = do
   colorIndicator <- Common.defaultedField "colorIndicator" Set.empty (Common.decodeSet (Codec.decode Color.codec)) ps
   characteristicPT <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe Quantity.fromJson) ps
   delayed <- Common.defaultedField "delayedAbilities" Map.empty (TriggeredAbility.fromJsonDelayed decodeCard) ps
+  rooms <- Common.defaultedField "rooms" Seq.empty (Common.decodeSeq (DungeonRoom.fromJson decodeCard)) ps
   playerAbilities <- Common.defaultedField "playerAbilities" [] (Common.decodeList PlayerStaticAbility.fromJson) ps
   blockRequirements <- Common.defaultedField "blockRequirements" [] (Common.decodeList BlockRequirement.fromJson) ps
   blockPermissions <- Common.defaultedField "blockPermissions" [] (Common.decodeList BlockPermission.fromJson) ps
@@ -152,6 +157,7 @@ fromJson decodeCard value = do
         Face.colorIndicator = colorIndicator,
         Face.characteristicPT = characteristicPT,
         Face.delayedAbilities = delayed,
+        Face.rooms = rooms,
         Face.playerAbilities = playerAbilities,
         Face.blockRequirements = blockRequirements,
         Face.blockPermissions = blockPermissions,

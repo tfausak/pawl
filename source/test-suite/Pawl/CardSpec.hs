@@ -41,6 +41,8 @@ import qualified Pawl.Engine.Setup as Setup
 -- alone: it counts the atom in a card's ENCODED form, which is a traversal of the
 -- whole card written by somebody else and so an independent witness to the
 -- hand-maintained one below.
+
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Object as Object
 import qualified Pawl.Json.Pair as Pair
@@ -80,6 +82,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -117,6 +120,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
@@ -166,6 +170,7 @@ vanillaFace name typeLine =
       Face.replacementEffects = [],
       Face.triggeredAbilities = [],
       Face.delayedAbilities = Map.empty,
+      Face.rooms = Seq.empty,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
       Face.characteristicPT = Nothing,
@@ -522,6 +527,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
   TriggerCondition.LoseControlOfBound _ -> []
+  TriggerCondition.RoomEntered _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
@@ -556,6 +562,7 @@ effectCounts effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.TemptWithTheRing -> []
+  Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices _ _ quantity -> quantityCounts quantity
   Effect.RestartGame -> []
@@ -835,6 +842,7 @@ effectReplacements effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.TemptWithTheRing -> []
+  Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame -> []
@@ -1338,6 +1346,7 @@ effectMintedFaces effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.TemptWithTheRing -> []
+  Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame -> []
@@ -1973,6 +1982,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 603.7's slot-named condition holds a SlotName, which is no Filter -- what
   -- the slot holds was selected by the arming spell's own target spec.
   TriggerCondition.LoseControlOfBound _ -> []
+  TriggerCondition.RoomEntered _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
@@ -2296,6 +2306,7 @@ effectFilters effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.TemptWithTheRing -> []
+  Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices _ f quantity -> unframed (f : quantityFilters quantity)
   Effect.RestartGame -> []
@@ -3804,6 +3815,41 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offends c = isBattle c /= Maybe.isJust (Face.defense c)
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "battle iff defense" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 309.4 / 309.1: the third biconditional, on the same terms. A dungeon
+  -- without rooms has nowhere for CR 309.4a's venture marker to go; a non-dungeon
+  -- with rooms carries a graph no rule reads, since CR 309.4's rooms are printed
+  -- on dungeon cards and nowhere else.
+  Spec.it s "a card is a dungeon iff it has rooms" $ do
+    ps <- S.allPrintings s
+    let isDungeon c = Set.member CardType.Dungeon (TypeLine.types (Face.typeLine c))
+        offends c = isDungeon c /= not (Seq.null (Face.rooms c))
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "dungeon iff rooms" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 309.4 / 309.5a: every arrow points at a room this card actually has. An
+  -- out-of-range exit would be offered by Prompt.ChooseRoom and then move the
+  -- marker onto a room that does not exist, which no rule describes.
+  Spec.it s "CR 309.4 every room's arrows point at rooms of the same card" $ do
+    ps <- S.allPrintings s
+    let offends c =
+          let rooms = Face.rooms c
+              inRange e = RoomIndex.unwrap e < Natural.length rooms
+           in not (all (all inRange . DungeonRoom.exits) rooms)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "arrows in range" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 309.6: the BOTTOMMOST room is where the dungeon ends, and
+  -- Pawl.Engine.Dungeon.isBottommost reads that off the position. This lint is
+  -- what makes position and the absence of arrows agree: the last room has no
+  -- arrows out of it, and no earlier room is a dead end the marker could never
+  -- leave.
+  Spec.it s "CR 309.6 a dungeon's last room is its only one with no arrows" $ do
+    ps <- S.allPrintings s
+    let offends c = case Seq.viewr (Face.rooms c) of
+          Seq.EmptyR -> False
+          earlier Seq.:> lastRoom ->
+            not (Set.null (DungeonRoom.exits lastRoom))
+              || any (Set.null . DungeonRoom.exits) earlier
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "one dead end, and it is last" (fmap (S.nameOf . Printing.card) offenders) []
   -- There is deliberately NO fourth biconditional here pairing the creature card
   -- type with a printed power, and the omission is a decision rather than a gap.
   -- CR 208.3 names the counterexample outright -- "even if it's a card with a

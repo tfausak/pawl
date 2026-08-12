@@ -68,7 +68,7 @@ import qualified Pawl.Types.Zone as Zone
 -- zone are what this file is about.
 commanderBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
 commanderBoard mountain shimatsu lands =
-  let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu}
+  let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu, Deck.dungeon = Nothing}
       -- A precombat main phase with alice holding priority and an empty stack,
       -- which is Support.handOne's shape. CR 302.1 -- a creature card is cast
       -- "during a main phase of their turn when the stack is empty" -- is a
@@ -128,7 +128,7 @@ designationSpec s registry = Spec.describe s "Designation" $ do
   -- IS the commander is one card, not zero.
   Spec.it s "CR 903.5 the commander counts toward the deck's size" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
-    let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu}
+    let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just shimatsu, Deck.dungeon = Nothing}
     Spec.assertEqWith s "one card" (Setup.deckSize deck) 1
     Spec.assertEqWith s "and none without a commander" (Setup.deckSize (Deck.fromCards Map.empty)) 0
 
@@ -245,7 +245,7 @@ designating :: [(PlayerId.PlayerId, Printing.Printing)] -> GameState.GameState -
 designating seats gs0 =
   let one g (pid, printing) =
         S.runPure S.identityAnswer g $
-          Setup.createDeck pid Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just printing}
+          Setup.createDeck pid Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Just printing, Deck.dungeon = Nothing}
    in List.foldl' one gs0 seats
 
 -- Move a player's commander out of the command zone onto the battlefield through

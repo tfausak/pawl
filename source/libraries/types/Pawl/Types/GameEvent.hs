@@ -13,6 +13,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -585,4 +586,19 @@ data GameEvent
     -- new object with a new id, so nothing can observe the difference through a
     -- binding taken before the move.
     ControlChanged ObjectId.ObjectId PlayerId.PlayerId PlayerId.PlayerId
+  | -- | CR 309.4c \/ 701.49a\/b: a player moved their venture marker into a room --
+    -- the player, the dungeon card it is on, and which room. What CR 309.4c's
+    -- unprinted trigger condition ("When you move your venture marker into this
+    -- room") watches for.
+    --
+    -- Minted by Pawl.Engine.Dungeon.venture on ENTERING a dungeon as well as on
+    -- advancing within one, because CR 701.49a puts the marker on the topmost room
+    -- and CR 309.4c asks only that the marker MOVED INTO the room. The topmost
+    -- room's ability triggers the first time a player ventures, which is the whole
+    -- reason a first venture does anything.
+    --
+    -- Carries the dungeon's ObjectId as well as the room, because the room index
+    -- alone names nothing: two players may be in room 1 of two different dungeons,
+    -- and CR 309.4c makes each room ability the dungeon card's own.
+    VentureMarkerEntered PlayerId.PlayerId ObjectId.ObjectId RoomIndex.RoomIndex
   deriving (Eq, Ord, Show)
