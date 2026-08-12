@@ -401,10 +401,11 @@ data PlayerEffect
     -- CastAsThoughItHadFlash: Yawgmoth's Will says "spells" and so matches
     -- everything (`And []`), while Haakon, Stromgald Scourge's "Knight spells"
     -- and Liliana, Untouched by Death's "Zombie spells" would narrow it. Read
-    -- through Pawl.Engine.PlayerEffect.matchesObject against the graveyard
-    -- card's projection, which for a card outside the battlefield is its printed
-    -- characteristics -- the same read CantCastMatching makes of a card in a
-    -- hand.
+    -- through Pawl.Engine.PlayerEffect.matchesObject, the same read
+    -- CantCastMatching makes of a card in a hand. What a NARROWING filter sees
+    -- of a card in a graveyard is unobserved, since the one producer writes the
+    -- predicate that is true of everything -- pawl's projection does not reach
+    -- that zone (#160).
     --
     -- A PERMISSION, folded as a disjunction for CastAsThoughItHadFlash's reason:
     -- there is nothing for a second permission to outvote.
