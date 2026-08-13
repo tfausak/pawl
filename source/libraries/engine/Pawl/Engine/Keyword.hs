@@ -64,13 +64,16 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -430,9 +433,11 @@ reinforce n cost =
     spec = TargetSpec.required Pool.Creatures Nothing
     effect =
       Effect.PutCounters
-        CounterKind.PlusOnePlusOne
-        (Quantity.Literal (toInteger n))
-        (ObjectRef.InSlot reinforceTarget)
+        ( PutCounters.MkPutCounters
+            CounterKind.PlusOnePlusOne
+            (Quantity.Literal (toInteger n))
+            (ObjectRef.InSlot reinforceTarget)
+        )
 
 -- The slot rule 702.77a's one target is chosen into, modularTarget's position and
 -- for its reason.
@@ -658,7 +663,7 @@ outlast cost =
       ActivatedAbility.condition = Nothing
     }
   where
-    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource)
+    grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions (Face.castingPermissions) are a separate,
@@ -1471,9 +1476,11 @@ poisonous n =
   where
     effect =
       Effect.GainPlayerCounters
-        (PlayerRef.InSlot Binding.triggerPlayer)
-        PlayerCounterKind.Poison
-        (Quantity.Literal (toInteger n))
+        ( PlayerCounters.MkPlayerCounters
+            (PlayerRef.InSlot Binding.triggerPlayer)
+            PlayerCounterKind.Poison
+            (Quantity.Literal (toInteger n))
+        )
 
 -- CR 702.115a: whenever this creature deals combat damage to a player, that
 -- player exiles the top card of their library. Poisonous' condition and
@@ -2090,7 +2097,7 @@ training =
       TriggeredAbility.intervening = Nothing
     }
   where
-    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource)
+    effect = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
 -- CR 702.147a's TRIGGERED half: "When this creature attacks, sacrifice it at end
 -- of combat." CR 508.3a is what "attacks" means, so the condition is mentor's and
@@ -2279,7 +2286,7 @@ renown n =
         Just (Condition.Compares (Compares.MkCompares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0)))
     }
   where
-    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource)
+    grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource))
     designate = Effect.Designate Designation.Renowned Binding.triggerSource
 
 -- CR 702.105a: whenever this creature attacks the player with the most life or
@@ -2313,7 +2320,7 @@ dethrone =
       TriggeredAbility.intervening = Nothing
     }
   where
-    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource)
+    grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
 
 -- CR 702.79a: persist. "When this permanent is put into a graveyard from the
 -- battlefield, if it had no -1/-1 counters on it, return it to the battlefield
@@ -2829,7 +2836,7 @@ vanishingUpkeep =
         Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1)))
     }
   where
-    effect = Effect.RemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource
+    effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource)
 
 -- "When the last time counter is removed from this permanent, sacrifice it."
 --
@@ -2906,9 +2913,11 @@ modular =
     spec = TargetSpec.required Pool.Creatures (Just (Filter.HasCardType CardType.Artifact))
     effect =
       Effect.PutCounters
-        CounterKind.PlusOnePlusOne
-        (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)
-        (ObjectRef.InSlot modularTarget)
+        ( PutCounters.MkPutCounters
+            CounterKind.PlusOnePlusOne
+            (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)
+            (ObjectRef.InSlot modularTarget)
+        )
 
 -- The slot rule 702.43a's one target is chosen into, mentorTarget's position and
 -- for its reason.

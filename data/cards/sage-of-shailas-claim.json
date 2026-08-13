@@ -38,21 +38,21 @@
                     "effects": [
                       {
                         "type": "GainPlayerCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
+                            "type": "Energy"
+                          },
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          {
-                            "type": "Energy"
-                          },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 3
                           }
-                        ]
+                        }
                       }
                     ]
                   }

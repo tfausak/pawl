@@ -50,22 +50,22 @@
                   },
                   {
                     "type": "PutCounters",
-                    "value": [
-                      {
+                    "value": {
+                      "kind": {
                         "type": "Keyword",
                         "value": {
                           "type": "Flying"
                         }
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 1
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

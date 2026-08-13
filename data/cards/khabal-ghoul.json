@@ -49,11 +49,11 @@
                     "effects": [
                       {
                         "type": "PutCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
                             "type": "PlusOnePlusOne"
                           },
-                          {
+                          "quantity": {
                             "type": "Count",
                             "value": {
                               "aggregation": {
@@ -81,11 +81,11 @@
                               }
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

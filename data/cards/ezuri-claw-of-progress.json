@@ -68,21 +68,21 @@
                     "effects": [
                       {
                         "type": "GainPlayerCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
+                            "type": "Experience"
+                          },
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          {
-                            "type": "Experience"
-                          },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }
@@ -114,11 +114,11 @@
                     "effects": [
                       {
                         "type": "PutCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
                             "type": "PlusOnePlusOne"
                           },
-                          {
+                          "quantity": {
                             "type": "PlayerCounters",
                             "value": [
                               {
@@ -132,11 +132,11 @@
                               }
                             ]
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

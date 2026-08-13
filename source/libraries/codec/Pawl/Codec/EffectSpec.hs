@@ -51,13 +51,16 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scope as Scope
@@ -578,9 +581,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           Duration.UntilEndOfTurn
           (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
           (Quantity.Literal 3)
-          (Seq.singleton (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+          (Seq.singleton (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))
       )
-      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"target"},{"type":"Literal","value":3},[{"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"InSlot","value":"thatMuch"},{"type":"InSlot","value":"target"}]}]]} """
+      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"target"},{"type":"Literal","value":3},[{"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"InSlot","value":"thatMuch"},"ref":{"type":"InSlot","value":"target"}}}]]} """
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
   Spec.it s "PreventAllDamage" $
     Common.assertJsonCodec
@@ -635,8 +638,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "creature"))))
-      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},{"type":"InSlot","value":"creature"}]} """
+      (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "creature")))))
+      """ {"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"Literal","value":1},"ref":{"type":"InSlot","value":"creature"}}} """
   -- The ObjectRef's other arm: a Filter is an object where a slot is a string, so
   -- the widening left every card's spelling alone (Pawl.Codec.ObjectRef).
   Spec.it s "PutCounters over a swept set" $
@@ -644,8 +647,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasDesignation Designation.Renowned)))
-      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},{"type":"EachMatching","value":{"type":"HasDesignation","value":{"type":"Renowned"}}}]} """
+      (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasDesignation Designation.Renowned))))
+      """ {"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"Literal","value":1},"ref":{"type":"EachMatching","value":{"type":"HasDesignation","value":{"type":"Renowned"}}}}} """
   -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
   -- tag would make the two indistinguishable in a card file.
   Spec.it s "RemoveCounters" $
@@ -653,8 +656,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "target")))
-      """ {"type":"RemoveCounters","value":[{"type":"MinusOneMinusOne"},{"type":"Literal","value":1},"target"]} """
+      (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"RemoveCounters","value":{"kind":{"type":"MinusOneMinusOne"},"quantity":{"type":"Literal","value":1},"slot":"target"}} """
   -- Every PlayerRef shape the opcode accepts: the self-scoped one, and the slot
   -- read CR 702.70a needs.
   Spec.it s "GainPlayerCounters" $ do
@@ -662,14 +665,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
-      """ {"type":"GainPlayerCounters","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Energy"},{"type":"Literal","value":2}]} """
+      (Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2)))
+      """ {"type":"GainPlayerCounters","value":{"player":{"type":"Relative","value":{"type":"You"}},"kind":{"type":"Energy"},"quantity":{"type":"Literal","value":2}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GainPlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) PlayerCounterKind.Poison (Quantity.Literal 3))
-      """ {"type":"GainPlayerCounters","value":[{"type":"InSlot","value":"thatPlayer"},{"type":"Poison"},{"type":"Literal","value":3}]} """
+      (Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) PlayerCounterKind.Poison (Quantity.Literal 3)))
+      """ {"type":"GainPlayerCounters","value":{"player":{"type":"InSlot","value":"thatPlayer"},"kind":{"type":"Poison"},"quantity":{"type":"Literal","value":3}}} """
   -- The mirror opcode, on the same wire shape and a DIFFERENT tag: CR 728.1's
   -- removal must never decode as a gain.
   Spec.it s "RemovePlayerCounters" $
@@ -677,8 +680,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot (SlotName.MkSlotName (Text.pack "milled"))))
-      """ {"type":"RemovePlayerCounters","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Rad"},{"type":"InSlot","value":"milled"}]} """
+      (Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot (SlotName.MkSlotName (Text.pack "milled")))))
+      """ {"type":"RemovePlayerCounters","value":{"player":{"type":"Relative","value":{"type":"You"}},"kind":{"type":"Rad"},"quantity":{"type":"InSlot","value":"milled"}}} """
   -- CR 701.26a's Tap is Untap's mirror and shares its wire shape, so the two
   -- must not collapse into one tag.
   Spec.it s "Tap round-trips, and is not Untap" $ do
