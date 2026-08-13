@@ -1,23 +1,23 @@
 module Pawl.Codec.MonarchTarget where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.SlotName as SlotName
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 
-toJson :: MonarchTarget.MonarchTarget -> Value.Value
-toJson t = case t of
-  MonarchTarget.TheController -> Common.nullary "TheController"
-  MonarchTarget.ControllerOfSource -> Common.nullary "ControllerOfSource"
-  MonarchTarget.InSlot n -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec n
-
-fromJson :: Value.Value -> Either Text.Text MonarchTarget.MonarchTarget
-fromJson value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("TheController", _) -> Right MonarchTarget.TheController
-    ("ControllerOfSource", _) -> Right MonarchTarget.ControllerOfSource
-    ("InSlot", Just v) -> MonarchTarget.InSlot <$> Codec.decode SlotName.codec v
-    _ -> Left . Text.pack $ "unknown MonarchTarget: " <> t
+-- | The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec MonarchTarget.MonarchTarget
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "TheController" MonarchTarget.TheController,
+      Arm.nullary "ControllerOfSource" MonarchTarget.ControllerOfSource,
+      Arm.payload "InSlot" SlotName.codec MonarchTarget.InSlot
+    ]
+  where
+    encode t = case t of
+      MonarchTarget.TheController -> Common.nullary "TheController"
+      MonarchTarget.ControllerOfSource -> Common.nullary "ControllerOfSource"
+      MonarchTarget.InSlot n -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec n

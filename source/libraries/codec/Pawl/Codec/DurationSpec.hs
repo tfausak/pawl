@@ -14,41 +14,37 @@ import qualified Pawl.Types.Quantity as Quantity
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Duration" $ do
   Spec.it s "UntilEndOfTurn" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Duration.toJson
-      Duration.fromJson
+      Duration.codec
       Duration.UntilEndOfTurn
       """ {"type":"UntilEndOfTurn"} """
   -- CR 611.2a: for the rest of the game.
   Spec.it s "Indefinite" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Duration.toJson
-      Duration.fromJson
+      Duration.codec
       Duration.Indefinite
       """ {"type":"Indefinite"} """
   -- CR 611.2a: until your next turn.
   Spec.it s "UntilYourNextTurn" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Duration.toJson
-      Duration.fromJson
+      Duration.codec
       Duration.UntilYourNextTurn
       """ {"type":"UntilYourNextTurn"} """
   -- CR 611.2b, carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Duration.toJson
-      Duration.fromJson
+      Duration.codec
       (Duration.ForAsLongAs (Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))))
       """ {"type":"ForAsLongAs","value":{"type":"Compares","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
   -- CR 500.5a: until end of combat.
   Spec.it s "UntilEndOfCombat" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Duration.toJson
-      Duration.fromJson
+      Duration.codec
       Duration.UntilEndOfCombat
       """ {"type":"UntilEndOfCombat"} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s Duration.codec

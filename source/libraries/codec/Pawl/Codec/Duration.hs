@@ -1,27 +1,27 @@
 module Pawl.Codec.Duration where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.Condition as Condition
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Duration as Duration
 
-toJson :: Duration.Duration -> Value.Value
-toJson d = case d of
-  Duration.UntilEndOfTurn -> Common.nullary "UntilEndOfTurn"
-  Duration.Indefinite -> Common.nullary "Indefinite"
-  Duration.UntilYourNextTurn -> Common.nullary "UntilYourNextTurn"
-  Duration.ForAsLongAs c -> Common.tagged "ForAsLongAs" . Just $ Codec.encode Condition.codec c
-  Duration.UntilEndOfCombat -> Common.nullary "UntilEndOfCombat"
-
-fromJson :: Value.Value -> Either Text.Text Duration.Duration
-fromJson value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("UntilEndOfTurn", _) -> Right Duration.UntilEndOfTurn
-    ("Indefinite", _) -> Right Duration.Indefinite
-    ("UntilYourNextTurn", _) -> Right Duration.UntilYourNextTurn
-    ("ForAsLongAs", Just v) -> Duration.ForAsLongAs <$> Codec.decode Condition.codec v
-    ("UntilEndOfCombat", _) -> Right Duration.UntilEndOfCombat
-    _ -> Left . Text.pack $ "unknown Duration: " <> t
+-- | The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec Duration.Duration
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "UntilEndOfTurn" Duration.UntilEndOfTurn,
+      Arm.nullary "Indefinite" Duration.Indefinite,
+      Arm.nullary "UntilYourNextTurn" Duration.UntilYourNextTurn,
+      Arm.payload "ForAsLongAs" Condition.codec Duration.ForAsLongAs,
+      Arm.nullary "UntilEndOfCombat" Duration.UntilEndOfCombat
+    ]
+  where
+    encode d = case d of
+      Duration.UntilEndOfTurn -> Common.nullary "UntilEndOfTurn"
+      Duration.Indefinite -> Common.nullary "Indefinite"
+      Duration.UntilYourNextTurn -> Common.nullary "UntilYourNextTurn"
+      Duration.ForAsLongAs c -> Common.tagged "ForAsLongAs" . Just $ Codec.encode Condition.codec c
+      Duration.UntilEndOfCombat -> Common.nullary "UntilEndOfCombat"

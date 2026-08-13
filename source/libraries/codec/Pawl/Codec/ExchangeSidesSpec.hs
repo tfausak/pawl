@@ -12,16 +12,15 @@ import qualified Pawl.Types.SlotName as SlotName
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ExchangeSides" $ do
   Spec.it s "WithController" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ExchangeSides.toJson
-      ExchangeSides.fromJson
+      ExchangeSides.codec
       (ExchangeSides.WithController (SlotName.MkSlotName (Text.pack "target")))
       """ {"type":"WithController","value":"target"} """
   Spec.it s "BetweenTargets" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ExchangeSides.toJson
-      ExchangeSides.fromJson
+      ExchangeSides.codec
       (ExchangeSides.BetweenTargets (SlotName.MkSlotName (Text.pack "players")))
       """ {"type":"BetweenTargets","value":"players"} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s ExchangeSides.codec
