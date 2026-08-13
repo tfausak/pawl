@@ -1,10 +1,8 @@
 module Pawl.Types.CombatRestriction where
 
-import qualified Numeric.Natural as Natural
-import qualified Pawl.Types.Affected as Affected
-import qualified Pawl.Types.Condition as Condition
-import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.LimitUnless as LimitUnless
 
 -- | CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an effect saying a
 -- creature can't attack, can't attack alone, or can't attack unless some
@@ -124,14 +122,14 @@ data CombatRestriction
     -- restrictions that are not CR 702.3b's defender keyword, which stays a
     -- Keyword because rule 702 is part of the rulebook and a keyword's meaning
     -- is the closed half's to know.
-    CantAttack Affected.Affected (Maybe Condition.Condition)
+    CantAttack AffectedUnless.AffectedUnless
   | -- | CR 509.1b: these creatures can't block, unless the gate holds.
     -- Pacifism's second half and Blind-Spot Giant's are the pool's only printed
     -- blocking restrictions, and CR 702.98a's unleash is the one rule 702 mints
     -- (Pawl.Engine.Keyword.mintedCombatRestrictionsFor); every other one today
     -- restricts being blocked rather than blocking, as an evasion keyword on the
     -- ATTACKER or as the arm below.
-    CantBlock Affected.Affected (Maybe Condition.Condition)
+    CantBlock AffectedUnless.AffectedUnless
   | -- | CR 509.1b's second paragraph: these ATTACKING creatures can't be blocked
     -- by creatures matching the Filter, unless the gate holds. CR 701.54c's "your
     -- Ring-bearer ... can't be blocked by creatures with greater power" is the
@@ -157,7 +155,7 @@ data CombatRestriction
     -- Pawl.Engine.Filter.Context's sourcePower, and the power CR 701.54c compares
     -- against is the blocked creature's, not the emblem's -- CR 114.3 leaves an
     -- emblem no power at all. See Pawl.Engine.CombatRestriction.cantBeBlockedBy.
-    CantBeBlockedBy Affected.Affected (Filter.Filter Keyword.Keyword) (Maybe Condition.Condition)
+    CantBeBlockedBy CantBeBlockedBy.CantBeBlockedBy
   | -- | CR 508.1c together with CR 506.5: these creatures can't be the ONLY
     -- creature declared as an attacker, unless the gate holds. Bonded Construct
     -- ("This creature can't attack alone") is the pool's printing, and CR
@@ -172,7 +170,7 @@ data CombatRestriction
     --
     -- The gate beside it is the same "unless" every arm carries, and is about
     -- game state as usual: nothing in the pool prints a gated one.
-    CantAttackAlone Affected.Affected (Maybe Condition.Condition)
+    CantAttackAlone AffectedUnless.AffectedUnless
   | -- | CR 508.1c: no more than this many creatures may be declared as
     -- attackers, unless the gate holds. Silent Arbiter's first sentence, and
     -- the board CR 508.1d's Example is written about.
@@ -193,11 +191,11 @@ data CombatRestriction
     -- so a creature joining combat outside the declaration is exempt by rule
     -- rather than by pawl's omission, and a per-phase tally would have had to
     -- exclude it anyway.
-    CantAttackMoreThan Natural.Natural (Maybe Condition.Condition)
+    CantAttackMoreThan LimitUnless.LimitUnless
   | -- | CR 509.1b, the same bound on the other declaration. Silent Arbiter's
     -- second sentence, and the arm above's reasoning holds unchanged: CR 506.1
     -- gives a combat phase one declare blockers step, CR 703.4j makes
     -- Pawl.Engine.Combat.declareBlockers its turn-based action, and CR 509.1a
     -- names a single defending player to make it.
-    CantBlockMoreThan Natural.Natural (Maybe Condition.Condition)
+    CantBlockMoreThan LimitUnless.LimitUnless
   deriving (Eq, Ord, Show)

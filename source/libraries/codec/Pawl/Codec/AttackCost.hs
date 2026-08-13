@@ -16,13 +16,13 @@ import qualified Pawl.Types.AttackCost as AttackCost
 toJson :: AttackCost.AttackCost -> Value.Value
 toJson ac =
   Value.object
-    ( Common.requiredPair "subject" Affected.toJson (AttackCost.subject ac)
+    ( Common.requiredPair "subject" (Codec.encode Affected.codec) (AttackCost.subject ac)
         <> Common.requiredPair "perAttacker" (Codec.encode ManaCost.codec) (AttackCost.perAttacker ac)
     )
 
 fromJson :: Value.Value -> Either Text.Text AttackCost.AttackCost
 fromJson value = do
   ps <- Common.asObject value
-  subject <- Common.field "subject" ps >>= Affected.fromJson
+  subject <- Common.field "subject" ps >>= Codec.decode Affected.codec
   perAttacker <- Common.field "perAttacker" ps >>= Codec.decode ManaCost.codec
   pure (AttackCost.MkAttackCost subject perAttacker)

@@ -29,6 +29,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -948,7 +949,7 @@ forestCount = S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest
 insistOneOrBoth :: [ModeIndex.ModeIndex] -> ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 insistOneOrBoth idxs boneId forestId p = case p of
   Prompt.ChooseModes _ _ _ legal selection ->
-    if legal == vandalizeModes && selection == ModeSelection.ChooseBetween 1 2
+    if legal == vandalizeModes && selection == ModeSelection.ChooseBetween (ChooseBetween.MkChooseBetween 1 2)
       then Seq.fromList idxs
       else Seq.empty
   Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey aimAt sets
@@ -968,7 +969,7 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
   Spec.it s "CR 700.2 the instruction states a range, not a count" $ do
     vandalize <- S.printingOf s registry "Vandalize"
     let modal = Face.spell (S.combinedFace vandalize)
-    Spec.assertEqWith s "one through both" (ModalT.selection modal) (ModeSelection.ChooseBetween 1 2)
+    Spec.assertEqWith s "one through both" (ModalT.selection modal) (ModeSelection.ChooseBetween (ChooseBetween.MkChooseBetween 1 2))
     Spec.assertEqWith s "the two bounds differ" (fmap ($ ModalT.selection modal) [Modal.leastOf, Modal.mostOf]) [1, 2]
 
   -- The ceiling, read directly off Modal.selectionSatisfiedBy because no card in the
@@ -978,8 +979,8 @@ chooseOneOrBothSpec s registry = Spec.describe s "ChooseOneOrBoth (CR 700.2)" $ 
   -- conjunct, and until one exists it is a fence rather than a proven behaviour.
   Spec.it s "CR 700.2 an answer above the range's ceiling does not satisfy it" $ do
     let both = Seq.fromList [destroyArtifact, destroyLand]
-    Spec.assertBool s (Modal.selectionSatisfiedBy vandalizeModes (ModeSelection.ChooseBetween 1 2) both) "both modes satisfy one-or-both"
-    Spec.assertBool s (not (Modal.selectionSatisfiedBy vandalizeModes (ModeSelection.ChooseBetween 0 1) both)) "two modes do not satisfy a zero-to-one range"
+    Spec.assertBool s (Modal.selectionSatisfiedBy vandalizeModes (ModeSelection.ChooseBetween (ChooseBetween.MkChooseBetween 1 2)) both) "both modes satisfy one-or-both"
+    Spec.assertBool s (not (Modal.selectionSatisfiedBy vandalizeModes (ModeSelection.ChooseBetween (ChooseBetween.MkChooseBetween 0 1)) both)) "two modes do not satisfy a zero-to-one range"
 
   -- The choice is really offered and really taken: the answer above refuses to name
   -- a mode unless the prompt carries both modes and the range, and this one names

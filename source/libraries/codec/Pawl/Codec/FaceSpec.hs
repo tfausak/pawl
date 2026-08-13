@@ -15,6 +15,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -216,7 +217,7 @@ populatedFace =
       Face.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached],
       Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached (Just (Quantity.Literal 1)) Nothing],
       Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached],
-      Face.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing],
+      Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing)],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.untapRestrictions = [UntapRestriction.MkUntapRestriction Affected.Attached],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (ManaCost.MkManaCost [ManaSymbol.Generic 2])],
@@ -411,7 +412,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing]}
+        baseFace {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached Nothing)]}
         (init baseFaceJson <> ",\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}]}")
     Spec.it s "sacrificeRestrictions" $
       Common.assertJsonCodec

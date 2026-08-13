@@ -59,6 +59,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -67,6 +68,7 @@ import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
+import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -106,6 +108,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -753,13 +756,13 @@ spellCostsOf face =
 -- is an Affected, which holds a Filter but no Count.
 combatRestrictionCounts :: CombatRestriction.CombatRestriction -> [Count.Type.Count Quantity.Type.Quantity]
 combatRestrictionCounts restriction = case restriction of
-  CombatRestriction.CantAttack _ condition -> foldMap conditionCounts condition
-  CombatRestriction.CantBlock _ condition -> foldMap conditionCounts condition
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
   -- The blocker Filter beside the gate holds no Count either.
-  CombatRestriction.CantBeBlockedBy _ _ condition -> foldMap conditionCounts condition
-  CombatRestriction.CantAttackAlone _ condition -> foldMap conditionCounts condition
-  CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionCounts condition
-  CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionCounts condition
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
+  CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionCounts condition
 
 -- Every Count reachable from a blocking permission: CR 604.2's "as long as" gate,
 -- and the counted arity beside it (Kemba's Legion). The subject is an Affected,
@@ -2406,14 +2409,14 @@ replacementEffectFilters replacementEffect = case replacementEffect of
 -- there would report a filter Silent Arbiter does not print.
 combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.Filter Keyword.Keyword]
 combatRestrictionFilters restriction = case restriction of
-  CombatRestriction.CantAttack affected condition -> affectedFilters affected <> foldMap conditionFilters condition
-  CombatRestriction.CantBlock affected condition -> affectedFilters affected <> foldMap conditionFilters condition
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless affected condition) -> affectedFilters affected <> foldMap conditionFilters condition
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless affected condition) -> affectedFilters affected <> foldMap conditionFilters condition
   -- Three positions on the PAIRWISE arm: the attackers restricted, the blockers
   -- barred from them, and the gate.
-  CombatRestriction.CantBeBlockedBy affected blockers condition -> affectedFilters affected <> [blockers] <> foldMap conditionFilters condition
-  CombatRestriction.CantAttackAlone affected condition -> affectedFilters affected <> foldMap conditionFilters condition
-  CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionFilters condition
-  CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionFilters condition
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy affected blockers condition) -> affectedFilters affected <> [blockers] <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless affected condition) -> affectedFilters affected <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
+  CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ condition) -> foldMap conditionFilters condition
 
 -- All three of a blocking permission's Filter positions: the subject it names, CR
 -- 604.2's "as long as" gate beside it (Entourage of Trest), and the counted arity
@@ -4412,7 +4415,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 508.1c's combat restriction",
-              base {Face.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried) Nothing]}
+              base {Face.combatRestrictions = [CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless (Affected.Matching buried) Nothing)]}
             ),
             ( "CR 508.1h's cost to attack",
               base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (ManaCost.MkManaCost [ManaSymbol.Generic 2])]}
