@@ -1370,11 +1370,12 @@ handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 
 -- LABELED SYNTHETIC: an emblem's characteristics are only its abilities (CR
--- 114.3), and no emblem in the pool HAS any. Birthday Escape mints a real one
--- (CR 701.54c's The Ring), so the pool no longer lacks an emblem PRODUCER -- but
--- that emblem's four abilities have no carrier, so its static ability list is
--- empty and it cannot show that Projection.gather reads one from the command
--- zone. Hence this fixture -- an Elspeth-style anthem, "creatures you control get
+-- 114.3), and no emblem in the pool has a STATIC one. Birthday Escape mints a
+-- real emblem (CR 701.54c's The Ring), so the pool does not lack an emblem
+-- PRODUCER -- but that emblem's four abilities have no carrier, so its static
+-- ability list is empty; Ajani, Adversary of Tyrants' emblem does carry an
+-- ability, and it is triggered. Neither can show that Projection.gather reads a
+-- static one from the command zone. Hence this fixture -- an Elspeth-style anthem, "creatures you control get
 -- +1/+1". Built by overriding a vanilla card's static abilities; the residual
 -- printed fields are inert for a command-zone object (never projected as a
 -- permanent). (#125)
