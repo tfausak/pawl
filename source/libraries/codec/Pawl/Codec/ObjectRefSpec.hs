@@ -97,6 +97,12 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.ChosenCardInGraveyard Chooser.EachInScope PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
       """ {"type":"ChosenCardInGraveyard","value":[{"type":"EachInScope"},{"type":"EachPlayer"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
+  Spec.it s "ChosenCardInGraveyard carries the slot-named chooser Skullwinder needs" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenCardInGraveyard (Chooser.BoundInSlot (SlotName.MkSlotName (Text.pack "opponent"))) PlayerScope.EachPlayer (Filter.And []))
+      """ {"type":"ChosenCardInGraveyard","value":[{"type":"BoundInSlot","value":"opponent"},{"type":"EachPlayer"},{"type":"And","value":[]}]} """
   Spec.it s "ChosenCardInGraveyard rejects a bare filter with no chooser or scope" $
     Spec.assertBool
       s

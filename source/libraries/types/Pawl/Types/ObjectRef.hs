@@ -133,18 +133,19 @@ data ObjectRef
     -- the whole scope (Port of Karfell), EachInScope is one card per player in
     -- scope, each chosen by that player out of their own graveyard (Exhume's
     -- "each player puts a creature card from their graveyard onto the
-    -- battlefield"). Not implemented: a chooser named by a SLOT -- Obscura
-    -- Confluence's "target player returns a creature card from their graveyard
-    -- to their hand" -- and one an effect chooses at resolution, which is what
-    -- Infernal Offering's "choose an opponent" would need first (#1436).
+    -- battlefield"), and BoundInSlot is one card chosen by the one player a slot
+    -- names -- Skullwinder's "choose an opponent. That player returns a card
+    -- from their graveyard to their hand", where Effect.ChooseOpponent filled the
+    -- slot a sentence earlier.
     --
     -- The PlayerScope is WHOSE GRAVEYARDS the candidates are drawn from, which
     -- CR 400.1 forces this arm to say for EachCardInGraveyard's reason. Under
     -- TheController it is independent of the chooser -- `You` is Port of
     -- Karfell's "your graveyard", and the wider scopes are Extract from
     -- Darkness' "a graveyard", still chosen from by the effect's controller.
-    -- Under EachInScope the one phrase names both, which is what the sentence
-    -- itself does.
+    -- Under the other two the chooser fixes whose graveyard and the scope is the
+    -- outer bound on which graveyards the instruction reaches, which is what the
+    -- sentences themselves do.
     --
     -- ONE card per chooser, with no count beside the Filter, and CR 609.3
     -- covers the shortfall: a graveyard holding no matching card yields

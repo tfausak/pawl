@@ -654,6 +654,7 @@ effectCounts effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
+  Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
@@ -954,6 +955,7 @@ effectReplacements effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
+  Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
@@ -1480,6 +1482,7 @@ effectMintedFaces effect = case effect of
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
+  Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary {} -> []
   Effect.OfferCast {} -> []
@@ -2518,6 +2521,7 @@ effectFilters effect = case effect of
   -- carries no destination filter at all.
   Effect.Attach _ -> []
   Effect.PlaySubgame _ -> []
+  Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn _ _ -> []
   Effect.ShuffleIntoLibrary _ ref -> unframed (objectRefFilters ref)
   Effect.OfferCast {} -> []
@@ -3777,6 +3781,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.ChosenCardInGraveyard chooser _ _ -> case chooser of
             Chooser.TheController -> True
             Chooser.EachInScope -> False
+            -- One seat, so one graveyard and one card -- TheController's answer
+            -- with the chooser named by a slot instead of by CR 608.2c.
+            Chooser.BoundInSlot _ -> True
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           _ -> []
