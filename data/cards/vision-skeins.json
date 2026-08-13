@@ -25,15 +25,15 @@
                 "effects": [
                   {
                     "type": "Draw",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "EachPlayer"
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 2
                       }
-                    ]
+                    }
                   }
                 ]
               }

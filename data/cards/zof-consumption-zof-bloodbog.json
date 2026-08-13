@@ -34,33 +34,33 @@
                 "effects": [
                   {
                     "type": "LoseLife",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "Relative",
                         "value": {
                           "type": "Opponent"
                         }
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 4
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "GainLife",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "Relative",
                         "value": {
                           "type": "You"
                         }
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 4
                       }
-                    ]
+                    }
                   }
                 ]
               }

@@ -12,18 +12,18 @@
                     "effects": [
                       {
                         "type": "Scry",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }
@@ -227,33 +227,33 @@
                     "effects": [
                       {
                         "type": "LoseLife",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "Opponent"
                             }
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "GainLife",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }
@@ -325,18 +325,18 @@
                     "effects": [
                       {
                         "type": "Draw",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }

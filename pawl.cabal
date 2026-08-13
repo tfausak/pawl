@@ -255,6 +255,7 @@ library codec
     Pawl.Codec.PlayerId
     Pawl.Codec.PlayerIdSpec
     Pawl.Codec.PlayerQuantity
+    Pawl.Codec.PlayerQuantitySpec
     Pawl.Codec.PlayerRef
     Pawl.Codec.PlayerRefSpec
     Pawl.Codec.PlayerRelation

@@ -36,18 +36,18 @@
                   },
                   {
                     "type": "Draw",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "Relative",
                         "value": {
                           "type": "You"
                         }
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 1
                       }
-                    ]
+                    }
                   }
                 ]
               }
