@@ -1986,6 +1986,16 @@ anyConditional gs =
    in any conditional (Set.toList (GameState.battlefield gs))
         || any conditional (Set.toList (GameState.command gs))
         || any conditional (GameState.stack gs)
+        -- The GRAVEYARD, for the reason the stack is here: gatherGiven gathers a
+        -- CR 113.6f ability from there, and Viral Spawning's "as long as an
+        -- opponent has three or more poison counters" is a CR 604.2 clause on
+        -- one. Wired open, a Viral Spawning in a graveyard would carry flashback
+        -- against an unpoisoned board.
+        --
+        -- Every card in the graveyard rather than only the ones whose ability
+        -- gatherGiven will keep: a superset costs a second walk, where a subset
+        -- ungates a clause.
+        || any conditional (graveyardCards gs)
 
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
@@ -2069,9 +2079,61 @@ gatherGiven stripped functioning gs =
               then []
               else concat (zipWith (gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False) [0 ..] (Face.staticAbilities face))
       spells = concatMap fromSpell (GameState.stack gs)
+      fromGraveyardCard cardId = case Game.lookupObject cardId gs of
+        Nothing -> []
+        Just cardObj -> case Game.faceOf cardId gs of
+          Nothing -> []
+          Just face ->
+            -- CR 113.6f: "an object's ability that restricts or modifies what
+            -- zones that particular object can be played or cast from functions
+            -- everywhere". Viral Spawning's "as long as ... this card is in your
+            -- graveyard, it has flashback {2}{G}" is one -- the granted keyword
+            -- is rule 702.34a's, which is a permission to cast the card from a
+            -- graveyard -- so the ability functions where the card lies.
+            --
+            -- WHICH abilities qualify is asked of rule 702 rather than of the
+            -- card: an ability qualifies when a keyword it grants is one rule
+            -- 702 turns into a casting permission, which is
+            -- Keyword.permissionsFor, the same mapping Pawl.Engine.Cast reads
+            -- for a printed keyword. A classification, not an identity.
+            --
+            -- The PRINTED type line answers rule 702.34a's instant-or-sorcery
+            -- clause here, where Pawl.Engine.Cast asks it of the face being
+            -- cast: this is the gate on whether to gather at all, so reading it
+            -- from a projection this walk is building would be circular.
+            -- Nothing in the pool changes a graveyard card's type line, and the
+            -- permission is re-derived from the projected keywords downstream
+            -- anyway.
+            --
+            -- CR 613.7a again: the effect shares the card's own timestamp. No
+            -- text-change pass and never stripped, for the emblem and spell
+            -- branches' reason -- the pool's CR 613.1f removers reach creatures
+            -- on the battlefield, and a card in a graveyard is not one.
+            --
+            -- Not implemented: the ability's own zone clause, so an ability
+            -- gathered here is also gathered from the stack by `fromSpell`
+            -- above when its card is an instant or a sorcery (#1413).
+            let qualifies sa = any (grantsKeywordWhere (castZoneKeyword face)) (StaticAbility.modifications sa)
+                indexed = zip [0 :: Natural ..] (Face.staticAbilities face)
+             in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- indexed, qualifies sa]
+      graveyards = concatMap fromGraveyardCard (graveyardCards gs)
       counters = counterGathered gs
       designations = designationGathered gs
-   in stored <> static <> emblems <> spells <> counters <> designations
+   in stored <> static <> emblems <> spells <> graveyards <> counters <> designations
+
+-- Every card in every graveyard, which is the zone gatherGiven's CR 113.6f walk
+-- and anyConditional's precondition both range over.
+graveyardCards :: GameState -> [ObjectId]
+graveyardCards = foldMap (foldr (:) []) . Map.elems . GameState.graveyard
+
+-- CR 113.6f's classification, one keyword at a time: does rule 702 turn this
+-- keyword into a permission to cast the object it is on from somewhere? Rule
+-- 702.34a's flashback does, and so do aftermath and jump-start.
+--
+-- The face supplies rule 702.34a's card types, which is what makes flashback on
+-- a creature card grant nothing -- the same argument Pawl.Engine.Cast passes.
+castZoneKeyword :: Face.Face card -> Keyword -> Bool
+castZoneKeyword face keyword = not (null (Keyword.permissionsFor (TypeLine.types (Face.typeLine face)) keyword))
 
 -- CR 113.6's first sentence: the card types whose object has its abilities
 -- function on the stack rather than on the battlefield. Its own binding rather

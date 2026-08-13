@@ -289,7 +289,7 @@ data Object = MkObject
     -- STATE, where every other casting permission pawl has is a fact about a
     -- CARD: Face.castingPermissions and Pawl.Engine.Keyword.castingPermissionsOf
     -- are true of every copy of a card in every game, and
-    -- Pawl.Engine.Cast.permissionsOf reads them off a face. This one is true of
+    -- Pawl.Engine.Cast.permissionsWith reads them off a face. This one is true of
     -- one incarnation and names one player, so a CastingPermission arm could not
     -- carry it.
     --

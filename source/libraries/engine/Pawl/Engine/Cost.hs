@@ -248,12 +248,24 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             -- graveyard under such an effect: both costs are available and CR
             -- 601.2b picks one.
             Zone.Graveyard ->
-              fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
-                <> [printed | Keyword.hasAftermath (Face.keywords face)]
-                <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
-                   | Keyword.hasJumpStart (Face.keywords face)
-                   ]
-                <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
+              let -- CR 613.1: the keywords the card HAS in the graveyard, not
+                  -- the ones it prints. Rule 702.34a's cost is stated by the
+                  -- ability, and an ability granted to a card in a graveyard
+                  -- (Viral Spawning's own, CR 113.6f) states it as much as a
+                  -- printed one does -- so a projected read is what makes the
+                  -- granted cost reachable at all (#1385).
+                  --
+                  -- Off the OBJECT rather than the face, so the caller's CR
+                  -- 709.3a half is the one measured: every caller stamps the
+                  -- proposal through Pawl.Engine.Cast.asProposed first, and the
+                  -- projection resolves that same stamp.
+                  keywords = Map.keysSet (Projection.keywordsOf oid gs)
+               in fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost keywords))
+                    <> [printed | Keyword.hasAftermath keywords]
+                    <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
+                       | Keyword.hasJumpStart keywords
+                       ]
+                    <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
             -- CR 702.170d: a PLOTTED card is cast "without paying its mana
             -- cost", which is CR 118.9's alternative cost and so
             -- withoutPayingManaCost above -- the card's own additional costs
