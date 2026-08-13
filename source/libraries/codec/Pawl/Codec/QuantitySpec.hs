@@ -77,9 +77,10 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Plus (Quantity.Literal 1) Quantity.Star)
       """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"Star"}]} """
-  -- Toxic Deluge's -X on the wire: one whole Quantity under the tag, and a
-  -- printed negative Literal beside it, which is the other way to say a negative
-  -- number and NOT the same wire shape.
+  -- Toxic Deluge's -X on the wire: one whole Quantity under the tag, not a pair.
+  -- The second case nests a NEGATIVE Literal under it -- the other way this type
+  -- says a negative number -- so a decoder that folded the two into one could not
+  -- round-trip it.
   Spec.it s "Negate, over a slot read and over a literal" $ do
     let slot = SlotName.MkSlotName (Text.pack "X")
     Common.assertCodec

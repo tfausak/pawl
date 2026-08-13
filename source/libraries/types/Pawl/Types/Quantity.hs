@@ -102,9 +102,9 @@ data Quantity
     -- Literal already takes a signed Integer, so a printed -5/-5 (Dismember) is
     -- writable without this; what is not is a minus in front of anything else,
     -- since Plus is the only other arithmetic arm and this type has no inverse.
-    -- CR 107.3a's "[-X]" and CR 107.1b together are the licence: X is announced
-    -- as a nonnegative number (CR 107.1b forbids CHOOSING a negative one), and
-    -- the card's own minus sign is what makes the modification negative.
+    -- The sign belongs to the CARD, never to the announcement: CR 107.3a has the
+    -- controller announce X, and CR 107.1b forbids choosing a negative number,
+    -- so "-X/-X" is a minus the text prints in front of a nonnegative value.
     --
     -- A negative result is legal where it lands. CR 107.1b: "it's possible for a
     -- game value, such as a creature's power, to be less than zero", and
