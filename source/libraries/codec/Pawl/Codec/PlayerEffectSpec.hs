@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -98,6 +99,24 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.ReduceActivationCost (Filter.HasCardType CardType.Creature) (ManaCost.MkManaCost [ManaSymbol.Generic 2]) 1)
       """ {"type":"ReduceActivationCost","value":[{"type":"HasCardType","value":{"type":"Creature"}},[{"type":"Generic","value":2}],1]} """
+  -- CR 613.11 / 601.2f / Brutal Suppression: the criterion, and the components
+  -- it adds spelled exactly as a Cost's own components are.
+  Spec.it s "AddActivationCost" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.AddActivationCost (Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken]) [CostComponent.Sacrifice 1 (Filter.HasCardType CardType.Land)])
+      """ {"type":"AddActivationCost","value":[{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Rebel"}},{"type":"Not","value":{"type":"IsToken"}}]},[{"type":"Sacrifice","value":[1,{"type":"HasCardType","value":{"type":"Land"}}]}]]} """
+  -- TWO components, so a codec that read only the first would round-trip the one
+  -- above and not this -- and an EMPTY list is a legal value the same way.
+  Spec.it s "AddActivationCost, two components" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.AddActivationCost (Filter.And []) [CostComponent.DiscardCards 1, CostComponent.PayLife 2])
+      """ {"type":"AddActivationCost","value":[{"type":"And","value":[]},[{"type":"DiscardCards","value":1},{"type":"PayLife","value":2}]]} """
   -- CR 305.2 / Exploration.
   Spec.it s "PlayAdditionalLands, Exploration's one" $
     Common.assertJsonCodec

@@ -385,6 +385,28 @@ adjustmentResolutions adjustments =
 totalWith :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustments) (Cost.mana cost)}
 
+-- CR 601.2f's "plus all additional costs", the half that is not mana: the
+-- components an effect ADDS to a cost, appended to the ones the cost prints
+-- (Brutal Suppression's "Sacrifice a land" onto a Rebel's activation cost, by CR
+-- 602.2b).
+--
+-- SEPARATE from `totalWith` above rather than folded into it, and the separation
+-- is what keeps the components from being added twice: the gate measures a cost
+-- before CR 601.2b's completion (`canPaySomeCompletion` takes the mana totalling
+-- as a FUNCTION and never a whole cost), while `totalWith` runs on the announced
+-- cost afterwards. Both moments need the components, so this is applied at the
+-- earlier one and `totalWith` leaves them alone -- see Pawl.Engine.Activate,
+-- which is the only caller of either that has adjustments carrying any.
+--
+-- APPENDED, so a printed component is paid before an added one absent a payer's
+-- reordering -- and CR 601.2h makes the order the payer's anyway
+-- (`payComponents` prompts for it whenever it is observable).
+--
+-- A no-op for every SPELL cost, whose adjustments carry no components at all
+-- (Pawl.Engine.PlayerEffect.spellCostAdjustments).
+plusComponents :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+plusComponents adjustments cost = cost {Cost.components = Cost.components cost <> CostAdjustments.components adjustments}
+
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
 -- of one mana cost. `total` above is this fmapped over a whole Cost's mana part;
 -- what wants it separately is `announce` and `canPaySomeCompletion`, which both
@@ -1252,9 +1274,12 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- `lifeOwedBy` rides on every completion.
 --
 -- `total` is CR 601.2f's totalling of a mana cost, the CALLER's to supply for the
--- reason Pawl.Engine.Cost.announce's is: Pawl.Engine.Cast passes `totalManas` and
--- Pawl.Engine.Activate passes `pure`, since an activation cost is deliberately not
--- routed through `total` at all (#90).
+-- reason Pawl.Engine.Cost.announce's is: Pawl.Engine.Cast passes `totalManas`
+-- over the SPELL adjustments and Pawl.Engine.Activate passes it over the
+-- ACTIVATION ones (#90). CR 601.2f's non-mana additions are not in this
+-- parameter at all -- they are on the `cost` that arrives
+-- (Pawl.Engine.Cost.plusComponents), since a component is not a mana cost to
+-- rewrite.
 --
 -- It answers MANY totals, one per CR 118.7e resolution of the reductions
 -- (`totalManas`), and this asks `any` of them: the choice of half belongs to the
