@@ -10,6 +10,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -80,20 +81,33 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       s
       (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":[{"type":"Relative","value":{"type":"You"}},-1]} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
-  -- The graveyard's OTHER arm: one card the resolving controller chooses rather
-  -- than the whole matching set. Its payload is EachCardInGraveyard's exactly,
-  -- so only the tag tells them apart -- which is what the distinctness case
-  -- below is for.
+  -- The graveyard's OTHER arm: a card somebody chooses rather than the whole
+  -- matching set. Its scope and filter are EachCardInGraveyard's exactly, so
+  -- only the tag and the leading chooser tell them apart -- which is what the
+  -- distinctness case below is for.
   Spec.it s "ChosenCardInGraveyard" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInGraveyard PlayerScope.You (Filter.HasCardType CardType.Creature))
-      """ {"type":"ChosenCardInGraveyard","value":[{"type":"You"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
-  Spec.it s "ChosenCardInGraveyard rejects a bare filter with no scope" $
+      (ObjectRef.ChosenCardInGraveyard Chooser.TheController PlayerScope.You (Filter.HasCardType CardType.Creature))
+      """ {"type":"ChosenCardInGraveyard","value":[{"type":"TheController"},{"type":"You"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
+  Spec.it s "ChosenCardInGraveyard carries the chooser Exhume needs" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenCardInGraveyard Chooser.EachInScope PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
+      """ {"type":"ChosenCardInGraveyard","value":[{"type":"EachInScope"},{"type":"EachPlayer"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
+  Spec.it s "ChosenCardInGraveyard rejects a bare filter with no chooser or scope" $
     Spec.assertBool
       s
       (Either.isLeft (Common.parse (Text.pack """ {"type":"ChosenCardInGraveyard","value":{"type":"HasCardType","value":{"type":"Creature"}}} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
+  -- The chooser is REQUIRED rather than defaulted, so a card written before it
+  -- existed is a decode failure rather than a silent controller choice.
+  Spec.it s "ChosenCardInGraveyard rejects the two-element payload that preceded the chooser" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"ChosenCardInGraveyard","value":[{"type":"You"},{"type":"HasCardType","value":{"type":"Creature"}}]} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
   -- Guards against a decoder that read every payload as one arm. The arms are
   -- all objects, so only the tag separates them, and a duplicated tag would
@@ -111,7 +125,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3),
-                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
               ]
           )
       )
