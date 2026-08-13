@@ -1,0 +1,68 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Brutal Suppression",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "AddActivationCost",
+            "value": [
+              {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Rebel"
+                    }
+                  },
+                  {
+                    "type": "Not",
+                    "value": {
+                      "type": "IsToken"
+                    }
+                  }
+                ]
+              },
+              [
+                {
+                  "type": "Sacrifice",
+                  "value": [
+                    1,
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    }
+                  ]
+                }
+              ]
+            ]
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

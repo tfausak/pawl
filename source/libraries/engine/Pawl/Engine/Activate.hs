@@ -333,18 +333,28 @@ payableCostGiven grants pcs = payableCostAtGiven grants pcs 0
 -- Thalia's tax cannot arrive here however her Filter reads
 -- (Pawl.Engine.PlayerEffect.activationCostAdjustments).
 --
+-- BOTH halves of the totalling: the mana arithmetic rides in as a function, for
+-- the reason below, and CR 601.2f's additional non-mana components are appended
+-- to the cost before it is measured (Cost.plusComponents) -- so Brutal
+-- Suppression's "Sacrifice a land" is a reason this gate can answer False, and
+-- the cost it measures is the cost `activateAbility` will pay.
+--
 -- Cost.canPaySomeCompletion and not Cost.canPay so that the two gates ask ONE
 -- predicate, in the same shape Cost.announce's `total` parameter gives the two
 -- offers: CR 601.2b's completion comes before CR 601.2f's totalling, so a {2/R}
 -- totalled while still spelled {2/R} would hide the generic reduction the
 -- announcement exposes.
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x pid srcId gs cost = Cost.canPaySomeCompletion pid srcId (Cost.totalManas (Cost.activationAdjustments pid srcId gs)) (Cost.substituteX x cost) gs
+payableCostAt x pid srcId gs cost =
+  let adjustments = Cost.activationAdjustments pid srcId gs
+   in Cost.canPaySomeCompletion pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAtGiven grants pcs x pid srcId gs cost = Cost.canPaySomeCompletionGiven grants pcs pid srcId (Cost.totalManas (Cost.activationAdjustments pid srcId gs)) (Cost.substituteX x cost) gs
+payableCostAtGiven grants pcs x pid srcId gs cost =
+  let adjustments = Cost.activationAdjustments pid srcId gs
+   in Cost.canPaySomeCompletionGiven grants pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
 -- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,
@@ -570,7 +580,15 @@ activateAbility pid srcId ability = do
           -- Run on the cost carrying the ANNOUNCED value, which is CR 601.2b's own
           -- order (the value of X precedes the hybrid and Phyrexian
           -- announcements).
-          announcedCost <- Cost.announce pid srcId (Cost.totalManas (Cost.activationAdjustments pid srcId gs)) announcedAtX
+          --
+          -- CR 601.2f's additional components are on the cost by this point
+          -- (Cost.plusComponents), which is what payableCost measured and what
+          -- Cost.pay will charge. It matters to the announcement itself: the
+          -- offers are filtered against the claims a component makes on a zone,
+          -- so a Phyrexian symbol offered without the added "Sacrifice a land"
+          -- in view would be offered against a board that has one land too many.
+          let gathered = Cost.activationAdjustments pid srcId gs
+          announcedCost <- Cost.announce pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
           let specs = Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)
               sets = Target.legalSets (Just pid) srcId specs gs
           chosen <- Target.chooseTargets decider pid abilId specs sets
@@ -609,7 +627,7 @@ activateAbility pid srcId ability = do
               -- pool reduces by generic mana (Heartstone's {1}), which has no halves
               -- to choose between. The seam is here rather than skipped so that the
               -- one that does cannot arrive at a path that never asks.
-              adjustments <- Cost.announceReductions pid srcId gs (Cost.activationAdjustments pid srcId gs)
+              adjustments <- Cost.announceReductions pid srcId gs gathered
               let paidCost = Cost.totalWith adjustments announcedCost
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
               -- components. The gates above prove SOME sequence of choices pays for

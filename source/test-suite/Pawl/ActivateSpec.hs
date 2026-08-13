@@ -120,6 +120,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
   activationCostReductionSpec s registry
+  activationCostAdditionSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -2339,3 +2340,112 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
     Spec.assertBool s (Activate.activatable S.bob srcId ability board) "bob's creature is reduced too"
     Spec.assertEqWith s "two of bob's three Mountains paid it" (S.tappedCount S.bob after) 2
     Spec.assertEqWith s "and alice tapped nothing" (S.tappedCount S.alice after) 0
+
+-- alice's board: Saltfield Recluse, `lands` Plains, and a Goblin Piker under bob
+-- to aim the Recluse's ability at -- plus Brutal Suppression under BOB when one
+-- is passed. The positive and the negative differ in that Maybe and in nothing
+-- else: same seats, same permanents, same priority, and the same mana on both
+-- boards because the Recluse's activation cost has NO mana part at all, so no
+-- reading of the negative can be "she could not afford it".
+--
+-- Brutal Suppression sits with bob however the activation goes, because its
+-- sentence is symmetric ("activated abilities of nontoken Rebels", no
+-- possessive, PlayerScope.EachPlayer) -- the board that proves that is the one
+-- where the activating player does not control it.
+suppressionBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  Maybe Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+suppressionBoard recluse plains piker lands mSuppression =
+  let base = List.foldl' (\g _ -> snd (S.addCreature plains S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. lands]
+      (srcId, g1) = S.addCreature recluse S.alice base
+      g2 = snd (S.addCreature piker S.bob g1)
+      g3 = maybe g2 (\suppression -> snd (S.addCreature suppression S.bob g2)) mSuppression
+   in (srcId, g3 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
+
+-- CR 601.2f's "plus all additional costs" reaching an ACTIVATION cost by CR
+-- 602.2b (#1321), which nothing could do before: an adjustment carried mana
+-- only, so no effect could add a tap, a sacrifice or a discard to an ability.
+--
+-- Brutal Suppression {R} Enchantment -- "Activated abilities of nontoken Rebels
+-- cost an additional \"Sacrifice a land\" to activate" (Oracle text checked
+-- against Scryfall) -- is the printing. Saltfield Recluse {2}{W} Creature --
+-- Human Rebel Cleric 1/2, "{T}: Target creature gets -2/-0 until end of turn",
+-- is the ability it taxes, and its cost is why the pair is honest: {T} and
+-- nothing else, so the ONLY thing a land can be needed for on these boards is
+-- the added component.
+--
+-- Asserted at GAMEPLAY level -- what Action.legalActions offers, and what
+-- Activate.activateAbility actually does to the board -- rather than through
+-- Activate.activatable, so a refusal is one a player would meet.
+activationCostAdditionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition" $ do
+  -- The gate, on a pair of boards differing only in the Suppression: with no
+  -- land to sacrifice the added component cannot be paid, so the ability is not
+  -- offered and an activation attempted anyway is the no-op CR 602.2 requires --
+  -- nothing on the stack and the Recluse still UNTAPPED, which is the printed
+  -- half of the cost proving it was rolled back rather than half-paid.
+  Spec.it s "CR 601.2f Brutal Suppression's added cost stops an activation with no land" $ do
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    suppression <- S.printingOf s registry "Brutal Suppression"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let ability = theAbility recluse
+        (withId, withSuppression) = suppressionBoard recluse plains piker 0 (Just suppression)
+        (withoutId, withoutSuppression) = suppressionBoard recluse plains piker 0 Nothing
+        activated srcId gs = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId ability)
+        after = activated withId withSuppression
+        control = activated withoutId withoutSuppression
+    Spec.assertEqWith s "not offered under the Suppression" (activationsOf withId (Action.legalActions S.alice withSuppression)) []
+    Spec.assertBool s (not (null (activationsOf withoutId (Action.legalActions S.alice withoutSuppression)))) "and offered without it"
+    Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "and the Recluse was not tapped either" (fmap Object.tapped (Game.lookupObject withId after)) (Just TapState.Untapped)
+    Spec.assertEqWith s "where the same activation without the Suppression is on the stack" (length (GameState.stack control)) 1
+    Spec.assertEqWith s "having tapped the Recluse" (fmap Object.tapped (Game.lookupObject withoutId control)) (Just TapState.Tapped)
+
+  -- The added component being PAID rather than merely measured, on a pair
+  -- differing only in the Suppression again: one Plains under the Suppression is
+  -- gone after the activation, and the same Plains without it is untouched. An
+  -- ability that activated without paying is what this catches.
+  Spec.it s "CR 601.2h the added \"Sacrifice a land\" is actually paid" $ do
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    suppression <- S.printingOf s registry "Brutal Suppression"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let ability = theAbility recluse
+        plainsName = S.nameOf (Printing.card plains)
+        (withId, withSuppression) = suppressionBoard recluse plains piker 1 (Just suppression)
+        (withoutId, withoutSuppression) = suppressionBoard recluse plains piker 1 Nothing
+        activated srcId gs = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId ability)
+        after = activated withId withSuppression
+        control = activated withoutId withoutSuppression
+    Spec.assertBool s (not (null (activationsOf withId (Action.legalActions S.alice withSuppression)))) "one Plains pays the added cost"
+    Spec.assertEqWith s "the ability is on the stack" (length (GameState.stack after)) 1
+    Spec.assertEqWith s "and the Plains was sacrificed" (S.countOnBattlefieldByName plainsName S.alice after) 0
+    Spec.assertEqWith s "into her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "where the same activation without the Suppression keeps it" (S.countOnBattlefieldByName plainsName S.alice control) 1
+    Spec.assertEqWith s "and sacrifices nothing" (length (Game.zoneMembers Zone.Graveyard S.alice control)) 0
+
+  -- THE FALSIFIER for the criterion, both halves of it, on ONE board carrying a
+  -- positive: Brutal Suppression names "nontoken REBELS", so a nonRebel's
+  -- ability and a Rebel TOKEN's ability are both untaxed while the Recluse's is
+  -- taxed. Prodigal Sorcerer is the nonRebel (Human Wizard, "{T}: deals 1 damage
+  -- to any target"), and the token is a copy of the Recluse's own card -- so the
+  -- two differ from the taxed permanent in exactly one atom each.
+  Spec.it s "CR 601.2f Brutal Suppression's criterion spares a nonRebel and a token Rebel" $ do
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    recluseCard <- S.cardOf s registry "Saltfield Recluse"
+    suppression <- S.printingOf s registry "Brutal Suppression"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (reclusId, board) = suppressionBoard recluse plains piker 0 (Just suppression)
+        (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice board
+        (tokenId, withToken) = S.addToken recluseCard S.alice withSorcerer
+        actions = Action.legalActions S.alice withToken
+    Spec.assertEqWith s "the nontoken Rebel is taxed and cannot pay" (activationsOf reclusId actions) []
+    Spec.assertBool s (not (null (activationsOf sorcererId actions))) "the nonRebel is untaxed"
+    Spec.assertBool s (not (null (activationsOf tokenId actions))) "and so is the token Rebel"

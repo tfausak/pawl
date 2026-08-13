@@ -2075,6 +2075,12 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way.
   PlayerEffect.ReduceActivationCost f _ _ -> [f]
+  -- CR 601.2f's addition carries a Filter in two places: its own criterion
+  -- ("nontoken Rebels"), and one inside each component it adds ("sacrifice a
+  -- land"). Both are authored by the card, so both are linted, and the inner
+  -- ones go through costComponentFilters so an added component and a printed
+  -- one are held to one standard.
+  PlayerEffect.AddActivationCost f components -> f : concatMap costComponentFilters components
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantCastMoreThan _ -> []
   -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
@@ -2155,6 +2161,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost _ _ -> False
   PlayerEffect.ReduceSpellCost _ _ -> False
   PlayerEffect.ReduceActivationCost {} -> False
+  PlayerEffect.AddActivationCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False
@@ -2193,6 +2200,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost _ _ -> False
   PlayerEffect.ReduceSpellCost _ _ -> False
   PlayerEffect.ReduceActivationCost {} -> False
+  PlayerEffect.AddActivationCost {} -> False
   PlayerEffect.CantCastSpells -> False
   PlayerEffect.CantCastMoreThan _ -> False
   PlayerEffect.CantCastChosenName -> False
