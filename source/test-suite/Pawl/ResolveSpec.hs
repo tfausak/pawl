@@ -82,6 +82,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -127,6 +128,7 @@ import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
@@ -2220,7 +2222,7 @@ zombieUpkeep swamp zombie =
       upkeep = Phase.Beginning BeginningStep.Upkeep
       begun =
         Event.recordEvent
-          (GameEvent.StepBegan upkeep S.alice)
+          (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
           (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
    in (zombieId, swampId, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
 
@@ -2292,7 +2294,7 @@ vulturesUpkeep vultures buried =
       upkeep = Phase.Beginning BeginningStep.Upkeep
       begun =
         Event.recordEvent
-          (GameEvent.StepBegan upkeep S.alice)
+          (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
           (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
    in (vulturesId, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
 
@@ -2663,7 +2665,7 @@ bitterblossomChain s registry swap = do
       upkeep = Phase.Beginning BeginningStep.Upkeep
       begun =
         Event.recordEvent
-          (GameEvent.StepBegan upkeep S.alice)
+          (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
           (evolved {GameState.phase = upkeep, GameState.activePlayer = S.alice})
       onStack = S.runPure S.identityAnswer begun Engine.settleForPriority
       after = S.runPure S.identityAnswer onStack Engine.priorityLoop
@@ -3123,7 +3125,7 @@ stockLibrary printing pid k gs = List.foldl' (\g _ -> snd (S.addLibraryCard prin
 settleAtAlicesUpkeep :: GameState.GameState -> GameState.GameState
 settleAtAlicesUpkeep gs =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
-      began = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
    in snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
 
 -- Who drew, in the order they drew, read off the turn-scoped event log. CR
@@ -3872,10 +3874,10 @@ isActivation a = case a of
 -- the exchange a GAIN and a LOSS rather than two assignments, so this is what a
 -- "whenever you gain life" trigger would have to read.
 lifeGains :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
-lifeGains gs = [(pid, n) | GameEvent.LifeGained pid n <- S.eventsOf gs]
+lifeGains gs = [(pid, n) | GameEvent.LifeGained (LifeChange.MkLifeChange pid n) <- S.eventsOf gs]
 
 lifeLosses :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
-lifeLosses gs = [(pid, n) | GameEvent.LifeLost pid n <- S.eventsOf gs]
+lifeLosses gs = [(pid, n) | GameEvent.LifeLost (LifeChange.MkLifeChange pid n) <- S.eventsOf gs]
 
 exchangeLifeTotalsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
@@ -6225,7 +6227,7 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
         -- trigger did not fire rather than that there was nothing to take.
         stocked = snd (S.addLibraryCard piker S.bob (snd (S.addLibraryCard piker S.alice after)))
         endStep = Phase.Ending EndingStep.EndStep
-        endStepOf pid gs = Event.recordEvent (GameEvent.StepBegan endStep pid) (gs {GameState.phase = endStep, GameState.activePlayer = pid})
+        endStepOf pid gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep pid)) (gs {GameState.phase = endStep, GameState.activePlayer = pid})
         run gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
     Spec.assertEqWith s "bob really has the crown" (GameState.monarch after) (Just S.bob)
     Spec.assertEqWith s "CR 725.2 bob, the new monarch, draws on his own end step" (length (Game.zoneMembers Zone.Hand S.bob (run (endStepOf S.bob stocked)))) 1
@@ -7731,7 +7733,7 @@ countOnLuckSpec s registry =
             upkeep = Phase.Beginning BeginningStep.Upkeep
             begun =
               Event.recordEvent
-                (GameEvent.StepBegan upkeep S.alice)
+                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
                 (g3 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
             onStack = S.runPure S.identityAnswer begun Engine.settleForPriority
         pure (luckId, S.runPure S.identityAnswer onStack Engine.priorityLoop)
@@ -8990,7 +8992,7 @@ bishopBoard s registry = do
       (wallId, g4) = S.addCreature wall S.bob g3
       combat = Phase.Combat CombatStep.BeginningOfCombat
       gs =
-        Event.recordEvent (GameEvent.StepBegan combat S.alice) $
+        Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan combat S.alice)) $
           g4
             { GameState.phase = combat,
               GameState.activePlayer = S.alice,

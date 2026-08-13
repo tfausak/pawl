@@ -27,6 +27,9 @@ import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Combat (Combat)
@@ -1718,8 +1721,8 @@ declareBlockers = do
           -- creature, even if it blocks multiple creatures". Exactly the split
           -- AttackerBlocked already makes on the other side of the same
           -- declaration. The count it carries is CR 509.3e's.
-          State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared blocker attacker) h) g pairs
-          State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared blocker (Natural.length attackers)) h) g (filter (not . Set.null . snd) (Map.toList declaration))
+          State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker attacker)) h) g pairs
+          State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker (Natural.length attackers))) h) g (filter (not . Set.null . snd) (Map.toList declaration))
           -- CR 509.1h: and the same declaration makes each attacker it named a
           -- BLOCKED creature. One event per attacker rather than per pair, which
           -- is what makes CR 509.3c's "only once each combat for that creature,
@@ -1760,5 +1763,5 @@ declareBlockers = do
           State.modify'
             ( \g ->
                 let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
-                 in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked attacker (defendingFor attacker)) h) g (Set.toList becameBlocked)
+                 in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker))) h) g (Set.toList becameBlocked)
             )

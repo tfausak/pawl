@@ -1,22 +1,29 @@
 module Pawl.Types.GameEvent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.BecameDesignated as BecameDesignated
+import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
-import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.Mentored as Mentored
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
-import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
-import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | CR 608.2i: one entry of the turn-scoped record of what happened. Effects
 -- that look back in time read it, so entries are APPENDED by the
@@ -36,7 +43,7 @@ data GameEvent
     -- whenever a reader eventually forces it. An unforced field would be a thunk
     -- closing over the entire pre-move GameState, appended to a log that lives
     -- for a whole turn.
-    Moved ZoneChange.ZoneChange !ProjectedCharacteristics.ProjectedCharacteristics
+    Moved Moved.Moved
   | -- | CR 120 / 510: damage was dealt. The record the CR 704.5h deathtouch
     -- state-based action reads, watermarked rather than drained.
     DamageDealt DamageEvent.DamageEvent
@@ -60,11 +67,11 @@ data GameEvent
     -- Carries no identity for the prevention EFFECT. The pool's one reader
     -- (Selfless Squire) triggers on any prevention at all, by its own ruling, and
     -- a card saying "prevented this way" is what must add one (#687).
-    DamagePrevented Recipient.Recipient Natural.Natural
+    DamagePrevented DamagePrevented.DamagePrevented
   | -- | CR 603.2b: a phase or step began, on whose turn (the active player). What
     -- both an "at the beginning of each end step" step trigger and a CR 603.7
     -- delayed ability match against.
-    StepBegan Phase.Phase PlayerId.PlayerId
+    StepBegan StepBegan.StepBegan
   | -- | CR 601.2i: a player cast a spell -- the caster, and the spell. The event
     -- Rule of Law counts, and the reason the count is a fold over the whole turn
     -- log rather than a per-effect watermark: its ruling looks at the entire
@@ -152,7 +159,7 @@ data GameEvent
     -- ("whenever you draw your second card each turn, put a +1\/+1 counter on this
     -- creature" points only at its own bearer), and the Moved event beside this
     -- one carries the object for anything that folds the log.
-    Drew PlayerId.PlayerId Natural.Natural
+    Drew Drew.Drew
   | -- | CR 508.2b: an attacker was DECLARED -- one entry per creature the active
     -- player chose in CR 508.1's turn-based action. What "whenever this creature
     -- attacks" matches (CR 508.3a).
@@ -216,7 +223,7 @@ data GameEvent
     -- "becomes blocked by a creature" need -- the first binds it, the second
     -- matches on it -- and it cannot be derived later, since a blocker removed
     -- from combat (CR 506.4) leaves no record of what it was declared against.
-    BlockerDeclared ObjectId.ObjectId ObjectId.ObjectId
+    BlockerDeclared BlockerDeclared.BlockerDeclared
   | -- | CR 509.1h: an attacking creature BECAME a blocked creature -- one event
     -- per attacker the CR 509.1 declaration gave at least one blocker, appended
     -- by Pawl.Engine.Combat.declareBlockers alone.
@@ -244,7 +251,7 @@ data GameEvent
     -- 702.130a's afflict is what reads it. Carried rather than derived for
     -- AttackerDeclared's reason: Pawl.Engine.Event.eventBindings takes no game
     -- state, and the planeswalker and battle forms of CR 508.5 need the board.
-    AttackerBlocked ObjectId.ObjectId PlayerId.PlayerId
+    AttackerBlocked AttackerBlocked.AttackerBlocked
   | -- | CR 509.1i: a creature was declared BLOCKING -- one event per blocking
     -- creature the CR 509.1 declaration named, appended by
     -- Pawl.Engine.Combat.declareBlockers alone.
@@ -265,7 +272,7 @@ data GameEvent
     -- A DECLARATION is the only producer, which is STRICTER than rule 509.3a's
     -- second sentence: an effect that causes a creature to block also triggers
     -- it. No such effect is in the pool (#1146).
-    BlocksDeclared ObjectId.ObjectId Natural.Natural
+    BlocksDeclared BlocksDeclared.BlocksDeclared
   | -- | CR 701.20a: a player revealed a card.
     --
     -- A reveal is the one game action whose entire content is INFORMATION, so
@@ -337,7 +344,7 @@ data GameEvent
     -- changed" constructor covering both, though CR 119.3 does state the two
     -- directions in a single sentence: they are distinct EVENTS for triggers, and
     -- every card that cares says which.
-    LifeLost PlayerId.PlayerId Natural.Natural
+    LifeLost LifeChange.LifeChange
   | -- | CR 119.3's other direction: a player GAINED life, and how much. LifeLost
     -- above is the mirror, and the two are read by different cards.
     --
@@ -368,7 +375,7 @@ data GameEvent
     -- CR 119.5's life-total SET would record one, being a gain by that rule's own
     -- words whenever the new total is higher, but it has no producer in the pool
     -- and so no site here -- the same standing LifeLost's comment gives it.
-    LifeGained PlayerId.PlayerId Natural.Natural
+    LifeGained LifeChange.LifeChange
   | -- | CR 606.3: a LOYALTY ability of this permanent was activated -- the record
     -- that rule's once-per-permanent-per-turn limit is read out of.
     --
@@ -503,7 +510,7 @@ data GameEvent
     -- CR 400.7's new object is not a permanent losing a designation. CR 701.60a does
     -- let suspected end, and Effect.Unsuspect emits nothing -- no printed card
     -- triggers on a permanent ceasing to be suspected.
-    BecameDesignated Designation.Designation ObjectId.ObjectId
+    BecameDesignated BecameDesignated.BecameDesignated
   | -- | CR 702.100b: a creature EVOLVED -- "one or more +1/+1 counters are put on
     -- it as a result of its evolve ability resolving". Emitted by
     -- Pawl.Engine.Resolve's Effect.Evolve arm, the one place that ability's
@@ -540,7 +547,7 @@ data GameEvent
     -- Distinct from the CountersPut event the same placement records, for Evolved's
     -- reason: that one says +1/+1 counters arrived, this one says a mentor ability
     -- put them and on whose say-so.
-    Mentored ObjectId.ObjectId ObjectId.ObjectId
+    Mentored Mentored.Mentored
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice in the engine
     -- goes through -- a cost payment, Effect.Sacrifice, Effect.PlayerSacrifices
@@ -566,7 +573,7 @@ data GameEvent
     -- (Pawl.Engine.Event.eventBindingSlots answers empty for the condition), the
     -- payload being what a card printing "whenever YOU sacrifice" or "sacrifice a
     -- creature ... return IT" would need.
-    PermanentSacrificed PlayerId.PlayerId ObjectId.ObjectId
+    PermanentSacrificed PermanentSacrificed.PermanentSacrificed
   | -- | CR 603.3b: an ABILITY TRIGGERED. The one entry in this log that describes
     -- something the rules did rather than something that happened to the board,
     -- and it is here because rule 603.3b names it as a trigger event in as many

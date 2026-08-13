@@ -21,10 +21,14 @@ import qualified Pawl.Codec.ArmDelayedTriggerSpec
 import qualified Pawl.Codec.AttachTargetSpec
 import qualified Pawl.Codec.AttackCostSpec
 import qualified Pawl.Codec.AttackRequirementSpec
+import qualified Pawl.Codec.AttackerBlockedSpec
+import qualified Pawl.Codec.BecameDesignatedSpec
 import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockRequirementSpec
+import qualified Pawl.Codec.BlockerDeclaredSpec
+import qualified Pawl.Codec.BlocksDeclaredSpec
 import qualified Pawl.Codec.CantBeBlockedBySpec
 import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardSpec
@@ -57,6 +61,7 @@ import qualified Pawl.Codec.CreateSpec
 import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
+import qualified Pawl.Codec.DamagePreventedSpec
 import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DaytimeSpec
 import qualified Pawl.Codec.DealDamageSpec
@@ -68,6 +73,7 @@ import qualified Pawl.Codec.DestroySpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DiscardSpec
+import qualified Pawl.Codec.DrewSpec
 import qualified Pawl.Codec.DungeonRoomSpec
 import qualified Pawl.Codec.DurationRefSpec
 import qualified Pawl.Codec.DurationSpec
@@ -91,6 +97,7 @@ import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LayoutSpec
 import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
+import qualified Pawl.Codec.LifeChangeSpec
 import qualified Pawl.Codec.LimitUnlessSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
@@ -99,6 +106,7 @@ import qualified Pawl.Codec.ManaFilterSpec
 import qualified Pawl.Codec.ManaProductionSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
+import qualified Pawl.Codec.MentoredSpec
 import qualified Pawl.Codec.MillSpec
 import qualified Pawl.Codec.MillTallySpec
 import qualified Pawl.Codec.ModalSpec
@@ -110,12 +118,14 @@ import qualified Pawl.Codec.ModifyTargetSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveToZoneSpec
+import qualified Pawl.Codec.MovedSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
 import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
+import qualified Pawl.Codec.PermanentSacrificedSpec
 import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
@@ -162,6 +172,7 @@ import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
 import qualified Pawl.Codec.SpellCastSpec
 import qualified Pawl.Codec.StaticAbilitySpec
+import qualified Pawl.Codec.StepBeganSpec
 import qualified Pawl.Codec.StepBeginsSpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
@@ -342,10 +353,14 @@ spec s registry = do
   Pawl.Codec.AttachTargetSpec.spec s
   Pawl.Codec.AttackCostSpec.spec s
   Pawl.Codec.AttackRequirementSpec.spec s
+  Pawl.Codec.AttackerBlockedSpec.spec s
+  Pawl.Codec.BecameDesignatedSpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
   Pawl.Codec.BindingSpec.spec s
   Pawl.Codec.BlockPermissionSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
+  Pawl.Codec.BlockerDeclaredSpec.spec s
+  Pawl.Codec.BlocksDeclaredSpec.spec s
   Pawl.Codec.CantBeBlockedBySpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
@@ -378,6 +393,7 @@ spec s registry = do
   Pawl.Codec.DamageEventSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
+  Pawl.Codec.DamagePreventedSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DaytimeSpec.spec s
   Pawl.Codec.DealDamageSpec.spec s
@@ -389,6 +405,7 @@ spec s registry = do
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
   Pawl.Codec.DiscardSpec.spec s
+  Pawl.Codec.DrewSpec.spec s
   Pawl.Codec.DungeonRoomSpec.spec s
   Pawl.Codec.DurationRefSpec.spec s
   Pawl.Codec.DurationSpec.spec s
@@ -412,6 +429,7 @@ spec s registry = do
   Pawl.Codec.LayoutSpec.spec s
   Pawl.Codec.LibraryPlacementSpec.spec s
   Pawl.Codec.LibraryPositionSpec.spec s
+  Pawl.Codec.LifeChangeSpec.spec s
   Pawl.Codec.LimitUnlessSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
@@ -420,6 +438,7 @@ spec s registry = do
   Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
+  Pawl.Codec.MentoredSpec.spec s
   Pawl.Codec.MillSpec.spec s
   Pawl.Codec.MillTallySpec.spec s
   Pawl.Codec.ModalSpec.spec s
@@ -431,12 +450,14 @@ spec s registry = do
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.MorphVariantSpec.spec s
   Pawl.Codec.MoveToZoneSpec.spec s
+  Pawl.Codec.MovedSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
   Pawl.Codec.ObjectRefSpec.spec s
   Pawl.Codec.OfferCastSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
   Pawl.Codec.PermanentBecomesDesignatedSpec.spec s
+  Pawl.Codec.PermanentSacrificedSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
   Pawl.Codec.PhaseSelectorSpec.spec s
   Pawl.Codec.PhaseSpec.spec s
@@ -483,6 +504,7 @@ spec s registry = do
   Pawl.Codec.SpeedDecreaseSpec.spec s
   Pawl.Codec.SpellCastSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
+  Pawl.Codec.StepBeganSpec.spec s
   Pawl.Codec.StepBeginsSpec.spec s
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s

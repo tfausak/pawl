@@ -43,6 +43,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -181,7 +182,7 @@ inherentPending events gs =
       -- posture and not an oversight: this matcher answers about one event shape,
       -- and a new GameEvent constructor is not an event rule 702.179d names.
       lostLife event = case event of
-        GameEvent.LifeLost pid _ -> Set.member pid opponents
+        GameEvent.LifeLost (LifeChange.MkLifeChange pid _) -> Set.member pid opponents
         _ -> False
       hasSpeed = case Map.lookup you (GameState.players gs) of
         Just player -> Maybe.maybe False (>= 1) (Player.speed player)

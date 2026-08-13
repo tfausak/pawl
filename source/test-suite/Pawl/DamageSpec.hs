@@ -53,6 +53,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -445,7 +446,7 @@ witherSpec s registry =
       Spec.assertEqWith s "bob lost the two life" (S.lifeOf S.bob after) (Just 18)
       -- CR 119.2's EVENT and not only the total: lifeLostBy skips infect's
       -- diverted damage, and this is what keeps wither out of that skip.
-      Spec.assertEqWith s "a life-loss event was recorded" (elem (GameEvent.LifeLost S.bob 2) (S.eventsOf after)) True
+      Spec.assertEqWith s "a life-loss event was recorded" (elem (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 2)) (S.eventsOf after)) True
       Spec.assertEqWith s "bob has no poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 0
       Spec.assertEqWith
         s

@@ -654,27 +654,27 @@ castOf event = case event of
   GameEvent.SpellCast pid _ _ -> Just pid
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameDesignated _ _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
-  GameEvent.Moved _ _ -> Nothing
+  GameEvent.Moved {} -> Nothing
   GameEvent.DamageDealt _ -> Nothing
-  GameEvent.DamagePrevented _ _ -> Nothing
-  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
-  GameEvent.Drew _ _ -> Nothing
+  GameEvent.Drew {} -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared _ _ -> Nothing
-  GameEvent.BlocksDeclared _ _ -> Nothing
-  GameEvent.AttackerBlocked _ _ -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
-  GameEvent.LifeLost _ _ -> Nothing
-  GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
   GameEvent.ControlChanged {} -> Nothing
@@ -698,29 +698,29 @@ discardOf event = case event of
   GameEvent.Discarded pid _ _ -> Just pid
   -- CR 701.9a's discard moves a card OUT of a hand; CR 121.1's draw moves one
   -- in. Opposite directions, and neither event stands in for the other.
-  GameEvent.Drew _ _ -> Nothing
+  GameEvent.Drew {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameDesignated _ _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
-  GameEvent.Moved _ _ -> Nothing
+  GameEvent.Moved {} -> Nothing
   GameEvent.DamageDealt _ -> Nothing
-  GameEvent.DamagePrevented _ _ -> Nothing
-  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared _ _ -> Nothing
-  GameEvent.BlocksDeclared _ _ -> Nothing
-  GameEvent.AttackerBlocked _ _ -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
-  GameEvent.LifeLost _ _ -> Nothing
-  GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
   GameEvent.ControlChanged {} -> Nothing

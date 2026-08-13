@@ -56,12 +56,14 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -253,7 +255,7 @@ instructionSpec s registry = Spec.describe s "Instruction" $ do
     Spec.assertBool s (S.onBattlefield stolen after) "CR 101.3: the instruction is ignored"
     Spec.assertBool
       s
-      (notElem (GameEvent.PermanentSacrificed S.alice stolen) (S.eventsOf after))
+      (notElem (GameEvent.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed S.alice stolen)) (S.eventsOf after))
       "and no sacrifice was recorded"
   -- The control leg, and the one that proves the case above is about the
   -- prohibition rather than about a trigger that never fires: the SAME board with
@@ -267,7 +269,7 @@ instructionSpec s registry = Spec.describe s "Instruction" $ do
     Spec.assertBool s (not (S.onBattlefield his after)) "bob sacrifices his own creature"
     Spec.assertBool
       s
-      (elem (GameEvent.PermanentSacrificed S.bob his) (S.eventsOf after))
+      (elem (GameEvent.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed S.bob his)) (S.eventsOf after))
       "and the sacrifice was recorded"
 
 -- CR 305.7 as Pawl.Engine.SacrificeRestriction reads it, which is the gate
@@ -337,6 +339,6 @@ activatable oid gs = case Projection.abilitiesOf oid gs of
 -- so no ordering choice is made.
 endStepOf :: GameState.GameState -> GameState.GameState
 endStepOf gs =
-  let began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs
+  let began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs
       placed = S.runPure S.identityAnswer began Engine.settleForPriority
    in S.runPure S.identityAnswer placed Stack.resolveTop

@@ -49,7 +49,11 @@ import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import Pawl.Types.Binding (Binding)
+import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
@@ -64,12 +68,14 @@ import qualified Pawl.Types.Countering as Countering
 import Pawl.Types.DamageEvent (DamageEvent)
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -85,7 +91,10 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.Onset (Onset)
@@ -94,6 +103,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -117,6 +127,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -242,7 +253,7 @@ payLife pid n gs =
   -- CR 119.4's own last clause, "in other words, the player loses that much
   -- life", is why the payment is recorded as a life loss like any other. CR
   -- 119.4b's always-payable 0 loses nothing and so records nothing.
-  (if n == 0 then id else recordEvent (GameEvent.LifeLost pid n))
+  (if n == 0 then id else recordEvent (GameEvent.LifeLost (LifeChange.MkLifeChange pid n)))
     gs
       { GameState.players =
           Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)
@@ -267,36 +278,36 @@ enterTapped oid =
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
 movedOf event = case event of
-  GameEvent.Moved zc _ -> Just zc
+  GameEvent.Moved (Moved.MkMoved zc _) -> Just zc
   GameEvent.DamageDealt _ -> Nothing
-  GameEvent.DamagePrevented _ _ -> Nothing
-  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- The Moved event emitted by the same discard is the zone change; this one
   -- says the move WAS a discard (CR 701.9a).
   GameEvent.Discarded {} -> Nothing
-  GameEvent.Drew _ _ -> Nothing
+  GameEvent.Drew {} -> Nothing
   -- CR 701.20b: a reveal is never a zone change, even when the card is about to
   -- make one.
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared _ _ -> Nothing
-  GameEvent.BlocksDeclared _ _ -> Nothing
-  GameEvent.AttackerBlocked _ _ -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
   -- The Moved event `counter` records alongside this one is rule 701.6a's zone
   -- change; this one only says the move WAS a countering. The Discarded case.
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameDesignated _ _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
-  GameEvent.LifeLost _ _ -> Nothing
-  GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
   GameEvent.ControlChanged {} -> Nothing
@@ -306,29 +317,29 @@ movedOf event = case event of
 damageOf :: GameEvent -> Maybe DamageEvent
 damageOf event = case event of
   GameEvent.DamageDealt ev -> Just ev
-  GameEvent.DamagePrevented _ _ -> Nothing
-  GameEvent.Moved _ _ -> Nothing
-  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.Moved {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
-  GameEvent.Drew _ _ -> Nothing
+  GameEvent.Drew {} -> Nothing
   GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared _ _ -> Nothing
-  GameEvent.BlocksDeclared _ _ -> Nothing
-  GameEvent.AttackerBlocked _ _ -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameDesignated _ _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
-  GameEvent.LifeLost _ _ -> Nothing
-  GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
   GameEvent.ControlChanged {} -> Nothing
@@ -338,29 +349,29 @@ damageOf event = case event of
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
 revealOf event = case event of
   GameEvent.Revealed pid _ _ snapshot -> Just (pid, snapshot)
-  GameEvent.Moved _ _ -> Nothing
+  GameEvent.Moved {} -> Nothing
   GameEvent.DamageDealt _ -> Nothing
-  GameEvent.DamagePrevented _ _ -> Nothing
-  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
   GameEvent.SpellCast {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
-  GameEvent.Drew _ _ -> Nothing
+  GameEvent.Drew {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared _ _ -> Nothing
-  GameEvent.BlocksDeclared _ _ -> Nothing
-  GameEvent.AttackerBlocked _ _ -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameDesignated _ _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
-  GameEvent.LifeLost _ _ -> Nothing
-  GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
   GameEvent.ControlChanged {} -> Nothing
@@ -2297,7 +2308,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- once CR 400.7 has minted a new incarnation (CR 603.10a's look-back
           -- reads it). Recorded LAST, so the entry loop's choices are locked in
           -- before any trigger or SBA can observe the object.
-          State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot))
+          State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid newId fromZone dest) snapshot)))
           pure (Just newId)
 
 -- The single destruction funnel (CR 701.8 / 702.12b): the Destroy opcode and the
@@ -2573,7 +2584,7 @@ sacrifice pid oid = do
         -- repeat terminates. This arm is the backstop under both.
         | SacrificeRestriction.prohibited oid gs -> pure ()
         | otherwise -> do
-            State.modify' (recordEvent (GameEvent.PermanentSacrificed pid oid))
+            State.modify' (recordEvent (GameEvent.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed pid oid)))
             changeZone oid Zone.Graveyard
       Zone.Library -> pure ()
       Zone.Hand -> pure ()
@@ -2712,7 +2723,7 @@ recordTokenEntry :: ObjectId -> Game ()
 recordTokenEntry newId = do
   placed <- State.get
   let snapshot = Projection.project newId placed
-  State.modify' (recordEvent (GameEvent.Moved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot))
+  State.modify' (recordEvent (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange newId newId Zone.Battlefield Zone.Battlefield) snapshot)))
 
 -- CR 121.1, one card at a time per CR 121.2. An empty library records the failed
 -- draw, which CR 704.5b makes a loss at the next state-based-action check. Shared
@@ -2741,7 +2752,7 @@ drawCard pid = do
           nth <- State.state $ \g ->
             let tally = Map.insertWith (+) pid 1 (GameState.drawsThisTurn g)
              in (Map.findWithDefault 1 pid tally, g {GameState.drawsThisTurn = tally})
-          State.modify' (recordEvent (GameEvent.Drew pid nth))
+          State.modify' (recordEvent (GameEvent.Drew (Drew.MkDrew pid nth)))
           -- CR 702.94a's "if it's the FIRST card you've drawn this turn", asked
           -- off the ordinal this draw was just stamped with rather than off a
           -- second reading of the tally.
@@ -2874,30 +2885,30 @@ matchesTriggerGiven :: Map.Map SlotName.SlotName Binding -> GameState -> ObjectI
 matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
   TriggerCondition.SelfEnters -> case event of
-    GameEvent.Moved zc _ -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
+    GameEvent.Moved (Moved.MkMoved zc _) -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -2908,7 +2919,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- "another"), and its controller is the perspective CR 109.5 gives "you" in
   -- "a creature YOU CONTROL enters".
   TriggerCondition.PermanentEnters f -> case event of
-    GameEvent.Moved zc _
+    GameEvent.Moved (Moved.MkMoved zc _)
       | ZoneChange.to zc == Zone.Battlefield ->
           -- Deliberately NOT the snapshot the Moved event carries: that is the
           -- object as it last existed in the zone it LEFT, and reading it here
@@ -2930,61 +2941,61 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
            in case Projection.viewWithLastKnown entrant gs entrant of
                 Nothing -> False
                 Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope) -> case event of
-    GameEvent.StepBegan began active ->
+    GameEvent.StepBegan (StepBegan.MkStepBegan began active) ->
       began == wanted && turnScopeAdmits scope active you
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -2999,29 +3010,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       DamageEvent.source ev == bearer
         && DamageEvent.kind ev == DamageKind.Combat
         && isPlayerRecipient (DamageEvent.target ev)
-    GameEvent.Moved _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3048,29 +3059,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
                    Nothing -> False
                    Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
            )
-    GameEvent.Moved _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.Moved {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3092,29 +3103,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfCycled -> case event of
     GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> oid == bearer
     GameEvent.Discarded _ _ DiscardCause.Ordinary -> False
-    GameEvent.Drew _ _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3145,28 +3156,28 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Revealed _ oid RevealCause.ForMiracle _ -> oid == bearer
     GameEvent.Revealed _ _ RevealCause.Ordinary _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3192,29 +3203,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Discarded discarder _ _ -> case relation of
       PlayerRelation.You -> discarder == you
       PlayerRelation.Opponent -> discarder /= you
-    GameEvent.Drew _ _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3232,35 +3243,35 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Equality on the ordinal, which is what makes "your second card" fire once in
   -- a turn with five draws.
   TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard relation nth) -> case event of
-    GameEvent.Drew drawer ordinal ->
+    GameEvent.Drew (Drew.MkDrew drawer ordinal) ->
       ordinal
         == nth
         && case relation of
           PlayerRelation.You -> drawer == you
           PlayerRelation.Opponent -> drawer /= you
     GameEvent.Discarded {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3283,29 +3294,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch crowned -> case relation of
       PlayerRelation.You -> crowned == you
       PlayerRelation.Opponent -> crowned /= you
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3327,29 +3338,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
         TriggerFrequency.FirstTimeEachTurn -> declarationsOf bearer gs <= 1
     -- The other declaration. CR 509.1a's blocker is not an attacker, and a
     -- creature can be both this combat.
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3383,29 +3394,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
               admits other = other /= bearer && maybe False (\view -> Filter.matches context view f) (viewOf other)
            in any admits (Map.keys (Combat.attackers (GameState.combat gs)))
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3428,29 +3439,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
             Nothing -> False
             Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3478,29 +3489,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
                     Just theirs -> all (\pid -> maybe True (<= theirs) (lifeOf pid)) (Game.stillPlaying gs)
             _ -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3519,32 +3530,32 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- two attackers makes two BlockerDeclared and one BlocksDeclared, so matching
   -- the pairwise one here would fire twice.
   TriggerCondition.SelfBlocks -> case event of
-    GameEvent.BlocksDeclared blocker _ -> blocker == bearer
-    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker _) -> blocker == bearer
+    GameEvent.BlockerDeclared {} -> False
     -- The bearer BECOMING blocked is the other side of the same declaration and
     -- not this condition: CR 509.3a's creature is the one doing the blocking.
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3554,34 +3565,34 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- SelfBlocks above, together with the attacker eventBindings stamps under
   -- Binding.blockedCreature.
   TriggerCondition.SelfBlocksCreature -> case event of
-    GameEvent.BlockerDeclared blocker _ -> blocker == bearer
+    GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker _) -> blocker == bearer
     -- CR 509.3a's grouped event is the once-per-combat one, and matching it here
     -- would lose a blocker's second attacker.
-    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.BlocksDeclared {} -> False
     -- CR 509.3c's grouped event is the bearer BECOMING blocked, which is not a
     -- block by it.
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3593,30 +3604,30 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Rule 509.3e's "effects that add or remove blockers" also cause it to trigger,
   -- and no such effect is in the pool: the count is the declaration's (#1146).
   TriggerCondition.SelfBlocksAtLeast n -> case event of
-    GameEvent.BlocksDeclared blocker count -> blocker == bearer && count >= n
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker count) -> blocker == bearer && count >= n
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3637,37 +3648,37 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- viewWithLastKnown, and the Filter context framed by the bearer, exactly as
   -- SelfBecomesBlockedBy's arm below does it.
   TriggerCondition.SelfBlocksOneOrMore f -> case event of
-    GameEvent.BlocksDeclared blocker _
+    GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker _)
       | blocker == bearer ->
           let admits attacker = maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown attacker gs attacker)
               blocked = [attacker | (attacker, blockers) <- Map.toList (Combat.blockers (GameState.combat gs)), Set.member bearer blockers]
            in any admits blocked
-    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.BlocksDeclared {} -> False
     -- The PAIRWISE event is CR 509.3b's, and matching it here would fire once per
     -- attacker blocked rather than once for the declaration.
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3680,33 +3691,33 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- A match on GameEvent.BlockerDeclared's attacker would fire once per blocker
   -- instead; Pawl.TriggerSpec's two-blocker case is what tells the two apart.
   TriggerCondition.SelfBecomesBlocked -> case event of
-    GameEvent.AttackerBlocked oid _ -> oid == bearer
+    GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked oid _) -> oid == bearer
     -- CR 509.4's creature put onto the battlefield blocking never "blocked", but
     -- that is not why this is False: a blocker's own declaration is CR 509.3a's
     -- event, whoever it was declared against.
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3722,37 +3733,37 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- window to change them. viewWithLastKnown for PermanentEnters' reason -- a
   -- blocker already gone (CR 608.2h) is still read as it was on the battlefield.
   TriggerCondition.SelfBecomesBlockedBy f -> case event of
-    GameEvent.BlockerDeclared blocker attacker
+    GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker attacker)
       | attacker == bearer ->
           case Projection.viewWithLastKnown blocker gs blocker of
             Nothing -> False
             Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
     -- The GROUPED event is CR 509.3c's, and matching it here would collapse two
     -- blockers into one trigger.
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3767,34 +3778,34 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- and no blocker at all. The map is keyed by attacker, so the bearer's own entry
   -- is the whole answer here.
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> case event of
-    GameEvent.AttackerBlocked attacker _
+    GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker _)
       | attacker == bearer ->
           let admits blocker = maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown blocker gs blocker)
            in any admits (Set.toList (Map.findWithDefault Set.empty bearer (Combat.blockers (GameState.combat gs))))
-    GameEvent.AttackerBlocked _ _ -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3807,33 +3818,33 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- `from` is the half that does the work: the same card discarded out of a hand
   -- or dying off the battlefield reaches the same graveyard and must not trigger.
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> case event of
-    GameEvent.Moved zc _ ->
+    GameEvent.Moved (Moved.MkMoved zc _) ->
       ZoneChange.object zc == bearer
         && ZoneChange.from zc == Zone.Library
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3850,32 +3861,32 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- what makes the graveyard the one zone the scan has to find the bearer in,
   -- however far away the card started.
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> case event of
-    GameEvent.Moved zc _ ->
+    GameEvent.Moved (Moved.MkMoved zc _) ->
       ZoneChange.object zc == bearer
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3891,33 +3902,33 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- abilities look back in time, so the bearer offered here is the permanent as it
   -- was immediately before the event, never the CR 400.7 incarnation.
   TriggerCondition.SelfDies -> case event of
-    GameEvent.Moved zc _ ->
+    GameEvent.Moved (Moved.MkMoved zc _) ->
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3943,36 +3954,36 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Nothing is a permanent that is gone AND filed no last known information, about
   -- which no Filter can honestly answer.
   TriggerCondition.PermanentDies f -> case event of
-    GameEvent.Moved zc _
+    GameEvent.Moved (Moved.MkMoved zc _)
       | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard ->
           let deceased = ZoneChange.departed zc
            in case Projection.viewWithLastKnown deceased gs deceased of
                 Nothing -> False
                 Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -3991,33 +4002,33 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Not matched: CR 603.6c's other trigger event, a phased-in permanent leaving
   -- the game with its owner (#385).
   TriggerCondition.SelfLeavesTheBattlefield -> case event of
-    GameEvent.Moved zc _ ->
+    GameEvent.Moved (Moved.MkMoved zc _) ->
       ZoneChange.departed zc == bearer
         && ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc /= Zone.Battlefield
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -4036,33 +4047,33 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- targeted "regardless of whether or not that object is still a creature", so a
   -- creature that was turned into a Treasure and then destroyed still fires this.
   TriggerCondition.HauntedCreatureDies -> case event of
-    GameEvent.Moved zc _ ->
+    GameEvent.Moved (Moved.MkMoved zc _) ->
       ZoneChange.from zc == Zone.Battlefield
         && ZoneChange.to zc == Zone.Graveyard
         && Map.lookup bearer (GameState.haunting gs) == Just (ZoneChange.departed zc)
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -4084,29 +4095,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCountered c -> case relation of
       PlayerRelation.You -> Countering.controller c == you
       PlayerRelation.Opponent -> Countering.controller c /= you
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
-    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.DamagePrevented {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -4129,7 +4140,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- sentence says "to you", and the recipient the event carries is what
   -- distinguishes the two.
   TriggerCondition.DamageToPlayerPrevented relation -> case event of
-    GameEvent.DamagePrevented recipient _ -> case recipient of
+    GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented recipient _) -> case recipient of
       Recipient.ToPlayer pid -> case relation of
         PlayerRelation.You -> pid == you
         -- CR 102.2: no producer today -- a card watching an opponent's damage
@@ -4139,29 +4150,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
       Recipient.ToPlaneswalker _ -> False
       Recipient.ToBattle _ -> False
       Recipient.ToObject _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -4185,33 +4196,33 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- below is where that shows: one damage event can record both, and only the
   -- gain fires this.
   TriggerCondition.PlayerGainsLife relation -> case event of
-    GameEvent.LifeGained pid _ -> case relation of
+    GameEvent.LifeGained (LifeChange.MkLifeChange pid _) -> case relation of
       PlayerRelation.You -> pid == you
       -- CR 102.2: no producer today -- a card watching an OPPONENT gain life.
       PlayerRelation.Opponent -> pid /= you
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeLost {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -4240,35 +4251,35 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- damage event can record a loss and a lifelink gain together, and only the
   -- loss fires this.
   TriggerCondition.PlayerLosesLife relation -> case event of
-    GameEvent.LifeLost pid _ -> case relation of
+    GameEvent.LifeLost (LifeChange.MkLifeChange pid _) -> case relation of
       -- No producer today -- a card watching its OWN controller lose life.
       PlayerRelation.You -> pid == you
       -- Exquisite Blood's half. CR 102.2 is what makes "not you" the right test
       -- on a two-player board, as it is for Megrim under PlayerDiscards.
       PlayerRelation.Opponent -> pid /= you
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -4294,30 +4305,30 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 310.11b: the LAST counter of this kind came off the BEARER. The mirror of
   -- the arm above, and narrower in the way rule 310.11b is narrower than rule
   -- 714.2b: there is no threshold to cross, only a count that reached none.
@@ -4331,30 +4342,30 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CountersPut {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 601.2i's "any abilities that trigger when a spell is cast": a spell the
   -- Filter admits became cast. The bearer frames the match rather than being it,
   -- as for PermanentEnters -- it is the Filter.Context's source, and its
@@ -4393,7 +4404,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           && Filter.matches (Filter.contextFor (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -4402,22 +4413,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 601.2i, self-scoped: the spell that became cast IS the bearer. A bare
   -- comparison of ids and no Filter at all, which is what separates this arm
   -- from SpellCast's above -- nothing about the spell is read, so no projection
@@ -4432,28 +4443,28 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfCast -> case event of
     GameEvent.SpellCast _ spell _ -> spell == bearer
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
@@ -4469,7 +4480,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfHalfUnlocked half -> case event of
     GameEvent.HalfUnlocked oid name _ -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -4479,22 +4490,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 708.7 through CR 603.2: the bearer is the permanent that turned over.
   -- SelfEnters' shape -- a bare comparison of ids, with nothing about the
   -- permanent's characteristics read, so no CR 608.2h fallback is reachable.
@@ -4510,7 +4521,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 708.8's last sentence fall out rather than needing a clause.
   TriggerCondition.SelfTurnedFaceUp -> case event of
     GameEvent.TurnedFaceUp oid -> oid == bearer
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -4521,22 +4532,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 708.7's OTHER written form, read by a bystander: "whenever a permanent is
   -- turned face up". PermanentEnters' shape against SelfEnters', and for its
   -- reason -- the bearer frames the match rather than being it. The bearer is the
@@ -4570,7 +4581,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp oid -> case Projection.viewWithLastKnown oid gs oid of
       Nothing -> False
       Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -4581,22 +4592,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 702.112b: a permanent the Filter admits was given the renowned designation.
   -- PermanentTurnedFaceUp's arm above, line for line, and for its reasons: the
   -- permanent is read as it stands (viewWithLastKnown for CR 608.2h, a designation
@@ -4609,7 +4620,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   TriggerCondition.SelfEvolves -> case event of
     GameEvent.Evolved oid -> oid == bearer
     GameEvent.Mentored {} -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4619,22 +4630,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 702.134c: the creature the BEARER IS ATTACHED TO mentored another. The
   -- event's first id is rule 702.134c's "first creature", the mentor, and this arm
   -- asks only whether that is the bearer's host -- the pairing with the second
@@ -4650,10 +4661,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- stands when the trigger is gathered is CR 603.2's own reading of "equipped
   -- creature".
   TriggerCondition.AttachedCreatureMentors -> case event of
-    GameEvent.Mentored mentor _ ->
+    GameEvent.Mentored (Mentored.MkMentored mentor _) ->
       (Recipient.objectOf =<< Object.attachedTo =<< Game.lookupObject bearer gs) == Just mentor
     GameEvent.Evolved _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4663,26 +4674,26 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated wanted f) -> case event of
     -- The designations must MATCH, not merely both be present: Valeron Wardens'
     -- renown trigger must not fire when a creature you control becomes monstrous.
-    GameEvent.BecameDesignated got oid
+    GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated got oid)
       | got /= wanted -> False
       | otherwise -> case Projection.viewWithLastKnown oid gs oid of
           Nothing -> False
@@ -4698,22 +4709,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 709.5i: "such an ability triggers when that permanent has one of the two
   -- unlocked designations and gets the other, or when it has neither designation
   -- and gains both." The whole of that sentence is the flag the event carries,
@@ -4740,7 +4751,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           PlayerRelation.You -> controller == you
           PlayerRelation.Opponent -> controller /= you
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -4750,22 +4761,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 603.10a's sacrifice family: the log entry Event.sacrifice writes is the
   -- whole of the answer, which is exactly what makes the condition worth having.
   -- CR 700.4 makes every sacrifice a death, so the Moved event the same sacrifice
@@ -4779,7 +4790,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.PermanentSacrificed {} -> True
     GameEvent.AbilityTriggered {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.HalfUnlocked {} -> False
@@ -4790,22 +4801,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CountersPut {} -> False
     -- CR 700.4 again, from this side: a sacrifice DOES record a Moved event, and
     -- matching it here would answer twice for one sacrifice.
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 603.1b: "a triggered ability may have more than one trigger condition".
   -- `any`, because the printed sentence joins them with "and whenever": each
   -- clause is its own occasion for the ability to trigger. Two clauses matching
@@ -4855,7 +4866,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
            )
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.HalfUnlocked {} -> False
@@ -4864,22 +4875,22 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 603.7: "when you lose control of the creature" -- Ray of Command's third
   -- sentence. The slot is read out of CR 603.7c's captured environment, so the
   -- creature this asks about is the one the spell targeted rather than whatever
@@ -4908,29 +4919,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
   -- CR 309.4c: "when you move your venture marker into THIS room", so the
   -- dungeon card the marker is on must be the bearer and the room must be this
   -- ability's own. Never reached today -- eventTriggers' command-zone source is
@@ -4944,29 +4955,29 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.TurnedFaceUp _ -> False
-    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
     GameEvent.Mentored {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
-    GameEvent.Moved _ _ -> False
+    GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.DamagePrevented _ _ -> False
-    GameEvent.StepBegan _ _ -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.StepBegan {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
-    GameEvent.Drew _ _ -> False
+    GameEvent.Drew {} -> False
     GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
-    GameEvent.BlockerDeclared _ _ -> False
-    GameEvent.BlocksDeclared _ _ -> False
-    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
-    GameEvent.LifeLost _ _ -> False
-    GameEvent.LifeGained _ _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
 
 -- CR 603.3b: is this trigger condition "another ability triggering"? The
 -- classification the rule's two-part placement turns on -- False puts a trigger
@@ -5109,7 +5120,7 @@ eventBindings cond event = case (cond, event) of
   -- CR 400.7e's public-zone proviso holds by construction here, matchesTrigger's
   -- SelfDies arm having required `to == Graveyard`; the arm below is where it
   -- becomes a real test.
-  (TriggerCondition.SelfDies, GameEvent.Moved zc _) ->
+  (TriggerCondition.SelfDies, GameEvent.Moved (Moved.MkMoved zc _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
   -- The same rule and the same field, watched by a BYSTANDER: Promise of
   -- Tomorrow's "whenever a creature you control dies, exile IT". What differs
@@ -5130,7 +5141,7 @@ eventBindings cond event = case (cond, event) of
   -- PermanentDies arm has already required the battlefield-to-graveyard pair, and
   -- CR 400.2 lists the graveyard among the public zones. That is what makes
   -- eventBindingSlots' unconditional promise for this condition honest.
-  (TriggerCondition.PermanentDies _, GameEvent.Moved zc _) ->
+  (TriggerCondition.PermanentDies _, GameEvent.Moved (Moved.MkMoved zc _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
   -- The same rule, with its proviso doing real work for the first time: CR 603.6c's
   -- wider condition accepts ANY destination, and CR 400.2 makes two of them hidden.
@@ -5142,7 +5153,7 @@ eventBindings cond event = case (cond, event) of
   --
   -- Classified by the ZONE, never by whether the card is currently visible -- CR
   -- 400.2 draws exactly that distinction.
-  (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved zc _)
+  (TriggerCondition.SelfLeavesTheBattlefield, GameEvent.Moved (Moved.MkMoved zc _))
     | not (Game.isHiddenZone (ZoneChange.to zc)) ->
         Binding.setBecame (ZoneChange.object zc) Map.empty
   -- CR 400.7e again, read in the ENTRY direction: the object that moved is the
@@ -5164,7 +5175,7 @@ eventBindings cond event = case (cond, event) of
   -- RECEIVE what the payload does is the payload's question (CR 120.1a for
   -- damage), and a binding that existed only for creatures would make the slot's
   -- presence depend on the entrant, which eventBindingSlots cannot express.
-  (TriggerCondition.PermanentEnters _, GameEvent.Moved zc _) ->
+  (TriggerCondition.PermanentEnters _, GameEvent.Moved (Moved.MkMoved zc _)) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
   -- "That player": the discarder, which CR 701.9a makes one player and the event
   -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for the
@@ -5195,7 +5206,7 @@ eventBindings cond event = case (cond, event) of
   -- as the arm above -- CR 508.5 resolves it for an ability of an ATTACKING
   -- creature, which is what the bearer of this condition is. Read off the event
   -- for that arm's reason, Combat.declareBlockers having stamped it there.
-  (TriggerCondition.SelfBecomesBlocked, GameEvent.AttackerBlocked _ defending) ->
+  (TriggerCondition.SelfBecomesBlocked, GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked _ defending)) ->
     Binding.setTriggerPlayer defending Map.empty
   -- CR 615.13's "that many": how much this prevention effect prevented, which is
   -- the whole reason the event carries a number. The first reserved slot holding
@@ -5205,7 +5216,7 @@ eventBindings cond event = case (cond, event) of
   -- The recipient is NOT bound alongside it. Every payload in the pool acts on
   -- the ability's own source (Selfless Squire counters itself), and the player
   -- the recipient names under this condition is CR 109.5's "you", already bound.
-  (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented _ amount) ->
+  (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented _ amount)) ->
     Binding.setEventAmount amount Map.empty
   -- CR 119.9's "that much": how much life the gain was, which CR 603.2 makes part
   -- of the event that fired the trigger -- Sanguine Bond's "target opponent loses
@@ -5219,7 +5230,7 @@ eventBindings cond event = case (cond, event) of
   -- The gaining PLAYER is not bound alongside it, for the reason
   -- eventBindingSlots' arm gives: under the one relation a card in the pool uses
   -- that player is CR 109.5's "you", whom Binding.setYou already names.
-  (TriggerCondition.PlayerGainsLife _, GameEvent.LifeGained _ amount) ->
+  (TriggerCondition.PlayerGainsLife _, GameEvent.LifeGained (LifeChange.MkLifeChange _ amount)) ->
     Binding.setEventAmount amount Map.empty
   -- The other direction's "that much" -- Exquisite Blood's "you gain that much
   -- life". The same slot and the same reading as the gain arm above, off an
@@ -5241,7 +5252,7 @@ eventBindings cond event = case (cond, event) of
   -- "you", so the slot is a second name for one player there; that is a
   -- redundancy, not a wrong answer, and the alternative -- binding it only under
   -- Opponent -- would make the promise depend on the relation.
-  (TriggerCondition.PlayerLosesLife _, GameEvent.LifeLost pid amount) ->
+  (TriggerCondition.PlayerLosesLife _, GameEvent.LifeLost (LifeChange.MkLifeChange pid amount)) ->
     Binding.setTriggerPlayer pid (Binding.setEventAmount amount Map.empty)
   -- CR 601.2i's "it": the spell that became cast, which the event names and
   -- which nothing else on the ability does. Presence of the Master's "whenever a
@@ -5282,13 +5293,13 @@ eventBindings cond event = case (cond, event) of
   --
   -- The ATTACKER on the same event is the bearer, already bound as CR 113.7a's
   -- source, so it gets no second name.
-  (TriggerCondition.SelfBecomesBlockedBy _, GameEvent.BlockerDeclared blocker _) ->
+  (TriggerCondition.SelfBecomesBlockedBy _, GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared blocker _)) ->
     Binding.setBlockingCreature blocker Map.empty
   -- CR 509.3b's "that creature": the ATTACKER on the very same declaration, which
   -- Loyal Sentry's payload destroys. The mirror of the arm above, and
   -- unconditional for the same reason; here it is the BLOCKER that is the bearer
   -- and so gets no second name.
-  (TriggerCondition.SelfBlocksCreature, GameEvent.BlockerDeclared _ attacker) ->
+  (TriggerCondition.SelfBlocksCreature, GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared _ attacker)) ->
     Binding.setBlockedCreature attacker Map.empty
   -- CR 702.134c's "that creature": the creature that was mentored, the event's
   -- second id -- Aegis of the Legion's shield counter goes on it. The MENTOR gets no
@@ -5297,7 +5308,7 @@ eventBindings cond event = case (cond, event) of
   --
   -- Unconditional given a match, which is what eventBindingSlots' per-condition
   -- promise needs: every GameEvent.Mentored carries both ids.
-  (TriggerCondition.AttachedCreatureMentors, GameEvent.Mentored _ mentored) ->
+  (TriggerCondition.AttachedCreatureMentors, GameEvent.Mentored (Mentored.MkMentored _ mentored)) ->
     Binding.setMentoredCreature mentored Map.empty
   -- CR 725.1's newly crowned player: Garland, Royal Kidnapper's "that player",
   -- whose creature the trigger then targets and whose crown its duration watches.
@@ -5926,7 +5937,7 @@ eventTriggers events gs =
       -- that was standing on the battlefield when the event happened and so take
       -- only the ones CR 113.6m leaves functioning there.
       departedFrom pick event = case event of
-        GameEvent.Moved zc _
+        GameEvent.Moved (Moved.MkMoved zc _)
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
               case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
                 Nothing -> Map.empty
@@ -5934,30 +5945,30 @@ eventTriggers events gs =
                   Map.singleton
                     (ZoneChange.departed zc)
                     (LastKnown.controller lk, pick (LastKnown.characteristics lk))
-        GameEvent.Moved _ _ -> Map.empty
+        GameEvent.Moved {} -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
-        GameEvent.DamagePrevented _ _ -> Map.empty
-        GameEvent.StepBegan _ _ -> Map.empty
+        GameEvent.DamagePrevented {} -> Map.empty
+        GameEvent.StepBegan {} -> Map.empty
         GameEvent.SpellCast {} -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.Discarded {} -> Map.empty
-        GameEvent.Drew _ _ -> Map.empty
+        GameEvent.Drew {} -> Map.empty
         GameEvent.Revealed {} -> Map.empty
         GameEvent.AttackerDeclared {} -> Map.empty
-        GameEvent.BlockerDeclared _ _ -> Map.empty
-        GameEvent.BlocksDeclared _ _ -> Map.empty
-        GameEvent.AttackerBlocked _ _ -> Map.empty
+        GameEvent.BlockerDeclared {} -> Map.empty
+        GameEvent.BlocksDeclared {} -> Map.empty
+        GameEvent.AttackerBlocked {} -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.BecameDesignated _ _ -> Map.empty
+        GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
-        GameEvent.LifeLost _ _ -> Map.empty
-        GameEvent.LifeGained _ _ -> Map.empty
+        GameEvent.LifeLost {} -> Map.empty
+        GameEvent.LifeGained {} -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
         GameEvent.CountersRemoved {} -> Map.empty
         GameEvent.ControlChanged {} -> Map.empty
@@ -6054,31 +6065,31 @@ eventTriggers events gs =
         -- an ability that triggers from there -- CR 702.94a's miracle -- but that
         -- one fires on the REVEAL rather than on the draw, and `revealedInHand`
         -- below is its source.
-        GameEvent.Drew _ _ -> Map.empty
-        GameEvent.Moved _ _ -> Map.empty
+        GameEvent.Drew {} -> Map.empty
+        GameEvent.Moved {} -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
-        GameEvent.DamagePrevented _ _ -> Map.empty
-        GameEvent.StepBegan _ _ -> Map.empty
+        GameEvent.DamagePrevented {} -> Map.empty
+        GameEvent.StepBegan {} -> Map.empty
         GameEvent.SpellCast {} -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         -- A reveal is not a cycling, whatever it showed. `revealedInHand` below is
         -- what hangs an ability on the card a reveal names.
         GameEvent.Revealed {} -> Map.empty
         GameEvent.AttackerDeclared {} -> Map.empty
-        GameEvent.BlockerDeclared _ _ -> Map.empty
-        GameEvent.BlocksDeclared _ _ -> Map.empty
-        GameEvent.AttackerBlocked _ _ -> Map.empty
+        GameEvent.BlockerDeclared {} -> Map.empty
+        GameEvent.BlocksDeclared {} -> Map.empty
+        GameEvent.AttackerBlocked {} -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.BecameDesignated _ _ -> Map.empty
+        GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
-        GameEvent.LifeLost _ _ -> Map.empty
-        GameEvent.LifeGained _ _ -> Map.empty
+        GameEvent.LifeLost {} -> Map.empty
+        GameEvent.LifeGained {} -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
         GameEvent.CountersRemoved {} -> Map.empty
         GameEvent.ControlChanged {} -> Map.empty
@@ -6162,28 +6173,28 @@ eventTriggers events gs =
             [] -> Map.empty
             abilities -> Map.singleton spell (caster, abilities)
         GameEvent.Discarded {} -> Map.empty
-        GameEvent.Drew _ _ -> Map.empty
-        GameEvent.Moved _ _ -> Map.empty
+        GameEvent.Drew {} -> Map.empty
+        GameEvent.Moved {} -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
-        GameEvent.DamagePrevented _ _ -> Map.empty
-        GameEvent.StepBegan _ _ -> Map.empty
+        GameEvent.DamagePrevented {} -> Map.empty
+        GameEvent.StepBegan {} -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.Revealed {} -> Map.empty
         GameEvent.AttackerDeclared {} -> Map.empty
-        GameEvent.BlockerDeclared _ _ -> Map.empty
-        GameEvent.BlocksDeclared _ _ -> Map.empty
-        GameEvent.AttackerBlocked _ _ -> Map.empty
+        GameEvent.BlockerDeclared {} -> Map.empty
+        GameEvent.BlocksDeclared {} -> Map.empty
+        GameEvent.AttackerBlocked {} -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.BecameDesignated _ _ -> Map.empty
+        GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
-        GameEvent.LifeLost _ _ -> Map.empty
-        GameEvent.LifeGained _ _ -> Map.empty
+        GameEvent.LifeLost {} -> Map.empty
+        GameEvent.LifeGained {} -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
         GameEvent.CountersRemoved {} -> Map.empty
         GameEvent.ControlChanged {} -> Map.empty
@@ -6265,28 +6276,28 @@ eventTriggers events gs =
           _ -> Map.empty
         GameEvent.Revealed _ _ RevealCause.Ordinary _ -> Map.empty
         GameEvent.Discarded {} -> Map.empty
-        GameEvent.Drew _ _ -> Map.empty
-        GameEvent.Moved _ _ -> Map.empty
+        GameEvent.Drew {} -> Map.empty
+        GameEvent.Moved {} -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
-        GameEvent.DamagePrevented _ _ -> Map.empty
-        GameEvent.StepBegan _ _ -> Map.empty
+        GameEvent.DamagePrevented {} -> Map.empty
+        GameEvent.StepBegan {} -> Map.empty
         GameEvent.SpellCast {} -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.AttackerDeclared {} -> Map.empty
-        GameEvent.BlockerDeclared _ _ -> Map.empty
-        GameEvent.BlocksDeclared _ _ -> Map.empty
-        GameEvent.AttackerBlocked _ _ -> Map.empty
+        GameEvent.BlockerDeclared {} -> Map.empty
+        GameEvent.BlocksDeclared {} -> Map.empty
+        GameEvent.AttackerBlocked {} -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
-        GameEvent.BecameDesignated _ _ -> Map.empty
+        GameEvent.BecameDesignated {} -> Map.empty
         GameEvent.Evolved _ -> Map.empty
         GameEvent.Mentored {} -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
-        GameEvent.LifeLost _ _ -> Map.empty
-        GameEvent.LifeGained _ _ -> Map.empty
+        GameEvent.LifeLost {} -> Map.empty
+        GameEvent.LifeGained {} -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
         GameEvent.CountersRemoved {} -> Map.empty
         GameEvent.ControlChanged {} -> Map.empty

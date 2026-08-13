@@ -38,6 +38,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
@@ -1527,7 +1528,7 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           ( Combat.blockersOf first after,
             Combat.blockersOf second after,
             Combat.blockersOf third after,
-            [n | GameEvent.BlocksDeclared b n <- S.eventsOf after, b == guard]
+            [n | GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared b n) <- S.eventsOf after, b == guard]
           )
           (Set.singleton guard, Set.singleton guard, Set.singleton guard, [3])
       _ -> Spec.assertFailure s "fixture should have three attackers and one blocker"

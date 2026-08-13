@@ -7,22 +7,33 @@ import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.BecameDesignated as BecameDesignated
+import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.Mentored as Mentored
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -41,10 +52,10 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.Moved (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard) ProjectedCharacteristicsSpec.testCharacteristics)
-      ( "{\"type\":\"Moved\",\"value\":[{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}},"
+      (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Graveyard) ProjectedCharacteristicsSpec.testCharacteristics))
+      ( "{\"type\":\"Moved\",\"value\":{\"change\":{\"departed\":1,\"object\":2,\"from\":{\"type\":\"Battlefield\"},\"to\":{\"type\":\"Graveyard\"}},\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> "]}"
+          <> "}}"
       )
   -- A NONZERO toxic value and a PRESENT lifelink payee, so the CR 702.164b and
   -- CR 702.15b riders round-trip rather than getting defaulted past.
@@ -64,15 +75,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.DamagePrevented (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3)
-      """ {"type":"DamagePrevented","value":[{"type":"ToPlayer","value":1},3]} """
+      (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3))
+      """ {"type":"DamagePrevented","value":{"recipient":{"type":"ToPlayer","value":1},"amount":3}} """
   Spec.it s "StepBegan" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) (PlayerId.MkPlayerId 0))
-      """ {"type":"StepBegan","value":[{"type":"Ending","value":{"type":"EndStep"}},0]} """
+      (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) (PlayerId.MkPlayerId 0)))
+      """ {"type":"StepBegan","value":{"phase":{"type":"Ending","value":{"type":"EndStep"}},"player":0}} """
   Spec.it s "SpellCast" $
     Common.assertJsonCodec
       s
@@ -106,8 +117,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.Drew (PlayerId.MkPlayerId 3) 2)
-      """ {"type":"Drew","value":[3,2]} """
+      (GameEvent.Drew (Drew.MkDrew (PlayerId.MkPlayerId 3) 2))
+      """ {"type":"Drew","value":{"player":3,"nth":2}} """
   Spec.it s "Revealed" $
     Common.assertJsonCodec
       s
@@ -132,8 +143,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.BlockerDeclared (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7))
-      """ {"type":"BlockerDeclared","value":[6,7]} """
+      (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7)))
+      """ {"type":"BlockerDeclared","value":{"blocker":6,"attacker":7}} """
   -- An object and a COUNT: CR 509.3a's event is per blocking creature, and the
   -- number beside it is how many attackers it took (CR 509.3e). Distinct
   -- numbers again, so a codec that swapped them would fail.
@@ -142,8 +153,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.BlocksDeclared (ObjectId.MkObjectId 9) 2)
-      """ {"type":"BlocksDeclared","value":[9,2]} """
+      (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared (ObjectId.MkObjectId 9) 2))
+      """ {"type":"BlocksDeclared","value":{"blocker":9,"count":2}} """
   -- An object and a player, AttackerDeclared's shape rather than the sibling
   -- above's two objects: CR 509.3c's event is per blocked ATTACKER, so the
   -- blockers are not in it, and CR 508.5's defending player is.
@@ -152,8 +163,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.AttackerBlocked (ObjectId.MkObjectId 8) (PlayerId.MkPlayerId 2))
-      """ {"type":"AttackerBlocked","value":[8,2]} """
+      (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 8) (PlayerId.MkPlayerId 2)))
+      """ {"type":"AttackerBlocked","value":{"attacker":8,"defender":2}} """
   Spec.it s "SpellCountered" $
     Common.assertJsonCodec
       s
@@ -173,8 +184,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.LifeLost (PlayerId.MkPlayerId 1) 2)
-      """ {"type":"LifeLost","value":[1,2]} """
+      (GameEvent.LifeLost (LifeChange.MkLifeChange (PlayerId.MkPlayerId 1) 2))
+      """ {"type":"LifeLost","value":{"player":1,"amount":2}} """
   -- CR 119.3's other direction. A DIFFERENT tag from LifeLost above and the same
   -- payload shape, so the two must never decode to each other.
   Spec.it s "LifeGained" $
@@ -182,8 +193,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.LifeGained (PlayerId.MkPlayerId 1) 2)
-      """ {"type":"LifeGained","value":[1,2]} """
+      (GameEvent.LifeGained (LifeChange.MkLifeChange (PlayerId.MkPlayerId 1) 2))
+      """ {"type":"LifeGained","value":{"player":1,"amount":2}} """
   -- CR 122.6. The two counts are BEFORE then AFTER, in that order, which CR
   -- 714.2b's threshold crossing needs to be able to tell apart.
   Spec.it s "CountersPut" $
@@ -237,15 +248,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.BecameDesignated Designation.Renowned (ObjectId.MkObjectId 5))
-      """ {"type":"BecameDesignated","value":[{"type":"Renowned"},5]} """
+      (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated Designation.Renowned (ObjectId.MkObjectId 5)))
+      """ {"type":"BecameDesignated","value":{"designation":{"type":"Renowned"},"object":5}} """
   Spec.it s "BecameDesignated Monstrous" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.BecameDesignated Designation.Monstrous (ObjectId.MkObjectId 5))
-      """ {"type":"BecameDesignated","value":[{"type":"Monstrous"},5]} """
+      (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated Designation.Monstrous (ObjectId.MkObjectId 5)))
+      """ {"type":"BecameDesignated","value":{"designation":{"type":"Monstrous"},"object":5}} """
   Spec.it s "Evolved" $
     Common.assertJsonCodec
       s
@@ -260,8 +271,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.Mentored (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7))
-      """ {"type":"Mentored","value":[6,7]} """
+      (GameEvent.Mentored (Mentored.MkMentored (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7)))
+      """ {"type":"Mentored","value":{"mentor":6,"mentored":7}} """
   -- CR 701.21a: the sacrificing player and the permanent, in that order, and the
   -- id is the PRE-MOVE one -- the record is written before the zone change, which
   -- is CR 603.10a's look-back.
@@ -270,8 +281,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.PermanentSacrificed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 6))
-      """ {"type":"PermanentSacrificed","value":[0,6]} """
+      (GameEvent.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 6)))
+      """ {"type":"PermanentSacrificed","value":{"player":0,"permanent":6}} """
   -- CR 603.3b: the ability's source (CR 113.7), its controller as it triggered
   -- (CR 603.3a) and the condition that says which ability it was.
   Spec.it s "AbilityTriggered" $

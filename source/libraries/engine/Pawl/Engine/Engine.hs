@@ -89,6 +89,7 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -1667,7 +1668,7 @@ runStepThatBegan phase = do
   -- is held until the next time a player would receive priority -- usually
   -- upkeep, where CR 503.1a puts it on the stack before the active player gets
   -- priority.
-  State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan phase (GameState.activePlayer gs)) gs)
+  State.modify' (\gs -> Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan phase (GameState.activePlayer gs))) gs)
   runTurnBasedActions phase
   -- Asked BEFORE the CR 704.3 check below, not after it. For every step but one
   -- the order is free -- this line is pure there -- and for the cleanup step it
