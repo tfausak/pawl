@@ -887,8 +887,26 @@ apply batch candidate event =
       -- (see runEntry), so `sacrifice` would otherwise happily take it: the
       -- exclusion has to be written, not inherited.
       --
-      -- Not implemented: CR 614.12b's combined-affordability check when two such
-      -- permanents enter at once (#72).
+      -- CR 614.12b's COMBINED BUDGET across permanents entering simultaneously
+      -- needs no check of its own, and this is where that falls out. The choice
+      -- is paid for here, inside the entry loop, before the next member of the
+      -- batch runs its own (createTokens' mapM_ over runEntry); the offer above
+      -- is re-derived from the live board; so what an earlier choice spent is
+      -- not there for a later one to choose again, which is CR 614.13b. No joint
+      -- answer the rule allows is lost either -- the player answers each prompt
+      -- as it comes, so any partition of the supply among the batch is reachable
+      -- in this fixed order, and the rule only ever FORBIDS choices.
+      --
+      -- Kicked Rite of Replication on a Wood Elemental proves it
+      -- (Pawl.ReplacementSpec, "One budget for simultaneous entry costs"): five
+      -- token copies, one supply of three Forests. `many` counts what was
+      -- CHOSEN, so paying any later than this leaves five 3/3s instead of one.
+      --
+      -- The argument rests on every entry cost in the pool being "any number",
+      -- which is never unpayable. An entry cost whose amount is fixed by the
+      -- choice and CAN be unpayable (Frankenstein's Monster's X) would need the
+      -- forward check the rule literally describes; no EntryRewrite arm carries
+      -- one (#1395).
       EntryRewrite.SacrificeAnyNumber criterion kind -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
