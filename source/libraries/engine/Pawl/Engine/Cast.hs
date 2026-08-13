@@ -243,13 +243,21 @@ payableCostAt x pid oid gs cost =
 --
 -- FOUND BY ASCENDING SEARCH from 0, which is sound and terminating only because
 -- payability is MONOTONE in X, and that holds structurally rather than by
--- inspection of the pool: X reaches a cost only as generic mana
--- (Mana.substituteX), CR 601.2f's adjustments never read the cost so they add and
--- forgive the same amounts at every X, and only Mana.canPay's leftover comparison
--- reads the generic count -- on the demanding side of a >= whose supply side X
--- cannot move, and which the finite supplies must eventually fail.
+-- inspection of the pool. X reaches a cost two ways, and each is monotone on its
+-- own:
 --
--- The two degenerate costs -- one with no {X} in it, which would climb forever,
+--   * as GENERIC MANA (Mana.substituteX). CR 601.2f's adjustments never read the
+--     cost so they add and forgive the same amounts at every X, and only
+--     Mana.canPay's leftover comparison reads the generic count -- on the
+--     demanding side of a >= whose supply side X cannot move, and which the finite
+--     supplies must eventually fail.
+--
+--   * as LIFE (Cost.substituteXInComponent, a CostComponent.PayLifeX becoming a
+--     PayLife). CR 119.4's floor is Event.canPayLife's >= against a life total X
+--     cannot move either, so the same argument runs a second time. Hatred is the
+--     card whose X reaches a cost only this way.
+--
+-- The two degenerate costs -- one with no X in it, which would climb forever,
 -- and one unpayable even at X=0 -- both answer 0, and Cost.greatestPayableX says
 -- why. Neither is reachable from castSpell, which asks only about a candidate
 -- that already passed payableCost and only when Cost.hasVariable holds.

@@ -404,6 +404,13 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 --
 -- A no-op for every SPELL cost, whose adjustments carry no components at all
 -- (Pawl.Engine.PlayerEffect.spellCostAdjustments).
+--
+-- Applied AFTER `substituteX`, which is why an ADDED component may not carry CR
+-- 601.2b's X: a CostComponent.PayLifeX arriving this way would never be
+-- substituted, and `canPayComponent` would refuse the whole cost. No effect in
+-- the pool adds one -- CR 601.2b announces the variables of the cost as printed,
+-- and an increase that named an unannounced X would be an amount nobody chose --
+-- so this is a bound on the open half rather than an elision.
 plusComponents :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 plusComponents adjustments cost = cost {Cost.components = Cost.components cost <> CostAdjustments.components adjustments}
 
@@ -451,18 +458,80 @@ plus base extra =
           Cost.components = Cost.components base <> Cost.components extra
         }
 
--- CR 601.2b: substitute the chosen value of X into the mana part. Identity on a
--- Variable-free cost, and on an unpayable one.
+-- CR 601.2b: substitute the chosen value of X everywhere in this cost -- the mana
+-- part's ManaSymbol.Variable, and the components' CostComponent.PayLifeX.
+-- Identity on a cost that declares no X, and on an unpayable one.
+--
+-- BOTH halves, because CR 107.3a gives one announced value to "a mana cost,
+-- alternative cost, additional cost, and/or activation cost with an {X}, [-X], or
+-- X in it" -- Hatred's X is the same X whichever half of the cost it sits in, and
+-- CR 107.3i keeps the two equal.
 substituteX :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
-substituteX x cost = cost {Cost.mana = fmap (Mana.substituteX x) (Cost.mana cost)}
+substituteX x cost =
+  cost
+    { Cost.mana = fmap (Mana.substituteX x) (Cost.mana cost),
+      Cost.components = fmap (substituteXInComponent x) (Cost.components cost)
+    }
 
--- Does this cost's mana part contain an {X} (CR 107.3)? What decides whether the
--- caster is asked for a value at CR 601.2b -- a spell with no {X} is not asked,
--- and CR 602.2b sends an activation cost through the same question.
+-- EXHAUSTIVE with no wildcard, this module's posture for every CostComponent
+-- match: a new component that could carry CR 601.2b's X owes an answer here, and
+-- -Werror is what makes it.
+substituteXInComponent :: Natural -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
+substituteXInComponent x component = case component of
+  CostComponent.PayLifeX -> CostComponent.PayLife x
+  CostComponent.PayLife _ -> component
+  CostComponent.TapThis -> component
+  CostComponent.UntapThis -> component
+  CostComponent.SacrificeThis -> component
+  CostComponent.Sacrifice _ _ -> component
+  CostComponent.TapForTotalPower _ _ -> component
+  CostComponent.DiscardCards _ -> component
+  CostComponent.DiscardThis -> component
+  CostComponent.PayEnergy _ -> component
+  CostComponent.AddLoyaltyToThis _ -> component
+  CostComponent.RemoveLoyaltyFromThis _ -> component
+  CostComponent.PutPlusOneCountersOnThis _ -> component
+  CostComponent.ExileThisFromGraveyard -> component
+  CostComponent.ExileCardsFromGraveyard _ _ -> component
+  CostComponent.ExileTopFromGraveyard _ -> component
+
+-- Does this cost contain an X (CR 107.3)? What decides whether the caster is
+-- asked for a value at CR 601.2b -- a spell with no X is not asked, and CR 602.2b
+-- sends an activation cost through the same question.
+--
+-- BOTH HALVES, mana part and components. CR 601.2b's "a variable cost that will
+-- be paid as it's being cast (such as an {X} in its mana cost)" names the mana
+-- cost as an EXAMPLE rather than as the rule, and CR 107.3a lists the additional
+-- cost beside the mana cost -- so Hatred, whose only X is in "pay X life", is
+-- asked exactly as Blaze is.
 hasVariable :: Cost Keyword.Type.Keyword -> Bool
-hasVariable cost = case Cost.mana cost of
-  Nothing -> False
-  Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
+hasVariable cost = manaHasVariable || any componentHasVariable (Cost.components cost)
+  where
+    manaHasVariable = case Cost.mana cost of
+      Nothing -> False
+      Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
+
+-- substituteXInComponent's predicate half, and exhaustive for its reason: the
+-- two must agree, since a component this answers False for is one no announcement
+-- will ever substitute.
+componentHasVariable :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
+componentHasVariable component = case component of
+  CostComponent.PayLifeX -> True
+  CostComponent.PayLife _ -> False
+  CostComponent.TapThis -> False
+  CostComponent.UntapThis -> False
+  CostComponent.SacrificeThis -> False
+  CostComponent.Sacrifice _ _ -> False
+  CostComponent.TapForTotalPower _ _ -> False
+  CostComponent.DiscardCards _ -> False
+  CostComponent.DiscardThis -> False
+  CostComponent.PayEnergy _ -> False
+  CostComponent.AddLoyaltyToThis _ -> False
+  CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileCardsFromGraveyard _ _ -> False
+  CostComponent.ExileTopFromGraveyard _ -> False
 
 -- CR 601.2b: the greatest value of X this player could actually pay for -- what
 -- Prompt.ChooseX carries -- found by ASCENDING SEARCH from 0 over the caller's
@@ -483,7 +552,14 @@ hasVariable cost = case Cost.mana cost of
 -- Activate.affordableX's cost is the same one with CR 601.2f's totalling taken
 -- out, which can only shorten it.
 --
--- Answers 0 for a cost with no {X} in it, a totality guard rather than a rule:
+-- `substituteX` is what makes the demand grow, on BOTH halves of the cost: the
+-- generic mana Mana.substituteX writes, and the CostComponent.PayLife this
+-- module's substituteXInComponent writes for a CostComponent.PayLifeX. A half
+-- that took the value and charged nothing for it would leave the climb without a
+-- bound -- Pawl.CostSpec's "Hatred is asked for X, bounded by the life its cost
+-- can pay" is the case that stops running at all if the life half ever does.
+--
+-- Answers 0 for a cost with no X in it, a totality guard rather than a rule:
 -- the climb would never end and there is no variable to report a greatest value
 -- of. Neither caller asks -- both gate the prompt on the same `hasVariable`. Also
 -- 0 for a cost unpayable even at X=0, the least misleading number to report.
@@ -699,6 +775,7 @@ isLoyaltyComponent component = case component of
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
   CostComponent.PayLife _ -> False
+  CostComponent.PayLifeX -> False
   CostComponent.Sacrifice _ _ -> False
   CostComponent.TapForTotalPower _ _ -> False
   CostComponent.DiscardCards _ -> False
@@ -744,6 +821,7 @@ zoneOfComponent component = case component of
   CostComponent.UntapThis -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.PayLife _ -> Nothing
+  CostComponent.PayLifeX -> Nothing
   CostComponent.Sacrifice _ _ -> Nothing
   -- CR 702.122a taps permanents on the battlefield and moves nothing out of any
   -- zone, so CR 113.6m says nothing and CR 113.6's default stands.
@@ -941,6 +1019,7 @@ removalClaim pid oid component gs = case component of
   CostComponent.UntapThis -> Nothing
   CostComponent.TapForTotalPower _ _ -> Nothing
   CostComponent.PayLife _ -> Nothing
+  CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
@@ -1155,6 +1234,11 @@ uncountedCeiling component = case component of
   CostComponent.ExileThisFromGraveyard -> Nothing
   -- Counted by `lifeCeiling`, CR 119.4.
   CostComponent.PayLife _ -> Nothing
+  -- Zero, and not the 1 the uncounted components take: an unannounced X cannot be
+  -- paid even once (`canPayComponent`). Unreachable in fact -- `manaActivations`
+  -- asks canPayComponent of every component before it reaches `repeatsOf` -- so
+  -- this is the answer that stays true if that guard ever moves.
+  CostComponent.PayLifeX -> Just 0
   CostComponent.TapThis -> Just 1
   CostComponent.UntapThis -> Just 1
   CostComponent.TapForTotalPower _ _ -> Just 1
@@ -1248,15 +1332,21 @@ canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cos
 -- component owes 0, which is what leaves every such cost's answer exactly as it
 -- was.
 --
--- The only component that spends life: this module is the one place that matches
--- a CostComponent constructor, and the match is total so a new life-spending
--- component cannot be added without answering here.
+-- PayLife is the only component that spends a KNOWN amount of life, and
+-- PayLifeX the only one that will spend an announced amount -- which is why the
+-- latter owes 0 here rather than a guess. This module is the one place that
+-- matches a CostComponent constructor, and the match is total so a new
+-- life-spending component cannot be added without answering here.
 lifeOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
 lifeOwedBy = sum . fmap lifeOwedByComponent
 
 lifeOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
 lifeOwedByComponent component = case component of
   CostComponent.PayLife n -> n
+  -- 0, because an unannounced X names no amount to owe. Not a claim that this
+  -- component is free: `canPayComponent` refuses it outright, so no cost carrying
+  -- one is payable for this sum to understate.
+  CostComponent.PayLifeX -> 0
   CostComponent.TapThis -> 0
   CostComponent.UntapThis -> 0
   CostComponent.SacrificeThis -> 0
@@ -1308,6 +1398,16 @@ canPayComponent pid oid component gs = case component of
   -- is asked about on its own terms here, and it can only ever be the weaker of
   -- the two.
   CostComponent.PayLife n -> Event.canPayLife pid n gs
+  -- CR 601.2b: the value of X is announced as the spell is cast, and this is the
+  -- component BEFORE that announcement. There is no amount to measure against CR
+  -- 119.4, so the answer is no -- CR 601.2 reverses a casting a player cannot
+  -- comply with rather than choosing a value on their behalf.
+  --
+  -- Unreachable from either cast path: `hasVariable` reads the components, so a
+  -- cost carrying this is announced, and both paths substitute (`substituteX`)
+  -- before they measure or pay. What it is is the fence under that reasoning --
+  -- Pawl.CostSpec's "an unannounced X is unpayable" case is the test.
+  CostComponent.PayLifeX -> False
   -- CR 701.21a: this player must control at least `n` matching permanents.
   --
   -- This component ALONE, which is not the whole of CR 118.3's question, exactly
@@ -1517,7 +1617,7 @@ orderObservable components = case filter orderSensitive components of
 -- changes the counters on one -- a criterion reads tap state and counters (a
 -- Filter), and TapForTotalPower totals the power counters change.
 --
--- False for the two per-player scalars, for `orderObservable`'s stated reason.
+-- False for the per-player scalars, for `orderObservable`'s stated reason.
 --
 -- EXHAUSTIVE with no wildcard, `removalClaim`'s posture and for its reason: a new
 -- component has to answer here, and -Werror is what makes it. A component that
@@ -1539,6 +1639,7 @@ orderSensitive component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
   CostComponent.PayLife _ -> False
+  CostComponent.PayLifeX -> False
   CostComponent.PayEnergy _ -> False
 
 -- CR 601.2g: if the total cost includes a mana payment, the player then has a
@@ -1805,6 +1906,10 @@ payComponent pid oid component = case component of
   CostComponent.PayLife n -> do
     State.modify' (Event.payLife pid n)
     pure Payment.Paid
+  -- Unpayable, `canPayComponent`'s answer and for its reason: CR 601.2b's value
+  -- has not been announced, so there is nothing to subtract. Unpaid rather than a
+  -- guessed 0, which CR 601.2h turns into the reversal of the whole casting.
+  CostComponent.PayLifeX -> pure Payment.Unpaid
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a
   -- prompt. Elided only when forced -- exactly as many candidates as the count.
   -- Three payable Mountains and a count of two IS asked: they differ in tap

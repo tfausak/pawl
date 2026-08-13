@@ -44,6 +44,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.PayLife 2)
       """ {"type":"PayLife","value":2} """
+  -- CR 601.2b's announced X, which carries no number until it is announced.
+  Spec.it s "PayLifeX" $
+    Common.assertCodec
+      s
+      codec
+      CostComponent.PayLifeX
+      """ {"type":"PayLifeX"} """
   -- The count and the Filter both ride the payload, positionally.
   Spec.it s "Sacrifice" $
     Common.assertCodec

@@ -32,9 +32,30 @@ data CostComponent keyword
     -- at least that large.
     --
     -- A Natural and not a Quantity: a Quantity's evaluation needs a binding
-    -- environment, which a cost has no access to at CR 601.2f time, and no card
-    -- in the pool pays a variable amount of life (#99).
+    -- environment, which a cost has no access to at CR 601.2f time. CR 601.2b's
+    -- X is PayLifeX below rather than a Quantity here, for the reason that
+    -- constructor gives.
     PayLife Natural.Natural
+  | -- | CR 107.3a's X as an amount of LIFE: "pay X life", where the value is
+    -- announced by the caster at CR 601.2b (Hatred). CR 118.4 sends a cost with
+    -- an X in it to CR 107.3, and CR 601.2b's "a variable cost that will be paid
+    -- as it's being cast (such as an {X} in its mana cost)" names the mana cost
+    -- as an EXAMPLE, so an additional cost carrying X is announced by the same
+    -- rule.
+    --
+    -- A SEPARATE CONSTRUCTOR and not a Quantity in PayLife above, for that
+    -- constructor's stated reason: nothing here is evaluated against a binding
+    -- environment. Pawl.Engine.Cost.substituteX rewrites this to a
+    -- @PayLife n@ carrying the announced value, exactly as
+    -- Pawl.Engine.Mana.substituteX rewrites a ManaSymbol.Variable, so every
+    -- reader downstream of the announcement sees a number.
+    --
+    -- UNPAYABLE as it stands, which is Pawl.Engine.Cost.canPayComponent's answer:
+    -- a value the caster has not announced is not one this cost can charge, and
+    -- CR 601.2 reverses the casting rather than guessing. Nothing reaches payment
+    -- carrying it, since Pawl.Engine.Cost.hasVariable reads the components and
+    -- both cast paths substitute before they pay.
+    PayLifeX
   | -- | CR 701.21a: sacrifice this many permanents matching the Filter (Village
     -- Rites' one creature, Fireblast's two Mountains). The player chooses which,
     -- so this is a prompt and never an engine pick.

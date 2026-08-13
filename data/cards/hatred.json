@@ -1,0 +1,87 @@
+{
+  "faces": [
+    {
+      "additionalCosts": [
+        {
+          "type": "PayLifeX"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Hatred",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "X"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 0
+                          }
+                        ]
+                      },
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": {
+              "target": {
+                "pool": {
+                  "type": "Creatures"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
