@@ -98,6 +98,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.Discarded (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) DiscardCause.ToPayCyclingCost)
       """ {"type":"Discarded","value":[0,7,{"type":"ToPayCyclingCost"}]} """
+  -- CR 121.1's draw, with the ordinal CR 702.94a asks about. A player id and an
+  -- ordinal, deliberately different numbers, so a codec that swapped them fails.
+  Spec.it s "Drew" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.Drew (PlayerId.MkPlayerId 3) 2)
+      """ {"type":"Drew","value":[3,2]} """
   Spec.it s "Revealed" $
     Common.assertJsonCodec
       s

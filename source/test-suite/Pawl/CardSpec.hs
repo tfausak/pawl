@@ -529,6 +529,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfCycled -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
+  TriggerCondition.PlayerDrawsNthCard _ _ -> []
   -- CR 725.1's crowning condition is a PlayerRelation too.
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
@@ -2034,6 +2035,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> [f]
   TriggerCondition.SelfCycled -> []
   TriggerCondition.PlayerDiscards _ -> []
+  TriggerCondition.PlayerDrawsNthCard _ _ -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition holds a SlotName, which is no Filter -- what

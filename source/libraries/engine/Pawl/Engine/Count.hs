@@ -368,6 +368,7 @@ snapshotView gs shape event = case event of
   -- the same discard emits is what carries one -- so there is nothing here for
   -- an EventShape to match against.
   GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew _ _ -> Nothing
   -- A reveal DOES carry a characteristics snapshot, as the two arms above do,
   -- and is still Nothing here: no EventShape names revealing. This becomes a
   -- real view the day one does (#162).

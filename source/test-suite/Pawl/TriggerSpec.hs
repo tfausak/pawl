@@ -145,6 +145,9 @@
 -- through the ordinary Pool + Filter target machinery, with Bitterblossom --
 -- `kindredSpec`. CR 701.9a's discard trigger, and CR 702.29d's
 -- "only once when a card is cycled", with Megrim -- `discardTriggerSpec`.
+-- CR 121.1's draw read for WHICH draw of the turn it was, across a turn boundary
+-- so the count is shown to reset, with Erudite Wizard reading draws made by
+-- Think Twice -- `drawTriggerSpec`.
 -- CR 603.3a's controller read AT THE TRIGGER MOMENT rather than at the CR 117.5
 -- scan, with a Megrim stolen until end of turn by Zealous Conscripts and handed
 -- back by CR 514.2 before CR 514.3a places the trigger --
@@ -2901,6 +2904,140 @@ discardTriggerSpec s registry =
       Spec.assertEqWith s "the controller's own discard costs him nothing" (S.lifeOf S.bob (settle byBob)) (S.lifeOf S.bob gs)
       Spec.assertEqWith s "and costs alice nothing either" (S.lifeOf S.alice (settle byBob)) (S.lifeOf S.alice gs)
       Spec.assertEqWith s "bob's discard put nothing on the stack at all" (GameState.stack (S.runPure S.identityAnswer byBob Engine.settleForPriority)) []
+
+-- CR 121.1's draw, counted. "Whenever you draw your second card each turn" is the
+-- pool's reader of WHICH draw of the turn a draw was, and Erudite Wizard, {2}{U}
+-- 2/3 Creature -- Human Wizard, prints nothing else: "Whenever you draw your
+-- second card each turn, put a +1/+1 counter on this creature." One condition,
+-- one targetless effect, so the only new thing these cases can be passing on is
+-- the ordinal.
+--
+-- The draws are Think Twice's, {1}{U} Instant "Draw a card" -- ONE card per
+-- resolution, so each case decides for itself how many draws the turn has had
+-- and a miscount cannot hide inside a multi-card draw. alice controls the Wizard
+-- throughout, so CR 109.5 fixes its "you" as her.
+--
+-- Every case reads the counter through the Wizard's power and toughness rather
+-- than off the object, so what is asserted is what a player at the table sees.
+drawTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+drawTriggerSpec s registry =
+  Spec.describe s "DrawTrigger" $ do
+    -- THE case: two draws on one board, so "the second" is told apart from "any".
+    -- CR 121.2 makes each its own draw, and only the second one fires.
+    Spec.it s "CR 121.1 the turn's first draw fires nothing and its second fires the Wizard" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      wizard <- S.printingOf s registry "Erudite Wizard"
+      let (wizardId, gs, firsts) = drawBoard island piker think wizard 2
+      case firsts of
+        [firstId, secondId] -> do
+          let afterFirst = resolveCast gs firstId
+              afterSecond = resolveCast afterFirst secondId
+          Spec.assertEqWith s "one card drawn so far" (Map.lookup S.alice (GameState.drawsThisTurn afterFirst)) (Just 1)
+          Spec.assertEqWith s "the FIRST draw leaves the Wizard printed-size" (S.powerToughnessOf wizardId afterFirst) (Just (2, 3))
+          Spec.assertEqWith s "two cards drawn" (Map.lookup S.alice (GameState.drawsThisTurn afterSecond)) (Just 2)
+          Spec.assertEqWith s "the SECOND draw puts a +1/+1 counter on it" (S.powerToughnessOf wizardId afterSecond) (Just (3, 4))
+        _ -> Spec.assertFailure s "fixture should put two Think Twice in alice's hand"
+    -- CR 121.1's other producer of a draw: the draw step's turn-based action. The
+    -- same board and the same single cast, one draw step apart -- so the cast's
+    -- draw is the turn's first on one and its second on the other.
+    Spec.it s "CR 121.1 the draw step's draw is the turn's first, so the next one fires" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      wizard <- S.printingOf s registry "Erudite Wizard"
+      let (wizardId, gs, firsts) = drawBoard island piker think wizard 1
+      case firsts of
+        [thinkId] -> do
+          let stepped = S.runPure S.identityAnswer (gs {GameState.phase = Phase.Beginning BeginningStep.DrawStep}) S.drawStep
+              afterStep = resolveCast (stepped {GameState.phase = Phase.PrecombatMain}) thinkId
+              afterNoStep = resolveCast gs thinkId
+          Spec.assertEqWith s "the draw step drew one card" (Map.lookup S.alice (GameState.drawsThisTurn stepped)) (Just 1)
+          Spec.assertEqWith s "so the cast's draw is the second and fires" (S.powerToughnessOf wizardId afterStep) (Just (3, 4))
+          Spec.assertEqWith s "without the draw step it is the first and fires nothing" (S.powerToughnessOf wizardId afterNoStep) (Just (2, 3))
+        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
+    -- "EACH turn", which is what makes the tally a per-turn count rather than a
+    -- running total: four draws across two turns fire the Wizard TWICE, on the
+    -- second draw of each. A tally that accumulated would fire once and stop.
+    --
+    -- Think Twice is an instant, so the two casts after the handoff are legal on
+    -- bob's turn -- and the draws they make are still alice's own (CR 121.1).
+    Spec.it s "CR 121.1 the count is per turn: the handoff clears it and the next turn fires again" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      wizard <- S.printingOf s registry "Erudite Wizard"
+      let (wizardId, gs, firsts) = drawBoard island piker think wizard 4
+      case firsts of
+        [a, b, c, d] -> do
+          let thisTurn = resolveCast (resolveCast gs a) b
+              handed = S.runPure S.identityAnswer thisTurn Engine.handoffTurn
+              nextTurn = resolveCast (resolveCast handed c) d
+          Spec.assertEqWith s "the first turn's second draw fired it once" (S.powerToughnessOf wizardId thisTurn) (Just (3, 4))
+          Spec.assertEqWith s "the handoff clears the tally for every seat" (GameState.drawsThisTurn handed) Map.empty
+          Spec.assertEqWith s "and the new turn's second draw fires it again" (S.powerToughnessOf wizardId nextTurn) (Just (4, 5))
+        _ -> Spec.assertFailure s "fixture should put four Think Twice in alice's hand"
+    -- "YOU draw", not "a player draws". The same Wizard, the same two Think
+    -- Twice, the same two draws -- one seat apart, which is the only difference
+    -- a board with two seats can express and the one this axis turns on.
+    Spec.it s "CR 109.5 'you': bob drawing his second card leaves alice's Wizard alone" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      wizard <- S.printingOf s registry "Erudite Wizard"
+      let (wizardId, base, _) = drawBoard island piker think wizard 0
+          withLands = S.landsFor island S.bob 4 base
+          addThink (ids, g) _ = let (oid, g') = S.addHandCard think S.bob g in (ids <> [oid], g')
+          (bobsThinks, withHand) = List.foldl' addThink ([], withLands) [1 .. (2 :: Int)]
+          gs = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.bob g)) withHand [1 .. (10 :: Int)]
+      case bobsThinks of
+        [a, b] -> do
+          let after = resolveCastBy S.bob (resolveCastBy S.bob gs a) b
+          Spec.assertEqWith s "bob drew two cards" (Map.lookup S.bob (GameState.drawsThisTurn after)) (Just 2)
+          Spec.assertEqWith s "alice drew none of them" (Map.lookup S.alice (GameState.drawsThisTurn after)) Nothing
+          Spec.assertEqWith s "so her Wizard is printed-size" (S.powerToughnessOf wizardId after) (Just (2, 3))
+        _ -> Spec.assertFailure s "fixture should put two Think Twice in bob's hand"
+
+-- alice controls an Erudite Wizard and enough Islands to cast `copies` Think
+-- Twice, holds that many of them (none at all when `copies` is 0, which is the
+-- board the opponent case builds on), and has ten Goblin Pikers in her library --
+-- more than any case draws, so CR 104.3c never decks her before an assertion
+-- runs. Returns the Wizard, the board, and the Think Twice ids in hand order.
+drawBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  (ObjectId.ObjectId, GameState.GameState, [ObjectId.ObjectId])
+drawBoard island piker think wizard copies =
+  let (wizardId, base) = S.addCreature wizard S.alice (S.landsInPlay island (2 * copies))
+      addThink (ids, g) _ = let (oid, g') = S.addHandCard think S.alice g in (ids <> [oid], g')
+      (thinkIds, withHand) = List.foldl' addThink ([], base) [1 .. copies]
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withHand [1 .. (10 :: Int)]
+   in ( wizardId,
+        stocked
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            -- NOT the first turn: CR 103.8a has the starting player skip that
+            -- turn's draw step, and one of the cases above turns on a draw step
+            -- that draws.
+            GameState.turnNumber = 2
+          },
+        thinkIds
+      )
+
+-- Cast one spell and let the stack empty: the draw happens, and any trigger it
+-- fires resolves before the next assertion.
+resolveCast :: GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+resolveCast = resolveCastBy S.alice
+
+resolveCastBy :: PlayerId.PlayerId -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+resolveCastBy pid gs oid =
+  let cast = S.runPure S.identityAnswer gs (S.cast pid oid)
+   in S.runPure S.identityAnswer cast Engine.priorityLoop
 
 -- alice is the active player in her postcombat main phase, holding a Zealous
 -- Conscripts and eight uncastable Goblin Pikers, with five Mountains out; bob
@@ -7582,6 +7719,10 @@ representativeEvents cond =
         TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost S.bob 2)
         TriggerCondition.SelfCycled -> one (GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost)
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded S.alice departed DiscardCause.Ordinary)
+        -- The ordinal matches the condition's own, so the event is one this
+        -- condition genuinely admits -- an event it rejected would pin nothing,
+        -- eventBindings being consulted only for a match.
+        TriggerCondition.PlayerDrawsNthCard _ nth -> one (GameEvent.Drew S.alice nth)
         -- CR 508.5's defending player, and deliberately NOT the attacker's own
         -- controller: eventBindings binds this field under `thatPlayer`, so an
         -- arm that bound the attacking side instead would still agree with
@@ -7750,6 +7891,7 @@ everyTriggerCondition =
     TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
+    TriggerCondition.PlayerDrawsNthCard PlayerRelation.You 2,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfAttacksWithAnother (Filter.Type.And []),
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
@@ -10543,6 +10685,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   aetherFlashSpec s registry
   kindredSpec s registry
   discardTriggerSpec s registry
+  drawTriggerSpec s registry
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
   lifeGainTriggerSpec s registry
