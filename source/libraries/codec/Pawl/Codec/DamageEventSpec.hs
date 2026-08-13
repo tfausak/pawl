@@ -18,10 +18,9 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
   -- a present key too. No lifelink, no infect, so dealtByInfect and
   -- dealtByLifelink are both omitted keys.
   Spec.it s "MkDamageEvent, dealt to a player" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      DamageEvent.toJson
-      DamageEvent.fromJson
+      DamageEvent.codec
       DamageEvent.MkDamageEvent
         { DamageEvent.source = ObjectId.MkObjectId 1,
           DamageEvent.target = Recipient.ToPlayer (PlayerId.MkPlayerId 2),
@@ -37,10 +36,9 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
   -- CR 120.3c's recipient tag and CR 608's noncombat damage are each the other
   -- arm of their type. CR 702.15b's lifelink payee is a concrete PlayerId.
   Spec.it s "MkDamageEvent, dealt to a planeswalker, with lifelink" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      DamageEvent.toJson
-      DamageEvent.fromJson
+      DamageEvent.codec
       DamageEvent.MkDamageEvent
         { DamageEvent.source = ObjectId.MkObjectId 1,
           DamageEvent.target = Recipient.ToPlaneswalker (ObjectId.MkObjectId 5),
@@ -56,10 +54,9 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
   -- Every dealtBy* rider at its default, which is what an event carrying none
   -- of them means.
   Spec.it s "an all-default value omits every optional key" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      DamageEvent.toJson
-      DamageEvent.fromJson
+      DamageEvent.codec
       DamageEvent.MkDamageEvent
         { DamageEvent.source = ObjectId.MkObjectId 1,
           DamageEvent.target = Recipient.ToPlayer (PlayerId.MkPlayerId 2),

@@ -12,10 +12,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.Countering" . Spec.it s "MkCountering" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Countering.toJson
-      Countering.fromJson
+      Countering.codec
       Countering.MkCountering
         { Countering.spell = ObjectId.MkObjectId 4,
           Countering.source = ObjectId.MkObjectId 5,

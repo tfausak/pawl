@@ -412,6 +412,8 @@ library codec
     Pawl.Codec.UntapRestrictionSpec
     Pawl.Codec.Uses
     Pawl.Codec.UsesSpec
+    Pawl.Codec.While
+    Pawl.Codec.WhileSpec
     Pawl.Codec.Zone
     Pawl.Codec.ZoneChange
     Pawl.Codec.ZoneChangePattern
@@ -951,6 +953,7 @@ library types
     Pawl.Types.UnlessPaid
     Pawl.Types.UntapRestriction
     Pawl.Types.Uses
+    Pawl.Types.While
     Pawl.Types.Zone
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern

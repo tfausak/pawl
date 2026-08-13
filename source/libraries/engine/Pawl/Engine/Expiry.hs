@@ -41,6 +41,7 @@ import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.While as While
 
 -- CR 611.2: the moment a duration BEGINS. `controller` is the effect's
 -- controller -- CR 109.5's "you" -- and `source` is the object the effect comes
@@ -70,7 +71,7 @@ arm players controller source duration gs = case duration of
   Duration.ForAsLongAs cond ->
     let baked = Condition.bakeBound players cond
      in if Condition.holds (Projection.fullView gs) (Filter.contextFor (Just controller) (Just source)) gs source baked
-          then Just (Expiry.While controller baked)
+          then Just (Expiry.While (While.MkWhile controller baked))
           else Nothing
   -- CR 500.5a / 511.2: "until end of combat" is the end of the combat PHASE, so
   -- the stored window is PhaseSelector.CombatPhase and never the end of combat
@@ -91,7 +92,7 @@ dropAtCleanup gs =
   let survives expiry = case expiry of
         Expiry.AtCleanup -> False
         Expiry.Never -> True
-        Expiry.While _ _ -> True
+        Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
         Expiry.AtEndOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
@@ -132,7 +133,7 @@ sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
   let survives source expiry = case expiry of
-        Expiry.While you cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just you) (Just source)) gs source cond
+        Expiry.While (While.MkWhile you cond) -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just you) (Just source)) gs source cond
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         Expiry.AtTurnOf _ -> True
@@ -214,7 +215,7 @@ dropAtTurnOf pid gs =
         Expiry.AtTurnOf p -> p /= pid
         Expiry.AtCleanup -> True
         Expiry.Never -> True
-        Expiry.While _ _ -> True
+        Expiry.While {} -> True
         Expiry.AtEndOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
@@ -249,7 +250,7 @@ dropAtEndOf ending gs =
         Expiry.AtEndOf window -> window /= ending
         Expiry.AtCleanup -> True
         Expiry.Never -> True
-        Expiry.While _ _ -> True
+        Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)

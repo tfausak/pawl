@@ -182,6 +182,7 @@ import qualified Pawl.Codec.TypeLineSpec
 import qualified Pawl.Codec.UnlessPaidSpec
 import qualified Pawl.Codec.UntapRestrictionSpec
 import qualified Pawl.Codec.UsesSpec
+import qualified Pawl.Codec.WhileSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
 import qualified Pawl.Codec.ZoneSpec
@@ -502,6 +503,7 @@ spec s registry = do
   Pawl.Codec.UnlessPaidSpec.spec s
   Pawl.Codec.UntapRestrictionSpec.spec s
   Pawl.Codec.UsesSpec.spec s
+  Pawl.Codec.WhileSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s
   Pawl.Codec.ZoneSpec.spec s

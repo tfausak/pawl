@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Binding as Binding
@@ -21,20 +22,18 @@ import qualified Pawl.Types.SlotName as SlotName
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Binding" $ do
   Spec.it s "MkBinding, the empty binding" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Binding.toJson
-      Binding.fromJson
+      Binding.codec
       Binding.empty
       """ {} """
   -- A codec totality check, not a claim about a reachable game state: no real
   -- slot carries all five fields at once. The stand-in snapshot is needed
   -- because this sublibrary cannot reach the registry or Projection.project.
   Spec.it s "MkBinding, every field populated" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Binding.toJson
-      Binding.fromJson
+      Binding.codec
       ( Binding.MkBinding
           { Binding.targets = Just (Set.singleton (Recipient.ToPlayer (PlayerId.MkPlayerId 0))),
             Binding.amount = Just 3,
@@ -56,8 +55,8 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
   Spec.it s "toJsonMap/fromJsonMap sorts by slot name" $
     Common.assertJsonCodec
       s
-      Binding.toJsonMap
-      Binding.fromJsonMap
+      (Codec.encode Binding.codecMap)
+      (Codec.decode Binding.codecMap)
       ( Map.fromList
           [ (SlotName.MkSlotName (Text.pack "z-slot"), Binding.empty {Binding.amount = Just 1}),
             (SlotName.MkSlotName (Text.pack "a-slot"), Binding.empty {Binding.amount = Just 2})
