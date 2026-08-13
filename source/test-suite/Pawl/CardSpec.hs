@@ -73,6 +73,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
+import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -100,6 +101,7 @@ import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -174,6 +176,7 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -1989,17 +1992,17 @@ objectRefFilters ref = case ref of
   -- Rise of the Dark Realms' "all creature cards from all graveyards"; its
   -- PlayerScope names players rather than characteristics, so the Filter is the
   -- whole of what there is to lint.
-  ObjectRef.EachCardInGraveyard _ f -> [f]
+  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ f) -> [f]
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it holds
   -- no Filter either; its PlayerRef names players, and its depth counts cards --
   -- neither is a characteristic.
-  ObjectRef.TopOfLibrary _ _ -> []
+  ObjectRef.TopOfLibrary {} -> []
   -- Port of Karfell's "a creature card from your graveyard"; its PlayerScope and
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
-  ObjectRef.ChosenCardInGraveyard _ _ f -> [f]
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f) -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -3784,9 +3787,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         movesAtMostOne ref = case ref of
           ObjectRef.InSlot _ -> True
           ObjectRef.EachMatching _ -> False
-          ObjectRef.EachCardInGraveyard _ _ -> False
+          ObjectRef.EachCardInGraveyard {} -> False
           ObjectRef.EachPlayer -> False
-          ObjectRef.TopOfLibrary player depth ->
+          ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
             depth <= 1 && case player of
               PlayerRef.Relative PlayerRelation.You -> True
               PlayerRef.Relative PlayerRelation.Opponent -> False
@@ -3805,7 +3808,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- many graveyards the scope draws candidates from, where Exhume's
           -- "each player" is one choice each and so several cards on any board
           -- with more than one stocked graveyard.
-          ObjectRef.ChosenCardInGraveyard chooser _ _ -> case chooser of
+          ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> case chooser of
             Chooser.TheController -> True
             Chooser.EachInScope -> False
             -- One seat, so one graveyard and one card -- TheController's answer

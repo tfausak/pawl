@@ -56,6 +56,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
+import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -80,6 +81,7 @@ import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -168,6 +170,7 @@ import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.Uses as Uses
@@ -241,14 +244,14 @@ objectRefSlots :: ObjectRef -> Map.Map SlotName SlotArity
 objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
-  ObjectRef.EachCardInGraveyard _ _ -> Map.empty
+  ObjectRef.EachCardInGraveyard {} -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
-  ObjectRef.TopOfLibrary player _ -> playerRefSlots player
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> playerRefSlots player
   -- A PlayerScope names players by their relation to the effect's controller (CR
   -- 109.5) rather than out of a slot, so whose graveyards are drawn from names
   -- none. WHO CHOOSES may: Skullwinder's chosen opponent is read out of the slot
   -- an earlier effect bound.
-  ObjectRef.ChosenCardInGraveyard chooser _ _ -> chooserSlots chooser
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -1708,7 +1711,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- card's own words (CR 109.2a), over the per-player zone CR 400.1 gives each
   -- player instead of one shared one. Whose graveyards, which cards match and in
   -- what order are all graveyardCards below, shared with the chosen-card arm.
-  ObjectRef.EachCardInGraveyard scope filter_ -> graveyardCards controller source gs scope filter_
+  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) -> graveyardCards controller source gs scope filter_
   -- Names players and so no objects at all. Empty rather than an error: every
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
   -- empty answer is what a slot holding a player already gives them.
@@ -1725,7 +1728,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- and CR 101.4 fixes the order any per-object question is then asked in. That
   -- also drops a player CR 800.4 has taken out of the game, whose library
   -- playerRefPlayers would otherwise still be able to name.
-  ObjectRef.TopOfLibrary player depth ->
+  ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
     let named = playerRefPlayers legal controller gs player
      in concatMap
           (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
@@ -1882,10 +1885,10 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- Cards, so they arrive as Recipient.ToObject for EachMatching's reason: CR
   -- 109.2a draws the set from the graveyards named and says nothing about card
   -- types beyond the Filter's own.
-  ObjectRef.EachCardInGraveyard _ _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachCardInGraveyard {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- A card, so it arrives as Recipient.ToObject for EachMatching's reason: what
   -- kind of object a library's top card is, is the OPCODE's question.
-  ObjectRef.TopOfLibrary _ _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient, and this is the arm
   -- objectRefObjects has nothing to say about. APNAP (CR 608.2f) for
   -- objectRefObjects' reason, and Game.apnapOrder is the turn order rotated to
@@ -2823,7 +2826,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- the funnel is handed `Just controller` and CR 110.2a hands a
             -- battlefield arrival to the player the effect instructed, which is
             -- what EntryRiders.underOwner would have to override.
-            ObjectRef.EachCardInGraveyard _ _ -> do
+            ObjectRef.EachCardInGraveyard {} -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- Players, and no card moves one to a zone. objectRefObjects' empty
@@ -2835,7 +2838,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- batch comes off one look at each library, so nothing an earlier
             -- move of this same resolution did can change what the next card off
             -- the top is (CR 608.2c, CR 608.2f).
-            ObjectRef.TopOfLibrary _ _ -> do
+            ObjectRef.TopOfLibrary {} -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- Port of Karfell's "return a creature card from your graveyard to
@@ -2876,7 +2879,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- answer naming a card never offered falls back to the first
             -- candidate, since the instruction is mandatory and something must
             -- move.
-            ObjectRef.ChosenCardInGraveyard chooser scope filter_ -> do
+            ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser scope filter_) -> do
               gs <- State.get
               let ask asked candidates = case candidates of
                     [] -> pure []

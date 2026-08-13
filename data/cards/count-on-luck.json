@@ -58,15 +58,15 @@
                         "value": {
                           "ref": {
                             "type": "TopOfLibrary",
-                            "value": [
-                              {
+                            "value": {
+                              "count": 1,
+                              "player": {
                                 "type": "Relative",
                                 "value": {
                                   "type": "You"
                                 }
-                              },
-                              1
-                            ]
+                              }
+                            }
                           },
                           "slot": "exiled",
                           "zone": {

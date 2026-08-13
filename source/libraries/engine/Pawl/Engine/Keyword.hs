@@ -93,6 +93,7 @@ import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -1542,7 +1543,7 @@ ingest =
     effect =
       Effect.MoveToZone
         ( MoveToZone.MkMoveToZone
-            (ObjectRef.TopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) 1)
+            (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) 1))
             Zone.Exile
             EntryRiders.MkEntryRiders
               { EntryRiders.tapped = TapState.Untapped,

@@ -132,6 +132,8 @@ library codec
     Pawl.Codec.ChooseBetweenSpec
     Pawl.Codec.Chooser
     Pawl.Codec.ChooserSpec
+    Pawl.Codec.ChosenCardInGraveyard
+    Pawl.Codec.ChosenCardInGraveyardSpec
     Pawl.Codec.Clause
     Pawl.Codec.ClauseIndex
     Pawl.Codec.ClauseIndexSpec
@@ -216,6 +218,8 @@ library codec
     Pawl.Codec.DurationSpec
     Pawl.Codec.DuringPhase
     Pawl.Codec.DuringPhaseSpec
+    Pawl.Codec.EachCardInGraveyard
+    Pawl.Codec.EachCardInGraveyardSpec
     Pawl.Codec.Effect
     Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
@@ -438,6 +442,8 @@ library codec
     Pawl.Codec.TargetSlotSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
+    Pawl.Codec.TopOfLibrary
+    Pawl.Codec.TopOfLibrarySpec
     Pawl.Codec.Toughness
     Pawl.Codec.ToughnessSpec
     Pawl.Codec.TriggerCondition
@@ -804,6 +810,7 @@ library types
     Pawl.Types.CharacteristicPT
     Pawl.Types.ChooseBetween
     Pawl.Types.Chooser
+    Pawl.Types.ChosenCardInGraveyard
     Pawl.Types.Claim
     Pawl.Types.Clause
     Pawl.Types.ClauseIndex
@@ -859,6 +866,7 @@ library types
     Pawl.Types.Duration
     Pawl.Types.DurationRef
     Pawl.Types.DuringPhase
+    Pawl.Types.EachCardInGraveyard
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption
@@ -1016,6 +1024,7 @@ library types
     Pawl.Types.TargetSlot
     Pawl.Types.Timestamp
     Pawl.Types.TokenPattern
+    Pawl.Types.TopOfLibrary
     Pawl.Types.Toughness
     Pawl.Types.TriggerCondition
     Pawl.Types.TriggeredAbility

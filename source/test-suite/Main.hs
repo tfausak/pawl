@@ -42,6 +42,7 @@ import qualified Pawl.Codec.ChangeTextSpec
 import qualified Pawl.Codec.CharacteristicPTSpec
 import qualified Pawl.Codec.ChooseBetweenSpec
 import qualified Pawl.Codec.ChooserSpec
+import qualified Pawl.Codec.ChosenCardInGraveyardSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.ColorSpec
@@ -84,6 +85,7 @@ import qualified Pawl.Codec.DungeonRoomSpec
 import qualified Pawl.Codec.DurationRefSpec
 import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.DuringPhaseSpec
+import qualified Pawl.Codec.EachCardInGraveyardSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntryOptionSpec
@@ -195,6 +197,7 @@ import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TokenPatternSpec
+import qualified Pawl.Codec.TopOfLibrarySpec
 import qualified Pawl.Codec.ToughnessSpec
 import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
@@ -389,6 +392,7 @@ spec s registry = do
   Pawl.Codec.CharacteristicPTSpec.spec s
   Pawl.Codec.ChooseBetweenSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
+  Pawl.Codec.ChosenCardInGraveyardSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
   Pawl.Codec.ColorSpec.spec s
@@ -431,6 +435,7 @@ spec s registry = do
   Pawl.Codec.DurationRefSpec.spec s
   Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.DuringPhaseSpec.spec s
+  Pawl.Codec.EachCardInGraveyardSpec.spec s
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
@@ -542,6 +547,7 @@ spec s registry = do
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
+  Pawl.Codec.TopOfLibrarySpec.spec s
   Pawl.Codec.ToughnessSpec.spec s
   Pawl.Codec.TriggerConditionSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s

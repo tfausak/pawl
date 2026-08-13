@@ -62,19 +62,19 @@
                         "value": {
                           "ref": {
                             "type": "ChosenCardInGraveyard",
-                            "value": [
-                              {
+                            "value": {
+                              "chooser": {
                                 "type": "BoundInSlot",
                                 "value": "opponent"
                               },
-                              {
-                                "type": "EachPlayer"
-                              },
-                              {
+                              "filter": {
                                 "type": "And",
                                 "value": []
+                              },
+                              "players": {
+                                "type": "EachPlayer"
                               }
-                            ]
+                            }
                           },
                           "zone": {
                             "type": "Hand"

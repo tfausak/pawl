@@ -103,15 +103,15 @@
                           },
                           "ref": {
                             "type": "EachCardInGraveyard",
-                            "value": [
-                              {
-                                "type": "You"
-                              },
-                              {
+                            "value": {
+                              "filter": {
                                 "type": "And",
                                 "value": []
+                              },
+                              "players": {
+                                "type": "You"
                               }
-                            ]
+                            }
                           }
                         }
                       }

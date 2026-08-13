@@ -57,9 +57,9 @@ zoneFunctionedFrom effect = case effect of
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ origin _) -> case ref of
     ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
     ObjectRef.EachMatching _ -> Nothing
-    ObjectRef.EachCardInGraveyard _ _ -> Nothing
+    ObjectRef.EachCardInGraveyard {} -> Nothing
     ObjectRef.EachPlayer -> Nothing
-    ObjectRef.TopOfLibrary _ _ -> Nothing
+    ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing
   Effect.DealDamage (DealDamage.MkDealDamage _ _) -> Nothing
   Effect.ModifyTarget {} -> Nothing
