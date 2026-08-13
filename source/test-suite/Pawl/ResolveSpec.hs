@@ -4039,6 +4039,27 @@ setLifeTotalSpec s registry =
             lifed = stocked {GameState.players = at S.alice aliceLife (at S.bob bobLife (at S.carol carolLife (GameState.players stocked)))}
             (gs, spellId) = S.handOne spell lifed
          in (aliceMate, bobMate, spellId, gs)
+      addPikers piker pid n gs = List.foldl' (\board _ -> snd (S.addCreature piker pid board)) gs [1 .. n :: Int]
+      -- Biorhythm's board, where what differs between the seats is their CREATURE
+      -- COUNT rather than their life total. setBoard leaves alice a Pridemate and
+      -- a Mindcrank -- an ARTIFACT, so not one of her creatures -- and bob a
+      -- Pridemate, so the Pikers below take alice to 4 creatures and bob to 3.
+      -- `carolPikers` is the one knob the pair of cases turns.
+      --
+      -- Life totals 2, 3 and 9 against counts 4, 3 and 0: every seat's answer is
+      -- distinct, no seat's answer is any other seat's, and only bob's happens to
+      -- equal his own starting total -- which is what the CR 119.9 half of the
+      -- pair needs. bob's count and bob's life coinciding is why the other two
+      -- seats are there: alice's 2 against 4 and carol's 9 against 0 tell "counts
+      -- creatures" from "reads a life total".
+      biorhythmBoard carolPikers = do
+        forest <- S.printingOf s registry "Forest"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        mindcrank <- S.printingOf s registry "Mindcrank"
+        piker <- S.printingOf s registry "Goblin Piker"
+        biorhythm <- S.printingOf s registry "Biorhythm"
+        let (aliceMate, bobMate, spellId, gs) = setBoard [(forest, 8)] pridemate mindcrank piker biorhythm 2 3 9
+        pure (aliceMate, bobMate, spellId, addPikers piker S.carol carolPikers (addPikers piker S.bob 2 (addPikers piker S.alice 3 gs)))
       sphinxBoard aliceLife bobLife carolLife = do
         plains <- S.printingOf s registry "Plains"
         island <- S.printingOf s registry "Island"
@@ -4116,6 +4137,50 @@ setLifeTotalSpec s registry =
           Spec.assertEqWith s "alice's Pridemate saw her gain" (countersOn aliceMate after) (Just 1)
           Spec.assertEqWith s "bob's did not: a total set to itself is no gain (CR 119.9)" (countersOn bobMate after) (Just 0)
           Spec.assertEqWith s "and Mindcrank milled nobody" (graveyardSize S.carol after) 0
+        -- Biorhythm, {6}{G}{G} Sorcery: "Each player's life total becomes the
+        -- number of creatures they control." The number is EACH RECIPIENT'S OWN,
+        -- which neither producer above can tell from a single evaluation: the
+        -- Sphinx names one seat and Arbiter names one number for the whole table.
+        --
+        -- Three seats, three different counts -- alice 4, bob 3, carol 0 -- so no
+        -- seat's answer can stand in for another's, and a reading that evaluated
+        -- once from the CONTROLLER's perspective would hand bob and carol alice's
+        -- 4. Each seat carries one half of the rule besides:
+        --
+        --   * alice gains (2 -> 4), and her Pridemate sees it;
+        --   * bob's count is his current total, so CR 119.9 leaves him with no
+        --     life event at all and his Pridemate silent;
+        --   * carol controls nothing, so her total becomes 0 and CR 104.3b takes
+        --     her out of the game.
+        Spec.it s "CR 119.5 Biorhythm sets EACH seat to its OWN creature count" $ do
+          (aliceMate, bobMate, spellId, gs) <- biorhythmBoard 0
+          let after = castAndTrigger S.identityAnswer spellId gs
+          Spec.assertEqWith s "alice, controlling 4 creatures, rose from 2 to 4" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "bob, controlling 3, is at 3 -- not alice's 4" (S.lifeOf S.bob after) (Just 3)
+          Spec.assertEqWith s "carol, controlling none, fell from 9 to 0" (S.lifeOf S.carol after) (Just 0)
+          Spec.assertEqWith s "only alice gained, and by her own delta" (lifeGains after) [(S.alice, 2)]
+          Spec.assertEqWith s "only carol lost, and by hers" (lifeLosses after) [(S.carol, 9)]
+          Spec.assertEqWith s "alice's Pridemate saw her gain" (countersOn aliceMate after) (Just 1)
+          Spec.assertEqWith s "bob's did not: his total was already his count (CR 119.9)" (countersOn bobMate after) (Just 0)
+          Spec.assertBool s (notElem S.carol (Game.stillPlaying after)) "CR 104.3b took carol, at 0 life, out of the game"
+          Spec.assertEqWith s "and left the other two in it" (filter (`elem` Game.stillPlaying after) [S.alice, S.bob]) [S.alice, S.bob]
+        -- The control twin, differing in ONE thing: carol controls a single Piker.
+        -- Her answer moves 0 -> 1 while alice's and bob's do not move at all,
+        -- which is the pair that shows the count is read per seat; and a total of
+        -- 1 is a total CR 104.3b has no quarrel with, so the state-based action
+        -- above fired on carol's number rather than on her being named.
+        Spec.it s "CR 104.3b the control: one creature is one life, and carol stays in the game" $ do
+          (aliceMate, bobMate, spellId, gs) <- biorhythmBoard 1
+          let after = castAndTrigger S.identityAnswer spellId gs
+          Spec.assertEqWith s "alice is unmoved at 4" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "bob is unmoved at 3" (S.lifeOf S.bob after) (Just 3)
+          Spec.assertEqWith s "carol, controlling one creature, fell from 9 to 1" (S.lifeOf S.carol after) (Just 1)
+          Spec.assertEqWith s "alice still gained 2" (lifeGains after) [(S.alice, 2)]
+          Spec.assertEqWith s "carol lost 8 rather than 9" (lifeLosses after) [(S.carol, 8)]
+          Spec.assertBool s (elem S.carol (Game.stillPlaying after)) "and stayed in the game"
+          Spec.assertEqWith s "Mindcrank milled carol for exactly her loss" (graveyardSize S.carol after) 8
+          Spec.assertEqWith s "alice's Pridemate saw her gain" (countersOn aliceMate after) (Just 1)
+          Spec.assertEqWith s "bob's stayed silent" (countersOn bobMate after) (Just 0)
 
 -- One with the Machine, the card that proves Aggregation.Greatest (#254):
 -- "Draw cards equal to the greatest mana value among artifacts you control."

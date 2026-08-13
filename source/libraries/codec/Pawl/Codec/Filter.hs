@@ -52,6 +52,7 @@ codec keywordCodec =
       -- corpus lint keeps the pool honest instead (#199) -- the treatment
       -- Modification.SetController's baked PlayerId gets.
       Arm.payload "ControlledByPlayer" PlayerId.codec Filter.ControlledByPlayer,
+      Arm.nullary "ControlledByRecipient" Filter.ControlledByRecipient,
       Arm.payload "ManaValueAtMost" Common.integer Filter.ManaValueAtMost,
       Arm.nullary "ManaValueIsEven" Filter.ManaValueIsEven,
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy,
@@ -93,6 +94,7 @@ codec keywordCodec =
       Filter.ControlledByDefendingPlayer -> Common.nullary "ControlledByDefendingPlayer"
       Filter.ControlledByBound slot -> Common.tagged "ControlledByBound" . Just $ Codec.encode SlotName.codec slot
       Filter.ControlledByPlayer pid -> Common.tagged "ControlledByPlayer" . Just $ Codec.encode PlayerId.codec pid
+      Filter.ControlledByRecipient -> Common.nullary "ControlledByRecipient"
       Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Value.integer n
       Filter.ManaValueIsEven -> Common.nullary "ManaValueIsEven"
       Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ Codec.encode PlayerRelation.codec r
