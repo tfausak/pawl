@@ -50,6 +50,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -205,7 +206,7 @@ objectRefSlots ref = case ref of
   ObjectRef.TopOfLibrary player _ -> playerRefSlots player
   -- A PlayerScope names players by their relation to the effect's controller (CR
   -- 109.5) rather than out of a slot, so the chosen card's arm reads none either.
-  ObjectRef.ChosenCardInGraveyard _ _ -> Map.empty
+  ObjectRef.ChosenCardInGraveyard {} -> Map.empty
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -1644,28 +1645,56 @@ objectRefObjects legal resolving controller source gs ref = case ref of
      in concatMap
           (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
           (filter (`elem` named) (Game.apnapOrder gs))
-  -- ONE card the resolving controller chooses, which is a QUESTION rather than a
-  -- read -- and this function has no way to ask one. Empty here, and answered for
-  -- real by the MoveToZone arm's own gather, which runs in the Game monad and
-  -- raises Prompt.ChooseCardInGraveyard over graveyardCards below. A card that
-  -- writes the ref under any other opcode gets this empty answer, which is the
-  -- inert card-data error Pawl.Types.ObjectRef's own note describes.
-  ObjectRef.ChosenCardInGraveyard _ _ -> []
+  -- A card somebody CHOOSES, which is a QUESTION rather than a read -- and this
+  -- function has no way to ask one. Empty here, and answered for real by the
+  -- MoveToZone arm's own gather, which runs in the Game monad and raises
+  -- Prompt.ChooseCardInGraveyard over the candidates graveyardCards and
+  -- graveyardCardsOf below give it. A card that writes the ref under any other
+  -- opcode gets this empty answer, which is the inert card-data error
+  -- Pawl.Types.ObjectRef's own note describes.
+  ObjectRef.ChosenCardInGraveyard {} -> []
+
+-- The players a graveyard scope names, in APNAP order: the seat half of
+-- graveyardCards, shared with ObjectRef.ChosenCardInGraveyard's EachInScope
+-- chooser, which asks each of them separately and so needs the seats rather
+-- than the flattened cards. Nothing -- an absent perspective -- is empty, and
+-- cannot arise from these callers, which always have the resolving controller
+-- to offer.
+graveyardPlayers :: PlayerId -> GameState -> PlayerScope.PlayerScope -> [PlayerId]
+graveyardPlayers controller gs scope =
+  let named = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs scope)
+   in filter (`elem` named) (Game.apnapOrder gs)
+
+-- The cards in ONE player's graveyard matching the filter, in ascending
+-- ObjectId: the per-seat half of graveyardCards, shared for graveyardPlayers'
+-- reason.
+--
+-- The filter is matched against the projection exactly as the battlefield sweep
+-- does, in this effect's own context -- so `controller` here is CR 109.5's "you"
+-- rather than whoever is choosing, which the EachInScope chooser leaves alone: a
+-- card's characteristics do not depend on who is being asked about them.
+graveyardCardsOf :: PlayerId -> ObjectId -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
+graveyardCardsOf controller source gs pid filter_ =
+  let context = Filter.contextFor (Just controller) (Just source)
+   in List.sort
+        ( filter
+            (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
+            (Game.zoneMembers Zone.Graveyard pid gs)
+        )
 
 -- The cards in the named graveyards matching the filter: the shared body of
 -- ObjectRef.EachCardInGraveyard, which takes all of them, and of
--- ObjectRef.ChosenCardInGraveyard, which offers them as the candidates for one
--- choice. Written once so "which cards are in scope" cannot mean two things.
+-- ObjectRef.ChosenCardInGraveyard's TheController chooser, which offers them as
+-- the candidates for one choice. Written once so "which cards are in scope"
+-- cannot mean two things.
 --
--- Whose is PlayerEffect.playersInScope, the reading
--- Pawl.Engine.Target.graveyardRecipients already takes for a target pool, and
--- Nothing -- an absent perspective -- is empty there and here. It cannot arise
--- from these callers, which always have the resolving controller to offer.
+-- Whose is graveyardPlayers above, which is PlayerEffect.playersInScope -- the
+-- reading Pawl.Engine.Target.graveyardRecipients already takes for a target
+-- pool.
 --
--- The filter is matched against the projection exactly as the battlefield sweep
--- does, in this effect's own context. A card in a graveyard has no controller,
--- so Filter.ControlledBy is vacuously False for every candidate -- the posture
--- Pawl.Types.Pool.CardsInGraveyard's own note records.
+-- A card in a graveyard has no controller, so Filter.ControlledBy is vacuously
+-- False for every candidate -- the posture Pawl.Types.Pool.CardsInGraveyard's
+-- own note records.
 --
 -- APNAP and then ascending ObjectId, for the reasons the battlefield arm gives:
 -- the seat order is the fold over Game.apnapOrder, which also drops a player CR
@@ -1675,15 +1704,7 @@ objectRefObjects legal resolving controller source gs ref = case ref of
 -- processed in.
 graveyardCards :: PlayerId -> ObjectId -> GameState -> PlayerScope.PlayerScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 graveyardCards controller source gs scope filter_ =
-  let context = Filter.contextFor (Just controller) (Just source)
-      named = Maybe.fromMaybe [] (PlayerEffect.playersInScope (Just controller) gs scope)
-      cardsOf pid =
-        List.sort
-          ( filter
-              (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
-              (Game.zoneMembers Zone.Graveyard pid gs)
-          )
-   in concatMap cardsOf (filter (`elem` named) (Game.apnapOrder gs))
+  concatMap (\pid -> graveyardCardsOf controller source gs pid filter_) (graveyardPlayers controller gs scope)
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
@@ -1790,7 +1811,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- and this function cannot: objectRefObjects' own note explains where the real
   -- answer is made, and why an opcode that is not MoveToZone reading this ref is
   -- an inert card-data error.
-  ObjectRef.ChosenCardInGraveyard _ _ -> []
+  ObjectRef.ChosenCardInGraveyard {} -> []
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
 -- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
@@ -2702,9 +2723,10 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- Port of Karfell's "return a creature card from your graveyard to
-            -- the battlefield tapped": ONE card, and the only ref whose gather
-            -- asks a question rather than reading the board -- which is why it is
-            -- answered here, in the Game monad, and nowhere else.
+            -- the battlefield tapped": one card per chooser, and the only ref
+            -- whose gather asks a question rather than reading the board --
+            -- which is why it is answered here, in the Game monad, and nowhere
+            -- else.
             --
             -- The candidates are read from the pre-move state exactly as the
             -- sweeps above are (CR 608.2c), so an earlier effect of this same
@@ -2712,28 +2734,46 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- cards in the graveyard and they are on offer, which is what "mill
             -- four cards, THEN return" says.
             --
-            -- The chooser is the resolving CONTROLLER (CR 608.2c, CR 608.2d), no
-            -- matter whose graveyards the scope draws the candidates from.
+            -- WHO is asked is the ref's Pawl.Types.Chooser: the resolving
+            -- CONTROLLER (CR 608.2c, CR 608.2d) whatever graveyards the scope
+            -- draws the candidates from, or EACH PLAYER the scope names, asked
+            -- about their own graveyard alone -- Exhume's "each player puts a
+            -- creature card from their graveyard onto the battlefield".
+            --
+            -- The per-player asks run in APNAP order and all of them before any
+            -- card moves, which is CR 608.2e read with CR 101.4: the choices for
+            -- an action involving several players are made in that order and the
+            -- action is then processed. `gs` above is the pre-move state and
+            -- asking changes nothing, so every chooser sees the same board and
+            -- none of them sees another's answer -- and they cannot collide in
+            -- any case, since no card is in two graveyards.
             --
             -- Elided at one candidate and skipped at none, which is
             -- Prompt.ChooseCardInGraveyard's documented rule: one matching card
             -- is the whole of "a creature card in your graveyard" and leaves
             -- nothing to decide, and none makes the instruction impossible and
-            -- so ignored (CR 101.3, CR 609.3).
+            -- so ignored (CR 101.3, CR 609.3). Under EachInScope that is per
+            -- player: an empty graveyard drops one player out of the batch
+            -- rather than the instruction out of the effect.
             --
             -- FILTERED, NOT TRUSTED -- Pawl.Engine.Ring.tempt's posture: an
             -- answer naming a card never offered falls back to the first
             -- candidate, since the instruction is mandatory and something must
             -- move.
-            ObjectRef.ChosenCardInGraveyard scope filter_ -> do
+            ObjectRef.ChosenCardInGraveyard chooser scope filter_ -> do
               gs <- State.get
-              case graveyardCards controller source gs scope filter_ of
-                [] -> pure []
-                [only] -> pure [only]
-                first : second : more -> do
-                  let offered = first NonEmpty.:| (second : more)
-                  answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor controller gs) controller source offered)
-                  pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+              let ask asked candidates = case candidates of
+                    [] -> pure []
+                    [only] -> pure [only]
+                    first : second : more -> do
+                      let offered = first NonEmpty.:| (second : more)
+                      answer <- Game.choose (Prompt.ChooseCardInGraveyard (Decide.deciderFor asked gs) asked source offered)
+                      pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+              case chooser of
+                Chooser.TheController -> ask controller (graveyardCards controller source gs scope filter_)
+                Chooser.EachInScope ->
+                  fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf controller source gs pid filter_)) $
+                    graveyardPlayers controller gs scope
           arrived <- Monad.mapM moveOne =<< settleArrivals zone placement targets
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries.

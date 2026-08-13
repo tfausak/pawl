@@ -148,6 +148,9 @@
                             "type": "ChosenCardInGraveyard",
                             "value": [
                               {
+                                "type": "TheController"
+                              },
+                              {
                                 "type": "You"
                               },
                               {
