@@ -12,70 +12,62 @@ import qualified Pawl.Types.Pool as Pool
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Pool" $ do
   Spec.it s "Creatures" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       Pool.Creatures
       """ {"type":"Creatures"} """
   Spec.it s "Players" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       Pool.Players
       """ {"type":"Players"} """
   Spec.it s "AnyTarget" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       Pool.AnyTarget
       """ {"type":"AnyTarget"} """
   Spec.it s "Permanents" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       Pool.Permanents
       """ {"type":"Permanents"} """
   Spec.it s "Spells" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       Pool.Spells
       """ {"type":"Spells"} """
   -- CR 113.9: activated and triggered abilities on the stack, disjoint from
   -- Spells.
   Spec.it s "Abilities" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       Pool.Abilities
       """ {"type":"Abilities"} """
   Spec.it s "SpellsAndPermanents" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       Pool.SpellsAndPermanents
       """ {"type":"SpellsAndPermanents"} """
   -- CR 404.1: the cards in a graveyard, tagged with WHOSE.
   Spec.it s "CardsInGraveyard" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You))
       """ {"type":"CardsInGraveyard","value":{"type":"Scoped","value":{"type":"You"}}} """
   -- CR 406.1: the cards in the exile zone. Nullary, since exile has no
   -- per-player copy.
   Spec.it s "CardsInExile" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Pool.toJson
-      Pool.fromJson
+      Pool.codec
       Pool.CardsInExile
       """ {"type":"CardsInExile"} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s Pool.codec

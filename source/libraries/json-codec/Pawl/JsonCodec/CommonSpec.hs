@@ -10,6 +10,8 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonSchema.Define as Define
+import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Spec as Spec
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -266,3 +268,16 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         s
         (Either.isLeft (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "[]")))
         "expected a decode failure"
+    -- The bundle carries the pair's behaviour plus a Schema.mapOf schema, which
+    -- is the half the loose pair could not supply.
+    Spec.it s "the bundle round trips" $
+      Common.assertCodec
+        s
+        (Common.textMap id id Common.integer)
+        (Map.fromList [(Text.pack "a", 2), (Text.pack "z", 1)])
+        "{\"a\":2,\"z\":1}"
+    Spec.it s "the bundle's schema is mapOf over the value schema" $
+      Spec.assertEq
+        s
+        (Define.run (Codec.schema (Common.textMap id id Common.integer)))
+        (Define.run (fmap Schema.mapOf (Codec.schema Common.integer)))
