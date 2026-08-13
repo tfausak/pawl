@@ -1547,6 +1547,9 @@ rewriteEffect pairs effect = case effect of
   Effect.SetLifeTotal {} -> effect
   Effect.RedistributeLifeTotals -> effect
   Effect.IncreaseSpeed {} -> effect
+  -- CR 612.1 swaps a subtype word; the reference, the amount and the printed
+  -- floor hold none.
+  Effect.DecreaseSpeed {} -> effect
   -- CR 612.2a: a token-creating spell defines the token's creature types and its
   -- name with the same words, so a text change reaches both. Those words live in
   -- the token's defining card, which this arm hands to rewriteCard.
@@ -2690,6 +2693,9 @@ filterReads f = case f of
   Filter.Type.OwnedBy _ -> Set.empty
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
+  -- Reads a CONTROLLER rather than a characteristic (CR 109.3 lists none), so it
+  -- declares nothing -- IsPlayer's answer, and ControlledBy's.
+  Filter.Type.IsControllerOfBound _ -> Set.empty
   -- Over-declared deliberately, the posture CanHostSubject takes below: the atom
   -- reads the CONTROLLER of every permanent on the battlefield, plus whatever its
   -- nested filter reads of each, and Aspect names an aspect of ONE object's

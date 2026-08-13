@@ -518,6 +518,12 @@ matches context view predicate = case predicate of
       PlayerRelation.You -> candidate == you
       PlayerRelation.Opponent -> candidate /= you
     _ -> False
+  -- The controller of the object a slot names, and False WHEREVER IT IS REACHED,
+  -- for ControlsMoreThanYou's reason below: Pawl.Engine.Count.bakePerspective
+  -- answers it against the board, and this module holds none. An atom that
+  -- survives to here is one in a position nothing bakes -- any filter but a
+  -- Scope.OverPlayers count's.
+  Filter.IsControllerOfBound _ -> False
   -- CR 110.2's board comparison, and False WHEREVER IT IS REACHED, exactly as
   -- ControlledByBound above is: Pawl.Engine.Count.bakePerspective replaces the
   -- atom with a trivially true or trivially false predicate before the candidate
@@ -662,6 +668,9 @@ rewrite pairs predicate = case predicate of
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
   Filter.IsPlayer _ -> predicate
+  -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
+  -- atom names a slot rather than a subtype.
+  Filter.IsControllerOfBound _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsBlocking -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -945,6 +954,10 @@ bakeBound players predicate = case predicate of
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
   Filter.IsPlayer _ -> predicate
+  -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
+  -- holding an OBJECT -- there is nothing here to substitute.
+  -- Pawl.Engine.Count.bakePerspective is where it is answered instead.
+  Filter.IsControllerOfBound _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsBlocking -> predicate
   Filter.AttackedThisTurn -> predicate
@@ -1009,6 +1022,7 @@ manaValueThresholds predicate = case predicate of
   Filter.OwnedBy _ -> []
   Filter.IsSource -> []
   Filter.IsPlayer _ -> []
+  Filter.IsControllerOfBound _ -> []
   Filter.IsAttacking -> []
   Filter.IsBlocking -> []
   Filter.AttackedThisTurn -> []
@@ -1076,6 +1090,7 @@ statesAQuality predicate = case predicate of
   Filter.OwnedBy _ -> True
   Filter.IsSource -> True
   Filter.IsPlayer _ -> True
+  Filter.IsControllerOfBound _ -> True
   Filter.IsAttacking -> True
   Filter.IsBlocking -> True
   Filter.AttackedThisTurn -> True
@@ -1102,6 +1117,12 @@ statesAQuality predicate = case predicate of
 boundSlots :: Filter.Filter Keyword.Type.Keyword -> Set.Set SlotName.SlotName
 boundSlots predicate = case predicate of
   Filter.ControlledByBound slot -> Set.singleton slot
+  -- Reported although `bakeBound` above leaves it standing, which the pairing
+  -- this function's comment states would otherwise forbid. What the pairing is
+  -- for is that a reported slot be ANSWERABLE, and this one is -- one module
+  -- over, at Pawl.Engine.Count.bakePerspective, which holds the board a
+  -- controller has to be projected off.
+  Filter.IsControllerOfBound slot -> Set.singleton slot
   Filter.And fs -> foldMap boundSlots fs
   Filter.Or fs -> foldMap boundSlots fs
   Filter.Not f -> boundSlots f
