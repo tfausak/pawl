@@ -1,20 +1,24 @@
 module Pawl.Types.Effect where
 
 import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
+import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
-import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DealDamage as DealDamage
+import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
+import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -25,7 +29,6 @@ import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
-import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -37,8 +40,10 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
+import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.Uses as Uses
 
 -- | The ISA (design.md section 1): first-order, non-recursive in CONTROL FLOW --
@@ -63,7 +68,7 @@ data Effect card
     --
     -- A one-shot under CR 608.2c/608.2f: nothing is stored, so unlike
     -- ModifyTarget and GainControl it owes CR 611.2c no frozen set.
-    DealDamage ObjectRef.ObjectRef Quantity.Quantity
+    DealDamage DealDamage.DealDamage
   | -- | CR 611: create a continuous effect on the objects the ObjectRef names,
     -- for a duration. Giant Growth and Serpent's Gift are this one opcode,
     -- differing only in the Modification (layer 7c vs 6), which Resolve stores
@@ -212,7 +217,7 @@ data Effect card
     -- Only a card whose text does NOT already exclude such a destination can reach
     -- it (Crown of the Ages can, Aura Graft cannot), which is why the rule and the
     -- atom are not the same thing.
-    AttachTarget SlotName.SlotName (Filter.Filter Keyword.Keyword)
+    AttachTarget AttachTarget.AttachTarget
   | -- | CR 400.7: move the objects the ObjectRef names to a zone through the
     -- changeZone funnel. Bounce is Hand (owner-relative -- changeZone carries
     -- Object.owner), targeted exile is Exile; the destination is data, so this is
@@ -411,7 +416,7 @@ data Effect card
     -- player chooses which (CR 701.9b) via Prompt.ChooseDiscard, routed through
     -- Decide.deciderFor. A hand smaller than the count discards all of it (CR
     -- 609.3), forced -- so it is not prompted.
-    Discard SlotName.SlotName Quantity.Quantity
+    Discard Discard.Discard
   | -- | CR 119.3: the players the PlayerRef names each lose this much life. Sign in
     -- Blood is `InSlot`, reading a slot TARGETING filled (CR 601.2c); a "you lose
     -- N life" drawback is `Relative You`. PlayerRef rather than Mill's and
@@ -626,7 +631,7 @@ data Effect card
     -- Targetless in itself, like GainPlayerCounters: the slot a PlayerRef reads
     -- may have been filled by targeting (CR 601.2c), which is how Fatigue writes
     -- "target player", but nothing here demands it.
-    SkipNextPhase PlayerRef.PlayerRef PhaseSelector.PhaseSelector
+    SkipNextPhase SkipNextPhase.SkipNextPhase
   | -- | CR 615.7: install a prevention SHIELD over the recipients an ObjectRef
     -- names, for a duration -- Mending Hands' "Prevent the next 4 damage that
     -- would be dealt to any target this turn". The Quantity is the shield's
@@ -683,7 +688,7 @@ data Effect card
     -- pattern must name the shielded permanent or player, which card data cannot
     -- write. Fog IS such a Replace precisely because it shields nobody in
     -- particular.
-    PreventAllDamage Duration.Duration ObjectRef.ObjectRef
+    PreventAllDamage DurationRef.DurationRef
   | -- | CR 614.9: install a floating REDIRECTION effect -- Turn the Tables' "all
     -- combat damage that would be dealt to you this turn is dealt to target
     -- attacking creature instead". The first ObjectRef is the damage's original
@@ -870,7 +875,7 @@ data Effect card
     -- enchantments" EachMatching. Like ModifyTarget and unlike the one-shots, the
     -- swept set is FROZEN into the stored effect (CR 611.2c names controller
     -- changes in as many words), so an enchantment entering afterwards is safe.
-    GainControl Duration.Duration ObjectRef.ObjectRef
+    GainControl DurationRef.DurationRef
   | -- | CR 603.7: create the delayed triggered ability this card declares under
     -- this name (Face.delayedAbilities). First-order: the payload is card data
     -- joined by a name, so this opcode carries no nested ability and adds no type
@@ -958,7 +963,7 @@ data Effect card
     -- stops it before reaching here) and CR 701.60d's "a suspected permanent can't
     -- become suspected again". Emits GameEvent.BecameDesignated, once, only when the
     -- designation was not already there.
-    Designate Designation.Designation SlotName.SlotName
+    Designate Designate.Designate
   | -- | CR 701.60a's other ending: the named permanents are NO LONGER SUSPECTED --
     -- Eliminate the Impossible's "if any of them are suspected, they're no longer
     -- suspected". Rule 701.60a's "until it leaves the battlefield" needs no opcode,
@@ -1047,7 +1052,7 @@ data Effect card
     -- one named card, never a swept set, so the mover is the slot CR 400.7e's
     -- rescue bound -- Pawl.Engine.Binding.became -- read live off the resolving
     -- object. Only the second is a target (CR 115.10a); the first is a definition.
-    ExileHaunting SlotName.SlotName SlotName.SlotName
+    ExileHaunting ExileHaunting.ExileHaunting
   | -- | CR 729.1/729.1b: play a Magic subgame, then bind its outcome (the derived
     -- loser) into this slot for a later effect to read. DEFINED here, like
     -- Create's minted-token slot, not a cast-time target -- the loser is known
@@ -1182,7 +1187,7 @@ data Effect card
     -- resolution just created, and CR 500.7's most-recently-created-first ordering
     -- means the obvious reference -- SkipNextPhase's CR 614.10a "next" -- names a
     -- DIFFERENT turn as soon as another extra-turn effect resolves afterwards.
-    TakeExtraTurn PlayerRef.PlayerRef (Set.Set PhaseSelector.PhaseSelector)
+    TakeExtraTurn TakeExtraTurn.TakeExtraTurn
   | -- | CR 701.24: the referenced objects are shuffled into their OWNERS' libraries
     -- -- Riftsweeper's "choose target face-up exiled card. Its owner shuffles it into
     -- their library." The move goes through the changeZone funnel (CR 400.7's new
@@ -1281,5 +1286,5 @@ data Effect card
     -- CR 611.2b: if the stated duration never starts, the effect does nothing --
     -- Pawl.Engine.Expiry.arm answers Nothing and Resolve stores no permission at
     -- all, rather than storing one that a later sweep would remove.
-    GrantPlayFromExile Duration.Duration ObjectRef.ObjectRef
+    GrantPlayFromExile DurationRef.DurationRef
   deriving (Eq, Ord, Show)

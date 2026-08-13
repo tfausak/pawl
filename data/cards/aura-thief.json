@@ -43,11 +43,11 @@
                     "effects": [
                       {
                         "type": "GainControl",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "Indefinite"
                           },
-                          {
+                          "ref": {
                             "type": "EachMatching",
                             "value": {
                               "type": "HasCardType",
@@ -56,7 +56,7 @@
                               }
                             }
                           }
-                        ]
+                        }
                       }
                     ]
                   }

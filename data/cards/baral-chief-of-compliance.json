@@ -91,13 +91,13 @@
                       },
                       {
                         "type": "Discard",
-                        "value": [
-                          "you",
-                          {
+                        "value": {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
-                          }
-                        ]
+                          },
+                          "slot": "you"
+                        }
                       }
                     ],
                     "optionality": {

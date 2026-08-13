@@ -22,15 +22,15 @@
                     "effects": [
                       {
                         "type": "DealDamage",
-                        "value": [
-                          {
+                        "value": {
+                          "quantity": {
+                            "type": "Power"
+                          },
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
-                          },
-                          {
-                            "type": "Power"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

@@ -56,15 +56,15 @@
                       },
                       {
                         "type": "GrantPlayFromExile",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "exiled"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

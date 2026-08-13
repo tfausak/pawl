@@ -16,6 +16,7 @@ import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AlternativeCostSpec
+import qualified Pawl.Codec.AttachTargetSpec
 import qualified Pawl.Codec.AttackCostSpec
 import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.BeginningStepSpec
@@ -53,13 +54,17 @@ import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DaytimeSpec
+import qualified Pawl.Codec.DealDamageSpec
 import qualified Pawl.Codec.DefenseSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
+import qualified Pawl.Codec.DesignateSpec
 import qualified Pawl.Codec.DesignationSpec
 import qualified Pawl.Codec.DestroySpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
+import qualified Pawl.Codec.DiscardSpec
 import qualified Pawl.Codec.DungeonRoomSpec
+import qualified Pawl.Codec.DurationRefSpec
 import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
@@ -68,6 +73,7 @@ import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExchangeSidesSpec
+import qualified Pawl.Codec.ExileHauntingSpec
 import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FaceSpec
@@ -134,6 +140,7 @@ import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
+import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
@@ -141,6 +148,7 @@ import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
+import qualified Pawl.Codec.TakeExtraTurnSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSpecSpec
@@ -310,6 +318,7 @@ spec s registry = do
   Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s
+  Pawl.Codec.AttachTargetSpec.spec s
   Pawl.Codec.AttackCostSpec.spec s
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
@@ -347,13 +356,17 @@ spec s registry = do
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DaytimeSpec.spec s
+  Pawl.Codec.DealDamageSpec.spec s
+  Pawl.Codec.DesignateSpec.spec s
   Pawl.Codec.DesignationSpec.spec s
   Pawl.Codec.DefenseSpec.spec s
   Pawl.Codec.DelayedTriggerSpec.spec s
   Pawl.Codec.DestroySpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
+  Pawl.Codec.DiscardSpec.spec s
   Pawl.Codec.DungeonRoomSpec.spec s
+  Pawl.Codec.DurationRefSpec.spec s
   Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
@@ -362,6 +375,7 @@ spec s registry = do
   Pawl.Codec.EntryRidersSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
+  Pawl.Codec.ExileHauntingSpec.spec s
   Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FaceSpec.spec s
@@ -428,6 +442,7 @@ spec s registry = do
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
+  Pawl.Codec.SkipNextPhaseSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s
   Pawl.Codec.SpeedDecreaseSpec.spec s
@@ -435,6 +450,7 @@ spec s registry = do
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
+  Pawl.Codec.TakeExtraTurnSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSpecSpec.spec s

@@ -38,15 +38,15 @@
                     "effects": [
                       {
                         "type": "SkipNextPhase",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "InSlot",
                             "value": "target"
                           },
-                          {
+                          "selector": {
                             "type": "CombatPhase"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

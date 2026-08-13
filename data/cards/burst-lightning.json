@@ -49,16 +49,16 @@
                 "effects": [
                   {
                     "type": "DealDamage",
-                    "value": [
-                      {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
+                    "value": {
+                      "quantity": {
                         "type": "Literal",
                         "value": 2
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               },
@@ -81,16 +81,16 @@
                 "effects": [
                   {
                     "type": "DealDamage",
-                    "value": [
-                      {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
+                    "value": {
+                      "quantity": {
                         "type": "Literal",
                         "value": 4
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

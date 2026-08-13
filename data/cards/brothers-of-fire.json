@@ -37,29 +37,29 @@
                     "effects": [
                       {
                         "type": "DealDamage",
-                        "value": [
-                          {
-                            "type": "InSlot",
-                            "value": "target"
-                          },
-                          {
+                        "value": {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "target"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "DealDamage",
-                        "value": [
-                          {
-                            "type": "InSlot",
-                            "value": "you"
-                          },
-                          {
+                        "value": {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "you"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

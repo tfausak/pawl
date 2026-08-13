@@ -83,14 +83,14 @@
                     "effects": [
                       {
                         "type": "SkipNextPhase",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "Opponent"
                             }
                           },
-                          {
+                          "selector": {
                             "type": "Step",
                             "value": {
                               "type": "Beginning",
@@ -99,7 +99,7 @@
                               }
                             }
                           }
-                        ]
+                        }
                       }
                     ]
                   }
