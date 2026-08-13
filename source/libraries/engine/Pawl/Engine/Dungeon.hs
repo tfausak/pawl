@@ -195,6 +195,7 @@ enter pid = do
                 Object.turnedOverAt = Nothing,
                 Object.worldSince = Nothing,
                 Object.playableFromExile = Nothing,
+                Object.plotted = Nothing,
                 Object.ringBearerFor = Nothing,
                 Object.protector = Nothing,
                 -- CR 309.4a: "as a player puts a dungeon they own into the command

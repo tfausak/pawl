@@ -1658,6 +1658,9 @@ keywordFilters keyword = case keyword of
   Keyword.Flashback cost -> costFilters cost
   Keyword.Kicker cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
+  -- CR 702.170a: the plot cost, whose components may hold a Filter exactly as
+  -- flashback's and entwine's may.
+  Keyword.Plot cost -> costFilters cost
   -- CR 702.37a: the morph cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
   Keyword.Morph cost _ -> costFilters cost

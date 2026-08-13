@@ -310,6 +310,31 @@ data Object = MkObject
     -- What reads it is narrower than that: only Pawl.Engine.Cast does, so a land
     -- under this permission would be permitted nothing (#670).
     playableFromExile :: Maybe ExilePlayPermission.ExilePlayPermission,
+    -- | CR 702.170a: this exiled card is a PLOTTED card, stamped with the turn on
+    -- which it became one. Nothing for everything that is not plotted.
+    --
+    -- The TURN NUMBER and not a Bool, because CR 702.170d's permission is scoped
+    -- by it: "during any turn AFTER THE TURN IN WHICH IT BECAME PLOTTED".
+    -- GameState.turnNumber counts every turn the game takes, extra turns included
+    -- (CR 500.7), so a strict comparison against the stamp is that clause exactly
+    -- -- where a "plotted this turn" flag would need clearing at a boundary and
+    -- would answer wrongly for a card plotted during an extra turn.
+    --
+    -- Not Pawl.Types.TurnWindow, whose OnTurn names a turn an effect is WAITING
+    -- for: this stamp is a turn already past when it is read, so the two rule
+    -- shapes are opposites.
+    --
+    -- Beside playableFromExile above rather than inside it, though both are
+    -- permissions to cast an exiled card. CR 715.3d's names a PLAYER and states no
+    -- cost; CR 702.170d's names the card's OWNER, makes the cast free, and fixes
+    -- the timing -- so one field cannot answer both without a tag, and the tag
+    -- would be this field.
+    --
+    -- Per-incarnation, like damage and counters: cleared by newIncarnation,
+    -- because CR 400.7 makes the moved object a new one. A plotted card that is
+    -- cast and dies is not plotted in its graveyard, which is CR 702.170d read
+    -- forward -- the permission is about a card in exile.
+    plotted :: Maybe Natural.Natural,
     -- | CR 701.54b: the Ring-bearer designation, as the player it was made for.
     -- Nothing for every permanent that is not anyone's Ring-bearer, which is
     -- almost all of them.
@@ -520,6 +545,7 @@ newIncarnation object =
       turnedOverAt = Nothing,
       worldSince = Nothing,
       playableFromExile = Nothing,
+      plotted = Nothing,
       ringBearerFor = Nothing,
       protector = Nothing,
       ventureRoom = Nothing,

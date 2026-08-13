@@ -254,6 +254,24 @@ costsFor name oid gs = case Game.lookupObject oid gs of
                    | Keyword.hasJumpStart (Face.keywords face)
                    ]
                 <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
+            -- CR 702.170d: a PLOTTED card is cast "without paying its mana
+            -- cost", which is CR 118.9's alternative cost and so
+            -- withoutPayingManaCost above -- the card's own additional costs
+            -- ride along with it, since that function carries them.
+            --
+            -- INSTEAD of the printed cost and not beside it, which is the whole
+            -- difference from the graveyard arm's Yawgmoth's Will case: rule
+            -- 702.170d is the only thing permitting this cast (nothing else in
+            -- the pool casts a card from exile for its mana cost), so offering
+            -- `printed` here would price a cast no rule allows.
+            --
+            -- The OTHER permission this zone can carry -- CR 715.3d's Adventure
+            -- exile, and Effect.GrantPlayFromExile -- states no cost, so what the
+            -- card asks for is what it asks for anywhere. That is the `_` arm's
+            -- list, and this arm falls back to it for an exiled card that is not
+            -- plotted.
+            Zone.Exile
+              | Maybe.isJust (Object.plotted obj) -> [withoutPayingManaCost face]
             _ -> printed : alternatives
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
