@@ -34,27 +34,27 @@
                     "effects": [
                       {
                         "type": "Destroy",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "thatAttacker"
                           },
-                          {
+                          "regenerability": {
                             "type": "Regenerable"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "Destroy",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           },
-                          {
+                          "regenerability": {
                             "type": "Regenerable"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

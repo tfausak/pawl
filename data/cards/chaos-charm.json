@@ -21,15 +21,15 @@
                 "effects": [
                   {
                     "type": "Destroy",
-                    "value": [
-                      {
+                    "value": {
+                      "ref": {
                         "type": "InSlot",
                         "value": "wall"
                       },
-                      {
+                      "regenerability": {
                         "type": "Regenerable"
                       }
-                    ]
+                    }
                   }
                 ]
               }

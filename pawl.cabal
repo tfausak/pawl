@@ -113,6 +113,7 @@ library codec
     Pawl.Codec.CombatStep
     Pawl.Codec.CombatStepSpec
     Pawl.Codec.Compares
+    Pawl.Codec.ComparesSpec
     Pawl.Codec.Comparison
     Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
@@ -136,6 +137,7 @@ library codec
     Pawl.Codec.CounterPatternSpec
     Pawl.Codec.CountSpec
     Pawl.Codec.CreateCopy
+    Pawl.Codec.CreateCopySpec
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
@@ -153,6 +155,7 @@ library codec
     Pawl.Codec.Designation
     Pawl.Codec.DesignationSpec
     Pawl.Codec.Destroy
+    Pawl.Codec.DestroySpec
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.DiscardCause
@@ -212,6 +215,7 @@ library codec
     Pawl.Codec.ManaType
     Pawl.Codec.ManaTypeSpec
     Pawl.Codec.Mill
+    Pawl.Codec.MillSpec
     Pawl.Codec.MillTally
     Pawl.Codec.MillTallySpec
     Pawl.Codec.Modal

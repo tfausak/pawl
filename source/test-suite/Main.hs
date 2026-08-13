@@ -31,6 +31,7 @@ import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.ColorSpec
 import qualified Pawl.Codec.CombatRestrictionSpec
 import qualified Pawl.Codec.CombatStepSpec
+import qualified Pawl.Codec.ComparesSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ConditionSpec
 import qualified Pawl.Codec.ControllerRelationSpec
@@ -42,6 +43,7 @@ import qualified Pawl.Codec.CounterKindSpec
 import qualified Pawl.Codec.CounterPatternSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
+import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
@@ -50,6 +52,7 @@ import qualified Pawl.Codec.DaytimeSpec
 import qualified Pawl.Codec.DefenseSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
 import qualified Pawl.Codec.DesignationSpec
+import qualified Pawl.Codec.DestroySpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
 import qualified Pawl.Codec.DungeonRoomSpec
@@ -79,6 +82,7 @@ import qualified Pawl.Codec.ManaFilterSpec
 import qualified Pawl.Codec.ManaProductionSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
+import qualified Pawl.Codec.MillSpec
 import qualified Pawl.Codec.MillTallySpec
 import qualified Pawl.Codec.ModalSpec
 import qualified Pawl.Codec.ModeIndexSpec
@@ -304,6 +308,7 @@ spec s registry = do
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
   Pawl.Codec.CombatStepSpec.spec s
+  Pawl.Codec.ComparesSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s
@@ -315,6 +320,7 @@ spec s registry = do
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CountSpec.spec s
+  Pawl.Codec.CreateCopySpec.spec s
   Pawl.Codec.DamageEventSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
@@ -323,6 +329,7 @@ spec s registry = do
   Pawl.Codec.DesignationSpec.spec s
   Pawl.Codec.DefenseSpec.spec s
   Pawl.Codec.DelayedTriggerSpec.spec s
+  Pawl.Codec.DestroySpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
   Pawl.Codec.DungeonRoomSpec.spec s
@@ -352,6 +359,7 @@ spec s registry = do
   Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
+  Pawl.Codec.MillSpec.spec s
   Pawl.Codec.MillTallySpec.spec s
   Pawl.Codec.ModalSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s

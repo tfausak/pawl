@@ -34,15 +34,15 @@
                 "effects": [
                   {
                     "type": "Destroy",
-                    "value": [
-                      {
+                    "value": {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       },
-                      {
+                      "regenerability": {
                         "type": "Regenerable"
                       }
-                    ]
+                    }
                   }
                 ]
               }
