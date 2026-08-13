@@ -40,19 +40,19 @@
                       [
                         {
                           "type": "PutCounters",
-                          "value": [
-                            {
+                          "value": {
+                            "kind": {
                               "type": "PlusOnePlusOne"
                             },
-                            {
+                            "quantity": {
                               "type": "InSlot",
                               "value": "thatMuch"
                             },
-                            {
+                            "ref": {
                               "type": "InSlot",
                               "value": "target"
                             }
-                          ]
+                          }
                         }
                       ]
                     ]

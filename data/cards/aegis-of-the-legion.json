@@ -109,19 +109,19 @@
                     "effects": [
                       {
                         "type": "PutCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
                             "type": "Shield"
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "thatMentoredCreature"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

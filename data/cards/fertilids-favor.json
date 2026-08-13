@@ -66,19 +66,19 @@
                 "effects": [
                   {
                     "type": "PutCounters",
-                    "value": [
-                      {
+                    "value": {
+                      "kind": {
                         "type": "PlusOnePlusOne"
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 2
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "permanent"
                       }
-                    ]
+                    }
                   }
                 ]
               }

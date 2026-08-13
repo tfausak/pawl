@@ -54,6 +54,7 @@ import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -154,7 +155,7 @@ ability =
                         Effect.LoseLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot milledSlot)),
                         -- "and removes one rad counter from themselves",
                         -- likewise once per card.
-                        Effect.RemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot milledSlot)
+                        Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot milledSlot))
                       ]
                   )
                   Map.empty

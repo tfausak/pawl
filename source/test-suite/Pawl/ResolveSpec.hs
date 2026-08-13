@@ -99,6 +99,7 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -110,6 +111,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Scope as Scope
@@ -4769,7 +4771,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) slot)
+            (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) slot))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "one of the two counters is gone" (fmap Object.counters (Game.lookupObject oid after)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
   -- CR 122 states no rule making the instruction fail when there are fewer
@@ -4788,7 +4790,7 @@ countersSpec s registry = Spec.describe s "Counters" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot)
+            (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "the kind is gone, not negative" (fmap Object.counters (Game.lookupObject oid after)) (Just Map.empty)
   -- CR 608.2d over CR 608.2e's unit, on a whole card: Shed Weakness ({G} Instant,
@@ -5028,7 +5030,7 @@ gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
   Spec.it s "CR 107.14 GainPlayerCounters gives the resolving controller energy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        act = Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
+        act = Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2)))
         after = S.runPure S.identityAnswer gs0 act
     Spec.assertEqWith s "alice has two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
   -- CR 122.1: `EachPlayer` on GainPlayerCounters had no card producer until

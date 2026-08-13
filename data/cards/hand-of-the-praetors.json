@@ -122,19 +122,19 @@
                     "effects": [
                       {
                         "type": "GainPlayerCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
+                            "type": "Poison"
+                          },
+                          "player": {
                             "type": "InSlot",
                             "value": "target"
                           },
-                          {
-                            "type": "Poison"
-                          },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }

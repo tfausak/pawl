@@ -110,6 +110,7 @@ import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import Pawl.Types.PlayerRef (PlayerRef)
@@ -122,9 +123,11 @@ import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import Pawl.Types.Result (Result)
@@ -324,10 +327,10 @@ slotsOf effect = case effect of
   Effect.RedirectDamage duration _ srcRef destRef ->
     joinSlots [durationSlots duration, objectRefSlots srcRef, objectRefSlots destRef]
   Effect.Counter slot -> oneSlot slot
-  Effect.PutCounters _ quantity ref -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
-  Effect.RemoveCounters _ quantity slot -> insertOne slot (quantitySlots quantity)
-  Effect.GainPlayerCounters ref _ quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.RemovePlayerCounters ref _ quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot) -> insertOne slot (quantitySlots quantity)
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
@@ -522,10 +525,10 @@ slotsAreExhaustive effect = case effect of
   Effect.PreventAllDamage duration _ -> durationSlotsAreExhaustive duration
   Effect.RedirectDamage duration _ _ _ -> durationSlotsAreExhaustive duration
   Effect.Counter _ -> True
-  Effect.PutCounters _ quantity _ -> Quantity.slotsAreExhaustive quantity
-  Effect.RemoveCounters _ quantity _ -> Quantity.slotsAreExhaustive quantity
-  Effect.GainPlayerCounters _ _ quantity -> Quantity.slotsAreExhaustive quantity
-  Effect.RemovePlayerCounters _ _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Tap _ -> True
   Effect.Untap _ -> True
   Effect.Transform _ -> True
@@ -646,10 +649,10 @@ readsX = any effectReadsX
       Effect.PreventAllDamage {} -> False
       Effect.RedirectDamage {} -> False
       Effect.Counter _ -> False
-      Effect.PutCounters _ quantity _ -> Quantity.readsX quantity
-      Effect.RemoveCounters _ quantity _ -> Quantity.readsX quantity
-      Effect.GainPlayerCounters _ _ quantity -> Quantity.readsX quantity
-      Effect.RemovePlayerCounters _ _ quantity -> Quantity.readsX quantity
+      Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
+      Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
+      Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
+      Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
       Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.Transform _ -> False
@@ -4071,7 +4074,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- exactly -- see Pawl.Types.Countering, which sets out the two cases.
       Just recipient -> mapM_ (Event.counter source controller) $ Recipient.objectOf recipient
       _ -> pure ()
-  Effect.PutCounters kind quantity ref -> do
+  Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -4089,7 +4092,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- CR 122: PutCounters' mirror, and deliberately NOT through a CR 614.16 gate
   -- -- that rule replaces a placement, and nothing in CR 614 replaces a removal,
   -- so there is no loop for this to enter.
-  Effect.RemoveCounters kind quantity slot -> do
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters kind quantity slot) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -4165,7 +4168,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   Effect.TemptWithTheRing -> Ring.tempt controller
   -- CR 701.49: the whole keyword action, which Pawl.Engine.Dungeon owns.
   Effect.Venture -> Dungeon.venture controller
-  Effect.GainPlayerCounters ref kind quantity -> do
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -4180,7 +4183,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             Monad.forM_ recipients $ \pid ->
               Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind (Integer.toNaturalSaturating n))
       _ -> pure ()
-  Effect.RemovePlayerCounters ref kind quantity -> do
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal

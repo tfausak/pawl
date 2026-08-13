@@ -121,11 +121,11 @@
                     "effects": [
                       {
                         "type": "PutCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
                             "type": "PlusOnePlusOne"
                           },
-                          {
+                          "quantity": {
                             "type": "AgainstSlot",
                             "value": [
                               "thatDamager",
@@ -137,11 +137,11 @@
                               }
                             ]
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "thatDamager"
                           }
-                        ]
+                        }
                       }
                     ]
                   }
