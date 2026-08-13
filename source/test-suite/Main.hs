@@ -90,6 +90,7 @@ import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
 import qualified Pawl.Codec.ModeSpec
 import qualified Pawl.Codec.ModificationSpec
+import qualified Pawl.Codec.ModifyTargetSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveToZoneSpec
@@ -121,6 +122,7 @@ import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.RemoveCountersSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
+import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
@@ -377,6 +379,7 @@ spec s registry = do
   Pawl.Codec.ModeSelectionSpec.spec s
   Pawl.Codec.ModeSpec.spec s
   Pawl.Codec.ModificationSpec.spec s
+  Pawl.Codec.ModifyTargetSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.MorphVariantSpec.spec s
   Pawl.Codec.MoveToZoneSpec.spec s
@@ -406,6 +409,7 @@ spec s registry = do
   Pawl.Codec.ReduceActivationCostSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
+  Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s

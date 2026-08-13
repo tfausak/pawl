@@ -5,7 +5,6 @@ module Pawl.Codec.RequireBlock where
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.RequireBlock as RequireBlock
 

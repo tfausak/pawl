@@ -121,27 +121,27 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t")))))
-      """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},{"type":"InSlot","value":"t"}]} """
+      """ {"type":"ModifyTarget","value":{"duration":{"type":"UntilEndOfTurn"},"modification":{"type":"GainKeyword","value":{"type":"Trample"}},"ref":{"type":"InSlot","value":"t"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking]))))
-      """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},{"type":"EachMatching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"IsAttacking"}]}}]} """
+      """ {"type":"ModifyTarget","value":{"duration":{"type":"UntilEndOfTurn"},"modification":{"type":"GainKeyword","value":{"type":"Trample"}},"ref":{"type":"EachMatching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"IsAttacking"}]}}}} """
   Spec.it s "ChangeText, a basic land type swap that forbids nothing" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.ChangeText (ChangeText.MkChangeText SubtypeFamily.BasicLandType Set.empty (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"ChangeText","value":[{"type":"BasicLandType"},[],"target"]} """
+      """ {"type":"ChangeText","value":{"family":{"type":"BasicLandType"},"forbidden":[],"slot":"target"}} """
   Spec.it s "ChangeText, a creature type swap whose new word can't be Wall" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.ChangeText (ChangeText.MkChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"ChangeText","value":[{"type":"CreatureType"},[{"type":"Wall"}],"target"]} """
+      """ {"type":"ChangeText","value":{"family":{"type":"CreatureType"},"forbidden":[{"type":"Wall"}],"slot":"target"}} """
   Spec.it s "AddMana, a fixed type and any color" $ do
     Common.assertJsonCodec
       s
@@ -825,7 +825,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.CantCastSpells))
-      """ {"type":"AffectPlayers","value":[{"type":"UntilEndOfTurn"},{"type":"Scoped","value":{"type":"Opponents"}},{"type":"CantCastSpells"}]} """
+      """ {"type":"AffectPlayers","value":{"duration":{"type":"UntilEndOfTurn"},"players":{"type":"Scoped","value":{"type":"Opponents"}},"effect":{"type":"CantCastSpells"}}} """
   -- The targeted seat, which is the arm no scope can say (Cease-Fire).
   Spec.it s "AffectPlayers at a named slot" $
     Common.assertJsonCodec
@@ -833,14 +833,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Named (SlotName.MkSlotName (Text.pack "target"))) PlayerEffect.CantCastSpells))
-      """ {"type":"AffectPlayers","value":[{"type":"UntilEndOfTurn"},{"type":"Named","value":"target"},{"type":"CantCastSpells"}]} """
+      """ {"type":"AffectPlayers","value":{"duration":{"type":"UntilEndOfTurn"},"players":{"type":"Named","value":"target"},"effect":{"type":"CantCastSpells"}}} """
   Spec.it s "RequireBlock" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
       (Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfCombat (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))))
-      """ {"type":"RequireBlock","value":[{"type":"UntilEndOfCombat"},{"type":"InSlot","value":"target"},{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}]} """
+      """ {"type":"RequireBlock","value":{"duration":{"type":"UntilEndOfCombat"},"blocker":{"type":"InSlot","value":"target"},"attacker":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}}} """
   Spec.it s "CreateEmblem" $
     Common.assertJsonCodec
       s
@@ -979,7 +979,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1)))
-      """ {"type":"PlayerSacrifices","value":["t",{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Literal","value":1}]} """
+      """ {"type":"PlayerSacrifices","value":{"slot":"t","filter":{"type":"HasCardType","value":{"type":"Creature"}},"quantity":{"type":"Literal","value":1}}} """
   -- CR 500.7: a slot read with an empty skip set, a self-scoped arm carrying
   -- CR 500.11's skip of one step, and a two-member set.
   Spec.it s "TakeExtraTurn" $ do

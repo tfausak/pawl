@@ -5,7 +5,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.AffectPlayers as AffectPlayers
-import qualified Pawl.Codec.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.Condition as Condition
@@ -22,7 +21,6 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.Mill as Mill
-import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.ModifyTarget as ModifyTarget
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
 import qualified Pawl.Codec.MoveToZone as MoveToZone
@@ -30,7 +28,6 @@ import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Onset as Onset
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerCounters as PlayerCounters
-import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.PlayerSacrifices as PlayerSacrifices
@@ -43,8 +40,6 @@ import qualified Pawl.Codec.RequireBlock as RequireBlock
 import qualified Pawl.Codec.SearchDestination as SearchDestination
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.SpeedDecrease as SpeedDecrease
-import qualified Pawl.Codec.Subtype as Subtype
-import qualified Pawl.Codec.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Codec.Uses as Uses
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value

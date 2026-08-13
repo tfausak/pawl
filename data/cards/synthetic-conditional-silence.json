@@ -21,8 +21,8 @@
                 "effects": [
                   {
                     "type": "AffectPlayers",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "ForAsLongAs",
                         "value": {
                           "type": "Compares",
@@ -73,16 +73,16 @@
                           }
                         }
                       },
-                      {
+                      "effect": {
+                        "type": "CantCastSpells"
+                      },
+                      "players": {
                         "type": "Scoped",
                         "value": {
                           "type": "Opponents"
                         }
-                      },
-                      {
-                        "type": "CantCastSpells"
                       }
-                    ]
+                    }
                   }
                 ]
               }

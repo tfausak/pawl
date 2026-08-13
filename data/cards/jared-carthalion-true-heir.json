@@ -59,20 +59,20 @@
                       },
                       {
                         "type": "AffectPlayers",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "effect": {
+                            "type": "CantBecomeMonarch"
+                          },
+                          "players": {
                             "type": "Scoped",
                             "value": {
                               "type": "You"
                             }
-                          },
-                          {
-                            "type": "CantBecomeMonarch"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

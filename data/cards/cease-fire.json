@@ -25,15 +25,11 @@
                 "effects": [
                   {
                     "type": "AffectPlayers",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
-                        "type": "Named",
-                        "value": "target"
-                      },
-                      {
+                      "effect": {
                         "type": "CantCastMatching",
                         "value": {
                           "type": "HasCardType",
@@ -41,8 +37,12 @@
                             "type": "Creature"
                           }
                         }
+                      },
+                      "players": {
+                        "type": "Named",
+                        "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               },

@@ -233,6 +233,7 @@ library codec
     Pawl.Codec.Modification
     Pawl.Codec.ModificationSpec
     Pawl.Codec.ModifyTarget
+    Pawl.Codec.ModifyTargetSpec
     Pawl.Codec.MonarchTarget
     Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.MorphVariant
@@ -297,6 +298,7 @@ library codec
     Pawl.Codec.ReplacementOrigin
     Pawl.Codec.ReplacementOriginSpec
     Pawl.Codec.RequireBlock
+    Pawl.Codec.RequireBlockSpec
     Pawl.Codec.RevealCause
     Pawl.Codec.RevealCauseSpec
     Pawl.Codec.RoomIndex

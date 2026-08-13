@@ -25,24 +25,24 @@
                 "effects": [
                   {
                     "type": "AffectPlayers",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
-                        "type": "Scoped",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
+                      "effect": {
                         "type": "CastFromGraveyard",
                         "value": {
                           "type": "And",
                           "value": []
                         }
+                      },
+                      "players": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "You"
+                        }
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "Replace",

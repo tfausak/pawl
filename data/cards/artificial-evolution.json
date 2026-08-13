@@ -21,17 +21,17 @@
                 "effects": [
                   {
                     "type": "ChangeText",
-                    "value": [
-                      {
+                    "value": {
+                      "family": {
                         "type": "CreatureType"
                       },
-                      [
+                      "forbidden": [
                         {
                           "type": "Wall"
                         }
                       ],
-                      "target"
-                    ]
+                      "slot": "target"
+                    }
                   }
                 ]
               }
