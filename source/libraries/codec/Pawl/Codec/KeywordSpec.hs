@@ -276,6 +276,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (plot 3)
       """ {"type":"Plot","value":{"mana":[{"type":"Generic","value":3}]}} """
     Spec.assertBool s (Codec.encode Keyword.codec (plot 3) /= Codec.encode Keyword.codec (flashbackOf 3)) "the same cost under two keywords encodes differently"
+  -- CR 702.94a's payload is a Cost too, and must not share Plot's or Flashback's
+  -- tag: all three name a cost on a card, and miracle's is the one CR 118.9
+  -- alternative the reveal window offers.
+  Spec.it s "Miracle carries its cost, and is not Plot" $ do
+    let miracle n = Keyword.Miracle (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        plotOf n = Keyword.Plot (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (miracle 2)
+      """ {"type":"Miracle","value":{"mana":[{"type":"Generic","value":2}]}} """
+    Spec.assertBool s (Codec.encode Keyword.codec (miracle 2) /= Codec.encode Keyword.codec (plotOf 2)) "the same cost under two keywords encodes differently"
   -- CR 702.107a's payload is a Cost too, Flashback's shape rather than Crew's
   -- Natural.
   Spec.it s "Outlast carries its cost" $ do

@@ -56,6 +56,7 @@ import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CreateCopy as CreateCopy
@@ -124,6 +125,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotArity (SlotArity)
@@ -1802,8 +1804,9 @@ slotOne slot resolving gs = do
 --      CR 712.8c gives the resulting spell that face's characteristics; without
 --      the rider it is CR 712.11's default, the card's front face.
 --   3. WHAT IT COSTS (CR 118.9). `withoutPayingManaCost` applies the alternative
---      cost the rule names by that very phrase; without the rider the candidates
---      are CR 601.2b's own.
+--      cost the rule names by that very phrase, and `payingInstead` applies a
+--      STATED one (CR 702.94a); without either rider the candidates are CR
+--      601.2b's own.
 --   4. MAY IT BE CAST AT ALL, which is Cast.castableWhenOffered -- the prohibit
 --      half of CR 601.3, an affordable cost, and a fillable target set. Asked
 --      BEFORE the prompt, so the player is never offered a cast the announcement
@@ -1834,7 +1837,20 @@ offerCast resolving controller slot offer = do
         let name = Face.name face
             -- CR 118.9a: at most ONE alternative cost, so the applied one
             -- replaces the candidates rather than joining them.
-            applied = if CastOffer.withoutPayingManaCost offer then Just (Cost.withoutPayingManaCost face) else Nothing
+            --
+            -- Two riders can state one, and rule 118.9a is why they are asked in
+            -- order rather than combined: `withoutPayingManaCost` is CR 118.9's
+            -- "without paying its mana cost" and `payingInstead` is its "rather
+            -- than pay this spell's mana cost" (CR 702.94a's miracle). No producer
+            -- sets both, and if one did the free cast would be the one applied.
+            --
+            -- CR 118.9d in both cases: an alternative replaces only the MANA
+            -- cost, so the face's own additional costs ride along -- which is what
+            -- Cost.withoutPayingManaCost does for the free branch and what this
+            -- one does explicitly for the stated branch.
+            applied
+              | CastOffer.withoutPayingManaCost offer = Just (Cost.withoutPayingManaCost face)
+              | otherwise = fmap (\c -> c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face}) (CastOffer.payingInstead offer)
             -- Face up: CR 708.4's face-down cast is a permission a MORPH
             -- ability gives (CR 702.37d), and an OfferCast opcode carries no
             -- such rider -- CR 310.11b's offer names a face and a cost and
@@ -4297,7 +4313,7 @@ putFound searcher destination cardId = case destination of
   -- with the same characteristics today, and would still be the wrong act --
   -- what was shown was the card in the library, not the card in the hand.
   SearchDestination.RevealThenHand -> do
-    Event.reveal searcher cardId
+    Event.reveal RevealCause.Ordinary searcher cardId
     Event.changeZone cardId Zone.Hand
   -- Hoarding Dragon's "exile it": the move alone, with NO Event.reveal ahead of
   -- it. CR 701.23e is what makes that right rather than an omission -- the card
@@ -4490,7 +4506,7 @@ exploreOne oid = do
     Just pid -> case Game.zoneMembers Zone.Library pid gs of
       [] -> grow pid
       top : _ -> do
-        Event.reveal pid top
+        Event.reveal RevealCause.Ordinary pid top
         after <- State.get
         let isLand = case Game.faceOf top after of
               Nothing -> False

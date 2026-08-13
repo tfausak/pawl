@@ -672,7 +672,7 @@ placePendingTriggers = do
       -- CR 309.4c's room abilities, gathered separately for the reason the four
       -- above are: Event.gatherTriggers reads the command zone for CR 114.4's
       -- emblems alone, and a dungeon card is not one -- nor is a room ability
-      -- printed on its face (#348). Unlike them these DO have a source, so they carry
+      -- printed on its face (#1411). Unlike them these DO have a source, so they carry
       -- TriggerSource.OfObject and go on the stack through placeBorne.
       entered = Dungeon.roomPending evs gs
   State.put

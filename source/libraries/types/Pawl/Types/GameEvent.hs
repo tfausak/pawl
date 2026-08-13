@@ -13,6 +13,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -272,12 +273,19 @@ data GameEvent
     -- the card, so an engine that did not record the reveal would be
     -- bit-for-bit identical to one that never performed it.
     --
-    -- Carries the CARD's characteristics rather than an ObjectId, because what a
-    -- reveal discloses is a card and not an identity -- and because the id is
-    -- routinely dead by the time anything reads the event: every reveal in the
-    -- pool today is a search's "reveal it, and put it into your hand", where
-    -- CR 400.7 mints a new object one step later. An id joins this payload when
-    -- a card needs to refer back to "that card" it revealed.
+    -- Carries the CARD's characteristics because what a reveal discloses is a
+    -- card rather than an identity, and the ID BESIDE THEM because CR 702.94a
+    -- needs to refer back to "this card": miracle's linked triggered ability
+    -- (CR 603.11) is borne by the very card the reveal showed, still sitting in
+    -- its owner's hand, so the snapshot alone could not say which object fired.
+    -- The id is routinely dead by the time anything reads the event -- a search's
+    -- "reveal it, and put it into your hand" moves the card one step later and
+    -- CR 400.7 mints a new object -- so a reader that needs a live object must
+    -- check, exactly as Discarded's does.
+    --
+    -- The RevealCause is CR 702.94a's "this way", and DiscardCause's shape one
+    -- rule over: one showing of one card, described once, answering both "was a
+    -- card revealed?" and "was it revealed as it was drawn?".
     --
     -- Strict (!) for GameEvent.Moved's reason.
     --
@@ -285,7 +293,7 @@ data GameEvent
     -- revealed to pay a cost, and one that stays revealed while a triggered
     -- ability it caused is on the stack -- need a per-object flag that no card
     -- in the pool asks for (#185, #282).
-    Revealed PlayerId.PlayerId !ProjectedCharacteristics.ProjectedCharacteristics
+    Revealed PlayerId.PlayerId !ObjectId.ObjectId !RevealCause.RevealCause !ProjectedCharacteristics.ProjectedCharacteristics
   | -- | CR 701.6a: a spell was COUNTERED. Emitted by Pawl.Engine.Event.counter,
     -- the one funnel every countering in the engine goes through, alongside the
     -- Moved event that same removal records.

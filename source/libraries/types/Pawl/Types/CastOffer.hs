@@ -1,5 +1,8 @@
 module Pawl.Types.CastOffer where
 
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Keyword as Keyword
+
 -- | What an effect says about a cast IT offers, beyond what casting the card
 -- would ordinarily mean -- CR 310.11b's "you may cast it transformed without
 -- paying its mana cost", whose two riders are these two fields.
@@ -17,12 +20,22 @@ module Pawl.Types.CastOffer where
 -- without the other -- a cascade's "you may cast it without paying its mana
 -- cost" transforms nothing.
 --
--- Both are Bools rather than richer choices because each is the presence or
--- absence of one printed clause. A second alternative-cost WORDING ("you may pay
--- {2} rather than pay this spell's mana cost") is a different rider and would be
--- a different field, not another value of this one.
+-- The first two are Bools rather than richer choices because each is the presence
+-- or absence of one printed clause. `payingInstead` is CR 118.9's OTHER wording
+-- -- "you may pay [cost] rather than its mana cost" -- and it is a third field
+-- rather than another value of the second for exactly the reason this haddock
+-- gave before it existed: a stated cost is a different rider, not a different
+-- setting of "without paying".
+--
+-- CR 118.9a allows a spell only ONE alternative cost, so the two cost riders are
+-- never both meaningful at once; Pawl.Engine.Resolve.offerCast reads
+-- `withoutPayingManaCost` first, and no producer sets both. Rule 702.94a's
+-- miracle is what sets this one, carried here rather than on the card for this
+-- type's own reason: the cost is not a characteristic, and the same card cast
+-- any other way pays what it prints.
 data CastOffer = MkCastOffer
   { transformed :: Bool,
-    withoutPayingManaCost :: Bool
+    withoutPayingManaCost :: Bool,
+    payingInstead :: Maybe (Cost.Cost Keyword.Keyword)
   }
   deriving (Eq, Ord, Show)

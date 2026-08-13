@@ -2,6 +2,8 @@
 
 module Pawl.Codec.CastOffer where
 
+import qualified Pawl.Codec.Cost as Cost
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.JsonCodec.Fields as Fields
@@ -11,10 +13,12 @@ codec :: Codec.Codec CastOffer.CastOffer
 codec = Fields.object $ do
   transformed <- Fields.defaulted "transformed" False Common.boolean CastOffer.transformed
   withoutPayingManaCost <- Fields.defaulted "withoutPayingManaCost" False Common.boolean CastOffer.withoutPayingManaCost
+  payingInstead <- Fields.defaulted "payingInstead" Nothing (Common.maybe (Cost.codec Keyword.codec)) CastOffer.payingInstead
   pure
     CastOffer.MkCastOffer
       { CastOffer.transformed = transformed,
-        CastOffer.withoutPayingManaCost = withoutPayingManaCost
+        CastOffer.withoutPayingManaCost = withoutPayingManaCost,
+        CastOffer.payingInstead = payingInstead
       }
 
 -- | The value the codec elides entirely: an offer that transforms nothing and
@@ -24,5 +28,6 @@ defaultValue :: CastOffer.CastOffer
 defaultValue =
   CastOffer.MkCastOffer
     { CastOffer.transformed = False,
-      CastOffer.withoutPayingManaCost = False
+      CastOffer.withoutPayingManaCost = False,
+      CastOffer.payingInstead = Nothing
     }

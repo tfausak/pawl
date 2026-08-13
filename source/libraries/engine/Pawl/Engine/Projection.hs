@@ -1767,6 +1767,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> condition
   TriggerCondition.OpponentLostLifeDuringYourTurn -> condition
   TriggerCondition.SelfCycled -> condition
+  TriggerCondition.SelfRevealedForMiracle -> condition
   TriggerCondition.SelfCast -> condition
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerDrawsNthCard _ _ -> condition
