@@ -759,6 +759,30 @@ combatReplaySpec s =
           -- replaying as the other.
           let p = Prompt.ChooseRingBearer decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))) Nothing
+        -- CR 608.2d: which card the resolving controller took out of a graveyard
+        -- is a decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseCardInGraveyard round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseCardInGraveyard decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "returning the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "returning the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a graveyard-card choice does not decode as a Ring-bearer choice" $ do
+          -- Discriminating: fails if ChooseCardInGraveyard reuses ChoseRingBearer
+          -- rather than getting its own ObjectId-shaped constructor. The two are
+          -- the same SHAPE, so nothing but a distinct constructor keeps a
+          -- transcript of one from replaying as the other.
+          let p = Prompt.ChooseCardInGraveyard decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseRingBearer (ObjectId.MkObjectId 7))) Nothing
+        Spec.it s "a short transcript returns the first candidate offered" $
+          -- CR 608.2d: every offered card is a legal choice, so the head is legal.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseCardInGraveyard decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
+            (ObjectId.MkObjectId 7)
         -- CR 508.1b: what each attacking creature was announced as attacking is
         -- a decision, so it has to survive a transcript like any other -- and
         -- both arms of AttackTarget have to survive it, since a transcript that

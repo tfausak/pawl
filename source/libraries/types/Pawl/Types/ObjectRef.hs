@@ -112,4 +112,49 @@ data ObjectRef
     -- executes (CR 608.2c), which is what makes an empty library a no-op rather
     -- than an error: there is no top card, so the arm names nothing.
     TopOfLibrary PlayerRef.PlayerRef Natural.Natural
+  | -- | ONE card in a graveyard, matching the Filter, CHOSEN by the resolving
+    -- controller as the effect runs -- Port of Karfell's "return a creature card
+    -- from your graveyard to the battlefield tapped".
+    --
+    -- NOT A TARGET, and the distinction this arm exists for. A graveyard is a
+    -- public zone (CR 400.2), so nothing about the zone would stop the card from
+    -- saying "target"; CR 115.1 is what settles it, since a spell or ability is
+    -- targeted only where its own text says "target [something]". This sentence
+    -- does not, so the choice is made while applying the effect (CR 608.2d)
+    -- rather than announced on the stack (CR 601.2c), and CR 608.2b has nothing
+    -- to re-validate. That is also why the arm is here rather than in
+    -- Pawl.Types.GraveyardScope, which is a TARGET pool: the two questions look
+    -- alike on the board and differ in every rule that reads them -- shroud,
+    -- hexproof, "becomes the target" triggers and the fizzle.
+    --
+    -- WHO CHOOSES is the resolving controller and is carried by nothing: CR
+    -- 608.2c makes the controller of the spell or ability the one who follows
+    -- its instructions, and CR 608.2d has that player announce the effect's
+    -- choices. Not implemented: a sentence that hands the choice to ANOTHER
+    -- player ("each opponent returns a creature card from their graveyard to
+    -- their hand") has no spelling here (#1432).
+    --
+    -- The PlayerScope is WHOSE GRAVEYARDS the candidates are drawn from, which
+    -- CR 400.1 forces this arm to say for EachCardInGraveyard's reason, and it
+    -- is independent of the chooser: `You` is Port of Karfell's "your
+    -- graveyard", and the wider scopes would be Extract from Darkness' "a
+    -- graveyard", still chosen from by the effect's controller.
+    --
+    -- SINGULAR, with no count beside the Filter. Every producer in the pool
+    -- names one card, and CR 609.3 covers the shortfall the other way: a
+    -- graveyard holding no matching card yields nothing, and the instruction is
+    -- ignored (CR 101.3) rather than failing. Not implemented: a sentence
+    -- naming TWO chosen cards, and Blood for Bones' "another creature card",
+    -- whose second choice must exclude the first (#1433).
+    --
+    -- Read when the effect executes (CR 608.2c), the property every arm above
+    -- but InSlot has. Unlike them the read is a QUESTION, so only
+    -- Pawl.Engine.Resolve's MoveToZone arm -- which already gathers its objects
+    -- in the Game monad -- can carry it out; Resolve's pure sweep answers
+    -- nothing for it. A card that writes this arm under any other opcode
+    -- therefore names no object and does nothing, which is an INERT card-data
+    -- error of the same kind as a stated origin zone on somebody else's
+    -- permanent (Pawl.Engine.EffectZone's note), and gets no lint for the same
+    -- reason: nothing reaches the wire and no rule is misread.
+    ChosenCardInGraveyard PlayerScope.PlayerScope (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)
