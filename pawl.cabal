@@ -253,6 +253,7 @@ library codec
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerCounters
+    Pawl.Codec.PlayerCountersSpec
     Pawl.Codec.PlayerEffect
     Pawl.Codec.PlayerEffectSpec
     Pawl.Codec.PlayerId
@@ -276,6 +277,7 @@ library codec
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.ProjectedCharacteristicsSpec
     Pawl.Codec.PutCounters
+    Pawl.Codec.PutCountersSpec
     Pawl.Codec.Quantity
     Pawl.Codec.QuantitySpec
     Pawl.Codec.Recipient
@@ -285,6 +287,7 @@ library codec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.RemoveCounters
+    Pawl.Codec.RemoveCountersSpec
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.ReplacementOrigin

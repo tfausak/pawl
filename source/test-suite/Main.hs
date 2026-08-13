@@ -101,6 +101,7 @@ import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
+import qualified Pawl.Codec.PlayerCountersSpec
 import qualified Pawl.Codec.PlayerEffectSpec
 import qualified Pawl.Codec.PlayerIdSpec
 import qualified Pawl.Codec.PlayerQuantitySpec
@@ -112,10 +113,12 @@ import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.PowerSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
+import qualified Pawl.Codec.PutCountersSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.ReduceActivationCostSpec
 import qualified Pawl.Codec.RegenerabilitySpec
+import qualified Pawl.Codec.RemoveCountersSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
 import qualified Pawl.Codec.RevealCauseSpec
@@ -384,6 +387,7 @@ spec s registry = do
   Pawl.Codec.PhaseSelectorSpec.spec s
   Pawl.Codec.PhaseSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
+  Pawl.Codec.PlayerCountersSpec.spec s
   Pawl.Codec.PlayerEffectSpec.spec s
   Pawl.Codec.PlayerIdSpec.spec s
   Pawl.Codec.PlayerQuantitySpec.spec s
@@ -395,10 +399,12 @@ spec s registry = do
   Pawl.Codec.PowerSpec.spec s
   Pawl.Codec.PrintingSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
+  Pawl.Codec.PutCountersSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
   Pawl.Codec.ReduceActivationCostSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
+  Pawl.Codec.RemoveCountersSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s

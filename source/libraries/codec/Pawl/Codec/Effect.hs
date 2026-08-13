@@ -7,7 +7,6 @@ import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Condition as Condition
-import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.CreateCopy as CreateCopy
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Daytime as Daytime
@@ -27,7 +26,6 @@ import qualified Pawl.Codec.MoveToZone as MoveToZone
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Onset as Onset
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
-import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerCounters as PlayerCounters
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
