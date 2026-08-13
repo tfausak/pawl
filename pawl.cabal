@@ -113,6 +113,7 @@ library codec
     Pawl.Codec.CombatStep
     Pawl.Codec.CombatStepSpec
     Pawl.Codec.Compares
+    Pawl.Codec.ComparesSpec
     Pawl.Codec.Comparison
     Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
@@ -135,6 +136,8 @@ library codec
     Pawl.Codec.CounterPattern
     Pawl.Codec.CounterPatternSpec
     Pawl.Codec.CountSpec
+    Pawl.Codec.CreateCopy
+    Pawl.Codec.CreateCopySpec
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
@@ -151,6 +154,8 @@ library codec
     Pawl.Codec.DelayedTriggerSpec
     Pawl.Codec.Designation
     Pawl.Codec.DesignationSpec
+    Pawl.Codec.Destroy
+    Pawl.Codec.DestroySpec
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.DiscardCause
@@ -209,6 +214,8 @@ library codec
     Pawl.Codec.ManaSymbolSpec
     Pawl.Codec.ManaType
     Pawl.Codec.ManaTypeSpec
+    Pawl.Codec.Mill
+    Pawl.Codec.MillSpec
     Pawl.Codec.MillTally
     Pawl.Codec.MillTallySpec
     Pawl.Codec.Modal
@@ -670,6 +677,7 @@ library types
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterPattern
+    Pawl.Types.CreateCopy
     Pawl.Types.DamageEvent
     Pawl.Types.DamageKind
     Pawl.Types.DamagePattern
@@ -682,6 +690,7 @@ library types
     Pawl.Types.DelayedTrigger
     Pawl.Types.Departure
     Pawl.Types.Designation
+    Pawl.Types.Destroy
     Pawl.Types.DestructionCause
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
@@ -730,6 +739,7 @@ library types
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType
     Pawl.Types.ManaUnit
+    Pawl.Types.Mill
     Pawl.Types.MillTally
     Pawl.Types.Modal
     Pawl.Types.Mode

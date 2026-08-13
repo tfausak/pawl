@@ -47,8 +47,8 @@
                     "effects": [
                       {
                         "type": "Destroy",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "EachMatching",
                             "value": {
                               "type": "Or",
@@ -68,11 +68,11 @@
                               ]
                             }
                           },
-                          {
+                          "regenerability": {
                             "type": "Regenerable"
                           },
-                          "destroyed"
-                        ]
+                          "slot": "destroyed"
+                        }
                       },
                       {
                         "type": "PutCounters",

@@ -34,10 +34,12 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -55,6 +57,7 @@ import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -1512,7 +1515,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
-  Effect.Destroy ref regenerability mSlot -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability mSlot
+  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot)
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
   Effect.RemoveFromCombat _ -> effect
@@ -1522,8 +1525,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Draw {} -> effect
   -- The tally's Filter is text like the Search arm's above (CR 612.1), so a
   -- swap reaches it; the slot it binds to is a name no card prints.
-  Effect.Mill ref quantity mTally ->
-    Effect.Mill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally)
+  Effect.Mill (Mill.MkMill ref quantity mTally) ->
+    Effect.Mill (Mill.MkMill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally))
   Effect.Scry {} -> effect
   Effect.Surveil {} -> effect
   Effect.Fateseal {} -> effect
@@ -1548,7 +1551,7 @@ rewriteEffect pairs effect = case effect of
   -- word a CR 612.1 swap reaches. What the token BECOMES is not text on this
   -- card at all -- it is the copied permanent's copiable values, and CR 707.2
   -- excludes text-changing effects from those, so nothing here rewrites them.
-  Effect.CreateCopy quantity ref -> Effect.CreateCopy quantity (rewriteObjectRef pairs ref)
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> Effect.CreateCopy (CreateCopy.MkCreateCopy quantity (rewriteObjectRef pairs ref))
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other, so the recursion

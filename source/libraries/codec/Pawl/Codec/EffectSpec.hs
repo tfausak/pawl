@@ -22,11 +22,13 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
@@ -39,6 +41,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
@@ -178,29 +181,31 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing)
-      """ {"type":"Destroy","value":[{"type":"InSlot","value":"t"},{"type":"Regenerable"}]} """
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.Regenerable Nothing))
+      """ {"type":"Destroy","value":{"ref":{"type":"InSlot","value":"t"},"regenerability":{"type":"Regenerable"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Destroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing)
-      """ {"type":"Destroy","value":[{"type":"InSlot","value":"t"},{"type":"CantBeRegenerated"}]} """
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))) Regenerability.CantBeRegenerated Nothing))
+      """ {"type":"Destroy","value":{"ref":{"type":"InSlot","value":"t"},"regenerability":{"type":"CantBeRegenerated"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Destroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing)
-      """ {"type":"Destroy","value":[{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}},{"type":"Regenerable"}]} """
-  -- The third element is the slot the sweep binds its count into, ELIDED when
-  -- absent, so a Destroy already on disk keeps its two-element payload.
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing))
+      """ {"type":"Destroy","value":{"ref":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}},"regenerability":{"type":"Regenerable"}}} """
+  -- The slot the sweep binds its count into is ELIDED when absent, so the case
+  -- above writes two keys and this one writes three. Since #1305 that is
+  -- Fields.defaulted omitting a key, not a trailing array element recovered by
+  -- JSON type.
   Spec.it s "Destroy's bound-count slot round-trips and is written only when present" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Destroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed"))))
-      """ {"type":"Destroy","value":[{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Artifact"}}},{"type":"Regenerable"},"destroyed"]} """
+      (Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Artifact)) Regenerability.Regenerable (Just (SlotName.MkSlotName (Text.pack "destroyed")))))
+      """ {"type":"Destroy","value":{"ref":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Artifact"}}},"regenerability":{"type":"Regenerable"},"slot":"destroyed"}} """
   Spec.it s "Sacrifice" $
     Common.assertJsonCodec
       s
@@ -384,8 +389,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Mill (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2) Nothing)
-      """ {"type":"Mill","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":2}]} """
+      (Effect.Mill (Mill.MkMill (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2) Nothing))
+      """ {"type":"Mill","value":{"player":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":2}}} """
   -- CR 728.1's mill, which counts the nonland cards it put in the graveyard.
   Spec.it s "Mill, with a tally" $
     Common.assertJsonCodec
@@ -393,16 +398,18 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       ( Effect.Mill
-          (PlayerRef.Relative PlayerRelation.You)
-          (Quantity.Literal 2)
-          ( Just
-              MillTally.MkMillTally
-                { MillTally.slot = SlotName.MkSlotName (Text.pack "milled"),
-                  MillTally.filter = Filter.Not (Filter.HasCardType CardType.Land)
-                }
+          ( Mill.MkMill
+              (PlayerRef.Relative PlayerRelation.You)
+              (Quantity.Literal 2)
+              ( Just
+                  MillTally.MkMillTally
+                    { MillTally.slot = SlotName.MkSlotName (Text.pack "milled"),
+                      MillTally.filter = Filter.Not (Filter.HasCardType CardType.Land)
+                    }
+              )
           )
       )
-      """ {"type":"Mill","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2},{"slot":"milled","filter":{"type":"Not","value":{"type":"HasCardType","value":{"type":"Land"}}}}]} """
+      """ {"type":"Mill","value":{"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":2},"tally":{"slot":"milled","filter":{"type":"Not","value":{"type":"HasCardType","value":{"type":"Land"}}}}}} """
   Spec.it s "Discard" $
     Common.assertJsonCodec
       s
@@ -470,30 +477,31 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Create (Quantity.Literal 1) card attacking (Just slot))
       """ {"type":"Create","value":[{"type":"Literal","value":1},"Goblin Piker",{"tapped":{"type":"Tapped"},"attacking":true},"token"]} """
-  -- Both ObjectRef arms have to survive. A count of one is elided, so the
-  -- lone-ref form is what both of these write.
+  -- Both ObjectRef arms have to survive. A count of one is elided, so both of
+  -- these write the ref alone.
   Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"CreateCopy","value":{"type":"InSlot","value":"target"}} """
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      """ {"type":"CreateCopy","value":{"ref":{"type":"InSlot","value":"target"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CreateCopy (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)))
-      """ {"type":"CreateCopy","value":{"type":"EachMatching","value":{"type":"HasKeyword","value":{"type":"Flying"}}}} """
-  -- Kicked Rite of Replication's five: the pair form, which the decoder tells
-  -- from a ref by length.
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 1) (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying))))
+      """ {"type":"CreateCopy","value":{"ref":{"type":"EachMatching","value":{"type":"HasKeyword","value":{"type":"Flying"}}}}} """
+  -- Kicked Rite of Replication's five. Before #1305 this was a second payload
+  -- SHAPE told apart by length; it is now the same shape with the defaulted key
+  -- present.
   Spec.it s "CreateCopy round-trips a count above one" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.CreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"CreateCopy","value":[{"type":"Literal","value":5},{"type":"InSlot","value":"target"}]} """
+      (Effect.CreateCopy (CreateCopy.MkCreateCopy (Quantity.Literal 5) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      """ {"type":"CreateCopy","value":{"quantity":{"type":"Literal","value":5},"ref":{"type":"InSlot","value":"target"}}} """
   Spec.it s "Replace" $
     Common.assertJsonCodec
       s

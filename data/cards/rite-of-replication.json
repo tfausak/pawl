@@ -63,8 +63,10 @@
                   {
                     "type": "CreateCopy",
                     "value": {
-                      "type": "InSlot",
-                      "value": "target"
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      }
                     }
                   }
                 ]
@@ -88,16 +90,16 @@
                 "effects": [
                   {
                     "type": "CreateCopy",
-                    "value": [
-                      {
+                    "value": {
+                      "quantity": {
                         "type": "Literal",
                         "value": 5
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

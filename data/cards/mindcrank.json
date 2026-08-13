@@ -24,16 +24,16 @@
                     "effects": [
                       {
                         "type": "Mill",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "InSlot",
                             "value": "thatPlayer"
                           },
-                          {
+                          "quantity": {
                             "type": "InSlot",
                             "value": "thatMuch"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

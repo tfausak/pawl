@@ -43,6 +43,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -141,9 +142,11 @@ ability =
                         -- number of rad counters they have", counting the
                         -- nonland cards it milled.
                         Effect.Mill
-                          (PlayerRef.Relative PlayerRelation.You)
-                          (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
-                          (Just (MillTally.MkMillTally {MillTally.slot = milledSlot, MillTally.filter = nonland})),
+                          ( Mill.MkMill
+                              (PlayerRef.Relative PlayerRelation.You)
+                              (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
+                              (Just (MillTally.MkMillTally {MillTally.slot = milledSlot, MillTally.filter = nonland}))
+                          ),
                         -- "for each nonland card milled this way, that player
                         -- loses 1 life" -- one life per card, which is the count
                         -- itself.
