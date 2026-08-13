@@ -103,6 +103,7 @@ import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerEffectSpec
 import qualified Pawl.Codec.PlayerIdSpec
+import qualified Pawl.Codec.PlayerQuantitySpec
 import qualified Pawl.Codec.PlayerRefSpec
 import qualified Pawl.Codec.PlayerRelationSpec
 import qualified Pawl.Codec.PlayerScopeSpec
@@ -384,6 +385,7 @@ spec s registry = do
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.PlayerEffectSpec.spec s
   Pawl.Codec.PlayerIdSpec.spec s
+  Pawl.Codec.PlayerQuantitySpec.spec s
   Pawl.Codec.PlayerRefSpec.spec s
   Pawl.Codec.PlayerRelationSpec.spec s
   Pawl.Codec.PlayerScopeSpec.spec s

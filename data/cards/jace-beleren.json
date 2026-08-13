@@ -20,15 +20,15 @@
                     "effects": [
                       {
                         "type": "Draw",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "EachPlayer"
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }
@@ -55,16 +55,16 @@
                     "effects": [
                       {
                         "type": "Draw",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "InSlot",
                             "value": "target"
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }

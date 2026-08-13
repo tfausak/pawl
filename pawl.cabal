@@ -256,6 +256,8 @@ library codec
     Pawl.Codec.PlayerEffectSpec
     Pawl.Codec.PlayerId
     Pawl.Codec.PlayerIdSpec
+    Pawl.Codec.PlayerQuantity
+    Pawl.Codec.PlayerQuantitySpec
     Pawl.Codec.PlayerRef
     Pawl.Codec.PlayerRefSpec
     Pawl.Codec.PlayerRelation
@@ -780,6 +782,7 @@ library types
     Pawl.Types.PlayerCounterKind
     Pawl.Types.PlayerEffect
     Pawl.Types.PlayerId
+    Pawl.Types.PlayerQuantity
     Pawl.Types.PlayerRef
     Pawl.Types.PlayerRelation
     Pawl.Types.PlayerScope

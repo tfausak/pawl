@@ -34,11 +34,11 @@
                 "effects": [
                   {
                     "type": "SetLifeTotal",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "EachPlayer"
                       },
-                      {
+                      "quantity": {
                         "type": "Count",
                         "value": {
                           "aggregation": {
@@ -71,7 +71,7 @@
                           }
                         }
                       }
-                    ]
+                    }
                   }
                 ]
               }

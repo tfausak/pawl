@@ -111,6 +111,7 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -262,22 +263,22 @@ slotsOf effect = case effect of
   Effect.TurnFaceDown slot -> oneSlot slot
   Effect.RemoveFromCombat slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> objectRefSlots ref
-  Effect.Draw ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The tally's slot is a DEFINITION (how many of them counted), not a read, so
   -- it belongs to boundSlots below -- Destroy's third field takes the same
   -- posture, for the same reason.
   Effect.Mill (Mill.MkMill ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.Scry ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.Surveil ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.Fateseal ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Explore ref -> objectRefSlots ref
   Effect.Discard slot quantity -> insertOne slot (quantitySlots quantity)
-  Effect.LoseLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
-  Effect.GainLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
-  Effect.SetLifeTotal ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.RedistributeLifeTotals -> Map.empty
-  Effect.IncreaseSpeed ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
   Effect.Create quantity _ _ _ -> quantitySlots quantity
@@ -485,19 +486,19 @@ slotsAreExhaustive effect = case effect of
   Effect.TurnFaceDown _ -> True
   Effect.RemoveFromCombat _ -> True
   Effect.MoveToZone {} -> True
-  Effect.Draw _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
-  Effect.Scry _ quantity -> Quantity.slotsAreExhaustive quantity
-  Effect.Surveil _ quantity -> Quantity.slotsAreExhaustive quantity
-  Effect.Fateseal _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Explore {} -> True
   Effect.Discard _ quantity -> Quantity.slotsAreExhaustive quantity
-  Effect.LoseLife _ quantity -> Quantity.slotsAreExhaustive quantity
-  Effect.GainLife _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
-  Effect.SetLifeTotal _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RedistributeLifeTotals -> True
-  Effect.IncreaseSpeed _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
   Effect.Create quantity _ _ _ -> Quantity.slotsAreExhaustive quantity
@@ -612,19 +613,19 @@ readsX = any effectReadsX
       Effect.TurnFaceDown _ -> False
       Effect.RemoveFromCombat _ -> False
       Effect.MoveToZone {} -> False
-      Effect.Draw _ quantity -> Quantity.readsX quantity
+      Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
-      Effect.Scry _ quantity -> Quantity.readsX quantity
-      Effect.Surveil _ quantity -> Quantity.readsX quantity
-      Effect.Fateseal _ quantity -> Quantity.readsX quantity
+      Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Explore {} -> False
       Effect.Discard _ quantity -> Quantity.readsX quantity
-      Effect.LoseLife _ quantity -> Quantity.readsX quantity
-      Effect.GainLife _ quantity -> Quantity.readsX quantity
+      Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.ExchangeLifeTotals _ -> False
-      Effect.SetLifeTotal _ quantity -> Quantity.readsX quantity
+      Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.RedistributeLifeTotals -> False
-      Effect.IncreaseSpeed _ quantity -> Quantity.readsX quantity
+      Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
       Effect.Replace {} -> False
@@ -2861,7 +2862,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                     }
                 grant o = o {Object.playableFromExile = Just permission}
              in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}
-  Effect.Draw ref quantity -> do
+  Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -2927,7 +2928,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             Nothing -> False
             Just face -> Filter.matches tallyContext (Projection.viewOfCardIn gs oid face) (MillTally.filter tally)
        in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
-  Effect.Scry ref quantity -> do
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -2945,7 +2946,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- no player and raises no prompt.
       Just n | n > 0 -> Monad.forM_ scryers (scryOne n)
       _ -> pure ()
-  Effect.Surveil ref quantity -> do
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -2958,7 +2959,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- CR 701.25c: surveil 0 is not a surveil at all.
       Just n | n > 0 -> Monad.forM_ surveillers (surveilOne n)
       _ -> pure ()
-  Effect.Fateseal ref quantity -> do
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -3026,7 +3027,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
-  Effect.LoseLife ref quantity -> do
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -3060,7 +3061,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- no life gain event has occurred". Here it is load-bearing rather than tidy --
   -- a Quantity that evaluates to 0 (an X of nothing, a count of an empty board)
   -- must leave the log silent, or "whenever you gain life" would fire on it.
-  Effect.GainLife ref quantity -> do
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -3150,7 +3151,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- the existing one in Pawl.Engine.Sba -- reached through changeLife's ordinary
   -- subtraction, with nothing here to arrange. Biorhythm's seat controlling no
   -- creature is the producer that gets there.
-  Effect.SetLifeTotal ref quantity -> do
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -3237,7 +3238,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- is its "if your speed is less than 4", checked when it triggers (CR 603.4) and
   -- again as it resolves (CR 608.2a) -- Pawl.Engine.Stack's inherent-trigger arm.
   -- Whether an EFFECT may push past 4, having no such gate, is unsettled (#809).
-  Effect.IncreaseSpeed ref quantity -> do
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal

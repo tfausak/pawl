@@ -42,16 +42,16 @@
                     "effects": [
                       {
                         "type": "LoseLife",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "InSlot",
                             "value": "target"
                           },
-                          {
+                          "quantity": {
                             "type": "InSlot",
                             "value": "thatMuch"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

@@ -64,6 +64,7 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -391,7 +392,7 @@ cycling cost searchFor =
     -- that same sentence -- see Pawl.Types.SearchDestination, and CR 701.23e for
     -- why a search does not reveal on its own.
     effect = case searchFor of
-      Nothing -> Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
+      Nothing -> Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
       -- CR 702.29e's "search your library for a [quality] card", so one card is
       -- the whole instruction's count.
       Just filter_ -> Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) filter_ SearchDestination.RevealThenHand
@@ -1981,8 +1982,10 @@ afflict n =
   where
     effect =
       Effect.LoseLife
-        (PlayerRef.InSlot Binding.triggerPlayer)
-        (Quantity.Literal (toInteger n))
+        ( PlayerQuantity.MkPlayerQuantity
+            (PlayerRef.InSlot Binding.triggerPlayer)
+            (Quantity.Literal (toInteger n))
+        )
 
 -- CR 702.134a: whenever this creature attacks, put a +1/+1 counter on target
 -- attacking creature with power less than this creature's power. Rule 702 states

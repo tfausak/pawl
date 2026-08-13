@@ -13,16 +13,15 @@ import qualified Pawl.Types.SlotName as SlotName
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.AffectedPlayers" $ do
   Spec.it s "Scoped" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      AffectedPlayers.toJson
-      AffectedPlayers.fromJson
+      AffectedPlayers.codec
       (AffectedPlayers.Scoped PlayerScope.Opponents)
       """ {"type":"Scoped","value":{"type":"Opponents"}} """
   Spec.it s "Named" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      AffectedPlayers.toJson
-      AffectedPlayers.fromJson
+      AffectedPlayers.codec
       (AffectedPlayers.Named (SlotName.MkSlotName (Text.pack "target")))
       """ {"type":"Named","value":"target"} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s AffectedPlayers.codec

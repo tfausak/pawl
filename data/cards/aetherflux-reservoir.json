@@ -77,14 +77,14 @@
                     "effects": [
                       {
                         "type": "GainLife",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          {
+                          "quantity": {
                             "type": "Count",
                             "value": {
                               "aggregation": {
@@ -104,7 +104,7 @@
                               }
                             }
                           }
-                        ]
+                        }
                       }
                     ]
                   }

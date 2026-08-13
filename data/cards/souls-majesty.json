@@ -25,14 +25,14 @@
                 "effects": [
                   {
                     "type": "Draw",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "Relative",
                         "value": {
                           "type": "You"
                         }
                       },
-                      {
+                      "quantity": {
                         "type": "AgainstSlot",
                         "value": [
                           "creature",
@@ -41,7 +41,7 @@
                           }
                         ]
                       }
-                    ]
+                    }
                   }
                 ]
               }

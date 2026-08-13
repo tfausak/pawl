@@ -38,6 +38,7 @@ import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -78,7 +79,7 @@ endStepDraw :: TriggeredAbility Card
 endStepDraw =
   oneEffect
     (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
-    (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
+    (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))
 
 -- CR 725.2's crown steal. Controlled by the current monarch; makes a DIFFERENT
 -- player (the damager's controller) the monarch.
