@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
@@ -150,9 +151,11 @@ increaseAbility =
 belowMaxSpeed :: Condition.Condition
 belowMaxSpeed =
   Condition.Compares
-    (Quantity.Speed (PlayerRef.Relative PlayerRelation.You))
-    Comparison.AtMost
-    (Quantity.Literal (toInteger maxSpeed - 1))
+    ( Compares.MkCompares
+        (Quantity.Speed (PlayerRef.Relative PlayerRelation.You))
+        Comparison.AtMost
+        (Quantity.Literal (toInteger maxSpeed - 1))
+    )
 
 -- | CR 702.179d: the inherent trigger this batch of events fires, if any, as an
 -- ordinary PendingTrigger whose source is TriggerSource.Sourceless -- what lets

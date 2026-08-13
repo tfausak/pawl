@@ -9,6 +9,7 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
@@ -83,7 +84,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       toJson
       fromJson
       ( Clause.MkClause
-          (Just (Condition.Compares (Quantity.ObjectCounters CounterKind.PlusOnePlusOne) Comparison.Exactly (Quantity.Literal 0)))
+          (Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.PlusOnePlusOne) Comparison.Exactly (Quantity.Literal 0))))
           Optionality.Mandatory
           Nothing
           Seq.empty

@@ -24,7 +24,7 @@ toJson c = case c of
   TriggerCondition.SelfEnters -> Common.nullary "SelfEnters"
   TriggerCondition.PermanentEnters f -> Common.tagged "PermanentEnters" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Value.array $ [Codec.encode Phase.codec p, Codec.encode TurnScope.codec s]
-  TriggerCondition.StateIs c2 -> Common.tagged "StateIs" . Just $ Condition.toJson c2
+  TriggerCondition.StateIs c2 -> Common.tagged "StateIs" . Just $ Codec.encode Condition.codec c2
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Common.nullary "SelfDealsCombatDamageToPlayer"
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> Common.tagged "PermanentDealsCombatDamageToPlayer" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> Common.nullary "CreatureDealtCombatDamageToMonarch"
@@ -78,7 +78,7 @@ fromJson value = do
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> Codec.decode (Filter.codec Keyword.codec) v
     ("StepBegins", Just (Value.Array (Array.MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Codec.decode Phase.codec p <*> Codec.decode TurnScope.codec s
-    ("StateIs", Just v) -> TriggerCondition.StateIs <$> Condition.fromJson v
+    ("StateIs", Just v) -> TriggerCondition.StateIs <$> Codec.decode Condition.codec v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("PermanentDealsCombatDamageToPlayer", Just v) -> TriggerCondition.PermanentDealsCombatDamageToPlayer <$> Codec.decode (Filter.codec Keyword.codec) v
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch

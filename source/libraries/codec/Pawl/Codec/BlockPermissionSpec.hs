@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BlockPermission as BlockPermission
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
@@ -48,7 +49,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
       ( BlockPermission.MkBlockPermission
           (Affected.Matching Filter.IsSource)
           (Just (Quantity.Literal 1))
-          (Just (Condition.Compares (Quantity.IsMonarch (PlayerRef.Relative PlayerRelation.You)) Comparison.AtLeast (Quantity.Literal 1)))
+          (Just (Condition.Compares (Compares.MkCompares (Quantity.IsMonarch (PlayerRef.Relative PlayerRelation.You)) Comparison.AtLeast (Quantity.Literal 1))))
       )
       """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Literal","value":1},"while":{"type":"Compares","value":{"measured":{"type":"IsMonarch","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}}} """
   -- Kemba's Legion's: the arity itself is counted (CR 301.5a), so "additional"

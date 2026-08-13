@@ -133,7 +133,7 @@ toJson codec e = case e of
     | otherwise -> Common.tagged "CreateCopy" (Just (Value.array [Codec.encode Quantity.codec q, Codec.encode ObjectRef.codec r]))
   Effect.Replace d u o c re ->
     Common.tagged "Replace" . Just . Value.array $
-      [Duration.toJson d, Codec.encode Uses.codec u, Codec.encode ReplacementOrigin.codec o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
+      [Duration.toJson d, Codec.encode Uses.codec u, Codec.encode ReplacementOrigin.codec o, Common.encodeMaybe (Codec.encode Condition.codec) c, ReplacementEffect.toJson re]
   Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode PhaseSelector.codec sel]))
   -- CR 615.5's additional effect is ELIDED when it is empty, which is Create's
   -- posture above and every other prevention in the corpus: a shield with no
@@ -351,7 +351,7 @@ fromJson decode value = do
         duration <- Duration.fromJson d
         uses <- Codec.decode Uses.codec u
         origin <- Codec.decode ReplacementOrigin.codec o
-        condition <- Common.decodeMaybe Condition.fromJson c
+        condition <- Common.decodeMaybe (Codec.decode Condition.codec) c
         effect <- ReplacementEffect.fromJson re
         pure (Effect.Replace duration uses origin condition effect)
       _ -> Left . Text.pack $ "Replace expects [Duration, Uses, ReplacementOrigin, Maybe Condition, ReplacementEffect]"

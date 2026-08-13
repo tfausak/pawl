@@ -18,6 +18,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Count as Count.Type
@@ -67,7 +68,7 @@ check swamp n comparison threshold =
         context
         gs
         (ObjectId.MkObjectId 0)
-        (Condition.Type.Compares (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold))
+        (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold)))
 
 -- Queen Marchesa's upkeep trigger: "if an opponent is the monarch" is
 -- Quantity.IsMonarch (Relative Opponent), which names EVERY opponent -- one
@@ -177,7 +178,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
               (Filter.contextFor Nothing Nothing)
               gs
               (ObjectId.MkObjectId 0)
-              (Condition.Type.Compares (Quantity.Type.Count count) Comparison.Exactly (Quantity.Type.Literal 0))
+              (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Count count) Comparison.Exactly (Quantity.Type.Literal 0)))
         )
         "false"
 
@@ -193,7 +194,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
               context
               gs
               (ObjectId.MkObjectId 0)
-              (Condition.Type.Compares (Quantity.Type.Count everyPermanent) Comparison.Exactly (Quantity.Type.InSlot Binding.variableX))
+              (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Count everyPermanent) Comparison.Exactly (Quantity.Type.InSlot Binding.variableX)))
         )
         "false"
 

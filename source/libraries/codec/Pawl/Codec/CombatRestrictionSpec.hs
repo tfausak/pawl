@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
@@ -108,12 +109,14 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
 anotherGiant :: Condition.Condition
 anotherGiant =
   Condition.Compares
-    ( Quantity.Count
-        ( Count.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-            (Filter.And [Filter.HasSubtype Subtype.Giant, Filter.ControlledBy PlayerRelation.You])
-            Aggregation.Members
+    ( Compares.MkCompares
+        ( Quantity.Count
+            ( Count.MkCount
+                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Filter.And [Filter.HasSubtype Subtype.Giant, Filter.ControlledBy PlayerRelation.You])
+                Aggregation.Members
+            )
         )
+        Comparison.AtLeast
+        (Quantity.Literal 1)
     )
-    Comparison.AtLeast
-    (Quantity.Literal 1)

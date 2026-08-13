@@ -18,7 +18,7 @@ toJson :: Expiry.Expiry -> Value.Value
 toJson e = case e of
   Expiry.AtCleanup -> Common.nullary "AtCleanup"
   Expiry.Never -> Common.nullary "Never"
-  Expiry.While p c -> Common.tagged "While" . Just . Value.array $ [Codec.encode PlayerId.codec p, Condition.toJson c]
+  Expiry.While p c -> Common.tagged "While" . Just . Value.array $ [Codec.encode PlayerId.codec p, Codec.encode Condition.codec c]
   Expiry.AtTurnOf p -> Common.tagged "AtTurnOf" . Just $ Codec.encode PlayerId.codec p
   Expiry.AtEndOf sel -> Common.tagged "AtEndOf" . Just $ Codec.encode PhaseSelector.codec sel
 
@@ -28,7 +28,7 @@ fromJson value = do
   case (t, mv) of
     ("AtCleanup", _) -> Right Expiry.AtCleanup
     ("Never", _) -> Right Expiry.Never
-    ("While", Just (Value.Array (Array.MkArray [p, c]))) -> Expiry.While <$> Codec.decode PlayerId.codec p <*> Condition.fromJson c
+    ("While", Just (Value.Array (Array.MkArray [p, c]))) -> Expiry.While <$> Codec.decode PlayerId.codec p <*> Codec.decode Condition.codec c
     ("AtTurnOf", Just v) -> Expiry.AtTurnOf <$> Codec.decode PlayerId.codec v
     ("AtEndOf", Just v) -> Expiry.AtEndOf <$> Codec.decode PhaseSelector.codec v
     _ -> Left . Text.pack $ "unknown Expiry: " <> t

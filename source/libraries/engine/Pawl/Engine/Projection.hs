@@ -29,6 +29,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
@@ -1850,8 +1851,12 @@ rewriteTriggerCondition pairs condition = case condition of
 -- it here. Both sides are rewritten, both being full Quantities.
 rewriteCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Condition.Type.Condition -> Condition.Type.Condition
 rewriteCondition pairs condition = case condition of
-  Condition.Type.Compares measured comparison threshold ->
-    Condition.Type.Compares (rewriteQuantity pairs measured) comparison (rewriteQuantity pairs threshold)
+  Condition.Type.Compares c ->
+    Condition.Type.Compares
+      c
+        { Compares.measured = rewriteQuantity pairs (Compares.measured c),
+          Compares.threshold = rewriteQuantity pairs (Compares.threshold c)
+        }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (rewriteCondition pairs) conditions)
 
 -- CR 612.1 through a Quantity. A Count's Filter is where the subtype word hides,

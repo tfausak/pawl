@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.StaticAbility as StaticAbility
 
@@ -22,7 +23,7 @@ toJson :: StaticAbility.StaticAbility -> Value.Value
 toJson sa =
   Value.object
     ( Common.requiredPair "affected" Affected.toJson (StaticAbility.affected sa)
-        <> Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (StaticAbility.condition sa)
+        <> Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (StaticAbility.condition sa)
         <> Common.optionalPair "lingers" Nothing (Common.encodeMaybe Duration.toJson) (StaticAbility.lingers sa)
         <> Common.requiredPair
           "modifications"
@@ -34,7 +35,7 @@ fromJson :: Value.Value -> Either Text.Text StaticAbility.StaticAbility
 fromJson value = do
   ps <- Common.asObject value
   a <- Common.field "affected" ps >>= Affected.fromJson
-  c <- Common.defaultedField "condition" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  c <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   l <- Common.defaultedField "lingers" Nothing (Common.decodeMaybe Duration.fromJson) ps
   ms <- Common.field "modifications" ps >>= Common.decodeNonEmpty Modification.fromJson
   pure (StaticAbility.MkStaticAbility a c l ms)

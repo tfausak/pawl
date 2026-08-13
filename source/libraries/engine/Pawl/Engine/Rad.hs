@@ -33,6 +33,7 @@ import Numeric.Natural (Natural)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
@@ -97,9 +98,11 @@ nonland = Filter.Not (Filter.HasCardType CardType.Land)
 hasRadCounters :: Condition.Condition
 hasRadCounters =
   Condition.Compares
-    (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
-    Comparison.AtLeast
-    (Quantity.Literal 1)
+    ( Compares.MkCompares
+        (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
+        Comparison.AtLeast
+        (Quantity.Literal 1)
+    )
 
 -- | CR 728.1, in full: "At the beginning of each player's precombat main phase,
 -- if that player has one or more rad counters, that player mills a number of

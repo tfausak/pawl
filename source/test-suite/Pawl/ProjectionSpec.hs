@@ -40,6 +40,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -875,7 +876,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         hacked = S.withEffectAt outcastId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island) plain
         asksAbout gs = case Projection.triggeredAbilitiesOf outcastId gs of
           ability : _ -> case TriggeredAbility.condition ability of
-            TriggerCondition.StateIs (Condition.Type.Compares measured _ _) -> countedSubtypes measured
+            TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares measured _ _)) -> countedSubtypes measured
             _ -> []
           [] -> []
         countedSubtypes quantity = case quantity of
