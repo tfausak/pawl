@@ -113,21 +113,21 @@
                   },
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "GainKeyword",
                         "value": {
                           "type": "Haste"
                         }
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "tokens"
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "ArmDelayedTrigger",

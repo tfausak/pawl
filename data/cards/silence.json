@@ -21,20 +21,20 @@
                 "effects": [
                   {
                     "type": "AffectPlayers",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "effect": {
+                        "type": "CantCastSpells"
+                      },
+                      "players": {
                         "type": "Scoped",
                         "value": {
                           "type": "Opponents"
                         }
-                      },
-                      {
-                        "type": "CantCastSpells"
                       }
-                    ]
+                    }
                   }
                 ]
               }

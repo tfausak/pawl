@@ -89,20 +89,20 @@
                   },
                   {
                     "type": "AffectPlayers",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "Indefinite"
                       },
-                      {
+                      "effect": {
+                        "type": "NoMaximumHandSize"
+                      },
+                      "players": {
                         "type": "Scoped",
                         "value": {
                           "type": "You"
                         }
-                      },
-                      {
-                        "type": "NoMaximumHandSize"
                       }
-                    ]
+                    }
                   }
                 ]
               }

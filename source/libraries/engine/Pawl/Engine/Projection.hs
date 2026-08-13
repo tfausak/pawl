@@ -26,6 +26,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
@@ -63,11 +64,13 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.Modification (Modification)
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Power as Power
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -75,6 +78,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -1502,15 +1506,15 @@ rewriteAffected pairs a = case a of
 -- word a swap could reach -- never on which effect it is.
 rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect Card.Type.Card -> Effect.Effect Card.Type.Card
 rewriteEffect pairs effect = case effect of
-  Effect.ModifyTarget duration modification ref ->
-    Effect.ModifyTarget duration (rewriteModification pairs modification) (rewriteObjectRef pairs ref)
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
+    Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
   Effect.DealDamage ref quantity -> Effect.DealDamage (rewriteObjectRef pairs ref) quantity
   -- A text-changer's own restriction clause is text like any other (CR 612.1), so
   -- an Artificial Evolution aimed at another on the stack leaves a spell that
   -- forbids the NEW word instead. The CR 612.2 family gate is read off the
   -- ChangeText's own family rather than off a constructor.
-  Effect.ChangeText family forbidden slot ->
-    Effect.ChangeText family (Set.map (swapWordIn family pairs) forbidden) slot
+  Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
+    Effect.ChangeText (ChangeText.MkChangeText family (Set.map (swapWordIn family pairs) forbidden) slot)
   Effect.AddMana _ -> effect
   Effect.Search searcher owner quantity filter_ destination -> Effect.Search searcher owner quantity (Filter.rewrite pairs filter_) destination
   Effect.ExileAllGraveyards -> effect
@@ -1518,7 +1522,7 @@ rewriteEffect pairs effect = case effect of
   Effect.TemptWithTheRing -> effect
   Effect.Venture -> effect
   Effect.ExileHandThenDraw -> effect
-  Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) quantity)
   Effect.RestartGame -> effect
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot)
@@ -1588,8 +1592,8 @@ rewriteEffect pairs effect = case effect of
   Effect.AffectPlayers {} -> effect
   -- CR 612.1 swaps a WORD, and both refs can carry one: an EachMatching's
   -- Filter is subtype-shaped exactly as Untap's is.
-  Effect.RequireBlock duration blocker attacker ->
-    Effect.RequireBlock duration (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker)
+  Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) ->
+    Effect.RequireBlock (RequireBlock.MkRequireBlock duration (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker))
   -- Identity, not a rewriteCard call: CR 114.3 leaves an emblem no type line and
   -- no name, the two things rewriteCard reaches. What CR 612.1 could reach on one
   -- is its abilities, which nothing here walks (#643).

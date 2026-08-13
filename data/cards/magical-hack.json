@@ -21,13 +21,13 @@
                 "effects": [
                   {
                     "type": "ChangeText",
-                    "value": [
-                      {
+                    "value": {
+                      "family": {
                         "type": "BasicLandType"
                       },
-                      [],
-                      "target"
-                    ]
+                      "forbidden": [],
+                      "slot": "target"
+                    }
                   }
                 ]
               }

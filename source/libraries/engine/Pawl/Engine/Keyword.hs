@@ -57,6 +57,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -68,6 +69,7 @@ import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
@@ -76,6 +78,7 @@ import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -625,9 +628,11 @@ crew n =
         ]
     becomes cardType =
       Effect.ModifyTarget
-        Duration.UntilEndOfTurn
-        (Modification.AddCardType cardType)
-        (ObjectRef.InSlot Binding.triggerSource)
+        ( ModifyTarget.MkModifyTarget
+            Duration.UntilEndOfTurn
+            (Modification.AddCardType cardType)
+            (ObjectRef.InSlot Binding.triggerSource)
+        )
 
 -- CR 702.107a: "Outlast [cost]" means "[Cost], {T}: Put a +1/+1 counter on this
 -- creature. Activate only as a sorcery." The card names the cost; every other
@@ -1572,9 +1577,11 @@ annihilator n =
   where
     effect =
       Effect.PlayerSacrifices
-        Binding.triggerPlayer
-        (Filter.And [])
-        (Quantity.Literal (toInteger n))
+        ( PlayerSacrifices.MkPlayerSacrifices
+            Binding.triggerPlayer
+            (Filter.And [])
+            (Quantity.Literal (toInteger n))
+        )
 
 -- CR 702.91a: whenever this creature attacks, each other attacking creature gets
 -- +1/+0 until end of turn. Rule 702.70a's poisonous above and rule 702.86a's
@@ -1614,10 +1621,12 @@ battleCry =
   where
     effect =
       Effect.ModifyTarget
-        Duration.UntilEndOfTurn
-        (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 0))
-        ( ObjectRef.EachMatching
-            (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking, Filter.Not Filter.IsSource])
+        ( ModifyTarget.MkModifyTarget
+            Duration.UntilEndOfTurn
+            (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 0))
+            ( ObjectRef.EachMatching
+                (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking, Filter.Not Filter.IsSource])
+            )
         )
 
 -- CR 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
@@ -1725,9 +1734,11 @@ prowess =
   where
     effect =
       Effect.ModifyTarget
-        Duration.UntilEndOfTurn
-        (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
-        (ObjectRef.EachMatching Filter.IsSource)
+        ( ModifyTarget.MkModifyTarget
+            Duration.UntilEndOfTurn
+            (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+            (ObjectRef.EachMatching Filter.IsSource)
+        )
 
 -- CR 702.121a: whenever this creature attacks, it gets +1/+1 until end of turn
 -- for each opponent you attacked with a creature this combat. Rule 702 states it
@@ -1769,9 +1780,11 @@ melee =
     bonus = Quantity.OpponentsAttacked (PlayerRef.Relative PlayerRelation.You)
     effect =
       Effect.ModifyTarget
-        Duration.UntilEndOfTurn
-        (Modification.ModifyPowerToughness bonus bonus)
-        (ObjectRef.EachMatching Filter.IsSource)
+        ( ModifyTarget.MkModifyTarget
+            Duration.UntilEndOfTurn
+            (Modification.ModifyPowerToughness bonus bonus)
+            (ObjectRef.EachMatching Filter.IsSource)
+        )
 
 -- CR 702.23a: whenever this creature becomes blocked, it gets +N/+N until end of
 -- turn for each creature blocking it beyond the first. Rule 702 states it as a
@@ -1813,9 +1826,11 @@ rampage n =
     bonus = foldr Quantity.Plus (Quantity.Literal 0) (List.genericReplicate n Quantity.BlockersBeyondFirst)
     effect =
       Effect.ModifyTarget
-        Duration.UntilEndOfTurn
-        (Modification.ModifyPowerToughness bonus bonus)
-        (ObjectRef.EachMatching Filter.IsSource)
+        ( ModifyTarget.MkModifyTarget
+            Duration.UntilEndOfTurn
+            (Modification.ModifyPowerToughness bonus bonus)
+            (ObjectRef.EachMatching Filter.IsSource)
+        )
 
 -- CR 702.25a: whenever this creature becomes blocked by a creature without
 -- flanking, the blocking creature gets -1/-1 until end of turn. Rule 702 states
@@ -1861,9 +1876,11 @@ flanking =
 flankingEffect :: Effect.Effect Card
 flankingEffect =
   Effect.ModifyTarget
-    Duration.UntilEndOfTurn
-    (Modification.ModifyPowerToughness (Quantity.Literal (-1)) (Quantity.Literal (-1)))
-    (ObjectRef.InSlot Binding.blockingCreature)
+    ( ModifyTarget.MkModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.ModifyPowerToughness (Quantity.Literal (-1)) (Quantity.Literal (-1)))
+        (ObjectRef.InSlot Binding.blockingCreature)
+    )
 
 -- CR 702.83a: whenever a creature you control attacks alone, that creature gets
 -- +1/+1 until end of turn. Rule 702 states it as a triggered ability, minted
@@ -1906,9 +1923,11 @@ exalted =
   where
     effect =
       Effect.ModifyTarget
-        Duration.UntilEndOfTurn
-        (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
-        (ObjectRef.InSlot Binding.attackingCreature)
+        ( ModifyTarget.MkModifyTarget
+            Duration.UntilEndOfTurn
+            (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+            (ObjectRef.InSlot Binding.attackingCreature)
+        )
 
 -- CR 702.45a: "'Bushido N' means 'Whenever this creature blocks or becomes
 -- blocked, it gets +N/+N until end of turn.'" Rule 702 states it as a triggered
@@ -1956,9 +1975,11 @@ bushidoHalf condition n =
   where
     effect =
       Effect.ModifyTarget
-        Duration.UntilEndOfTurn
-        (Modification.ModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal (toInteger n)))
-        (ObjectRef.EachMatching Filter.IsSource)
+        ( ModifyTarget.MkModifyTarget
+            Duration.UntilEndOfTurn
+            (Modification.ModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal (toInteger n)))
+            (ObjectRef.EachMatching Filter.IsSource)
+        )
 
 -- CR 702.130a: whenever this creature becomes blocked, defending player loses N
 -- life. Rule 702 states it as a triggered ability, and it adds nothing new --
@@ -2235,9 +2256,11 @@ provoke =
     spec = TargetSpec.required Pool.Creatures (Just Filter.ControlledByDefendingPlayer)
     requirement =
       Effect.RequireBlock
-        Duration.UntilEndOfCombat
-        (ObjectRef.InSlot provokeTarget)
-        (ObjectRef.InSlot Binding.triggerSource)
+        ( RequireBlock.MkRequireBlock
+            Duration.UntilEndOfCombat
+            (ObjectRef.InSlot provokeTarget)
+            (ObjectRef.InSlot Binding.triggerSource)
+        )
     untap = Effect.Untap (ObjectRef.InSlot provokeTarget)
 
 -- The slot rule 702.39a's one target is chosen into, declared by the ability that

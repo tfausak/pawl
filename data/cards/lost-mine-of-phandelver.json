@@ -275,11 +275,11 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilYourNextTurn"
                           },
-                          {
+                          "modification": {
                             "type": "ModifyPowerToughness",
                             "value": [
                               {
@@ -292,11 +292,11 @@
                               }
                             ]
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

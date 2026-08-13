@@ -24,21 +24,21 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "Indefinite"
                           },
-                          {
+                          "modification": {
                             "type": "RemoveSupertype",
                             "value": {
                               "type": "Snow"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       }
                     ]
                   }
@@ -93,21 +93,21 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "Indefinite"
                           },
-                          {
+                          "modification": {
                             "type": "AddSupertype",
                             "value": {
                               "type": "Snow"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

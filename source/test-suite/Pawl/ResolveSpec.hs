@@ -50,6 +50,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
@@ -89,6 +90,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -104,6 +106,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -571,7 +574,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "one card in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
   Spec.it s "CR 612 slotsOf finds a ChangeText slot" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot)) (Map.singleton slot SlotArity.One)
+    Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText (ChangeText.MkChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot))) (Map.singleton slot SlotArity.One)
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
@@ -1579,7 +1582,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               S.alice
               (Map.singleton slot (Set.singleton (Recipient.ToCreature pikerId)))
               (Map.singleton slot (Set.singleton (Recipient.ToCreature pikerId)))
-              (Effect.ModifyTarget Duration.UntilEndOfTurn m (ObjectRef.InSlot slot))
+              (Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn m (ObjectRef.InSlot slot)))
         refused = store (Modification.ModifyPowerToughness (Quantity.Literal 3) Quantity.Star)
         stored = store (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))
     Spec.assertEqWith s "no effect is stored for an unevaluable quantity" (GameState.continuousEffects refused) []
@@ -6024,7 +6027,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
     let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (hisPiker, g1) = S.addCreature piker S.bob g0
         (hisRats, gs) = S.addCreature rats S.bob g1
-        edict = Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+        edict = Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
         keptRats = S.runPure (sacrifices hisPiker) gs edict
         keptPiker = S.runPure (sacrifices hisRats) gs edict
     Spec.assertBool s (S.onBattlefield hisRats keptRats) "choosing the Piker leaves the Rats"
@@ -6048,7 +6051,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
         (hers, g1) = S.addCreature piker S.alice g0
         (hisPiker, g2) = S.addCreature piker S.bob g1
         (hisRats, gs) = S.addCreature rats S.bob g2
-        after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))))
         bobsLeft = length (filter (`S.onBattlefield` after) [hisPiker, hisRats])
     Spec.assertBool s (S.onBattlefield hers after) "alice's creature is untouched"
     -- The edict still takes exactly one: an answer the engine refuses does not
@@ -6067,7 +6070,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
             State.modify (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        act = Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+        act = Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
         asked = State.execState (Engine.runGame countingAnswer gs act) 0
         after = S.runPure S.identityAnswer gs act
     Spec.assertEqWith s "nothing to choose" asked 0
@@ -6077,7 +6080,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
   Spec.it s "CR 609.3 an edict against an empty board does nothing" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))))
     Spec.assertBool s (S.onBattlefield src after) "alice keeps hers"
   -- The gameplay-level proof: the real card, cast and resolved.
   Spec.it s "Diabolic Edict whole card: cast off two Swamps, bob sacrifices" $ do

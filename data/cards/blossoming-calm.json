@@ -21,23 +21,23 @@
                 "effects": [
                   {
                     "type": "AffectPlayers",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilYourNextTurn"
                       },
-                      {
-                        "type": "Scoped",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
+                      "effect": {
                         "type": "CantBeTargetedBy",
                         "value": {
                           "type": "Opponents"
                         }
+                      },
+                      "players": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "You"
+                        }
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "GainLife",
