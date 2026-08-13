@@ -11,6 +11,7 @@ import qualified Pawl.CastSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
+import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AlternativeCostSpec
@@ -283,6 +284,7 @@ spec s registry = do
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.ActivatedAbilitySpec.spec s
   Pawl.Codec.ActivationRestrictionSpec.spec s
+  Pawl.Codec.AffectedPlayersSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s

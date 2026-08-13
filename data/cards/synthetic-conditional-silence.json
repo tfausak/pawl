@@ -74,7 +74,10 @@
                         }
                       },
                       {
-                        "type": "Opponents"
+                        "type": "Scoped",
+                        "value": {
+                          "type": "Opponents"
+                        }
                       },
                       {
                         "type": "CantCastSpells"

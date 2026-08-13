@@ -45,6 +45,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
@@ -83,7 +84,6 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
-import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -1259,7 +1259,7 @@ addRegenShield oid gs =
 -- nothing here reads the source's own characteristics.
 addPlayerEffect ::
   Expiry.Expiry ->
-  PlayerScope.PlayerScope ->
+  AffectedPlayers.AffectedPlayers PlayerId.PlayerId ->
   PlayerEffect.PlayerEffect ->
   PlayerId.PlayerId ->
   GameState.GameState ->

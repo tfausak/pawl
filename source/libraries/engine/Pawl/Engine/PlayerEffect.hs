@@ -13,6 +13,10 @@
 -- Pawl.Engine.Projection over Modification, Pawl.Engine.Event over
 -- TriggerCondition and Pawl.Engine.Expiry over Expiry. Every consumer asks a
 -- TYPED QUESTION and never sees a constructor.
+--
+-- Pawl.Types.AffectedPlayers is the one type here that Resolve also cases on,
+-- and by that same standing: it is an Effect payload, and only a resolution can
+-- answer the slot its Named arm holds. This module reads the BAKED value.
 module Pawl.Engine.PlayerEffect where
 
 import qualified Data.Foldable as Foldable
@@ -26,6 +30,7 @@ import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import Pawl.Types.CardName (CardName)
 import Pawl.Types.CostAdjustments (CostAdjustments)
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
@@ -77,6 +82,17 @@ inScope pid controller gs scope = case scope of
   -- Thalia's ruling: "including your own".
   PlayerScope.EachPlayer -> True
   PlayerScope.ControllingMostPermanents -> permanentLeader gs == Just pid
+
+-- The same question over a CARRIER's affected set rather than over a bare scope:
+-- is `pid` one of the players this row applies to? inScope for the Scoped arm,
+-- and an equality for the seat CR 601.2c chose and Pawl.Engine.Resolve baked.
+--
+-- Both carriers are asked through this, and the printed one only ever holds a
+-- Scoped: a static ability has no target slot to have named a seat.
+applies :: PlayerId -> PlayerId -> GameState -> AffectedPlayers.AffectedPlayers PlayerId -> Bool
+applies pid controller gs affected = case affected of
+  AffectedPlayers.Scoped scope -> inScope pid controller gs scope
+  AffectedPlayers.Named seat -> pid == seat
 
 -- Damping Engine's "a player who controls more permanents than each other
 -- player", as the at-most-one player it names. Nothing when the lead is TIED,
@@ -147,7 +163,7 @@ playersInScope perspective gs scope =
 --
 -- UNSORTED and UNFILTERED. Both are `applying`'s job, and neither reader may
 -- assume the other's.
-printedRows :: GameState -> [(Timestamp, Maybe ObjectId, PlayerId, PlayerScope, PlayerEffect)]
+printedRows :: GameState -> [(Timestamp, Maybe ObjectId, PlayerId, AffectedPlayers.AffectedPlayers PlayerId, PlayerEffect)]
 printedRows gs =
   let -- Hoisted out of the walk exactly as Projection.gather hoists it: an
       -- inlined call would recompute the whole game's SetLandSubtype list once
@@ -208,7 +224,7 @@ printedRows gs =
                   -- permanent on the battlefield.
                   let changes = Projection.textChangesAffecting oid gs
                       readAs = if null changes then id else rewritePlayerEffect changes
-                   in fmap (\ability -> (Object.timestamp object, Just oid, controller, PlayerStaticAbility.scope ability, readAs (PlayerStaticAbility.effect ability))) abilities
+                   in fmap (\ability -> (Object.timestamp object, Just oid, controller, AffectedPlayers.Scoped (PlayerStaticAbility.scope ability), readAs (PlayerStaticAbility.effect ability))) abilities
                 else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 
@@ -232,17 +248,19 @@ printedRows gs =
 -- suppresses them all.
 affectedBy :: PlayerId -> ObjectId -> GameState -> Bool
 affectedBy pid oid gs =
-  let affects (_, source, controller, scope, _) = source == Just oid && inScope pid controller gs scope
-   in any affects (printedRows gs)
+  let affected (_, source, controller, scope, _) = source == Just oid && applies pid controller gs scope
+   in any affected (printedRows gs)
 
 -- CR 604.2: every player effect applying to `pid` right now. Gathered LIVE from
 -- the battlefield on every read and never captured, the same posture
 -- Projection.gather takes for staticAbilities -- which is why Rule of Law
 -- leaving the battlefield lifts its restriction with nothing to unwind.
 --
--- The scope is resolved DYNAMICALLY (see Pawl.Types.PlayerScope): CR 611.2c
+-- A Scoped set is resolved DYNAMICALLY (see Pawl.Types.PlayerScope): CR 611.2c
 -- lets a rules-modifying effect reach objects that were not affected when it
--- began, so no set is ever frozen on this axis.
+-- began, so no OBJECT set is ever frozen on this axis. A Named seat is fixed, and
+-- by CR 601.2c rather than by that rule -- the target was chosen as the spell was
+-- cast.
 --
 -- The (timestamp, source, controller, scope, effect) rows go no further than this
 -- module: no consumer sees more than the (source, effect) pair returned here, and
@@ -308,7 +326,7 @@ applying pid gs =
       -- stored effect came from a resolution instead (Silence). Those arrive
       -- with source Nothing and so match nothing here.
       keep (_, source, controller, scope, _) =
-        inScope pid controller gs scope
+        applies pid controller gs scope
           && not (any (ignores source) (GameState.ignoredAbilities gs))
       ignores source ignored =
         IgnoredAbility.player ignored == pid

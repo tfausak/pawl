@@ -28,6 +28,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -986,7 +987,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
               floated = S.runPure S.identityAnswer gs1 (Cost.tapForMana mtn)
            in S.addPlayerEffect
                 expiry
-                PlayerScope.EachPlayer
+                (AffectedPlayers.Scoped PlayerScope.EachPlayer)
                 (PlayerEffect.DontLoseUnspentMana ManaFilter.Any)
                 S.alice
                 floated

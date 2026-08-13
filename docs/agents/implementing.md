@@ -71,6 +71,12 @@ say:
   value instead --- `const Map.empty . f`, a `filter (const False)`, a `seq` ---
   so every binding still has a use.
 
+- **Run the mutation through the NARROWEST path that shows the behaviour.** A
+  test that drives the whole priority loop can answer a mutation for the wrong
+  reason: a settle sweeps a conditional effect whose condition is already false,
+  so the loop cannot tell "never started" from "started and was swept". Resolving
+  through the single step under test made the same mutation discriminate.
+
 - **Report a mutation you could not run.** If a behaviour holds by construction
   rather than by a guard you wrote, or `-Werror` rejects the mutated source so
   the suite never runs, there is nothing to break. Say plainly that the

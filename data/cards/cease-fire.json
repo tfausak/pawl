@@ -3,6 +3,10 @@
     {
       "manaCost": [
         {
+          "type": "Generic",
+          "value": 2
+        },
+        {
           "type": "OfType",
           "value": {
             "type": "Colored",
@@ -12,7 +16,7 @@
           }
         }
       ],
-      "name": "Blossoming Calm",
+      "name": "Cease-Fire",
       "spell": {
         "modes": [
           {
@@ -23,24 +27,29 @@
                     "type": "AffectPlayers",
                     "value": [
                       {
-                        "type": "UntilYourNextTurn"
+                        "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "Scoped",
-                        "value": {
-                          "type": "You"
-                        }
+                        "type": "Named",
+                        "value": "target"
                       },
                       {
-                        "type": "CantBeTargetedBy",
+                        "type": "CantCastMatching",
                         "value": {
-                          "type": "Opponents"
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
                         }
                       }
                     ]
-                  },
+                  }
+                ]
+              },
+              {
+                "effects": [
                   {
-                    "type": "GainLife",
+                    "type": "Draw",
                     "value": [
                       {
                         "type": "Relative",
@@ -50,13 +59,20 @@
                       },
                       {
                         "type": "Literal",
-                        "value": 2
+                        "value": 1
                       }
                     ]
                   }
                 ]
               }
-            ]
+            ],
+            "targetSpecs": {
+              "target": {
+                "pool": {
+                  "type": "Players"
+                }
+              }
+            }
           }
         ]
       },
