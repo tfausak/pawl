@@ -21,15 +21,15 @@
                 "effects": [
                   {
                     "type": "MoveToZone",
-                    "value": [
-                      {
+                    "value": {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       },
-                      {
+                      "zone": {
                         "type": "Hand"
                       }
-                    ]
+                    }
                   }
                 ]
               }

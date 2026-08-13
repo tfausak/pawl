@@ -232,6 +232,8 @@ library codec
     Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.MorphVariant
     Pawl.Codec.MorphVariantSpec
+    Pawl.Codec.MoveToZone
+    Pawl.Codec.MoveToZoneSpec
     Pawl.Codec.ObjectId
     Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef
@@ -750,6 +752,7 @@ library types
     Pawl.Types.MonarchTarget
     Pawl.Types.MonarchWatch
     Pawl.Types.MorphVariant
+    Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer
     Pawl.Types.Object

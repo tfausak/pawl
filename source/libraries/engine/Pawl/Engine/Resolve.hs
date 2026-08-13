@@ -95,6 +95,7 @@ import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.ObjectRef (ObjectRef)
@@ -249,7 +250,7 @@ slotsOf effect = case effect of
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown slot -> oneSlot slot
   Effect.RemoveFromCombat slot -> oneSlot slot
-  Effect.MoveToZone ref _ _ _ _ _ -> objectRefSlots ref
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> objectRefSlots ref
   Effect.Draw ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The tally's slot is a DEFINITION (how many of them counted), not a read, so
   -- it belongs to boundSlots below -- Destroy's third field takes the same
@@ -780,7 +781,7 @@ boundSlots :: Effect Card.Type.Card -> Set SlotName
 boundSlots effect = case effect of
   -- CR 400.7: the incarnation minted at the destination, named so a later
   -- effect can reach the object the move created rather than the one it ended.
-  Effect.MoveToZone _ _ _ mSlot _ _ -> foldMap Set.singleton mSlot
+  Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ _ mSlot _ _) -> foldMap Set.singleton mSlot
   -- The token or tokens this Create minted, named so a later effect can refer
   -- back to them -- CR 603.7c's delayed trigger "that refers to a particular
   -- object" is the case that needs the name to survive the resolution.
@@ -2448,7 +2449,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         -- creature that is not in the record is what Game.removeFromCombat
         -- already does to it, which is nothing.
         _ -> gs
-  Effect.MoveToZone ref zone entry mSlot _ placement ->
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone entry mSlot _ placement) ->
     -- ONE object through CR 400.7's funnel, shared by the two arms below so that
     -- what a move DOES is written once and only WHICH objects move differs.
     let -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative

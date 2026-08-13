@@ -25,8 +25,8 @@
                 "effects": [
                   {
                     "type": "MoveToZone",
-                    "value": [
-                      {
+                    "value": {
+                      "ref": {
                         "type": "EachMatching",
                         "value": {
                           "type": "And",
@@ -52,10 +52,10 @@
                           ]
                         }
                       },
-                      {
+                      "zone": {
                         "type": "Exile"
                       }
-                    ]
+                    }
                   }
                 ]
               }

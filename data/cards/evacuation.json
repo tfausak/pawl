@@ -34,8 +34,8 @@
                 "effects": [
                   {
                     "type": "MoveToZone",
-                    "value": [
-                      {
+                    "value": {
+                      "ref": {
                         "type": "EachMatching",
                         "value": {
                           "type": "HasCardType",
@@ -44,10 +44,10 @@
                           }
                         }
                       },
-                      {
+                      "zone": {
                         "type": "Hand"
                       }
-                    ]
+                    }
                   }
                 ]
               }

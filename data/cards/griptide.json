@@ -25,21 +25,21 @@
                 "effects": [
                   {
                     "type": "MoveToZone",
-                    "value": [
-                      {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
-                        "type": "Library"
-                      },
-                      {
+                    "value": {
+                      "placement": {
                         "type": "Stated",
                         "value": {
                           "type": "Top"
                         }
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      "zone": {
+                        "type": "Library"
                       }
-                    ]
+                    }
                   }
                 ]
               }

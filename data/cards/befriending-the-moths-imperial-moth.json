@@ -194,31 +194,31 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           },
-                          {
+                          "slot": "exiled",
+                          "zone": {
                             "type": "Exile"
-                          },
-                          "exiled"
-                        ]
+                          }
+                        }
                       },
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "exiled"
                           },
-                          {
-                            "type": "Battlefield"
-                          },
-                          {
+                          "riders": {
                             "transformed": true
+                          },
+                          "zone": {
+                            "type": "Battlefield"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

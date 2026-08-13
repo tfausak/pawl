@@ -28,23 +28,23 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "origin": {
+                            "type": "Graveyard"
+                          },
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           },
-                          {
-                            "type": "Battlefield"
-                          },
-                          {
+                          "riders": {
                             "tapped": {
                               "type": "Tapped"
                             }
                           },
-                          {
-                            "type": "Graveyard"
+                          "zone": {
+                            "type": "Battlefield"
                           }
-                        ]
+                        }
                       }
                     ]
                   }
