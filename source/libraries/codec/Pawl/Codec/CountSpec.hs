@@ -4,7 +4,6 @@ module Pawl.Codec.CountSpec where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Count as Count
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -25,10 +24,9 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Count" $ do
   Spec.it s "MkCount, in a zone" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      (Count.toJson Value.integer)
-      (Count.fromJson Common.asInteger)
+      (Count.codec Common.integer)
       ( Count.MkCount
           (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
           (Filter.And [Filter.HasSubtype Subtype.Swamp, Filter.ControlledBy PlayerRelation.You])
@@ -37,10 +35,9 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
       """ {"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Swamp"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}} """
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "MkCount, scoped to the event history" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      (Count.toJson Value.integer)
-      (Count.fromJson Common.asInteger)
+      (Count.codec Common.integer)
       ( Count.MkCount
           (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
           (Filter.HasCardType CardType.Creature)
@@ -48,13 +45,13 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
       )
       """ {"scope":{"type":"InHistory","value":{"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]}},"filter":{"type":"HasCardType","value":{"type":"Creature"}},"aggregation":{"type":"DistinctCardTypes"}} """
   Spec.it s "MkCount, scoped to a slot" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      (Count.toJson Value.integer)
-      (Count.fromJson Common.asInteger)
+      (Count.codec Common.integer)
       ( Count.MkCount
           (Scope.InZone Zone.Hand (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
           (Filter.And [])
           Aggregation.Members
       )
       """ {"scope":{"type":"InZone","value":[{"type":"Hand"},{"type":"InSlot","value":"target"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"Members"}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s (Count.codec Common.integer)

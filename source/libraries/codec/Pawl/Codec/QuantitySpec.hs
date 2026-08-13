@@ -4,6 +4,7 @@ module Pawl.Codec.QuantitySpec where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -23,34 +24,30 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   Spec.it s "Literal" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.Literal 5)
       """ {"type":"Literal","value":5} """
   Spec.it s "ManaValue" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       Quantity.ManaValue
       """ {"type":"ManaValue"} """
   -- CR 208.1. Nullary like ManaValue, and NOT to be confused with the Power
   -- newtype, which wraps a printed power/toughness box.
   Spec.it s "Power" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       Quantity.Power
       """ {"type":"Power"} """
   -- CR 208.1's other half, and Power's sibling on the wire as in the type.
   Spec.it s "Toughness" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       Quantity.Toughness
       """ {"type":"Toughness"} """
   -- A number an earlier effect of the same resolution bound into a slot. Unlike
@@ -58,39 +55,34 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- composition is where a recursive decoder loses a payload.
   Spec.it s "InSlot, bare and nested" $ do
     let slot = SlotName.MkSlotName (Text.pack "destroyed")
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.InSlot slot)
       """ {"type":"InSlot","value":"destroyed"} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.Plus (Quantity.Literal 1) (Quantity.InSlot slot))
       """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"InSlot","value":"destroyed"}]} """
   Spec.it s "Star" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       Quantity.Star
       """ {"type":"Star"} """
   Spec.it s "Plus" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.Plus (Quantity.Literal 1) Quantity.Star)
       """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"Star"}]} """
   -- Quantity.Count's arm is tagged here and nowhere else: Pawl.Codec.Count
   -- writes a bare object, so a Count payload can never be double-tagged.
   Spec.it s "Count is tagged by Quantity, and the payload is Count's bare object" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       ( Quantity.Count
           ( Count.MkCount
               (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
@@ -102,10 +94,9 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- Greatest's payload is a whole Quantity rather than a nullary tag, so a
   -- per-member quantity that is itself a Count has to round-trip.
   Spec.it s "Greatest round-trips a nested Count payload" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       ( Quantity.Count
           ( Count.MkCount
               (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
@@ -126,16 +117,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- is the Relative arm; the InSlot arm below is the one a recursive decoder
   -- could lose a payload through, so both are round-tripped.
   Spec.it s "LifeTotal, relative and from a slot" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.LifeTotal (PlayerRef.Relative PlayerRelation.You))
       """ {"type":"LifeTotal","value":{"type":"Relative","value":{"type":"You"}}} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.LifeTotal (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"LifeTotal","value":{"type":"InSlot","value":"target"}} """
   -- CR 725.1, with a PlayerRef and nothing else on the wire: the arm answers a
@@ -143,64 +132,56 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- is the Relative arm; the InSlot arm beside it is the one a recursive decoder
   -- could lose a payload through, so both are round-tripped, as LifeTotal's are.
   Spec.it s "IsMonarch, relative and from a slot" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.IsMonarch (PlayerRef.Relative PlayerRelation.You))
       """ {"type":"IsMonarch","value":{"type":"Relative","value":{"type":"You"}}} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.IsMonarch (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"IsMonarch","value":{"type":"InSlot","value":"target"}} """
   -- CR 702.112b, CR 701.37b and CR 701.60b: WHICH designation is on the wire and
   -- nothing else, the object it is asked of riding the evaluation rather than a
   -- reference -- so this is Power's shape rather than IsMonarch's.
   Spec.it s "HasDesignation Renowned" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.HasDesignation Designation.Renowned)
       """ {"type":"HasDesignation","value":{"type":"Renowned"}} """
   Spec.it s "HasDesignation Monstrous" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.HasDesignation Designation.Monstrous)
       """ {"type":"HasDesignation","value":{"type":"Monstrous"}} """
   Spec.it s "HasDesignation Suspected" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.HasDesignation Designation.Suspected)
       """ {"type":"HasDesignation","value":{"type":"Suspected"}} """
   -- CR 702.33d, with nothing on the wire: a spell's kicked flag is not a member of
   -- Pawl.Types.Designation, so it keeps a tag of its own.
   Spec.it s "WasKicked" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       Quantity.WasKicked
       """ {"type":"WasKicked"} """
   -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
   -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
   Spec.it s "PlayerCounters, relative and from a slot" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
       """ {"type":"PlayerCounters","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Rad"}]} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.PlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PlayerCounterKind.Experience)
       """ {"type":"PlayerCounters","value":[{"type":"InSlot","value":"target"},{"type":"Experience"}]} """
   -- CR 122.1's OBJECT reading, with only a CounterKind on the wire: the object
@@ -209,16 +190,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- counter) is round-tripped too, since that is the one a recursive decoder
   -- could lose.
   Spec.it s "ObjectCounters, a plain kind and a payload-bearing one" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)
       """ {"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.ObjectCounters (CounterKind.Keyword Keyword.Flying))
       """ {"type":"ObjectCounters","value":{"type":"Keyword","value":{"type":"Flying"}}} """
   -- CR 508.3b, with a PlayerRef and nothing else on the wire: what is counted is
@@ -226,16 +205,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- beside it is the one a recursive decoder could lose a payload through, as
   -- LifeTotal's and IsMonarch's are.
   Spec.it s "OpponentsAttacked, relative and from a slot" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.OpponentsAttacked (PlayerRef.Relative PlayerRelation.You))
       """ {"type":"OpponentsAttacked","value":{"type":"Relative","value":{"type":"You"}}} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.OpponentsAttacked (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"OpponentsAttacked","value":{"type":"InSlot","value":"target"}} """
   -- CR 701.9a, with a PlayerRef and nothing else on the wire: what is counted is
@@ -243,25 +220,22 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- arm; the InSlot arm beside it is the one a recursive decoder could lose a
   -- payload through, as OpponentsAttacked's is.
   Spec.it s "CardsDiscardedThisTurn, relative and from a slot" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.CardsDiscardedThisTurn (PlayerRef.Relative PlayerRelation.You))
       """ {"type":"CardsDiscardedThisTurn","value":{"type":"Relative","value":{"type":"You"}}} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.CardsDiscardedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"CardsDiscardedThisTurn","value":{"type":"InSlot","value":"target"}} """
   -- CR 509.1h with NOTHING on the wire: the object is the one the quantity is
   -- evaluated against, so this is a bare tag like Power and ManaValue.
   Spec.it s "BlockersBeyondFirst is nullary" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       Quantity.BlockersBeyondFirst
       """ {"type":"BlockersBeyondFirst"} """
   -- A slot and a payload on the wire. Nested once, since a recursive decoder is
@@ -269,21 +243,26 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- slot moves, which is the whole point of the constructor.
   Spec.it s "AgainstSlot, bare and nested" $ do
     let slot = SlotName.MkSlotName (Text.pack "creature")
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.AgainstSlot slot Quantity.Power)
       """ {"type":"AgainstSlot","value":["creature",{"type":"Power"}]} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Quantity.toJson
-      Quantity.fromJson
+      Quantity.codec
       (Quantity.Plus (Quantity.Literal 1) (Quantity.AgainstSlot slot (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)))
       """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"AgainstSlot","value":["creature",{"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}}]}]} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s
-      Quantity.fromJsonPair
+      (Codec.decode Quantity.pairCodec)
       "[{\"type\":\"Literal\",\"value\":1},{\"type\":\"Star\"}]"
       (Quantity.Literal 1, Quantity.Star)
+  -- Forcing the schema is what proves the RECURSIVE definition terminates:
+  -- Plus, AgainstSlot and the Count arm all name `codec` itself, and
+  -- assertHasSchema renders the whole tree rather than just its outer tag, so a
+  -- definition that failed to emit a $ref on re-entry would hang here rather
+  -- than pass.
+  Spec.it s "has a schema" $ Common.assertHasSchema s Quantity.codec
+  Spec.it s "the [power, toughness] pair has a schema" $ Common.assertHasSchema s Quantity.pairCodec

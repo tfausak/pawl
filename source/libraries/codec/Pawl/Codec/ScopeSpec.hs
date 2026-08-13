@@ -14,25 +14,23 @@ import qualified Pawl.Types.Zone as Zone
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Scope" $ do
   Spec.it s "InZone" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Scope.toJson
-      Scope.fromJson
+      Scope.codec
       (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
       """ {"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]} """
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "InHistory" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Scope.toJson
-      Scope.fromJson
+      Scope.codec
       (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
       """ {"type":"InHistory","value":{"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]}} """
   -- CR 102.1's domain: the players a reference names, rather than their zones.
   Spec.it s "OverPlayers" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Scope.toJson
-      Scope.fromJson
+      Scope.codec
       (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
       """ {"type":"OverPlayers","value":{"type":"Relative","value":{"type":"Opponent"}}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s Scope.codec

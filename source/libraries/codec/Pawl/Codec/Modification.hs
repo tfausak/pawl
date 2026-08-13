@@ -18,8 +18,8 @@ toJson :: Modification.Modification -> Value.Value
 toJson m = case m of
   Modification.GainKeyword k -> Common.tagged "GainKeyword" . Just $ Codec.encode Keyword.codec k
   Modification.LoseAllAbilities -> Common.nullary "LoseAllAbilities"
-  Modification.SetBasePowerToughness p t -> Common.tagged "SetBasePowerToughness" . Just . Value.array $ [Quantity.toJson p, Quantity.toJson t]
-  Modification.ModifyPowerToughness p t -> Common.tagged "ModifyPowerToughness" . Just . Value.array $ [Quantity.toJson p, Quantity.toJson t]
+  Modification.SetBasePowerToughness p t -> Common.tagged "SetBasePowerToughness" . Just . Value.array $ [Codec.encode Quantity.codec p, Codec.encode Quantity.codec t]
+  Modification.ModifyPowerToughness p t -> Common.tagged "ModifyPowerToughness" . Just . Value.array $ [Codec.encode Quantity.codec p, Codec.encode Quantity.codec t]
   Modification.SetLandSubtype s -> Common.tagged "SetLandSubtype" . Just $ Codec.encode Subtype.codec s
   Modification.SetLandSubtypeToChosen -> Common.nullary "SetLandSubtypeToChosen"
   Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Codec.encode Subtype.codec s
@@ -46,8 +46,8 @@ fromJson value = do
   case t of
     "GainKeyword" -> Common.withValue mv (fmap Modification.GainKeyword . Codec.decode Keyword.codec)
     "LoseAllAbilities" -> Right Modification.LoseAllAbilities
-    "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
-    "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> Quantity.fromJson x <*> Quantity.fromJson y
+    "SetBasePowerToughness" -> pair mv >>= \(x, y) -> Modification.SetBasePowerToughness <$> Codec.decode Quantity.codec x <*> Codec.decode Quantity.codec y
+    "ModifyPowerToughness" -> pair mv >>= \(x, y) -> Modification.ModifyPowerToughness <$> Codec.decode Quantity.codec x <*> Codec.decode Quantity.codec y
     "SetLandSubtype" -> Common.withValue mv (fmap Modification.SetLandSubtype . Codec.decode Subtype.codec)
     "SetLandSubtypeToChosen" -> Right Modification.SetLandSubtypeToChosen
     "AddLandSubtype" -> Common.withValue mv (fmap Modification.AddLandSubtype . Codec.decode Subtype.codec)

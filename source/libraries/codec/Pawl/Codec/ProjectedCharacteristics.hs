@@ -33,7 +33,7 @@ toJson pc =
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Value.integer) (PC.toughness pc),
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe (Codec.encode Loyalty.codec)) (PC.loyalty pc),
       Common.optionalPair "defense" Nothing (Common.encodeMaybe (Codec.encode Defense.codec)) (PC.defense pc),
-      Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (\(p, t) -> Value.array [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc),
+      Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (\(p, t) -> Value.array [Codec.encode Quantity.codec p, Codec.encode Quantity.codec t])) (PC.characteristicPT pc),
       Common.requiredPair "cardTypes" (Common.encodeSet (Codec.encode CardType.codec)) (PC.cardTypes pc),
       Common.optionalPair "subtypes" Set.empty (Common.encodeSet (Codec.encode Subtype.codec)) (PC.subtypes pc),
       Common.optionalPair "activatedAbilities" [] (Common.encodeList (ActivatedAbility.toJson Card.toJson)) (PC.activatedAbilities pc),
@@ -53,7 +53,7 @@ fromJson value = do
   tou <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Common.asInteger) ps
   loy <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe (Codec.decode Loyalty.codec)) ps
   def_ <- Common.defaultedField "defense" Nothing (Common.decodeMaybe (Codec.decode Defense.codec)) ps
-  cda <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe Quantity.fromJsonPair) ps
+  cda <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe (Codec.decode Quantity.pairCodec)) ps
   cts <- Common.field "cardTypes" ps >>= Common.decodeSet (Codec.decode CardType.codec)
   subs <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet (Codec.decode Subtype.codec)) ps
   acts <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (ActivatedAbility.fromJson Card.fromJson)) ps
