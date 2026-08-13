@@ -84,6 +84,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.GainLife {} -> Nothing
   Effect.ExchangeLifeTotals _ -> Nothing
   Effect.SetLifeTotal {} -> Nothing
+  Effect.RedistributeLifeTotals -> Nothing
   Effect.IncreaseSpeed {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.CreateCopy {} -> Nothing

@@ -76,6 +76,9 @@ data Response
   | -- | CR 701.34a: the permanents and players a proliferating player chose. A
     -- pair rather than two constructors, because one prompt asks one question.
     ChoseProliferation (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)
+  | -- | CR 119.7-8's redistribution: each player the controller chose, beside the
+    -- player whose previous life total they take.
+    ChoseRedistribution (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   | -- | CR 701.54a: the creature a tempted player chose as their Ring-bearer.
     ChoseRingBearer ObjectId.ObjectId
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.

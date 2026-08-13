@@ -604,6 +604,26 @@ combatReplaySpec s =
           -- Discriminating: CR 701.34a's "any number" includes none, and a
           -- decode that defaulted to the offered set would pass one leg.
           Spec.assertEqWith s "declining round trips" (Replay.decode p (Replay.encode p neither)) (Just neither)
+        -- Which player got whose life total is a decision, so it has to survive a
+        -- transcript like any other.
+        Spec.it s "ChooseRedistribution round-trips through the transcript" $ do
+          let p = Prompt.ChooseRedistribution decider S.alice [(S.alice, 27), (S.bob, 4), (S.carol, 13)]
+              swap = Map.fromList [(S.alice, S.bob), (S.bob, S.alice), (S.carol, S.carol)]
+          Spec.assertEqWith s "a permutation round trips" (Replay.decode p (Replay.encode p swap)) (Just swap)
+          -- Discriminating: "any number" includes none, and a decode that
+          -- defaulted to the identity over the candidates would pass one leg.
+          Spec.assertEqWith s "redistributing among nobody round trips" (Replay.decode p (Replay.encode p Map.empty)) (Just Map.empty)
+        -- Discriminating: fails if ChooseRedistribution reuses DeclaredBlockers'
+        -- map rather than getting its own constructor.
+        Spec.it s "a redistribution does not decode as a proliferation" $ do
+          let p = Prompt.ChooseRedistribution decider S.alice [(S.alice, 27), (S.bob, 4)]
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseProliferation (Set.empty, Set.singleton S.bob))) Nothing
+        Spec.it s "a short transcript redistributes among nobody" $
+          Spec.assertEqWith
+            s
+            "declines"
+            (Replay.defaultAnswer (Prompt.ChooseRedistribution decider S.alice [(S.alice, 27), (S.bob, 4)]))
+            Map.empty
         Spec.it s "a short transcript proliferates onto nothing" $
           Spec.assertEqWith
             s
