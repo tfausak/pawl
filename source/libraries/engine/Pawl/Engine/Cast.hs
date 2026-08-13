@@ -5,6 +5,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
@@ -505,11 +506,11 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 -- Troops' "only during the declare attackers step and only if you've been
 -- attacked this step".
 --
--- The exact counterweight to permissionsOf above, and read the same way: off the
--- card, never through the projection (CR 113.6e, which for this pool means a
--- hand, which pawl's projection does not reach -- #160). ALL of them must hold,
--- which is what CR 601.3's "no ... prohibits" means; one permission, by contrast,
--- suffices.
+-- The exact counterweight to permissionsWith below, and read the way its LIBRARY
+-- caller reads keywords: off the card, never through the projection (CR 113.6e,
+-- which for this pool means a hand, which pawl's projection does not reach --
+-- #160). ALL of them must hold, which is what CR 601.3's "no ... prohibits"
+-- means; one permission, by contrast, suffices.
 --
 -- Casing on the arms is a classification, not an effect's identity:
 -- Pawl.Engine.Cast is the sole reader of Pawl.Types.CastingRestriction exactly as
@@ -669,7 +670,7 @@ castableSpells pid gs =
 -- permissions -- a classification, never card identity.
 permitsCastWhileSearching :: Face.Face Card.Type.Card -> Bool
 permitsCastWhileSearching face =
-  elem CastingPermission.CastFromLibraryWhileSearching (permissionsOf face)
+  elem CastingPermission.CastFromLibraryWhileSearching (permissionsWith (Face.keywords face) face)
 
 -- CR 601.3 / 702.34a: may this card be cast from its owner's graveyard?
 --
@@ -687,14 +688,31 @@ permitsCastWhileSearching face =
 -- to say "for this player".
 permitsCastFromGraveyard :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromGraveyard pid oid face gs =
-  elem CastingPermission.CastFromGraveyard (permissionsOf face)
+  elem CastingPermission.CastFromGraveyard (permissionsWith (graveyardKeywords oid gs) face)
     || PlayerEffect.mayCastFromGraveyard pid oid gs
 
+-- CR 613.1: the keywords a card in a GRAVEYARD has, projected rather than
+-- printed. Rule 702.34a's permission is stated by the ABILITY, and an ability
+-- granted to a card lying in a graveyard (Viral Spawning's own, CR 113.6f, which
+-- Projection.gather reaches there) states it as much as a printed one does
+-- (#1385).
+--
+-- Read off the OBJECT, so the CR 709.3a half the caller stamped through
+-- asProposed is the one projected -- the same posture Pawl.Engine.Cost.costsFor
+-- takes for the cost half of the same sentence.
+graveyardKeywords :: ObjectId -> GameState -> Set Keyword
+graveyardKeywords oid gs = Map.keysSet (Projection.keywordsOf oid gs)
+
 -- Every casting permission a card has: the ones it PRINTS (Panglacial Wurm) plus
--- the ones rule 702 gives it for a keyword it holds (flashback). Read off the
--- card and never through the projection: these permissions function in the
--- library and the graveyard (CR 113.6), which pawl's projection does not reach
--- (#160).
+-- the ones rule 702 gives it for a keyword set the CALLER supplies.
+--
+-- The keywords arrive as an argument rather than being read off the face because
+-- the two callers read them from different places, and each is right for its
+-- zone: a card in a GRAVEYARD is read through the projection, since an ability
+-- granted to it there grants rule 702.34a's permission as much as a printed
+-- keyword does; a card in a LIBRARY is read as printed, since nothing in the
+-- pool changes such a card and the projection's own gather reaches neither it
+-- nor a hand (#160).
 --
 -- The face's own type line is what answers rule 702.34a's "if the resulting
 -- spell is an instant or sorcery spell", and it is the PROPOSED face's because
@@ -702,10 +720,10 @@ permitsCastFromGraveyard pid oid face gs =
 -- example is that same reading one zone over: under "you may cast instant and
 -- sorcery spells from the top of your library", an adventurer card offers its
 -- instant Adventure half and not its creature half.
-permissionsOf :: Face.Face Card.Type.Card -> [CastingPermission.CastingPermission]
-permissionsOf face =
+permissionsWith :: Set Keyword -> Face.Face Card.Type.Card -> [CastingPermission.CastingPermission]
+permissionsWith keywords face =
   Face.castingPermissions face
-    <> Keyword.castingPermissionsOf (TypeLine.types (Face.typeLine face)) (Face.keywords face)
+    <> Keyword.castingPermissionsOf (TypeLine.types (Face.typeLine face)) keywords
 
 -- The library cards this player may cast while searching their own library:
 -- permitted, not prohibited, affordable, and with a fillable target set.
@@ -919,6 +937,13 @@ castSpellWith applied pid oid name facing = do
           -- 601.2f's order says and what Commander decks expect.
           taxed = Commander.taxCandidates pid oid before
           candidates = fmap taxed (maybe (Cost.costsFor name oid proposed) pure applied)
+          -- CR 400.7 / 613.1: the keywords the card has WHERE IT LIES, read one
+          -- step ahead of the move below for the reason `castFrom` is. The move
+          -- mints a fresh incarnation on the stack, and an ability granting this
+          -- card flashback while it sat in the graveyard (Viral Spawning's own)
+          -- stops applying the moment it leaves -- so armCastFromGraveyard, which
+          -- runs after the move, could not ask the question there.
+          keywordsBefore = graveyardKeywords oid proposed
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -945,15 +970,15 @@ castSpellWith applied pid oid name facing = do
       moved <- Event.changeZoneCasting pid oid Zone.Stack (Just name) facing
       case moved of
         Nothing -> State.put before
-        Just sid -> castProposed pid sid face castFrom candidates before
+        Just sid -> castProposed pid sid face castFrom keywordsBefore candidates before
 
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
 -- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object
 -- every step below announces for, targets relative to, is projected from and
 -- stamps its choices onto; `before` is the state to return to. Split out so the
 -- whole announcement reads one state and one id.
-castProposed :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> [Cost Keyword] -> GameState -> Game ()
-castProposed pid sid face castFrom candidates before = do
+castProposed :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [Cost Keyword] -> GameState -> Game ()
+castProposed pid sid face castFrom keywordsBefore candidates before = do
   gs <- State.get
   let decider = Decide.deciderFor pid gs
       modal = Face.spell face
@@ -1209,7 +1234,7 @@ castProposed pid sid face castFrom candidates before = do
                                         (GameState.objects g)
                                   }
                             )
-                          Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid face sid)
+                          Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid keywordsBefore sid)
                           -- CR 903.8: the cast is now announced, so this is a
                           -- "previous time they cast it from the command zone"
                           -- for every later one. Here rather than at CR 601.2a's
@@ -1229,6 +1254,10 @@ castProposed pid sid face castFrom candidates before = do
 -- themselves come from Pawl.Engine.Keyword, so this installs a replacement it
 -- never inspects.
 --
+-- The keywords are the ones the card held IN THE GRAVEYARD, read before CR
+-- 601.2a's move (castSpellWith's `keywordsBefore`) -- a granted flashback stops
+-- applying as the card leaves, so the stack incarnation cannot be asked.
+--
 -- ARMED HERE rather than re-derived from the card while the spell sits on the
 -- stack because CR 702.34a conditions the ability on "if the flashback cost was
 -- paid", and nothing downstream records which cost was paid (#101). This is the
@@ -1241,8 +1270,8 @@ castProposed pid sid face castFrom candidates before = do
 --
 -- CR 614.3's `uses` is Once and its expiry is Never: a spell leaves the stack
 -- exactly once, and the ability has no duration.
-armCastFromGraveyard :: PlayerId -> Face.Face Card.Type.Card -> ObjectId -> Game ()
-armCastFromGraveyard caster face spellId =
+armCastFromGraveyard :: PlayerId -> Set Keyword -> ObjectId -> Game ()
+armCastFromGraveyard caster keywords spellId =
   let arm re = State.modify' $ \gs ->
         let (ts, gs1) = Game.freshTimestamp gs
             active =
@@ -1265,4 +1294,4 @@ armCastFromGraveyard caster face spellId =
                   ActiveReplacement.rider = Nothing
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
-   in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf (Face.keywords face))
+   in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf keywords)
