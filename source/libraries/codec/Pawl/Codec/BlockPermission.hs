@@ -5,6 +5,7 @@ import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.BlockPermission as BlockPermission
 
@@ -24,7 +25,7 @@ toJson :: BlockPermission.BlockPermission -> Value.Value
 toJson bp =
   Value.object
     ( Common.requiredPair "affected" Affected.toJson (BlockPermission.affected bp)
-        <> Common.requiredPair "additional" (Common.encodeMaybe Quantity.toJson) (BlockPermission.additional bp)
+        <> Common.requiredPair "additional" (Common.encodeMaybe (Codec.encode Quantity.codec)) (BlockPermission.additional bp)
         <> Common.optionalPair "while" Nothing (Common.encodeMaybe Condition.toJson) (BlockPermission.while bp)
     )
 
@@ -32,6 +33,6 @@ fromJson :: Value.Value -> Either Text.Text BlockPermission.BlockPermission
 fromJson value = do
   ps <- Common.asObject value
   a <- Common.field "affected" ps >>= Affected.fromJson
-  n <- Common.field "additional" ps >>= Common.decodeMaybe Quantity.fromJson
+  n <- Common.field "additional" ps >>= Common.decodeMaybe (Codec.decode Quantity.codec)
   c <- Common.defaultedField "while" Nothing (Common.decodeMaybe Condition.fromJson) ps
   pure (BlockPermission.MkBlockPermission a n c)

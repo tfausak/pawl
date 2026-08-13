@@ -1,26 +1,28 @@
 module Pawl.Codec.Scope where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.EventShape as EventShape
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Zone as Zone
-import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Scope as Scope
 
-toJson :: Scope.Scope -> Value.Value
-toJson s = case s of
-  Scope.InZone z r -> Common.tagged "InZone" . Just . Value.array $ [Codec.encode Zone.codec z, Codec.encode PlayerRef.codec r]
-  Scope.InHistory e -> Common.tagged "InHistory" . Just $ EventShape.toJson e
-  Scope.OverPlayers r -> Common.tagged "OverPlayers" . Just $ Codec.encode PlayerRef.codec r
-
-fromJson :: Value.Value -> Either Text.Text Scope.Scope
-fromJson value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("InZone", Just (Value.Array (Array.MkArray [z, r]))) -> Scope.InZone <$> Codec.decode Zone.codec z <*> Codec.decode PlayerRef.codec r
-    ("InHistory", Just v) -> Scope.InHistory <$> EventShape.fromJson v
-    ("OverPlayers", Just v) -> Scope.OverPlayers <$> Codec.decode PlayerRef.codec v
-    _ -> Left . Text.pack $ "unknown Scope: " <> t
+-- | The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec Scope.Scope
+codec =
+  Arm.tagged
+    encode
+    [ Arm.payload "InZone" (Common.tuple Zone.codec PlayerRef.codec) (uncurry Scope.InZone),
+      Arm.payload "InHistory" EventShape.codec Scope.InHistory,
+      Arm.payload "OverPlayers" PlayerRef.codec Scope.OverPlayers
+    ]
+  where
+    encode s = case s of
+      Scope.InZone z r ->
+        Common.tagged "InZone" . Just . Value.array $
+          [Codec.encode Zone.codec z, Codec.encode PlayerRef.codec r]
+      Scope.InHistory e -> Common.tagged "InHistory" . Just $ Codec.encode EventShape.codec e
+      Scope.OverPlayers r -> Common.tagged "OverPlayers" . Just $ Codec.encode PlayerRef.codec r

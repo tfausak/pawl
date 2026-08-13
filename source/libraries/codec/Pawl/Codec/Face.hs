@@ -65,7 +65,7 @@ toJson encodeCard f =
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Toughness.toJson) (Face.toughness f),
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe (Codec.encode Loyalty.codec)) (Face.loyalty f),
       Common.optionalPair "defense" Nothing (Common.encodeMaybe (Codec.encode Defense.codec)) (Face.defense f),
-      Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe Quantity.toJson) (Face.characteristicPT f),
+      Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (Codec.encode Quantity.codec)) (Face.characteristicPT f),
       Common.optionalPair "enchant" [] (Common.encodeList (Codec.encode TargetSpec.codec)) (Face.enchant f),
       Common.optionalPair "keywords" Set.empty (Common.encodeSet (Codec.encode Keyword.codec)) (Face.keywords f),
       Common.optionalPair "colorIndicator" Set.empty (Common.encodeSet (Codec.encode Color.codec)) (Face.colorIndicator f),
@@ -119,7 +119,7 @@ fromJson decodeCard value = do
   permissions <- Common.defaultedField "castingPermissions" [] (Common.decodeList (Codec.decode CastingPermission.codec)) ps
   restrictions <- Common.defaultedField "castingRestrictions" [] (Common.decodeList (Codec.decode CastingRestriction.codec)) ps
   colorIndicator <- Common.defaultedField "colorIndicator" Set.empty (Common.decodeSet (Codec.decode Color.codec)) ps
-  characteristicPT <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe Quantity.fromJson) ps
+  characteristicPT <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe (Codec.decode Quantity.codec)) ps
   delayed <- Common.defaultedField "delayedAbilities" Map.empty (TriggeredAbility.fromJsonDelayed decodeCard) ps
   rooms <- Common.defaultedField "rooms" Seq.empty (Common.decodeSeq (DungeonRoom.fromJson decodeCard)) ps
   playerAbilities <- Common.defaultedField "playerAbilities" [] (Common.decodeList PlayerStaticAbility.fromJson) ps
