@@ -74,6 +74,7 @@ library codec
     Pawl.Codec.AffectedPlayers
     Pawl.Codec.AffectedPlayersSpec
     Pawl.Codec.AffectedSpec
+    Pawl.Codec.AffectPlayers
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AlternativeCost
@@ -102,6 +103,7 @@ library codec
     Pawl.Codec.CastingRestrictionSpec
     Pawl.Codec.CastOffer
     Pawl.Codec.CastOfferSpec
+    Pawl.Codec.ChangeText
     Pawl.Codec.Chooser
     Pawl.Codec.ChooserSpec
     Pawl.Codec.Clause
@@ -230,6 +232,7 @@ library codec
     Pawl.Codec.ModeSpec
     Pawl.Codec.Modification
     Pawl.Codec.ModificationSpec
+    Pawl.Codec.ModifyTarget
     Pawl.Codec.MonarchTarget
     Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.MorphVariant
@@ -264,6 +267,7 @@ library codec
     Pawl.Codec.PlayerRefSpec
     Pawl.Codec.PlayerRelation
     Pawl.Codec.PlayerRelationSpec
+    Pawl.Codec.PlayerSacrifices
     Pawl.Codec.PlayerScope
     Pawl.Codec.PlayerScopeSpec
     Pawl.Codec.PlayerStaticAbility
@@ -292,6 +296,7 @@ library codec
     Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.ReplacementOrigin
     Pawl.Codec.ReplacementOriginSpec
+    Pawl.Codec.RequireBlock
     Pawl.Codec.RevealCause
     Pawl.Codec.RevealCauseSpec
     Pawl.Codec.RoomIndex
@@ -656,6 +661,7 @@ library types
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected
     Pawl.Types.AffectedPlayers
+    Pawl.Types.AffectPlayers
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost
     Pawl.Types.Asked
@@ -673,6 +679,7 @@ library types
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
     Pawl.Types.CastOffer
+    Pawl.Types.ChangeText
     Pawl.Types.Chooser
     Pawl.Types.Claim
     Pawl.Types.Clause
@@ -768,6 +775,7 @@ library types
     Pawl.Types.ModeInstance
     Pawl.Types.ModeSelection
     Pawl.Types.Modification
+    Pawl.Types.ModifyTarget
     Pawl.Types.MonarchTarget
     Pawl.Types.MonarchWatch
     Pawl.Types.MorphVariant
@@ -796,6 +804,7 @@ library types
     Pawl.Types.PlayerQuantity
     Pawl.Types.PlayerRef
     Pawl.Types.PlayerRelation
+    Pawl.Types.PlayerSacrifices
     Pawl.Types.PlayerScope
     Pawl.Types.PlayerStaticAbility
     Pawl.Types.Pool
@@ -819,6 +828,7 @@ library types
     Pawl.Types.ReplacementEffect
     Pawl.Types.ReplacementEntry
     Pawl.Types.ReplacementOrigin
+    Pawl.Types.RequireBlock
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.Result

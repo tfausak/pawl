@@ -56,6 +56,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -110,6 +111,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
@@ -121,6 +123,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
@@ -133,6 +136,7 @@ import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Scaling as Scaling
@@ -579,7 +583,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
 effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 effectCounts effect = case effect of
   Effect.DealDamage _ quantity -> quantityCounts quantity
-  Effect.ModifyTarget duration modification _ -> durationCounts duration <> modificationCounts modification
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
@@ -590,7 +594,7 @@ effectCounts effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
-  Effect.PlayerSacrifices _ _ quantity -> quantityCounts quantity
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> quantityCounts quantity
   Effect.RestartGame -> []
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy {} -> []
@@ -640,8 +644,8 @@ effectCounts effect = case effect of
   Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration
   Effect.ArmDelayedTrigger {} -> []
-  Effect.AffectPlayers duration _ _ -> durationCounts duration
-  Effect.RequireBlock duration _ _ -> durationCounts duration
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
+  Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
   Effect.Designate _ _ -> []
@@ -2309,7 +2313,7 @@ printedPlayerScope ability = (AffectedPlayers.Scoped (PlayerStaticAbility.scope 
 -- resolution effect is not a new player carrier.
 storedPlayerScope :: Effect.Effect Card.Type.Card -> Maybe (AffectedPlayers.AffectedPlayers SlotName.SlotName, PlayerEffect.PlayerEffect)
 storedPlayerScope effect = case effect of
-  Effect.AffectPlayers _ scope playerEffect -> Just (scope, playerEffect)
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ scope playerEffect) -> Just (scope, playerEffect)
   _ -> Nothing
 
 -- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
@@ -2430,7 +2434,7 @@ effectFilters effect = case effect of
   -- fortify, respectively." Aura Graft's "another permanent it can enchant".
   Effect.AttachTarget _ f -> [(True, f)]
   Effect.DealDamage ref quantity -> unframed (objectRefFilters ref <> quantityFilters quantity)
-  Effect.ModifyTarget duration modification ref ->
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters modification <> objectRefFilters ref)
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
@@ -2440,7 +2444,7 @@ effectFilters effect = case effect of
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
-  Effect.PlayerSacrifices _ f quantity -> unframed (f : quantityFilters quantity)
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ f quantity) -> unframed (f : quantityFilters quantity)
   Effect.RestartGame -> []
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy (Destroy.MkDestroy ref _ _) -> unframed (objectRefFilters ref)
@@ -2502,8 +2506,8 @@ effectFilters effect = case effect of
   Effect.AddPhases _ -> []
   Effect.GainControl duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
   Effect.ArmDelayedTrigger _ _ mDuration -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
-  Effect.AffectPlayers duration _ playerEffect -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
-  Effect.RequireBlock duration blocker attacker -> unframed (durationFilters duration <> objectRefFilters blocker <> objectRefFilters attacker)
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
+  Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> unframed (durationFilters duration <> objectRefFilters blocker <> objectRefFilters attacker)
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
@@ -3706,7 +3710,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no card authors a control modification into a resolving effect (#199)" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.ModifyTarget _ modification _ -> Projection.layer modification == Layer.Control
+          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> Projection.layer modification == Layer.Control
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
@@ -3912,10 +3916,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- shape real, and this is what keeps the sweep honest until it lands.
     silence <- S.printingOf s registry "Silence"
     let unpreventable effect = case effect of
-          Effect.AffectPlayers duration scope _ -> Effect.AffectPlayers duration scope (PlayerEffect.DamageCantBePrevented anyDamage)
+          Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration scope _) -> Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration scope (PlayerEffect.DamageCantBePrevented anyDamage))
           other -> other
         widen effect = case effect of
-          Effect.AffectPlayers duration _ playerEffect -> Effect.AffectPlayers duration (AffectedPlayers.Scoped PlayerScope.EachPlayer) playerEffect
+          Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration (AffectedPlayers.Scoped PlayerScope.EachPlayer) playerEffect)
           other -> other
         overSpell f face =
           face

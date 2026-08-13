@@ -12,10 +12,12 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -44,6 +46,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -56,6 +59,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
@@ -63,6 +67,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
@@ -115,27 +120,27 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t"))))
+      (Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "t")))))
       """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},{"type":"InSlot","value":"t"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking])))
+      (Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn (Modification.GainKeyword Keyword.Trample) (ObjectRef.EachMatching (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking]))))
       """ {"type":"ModifyTarget","value":[{"type":"UntilEndOfTurn"},{"type":"GainKeyword","value":{"type":"Trample"}},{"type":"EachMatching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"IsAttacking"}]}}]} """
   Spec.it s "ChangeText, a basic land type swap that forbids nothing" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChangeText SubtypeFamily.BasicLandType Set.empty (SlotName.MkSlotName (Text.pack "target")))
+      (Effect.ChangeText (ChangeText.MkChangeText SubtypeFamily.BasicLandType Set.empty (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"ChangeText","value":[{"type":"BasicLandType"},[],"target"]} """
   Spec.it s "ChangeText, a creature type swap whose new word can't be Wall" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) (SlotName.MkSlotName (Text.pack "target")))
+      (Effect.ChangeText (ChangeText.MkChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"ChangeText","value":[{"type":"CreatureType"},[{"type":"Wall"}],"target"]} """
   Spec.it s "AddMana, a fixed type and any color" $ do
     Common.assertJsonCodec
@@ -819,7 +824,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.CantCastSpells)
+      (Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Scoped PlayerScope.Opponents) PlayerEffect.CantCastSpells))
       """ {"type":"AffectPlayers","value":[{"type":"UntilEndOfTurn"},{"type":"Scoped","value":{"type":"Opponents"}},{"type":"CantCastSpells"}]} """
   -- The targeted seat, which is the arm no scope can say (Cease-Fire).
   Spec.it s "AffectPlayers at a named slot" $
@@ -827,14 +832,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Named (SlotName.MkSlotName (Text.pack "target"))) PlayerEffect.CantCastSpells)
+      (Effect.AffectPlayers (AffectPlayers.MkAffectPlayers Duration.UntilEndOfTurn (AffectedPlayers.Named (SlotName.MkSlotName (Text.pack "target"))) PlayerEffect.CantCastSpells))
       """ {"type":"AffectPlayers","value":[{"type":"UntilEndOfTurn"},{"type":"Named","value":"target"},{"type":"CantCastSpells"}]} """
   Spec.it s "RequireBlock" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.RequireBlock Duration.UntilEndOfCombat (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      (Effect.RequireBlock (RequireBlock.MkRequireBlock Duration.UntilEndOfCombat (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))))
       """ {"type":"RequireBlock","value":[{"type":"UntilEndOfCombat"},{"type":"InSlot","value":"target"},{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}]} """
   Spec.it s "CreateEmblem" $
     Common.assertJsonCodec
@@ -973,7 +978,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1))
+      (Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1)))
       """ {"type":"PlayerSacrifices","value":["t",{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Literal","value":1}]} """
   -- CR 500.7: a slot read with an empty skip set, a self-scoped arm carrying
   -- CR 500.11's skip of one step, and a two-member set.

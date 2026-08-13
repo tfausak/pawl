@@ -4,8 +4,10 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
+import qualified Pawl.Codec.AffectPlayers as AffectPlayers
 import qualified Pawl.Codec.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Codec.CastOffer as CastOffer
+import qualified Pawl.Codec.ChangeText as ChangeText
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CreateCopy as CreateCopy
 import qualified Pawl.Codec.DamageKind as DamageKind
@@ -21,6 +23,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.Modification as Modification
+import qualified Pawl.Codec.ModifyTarget as ModifyTarget
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
 import qualified Pawl.Codec.MoveToZone as MoveToZone
 import qualified Pawl.Codec.ObjectRef as ObjectRef
@@ -30,11 +33,13 @@ import qualified Pawl.Codec.PlayerCounters as PlayerCounters
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Codec.PlayerRef as PlayerRef
+import qualified Pawl.Codec.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Codec.PutCounters as PutCounters
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.RemoveCounters as RemoveCounters
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Codec.RequireBlock as RequireBlock
 import qualified Pawl.Codec.SearchDestination as SearchDestination
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.SpeedDecrease as SpeedDecrease
@@ -54,10 +59,8 @@ import qualified Pawl.Types.Onset as Onset
 toJson :: (card -> Value.Value) -> Effect.Effect card -> Value.Value
 toJson codec e = case e of
   Effect.DealDamage r q -> Common.tagged "DealDamage" (Just (Value.array [Codec.encode ObjectRef.codec r, Codec.encode Quantity.codec q]))
-  Effect.ModifyTarget d m r -> Common.tagged "ModifyTarget" (Just (Value.array [Codec.encode Duration.codec d, Codec.encode Modification.codec m, Codec.encode ObjectRef.codec r]))
-  Effect.ChangeText family forbidden s ->
-    Common.tagged "ChangeText" . Just . Value.array $
-      [Codec.encode SubtypeFamily.codec family, Common.encodeSet (Codec.encode Subtype.codec) forbidden, Codec.encode SlotName.codec s]
+  Effect.ModifyTarget x -> Common.tagged "ModifyTarget" . Just $ Codec.encode ModifyTarget.codec x
+  Effect.ChangeText x -> Common.tagged "ChangeText" . Just $ Codec.encode ChangeText.codec x
   Effect.AddMana production -> Common.tagged "AddMana" (Just (Codec.encode ManaProduction.codec production))
   Effect.Search s o q f d -> Common.tagged "Search" (Just (Value.array [Codec.encode PlayerRef.codec s, Codec.encode PlayerRef.codec o, Codec.encode Quantity.codec q, Codec.encode (Filter.codec Keyword.codec) f, Codec.encode SearchDestination.codec d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
@@ -65,7 +68,7 @@ toJson codec e = case e of
   Effect.TemptWithTheRing -> Common.nullary "TemptWithTheRing"
   Effect.Venture -> Common.nullary "Venture"
   Effect.ExileHandThenDraw -> Common.nullary "ExileHandThenDraw"
-  Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Value.array [Codec.encode SlotName.codec slot, Codec.encode (Filter.codec Keyword.codec) f, Codec.encode Quantity.codec q]))
+  Effect.PlayerSacrifices x -> Common.tagged "PlayerSacrifices" . Just $ Codec.encode PlayerSacrifices.codec x
   Effect.RestartGame -> Common.nullary "RestartGame"
   Effect.ControlPlayerNextTurn s -> Common.tagged "ControlPlayerNextTurn" (Just (Codec.encode SlotName.codec s))
   Effect.Destroy d -> Common.tagged "Destroy" . Just $ Codec.encode Destroy.codec d
@@ -134,8 +137,8 @@ toJson codec e = case e of
     (Onset.Immediately, Nothing) -> Codec.encode AbilityName.codec n
     (Onset.Immediately, Just d) -> Value.array [Codec.encode AbilityName.codec n, Codec.encode Duration.codec d]
     _ -> Value.array [Codec.encode AbilityName.codec n, Codec.encode Onset.codec o, Common.encodeMaybe (Codec.encode Duration.codec) md]
-  Effect.AffectPlayers d s pe -> Common.tagged "AffectPlayers" (Just (Value.array [Codec.encode Duration.codec d, Codec.encode AffectedPlayers.codec s, Codec.encode PlayerEffect.codec pe]))
-  Effect.RequireBlock d b a -> Common.tagged "RequireBlock" (Just (Value.array [Codec.encode Duration.codec d, Codec.encode ObjectRef.codec b, Codec.encode ObjectRef.codec a]))
+  Effect.AffectPlayers x -> Common.tagged "AffectPlayers" . Just $ Codec.encode AffectPlayers.codec x
+  Effect.RequireBlock x -> Common.tagged "RequireBlock" . Just $ Codec.encode RequireBlock.codec x
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (Codec.encode MonarchTarget.codec t))
   Effect.Designate d s -> Common.tagged "Designate" (Just (Value.array [Designation.toJson d, Codec.encode SlotName.codec s]))
@@ -178,13 +181,8 @@ fromJson decode value = do
     "DealDamage" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.DealDamage <$> Codec.decode ObjectRef.codec r <*> Codec.decode Quantity.codec q
       _ -> Left . Text.pack $ "DealDamage expects [objectRef, quantity]"
-    "ModifyTarget" -> case mv of
-      Just (Value.Array (Array.MkArray [d, m, r])) -> Effect.ModifyTarget <$> Codec.decode Duration.codec d <*> Codec.decode Modification.codec m <*> Codec.decode ObjectRef.codec r
-      _ -> Left . Text.pack $ "ModifyTarget expects [duration, modification, objectRef]"
-    "ChangeText" -> case mv of
-      Just (Value.Array (Array.MkArray [fv, xv, sv])) ->
-        Effect.ChangeText <$> Codec.decode SubtypeFamily.codec fv <*> Common.decodeSet (Codec.decode Subtype.codec) xv <*> Codec.decode SlotName.codec sv
-      _ -> Left . Text.pack $ "ChangeText expects [subtypeFamily, forbiddenSubtypes, slot]"
+    "ModifyTarget" -> Common.withValue mv (fmap Effect.ModifyTarget . Codec.decode ModifyTarget.codec)
+    "ChangeText" -> Common.withValue mv (fmap Effect.ChangeText . Codec.decode ChangeText.codec)
     "AddMana" -> Common.withValue mv (fmap Effect.AddMana . Codec.decode ManaProduction.codec)
     "Search" -> case mv of
       Just (Value.Array (Array.MkArray [s, o, q, f, d])) -> Effect.Search <$> Codec.decode PlayerRef.codec s <*> Codec.decode PlayerRef.codec o <*> Codec.decode Quantity.codec q <*> Codec.decode (Filter.codec Keyword.codec) f <*> Codec.decode SearchDestination.codec d
@@ -194,9 +192,7 @@ fromJson decode value = do
     "TemptWithTheRing" -> Right Effect.TemptWithTheRing
     "Venture" -> Right Effect.Venture
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
-    "PlayerSacrifices" -> case mv of
-      Just (Value.Array (Array.MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> Codec.decode SlotName.codec sv <*> Codec.decode (Filter.codec Keyword.codec) fv <*> Codec.decode Quantity.codec qv
-      _ -> Left . Text.pack $ "PlayerSacrifices expects [slot, filter, quantity]"
+    "PlayerSacrifices" -> Common.withValue mv (fmap Effect.PlayerSacrifices . Codec.decode PlayerSacrifices.codec)
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> Common.withValue mv (fmap Effect.ControlPlayerNextTurn . Codec.decode SlotName.codec)
     "Destroy" -> Common.withValue mv (fmap Effect.Destroy . Codec.decode Destroy.codec)
@@ -274,12 +270,8 @@ fromJson decode value = do
     "GainControl" -> case mv of
       Just (Value.Array (Array.MkArray [d, r])) -> Effect.GainControl <$> Codec.decode Duration.codec d <*> Codec.decode ObjectRef.codec r
       _ -> Left . Text.pack $ "GainControl expects [duration, objectRef]"
-    "AffectPlayers" -> case mv of
-      Just (Value.Array (Array.MkArray [d, s, pe])) -> Effect.AffectPlayers <$> Codec.decode Duration.codec d <*> Codec.decode AffectedPlayers.codec s <*> Codec.decode PlayerEffect.codec pe
-      _ -> Left . Text.pack $ "AffectPlayers expects [Duration, AffectedPlayers, PlayerEffect]"
-    "RequireBlock" -> case mv of
-      Just (Value.Array (Array.MkArray [d, b, a])) -> Effect.RequireBlock <$> Codec.decode Duration.codec d <*> Codec.decode ObjectRef.codec b <*> Codec.decode ObjectRef.codec a
-      _ -> Left . Text.pack $ "RequireBlock expects [Duration, ObjectRef, ObjectRef]"
+    "AffectPlayers" -> Common.withValue mv (fmap Effect.AffectPlayers . Codec.decode AffectPlayers.codec)
+    "RequireBlock" -> Common.withValue mv (fmap Effect.RequireBlock . Codec.decode RequireBlock.codec)
     "CreateEmblem" -> Common.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Common.withValue mv (fmap Effect.BecomeMonarch . Codec.decode MonarchTarget.codec)
     "Designate" -> case mv of

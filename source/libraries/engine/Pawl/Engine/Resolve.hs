@@ -45,11 +45,13 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
@@ -96,6 +98,7 @@ import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.ModeInstance (ModeInstance)
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.MoveToZone as MoveToZone
@@ -116,6 +119,7 @@ import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
@@ -130,6 +134,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.RequireBlock as RequireBlock
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RevealCause as RevealCause
@@ -247,9 +252,9 @@ slotsOf effect = case effect of
   -- The modification's own quantities read slots too, through
   -- Projection.quantitiesOf. No card in the pool reads a slot there, but a
   -- dangling one would otherwise slip past the lint entirely.
-  Effect.ModifyTarget duration modification ref ->
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (Projection.quantitiesOf modification)), durationSlots duration]
-  Effect.ChangeText _ _ slot -> oneSlot slot
+  Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
   Effect.AddMana _ -> Map.empty
   -- BOTH refs: Extract's library owner is the slot it targets, and a slot read
   -- only by that ref would otherwise look dangling to the dataflow lint.
@@ -260,7 +265,7 @@ slotsOf effect = case effect of
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
-  Effect.PlayerSacrifices slot _ quantity -> insertOne slot (quantitySlots quantity)
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot _ quantity) -> insertOne slot (quantitySlots quantity)
   Effect.RestartGame -> Map.empty
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
   -- The third field is a DEFINITION (how many this sweep destroyed), not a read,
@@ -338,9 +343,9 @@ slotsOf effect = case effect of
   Effect.GainControl _ ref -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Map.empty
   -- The AffectedPlayers may name a target slot -- Cease-Fire's "target player".
-  Effect.AffectPlayers _ affected _ -> affectedPlayersSlots affected
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected _) -> affectedPlayersSlots affected
   -- Both refs, for Tap and Untap's reason: either may name a slot.
-  Effect.RequireBlock _ blocker attacker -> joinTwo (objectRefSlots blocker) (objectRefSlots attacker)
+  Effect.RequireBlock (RequireBlock.MkRequireBlock _ blocker attacker) -> joinTwo (objectRefSlots blocker) (objectRefSlots attacker)
   Effect.CreateEmblem {} -> Map.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm (Denethor's
   -- "target player"); the other two derive their player and read nothing.
@@ -477,7 +482,7 @@ conditionSlots condition = case condition of
 slotsAreExhaustive :: Effect Card.Type.Card -> Bool
 slotsAreExhaustive effect = case effect of
   Effect.DealDamage _ quantity -> Quantity.slotsAreExhaustive quantity
-  Effect.ModifyTarget duration modification _ ->
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
     durationSlotsAreExhaustive duration
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
@@ -488,7 +493,7 @@ slotsAreExhaustive effect = case effect of
   Effect.TemptWithTheRing -> True
   Effect.Venture -> True
   Effect.ExileHandThenDraw -> True
-  Effect.PlayerSacrifices _ _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RestartGame -> True
   Effect.ControlPlayerNextTurn _ -> True
   Effect.Destroy {} -> True
@@ -541,11 +546,11 @@ slotsAreExhaustive effect = case effect of
   Effect.ArmDelayedTrigger {} -> False
   -- GainControl's reason for the Duration; the AffectedPlayers is reported by
   -- slotsOf above and the PlayerEffect beside it holds no reference of any sort.
-  Effect.AffectPlayers duration _ _ ->
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- slotsOf's arm reports both refs but drops the Duration, so the slotless
   -- test is made here -- AffectPlayers' reason.
-  Effect.RequireBlock duration _ _ ->
+  Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- CR 114.2's emblem is minted with EMPTY bindings (Event.createEmblem), so its
   -- embedded card is literal text for Create's reason.
@@ -607,7 +612,7 @@ readsX = any effectReadsX
       Effect.DealDamage _ quantity -> Quantity.readsX quantity
       -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
       -- inside the Modification, reached through Projection.quantitiesOf.
-      Effect.ModifyTarget _ modification _ -> any Quantity.readsX (Projection.quantitiesOf modification)
+      Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
       Effect.Search _ _ quantity _ _ -> Quantity.readsX quantity
@@ -616,7 +621,7 @@ readsX = any effectReadsX
       Effect.TemptWithTheRing -> False
       Effect.Venture -> False
       Effect.ExileHandThenDraw -> False
-      Effect.PlayerSacrifices _ _ quantity -> Quantity.readsX quantity
+      Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
       Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy {} -> False
@@ -2126,7 +2131,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           -- a shield this damage spent runs its additional effect here, inside
           -- the same resolution, rather than waiting for the next SBA check.
           runPreventionRiders
-  Effect.ModifyTarget duration modification ref ->
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     State.modify' $ \gs ->
       -- The affected objects are enumerated ONCE, here, by the same sweep every
       -- ObjectRef-taking opcode uses. Giant Growth's slot and Trumpet Blast's
@@ -2190,7 +2195,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- cast; the difference is observable, because a countered Magical Hack is then
   -- never asked at all (Pawl.ResolveSpec's MagicalHackTiming group proves both
   -- directions).
-  Effect.ChangeText family forbidden slot -> case legalOne slot legal of
+  Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) -> case legalOne slot legal of
     Just recipient -> case Recipient.objectOf recipient of
       Nothing -> pure ()
       Just target -> do
@@ -3336,7 +3341,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- CR 609.3: with no more candidates than the count, every one of them goes and
   -- there is nothing to ask; with none, nothing happens. Only a genuine surplus
   -- raises the prompt, which is the same shape Cost's Sacrifice component takes.
-  Effect.PlayerSacrifices slot filter_ quantity -> do
+  Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -3718,7 +3723,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                   }
            in g1 {GameState.replacements = active : GameState.replacements g1}
     State.modify' (\g -> List.foldl' (flip install) g named)
-  Effect.AffectPlayers duration affected playerEffect ->
+  Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration affected playerEffect) ->
     -- CR 611.1 / 613.11: install the stored player effect. Unprompted, and
     -- targetless except through the AffectedPlayers below. CR 109.5: the
     -- CONTROLLER is baked in now, because the source will not have one to project
@@ -3757,7 +3762,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                       }
                in g1 {GameState.playerEffects = active : GameState.playerEffects g1}
          in List.foldl' install gs baked
-  Effect.RequireBlock duration blockerRef attackerRef ->
+  Effect.RequireBlock (RequireBlock.MkRequireBlock duration blockerRef attackerRef) ->
     -- CR 509.1c / 613.11: store one requirement per (blocker, attacker) pair the
     -- two refs name. Rule 509.1c counts requirements PER CREATURE, so the pairs
     -- are what has to be stored -- Pawl.Engine.BlockRequirement.instances mints
