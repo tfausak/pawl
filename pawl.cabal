@@ -75,6 +75,7 @@ library codec
     Pawl.Codec.AffectedPlayersSpec
     Pawl.Codec.AffectedSpec
     Pawl.Codec.AffectPlayers
+    Pawl.Codec.AffectPlayersSpec
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AlternativeCost
@@ -104,6 +105,7 @@ library codec
     Pawl.Codec.CastOffer
     Pawl.Codec.CastOfferSpec
     Pawl.Codec.ChangeText
+    Pawl.Codec.ChangeTextSpec
     Pawl.Codec.Chooser
     Pawl.Codec.ChooserSpec
     Pawl.Codec.Clause
@@ -269,6 +271,7 @@ library codec
     Pawl.Codec.PlayerRelation
     Pawl.Codec.PlayerRelationSpec
     Pawl.Codec.PlayerSacrifices
+    Pawl.Codec.PlayerSacrificesSpec
     Pawl.Codec.PlayerScope
     Pawl.Codec.PlayerScopeSpec
     Pawl.Codec.PlayerStaticAbility
