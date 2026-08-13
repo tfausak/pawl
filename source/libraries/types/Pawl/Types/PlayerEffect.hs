@@ -92,17 +92,27 @@ data PlayerEffect
     -- activationCostAdjustments).
     --
     -- The Filter is matched against the ability's SOURCE PERMANENT and not
-    -- against the ability, which is what both printings name: Heartstone says
-    -- "activated abilities of creatures" and Training Grounds "of creatures you
-    -- control" (HasCardType Creature, with the possessive riding the carrier's
-    -- PlayerScope as every other arm's does).
+    -- against the ability, which is what these printings name: Heartstone says
+    -- "activated abilities of creatures", Training Grounds "of creatures you
+    -- control", Blossoming Tortoise "of lands you control" (HasCardType Creature
+    -- or Land, with the possessive riding the carrier's PlayerScope as every
+    -- other arm's does).
+    --
+    -- Not expressible: a reducer that narrows by the KIND of ability rather than
+    -- by its source -- Fluctuator's "cycling abilities you activate", Helitrooper's
+    -- "equip abilities you activate that target this creature". This arm can only
+    -- state them as "the activated abilities of a permanent matching X", which is
+    -- WEAKER than each of them prints, so no such card belongs in the pool
+    -- (#1431).
     --
     -- The FLOOR is carried rather than assumed, because it is card text (CR
     -- 101.1) and not a rule: both printings say "This effect can't reduce the
     -- mana in that cost to less than one mana" and so carry 1, while an
-    -- activation-cost reducer that does not say it (Hero of Iroas) carries 0.
-    -- See Pawl.Types.CostAdjustments.minimumMana for what zero means and why the
-    -- clamp never raises a cost.
+    -- activation-cost reducer that does not say it (Blossoming Tortoise's
+    -- "Activated abilities of lands you control cost {1} less to activate")
+    -- carries 0. See Pawl.Types.CostAdjustments.reductions for what zero means,
+    -- why a floor never raises a cost, and why the two kinds cannot share one
+    -- floor over the pool.
     --
     -- Not implemented: nothing INCREASES an activation cost (Suppression Field),
     -- which would be this arm's sibling and needs the "unless they're mana

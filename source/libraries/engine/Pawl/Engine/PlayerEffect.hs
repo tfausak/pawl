@@ -785,9 +785,9 @@ variablesIn oid gs =
 -- "spells", so Thalia's tax cannot reach an activation cost however her Filter
 -- reads. activationCostAdjustments below is the other half.
 --
--- No floor: no printed spell-cost reducer states Heartstone's sentence, so
--- CostAdjustments.minimumMana is zero here and CR 601.2f's own {0} is the only
--- floor a spell's total has.
+-- No floor: no printed spell-cost reducer states Heartstone's sentence, so every
+-- reduction gathered here is paired with a floor of zero and CR 601.2f's own {0}
+-- is the only floor a spell's total has.
 --
 -- matchesObject is called only from inside an arm that already matched a
 -- cost-modifying constructor, so a board with no Thalia and no Medallion runs no
@@ -846,8 +846,10 @@ spellCostAdjustments pid oid gs =
       effects = fmap snd (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
-          CostAdjustments.reductions = Maybe.mapMaybe reductionOf effects,
-          CostAdjustments.minimumMana = 0,
+          -- Every spell-cost reduction is paired with a floor of ZERO, for the
+          -- reason the header gives: no printed spell-cost reducer states
+          -- Heartstone's sentence.
+          CostAdjustments.reductions = fmap (\amount -> (amount, 0)) (Maybe.mapMaybe reductionOf effects),
           -- Empty, for Pawl.Types.CostAdjustments.components' stated reason: a
           -- spell's additional costs are its own card text and arrive through
           -- Pawl.Engine.Cost.plus, so no player effect adds one here.
@@ -873,9 +875,10 @@ spellCostAdjustments pid oid gs =
 -- The non-mana additions beside it are gathered, and are a different field for
 -- Pawl.Types.CostAdjustments.components' stated reason.
 --
--- The FLOOR is the MAXIMUM of the applying effects' floors: two effects each
--- forbidding a reduction below one mana forbid it once, and an effect that states
--- no floor cannot license another effect to ignore its own.
+-- Each reduction keeps ITS OWN floor rather than the pool taking the maximum: the
+-- sentence says "this effect", so an effect that states no floor is not bound by
+-- another's, and Pawl.Engine.Cost.applyAdjustments applies each floor as its own
+-- reduction lands.
 activationCostAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments
 activationCostAdjustments pid srcId gs =
   let reductionOf effect = case effect of
@@ -936,11 +939,9 @@ activationCostAdjustments pid srcId gs =
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
       effects = fmap snd (applying pid gs)
-      applicable = Maybe.mapMaybe reductionOf effects
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = [],
-          CostAdjustments.reductions = fmap fst applicable,
-          CostAdjustments.minimumMana = maximum (0 : fmap snd applicable),
+          CostAdjustments.reductions = Maybe.mapMaybe reductionOf effects,
           CostAdjustments.components = concat (Maybe.mapMaybe additionOf effects)
         }
 
