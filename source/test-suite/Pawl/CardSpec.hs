@@ -3689,7 +3689,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Pawl.Engine.Projection may do. Layer.Control is exactly the two control
   -- constructors, so this covers a third one automatically.
   --
-  -- A codec-level rejection would be the wrong shape: Modification.fromJson is
+  -- A codec-level rejection would be the wrong shape: (Codec.decode Modification.codec) is
   -- shared with staticAbilities, which Control Magic legitimately uses.
   Spec.it s "no card authors a control modification into a resolving effect (#199)" $ do
     ps <- S.allPrintings s

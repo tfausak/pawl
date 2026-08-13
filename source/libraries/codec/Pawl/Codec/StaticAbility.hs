@@ -24,10 +24,10 @@ toJson sa =
   Value.object
     ( Common.requiredPair "affected" Affected.toJson (StaticAbility.affected sa)
         <> Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (StaticAbility.condition sa)
-        <> Common.optionalPair "lingers" Nothing (Common.encodeMaybe Duration.toJson) (StaticAbility.lingers sa)
+        <> Common.optionalPair "lingers" Nothing (Common.encodeMaybe (Codec.encode Duration.codec)) (StaticAbility.lingers sa)
         <> Common.requiredPair
           "modifications"
-          (Common.encodeNonEmpty Modification.toJson)
+          (Common.encodeNonEmpty (Codec.encode Modification.codec))
           (StaticAbility.modifications sa)
     )
 
@@ -36,6 +36,6 @@ fromJson value = do
   ps <- Common.asObject value
   a <- Common.field "affected" ps >>= Affected.fromJson
   c <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
-  l <- Common.defaultedField "lingers" Nothing (Common.decodeMaybe Duration.fromJson) ps
-  ms <- Common.field "modifications" ps >>= Common.decodeNonEmpty Modification.fromJson
+  l <- Common.defaultedField "lingers" Nothing (Common.decodeMaybe (Codec.decode Duration.codec)) ps
+  ms <- Common.field "modifications" ps >>= Common.decodeNonEmpty (Codec.decode Modification.codec)
   pure (StaticAbility.MkStaticAbility a c l ms)
