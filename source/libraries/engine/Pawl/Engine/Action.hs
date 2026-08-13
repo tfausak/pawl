@@ -9,11 +9,11 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
-import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Room as Room
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Action (Action)
 import qualified Pawl.Types.Action as Action
@@ -194,12 +194,27 @@ legalActions pid gs =
       -- board costs more than 8x, which one projection per object does. A
       -- NON-mana ability runs the whole chain: that path is held by an absolute
       -- per-permanent ceiling instead, because what is left in it is still O(N)
-      -- per permanent without being a projection (#1073).
+      -- per permanent without being a whole-board structure to hoist -- the
+      -- per-candidate filter over the shared pool below (#1448).
       grants = Projection.controlGrants gs
       pcs = Projection.projectAll gs
+      -- ONE mana-source sweep for the whole enumeration, shared by the cost gate
+      -- below and by CR 605.3a's offer at the end of this list. It is a walk of
+      -- everything this player controls, asking each what mana routes it offers,
+      -- and it does not depend on which permanent's ability is being gated -- so
+      -- the cost gate took an identical one per ability until it was handed this
+      -- one (#1073). The offer and the gate reading the SAME list is what keeps
+      -- them from disagreeing, which is the note at manaAbilityActivations.
+      manaSources = Cost.activationManaSourcesGiven grants pcs pid gs
+      -- ONE set of base target pools for the whole enumeration, for the same
+      -- reason: CR 115's candidate set for a Pool is a function of `gs` alone
+      -- (Target.Pools), so building one per slot per ability walked the
+      -- battlefield once per permanent. Lazy per pool, so an enumeration that
+      -- targets only creatures pays for the creature walk alone (#1073).
+      pools = Target.poolsGiven pcs gs
       activations =
         let forObject oid =
-              fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
+              fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pools manaSources pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
          in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
       -- CR 605.3a's first window -- "a player may activate an activated mana
       -- ability whenever they have priority" -- which the activation list above
@@ -223,5 +238,5 @@ legalActions pid gs =
       -- asked at the offer and at the payment, so the two cannot disagree.
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
-      manaAbilityActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.manaActivations grants pcs pid gs)
+      manaAbilityActivations = fmap Action.ActivateManaAbility manaSources
    in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> plots <> activations <> manaAbilityActivations

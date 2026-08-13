@@ -16,9 +16,10 @@
 -- Elves stops at that test and holds the RATIO guard; Prodigal Sorcerer runs
 -- past it into the target and cost gates and holds an ABSOLUTE per-permanent
 -- ceiling. See boardOf and sorcererCeilingBytesPerPermanent for why the second
--- one cannot be a ratio: after #716 that path takes a constant number of
--- whole-board PROJECTIONS, but it still walks the battlefield per ability for
--- other reasons and so is still quadratic overall (#1073).
+-- one cannot be a ratio: after #716 and #1073 that path takes a constant number
+-- of whole-board projections, base target pools and mana-source sweeps, but it
+-- still FILTERS a whole-board candidate set per ability and so is still
+-- quadratic overall (#1448).
 --
 -- Only the action enumeration is measured. The other paths the priority loop
 -- reaches every pass -- Combat.legalAttackers, Combat.legalBlockers,
@@ -38,14 +39,24 @@ import qualified Data.Set as Set
 import qualified GHC.Conc as Conc
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Zone as Zone
 
 -- The two board sizes every measurement here is taken at. Their RATIO is what
 -- the growth guard reads: 4x the board costs about 4x a linear enumeration and
@@ -99,6 +110,59 @@ enumerationOver :: Printing.Printing -> Int -> Int
 enumerationOver printing n = length (Action.legalActions S.alice (boardOf printing n))
 {-# NOINLINE enumerationOver #-}
 
+-- `n` of EACH printing on the battlefield under alice, in her precombat main
+-- phase. boardOf's mixed twin, for the assertion that pins the enumeration's
+-- ANSWER rather than its cost -- see "the enumeration answers what the
+-- unhoisted wrappers answer" for why one printing is not enough there.
+mixedBoard :: [Printing.Printing] -> Int -> GameState.GameState
+mixedBoard printings n =
+  let addOne gs printing = snd (S.addCreature printing S.alice gs)
+      board = List.foldl' addOne (Setup.emptyGame S.bothPlayers) (concat (replicate n printings))
+   in board {GameState.phase = Phase.PrecombatMain}
+
+-- Activate.activatableGiven fed everything Action.legalActions hoists for it.
+-- One expression, so the spec below reads as a differential rather than as a
+-- pile of arguments.
+threadedGate :: PlayerId.PlayerId -> ObjectId.ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState.GameState -> Bool
+threadedGate pid oid ability gs =
+  let grants = Projection.controlGrants gs
+      pcs = Projection.projectAll gs
+   in Activate.activatableGiven grants pcs (Target.poolsGiven pcs gs) (Cost.activationManaSourcesGiven grants pcs pid gs) pid oid ability gs
+
+-- Action.legalActions' two ACTIVATION lists rebuilt out of the plain per-call
+-- wrappers, which hoist nothing: Activate.activatable projects each object for
+-- itself and builds a fresh base pool and a fresh mana-source sweep per ability,
+-- and Mana.manaSources takes its own board. Same zones in the same order as the
+-- enumeration, so the two lists are comparable element for element and a hoist
+-- that reordered the menu would show up here.
+--
+-- Only those two, because they are the only ones #716 and #1073 touched. The
+-- other seven kinds of action in the menu are enumerated identically either way,
+-- so the spec compares this against the enumeration's activation slice.
+referenceActivations :: PlayerId.PlayerId -> GameState.GameState -> [Action.Type.Action]
+referenceActivations pid gs =
+  let forObject oid = fmap (Action.Type.Activate oid) (filter (\ab -> Activate.activatable pid oid ab gs) (Activate.abilitiesFor oid gs))
+      zones = Projection.controls pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs
+   in concatMap forObject zones <> fmap Action.Type.ActivateManaAbility (Mana.manaSources Cost.manaActivations pid gs)
+
+-- The enumeration's activation slice. EXHAUSTIVE over Action, so a new kind of
+-- action has to be classified here rather than silently dropping out of the
+-- comparison above.
+activationsIn :: [Action.Type.Action] -> [Action.Type.Action]
+activationsIn =
+  let isActivation action = case action of
+        Action.Type.Activate _ _ -> True
+        Action.Type.ActivateManaAbility _ -> True
+        Action.Type.Pass -> False
+        Action.Type.Play _ _ -> False
+        Action.Type.Cast {} -> False
+        Action.Type.TurnFaceUp _ -> False
+        Action.Type.Unlock _ _ -> False
+        Action.Type.DiscardFromHand _ -> False
+        Action.Type.Plot _ -> False
+        Action.Type.Ignore _ -> False
+   in filter isActivation
+
 -- Bytes the calling thread allocates while forcing `f n`.
 --
 -- GHC.Conc's allocation counter is PER HASKELL THREAD and counts DOWN, so the
@@ -150,43 +214,41 @@ ceilingBytesPerPermanent = 12000
 -- The same committed ceiling for the OTHER fixture -- the one whose ability is
 -- not a mana ability, so the enumeration runs the two conjuncts that ask about
 -- other objects (CR 700.2a's fillable-mode test and CR 118.3's payability
--- test). Those two are the ones #716 threaded the enumeration's own board into,
--- and this is what holds that threading in place.
+-- test). Those two are the ones #716 threaded the enumeration's own board into
+-- and #1073 hoisted the rest of the way, and this is what holds both in place.
 --
 -- AN ABSOLUTE CEILING AND DELIBERATELY NOT A RATIO, because this board is STILL
 -- QUADRATIC and the ratio would say so without saying anything about the
--- threading. Neither conjunct takes a whole-board PROJECTION per permanent any
--- more, but each still does O(N) non-projection work per permanent:
--- Target.basePoolGiven builds a fresh recipient Set over the battlefield for
--- every slot of every ability, Mana.manaSourcesGiven filters
--- Projection.controlsGiven for every ability, and PlayerEffect.applying walks
--- the battlefield once per player candidate (#1073). Measured at 16.5x for a 4x
--- board after the threading, against ~16x before it -- so a growth bound here
--- would fail at 8x and assert nothing at 20x.
+-- hoists. What is left per permanent is the pool FILTER rather than the pool:
+-- Target.legalRecipientsGiven runs `targetable` over every candidate of the
+-- shared base pool for every slot of every ability, and PlayerEffect.applying
+-- walks the battlefield once per player candidate (#1448, #435). Measured at 11.1x for
+-- a 4x board (2,293,288 bytes at 64 permanents, 25,400,600 at 256), against
+-- 16.5x before the hoists -- so a growth bound here would fail at 8x and assert
+-- nothing at 14x.
 --
--- THE BRACKET this number sits in, all at largeBoard on GHC 9.14.1 / aarch64,
--- and the reason the headroom is thinner than ceilingBytesPerPermanent's:
+-- THE BRACKET this number sits in, all measured at largeBoard on GHC 9.14.1 /
+-- aarch64:
 --
---   * 766,459 as it stands.
---   * 1,453,467 with the target gate's board taken away again (pass
---     Target.fillableModesGiven a fresh Projection.projectAll rather than
---     Activate.activatableGiven's own).
---   * 1,556,019 with the cost gate's board taken away again, the same way.
---   * 2,242,971 with both -- which is the pre-#716 tree.
+--   * 99,221 as it stands.
+--   * 571,352 with the base pools taken away again (build them per slot in
+--     Target.basePoolGiven rather than reading Action.legalActions' Pools).
+--   * 813,080 with the mana-source sweep taken away too, which is the pre-#1073
+--     tree.
 --
--- So this is the geometric middle of the reading and the SMALLEST of the three
--- regressions it has to catch, exactly as growthBound above is the geometric
--- middle of its two: ~1.37x headroom over the reading, ~1.38x under the
--- cheapest regression. There is no more room than that, and that is a fact
--- about the size of the win rather than a choice -- the threading is a 2.9x
--- constant, not an order of magnitude, because #1073's residual dominates what
--- is left.
+-- So this carries ~1.3x headroom over the reading -- enough for a compiler bump
+-- or the x86_64 CI runner -- and catches the pool regression 5.7x over. It does
+-- NOT catch losing the MANA-SOURCE hoist alone, which the two figures above put
+-- at about 1.4x: no ceiling could, without being tight enough to fail on a
+-- differently sized allocation. What holds that one is that it is a single
+-- `let` in Action.legalActions read by both the cost gate and CR 605.3a's
+-- offer -- losing it means deleting a shared binding rather than drifting into
+-- it. Saying so is better than implying a coverage this number does not have.
 --
 -- REGENERATED exactly as ceilingBytesPerPermanent above is: run this test and
--- read the observed figure out of the failure message. If #1073 lands, the
--- reading drops a long way and this should be retightened with it.
+-- read the observed figure out of the failure message.
 sorcererCeilingBytesPerPermanent :: Integer
-sorcererCeilingBytesPerPermanent = 1050000
+sorcererCeilingBytesPerPermanent = 130000
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "performance" $ do
@@ -258,12 +320,34 @@ spec s registry = Spec.describe s "performance" $ do
     let board = boardOf sorcerer 8
         oids = Set.toList (GameState.battlefield board)
         viaPlain oid = filter (\ab -> Activate.activatable S.alice oid ab board) (Activate.abilitiesFor oid board)
-        viaThreaded oid =
-          filter
-            (\ab -> Activate.activatableGiven (Projection.controlGrants board) (Projection.projectAll board) S.alice oid ab board)
-            (Activate.abilitiesFor oid board)
+        viaThreaded oid = filter (\ab -> threadedGate S.alice oid ab board) (Activate.abilitiesFor oid board)
     Spec.assertEqWith s "the plain gate offers something to differ about" (fmap (length . viaPlain) oids) (replicate 8 1)
     Spec.assertEqWith s "and the threaded gate agrees with it object for object" (fmap viaThreaded oids) (fmap viaPlain oids)
+
+  -- THE WHOLE MENU, not one gate: the same list Action.legalActions answers,
+  -- rebuilt out of the plain per-call wrappers that hoist nothing. #1073 hoisted
+  -- two more whole-board structures out of the per-ability loop -- the base
+  -- target pools and the mana-source sweep -- and a hoist that drops or reorders
+  -- a legal action is a rules bug rather than a slow one, so this pins the
+  -- ANSWER rather than the cost.
+  --
+  -- A MIXED board, and that is what makes it discriminate: a board of one
+  -- printing cannot tell "every permanent answered" from "the first permanent's
+  -- answer was reused". These four differ in every conjunct the hoists reach --
+  -- a targeting activation (Prodigal Sorcerer), a mana ability with no target
+  -- (Llanowar Elves), a land whose mana ability costs no {T} of a creature
+  -- (Mountain), and a creature with no activated ability at all (Hill Giant),
+  -- so the reference and the enumeration each answer a different action count
+  -- per permanent.
+  Spec.it s "the enumeration answers what the unhoisted wrappers answer" $ do
+    printings <- traverse (S.printingOf s registry) ["Prodigal Sorcerer", "Llanowar Elves", "Mountain", "Hill Giant"]
+    let board = mixedBoard printings 6
+        reference = referenceActivations S.alice board
+    -- 6 Sorcerer activations + 6 Elf and 6 Mountain mana activations, and
+    -- nothing from the Bears: three different answers on one board, so a hoist
+    -- that reused one permanent's answer cannot pass this.
+    Spec.assertEqWith s "the reference offers three different per-permanent answers to differ about" (length reference) 18
+    Spec.assertEqWith s "and the hoisted enumeration answers it action for action" (activationsIn (Action.legalActions S.alice board)) reference
 
   Spec.it s "enumerating a board of non-mana abilities stays within its committed allocation ceiling" $ do
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
