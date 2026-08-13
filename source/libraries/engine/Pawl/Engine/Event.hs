@@ -4678,10 +4678,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
   -- CR 309.4c: "when you move your venture marker into THIS room", so the
   -- dungeon card the marker is on must be the bearer and the room must be this
-  -- ability's own. Never reached today -- eventTriggers scans the battlefield,
-  -- and Pawl.Engine.Dungeon.roomPending is what gathers a room ability from the
-  -- command zone (#348) -- so this is a regression fence rather than a proven
-  -- path, and it is written to agree with that gatherer rather than to differ.
+  -- ability's own. Never reached today -- eventTriggers' command-zone source is
+  -- CR 114.4's and takes emblems alone, so a dungeon card is not offered and
+  -- Pawl.Engine.Dungeon.roomPending is still what gathers a room ability (#348)
+  -- -- so this is a regression fence rather than a proven path, and it is written
+  -- to agree with that gatherer rather than to differ.
   TriggerCondition.RoomEntered room -> case event of
     GameEvent.VentureMarkerEntered _ oid entered -> oid == bearer && entered == room
     GameEvent.ControlChanged {} -> False
@@ -5485,9 +5486,9 @@ looksBack condition = case condition of
 -- board size.
 --
 -- The battlefield is not the only scanned zone -- every GRAVEYARD is scanned for
--- the abilities CR 113.6k puts there, and a spell that just became cast is
--- offered from the STACK for the same rule. The hand, exile and the command zone
--- are unscanned (#348).
+-- the abilities CR 113.6k puts there, a spell that just became cast is offered
+-- from the STACK for the same rule, and an EMBLEM is offered from the command
+-- zone under CR 114.4. The hand and exile are unscanned (#348).
 --
 -- CR 603.10's FIRST sentence is a per-EVENT question, and the live battlefield set
 -- answers a per-BOUNDARY one: the scan runs once at CR 117.5, after CR 704.5's
@@ -5822,14 +5823,15 @@ eventTriggers events gs =
       -- nobody's graveyard, so no source above can reach it.
       --
       -- Scoped to the CAST EVENT rather than computed once over GameState.stack,
-      -- which is `cycledCard`'s shape and is here for a sharper reason: CR 112.2
-      -- makes the spell's controller the player who cast it, and a stack object
-      -- carries no Object.enteredUnder for Projection.controllerOf to read (see
-      -- Projection.viewOfSpell), so a standing scan would have to fall back to the
-      -- OWNER -- a different player for a card cast from somebody else's zone. The
-      -- event names the caster outright. Nothing is lost by the narrower scope
-      -- today: SelfCast is the only condition zoneTriggeredFrom puts on the stack,
-      -- and it matches no other event.
+      -- which is `cycledCard`'s shape. Not for want of a controller: CR 405.4's
+      -- caster is stamped into Object.enteredUnder by changeZoneCasting, and
+      -- Projection.defaultControllerOf reads it back, so a standing scan would
+      -- find the caster rather than falling back to the owner. The narrower scope
+      -- is what the WORK asks for -- SelfCast is the only condition
+      -- zoneTriggeredFrom puts on the stack and it matches no other event, so a
+      -- standing scan of every spell would answer alike at more cost. A future
+      -- condition that functions on the stack and watches some other event is
+      -- what widens this (#348).
       --
       -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#160).
       spellCast event = case event of
@@ -5864,6 +5866,48 @@ eventTriggers events gs =
         GameEvent.CountersRemoved {} -> Map.empty
         GameEvent.ControlChanged {} -> Map.empty
         GameEvent.VentureMarkerEntered {} -> Map.empty
+      -- CR 114.4 / CR 113.6p: "abilities of emblems function in the command zone".
+      -- The third source that widens the SCANNED ZONE rather than recovering an
+      -- object an event names, so it is computed once outside the event loop as
+      -- `onBattlefield` and `inGraveyards` are.
+      --
+      -- NOT filtered through `functionsIn`, where `inGraveyards` is. CR 113.6k
+      -- decides one CONDITION at a time and answers for the ability's usual zone;
+      -- CR 114.4 is about the OBJECT, and says every ability of this one functions
+      -- here. Filtering would drop them all: an emblem's "at the beginning of your
+      -- upkeep" is a condition that triggers perfectly well from the battlefield,
+      -- so CR 113.6's default sends it there and the emblem would never be asked.
+      --
+      -- EMBLEMS alone, where a graveyard walk takes the whole zone, for the reason
+      -- Pawl.Engine.CombatRestriction.inForce narrows the same walk: the command
+      -- zone also holds a commander and a dungeon card, whose abilities CR 113.6
+      -- leaves functioning on the battlefield and CR 309.4c mints rather than
+      -- prints. Asking Source.OfEmblem is reading the rulebook's own list (CR
+      -- 113.6p), not an effect's identity.
+      --
+      -- The controller is the OWNER: CR 114.2 makes an emblem both owned and
+      -- controlled by the player it was created for, and createEmblem leaves
+      -- Object.enteredUnder empty so Projection.defaultControllerOf answers the
+      -- same. CR 603.3a's control sample is not consulted, and cannot disagree:
+      -- CR 110.2 gives a PERMANENT a controller, and CR 114.5 says an emblem is
+      -- not one, so no layer-2 effect (CR 613.1b) has an emblem to move.
+      --
+      -- Abilities come from the emblem's own card, which is the whole of it (CR
+      -- 114.3) -- no projection is involved, which is the posture
+      -- Projection.gatherGiven's emblem walk takes for its static half: an emblem
+      -- is not a creature, so the pool's CR 613.1f removers never reach it.
+      emblemCandidate oid = case Game.lookupObject oid gs of
+        Nothing -> Nothing
+        Just obj -> case Object.source obj of
+          Source.OfEmblem _ -> case Game.faceOf oid gs of
+            Nothing -> Nothing
+            Just face -> case Face.triggeredAbilities face of
+              [] -> Nothing
+              abilities -> Just (oid, (Object.owner obj, abilities))
+          _ -> Nothing
+      inCommand =
+        Map.fromList
+          (Maybe.mapMaybe emblemCandidate (Set.toAscList (GameState.command gs)))
       forOne event (oid, (ctrl, abilities)) =
         let -- The bearer's own slot environment, so a condition naming a slot
             -- (TriggerCondition.LoseControlOfBound) is read the same way here as it
@@ -5882,8 +5926,10 @@ eventTriggers events gs =
       -- cycled into a graveyard is honestly a member of both -- and the winner
       -- offers that card's printed abilities unfiltered, a superset either way.
       -- `spellCast` overlaps nothing: CR 601.2a keeps its object on the stack,
-      -- which no other source reads.
-      candidates event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, inGraveyards])
+      -- which no other source reads. Neither does `inCommand`: CR 114.1 puts an
+      -- emblem into the command zone, and no rule or effect in pawl moves one
+      -- anywhere else -- Event.createEmblem is its only writer.
+      candidates event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, inGraveyards, inCommand])
       scanOne later same event = concatMap (forOne event) (candidates event later same)
    in concat (List.zipWith3 (\block later same -> concatMap (scanOne later same . snd) block) groups laterGroups sameGroup)
 
@@ -5940,10 +5986,10 @@ functionsIn zone ability = case zoneFunctionedFrom ability of
 
 -- CR 113.6k: a trigger condition that can't trigger from the battlefield functions
 -- in all zones it can trigger from -- WHICH zone, for the conditions that have
--- one. The graveyard and the stack are the two answers eventTriggers can act on,
--- being the two non-battlefield zones it scans; the hand and exile are still
--- unscanned, and so is the command zone, whose one answer -- CR 309.4c's room
--- ability -- is gathered by Pawl.Engine.Dungeon.roomPending instead (#348).
+-- one. The graveyard and the stack are the two answers eventTriggers can act on;
+-- the hand and exile are still unscanned (#348). The command zone IS scanned now,
+-- but by a source CR 114.4 governs rather than this rule, so this function's one
+-- Command answer -- CR 309.4c's room ability -- still goes unconsulted.
 --
 -- One of the three sentences `functionsIn` above reads, and the only one that
 -- looks at the CONDITION -- so an ability whose effect already names its zone
@@ -5957,8 +6003,8 @@ functionsIn zone ability = case zoneFunctionedFrom ability of
 zoneTriggeredFrom :: TriggerCondition -> Maybe Zone
 zoneTriggeredFrom cond = case cond of
   -- CR 309.4c: "as long as a dungeon card is in the command zone, its abilities
-  -- may trigger". The honest answer, and inert: eventTriggers scans the
-  -- battlefield, the graveyard and the stack, so nothing consults this arm --
+  -- may trigger". The honest answer, and inert: eventTriggers' command-zone source
+  -- is CR 114.4's and takes emblems alone, so nothing consults this arm --
   -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability (#348).
   TriggerCondition.RoomEntered _ -> Just Zone.Command
   -- CR 603.6a is an enters-the-battlefield ability; its bearer is on the
@@ -6251,6 +6297,10 @@ controllerTurnScoped cond = case cond of
 -- 603.3c) and re-trigger on the next settle pass while its condition held, which
 -- would not terminate. No card in the pool can do that, and the first that could
 -- is the one that must revisit this.
+--
+-- Not implemented: a state trigger borne by an EMBLEM, which CR 114.4 would have
+-- function in the command zone -- this scan reads the battlefield alone, where
+-- eventTriggers reads both (#1400).
 stateTriggers :: GameState -> [PendingTrigger]
 stateTriggers gs
   -- A stack id whose object can't be found: fail CLOSED, not open. This runs

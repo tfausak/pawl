@@ -32,8 +32,8 @@ data Player = MkPlayer
     --
     -- Read by nothing yet. CR 701.54c makes the emblem's ability set a function of
     -- this number, and none of its four tiers is built: the base one (#707), and
-    -- the two-, three- and four-temptation ones, which are triggered abilities an
-    -- emblem cannot fire from the command zone (#709).
+    -- the two-, three- and four-temptation ones, which are triggered abilities
+    -- nothing yet mints onto the emblem (#706).
     ringTemptations :: Natural.Natural,
     -- | CR 702.179b: this player's speed, or Nothing for a player who has none.
     -- "Players do not have speed until a rule or effect sets their speed to a

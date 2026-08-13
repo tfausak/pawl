@@ -104,7 +104,10 @@
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
 -- zone off a triggered ability's EFFECT rather than its condition, with Squee,
 -- Goblin Nabob against a Bitterblossom in the same graveyard --
--- `graveyardEffectZoneTriggerSpec`. CR 400.7e's OTHER reference inside a
+-- `graveyardEffectZoneTriggerSpec`, and CR 114.4's command-zone scan, whose
+-- membership is decided by the OBJECT rather than the condition, with Ajani,
+-- Adversary of Tyrants' emblem at three seats -- `commandZoneTriggerSpec`.
+-- CR 400.7e's OTHER reference inside a
 -- look-back trigger, the card it became in the first zone it went to, with
 -- Endless Cockroaches -- `becameSlotSpec`, which also pins
 -- Event.eventBindingSlots (the per-condition slot set the card lint asks)
@@ -6405,6 +6408,83 @@ graveyardEffectZoneTriggerSpec s registry =
               begun = beginUpkeep gs
           Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped begun) begun))) []
 
+-- CR 114.4: "abilities of emblems function in the command zone" -- the third zone
+-- Pawl.Engine.Event.eventTriggers scans, and the only one whose membership is
+-- decided by the OBJECT rather than by the trigger condition (CR 113.6p).
+--
+-- Ajani, Adversary of Tyrants {2}{W}{W} Legendary Planeswalker -- Ajani, loyalty
+-- 4. "-7: You get an emblem with \"At the beginning of your end step, create three
+-- 1/1 white Cat creature tokens with lifelink.\"" (Name, cost, type line, loyalty
+-- and oracle text checked against Scryfall.) The pool's first emblem with a
+-- triggered ability, so before this the ability was authorable and inert.
+--
+-- The board holds the vacuity traps down:
+--
+--   * The emblem is the ONLY bearer, and CR 114.1 keeps it in the command zone
+--     for its whole existence -- there is no battlefield reading of this ability
+--     for the assertion to be passing on instead.
+--   * Three seats, and the two boards differ in exactly one thing: WHOSE end step
+--     began. "At the beginning of YOUR end step" is CR 114.2's controller, and a
+--     scan that took the active player, or the owner of some other object, would
+--     fire on bob's.
+commandZoneTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+commandZoneTriggerSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      -- One seat's end step, everything else held equal.
+      beginEndStepOf pid gs =
+        Event.recordEvent
+          (GameEvent.StepBegan endStep pid)
+          gs {GameState.phase = endStep, GameState.activePlayer = pid}
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      catName = CardName.MkCardName (Text.pack "Cat Token")
+      cats gs = length (filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just catName) (Set.toList (GameState.battlefield gs)))
+      ultimate = 2 :: Int
+      -- alice's Ajani at seven loyalty, its ultimate activated and resolved, at
+      -- three seats. The loyalty is a fixture rather than seven turns of +1: CR
+      -- 306.5b's counters are what the ability's cost pays, and how they got there
+      -- is no part of what this asks.
+      emblemBoard = do
+        ajani <- S.printingOf s registry "Ajani, Adversary of Tyrants"
+        let (ajaniId, g1) = S.addCreature ajani S.alice S.threePlayerGame
+            armed = S.addCounter CounterKind.Loyalty 7 ajaniId g1
+            used = case drop ultimate (Face.activatedAbilities (S.combinedFace ajani)) of
+              ability : _ -> S.runPure S.identityAnswer armed (do Activate.activateAbility S.alice ajaniId ability; Stack.resolveTop)
+              [] -> armed
+        pure (Set.toList (GameState.command used), used)
+   in Spec.describe s "CommandZoneTrigger" $ do
+        -- The premise, asserted rather than assumed: CR 114.2 put one emblem in
+        -- the command zone, and it is on nobody's battlefield.
+        Spec.it s "CR 114.2 the ultimate puts one emblem in the command zone" $ do
+          (emblems, gs) <- emblemBoard
+          Spec.assertEqWith s "one emblem" (length emblems) 1
+          Spec.assertEqWith s "no Cats yet" (cats gs) 0
+        -- The gathering itself, at the narrowest path: one trigger, borne by the
+        -- emblem, from a zone no other source reads.
+        Spec.it s "CR 114.4 the emblem's trigger is gathered from the command zone" $ do
+          (emblems, gs) <- emblemBoard
+          let atEnd = beginEndStepOf S.alice gs
+          Spec.assertEqWith
+            s
+            "exactly one trigger, borne by the emblem"
+            (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped atEnd) atEnd)))
+            (fmap TriggerSource.OfObject emblems)
+        -- End to end through the real engine: placed, resolved, three Cats.
+        Spec.it s "CR 114.4 whole card: three Cat tokens arrive at its controller's end step" $ do
+          (_, gs) <- emblemBoard
+          let placed = settle (beginEndStepOf S.alice gs)
+              after = resolveAll placed
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertEqWith s "three Cats" (cats after) 3
+        -- The negative, on the same board with one thing changed: CR 114.2 makes
+        -- the emblem alice's, and bob's end step is not hers.
+        Spec.it s "CR 114.2 another seat's end step fires nothing" $ do
+          (_, gs) <- emblemBoard
+          let atBobs = beginEndStepOf S.bob gs
+              after = resolveAll (settle atBobs)
+          Spec.assertEqWith s "no trigger gathered" (length (fst (Event.gatherTriggers (Event.unscannedGrouped atBobs) atBobs))) 0
+          Spec.assertEqWith s "no Cats" (cats after) 0
+
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), second line: "When
 -- Serra Avatar is put into a graveyard from anywhere, shuffle it into its
 -- owner's library." Oracle text verified against Scryfall. Its first line, the
@@ -10316,6 +10396,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   graveyardTriggerSpec s registry
   gaeasBlessingSpec s registry
   graveyardEffectZoneTriggerSpec s registry
+  commandZoneTriggerSpec s registry
   serraAvatarSpec s registry
   diesTriggerSpec s registry
   permanentDiesSpec s registry
