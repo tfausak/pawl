@@ -5,6 +5,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Mode as Mode
 import qualified Pawl.Codec.ModeSelection as ModeSelection
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -19,7 +20,7 @@ toJson :: (Eq card) => (card -> Value.Value) -> Modal.Modal card -> Value.Value
 toJson codec m =
   Value.object
     ( Common.requiredPair "modes" (Common.encodeSeq (Mode.toJson codec)) (Modal.modes m)
-        <> Common.optionalPair "selection" defaultSelection ModeSelection.toJson (Modal.selection m)
+        <> Common.optionalPair "selection" defaultSelection (Codec.encode ModeSelection.codec) (Modal.selection m)
     )
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Modal.Modal card)
@@ -29,5 +30,5 @@ fromJson decode value = do
   if Seq.null ms
     then Left (Text.pack "modal has no modes")
     else do
-      sel <- Common.defaultedField "selection" defaultSelection ModeSelection.fromJson ps
+      sel <- Common.defaultedField "selection" defaultSelection (Codec.decode ModeSelection.codec) ps
       pure (Modal.MkModal ms sel)

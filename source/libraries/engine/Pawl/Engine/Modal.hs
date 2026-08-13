@@ -15,6 +15,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -220,7 +221,7 @@ leastOf :: ModeSelection.ModeSelection -> Natural
 leastOf selection = case selection of
   ModeSelection.ChooseExactly n -> n
   ModeSelection.ChooseExactlyWithRepeats n -> n
-  ModeSelection.ChooseBetween least _ -> least
+  ModeSelection.ChooseBetween cb -> ChooseBetween.least cb
 
 -- CR 700.2: the MOST modes a selection satisfying this instruction may name --
 -- leastOf's counterpart, and the same number for every exact instruction.
@@ -228,7 +229,7 @@ mostOf :: ModeSelection.ModeSelection -> Natural
 mostOf selection = case selection of
   ModeSelection.ChooseExactly n -> n
   ModeSelection.ChooseExactlyWithRepeats n -> n
-  ModeSelection.ChooseBetween _ most -> most
+  ModeSelection.ChooseBetween cb -> ChooseBetween.most cb
 
 -- CR 700.2d: does this instruction print "You may choose the same mode more than
 -- once"? False is that rule's default -- "that player normally can't choose the
@@ -242,7 +243,7 @@ allowsRepeatsIn :: ModeSelection.ModeSelection -> Bool
 allowsRepeatsIn selection = case selection of
   ModeSelection.ChooseExactly _ -> False
   ModeSelection.ChooseExactlyWithRepeats _ -> True
-  ModeSelection.ChooseBetween _ _ -> False
+  ModeSelection.ChooseBetween {} -> False
 
 -- Every size a selection satisfying the printed instruction may have, ascending.
 -- One element for an exact instruction, `most - least + 1` for a range.

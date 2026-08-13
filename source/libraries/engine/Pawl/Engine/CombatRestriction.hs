@@ -24,6 +24,8 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Designation as Designation
@@ -32,6 +34,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Source as Source
@@ -80,33 +83,33 @@ blockLimit = bounded blockingMoreThan
 -- it.
 attacking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 attacking cr = case cr of
-  CombatRestriction.CantAttack a _ -> Just a
-  CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless a _) -> Just a
+  CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
-  CombatRestriction.CantAttackAlone _ _ -> Nothing
-  CombatRestriction.CantAttackMoreThan _ _ -> Nothing
-  CombatRestriction.CantBlockMoreThan _ _ -> Nothing
+  CombatRestriction.CantAttackAlone {} -> Nothing
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
 
 blocking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 blocking cr = case cr of
-  CombatRestriction.CantAttack _ _ -> Nothing
-  CombatRestriction.CantBlock a _ -> Just a
+  CombatRestriction.CantAttack {} -> Nothing
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless a _) -> Just a
   -- The Affected here names ATTACKERS, never blockers, so this selector must not
   -- see it: answering Just would take the Ring-bearer off CR 509.1a's candidate
   -- list, which is the opposite of what CR 701.54c says.
   CombatRestriction.CantBeBlockedBy {} -> Nothing
-  CombatRestriction.CantAttackAlone _ _ -> Nothing
-  CombatRestriction.CantAttackMoreThan _ _ -> Nothing
-  CombatRestriction.CantBlockMoreThan _ _ -> Nothing
+  CombatRestriction.CantAttackAlone {} -> Nothing
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
 
 attackingAlone :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 attackingAlone cr = case cr of
-  CombatRestriction.CantAttack _ _ -> Nothing
-  CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantAttack {} -> Nothing
+  CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
-  CombatRestriction.CantAttackAlone a _ -> Just a
-  CombatRestriction.CantAttackMoreThan _ _ -> Nothing
-  CombatRestriction.CantBlockMoreThan _ _ -> Nothing
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless a _) -> Just a
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
 
 -- The PAIRWISE selector. Its own, and not a fourth of the three above, because
 -- what it answers is an Affected TOGETHER WITH the Filter describing the blockers
@@ -114,33 +117,33 @@ attackingAlone cr = case cr of
 -- creature can't be blocked" full stop.
 blockedBy :: CombatRestriction.CombatRestriction -> Maybe (Affected.Affected, Filter.Type.Filter Keyword.Type.Keyword)
 blockedBy cr = case cr of
-  CombatRestriction.CantAttack _ _ -> Nothing
-  CombatRestriction.CantBlock _ _ -> Nothing
-  CombatRestriction.CantBeBlockedBy a f _ -> Just (a, f)
-  CombatRestriction.CantAttackAlone _ _ -> Nothing
-  CombatRestriction.CantAttackMoreThan _ _ -> Nothing
-  CombatRestriction.CantBlockMoreThan _ _ -> Nothing
+  CombatRestriction.CantAttack {} -> Nothing
+  CombatRestriction.CantBlock {} -> Nothing
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy a f _) -> Just (a, f)
+  CombatRestriction.CantAttackAlone {} -> Nothing
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
 
 -- The bound selectors. A separate pair from the four above rather than a fifth
 -- and sixth of them, because what they answer is a NUMBER and no Affected can
 -- stand in for one -- which is the whole reason the arms exist.
 attackingMoreThan :: CombatRestriction.CombatRestriction -> Maybe Natural
 attackingMoreThan cr = case cr of
-  CombatRestriction.CantAttack _ _ -> Nothing
-  CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantAttack {} -> Nothing
+  CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
-  CombatRestriction.CantAttackAlone _ _ -> Nothing
-  CombatRestriction.CantAttackMoreThan n _ -> Just n
-  CombatRestriction.CantBlockMoreThan _ _ -> Nothing
+  CombatRestriction.CantAttackAlone {} -> Nothing
+  CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless n _) -> Just n
+  CombatRestriction.CantBlockMoreThan {} -> Nothing
 
 blockingMoreThan :: CombatRestriction.CombatRestriction -> Maybe Natural
 blockingMoreThan cr = case cr of
-  CombatRestriction.CantAttack _ _ -> Nothing
-  CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantAttack {} -> Nothing
+  CombatRestriction.CantBlock {} -> Nothing
   CombatRestriction.CantBeBlockedBy {} -> Nothing
-  CombatRestriction.CantAttackAlone _ _ -> Nothing
-  CombatRestriction.CantAttackMoreThan _ _ -> Nothing
-  CombatRestriction.CantBlockMoreThan n _ -> Just n
+  CombatRestriction.CantAttackAlone {} -> Nothing
+  CombatRestriction.CantAttackMoreThan {} -> Nothing
+  CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless n _) -> Just n
 
 -- CR 508.1c / CR 509.1b's second clause: the condition the creature can't
 -- attack (or block) UNLESS. Read off any arm, because the clause is the same
@@ -151,12 +154,12 @@ blockingMoreThan cr = case cr of
 -- Nothing is the UNCONDITIONAL restriction (Pacifism), not a gate that fails.
 gate :: CombatRestriction.CombatRestriction -> Maybe Condition.Type.Condition
 gate cr = case cr of
-  CombatRestriction.CantAttack _ c -> c
-  CombatRestriction.CantBlock _ c -> c
-  CombatRestriction.CantBeBlockedBy _ _ c -> c
-  CombatRestriction.CantAttackAlone _ c -> c
-  CombatRestriction.CantAttackMoreThan _ c -> c
-  CombatRestriction.CantBlockMoreThan _ c -> c
+  CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless _ c) -> c
+  CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless _ c) -> c
+  CombatRestriction.CantBeBlockedBy (CantBeBlockedBy.MkCantBeBlockedBy _ _ c) -> c
+  CombatRestriction.CantAttackAlone (AffectedUnless.MkAffectedUnless _ c) -> c
+  CombatRestriction.CantAttackMoreThan (LimitUnless.MkLimitUnless _ c) -> c
+  CombatRestriction.CantBlockMoreThan (LimitUnless.MkLimitUnless _ c) -> c
 
 -- Every combat restriction some permanent on the battlefield -- or some object in
 -- the command zone, whose abilities CR 114.4 makes function there -- states right
@@ -261,7 +264,7 @@ inForce gs =
       -- and this gate drops it anyway (#1216). The menace half has no such hole,
       -- going through the layer fold itself.
       designationRows source = case Game.lookupObject source gs of
-        Just obj | Set.member Designation.Suspected (Object.designations obj) -> [(source, [], CombatRestriction.CantBlock (Affected.Matching Filter.Type.IsSource) Nothing)]
+        Just obj | Set.member Designation.Suspected (Object.designations obj) -> [(source, [], CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.Type.IsSource) Nothing))]
         _ -> []
       -- The two ability losses the printed rows below check for, named because the
       -- designation row above asks the same question: CR 305.7's basic-land

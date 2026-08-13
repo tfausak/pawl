@@ -17,6 +17,7 @@ import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
@@ -1281,8 +1282,10 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- carrier.
   Keyword.Unleash ->
     [ CombatRestriction.CantBlock
-        (Affected.Matching (Filter.And [Filter.IsSource, Filter.HasCounters CounterKind.PlusOnePlusOne]))
-        Nothing
+        AffectedUnless.MkAffectedUnless
+          { AffectedUnless.affected = Affected.Matching (Filter.And [Filter.IsSource, Filter.HasCounters CounterKind.PlusOnePlusOne]),
+            AffectedUnless.unless = Nothing
+          }
     ]
   Keyword.Riot -> []
   Keyword.Vanishing _ -> []
@@ -1350,7 +1353,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   -- with the counter clause and nothing else removed -- rule 702.147a states the
   -- restriction flat, so the affected set is the source alone and the CR 509.1b
   -- "unless" gate is Nothing.
-  Keyword.Decayed -> [CombatRestriction.CantBlock (Affected.Matching Filter.IsSource) Nothing]
+  Keyword.Decayed -> [CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.IsSource) Nothing)]
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []

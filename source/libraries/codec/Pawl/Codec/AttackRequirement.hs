@@ -3,6 +3,7 @@ module Pawl.Codec.AttackRequirement where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 
@@ -11,10 +12,10 @@ import qualified Pawl.Types.AttackRequirement as AttackRequirement
 -- blocked. Same shape, opposite axis (Pawl.Types.AttackRequirement).
 toJson :: AttackRequirement.AttackRequirement -> Value.Value
 toJson ar =
-  Value.object (Common.requiredPair "subject" Affected.toJson (AttackRequirement.subject ar))
+  Value.object (Common.requiredPair "subject" (Codec.encode Affected.codec) (AttackRequirement.subject ar))
 
 fromJson :: Value.Value -> Either Text.Text AttackRequirement.AttackRequirement
 fromJson value = do
   ps <- Common.asObject value
-  a <- Common.field "subject" ps >>= Affected.fromJson
+  a <- Common.field "subject" ps >>= Codec.decode Affected.codec
   pure (AttackRequirement.MkAttackRequirement a)
