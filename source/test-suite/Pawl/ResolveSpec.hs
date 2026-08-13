@@ -100,6 +100,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
@@ -3006,7 +3007,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         -- illegal (it's no longer a legal CreatureTarget), while the
         -- reserved slot -- never targeted -- stays vacuously legal.
         gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-        mode = Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing), Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]))) specs
+        mode = Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing), Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))]))) specs
         run = Resolve.resolveModes abilId source [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)]
         after = snd (Engine.runGamePure S.identityAnswer gone run)
     Spec.assertEqWith s "the targetless Draw did not run: the ability fizzled" (S.handSize S.alice after) handBefore
@@ -5038,7 +5039,7 @@ scryPromptSpec s registry = Spec.describe s "ScryPrompt" $ do
   -- Crystal Ball's count being fixed at two.
   Spec.it s "CR 701.22b scry 0 raises no prompt and moves nothing" $ do
     (ids, ballId, board) <- scryBoard s registry 4
-    let scryZero = Effect.Scry (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 0)
+    let scryZero = Effect.Scry (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 0))
         zero = Resolve.applyEffect ballId ballId S.alice Map.empty Map.empty scryZero
         asked = State.execState (Engine.runGame counting board zero) 0
         after = S.runPure (scryAnswer ([], [])) board zero
@@ -5186,7 +5187,7 @@ surveilPromptSpec s registry = Spec.describe s "SurveilPrompt" $ do
           State.modify (+ 1)
           pure (S.identityAnswer p)
         _ -> pure (S.identityAnswer p)
-      surveilTwo = Effect.Surveil (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)
+      surveilTwo = Effect.Surveil (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
       apply effect sourceId = Resolve.applyEffect sourceId sourceId S.alice Map.empty Map.empty effect
       asks effect sourceId gs = State.execState (Engine.runGame counting gs (apply effect sourceId)) 0
   -- Nothing to LOOK at, the one case rule 701.25a's process cannot run on.
@@ -5207,7 +5208,7 @@ surveilPromptSpec s registry = Spec.describe s "SurveilPrompt" $ do
   -- occurs." Driven through the opcode, no printing surveilling zero.
   Spec.it s "CR 701.25c surveil 0 raises no prompt and moves nothing" $ do
     (ids, sourceId, board) <- surveilOpcodeBoard s registry 2
-    let surveilZero = Effect.Surveil (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 0)
+    let surveilZero = Effect.Surveil (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 0))
         after = S.runPure (surveilAnswer ([], [])) board (apply surveilZero sourceId)
     Spec.assertEqWith s "not asked" (asks surveilZero sourceId board) 0
     Spec.assertEqWith s "and the library is what it was" (Game.zoneMembers Zone.Library S.alice after) ids
@@ -5377,7 +5378,7 @@ fatesealSpec s registry = Spec.describe s "Fateseal" $ do
             State.modify (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        fatesealTwo = Effect.Fateseal (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)
+        fatesealTwo = Effect.Fateseal (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
         apply = Resolve.applyEffect sourceId sourceId S.alice Map.empty Map.empty fatesealTwo
         asks gs = State.execState (Engine.runGame counting gs apply) 0
     Spec.assertEqWith s "one card, not asked" (asks one) 0
@@ -6109,7 +6110,7 @@ optionalEffectSpec s registry =
               -- A Stack-zone object whose Object.owner is the effect controller
               -- resolveModes reads, without paying to cast anything.
               (stackId, gs) = S.spellOnStack piker S.alice gs1
-              draw = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
+              draw = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
               mode =
                 Mode.MkMode
                   ( Seq.fromList

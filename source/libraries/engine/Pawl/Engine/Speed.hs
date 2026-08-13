@@ -52,6 +52,7 @@ import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -136,7 +137,7 @@ increaseAbility =
         Modal.MkModal
           ( Seq.singleton
               ( Mode.MkMode
-                  (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.IncreaseSpeed (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))))
+                  (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))))))
                   Map.empty
               )
           )

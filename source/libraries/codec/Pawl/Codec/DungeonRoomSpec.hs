@@ -19,6 +19,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -43,7 +44,7 @@ drawOne =
   Modal.MkModal
     ( Seq.singleton
         ( Mode.MkMode
-            (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))))
+            (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))))))
             Map.empty
         )
     )

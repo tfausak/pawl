@@ -29,6 +29,7 @@ import qualified Pawl.Codec.Onset as Onset
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
+import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
@@ -71,17 +72,17 @@ toJson codec e = case e of
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (Codec.encode SlotName.codec s))
   Effect.Counter s -> Common.tagged "Counter" (Just (Codec.encode SlotName.codec s))
   Effect.MoveToZone m -> Common.tagged "MoveToZone" . Just $ Codec.encode MoveToZone.codec m
-  Effect.Draw r q -> Common.tagged "Draw" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
-  Effect.Scry r q -> Common.tagged "Scry" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
-  Effect.Surveil r q -> Common.tagged "Surveil" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
-  Effect.Fateseal r q -> Common.tagged "Fateseal" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
+  Effect.Draw x -> Common.tagged "Draw" . Just $ Codec.encode PlayerQuantity.codec x
+  Effect.Scry x -> Common.tagged "Scry" . Just $ Codec.encode PlayerQuantity.codec x
+  Effect.Surveil x -> Common.tagged "Surveil" . Just $ Codec.encode PlayerQuantity.codec x
+  Effect.Fateseal x -> Common.tagged "Fateseal" . Just $ Codec.encode PlayerQuantity.codec x
   Effect.Explore r -> Common.tagged "Explore" (Just (Codec.encode ObjectRef.codec r))
   Effect.Mill m -> Common.tagged "Mill" . Just $ Codec.encode Mill.codec m
   Effect.Discard s q -> Common.tagged "Discard" (Just (Value.array [Codec.encode SlotName.codec s, Codec.encode Quantity.codec q]))
-  Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
-  Effect.GainLife r q -> Common.tagged "GainLife" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
+  Effect.LoseLife x -> Common.tagged "LoseLife" . Just $ Codec.encode PlayerQuantity.codec x
+  Effect.GainLife x -> Common.tagged "GainLife" . Just $ Codec.encode PlayerQuantity.codec x
   Effect.ExchangeLifeTotals sides -> Common.tagged "ExchangeLifeTotals" (Just (ExchangeSides.toJson sides))
-  Effect.IncreaseSpeed r q -> Common.tagged "IncreaseSpeed" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
+  Effect.IncreaseSpeed x -> Common.tagged "IncreaseSpeed" . Just $ Codec.encode PlayerQuantity.codec x
   -- Create's payload is positional, and the EntryRiders are ELIDED when they
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
   -- told apart on decode by JSON TYPE rather than by position: a slot name is a
@@ -199,33 +200,19 @@ fromJson decode value = do
     "RemoveFromCombat" -> Common.withValue mv (fmap Effect.RemoveFromCombat . Codec.decode SlotName.codec)
     "Counter" -> Common.withValue mv (fmap Effect.Counter . Codec.decode SlotName.codec)
     "MoveToZone" -> Common.withValue mv (fmap Effect.MoveToZone . Codec.decode MoveToZone.codec)
-    "Draw" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Draw <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "Draw expects [playerRef, quantity]"
-    "Scry" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Scry <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "Scry expects [playerRef, quantity]"
-    "Surveil" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Surveil <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "Surveil expects [playerRef, quantity]"
-    "Fateseal" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Fateseal <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "Fateseal expects [playerRef, quantity]"
+    "Draw" -> Common.withValue mv (fmap Effect.Draw . Codec.decode PlayerQuantity.codec)
+    "Scry" -> Common.withValue mv (fmap Effect.Scry . Codec.decode PlayerQuantity.codec)
+    "Surveil" -> Common.withValue mv (fmap Effect.Surveil . Codec.decode PlayerQuantity.codec)
+    "Fateseal" -> Common.withValue mv (fmap Effect.Fateseal . Codec.decode PlayerQuantity.codec)
     "Explore" -> Common.withValue mv (fmap Effect.Explore . Codec.decode ObjectRef.codec)
     "Mill" -> Common.withValue mv (fmap Effect.Mill . Codec.decode Mill.codec)
     "Discard" -> case mv of
       Just (Value.Array (Array.MkArray [s, q])) -> Effect.Discard <$> Codec.decode SlotName.codec s <*> Codec.decode Quantity.codec q
       _ -> Left . Text.pack $ "Discard expects [slot, quantity]"
-    "LoseLife" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.LoseLife <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "LoseLife expects [playerRef, quantity]"
-    "GainLife" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.GainLife <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "GainLife expects [playerRef, quantity]"
+    "LoseLife" -> Common.withValue mv (fmap Effect.LoseLife . Codec.decode PlayerQuantity.codec)
+    "GainLife" -> Common.withValue mv (fmap Effect.GainLife . Codec.decode PlayerQuantity.codec)
     "ExchangeLifeTotals" -> Common.withValue mv (fmap Effect.ExchangeLifeTotals . ExchangeSides.fromJson)
-    "IncreaseSpeed" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.IncreaseSpeed <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "IncreaseSpeed expects [playerRef, quantity]"
+    "IncreaseSpeed" -> Common.withValue mv (fmap Effect.IncreaseSpeed . Codec.decode PlayerQuantity.codec)
     -- The three-element form is read by JSON type: an Object is the
     -- EntryRiders, anything else is the slot name, which is what lets the
     -- riders be elided without leaving a hole in the array.

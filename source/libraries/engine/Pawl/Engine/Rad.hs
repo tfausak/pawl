@@ -55,6 +55,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -150,7 +151,7 @@ ability =
                         -- "for each nonland card milled this way, that player
                         -- loses 1 life" -- one life per card, which is the count
                         -- itself.
-                        Effect.LoseLife (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot milledSlot),
+                        Effect.LoseLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.InSlot milledSlot)),
                         -- "and removes one rad counter from themselves",
                         -- likewise once per card.
                         Effect.RemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot milledSlot)
