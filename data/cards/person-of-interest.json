@@ -38,12 +38,12 @@
                     "effects": [
                       {
                         "type": "Designate",
-                        "value": [
-                          {
+                        "value": {
+                          "designation": {
                             "type": "Suspected"
                           },
-                          "self"
-                        ]
+                          "slot": "self"
+                        }
                       },
                       {
                         "type": "Create",

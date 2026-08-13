@@ -34,14 +34,14 @@
                 "effects": [
                   {
                     "type": "TakeExtraTurn",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "Relative",
                         "value": {
                           "type": "You"
                         }
                       },
-                      [
+                      "skips": [
                         {
                           "type": "Step",
                           "value": {
@@ -52,7 +52,7 @@
                           }
                         }
                       ]
-                    ]
+                    }
                   }
                 ]
               }

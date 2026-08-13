@@ -21,12 +21,8 @@
                 "effects": [
                   {
                     "type": "DealDamage",
-                    "value": [
-                      {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
+                    "value": {
+                      "quantity": {
                         "type": "Count",
                         "value": {
                           "aggregation": {
@@ -61,8 +57,12 @@
                             ]
                           }
                         }
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

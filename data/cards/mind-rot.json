@@ -25,13 +25,13 @@
                 "effects": [
                   {
                     "type": "Discard",
-                    "value": [
-                      "target",
-                      {
+                    "value": {
+                      "quantity": {
                         "type": "Literal",
                         "value": 2
-                      }
-                    ]
+                      },
+                      "slot": "target"
+                    }
                   }
                 ]
               }

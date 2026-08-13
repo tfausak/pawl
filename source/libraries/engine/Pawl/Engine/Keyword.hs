@@ -38,11 +38,13 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
@@ -2310,7 +2312,7 @@ renown n =
     }
   where
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource))
-    designate = Effect.Designate Designation.Renowned Binding.triggerSource
+    designate = Effect.Designate (Designate.MkDesignate Designation.Renowned Binding.triggerSource)
 
 -- CR 702.105a: whenever this creature attacks the player with the most life or
 -- tied for most life, put a +1/+1 counter on it. Rule 702 states it as a
@@ -2743,7 +2745,7 @@ haunt =
     }
   where
     spec = TargetSpec.required Pool.Creatures Nothing
-    exile = Effect.ExileHaunting Binding.became hauntTarget
+    exile = Effect.ExileHaunting (ExileHaunting.MkExileHaunting Binding.became hauntTarget)
 
 -- The slot rule 702.55a's one target is chosen into, on soulshiftTarget's terms.
 hauntTarget :: SlotName.SlotName

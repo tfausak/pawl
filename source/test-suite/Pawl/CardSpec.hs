@@ -61,6 +61,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
+import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -87,10 +88,14 @@ import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DealDamage as DealDamage
+import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -142,6 +147,7 @@ import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpecialAction as SpecialAction
@@ -149,6 +155,7 @@ import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
@@ -582,7 +589,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
 -- card (the same nesting Pawl.Codec's round trip walks).
 effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 effectCounts effect = case effect of
-  Effect.DealDamage _ quantity -> quantityCounts quantity
+  Effect.DealDamage (DealDamage.MkDealDamage _ quantity) -> quantityCounts quantity
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
@@ -608,7 +615,7 @@ effectCounts effect = case effect of
   -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
   -- the one on top, so there is no number a card author writes.
   Effect.Explore {} -> []
-  Effect.Discard _ quantity -> quantityCounts quantity
+  Effect.Discard (Discard.MkDiscard _ quantity) -> quantityCounts quantity
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
@@ -625,11 +632,11 @@ effectCounts effect = case effect of
   -- artifacts", and its Counts are as much card data as a Duration's.
   Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
-  Effect.SkipNextPhase _ _ -> []
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider is an effect list a card authors, so its Counts are this
   -- card's Counts -- the same recursion Create takes into a minted token.
   Effect.PreventNextDamage duration _ quantity rider -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
-  Effect.PreventAllDamage duration _ -> durationCounts duration
+  Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationCounts duration
   Effect.RedirectDamage duration _ _ _ -> durationCounts duration
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
@@ -642,13 +649,13 @@ effectCounts effect = case effect of
   Effect.Untap _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
-  Effect.GainControl duration _ -> durationCounts duration
+  Effect.GainControl (DurationRef.MkDurationRef duration _) -> durationCounts duration
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ _) -> durationCounts duration
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration _ _) -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
-  Effect.Designate _ _ -> []
+  Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
@@ -665,7 +672,7 @@ effectCounts effect = case effect of
   -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
   -- "for as long as you control this creature" is a Count, and dropping it here
   -- would take its Filters out of the lint with it.
-  Effect.GrantPlayFromExile duration _ -> durationCounts duration
+  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration _) -> durationCounts duration
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -899,7 +906,7 @@ effectReplacements effect = case effect of
   Effect.Create _ token _ _ -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
-  Effect.DealDamage _ _ -> []
+  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
   Effect.Search {} -> []
@@ -920,7 +927,7 @@ effectReplacements effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
-  Effect.Discard _ _ -> []
+  Effect.Discard (Discard.MkDiscard _ _) -> []
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
@@ -928,7 +935,7 @@ effectReplacements effect = case effect of
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.DecreaseSpeed _ -> []
-  Effect.SkipNextPhase _ _ -> []
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
   Effect.PreventNextDamage _ _ _ rider -> concatMap effectReplacements rider
   Effect.PreventAllDamage {} -> []
@@ -944,12 +951,12 @@ effectReplacements effect = case effect of
   Effect.Untap _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
-  Effect.GainControl _ _ -> []
+  Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
-  Effect.Designate _ _ -> []
+  Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
@@ -1426,7 +1433,7 @@ effectMintedFaces effect = case effect of
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> fmap ((,) MintedEmblem) (NonEmpty.toList (Card.Type.faces emblem))
   Effect.Replace {} -> []
-  Effect.DealDamage _ _ -> []
+  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
   Effect.Search {} -> []
@@ -1447,7 +1454,7 @@ effectMintedFaces effect = case effect of
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
-  Effect.Discard _ _ -> []
+  Effect.Discard (Discard.MkDiscard _ _) -> []
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
@@ -1455,7 +1462,7 @@ effectMintedFaces effect = case effect of
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.DecreaseSpeed _ -> []
-  Effect.SkipNextPhase _ _ -> []
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
   Effect.PreventNextDamage _ _ _ rider -> concatMap effectMintedFaces rider
   Effect.PreventAllDamage {} -> []
@@ -1471,12 +1478,12 @@ effectMintedFaces effect = case effect of
   Effect.Untap _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
-  Effect.GainControl _ _ -> []
+  Effect.GainControl (DurationRef.MkDurationRef _ _) -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
-  Effect.Designate _ _ -> []
+  Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
@@ -2435,8 +2442,8 @@ effectFilters effect = case effect of
   -- THE one framed position. CR 701.3a: "An Aura, Equipment, or Fortification
   -- can't be attached to an object or player it couldn't enchant, equip, or
   -- fortify, respectively." Aura Graft's "another permanent it can enchant".
-  Effect.AttachTarget _ f -> [(True, f)]
-  Effect.DealDamage ref quantity -> unframed (objectRefFilters ref <> quantityFilters quantity)
+  Effect.AttachTarget (AttachTarget.MkAttachTarget _ f) -> [(True, f)]
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> unframed (objectRefFilters ref <> quantityFilters quantity)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters modification <> objectRefFilters ref)
   Effect.ChangeText {} -> []
@@ -2468,7 +2475,7 @@ effectFilters effect = case effect of
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as PutCounters' does.
   Effect.Explore ref -> unframed (objectRefFilters ref)
-  Effect.Discard _ quantity -> unframed (quantityFilters quantity)
+  Effect.Discard (Discard.MkDiscard _ quantity) -> unframed (quantityFilters quantity)
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
@@ -2483,13 +2490,13 @@ effectFilters effect = case effect of
   -- count's Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
-  Effect.SkipNextPhase _ _ -> []
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
   -- landwalk's payload once, so a nested effect list is exactly what it must not
   -- stop at.
   Effect.PreventNextDamage duration ref quantity rider ->
     unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity) <> concatMap effectFilters rider
-  Effect.PreventAllDamage duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
+  Effect.PreventAllDamage (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
   Effect.RedirectDamage duration _ srcRef destRef ->
     unframed (durationFilters duration <> objectRefFilters srcRef <> objectRefFilters destRef)
@@ -2507,14 +2514,14 @@ effectFilters effect = case effect of
   Effect.Untap ref -> unframed (objectRefFilters ref)
   Effect.Transform ref -> unframed (objectRefFilters ref)
   Effect.AddPhases _ -> []
-  Effect.GainControl duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
+  Effect.GainControl (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
   Effect.ArmDelayedTrigger _ _ mDuration -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> unframed (durationFilters duration <> objectRefFilters blocker <> objectRefFilters attacker)
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
-  Effect.Designate _ _ -> []
+  Effect.Designate (Designate.MkDesignate _ _) -> []
   Effect.Unsuspect ref -> unframed (objectRefFilters ref)
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
@@ -2526,13 +2533,13 @@ effectFilters effect = case effect of
   Effect.Attach _ -> []
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
-  Effect.TakeExtraTurn _ _ -> []
+  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
   Effect.ShuffleIntoLibrary _ ref -> unframed (objectRefFilters ref)
   Effect.OfferCast {} -> []
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
   -- take them out of the lint without failing anything.
-  Effect.GrantPlayFromExile duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
+  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSpecs, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
@@ -2881,7 +2888,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       )
       stems
   Spec.it s "the lint itself catches a dangling reference" $
-    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3)))
+    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3))))
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)) "misauthored card detected"
   -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
   -- announced against the card's own cost -- mana cost, additional costs and
@@ -3483,7 +3490,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         variable = Just (ManaCost.MkManaCost [ManaSymbol.Variable])
         -- CR 109.5's "you", in the shape Baral, Chief of Compliance's TRIGGERED
         -- ability uses it: a bare-SlotName opcode naming the controller.
-        youDiscards = Effect.Discard Binding.you (Quantity.Type.Literal 1)
+        youDiscards = Effect.Discard (Discard.MkDiscard Binding.you (Quantity.Type.Literal 1))
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
         returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
@@ -4299,7 +4306,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.GainControl (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))))
+                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.GainControl (DurationRef.MkDurationRef (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))))
                           (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.required Pool.Creatures Nothing))
                       )
                   )
@@ -4464,7 +4471,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Aura Graft is accepted"
       (canHostSubjectOffends (S.combinedFace graft), canHostSubjectCounts (S.combinedFace graft))
       (False, (1, 0))
-    let grafted = base {Face.spell = spellOf [Effect.AttachTarget slot buried] (Map.singleton slot (TargetSpec.required Pool.Permanents Nothing))}
+    let grafted = base {Face.spell = spellOf [Effect.AttachTarget (AttachTarget.MkAttachTarget slot buried)] (Map.singleton slot (TargetSpec.required Pool.Permanents Nothing))}
     Spec.assertEqWith
       s
       "a buried atom in an AttachTarget destination is accepted"

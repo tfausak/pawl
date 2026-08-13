@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -38,10 +39,13 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Defense as Defense
+import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
@@ -1508,7 +1512,7 @@ rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
-  Effect.DealDamage ref quantity -> Effect.DealDamage (rewriteObjectRef pairs ref) quantity
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> Effect.DealDamage (DealDamage.MkDealDamage (rewriteObjectRef pairs ref) quantity)
   -- A text-changer's own restriction clause is text like any other (CR 612.1), so
   -- an Artificial Evolution aimed at another on the stack leaves a spell that
   -- forbids the NEW word instead. The CR 612.2 family gate is read off the
@@ -1585,7 +1589,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
-  Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
+  Effect.GainControl (DurationRef.MkDurationRef duration ref) -> Effect.GainControl (DurationRef.MkDurationRef duration (rewriteObjectRef pairs ref))
   Effect.ArmDelayedTrigger {} -> effect
   -- Not implemented: the Filter inside the PlayerEffect keeps its printed word
   -- while the spell is on the stack (#1370).
@@ -1599,7 +1603,7 @@ rewriteEffect pairs effect = case effect of
   -- is its abilities, which nothing here walks (#643).
   Effect.CreateEmblem {} -> effect
   Effect.BecomeMonarch {} -> effect
-  Effect.Designate _ _ -> effect
+  Effect.Designate (Designate.MkDesignate _ _) -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.Evolve _ -> effect
   Effect.Mentor _ -> effect
@@ -1607,7 +1611,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ExileUntilMonarch _ -> effect
   Effect.ExileHaunting {} -> effect
   Effect.Attach _ -> effect
-  Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
+  Effect.AttachTarget (AttachTarget.MkAttachTarget slot filter_) -> Effect.AttachTarget (AttachTarget.MkAttachTarget slot (Filter.rewrite pairs filter_))
   Effect.PlaySubgame _ -> effect
   Effect.ChooseOpponent _ -> effect
   Effect.TakeExtraTurn {} -> effect
@@ -1617,7 +1621,7 @@ rewriteEffect pairs effect = case effect of
   -- untouched, so a ForAsLongAs Condition's Filters are not rewritten. That
   -- asymmetry is GainControl's and predates this opcode; matching it keeps the
   -- two arms one behaviour rather than two.
-  Effect.GrantPlayFromExile duration ref -> Effect.GrantPlayFromExile duration (rewriteObjectRef pairs ref)
+  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration (rewriteObjectRef pairs ref))
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.

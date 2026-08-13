@@ -64,11 +64,13 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
@@ -169,7 +171,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
               S.bob
               (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
               (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
-              (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
+              (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.InSlot slot)))
         control =
           S.runPure S.identityAnswer board $
             Resolve.applyEffect
@@ -178,7 +180,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
               S.bob
               (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
               (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
-              (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
+              (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.InSlot slot)))
     Spec.assertEqWith s "no control effect is stored for a departed controller" (GameState.continuousEffects after) []
     Spec.assertEqWith s "and the Myr's controller is unchanged" (Projection.controllerOf myr after) (Just S.carol)
     Spec.assertEqWith s "the same call for a player still in the game DOES store one -- the guard is what did it" (length (GameState.continuousEffects control)) 1
@@ -578,7 +580,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
-    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))) Nothing
+    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1)))) Nothing
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do
     -- Boil ("Destroy all Islands") is the first card whose effect selects by
     -- a BASIC LAND TYPE, so it is the first that can tell whether CR 612.1's
@@ -1294,7 +1296,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]))) Map.empty))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3))]))) Map.empty))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -1381,7 +1383,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]))) Map.empty))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3))]))) Map.empty))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -4998,7 +5000,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
+            (Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot slot)))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "alice now controls it" (Projection.controllerOf oid after) (Just S.alice)
     Spec.assertEqWith s "it is summoning sick for the new controller" (fmap Object.sickness (Game.lookupObject oid after)) (Just Sickness.Sick)
@@ -5022,7 +5024,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
             S.alice
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
-            (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
+            (Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot slot)))
         after = snd (Engine.runGamePure S.identityAnswer settled run)
     Spec.assertEqWith s "alice controlled it before" (Projection.controllerOf oid settled) (Just S.alice)
     Spec.assertEqWith s "and still does" (Projection.controllerOf oid after) (Just S.alice)

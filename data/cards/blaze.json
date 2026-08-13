@@ -24,16 +24,16 @@
                 "effects": [
                   {
                     "type": "DealDamage",
-                    "value": [
-                      {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
+                    "value": {
+                      "quantity": {
                         "type": "InSlot",
                         "value": "X"
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

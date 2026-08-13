@@ -37,6 +37,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -792,7 +793,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               S.alice
               (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
               (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
-              (Effect.AttachTarget slot (Filter.Type.HasCardType CardType.Creature))
+              (Effect.AttachTarget (AttachTarget.MkAttachTarget slot (Filter.Type.HasCardType CardType.Creature)))
         stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
     Spec.assertEqWith s "it moved" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature second)))
     Spec.assertBool s (stampOf after /= stampOf gs) "and was restamped"
@@ -819,7 +820,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               S.alice
               (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
               (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
-              (Effect.AttachTarget slot (Filter.Type.HasCardType CardType.Creature))
+              (Effect.AttachTarget (AttachTarget.MkAttachTarget slot (Filter.Type.HasCardType CardType.Creature)))
         stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
     Spec.assertEqWith s "still on the Piker" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature first)))
     Spec.assertEqWith s "and not restamped" (stampOf after) (stampOf gs)
@@ -860,7 +861,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
               -- `And []` matches everything, so the land is offered as a
               -- destination and CR 303.4j is what rejects it.
-              (Effect.AttachTarget slot (Filter.Type.And []))
+              (Effect.AttachTarget (AttachTarget.MkAttachTarget slot (Filter.Type.And [])))
         stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
         settled = S.settleSba (S.settleSba after)
     Spec.assertEqWith s "the Aura did not move onto the land" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature first)))

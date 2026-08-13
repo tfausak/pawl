@@ -21,8 +21,12 @@
                 "effects": [
                   {
                     "type": "DealDamage",
-                    "value": [
-                      {
+                    "value": {
+                      "quantity": {
+                        "type": "InSlot",
+                        "value": "X"
+                      },
+                      "ref": {
                         "type": "EachMatching",
                         "value": {
                           "type": "And",
@@ -41,12 +45,8 @@
                             }
                           ]
                         }
-                      },
-                      {
-                        "type": "InSlot",
-                        "value": "X"
                       }
-                    ]
+                    }
                   }
                 ]
               }

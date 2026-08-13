@@ -48,6 +48,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
@@ -66,16 +67,21 @@ import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
+import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
+import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
@@ -140,12 +146,14 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
+import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -258,7 +266,7 @@ exchangeSidesSlots sides = case sides of
 -- X's own half of the contract.
 slotsOf :: Effect Card.Type.Card -> Map.Map SlotName SlotArity
 slotsOf effect = case effect of
-  Effect.DealDamage ref quantity -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
   -- The modification's own quantities read slots too, through
   -- Projection.quantitiesOf. No card in the pool reads a slot there, but a
   -- dangling one would otherwise slip past the lint entirely.
@@ -295,7 +303,7 @@ slotsOf effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Explore ref -> objectRefSlots ref
-  Effect.Discard slot quantity -> insertOne slot (quantitySlots quantity)
+  Effect.Discard (Discard.MkDiscard slot quantity) -> insertOne slot (quantitySlots quantity)
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
@@ -317,7 +325,7 @@ slotsOf effect = case effect of
   -- one, but a dangling one would slip past the lint as ModifyTarget's would.
   Effect.Replace duration _ _ condition _ -> joinTwo (durationSlots duration) (joinSlots (fmap conditionSlots (Maybe.maybeToList condition)))
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
-  Effect.SkipNextPhase ref _ -> playerRefSlots ref
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref _) -> playerRefSlots ref
   -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
   -- CR 615.5's rider reads slots of its own -- Test of Faith's "that creature"
   -- is the spell's own target slot -- so its reads join this effect's, LESS the
@@ -335,7 +343,7 @@ slotsOf effect = case effect of
         Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider)))
       ]
   -- The same two reads, minus the shield size this opcode does not carry.
-  Effect.PreventAllDamage duration ref -> joinTwo (durationSlots duration) (objectRefSlots ref)
+  Effect.PreventAllDamage (DurationRef.MkDurationRef duration ref) -> joinTwo (durationSlots duration) (objectRefSlots ref)
   -- BOTH ObjectRefs. Turn the Tables reads its target slot through the
   -- DESTINATION ref, so naming only the source side would leave a declared
   -- target unread and pass the reads-equal-declares lint on a card that fizzles.
@@ -350,7 +358,7 @@ slotsOf effect = case effect of
   Effect.Untap ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
   Effect.AddPhases _ -> Map.empty
-  Effect.GainControl _ ref -> objectRefSlots ref
+  Effect.GainControl (DurationRef.MkDurationRef _ ref) -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Map.empty
   -- The AffectedPlayers may name a target slot -- Cease-Fire's "target player".
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ affected _) -> affectedPlayersSlots affected
@@ -364,7 +372,7 @@ slotsOf effect = case effect of
   -- than a target on renown and monstrosity (rule 702.112a's "it") and a CR 115.6
   -- target on Rune-Brand Juggler's suspect, but the lint's question is which slots
   -- the effect names, not which are targets.
-  Effect.Designate _ slot -> oneSlot slot
+  Effect.Designate (Designate.MkDesignate _ slot) -> oneSlot slot
   -- A READ of whatever slot the ref names, Tap's arm: rule 701.60a's ending can
   -- reach a set instead.
   Effect.Unsuspect ref -> objectRefSlots ref
@@ -374,9 +382,9 @@ slotsOf effect = case effect of
   Effect.Mentor slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
   Effect.ExileUntilMonarch slot -> oneSlot slot
-  Effect.ExileHaunting card slot -> joinSlots [oneSlot card, oneSlot slot]
+  Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) -> joinSlots [oneSlot card, oneSlot slot]
   Effect.Attach slot -> oneSlot slot
-  Effect.AttachTarget slot _ -> oneSlot slot
+  Effect.AttachTarget (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Map.empty
@@ -384,7 +392,7 @@ slotsOf effect = case effect of
   -- effect is applied (CR 608.2d) and bound, never read.
   Effect.ChooseOpponent _ -> Map.empty
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
-  Effect.TakeExtraTurn ref _ -> playerRefSlots ref
+  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   -- Both halves may name a slot: the ObjectRef names what is shuffled, and the
   -- PlayerRef whose library (Dwell on the Past's "target player").
   Effect.ShuffleIntoLibrary named ref -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
@@ -394,7 +402,7 @@ slotsOf effect = case effect of
   -- Both a READ: the ObjectRef names the object being permitted, normally bound
   -- by a MoveToZone earlier in the same list (CR 400.7) exactly as OfferCast's
   -- slot is, and the Duration's Condition may read a slot as a Quantity.
-  Effect.GrantPlayFromExile duration ref -> joinTwo (durationSlots duration) (objectRefSlots ref)
+  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> joinTwo (durationSlots duration) (objectRefSlots ref)
 
 -- CR 611.2b: the only Duration carrying a Quantity is ForAsLongAs, through its
 -- Condition.
@@ -494,7 +502,7 @@ conditionSlots condition = case condition of
 -- those is the one change this case will not force.
 slotsAreExhaustive :: Effect Card.Type.Card -> Bool
 slotsAreExhaustive effect = case effect of
-  Effect.DealDamage _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.DealDamage (DealDamage.MkDealDamage _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
     durationSlotsAreExhaustive duration
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
@@ -520,7 +528,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Explore {} -> True
-  Effect.Discard _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Discard (Discard.MkDiscard _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
@@ -537,10 +545,10 @@ slotsAreExhaustive effect = case effect of
   -- unions are the whole of it once their quantities check out.
   Effect.Replace duration _ _ condition _ ->
     durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
-  Effect.SkipNextPhase _ _ -> True
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
   Effect.PreventNextDamage duration _ quantity rider ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
-  Effect.PreventAllDamage duration _ -> durationSlotsAreExhaustive duration
+  Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationSlotsAreExhaustive duration
   Effect.RedirectDamage duration _ _ _ -> durationSlotsAreExhaustive duration
   Effect.Counter _ -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -552,7 +560,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Transform _ -> True
   Effect.AddPhases _ -> True
   -- slotsOf's arm drops this Duration, so the slotless test is made here.
-  Effect.GainControl duration _ ->
+  Effect.GainControl (DurationRef.MkDurationRef duration _) ->
     Map.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- CR 603.7c: the armed ability inherits this object's whole environment, so
   -- what it reads is not stated here at all.
@@ -573,25 +581,25 @@ slotsAreExhaustive effect = case effect of
   -- which monarchTargetSlots reports as nothing.
   Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
   Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
-  Effect.Designate _ _ -> True
+  Effect.Designate (Designate.MkDesignate _ _) -> True
   Effect.Unsuspect _ -> True
   Effect.Evolve _ -> True
   Effect.Mentor _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
-  Effect.ExileHaunting _ _ -> True
+  Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ _) -> True
   Effect.Attach _ -> True
-  Effect.AttachTarget _ _ -> True
+  Effect.AttachTarget (AttachTarget.MkAttachTarget _ _) -> True
   -- CR 729.1b: the slot is a DEFINITION, and the subgame itself reads no binding
   -- of the game that spawned it.
   Effect.PlaySubgame _ -> True
   -- PlaySubgame's answer: a definition reads no slot, so slotsOf's empty map is
   -- exhaustive.
   Effect.ChooseOpponent _ -> True
-  Effect.TakeExtraTurn _ _ -> True
+  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
   Effect.ShuffleIntoLibrary _ _ -> True
   Effect.OfferCast _ _ -> True
-  Effect.GrantPlayFromExile duration _ -> durationSlotsAreExhaustive duration
+  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration _) -> durationSlotsAreExhaustive duration
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
 durationSlotsAreExhaustive :: Duration.Duration -> Bool
@@ -625,7 +633,7 @@ readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
-      Effect.DealDamage _ quantity -> Quantity.readsX quantity
+      Effect.DealDamage (DealDamage.MkDealDamage _ quantity) -> Quantity.readsX quantity
       -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
       -- inside the Modification, reached through Projection.quantitiesOf.
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
@@ -651,7 +659,7 @@ readsX = any effectReadsX
       Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Explore {} -> False
-      Effect.Discard _ quantity -> Quantity.readsX quantity
+      Effect.Discard (Discard.MkDiscard _ quantity) -> Quantity.readsX quantity
       Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.ExchangeLifeTotals _ -> False
@@ -678,13 +686,13 @@ readsX = any effectReadsX
       Effect.Untap _ -> False
       Effect.Transform _ -> False
       Effect.AddPhases _ -> False
-      Effect.GainControl _ _ -> False
+      Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
       Effect.ArmDelayedTrigger {} -> False
       Effect.AffectPlayers {} -> False
       Effect.RequireBlock {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
-      Effect.Designate _ _ -> False
+      Effect.Designate (Designate.MkDesignate _ _) -> False
       Effect.Unsuspect _ -> False
       Effect.Evolve _ -> False
       Effect.Mentor _ -> False
@@ -711,7 +719,7 @@ searchesLibrary effect = case effect of
   Effect.TemptWithTheRing -> False
   Effect.Venture -> False
   Effect.PlayerSacrifices {} -> False
-  Effect.DealDamage _ _ -> False
+  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> False
   Effect.ModifyTarget {} -> False
   Effect.ChangeText {} -> False
   Effect.AddMana _ -> False
@@ -764,13 +772,13 @@ searchesLibrary effect = case effect of
   Effect.Untap _ -> False
   Effect.Transform _ -> False
   Effect.AddPhases _ -> False
-  Effect.GainControl _ _ -> False
+  Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
   Effect.RequireBlock {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
-  Effect.Designate _ _ -> False
+  Effect.Designate (Designate.MkDesignate _ _) -> False
   Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
   Effect.Mentor _ -> False
@@ -906,13 +914,13 @@ boundSlots effect = case effect of
   Effect.Untap _ -> Set.empty
   Effect.Transform _ -> Set.empty
   Effect.AddPhases _ -> Set.empty
-  Effect.GainControl _ _ -> Set.empty
+  Effect.GainControl (DurationRef.MkDurationRef _ _) -> Set.empty
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.RequireBlock {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
-  Effect.Designate _ _ -> Set.empty
+  Effect.Designate (Designate.MkDesignate _ _) -> Set.empty
   Effect.Unsuspect _ -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.Mentor _ -> Set.empty
@@ -2113,7 +2121,7 @@ effectContext controller source legal =
 -- source to pay leaves the announced value only on the ability object (#544).
 applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
 applyEffectWith runSubgame resolving source controller legal chosen effect = case effect of
-  Effect.DealDamage ref quantity -> do
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -2957,7 +2965,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- zone-scoped, and Cast.castableZones consults this field only on its exile
   -- arm, so a zone test here would be the rules core deciding what the effect
   -- means rather than the effect saying it.
-  Effect.GrantPlayFromExile duration ref ->
+  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) ->
     State.modify' $ \gs ->
       -- The same sweep every ObjectRef-taking opcode shares: a player recipient,
       -- an illegal slot (CR 608.2b) and a set that matched nothing all arrive as
@@ -3095,7 +3103,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- APNAP half is objectRefObjects' own order; its second key is the engine's
     -- where that rule gives the choice to the controller (#1345).
     Monad.mapM_ exploreOne (objectRefObjects legal resolving controller source gs ref)
-  Effect.Discard slot quantity -> do
+  Effect.Discard (Discard.MkDiscard slot quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -3712,7 +3720,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         Monad.when (n > 0) . State.modify' $ \g0 ->
           let amount = Integer.toNaturalSaturating n
            in List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration Nothing (DamageRewrite.PreventNext amount) rider) g0 recipients
-  Effect.PreventAllDamage duration ref -> do
+  Effect.PreventAllDamage (DurationRef.MkDurationRef duration ref) -> do
     -- CR 615.1 / 615.3: install one floating prevention shield per recipient the
     -- ref names, with no amount to count down -- "prevent all damage that would
     -- be dealt to you this turn" (Selfless Squire). The row is
@@ -3744,7 +3752,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       [dest] ->
         State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration kind (DamageRewrite.Redirect dest) Nothing) g0 (recipientsOf srcRef)
       _ -> pure ()
-  Effect.SkipNextPhase ref selector -> do
+  Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref selector) -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the
     -- sorcery (CR 614.3: floating replacements "last until they're used up").
@@ -3937,7 +3945,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- are read off Object.designations by Pawl.Engine.Projection and
   -- Pawl.Engine.CombatRestriction, which is rule 701.60c's "for as long as it's
   -- suspected".
-  Effect.Designate designation slot ->
+  Effect.Designate (Designate.MkDesignate designation slot) ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
@@ -4048,7 +4056,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       _ -> pure ()
   -- CR 701.3a, in the other direction from Attach above: the SLOT's target is what
   -- moves, and the destination is chosen now rather than targeted.
-  Effect.AttachTarget slot filter_ ->
+  Effect.AttachTarget (AttachTarget.MkAttachTarget slot filter_) ->
     case legalOne slot legal of
       -- An unfilled slot, or one CR 608.2b has since made illegal: no-op.
       Just recipient -> case Recipient.objectOf recipient of
@@ -4103,7 +4111,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                       }
               State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
       _ -> pure ()
-  Effect.ExileHaunting card slot ->
+  Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
@@ -4363,7 +4371,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   Effect.AddPhases extras ->
     State.modify' $ \gs ->
       gs {GameState.remaining = Turn.splicePhases (GameState.phase gs) extras (GameState.remaining gs)}
-  Effect.GainControl duration ref ->
+  Effect.GainControl (DurationRef.MkDurationRef duration ref) ->
     State.modify' $ \gs ->
       -- Enumerated ONCE, by the sweep every ObjectRef-taking opcode shares: Act
       -- of Treason's slot and Aura Thief's "all enchantments" arrive as the same
@@ -4431,7 +4439,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                       { GameState.continuousEffects = eff : GameState.continuousEffects gs1,
                         GameState.objects = foldr (Map.adjust sicken) (GameState.objects gs1) moved
                       }
-  Effect.TakeExtraTurn ref skips -> do
+  Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref skips) -> do
     gs <- State.get
     let named = playerRefPlayers legal controller gs ref
         -- CR 500.7: "If multiple players are given extra turns, the extra turns
