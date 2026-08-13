@@ -49,18 +49,18 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "origin": {
+                            "type": "Graveyard"
+                          },
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           },
-                          {
+                          "zone": {
                             "type": "Hand"
-                          },
-                          {
-                            "type": "Graveyard"
                           }
-                        ]
+                        }
                       }
                     ],
                     "optionality": {

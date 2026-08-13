@@ -86,6 +86,10 @@ toJson codec e = case e of
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
   -- told apart on decode by JSON TYPE rather than by position: a slot name is a
   -- string and riders are an object, so the two can never be confused.
+  --
+  -- The LAST arm still shaped this way. Its record waits on this module becoming
+  -- a bundle, since Create is parametric in the card and a record codec needs a
+  -- whole Codec for it (#1305, and #1306's constraint one level up).
   Effect.Create q c te ms ->
     Common.tagged "Create" . Just . Value.array $
       [Codec.encode Quantity.codec q, codec c]

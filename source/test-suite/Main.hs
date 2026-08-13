@@ -91,6 +91,7 @@ import qualified Pawl.Codec.ModeSpec
 import qualified Pawl.Codec.ModificationSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.MorphVariantSpec
+import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
 import qualified Pawl.Codec.OnsetSpec
@@ -368,6 +369,7 @@ spec s registry = do
   Pawl.Codec.ModificationSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.MorphVariantSpec.spec s
+  Pawl.Codec.MoveToZoneSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
   Pawl.Codec.ObjectRefSpec.spec s
   Pawl.Codec.OnsetSpec.spec s

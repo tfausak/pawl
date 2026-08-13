@@ -233,6 +233,7 @@ library codec
     Pawl.Codec.MorphVariant
     Pawl.Codec.MorphVariantSpec
     Pawl.Codec.MoveToZone
+    Pawl.Codec.MoveToZoneSpec
     Pawl.Codec.ObjectId
     Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef

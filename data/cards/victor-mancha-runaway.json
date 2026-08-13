@@ -29,16 +29,16 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           },
-                          {
+                          "slot": "exiled",
+                          "zone": {
                             "type": "Exile"
-                          },
-                          "exiled"
-                        ]
+                          }
+                        }
                       },
                       {
                         "type": "GrantPlayFromExile",

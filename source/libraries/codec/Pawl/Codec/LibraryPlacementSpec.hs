@@ -33,9 +33,9 @@ spec s = Spec.describe s "Pawl.Codec.LibraryPlacement" $ do
       LibraryPlacement.codec
       LibraryPlacement.OwnerChooses
       """ {"type":"OwnerChooses"} """
-  -- A bare position is no longer a placement. That rejection is what keeps the
-  -- schema's oneOf honest, and it is what tells a placement from a zone in
-  -- Pawl.Codec.Effect's moveTail.
+  -- A bare position is no longer a placement, which is what keeps the schema's
+  -- oneOf honest. It no longer has to tell a placement from a zone --- moveTail
+  -- is gone (#1305) and the placement is a named key.
   Spec.it s "rejects a bare position" $
     Spec.assertBool
       s

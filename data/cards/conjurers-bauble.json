@@ -22,15 +22,15 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "card"
                           },
-                          {
+                          "zone": {
                             "type": "Library"
                           }
-                        ]
+                        }
                       }
                     ]
                   },

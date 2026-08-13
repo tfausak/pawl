@@ -87,15 +87,15 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "permanent"
                           },
-                          {
+                          "zone": {
                             "type": "Hand"
                           }
-                        ]
+                        }
                       }
                     ]
                   }
