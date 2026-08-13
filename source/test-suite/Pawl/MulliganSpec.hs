@@ -29,6 +29,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.Object as Object
@@ -488,7 +489,7 @@ spec s registry =
       case Game.zoneMembers Zone.Hand S.alice drawn of
         [] -> Spec.assertFailure s "expected a drawn opening hand to act from"
         oid : _ -> do
-          let after = S.runPure S.identityAnswer drawn (Resolve.performHandAction oid S.alice [Effect.MoveToZone (ObjectRef.InSlot Binding.triggerSource) Zone.Exile EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue])
+          let after = S.runPure S.identityAnswer drawn (Resolve.performHandAction oid S.alice [Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.triggerSource) Zone.Exile EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)])
           Spec.assertEqWith s "the named card left the hand" (S.handSize S.alice after) 6
           Spec.assertEqWith s "and is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
     Spec.it s "CR 103.5b: the action is not a mulligan -- it does not add to the bottom count" $ do

@@ -18,11 +18,11 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -37,7 +37,6 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Uses as Uses
-import qualified Pawl.Types.Zone as Zone
 
 -- | The ISA (design.md section 1): first-order, non-recursive in CONTROL FLOW --
 -- no loops, branches, or recursive calls -- and with no functions in any field.
@@ -276,7 +275,7 @@ data Effect card
     -- EntryRiders' reason one zone over: the placement is what the EFFECT says,
     -- and a Zone that carried it would make every case over the zones ask about
     -- libraries twice.
-    MoveToZone ObjectRef.ObjectRef Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName) (Maybe Zone.Zone) LibraryPlacement.LibraryPlacement
+    MoveToZone MoveToZone.MoveToZone
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one at
     -- a time (CR 121.2). Divination is `Relative You`; Ancestral Recall is
     -- `InSlot`, reading a slot TARGETING filled (CR 601.2c). Empty-library draw is

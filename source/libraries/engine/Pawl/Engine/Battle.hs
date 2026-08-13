@@ -66,6 +66,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -276,12 +277,14 @@ siegeDefeat =
     -- and Binding.became for the exiled incarnation the next effect names.
     exile =
       Effect.MoveToZone
-        (ObjectRef.InSlot Binding.triggerSource)
-        Zone.Exile
-        EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False}
-        (Just Binding.became)
-        Nothing
-        LibraryPlacement.defaultValue
+        ( MoveToZone.MkMoveToZone
+            (ObjectRef.InSlot Binding.triggerSource)
+            Zone.Exile
+            EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False}
+            (Just Binding.became)
+            Nothing
+            LibraryPlacement.defaultValue
+        )
     -- "then you may cast it transformed without paying its mana cost": CR 608.2g's
     -- cast during a resolution, with CR 712.11a's face rider and CR 118.9's
     -- alternative cost. Both riders come from the OFFER, so nothing downstream

@@ -63,6 +63,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.Modification (Modification)
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -1521,7 +1522,7 @@ rewriteEffect pairs effect = case effect of
   Effect.RemoveFromCombat _ -> effect
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword through the swap (#1190).
-  Effect.MoveToZone ref zone riders mSlot mOrigin position -> Effect.MoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin position
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin position)
   Effect.Draw {} -> effect
   -- The tally's Filter is text like the Search arm's above (CR 612.1), so a
   -- swap reaches it; the slot it binds to is a name no card prints.
