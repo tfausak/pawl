@@ -29,6 +29,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -356,7 +357,7 @@ playersFor context gs ref =
 snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView gs shape event = case event of
   GameEvent.Moved (Moved.MkMoved zc snapshot) -> case shape of
-    EventShape.MovedBetween from to ->
+    EventShape.MovedBetween (MovedBetween.MkMovedBetween from to) ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to
         then -- CR 608.2h: who controlled it and what KIND of object it was, read
         -- from the record the move funnel filed under the DEPARTED id as the
@@ -396,7 +397,7 @@ snapshotView gs shape event = case event of
     -- CR 111.1 / 111.7: a token represents a PERMANENT and ceases to exist
     -- anywhere else, so nothing on the stack to be cast was ever one.
     EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) False snapshot)
-    EventShape.MovedBetween _ _ -> Nothing
+    EventShape.MovedBetween {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
   -- the same discard emits is what carries one -- so there is nothing here for

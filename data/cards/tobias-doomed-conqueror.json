@@ -118,14 +118,14 @@
                                 "type": "InHistory",
                                 "value": {
                                   "type": "MovedBetween",
-                                  "value": [
-                                    {
+                                  "value": {
+                                    "from": {
                                       "type": "Battlefield"
                                     },
-                                    {
+                                    "to": {
                                       "type": "Graveyard"
                                     }
-                                  ]
+                                  }
                                 }
                               }
                             }

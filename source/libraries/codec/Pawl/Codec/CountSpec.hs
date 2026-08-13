@@ -11,6 +11,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Scope as Scope
@@ -39,11 +40,11 @@ spec s = Spec.describe s "Pawl.Codec.Count" $ do
       s
       (Count.codec Common.integer)
       ( Count.MkCount
-          (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
+          (Scope.InHistory (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield Zone.Graveyard)))
           (Filter.HasCardType CardType.Creature)
           Aggregation.DistinctCardTypes
       )
-      """ {"scope":{"type":"InHistory","value":{"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]}},"filter":{"type":"HasCardType","value":{"type":"Creature"}},"aggregation":{"type":"DistinctCardTypes"}} """
+      """ {"scope":{"type":"InHistory","value":{"type":"MovedBetween","value":{"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}}}},"filter":{"type":"HasCardType","value":{"type":"Creature"}},"aggregation":{"type":"DistinctCardTypes"}} """
   Spec.it s "MkCount, scoped to a slot" $
     Common.assertCodec
       s

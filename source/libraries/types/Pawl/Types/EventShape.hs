@@ -1,6 +1,6 @@
 module Pawl.Types.EventShape where
 
-import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.MovedBetween as MovedBetween
 
 -- | Which recorded events a history count folds over. GameState.events is cleared
 -- at the turn change (Pawl.Engine.Engine), an engine choice made under CR 608.2i
@@ -12,7 +12,7 @@ import qualified Pawl.Types.Zone as Zone
 -- them (#162).
 data EventShape
   = -- | CR 700.4: "dies" is MovedBetween Battlefield Graveyard.
-    MovedBetween Zone.Zone Zone.Zone
+    MovedBetween MovedBetween.MovedBetween
   | -- | CR 601.2i: a spell became cast. What "for each spell you've cast this
     -- turn" folds over (Aetherflux Reservoir).
     --

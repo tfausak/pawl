@@ -297,6 +297,8 @@ library codec
     Pawl.Codec.MorphVariant
     Pawl.Codec.MorphVariantSpec
     Pawl.Codec.Moved
+    Pawl.Codec.MovedBetween
+    Pawl.Codec.MovedBetweenSpec
     Pawl.Codec.MovedSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
@@ -909,6 +911,7 @@ library types
     Pawl.Types.MonarchWatch
     Pawl.Types.MorphVariant
     Pawl.Types.Moved
+    Pawl.Types.MovedBetween
     Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer

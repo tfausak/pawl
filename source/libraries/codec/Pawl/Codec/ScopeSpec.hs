@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Scope as Scope
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Scope as Scope
@@ -24,8 +25,8 @@ spec s = Spec.describe s "Pawl.Codec.Scope" $ do
     Common.assertCodec
       s
       Scope.codec
-      (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
-      """ {"type":"InHistory","value":{"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]}} """
+      (Scope.InHistory (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield Zone.Graveyard)))
+      """ {"type":"InHistory","value":{"type":"MovedBetween","value":{"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}}}} """
   -- CR 102.1's domain: the players a reference names, rather than their zones.
   Spec.it s "OverPlayers" $
     Common.assertCodec

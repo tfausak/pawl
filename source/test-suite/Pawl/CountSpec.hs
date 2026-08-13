@@ -38,6 +38,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -206,7 +207,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         gs = S.withEvents [died, exiled] gs0
         count =
           Count.Type.MkCount
-            (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
+            (Scope.InHistory (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield Zone.Graveyard)))
             (Filter.Type.HasCardType CardType.Creature)
             Aggregation.Members
     Spec.assertEqWith s "one death" (S.countOf (S.stubView []) (Filter.contextFor Nothing Nothing) gs count) $ Just 1
