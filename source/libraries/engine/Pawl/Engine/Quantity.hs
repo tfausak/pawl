@@ -191,18 +191,21 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- and no priority pass owed in between, so a stored or sampled copy would go
   -- stale mid-resolution.
   --
-  -- The PlayerRef is resolved by the same Count.playersFor the two arms above
-  -- use, which is what keeps one reference from meaning different players in
-  -- different arms. Nothing for anything but EXACTLY ONE player: a life total is
-  -- one player's scalar, so a reference naming several answers "whose?" rather
-  -- than answering with a sum. Summing or maximising over several is a different
-  -- shape -- an aggregation, as Pawl.Types.Aggregation is for objects -- and no
-  -- card in the pool asks for one (#681).
+  -- The PlayerRef is resolved by playersOf below -- Count.playersFor for every
+  -- reference but the fold's own candidate -- which is what keeps one reference
+  -- from meaning different players in different arms. Nothing for anything but
+  -- EXACTLY ONE player: a life total is one player's scalar, so a reference
+  -- naming several answers "whose?" rather than answering with a sum.
+  --
+  -- Maximising over several is a different shape and has its own spelling:
+  -- Aggregation.Greatest over Scope.OverPlayers, with THIS arm reading each
+  -- candidate through PlayerRef.Candidate. Malignus is that card, and it is why
+  -- nothing here folds.
   Quantity.LifeTotal ref -> case playersOf ref of
     Just [pid] -> fmap Player.life (Map.lookup pid (GameState.players gs))
     _ -> Nothing
   -- CR 702.179e / 702.179f: a player's speed. LifeTotal's arm in every respect
-  -- above -- read live, resolved through the same Count.playersFor, and Nothing
+  -- above -- read live, resolved through the same playersOf, and Nothing
   -- for a reference naming anything but exactly one player.
   --
   -- CR 702.179f is applied HERE and only here: "if that player has no speed,
@@ -237,7 +240,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     Just pids -> Just (if any (\pid -> GameState.monarch gs == Just pid) pids then 1 else 0)
   -- CR 122.1: how many counters of a kind that player has. The third arm on
   -- LifeTotal's and Speed's terms -- live, one player only, through the same
-  -- Count.playersFor.
+  -- playersOf.
   --
   -- A kind the player's map does not hold answers 0 rather than Nothing, which
   -- is Player.counters' own convention and not this arm's invention: an absent
@@ -276,7 +279,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.WasKicked -> fmap (\view -> if Filter.kicked view then 1 else 0) mView
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
-  -- through the same Count.playersFor, and Nothing for a reference naming
+  -- through the same playersOf, and Nothing for a reference naming
   -- anything but exactly one player, since "whose opponents?" has no sum.
   --
   -- Read off Combat.declaredAttacked and NOT Combat.attacked, which is that
@@ -298,7 +301,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     _ -> Nothing
   -- CR 701.9a / 608.2i: how many cards that player has discarded this turn.
   -- OpponentsAttacked's arm in shape -- live, one player only, resolved through the
-  -- same Count.playersFor, and Nothing for a reference naming anything but exactly
+  -- same playersOf, and Nothing for a reference naming anything but exactly
   -- one player, since "whose discards?" has no sum.
   --
   -- A fold over GameState.events, which is cleared at turn handoff

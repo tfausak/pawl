@@ -61,6 +61,21 @@
         }
       ],
       "name": "Malignus",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "DamageCantBePrevented",
+            "value": {
+              "whatSource": {
+                "type": "IsSource"
+              }
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
       "power": {
         "type": "Star"
       },

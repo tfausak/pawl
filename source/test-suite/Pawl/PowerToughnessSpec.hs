@@ -1314,9 +1314,9 @@ wolfOn forest hillGiant aspect n =
 -- api.scryfall.com.
 --
 -- Its second line -- "Damage that would be dealt by this creature can't be
--- prevented" -- is not implemented (#1428). The omission leaves pawl's Malignus
--- STRICTER than printed: its damage can be prevented, which is worse for its
--- controller and never better.
+-- prevented" (CR 615.12) -- is on the card verbatim, written with the same
+-- PlayerEffect.DamageCantBePrevented carrier Excruciator prints and covered by
+-- that card's own group; nothing is omitted from the transcription.
 --
 -- Two capabilities in one CDA (CR 604.3, layer 7a): CR 107.1a's rounding, and an
 -- Aggregation.Greatest folding a per-PLAYER quantity over Scope.OverPlayers --
