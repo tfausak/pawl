@@ -50,6 +50,7 @@ import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -66,6 +67,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
@@ -357,7 +359,7 @@ masterThiefBoard darksteelMyr masterThief =
       (myrId, gs1) = S.addCreature darksteelMyr S.bob gs0
       (thiefId, gs2) = S.addCreature masterThief S.alice gs1
       entered = ZoneChange.MkZoneChange thiefId thiefId Zone.Stack Zone.Battlefield
-      gs3 = S.withEvents [GameEvent.Moved entered (Projection.project thiefId gs2)] gs2
+      gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project thiefId gs2))] gs2
    in (thiefId, myrId, gs3)
 
 -- The masterThiefBoard shape at three seats, resolved: alice's Master Thief has
@@ -371,7 +373,7 @@ masterThiefThreeWay darksteelMyr masterThief =
   let (myrId, gs1) = S.addCreature darksteelMyr S.bob S.threePlayerGame
       (thiefId, gs2) = S.addCreature masterThief S.alice gs1
       entered = ZoneChange.MkZoneChange thiefId thiefId Zone.Stack Zone.Battlefield
-      gs3 = S.withEvents [GameEvent.Moved entered (Projection.project thiefId gs2)] gs2
+      gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project thiefId gs2))] gs2
    in (thiefId, myrId, masterThiefResolveAll (masterThiefSettle gs3))
 
 -- Master Thief {2}{U}{U} Creature -- Human Rogue 2/2: "When this creature
@@ -525,14 +527,14 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
   Spec.it s "CR 725.2 the monarch draws at the beginning of their own end step" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (_, gs0) = S.addLibraryCard piker S.alice (S.withMonarch S.alice (Setup.emptyGame S.bothPlayers))
-        began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
+        began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "alice drew (one card now in hand)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
   Spec.it s "CR 725.2 the end-step draw fires only on the monarch's own end step" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (_, gs0) = S.addLibraryCard piker S.bob (S.withMonarch S.bob (Setup.emptyGame S.bothPlayers))
         -- alice is the active player; her end step is not bob's (the monarch).
-        began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
+        began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs0
         after = monarchResolveAll (monarchSettle began)
     Spec.assertEqWith s "bob did not draw on alice's end step" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
   Spec.it s "CR 725.2 combat damage to the monarch hands the crown to the damager's controller" $ do
@@ -556,7 +558,7 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
         (victim, gs1) = S.addCreature piker S.bob gs0
         (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
-        gs3 = S.withEvents [GameEvent.Moved entered (Projection.project jailer gs2)] gs2
+        gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer gs2))] gs2
         afterEtb = monarchResolveAll (monarchSettle gs3)
         -- caster stays monarch across a turn boundary: exile holds.
         heldExiled = monarchSettle afterEtb
@@ -592,7 +594,7 @@ monarchSpec s registry = Spec.describe s "Monarch" $ do
     let (victim, gs1) = S.addCreature piker S.bob S.threePlayerGame
         (jailer, gs2) = S.addCreature palaceJailer S.alice gs1
         entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
-        gs3 = S.withEvents [GameEvent.Moved entered (Projection.project jailer gs2)] gs2
+        gs3 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer gs2))] gs2
         afterEtb = monarchResolveAll (monarchSettle (gs3 {GameState.activePlayer = S.carol}))
         gone = Departure.depart Departure.Type.Conceded S.alice afterEtb
         settled = monarchSettle gone
@@ -634,7 +636,7 @@ garlandBoard piker garland =
       (bobs, gs2) = S.addCreature piker S.bob gs1
       (entrant, gs3) = S.addCreature garland S.alice gs2
       entered = ZoneChange.MkZoneChange entrant entrant Zone.Stack Zone.Battlefield
-   in (bobs, carols, S.withEvents [GameEvent.Moved entered (Projection.project entrant gs3)] gs3)
+   in (bobs, carols, S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project entrant gs3))] gs3)
 
 -- The condition Garland's duration stores, AS STORED: CR 725.1's designation
 -- read of one PARTICULAR player, baked out of the `thatPlayer` slot the crowning
@@ -726,7 +728,7 @@ hagUpkeep :: Phase.Phase
 hagUpkeep = Phase.Beginning BeginningStep.Upkeep
 
 hagBeginUpkeep :: GameState.GameState -> GameState.GameState
-hagBeginUpkeep gs = Event.recordEvent (GameEvent.StepBegan hagUpkeep S.alice) (gs {GameState.phase = hagUpkeep, GameState.activePlayer = S.alice})
+hagBeginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan hagUpkeep S.alice)) (gs {GameState.phase = hagUpkeep, GameState.activePlayer = S.alice})
 
 hagSettle :: GameState.GameState -> GameState.GameState
 hagSettle gs = S.runPure S.identityAnswer gs Engine.settleForPriority

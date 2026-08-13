@@ -38,6 +38,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -165,7 +166,7 @@ libraryTopped printings pid gs = foldl (\g p -> snd (S.addLibraryCard p pid g)) 
 -- Engine.runStep writes it and then runs that very priority round.
 settledAtPrecombatMain :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 settledAtPrecombatMain pid gs =
-  let staged = S.withEvents [GameEvent.StepBegan Phase.PrecombatMain pid] (precombatMainOf pid gs)
+  let staged = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan Phase.PrecombatMain pid)] (precombatMainOf pid gs)
    in S.runPure S.identityAnswer staged Engine.settleForPriority
 
 -- A board sitting in pid's precombat main phase, the moment CR 728.1 names.

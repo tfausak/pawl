@@ -61,6 +61,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
@@ -184,7 +185,7 @@ inherentPending events gs =
       -- posture: this matcher answers about one event shape, and a new GameEvent
       -- constructor is not an event rule 728.1 names.
       precombatMainBegan event = case event of
-        GameEvent.StepBegan Phase.PrecombatMain active -> active == you
+        GameEvent.StepBegan (StepBegan.MkStepBegan Phase.PrecombatMain active) -> active == you
         _ -> False
       -- CR 603.4: the intervening "if" is checked here, as the event occurs. A
       -- player with no rad counters does not trigger at all, which is the

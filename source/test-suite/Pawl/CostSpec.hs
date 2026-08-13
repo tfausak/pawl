@@ -70,6 +70,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -439,7 +440,7 @@ villageRitesSpec s registry =
           (ghoul, gs1) = S.addCreature khabalGhoul S.alice gs0
           cast = S.runPure S.identityAnswer gs1 (S.cast S.alice rites)
           endStep = Phase.Ending EndingStep.EndStep
-          beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+          beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
           settle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
           resolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
           atEnd = resolveAll (settle (beginEndStep (settle cast)))

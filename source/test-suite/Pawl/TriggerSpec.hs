@@ -229,7 +229,11 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
+import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -245,11 +249,13 @@ import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -261,18 +267,22 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -296,6 +306,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
@@ -342,7 +353,7 @@ logSpec s registry =
           expected = Projection.project piker gs
           after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
       case S.eventsOf after of
-        GameEvent.Moved _ snapshot : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
+        GameEvent.Moved (Moved.MkMoved _ snapshot) : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
         _ -> Spec.assertFailure s "expected exactly one Moved event"
     -- CR 704.5h's window is "since the last SBA check": the check CONSUMES by
     -- bumping a watermark, and the record survives.
@@ -379,7 +390,7 @@ logSpec s registry =
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
-          gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
+          gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project ripId gs0))] gs0
           ending = gs1 {GameState.remaining = Seq.empty}
           after = snd (Engine.runGamePure S.identityAnswer ending Engine.advance)
           isTrigger oid = case Game.lookupObject oid after of
@@ -398,22 +409,22 @@ scanSpec s registry =
       let gs = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.Ending EndingStep.EndStep, GameState.activePlayer = S.alice}
           after = snd (Engine.runGamePure S.identityAnswer gs Engine.runStep)
           began ev = case ev of
-            GameEvent.StepBegan p pid -> Just (p, pid)
+            GameEvent.StepBegan (StepBegan.MkStepBegan p pid) -> Just (p, pid)
             _ -> Nothing
       Spec.assertEqWith s "the end step's beginning is recorded exactly once" (Maybe.mapMaybe began (S.eventsOf after)) [(Phase.Ending EndingStep.EndStep, S.alice)]
     Spec.it s "CR 603.2b StepBegins matches its own step and no other" $ do
       let bearer = ObjectId.MkObjectId 1
           cond = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn)
-      Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)) "the end step matches"
-      Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice))) "the upkeep does not"
+      Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))) "the end step matches"
+      Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)))) "the upkeep does not"
     -- CR 603.3a / 109.5: "your upkeep" is the ABILITY CONTROLLER's (603.3a
     -- controls the ability; 109.5 makes "your" mean that controller), so the
     -- scope is read against the bearer's controller, not the card.
     Spec.it s "CR 603.3a ControllersTurn matches only the bearer's controller's turn" $ do
       let bearer = ObjectId.MkObjectId 1
           cond = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
-      Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)) "alice's upkeep matches for alice"
-      Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.bob))) "bob's upkeep does not"
+      Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice))) "alice's upkeep matches for alice"
+      Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) S.bob)))) "bob's upkeep does not"
     -- The widening falsifier: the scan now visits every battlefield permanent,
     -- so SelfEnters must ask whether the event is about THIS permanent. Rest in
     -- Peace is on the battlefield and a DIFFERENT object entered.
@@ -423,13 +434,13 @@ scanSpec s registry =
       let (_, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           (pikerId, gs1) = S.addCreature piker S.bob gs0
           entered = ZoneChange.MkZoneChange pikerId pikerId Zone.Stack Zone.Battlefield
-          gs2 = S.withEvents [GameEvent.Moved entered (Projection.project pikerId gs1)] gs1
+          gs2 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project pikerId gs1))] gs1
       Spec.assertEqWith s "no trigger" (length (fst (Event.gatherTriggers (Event.unscannedGrouped gs2) gs2))) 0
     Spec.it s "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
-          gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
+          gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project ripId gs0))] gs0
       case fst (Event.gatherTriggers (Event.unscannedGrouped gs1) gs1) of
         [pt] -> do
           Spec.assertEqWith s "source is RiP" (PendingTrigger.source pt) (TriggerSource.OfObject ripId)
@@ -439,11 +450,11 @@ scanSpec s registry =
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           toGrave = ZoneChange.MkZoneChange ripId ripId Zone.Battlefield Zone.Graveyard
-          gs1 = S.withEvents [GameEvent.Moved toGrave (Projection.project ripId gs0)] gs0
+          gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved toGrave (Projection.project ripId gs0))] gs0
       Spec.assertEqWith s "no triggers" (length (fst (Event.gatherTriggers (Event.unscannedGrouped gs1) gs1))) 0
     Spec.it s "SelfEnters matches only a battlefield destination" $ do
       let bearer = ObjectId.MkObjectId 1
-          movedTo zone = GameEvent.Moved (ZoneChange.MkZoneChange bearer bearer Zone.Stack zone) S.emptyCharacteristics
+          movedTo zone = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange bearer bearer Zone.Stack zone) S.emptyCharacteristics)
       Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Battlefield)) "enters battlefield matches"
       Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice TriggerCondition.SelfEnters (movedTo Zone.Graveyard))) "enters graveyard does not"
     -- CR 508.3a plus Aurelia, the Warleader's "for the first time each turn".
@@ -465,7 +476,7 @@ scanSpec s registry =
       Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (ObjectId.MkObjectId 2) S.bob 1, declared]) "another creature's declaration does not spend this one's first time"
       -- CR 508.3a's last sentence, unchanged by the frequency: a
       -- non-declaration event never matches.
-      Spec.assertBool s (not (Event.matchesTrigger (gsWith [declared]) bearer S.alice (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn) (GameEvent.StepBegan (Phase.Combat CombatStep.DeclareAttackers) S.alice))) "a step beginning is not an attack"
+      Spec.assertBool s (not (Event.matchesTrigger (gsWith [declared]) bearer S.alice (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn) (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.DeclareAttackers) S.alice)))) "a step beginning is not an attack"
     -- Pins the canonical emission order this module's `eventTriggers` comment
     -- documents ("events outer, permanents inner, ascending by id"), which a
     -- later task's CR 603.3b ordering prompt indexes into. Two RiP bearers
@@ -480,8 +491,8 @@ scanSpec s registry =
           entered2 = ZoneChange.MkZoneChange rip2 rip2 Zone.Stack Zone.Battlefield
           gs2 =
             S.withEvents
-              [ GameEvent.Moved entered1 (Projection.project rip1 gs1),
-                GameEvent.Moved entered2 (Projection.project rip2 gs1)
+              [ GameEvent.Moved (Moved.MkMoved entered1 (Projection.project rip1 gs1)),
+                GameEvent.Moved (Moved.MkMoved entered2 (Projection.project rip2 gs1))
               ]
               gs1
           triggers = fst (Event.gatherTriggers (Event.unscannedGrouped gs2) gs2)
@@ -500,7 +511,7 @@ scanSpec s registry =
       khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (ghoul1, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           (ghoul2, gs1) = S.addCreature khabalGhoul S.alice gs0
-          event = GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
+          event = GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)
           triggers = fst (Event.gatherTriggers [(EventGroup.first, event)] gs1)
       Spec.assertBool s (ghoul1 < ghoul2) "ghoul1 has the lower id"
       Spec.assertEqWith s "both triggers fired" (length triggers) 2
@@ -610,7 +621,7 @@ sacrificeSpec s registry =
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
-          gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
+          gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project ripId gs0))] gs0
           placed = snd (Engine.runGamePure S.identityAnswer gs1 Engine.placePendingTriggers)
           bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid placed)
           selfOf oid = Map.lookup Binding.triggerSource (Binding.targetsOf (bindingsOn oid))
@@ -969,7 +980,7 @@ historySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n (
 historySpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
       beginEndStep gs =
-        Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+        Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       countersOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
@@ -1056,7 +1067,7 @@ historySpec s registry =
 delayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 delayedSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
-      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       walls gs = filter (\oid -> Set.member Subtype.Wall (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
@@ -1121,7 +1132,7 @@ delayedSpec s registry =
           island <- S.printingOf s registry "Island"
           let armed = castWave tidalWave island
               stated = withExpiry (Just Expiry.Type.AtCleanup) armed
-              began = [GameEvent.StepBegan endStep S.alice]
+              began = [GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)]
               (firedOnce, survivors) = Event.delayedPending began stated
               (firedAgain, _) = Event.delayedPending began stated {GameState.delayedTriggers = survivors}
           Spec.assertEqWith s "it fired" (length firedOnce) 1
@@ -1131,7 +1142,7 @@ delayedSpec s registry =
           tidalWave <- S.printingOf s registry "Tidal Wave"
           island <- S.printingOf s registry "Island"
           let armed = castWave tidalWave island
-              (fired, survivors) = Event.delayedPending [GameEvent.StepBegan endStep S.alice] armed
+              (fired, survivors) = Event.delayedPending [GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)] armed
           Spec.assertEqWith s "it fired" (length fired) 1
           Spec.assertEqWith s "and was evicted" (Seq.length survivors) 0
         -- Synthetic Deferred Rally {W} Instant: "At the beginning of the next
@@ -1274,9 +1285,9 @@ delayedSpec s registry =
               cast = S.runPure S.identityAnswer ready (S.cast S.bob waveId)
               armed = S.runPure S.identityAnswer cast Engine.priorityLoop
               gone = Departure.depart Departure.Type.Conceded S.bob armed
-              began = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gone {GameState.phase = endStep})
+              began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gone {GameState.phase = endStep})
               (placedAny, placed) = S.runPureWith S.identityAnswer began Engine.placePendingTriggers
-              (controlAny, control) = S.runPureWith S.identityAnswer (Event.recordEvent (GameEvent.StepBegan endStep S.alice) (armed {GameState.phase = endStep})) Engine.placePendingTriggers
+              (controlAny, control) = S.runPureWith S.identityAnswer (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (armed {GameState.phase = endStep})) Engine.placePendingTriggers
           Spec.assertEqWith s "the fixture really armed one delayed ability" (Seq.length (GameState.delayedTriggers armed)) 1
           Spec.assertEqWith s "bob's ability is not put on the stack" (GameState.stack placed) []
           Spec.assertEqWith s "CR 603.7b: it still triggered, so its one shot is spent" (Seq.length (GameState.delayedTriggers placed)) 0
@@ -1353,7 +1364,7 @@ delayedSpec s registry =
 tokenSetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenSetSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
-      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       humans gs = filter (\oid -> Set.member Subtype.Human (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
@@ -1456,7 +1467,7 @@ tokenSetSpec s registry =
 tokenGroupReadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenGroupReadSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
-      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       warriors gs = filter (\oid -> Set.member Subtype.Warrior (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
@@ -1546,7 +1557,7 @@ tokenGroupReadSpec s registry =
 tokenGroupMoveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenGroupMoveSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
-      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       elementals gs = filter (\oid -> Set.member Subtype.Elemental (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
@@ -1741,7 +1752,7 @@ singleTokenSlotReadSpec s registry =
 orderingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 orderingSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
-      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       countersOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
       -- alice has Khabál Ghoul out and casts Tidal Wave, so both a delayed
@@ -1940,7 +1951,7 @@ orderingSpec s registry =
 monarchOrderingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monarchOrderingSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
-      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       settleWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
       settleWith answer gs = S.runPure answer gs Engine.settleForPriority
@@ -1955,7 +1966,7 @@ monarchOrderingSpec s registry =
             (_, gs2) = S.addLibraryCard piker S.alice gs1
             (jailer, gs3) = S.addCreature palaceJailer S.alice gs2
             entered = ZoneChange.MkZoneChange jailer jailer Zone.Stack Zone.Battlefield
-         in beginEndStep (resolveAll (S.withEvents [GameEvent.Moved entered (Projection.project jailer gs3)] gs3))
+         in beginEndStep (resolveAll (S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project jailer gs3))] gs3))
       -- Records every ordering payload's SOURCES, in order, answering
       -- canonically. The sources are what this group is about (CR 725.2's
       -- absent one beside a borne one); battleCrySpec asserts on the ability
@@ -2064,7 +2075,7 @@ monarchOrderingSpec s registry =
 interveningSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 interveningSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
-      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       zombies gs = filter (\oid -> Set.member Subtype.Zombie (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
@@ -2072,7 +2083,7 @@ interveningSpec s registry =
       withZombie sarcomancy =
         let (sarcId, gs0) = S.addCreature sarcomancy S.alice (Setup.emptyGame S.bothPlayers)
             entered = ZoneChange.MkZoneChange sarcId sarcId Zone.Stack Zone.Battlefield
-            gs1 = S.withEvents [GameEvent.Moved entered (Projection.project sarcId gs0)] gs0
+            gs1 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project sarcId gs0))] gs0
          in (sarcId, resolveAll (settle gs1))
    in Spec.describe s "InterveningIf" $ do
         Spec.it s "CR 603.6a the enters trigger makes a 2/2 black Zombie token" $ do
@@ -5348,7 +5359,7 @@ vanishingSpec s registry =
       -- One upkeep for `pid`, run to the end of the priority loop, so the
       -- trigger is gathered (CR 603.3) and resolved.
       upkeepOf pid gs =
-        let began = Event.recordEvent (GameEvent.StepBegan upkeep pid) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
             settled = snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
          in (settled, snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop))
       after pid gs = snd (upkeepOf pid gs)
@@ -6004,7 +6015,7 @@ afflictSpec s registry =
         -- 702.130a's "defending player" reads. The falsifier is an arm that binds
         -- the attacking side, or none at all.
         Spec.it s "CR 603.2 the defending player rides the becomes-blocked event in the reserved slot" $ do
-          let bindings = Event.eventBindings TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (ObjectId.MkObjectId 9) S.carol)
+          let bindings = Event.eventBindings TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 9) S.carol))
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 702.130b: "If a creature has multiple instances of afflict, each
         -- triggers separately." Asked of the mint rather than of a board, as
@@ -6334,7 +6345,7 @@ permanentEntersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry 
 permanentEntersSpec s registry =
   let anyCreature = Filter.Type.HasCardType CardType.Creature
       anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
-      enters oid = GameEvent.Moved (ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics
+      enters oid = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
       sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs))
    in Spec.describe s "PermanentEnters" $ do
         -- The gameplay-level proof, cast to resolution: alice's second Soul
@@ -6406,7 +6417,7 @@ permanentEntersSpec s registry =
           plains <- S.printingOf s registry "Plains"
           let (_, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (landId, gs1) = S.addCreature plains S.alice gs0
-              gs2 = S.withEvents [GameEvent.Moved (ZoneChange.MkZoneChange landId landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1)] gs1
+              gs2 = S.withEvents [GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange landId landId Zone.Stack Zone.Battlefield) (Projection.project landId gs1))] gs1
           Spec.assertEqWith s "no trigger" (sourcesOf gs2) []
         -- The destination half: CR 603.6a is an ENTERS-THE-BATTLEFIELD
         -- ability, so a creature card moving to a graveyard is not it.
@@ -6415,7 +6426,7 @@ permanentEntersSpec s registry =
           piker <- S.printingOf s registry "Goblin Piker"
           let (warden, gs0) = S.addCreature soulWarden S.alice (Setup.emptyGame S.bothPlayers)
               (pikerId, gs1) = S.addCreature piker S.bob gs0
-              toGrave = GameEvent.Moved (ZoneChange.MkZoneChange pikerId pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
+              toGrave = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange pikerId pikerId Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertBool s (not (Event.matchesTrigger gs1 warden S.alice (TriggerCondition.PermanentEnters anotherCreature) toGrave)) "a graveyard-bound move does not match"
         -- CR 603.6a: "EACH TIME an event puts one or more permanents onto the
         -- battlefield" -- one bearer, two entering creatures, two triggers. A
@@ -6429,8 +6440,8 @@ permanentEntersSpec s registry =
               (second, gs2) = S.addCreature piker S.bob gs1
               gs3 =
                 S.withEvents
-                  [ GameEvent.Moved (ZoneChange.MkZoneChange first first Zone.Stack Zone.Battlefield) (Projection.project first gs2),
-                    GameEvent.Moved (ZoneChange.MkZoneChange second second Zone.Stack Zone.Battlefield) (Projection.project second gs2)
+                  [ GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange first first Zone.Stack Zone.Battlefield) (Projection.project first gs2)),
+                    GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange second second Zone.Stack Zone.Battlefield) (Projection.project second gs2))
                   ]
                   gs2
           Spec.assertEqWith s "twice, both from the one Warden" (sourcesOf gs3) (replicate 2 (TriggerSource.OfObject warden))
@@ -6654,7 +6665,7 @@ graveyardEffectZoneTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registr
 graveyardEffectZoneTriggerSpec s registry =
   let squeeName = CardName.MkCardName (Text.pack "Squee, Goblin Nabob")
       upkeep = Phase.Beginning BeginningStep.Upkeep
-      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
       settle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
       settle answer gs = S.runPure answer gs Engine.settleForPriority
       namesIn zone pid gs =
@@ -6742,7 +6753,7 @@ commandZoneTriggerSpec s registry =
       -- One seat's end step, everything else held equal.
       beginEndStepOf pid gs =
         Event.recordEvent
-          (GameEvent.StepBegan endStep pid)
+          (GameEvent.StepBegan (StepBegan.MkStepBegan endStep pid))
           gs {GameState.phase = endStep, GameState.activePlayer = pid}
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
@@ -6884,7 +6895,7 @@ serraAvatarSpec s registry =
         -- what makes the False side mean something.
         Spec.it s "CR 603.6 only a GRAVEYARD destination matches: exile does not" $ do
           (creature, gs) <- cardIn S.addCreature
-          let moveTo to = GameEvent.Moved (ZoneChange.MkZoneChange creature creature Zone.Battlefield to) S.emptyCharacteristics
+          let moveTo to = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange creature creature Zone.Battlefield to) S.emptyCharacteristics)
               matches = Event.matchesTrigger gs creature S.alice TriggerCondition.SelfPutIntoGraveyardFromAnywhere
           Spec.assertBool s (matches (moveTo Zone.Graveyard)) "a graveyard-bound move matches"
           Spec.assertBool s (not (matches (moveTo Zone.Exile))) "an exile-bound move does not"
@@ -7388,7 +7399,7 @@ leavesBattlefieldSpec s registry =
         Spec.it s "CR 400.2 eventBindings binds became for every PUBLIC destination and for no hidden one" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              leftFor to = Event.eventBindings TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics)
+              leftFor to = Event.eventBindings TriggerCondition.SelfLeavesTheBattlefield (GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield to) S.emptyCharacteristics))
               bound = Map.singleton Binding.became (Binding.toObject arrived)
           Spec.assertEqWith s "a graveyard is public" (leftFor Zone.Graveyard) bound
           Spec.assertEqWith s "exile is public" (leftFor Zone.Exile) bound
@@ -7404,8 +7415,8 @@ leavesBattlefieldSpec s registry =
         -- such a token, which is exactly why the guard needs a test of its own.
         Spec.it s "CR 603.6c a battlefield-to-battlefield pseudo-move is not a departure" $ do
           let token = ObjectId.MkObjectId 1
-              entry = GameEvent.Moved (ZoneChange.MkZoneChange token token Zone.Battlefield Zone.Battlefield) S.emptyCharacteristics
-              gone = GameEvent.Moved (ZoneChange.MkZoneChange token (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Exile) S.emptyCharacteristics
+              entry = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange token token Zone.Battlefield Zone.Battlefield) S.emptyCharacteristics)
+              gone = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange token (ObjectId.MkObjectId 2) Zone.Battlefield Zone.Exile) S.emptyCharacteristics)
               matches = Event.matchesTrigger (Setup.emptyGame S.bothPlayers) token S.alice TriggerCondition.SelfLeavesTheBattlefield
           Spec.assertBool s (not (matches entry)) "a token's own entry is not a departure"
           Spec.assertBool s (matches gone) "but the same token being exiled is"
@@ -7861,7 +7872,7 @@ representativeEvents :: TriggerCondition.TriggerCondition -> NonEmpty.NonEmpty G
 representativeEvents cond =
   let departed = ObjectId.MkObjectId 1
       arrived = ObjectId.MkObjectId 2
-      moved from to = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics
+      moved from to = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics)
       combatDamage =
         GameEvent.DamageDealt
           (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
@@ -7869,11 +7880,11 @@ representativeEvents cond =
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
         TriggerCondition.PermanentEnters _ -> one (moved Zone.Stack Zone.Battlefield)
-        TriggerCondition.StepBegins (StepBegins.MkStepBegins phase _) -> one (GameEvent.StepBegan phase S.alice)
+        TriggerCondition.StepBegins (StepBegins.MkStepBegins phase _) -> one (GameEvent.StepBegan (StepBegan.MkStepBegan phase S.alice))
         -- CR 603.8: a state trigger matches a game STATE, so no log entry fires
         -- it at all (Event.matchesTrigger's StateIs arm answers False for every
         -- event). Any event is therefore as representative as any other.
-        TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
+        TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
         TriggerCondition.SelfDealsCombatDamageToPlayer -> one combatDamage
         -- The same event read by a bystander, and the only one this condition
         -- admits.
@@ -7884,7 +7895,7 @@ representativeEvents cond =
         -- Event.matchesTrigger, which answers False for it whatever the event --
         -- so the pin here is that an inherent condition binds nothing from the
         -- log, which is what Event.eventBindingSlots claims for it.
-        TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost S.bob 2)
+        TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 2))
         TriggerCondition.SelfCycled -> one (GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost)
         -- CR 702.94a's cause, so the event is one this condition genuinely
         -- admits; an Ordinary reveal would pin nothing.
@@ -7893,7 +7904,7 @@ representativeEvents cond =
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
         -- eventBindings being consulted only for a match.
-        TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard _ nth) -> one (GameEvent.Drew S.alice nth)
+        TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard _ nth) -> one (GameEvent.Drew (Drew.MkDrew S.alice nth))
         -- CR 508.5's defending player, and deliberately NOT the attacker's own
         -- controller: eventBindings binds this field under `thatPlayer`, so an
         -- arm that bound the attacking side instead would still agree with
@@ -7913,28 +7924,28 @@ representativeEvents cond =
         TriggerCondition.SelfAttacksPlayerWithMostLife -> one (GameEvent.AttackerDeclared departed S.carol 1)
         -- The GROUPED blocking event, which is CR 509.3a's arity: one per blocking
         -- creature, whatever it was declared against.
-        TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared departed 1)
+        TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
         -- The same event with the count read, which is all CR 509.3e adds.
-        TriggerCondition.SelfBlocksAtLeast _ -> one (GameEvent.BlocksDeclared departed 2)
+        TriggerCondition.SelfBlocksAtLeast _ -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 2))
         -- The same grouped event once more, with the count IGNORED: CR 509.3e's
         -- filtered form reads the attackers off Combat.blockers instead, and
         -- binds nothing off the log.
-        TriggerCondition.SelfBlocksOneOrMore _ -> one (GameEvent.BlocksDeclared departed 1)
+        TriggerCondition.SelfBlocksOneOrMore _ -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
         -- The PAIRWISE event instead: CR 509.3b's bearer is the BLOCKER too, and
         -- the attacker beside it is what this one binds.
-        TriggerCondition.SelfBlocksCreature -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
+        TriggerCondition.SelfBlocksCreature -> one (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared departed (ObjectId.MkObjectId 41)))
         -- CR 508.5's defending player again, and carol for SelfAttacks' reason
         -- above: eventBindings binds this field under `thatPlayer`.
-        TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked departed S.carol)
+        TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
         -- The same declaration event SelfBlocks names, with the ids the other way
         -- round: this condition's bearer is the ATTACKER, and the blocker is what
         -- it binds.
-        TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BlockerDeclared (ObjectId.MkObjectId 41) departed)
+        TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BlockerDeclared (BlockerDeclared.MkBlockerDeclared (ObjectId.MkObjectId 41) departed))
         -- The GROUPED attacking-side event, which is what makes this one fire
         -- once where the arm above fires per blocker. carol on SelfBecomesBlocked's
         -- reasoning -- and this one binds that player nothing, which is the
         -- difference the pin catches.
-        TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> one (GameEvent.AttackerBlocked departed S.carol)
+        TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         -- Every origin zone is admitted, but the floor is the same for all of
         -- them: the destination is always a graveyard, which CR 400.2 makes
@@ -7958,13 +7969,13 @@ representativeEvents cond =
         -- CR 615.13: the recipient has to be a PLAYER, this condition being
         -- scoped to damage that would be dealt to one -- an event naming a
         -- creature matches nothing and would pin the floor at empty.
-        TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (Recipient.ToPlayer S.bob) 2)
+        TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Recipient.ToPlayer S.bob) 2))
         -- CR 119.9's own event, and the only one this condition admits: the
         -- payload is a player and an amount, and the amount is the floor.
-        TriggerCondition.PlayerGainsLife _ -> one (GameEvent.LifeGained S.bob 2)
+        TriggerCondition.PlayerGainsLife _ -> one (GameEvent.LifeGained (LifeChange.MkLifeChange S.bob 2))
         -- The loss condition's own event, and the only one it admits, on the
         -- gain arm's reasoning: same payload shape, same amount floor.
-        TriggerCondition.PlayerLosesLife _ -> one (GameEvent.LifeLost S.bob 2)
+        TriggerCondition.PlayerLosesLife _ -> one (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 2))
         -- CR 714.2b: a placement on the BEARER that crosses the chapter. The
         -- bearer here is `departed`, the id Event.matchesTrigger is asked about
         -- below, and the counts straddle N so the event really matches.
@@ -7992,7 +8003,7 @@ representativeEvents cond =
         -- intersection below the honest floor for an AnyOf: a slot one branch
         -- binds and another does not must not be claimed.
         TriggerCondition.AnyOf conditions -> case conditions of
-          [] -> one (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
+          [] -> one (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
           c : cs -> Foldable.foldr1 (<>) (fmap representativeEvents (c NonEmpty.:| cs))
         -- CR 708.7's own event, and the only one this condition admits, on the
         -- BEARER -- so the pair really matches.
@@ -8004,7 +8015,7 @@ representativeEvents cond =
         TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp departed)
         -- CR 702.112b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
-        TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d _) -> one (GameEvent.BecameDesignated d departed)
+        TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d _) -> one (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated d departed))
         -- CR 702.100b's own event, and the only one this condition admits. The
         -- pair does NOT match -- the condition is self-scoped and `departed` is
         -- not the bearer -- which pins the floor for a matching pair too, since
@@ -8016,11 +8027,11 @@ representativeEvents cond =
         -- instead would still agree with eventBindingSlots if the two coincided.
         -- Whether the pair matches on the board below does not matter, eventBindings
         -- reading the event rather than the attachment.
-        TriggerCondition.AttachedCreatureMentors -> one (GameEvent.Mentored departed arrived)
+        TriggerCondition.AttachedCreatureMentors -> one (GameEvent.Mentored (Mentored.MkMentored departed arrived))
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- payload is arbitrary: the condition compares nothing, so any sacrifice
         -- matches and the floor is the same for all of them.
-        TriggerCondition.PermanentSacrificed -> one (GameEvent.PermanentSacrificed S.alice departed)
+        TriggerCondition.PermanentSacrificed -> one (GameEvent.PermanentSacrificed (PermanentSacrificed.MkPermanentSacrificed S.alice departed))
         -- CR 603.3b's own event, and the only one this condition admits. The
         -- pair does NOT actually match here -- `departed` projects as no Saga on
         -- the empty board Event.matchesTrigger is asked about -- which is fine
@@ -8209,14 +8220,14 @@ becameSlotSpec s registry =
         Spec.it s "CR 400.7e eventBindings binds the ARRIVING id, not the departed one" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              died = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
+              died = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings TriggerCondition.SelfDies died) (Map.singleton Binding.became (Binding.toObject arrived))
         -- A condition that is not a look-back gets no such slot: Narcomoeba's
         -- bearer IS the arriving card, so binding it again would be a second
         -- name for the same object.
         Spec.it s "CR 113.6k a library-to-graveyard trigger binds nothing" $ do
           let oid = ObjectId.MkObjectId 1
-              milled = GameEvent.Moved (ZoneChange.MkZoneChange oid oid Zone.Library Zone.Graveyard) S.emptyCharacteristics
+              milled = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange oid oid Zone.Library Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertEqWith s "no became slot" (Event.eventBindings TriggerCondition.SelfPutIntoGraveyardFromLibrary milled) Map.empty
         -- The pin on Event.eventBindingSlots, the per-CONDITION slot set the
         -- card lint asks (CardSpec's "every slot a triggered ability reads is
@@ -8322,7 +8333,7 @@ promiseOfTomorrowSpec s registry =
         Spec.it s "CR 400.7e eventBindings binds the ARRIVING id for PermanentDies too" $ do
           let departed = ObjectId.MkObjectId 1
               arrived = ObjectId.MkObjectId 2
-              died = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
+              died = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
 
 -- CR 603.4's intervening "if" on a LOOK-BACK trigger, which is the one shape
@@ -9029,7 +9040,7 @@ strippedTriggerSpec s registry =
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       entering oid gs =
         let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll (settle (S.withEvents [GameEvent.Moved moved (Projection.project oid gs)] gs))
+         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
    in Spec.describe s "CR 305.7 strips a triggered ability" $ do
         Spec.it s "CR 603.6a Radiant Fountain's entry trigger gains its controller 2 life" $ do
           radiantFountain <- S.printingOf s registry "Radiant Fountain"
@@ -9154,7 +9165,7 @@ bystanderSpec s registry =
     Spec.it s "CR 603.10 a StepBegins bearer that dies later in the same batch still triggers" $ do
       khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
-          began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
+          began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs0
           dead = S.runPure S.identityAnswer began (Event.destroy Regenerability.Regenerable [ghoul])
           triggers = fst (Event.gatherTriggers (Event.unscannedGrouped dead) dead)
       Spec.assertEqWith s "the Ghoul really did leave the battlefield" (Game.lookupObject ghoul dead) Nothing
@@ -9167,7 +9178,7 @@ bystanderSpec s registry =
       khabalGhoul <- S.printingOf s registry "Khabál Ghoul"
       let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [ghoul])
-          began = S.runPure S.identityAnswer dead (State.modify' (Event.recordEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)))
+          began = S.runPure S.identityAnswer dead (State.modify' (Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))))
           triggers = fst (Event.gatherTriggers (Event.unscannedGrouped began) began)
       Spec.assertEqWith s "the Ghoul is gone" (Game.lookupObject ghoul began) Nothing
       Spec.assertEqWith s "and nothing triggered" (fmap PendingTrigger.source triggers) []
@@ -9220,7 +9231,7 @@ bystanderZoneSpec s registry =
             (blossomId, g2) = S.addCreature bitterblossom S.alice g1
             began =
               S.withEvents
-                [GameEvent.StepBegan upkeep S.alice]
+                [GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)]
                 (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
             after = S.runPure S.identityAnswer began (remove [squeeId, blossomId])
         pure (squeeId, blossomId, after, fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped after) after)))
@@ -9337,7 +9348,7 @@ aetherFlashSpec s registry =
         Spec.it s "CR 400.7e eventBindings binds the ENTRANT under became" $ do
           let castCard = ObjectId.MkObjectId 1
               entered = ObjectId.MkObjectId 2
-              entry = GameEvent.Moved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics
+              entry = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange castCard entered Zone.Stack Zone.Battlefield) S.emptyCharacteristics)
           Spec.assertEqWith s "became names the permanent that entered" (Event.eventBindings (TriggerCondition.PermanentEnters (Filter.Type.HasCardType CardType.Creature)) entry) (Map.singleton Binding.became (Binding.toObject entered))
         -- CR 603.6a's "EACH TIME an event puts one or more permanents onto
         -- the battlefield" met with a per-entrant payload: Dragon Fodder
@@ -9405,7 +9416,7 @@ aetherFlashSpec s registry =
 kindredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 kindredSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
-      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       -- Bitterblossom on alice's battlefield, alice's upkeep begun. The middle
@@ -9545,7 +9556,7 @@ towershellSkipSpec s registry = Spec.describe s "DelayedOnsetSkipped" $ do
       -- happens" -- and is why this is read before the turn ends, since
       -- Engine.handoffTurn clears the log.
       combatStepsOf pid gs =
-        [ph | GameEvent.StepBegan ph@(Phase.Combat _) who <- S.eventsOf gs, who == pid]
+        [ph | GameEvent.StepBegan (StepBegan.MkStepBegan ph@(Phase.Combat _) who) <- S.eventsOf gs, who == pid]
   -- The control that makes the case below discriminating: the same board and the
   -- same line of play with the Dignitary never cast. S.aggressiveAnswer takes no
   -- action at all, and S.fightAnswer is exactly it plus casting what it can
@@ -9763,7 +9774,7 @@ lifeGainTriggerSpec s registry =
           childOfNight <- S.printingOf s registry "Child of Night"
           let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
               evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False False 0 (Just S.alice) DamageKind.Combat
-              gainsIn gs = [p | GameEvent.LifeGained p _ <- S.eventsOf gs]
+              gainsIn gs = [p | GameEvent.LifeGained (LifeChange.MkLifeChange p _) <- S.eventsOf gs]
               after n = S.runPure S.identityAnswer gs0 (Damage.applyDamage [evOf n])
           Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
           Spec.assertEqWith s "zero damage records nothing" (gainsIn (after 0)) []
@@ -9797,7 +9808,7 @@ lifeGainAmountSpec s registry =
       -- settle.
       entering oid gs =
         let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-         in resolveAll (settle (S.withEvents [GameEvent.Moved moved (Projection.project oid gs)] gs))
+         in resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved moved (Projection.project oid gs))] gs))
    in Spec.describe s "CR 119.9 that much life" $ do
         -- The gameplay-level proof, cast to resolution. alice's Renewed Faith
         -- gains her 6 (CR 119.3), the Bond's trigger matches that event, and its
@@ -9834,7 +9845,7 @@ lifeGainAmountSpec s registry =
           Spec.assertEqWith
             s
             "thatMuch is the gain"
-            (Event.eventBindings (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained S.alice 7))
+            (Event.eventBindings (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained (LifeChange.MkLifeChange S.alice 7)))
             (Map.singleton Binding.eventAmount (Binding.toAmount 7))
 
 -- The life-GAIN group's mirror: "whenever an opponent loses life", which the
@@ -9974,7 +9985,7 @@ lifeLossTriggerSpec s registry =
           Spec.assertEqWith
             s
             "thatMuch is the loss and thatPlayer is who lost it"
-            (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost S.bob 7))
+            (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 7)))
             (Map.fromList [(Binding.eventAmount, Binding.toAmount 7), (Binding.triggerPlayer, Binding.toPlayer S.bob)])
         -- The loser is bound under the OTHER relation too, and that is a claim
         -- about the event rather than about the relation: CR 603.2's environment
@@ -9985,7 +9996,7 @@ lifeLossTriggerSpec s registry =
           Spec.assertEqWith
             s
             "thatPlayer names the loser whichever relation matched"
-            (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.You) (GameEvent.LifeLost S.alice 3))
+            (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.You) (GameEvent.LifeLost (LifeChange.MkLifeChange S.alice 3)))
             (Map.fromList [(Binding.eventAmount, Binding.toAmount 3), (Binding.triggerPlayer, Binding.toPlayer S.alice)])
 
 -- CR 603.2's other half of a life-loss event: the PLAYER it named, not only the
@@ -10233,7 +10244,7 @@ ezuriExperienceSpec s registry =
         -- assertion is what tells those apart.
         Spec.it s "CR 122.1 no experience counters put no +1/+1 counters, though the ability still resolves" $ do
           (_, targetId, board) <- ezuriAndTarget
-          let staged = S.withEvents [GameEvent.StepBegan (Phase.Combat CombatStep.BeginningOfCombat) S.alice] (atBeginningOfCombat S.alice board)
+          let staged = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.BeginningOfCombat) S.alice)] (atBeginningOfCombat S.alice board)
               settled = S.runPure (aimAt targetId) staged Engine.settleForPriority
               combat = S.runPure (aimAt targetId) (atBeginningOfCombat S.alice board) (Engine.runStep >> Engine.priorityLoop)
           Spec.assertEqWith s "alice has no experience counters" (experienceOf S.alice board) 0

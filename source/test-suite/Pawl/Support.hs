@@ -76,6 +76,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -738,7 +739,7 @@ entersWithTrigger :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameSta
 entersWithTrigger printing pid gs0 =
   let (oid, gs1) = addCreature printing pid gs0
       entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-   in (oid, withEvents [GameEvent.Moved entered (Projection.project oid gs1)] gs1)
+   in (oid, withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project oid gs1))] gs1)
 
 -- One more card of a printing in pid's hand, APPENDED (contrast handOne, which
 -- replaces the hand and sets up the phase for a cast).

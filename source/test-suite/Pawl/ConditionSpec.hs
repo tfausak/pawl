@@ -26,6 +26,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -33,6 +34,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -77,7 +79,7 @@ check swamp n comparison threshold =
 monarchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monarchSpec s registry =
   let upkeep = Phase.Beginning BeginningStep.Upkeep
-      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice)) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
       settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       -- Alice's upkeep with Queen Marchesa already out, on `seats`, after
@@ -121,7 +123,7 @@ monarchSpec s registry =
           marchesa <- S.printingOf s registry "Queen Marchesa"
           let (oid, gs0) = S.addCreature marchesa S.alice (Setup.emptyGame S.threePlayers)
               entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-              crowned = resolveAll (settle (S.withEvents [GameEvent.Moved entered (Projection.project oid gs0)] gs0))
+              crowned = resolveAll (settle (S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project oid gs0))] gs0))
           Spec.assertEqWith s "alice is the monarch" (GameState.monarch crowned) (Just S.alice)
           noToken (resolveAll (settle (beginUpkeep crowned)))
 

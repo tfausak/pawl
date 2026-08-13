@@ -39,6 +39,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -181,7 +182,7 @@ returnable :: GameState -> [(PlayerId, ObjectId)]
 returnable gs =
   let arrivals = Maybe.mapMaybe arrivalOf (Event.unscannedSbaEvents gs)
       arrivalOf event = case event of
-        GameEvent.Moved zc _
+        GameEvent.Moved (Moved.MkMoved zc _)
           | elem (ZoneChange.to zc) [Zone.Graveyard, Zone.Exile] -> Just (ZoneChange.object zc)
         _ -> Nothing
       stillThere oid = case Game.lookupObject oid gs of

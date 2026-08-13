@@ -50,6 +50,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
@@ -99,6 +100,8 @@ import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Mode as Mode
@@ -3964,7 +3967,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           Monad.when (maybe False (not . Set.member designation . Object.designations) (Game.lookupObject target gs)) $ do
             State.modify'
               (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.designations = Set.insert designation (Object.designations o)}) target (GameState.objects g)})
-            State.modify' (Event.recordEvent (GameEvent.BecameDesignated designation target))
+            State.modify' (Event.recordEvent (GameEvent.BecameDesignated (BecameDesignated.MkBecameDesignated designation target)))
       _ -> pure ()
   -- CR 701.60a's other ending, "until a spell or ability causes it to no longer be
   -- suspected". The write Designate above makes, undone for that one designation;
@@ -4020,7 +4023,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         Nothing -> pure ()
         Just target -> do
           _ <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
-          State.modify' (Event.recordEvent (GameEvent.Mentored source target))
+          State.modify' (Event.recordEvent (GameEvent.Mentored (Mentored.MkMentored source target)))
       _ -> pure ()
   -- CR 731.1: the GAME gains the designation. Everything about what that entails
   -- -- CR 731.1's at-most-one, and the CR 702.145c/f transforms it causes
@@ -4497,8 +4500,8 @@ changeLife pid delta =
   Monad.when (delta /= 0) . State.modify' $
     Event.recordEvent
       ( if delta > 0
-          then GameEvent.LifeGained pid (Integer.toNaturalSaturating delta)
-          else GameEvent.LifeLost pid (Integer.toNaturalSaturating (negate delta))
+          then GameEvent.LifeGained (LifeChange.MkLifeChange pid (Integer.toNaturalSaturating delta))
+          else GameEvent.LifeLost (LifeChange.MkLifeChange pid (Integer.toNaturalSaturating (negate delta)))
       )
       . (\g -> g {GameState.players = Map.adjust (\p -> p {Player.life = Player.life p + delta}) pid (GameState.players g)})
 

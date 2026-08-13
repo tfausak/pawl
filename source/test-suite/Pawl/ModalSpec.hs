@@ -42,6 +42,7 @@ import qualified Pawl.Types.Modal as ModalT
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
@@ -413,7 +414,7 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
     let gs0 = S.landsInPlay mountain 2
         (smtId, gs1) = S.addCreature smtPrinting S.alice gs0
         entered = ZoneChange.MkZoneChange smtId smtId Zone.Stack Zone.Battlefield
-        gs2 = S.withEvents [GameEvent.Moved entered (Projection.project smtId gs1)] gs1
+        gs2 = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project smtId gs1))] gs1
         answer :: Prompt.Prompt r -> r
         answer = S.identityAnswer
         placed = snd (Engine.runGamePure answer gs2 Engine.placePendingTriggers)

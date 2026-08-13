@@ -88,16 +88,24 @@ library codec
     Pawl.Codec.AttachTargetSpec
     Pawl.Codec.AttackCost
     Pawl.Codec.AttackCostSpec
+    Pawl.Codec.AttackerBlocked
+    Pawl.Codec.AttackerBlockedSpec
     Pawl.Codec.AttackRequirement
     Pawl.Codec.AttackRequirementSpec
+    Pawl.Codec.BecameDesignated
+    Pawl.Codec.BecameDesignatedSpec
     Pawl.Codec.BeginningStep
     Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
     Pawl.Codec.BindingSpec
+    Pawl.Codec.BlockerDeclared
+    Pawl.Codec.BlockerDeclaredSpec
     Pawl.Codec.BlockPermission
     Pawl.Codec.BlockPermissionSpec
     Pawl.Codec.BlockRequirement
     Pawl.Codec.BlockRequirementSpec
+    Pawl.Codec.BlocksDeclared
+    Pawl.Codec.BlocksDeclaredSpec
     Pawl.Codec.CantBeBlockedBy
     Pawl.Codec.CantBeBlockedBySpec
     Pawl.Codec.Card
@@ -162,6 +170,8 @@ library codec
     Pawl.Codec.DamageKindSpec
     Pawl.Codec.DamagePattern
     Pawl.Codec.DamagePatternSpec
+    Pawl.Codec.DamagePrevented
+    Pawl.Codec.DamagePreventedSpec
     Pawl.Codec.DamageRewrite
     Pawl.Codec.DamageRewriteSpec
     Pawl.Codec.Daytime
@@ -184,6 +194,8 @@ library codec
     Pawl.Codec.DiscardCause
     Pawl.Codec.DiscardCauseSpec
     Pawl.Codec.DiscardSpec
+    Pawl.Codec.Drew
+    Pawl.Codec.DrewSpec
     Pawl.Codec.DungeonRoom
     Pawl.Codec.DungeonRoomSpec
     Pawl.Codec.Duration
@@ -230,6 +242,8 @@ library codec
     Pawl.Codec.LibraryPlacementSpec
     Pawl.Codec.LibraryPosition
     Pawl.Codec.LibraryPositionSpec
+    Pawl.Codec.LifeChange
+    Pawl.Codec.LifeChangeSpec
     Pawl.Codec.LimitUnless
     Pawl.Codec.LimitUnlessSpec
     Pawl.Codec.Loyalty
@@ -246,6 +260,8 @@ library codec
     Pawl.Codec.ManaSymbolSpec
     Pawl.Codec.ManaType
     Pawl.Codec.ManaTypeSpec
+    Pawl.Codec.Mentored
+    Pawl.Codec.MentoredSpec
     Pawl.Codec.Mill
     Pawl.Codec.MillSpec
     Pawl.Codec.MillTally
@@ -266,6 +282,8 @@ library codec
     Pawl.Codec.MonarchTargetSpec
     Pawl.Codec.MorphVariant
     Pawl.Codec.MorphVariantSpec
+    Pawl.Codec.Moved
+    Pawl.Codec.MovedSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
     Pawl.Codec.ObjectId
@@ -280,6 +298,8 @@ library codec
     Pawl.Codec.OptionalitySpec
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
+    Pawl.Codec.PermanentSacrificed
+    Pawl.Codec.PermanentSacrificedSpec
     Pawl.Codec.Phase
     Pawl.Codec.PhasePattern
     Pawl.Codec.PhasePatternSpec
@@ -372,6 +392,8 @@ library codec
     Pawl.Codec.SpellCastSpec
     Pawl.Codec.StaticAbility
     Pawl.Codec.StaticAbilitySpec
+    Pawl.Codec.StepBegan
+    Pawl.Codec.StepBeganSpec
     Pawl.Codec.StepBegins
     Pawl.Codec.StepBeginsSpec
     Pawl.Codec.Subtype
@@ -728,12 +750,16 @@ library types
     Pawl.Types.Asked
     Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
+    Pawl.Types.AttackerBlocked
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
+    Pawl.Types.BecameDesignated
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
+    Pawl.Types.BlockerDeclared
     Pawl.Types.BlockPermission
     Pawl.Types.BlockRequirement
+    Pawl.Types.BlocksDeclared
     Pawl.Types.CandidateId
     Pawl.Types.CantBeBlockedBy
     Pawl.Types.Card
@@ -774,6 +800,7 @@ library types
     Pawl.Types.DamageEvent
     Pawl.Types.DamageKind
     Pawl.Types.DamagePattern
+    Pawl.Types.DamagePrevented
     Pawl.Types.DamageRewrite
     Pawl.Types.Daytime
     Pawl.Types.DealDamage
@@ -791,6 +818,7 @@ library types
     Pawl.Types.Desync
     Pawl.Types.Discard
     Pawl.Types.DiscardCause
+    Pawl.Types.Drew
     Pawl.Types.DungeonRoom
     Pawl.Types.Duration
     Pawl.Types.DurationRef
@@ -828,6 +856,7 @@ library types
     Pawl.Types.Layout
     Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition
+    Pawl.Types.LifeChange
     Pawl.Types.LimitUnless
     Pawl.Types.Loyalty
     Pawl.Types.Mana
@@ -839,6 +868,7 @@ library types
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType
     Pawl.Types.ManaUnit
+    Pawl.Types.Mentored
     Pawl.Types.Mill
     Pawl.Types.MillTally
     Pawl.Types.Modal
@@ -851,6 +881,7 @@ library types
     Pawl.Types.MonarchTarget
     Pawl.Types.MonarchWatch
     Pawl.Types.MorphVariant
+    Pawl.Types.Moved
     Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer
@@ -865,6 +896,7 @@ library types
     Pawl.Types.PaymentDecision
     Pawl.Types.PendingTrigger
     Pawl.Types.PermanentBecomesDesignated
+    Pawl.Types.PermanentSacrificed
     Pawl.Types.Phase
     Pawl.Types.PhasedOut
     Pawl.Types.PhasePattern
@@ -930,6 +962,7 @@ library types
     Pawl.Types.SpellCast
     Pawl.Types.StaticAbility
     Pawl.Types.Status
+    Pawl.Types.StepBegan
     Pawl.Types.StepBegins
     Pawl.Types.Subtype
     Pawl.Types.SubtypeFamily

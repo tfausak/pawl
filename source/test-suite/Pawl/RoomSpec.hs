@@ -64,6 +64,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
@@ -133,7 +134,7 @@ resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
 beginEndStep :: GameState.GameState -> GameState.GameState
 beginEndStep gs =
   Event.recordEvent
-    (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
+    (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice))
     (gs {GameState.phase = Phase.Ending EndingStep.EndStep})
 
 -- The Room permanent on the battlefield: the one permanent that is not a land

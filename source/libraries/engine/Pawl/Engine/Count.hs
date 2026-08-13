@@ -28,6 +28,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -353,7 +354,7 @@ playersFor context gs ref =
 -- supertype filter over a past event answers False (#646).
 snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
 snapshotView gs shape event = case event of
-  GameEvent.Moved zc snapshot -> case shape of
+  GameEvent.Moved (Moved.MkMoved zc snapshot) -> case shape of
     EventShape.MovedBetween from to ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to
         then -- CR 608.2h: who controlled it and what KIND of object it was, read
@@ -377,8 +378,8 @@ snapshotView gs shape event = case event of
   GameEvent.DamageDealt _ -> Nothing
   -- CR 615.13's record names a recipient and an amount and snapshots no
   -- characteristics, so there is nothing for a Filter to look at.
-  GameEvent.DamagePrevented _ _ -> Nothing
-  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
   -- CR 601.2i's cast, read from the snapshot the event took as the spell became
   -- cast rather than off the stack: by the time a look-back count folds the log
   -- that spell has resolved or been countered, so the live object is gone.
@@ -400,7 +401,7 @@ snapshotView gs shape event = case event of
   -- the same discard emits is what carries one -- so there is nothing here for
   -- an EventShape to match against.
   GameEvent.Discarded {} -> Nothing
-  GameEvent.Drew _ _ -> Nothing
+  GameEvent.Drew {} -> Nothing
   -- A reveal DOES carry a characteristics snapshot, as the two arms above do,
   -- and is still Nothing here: no EventShape names revealing. This becomes a
   -- real view the day one does (#162).
@@ -408,9 +409,9 @@ snapshotView gs shape event = case event of
   -- The same reason, with no snapshot to offer either: no EventShape names an
   -- attacker being declared (CR 508.2b).
   GameEvent.AttackerDeclared {} -> Nothing
-  GameEvent.BlockerDeclared _ _ -> Nothing
-  GameEvent.BlocksDeclared _ _ -> Nothing
-  GameEvent.AttackerBlocked _ _ -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
   -- A countering (CR 701.6a) does move the spell, but this event is not that
   -- move: Event.counter records a Moved event alongside this one, and matching
   -- both would count one countering twice. It carries no snapshot either.
@@ -418,14 +419,14 @@ snapshotView gs shape event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
-  GameEvent.BecameDesignated _ _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
   GameEvent.Evolved _ -> Nothing
   GameEvent.Mentored {} -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
-  GameEvent.LifeLost _ _ -> Nothing
-  GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
   -- CR 122.6's placement names an object by id and snapshots no characteristics,
   -- and no EventShape names it either.
   GameEvent.CountersPut {} -> Nothing

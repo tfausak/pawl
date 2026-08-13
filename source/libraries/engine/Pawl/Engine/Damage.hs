@@ -27,11 +27,13 @@ import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.DamagePrevented as DamagePrevented
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -894,7 +896,7 @@ applyDamage events = do
         Recipient.ToPlayer pid
           | not (DamageEvent.dealtByInfect ev),
             DamageEvent.amount ev > 0 ->
-              [GameEvent.LifeLost pid (DamageEvent.amount ev)]
+              [GameEvent.LifeLost (LifeChange.MkLifeChange pid (DamageEvent.amount ev))]
         _ -> []
       -- CR 120.3f's gain, recorded where `gainOne` above performs it, so that
       -- "whenever you gain life" sees lifelink (CR 702.15b) and not only an
@@ -918,7 +920,7 @@ applyDamage events = do
       -- quantity -- so this restates the rule at the site that writes the record
       -- instead of resting on an invariant two modules away.
       lifeGainedBy ev = case DamageEvent.dealtByLifelink ev of
-        Just pid | DamageEvent.amount ev > 0 -> [GameEvent.LifeGained pid (DamageEvent.amount ev)]
+        Just pid | DamageEvent.amount ev > 0 -> [GameEvent.LifeGained (LifeChange.MkLifeChange pid (DamageEvent.amount ev))]
         _ -> []
       -- CR 310.6's counter removal, recorded so CR 310.11b's "when the last
       -- defense counter is removed" has an event to fire off.
@@ -1038,7 +1040,7 @@ applyDamage events = do
         let marked = List.foldl' markOne gs survivors
             gained = List.foldl' gainOne marked survivors
             tallied = List.foldl' tallyOne gained survivors
-            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) tallied prevented
+            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented (Prevention.recipient p) (Prevention.amount p))) g) tallied prevented
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
          in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
             -- the damage that caused them, which is the same reasoning the

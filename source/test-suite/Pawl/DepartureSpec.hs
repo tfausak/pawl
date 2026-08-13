@@ -26,6 +26,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
+import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Phase as Phase
@@ -58,7 +59,7 @@ crownedIn event = case event of
 entersResolved :: ObjectId -> GameState.GameState -> GameState.GameState
 entersResolved oid gs =
   let entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
-      withEvent = S.withEvents [GameEvent.Moved entered (Projection.project oid gs)] gs
+      withEvent = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project oid gs))] gs
    in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
 
 -- bob's Meandering Towershell, stolen by alice's Control Magic, on a board that
