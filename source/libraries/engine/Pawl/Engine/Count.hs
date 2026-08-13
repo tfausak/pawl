@@ -372,7 +372,7 @@ snapshotView gs shape event = case event of
   -- A reveal DOES carry a characteristics snapshot, as the two arms above do,
   -- and is still Nothing here: no EventShape names revealing. This becomes a
   -- real view the day one does (#162).
-  GameEvent.Revealed _ _ -> Nothing
+  GameEvent.Revealed {} -> Nothing
   -- The same reason, with no snapshot to offer either: no EventShape names an
   -- attacker being declared (CR 508.2b).
   GameEvent.AttackerDeclared {} -> Nothing

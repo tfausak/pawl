@@ -13,6 +13,7 @@ import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
+import qualified Pawl.Codec.RevealCause as RevealCause
 import qualified Pawl.Codec.RoomIndex as RoomIndex
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.Codec.ZoneChange as ZoneChange
@@ -33,7 +34,8 @@ toJson e = case e of
   GameEvent.Discarded pid oid cause ->
     Common.tagged "Discarded" . Just . Value.array $ [Codec.encode PlayerId.codec pid, Codec.encode ObjectId.codec oid, Codec.encode DiscardCause.codec cause]
   GameEvent.Drew pid nth -> Common.tagged "Drew" . Just . Value.array $ [Codec.encode PlayerId.codec pid, Common.encodeNatural nth]
-  GameEvent.Revealed pid pc -> Common.tagged "Revealed" . Just . Value.array $ [Codec.encode PlayerId.codec pid, ProjectedCharacteristics.toJson pc]
+  GameEvent.Revealed pid oid cause pc ->
+    Common.tagged "Revealed" . Just . Value.array $ [Codec.encode PlayerId.codec pid, Codec.encode ObjectId.codec oid, Codec.encode RevealCause.codec cause, ProjectedCharacteristics.toJson pc]
   GameEvent.AttackerDeclared oid pid count -> Common.tagged "AttackerDeclared" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode PlayerId.codec pid, Common.encodeNatural count]
   GameEvent.BlockerDeclared blocker attacker -> Common.tagged "BlockerDeclared" . Just . Value.array $ [Codec.encode ObjectId.codec blocker, Codec.encode ObjectId.codec attacker]
   GameEvent.BlocksDeclared blocker count -> Common.tagged "BlocksDeclared" . Just . Value.array $ [Codec.encode ObjectId.codec blocker, Common.encodeNatural count]
@@ -72,7 +74,8 @@ fromJson value = do
     ("Discarded", Just (Value.Array (Array.MkArray [pid, oid, cause]))) ->
       GameEvent.Discarded <$> Codec.decode PlayerId.codec pid <*> Codec.decode ObjectId.codec oid <*> Codec.decode DiscardCause.codec cause
     ("Drew", Just (Value.Array (Array.MkArray [pid, nth]))) -> GameEvent.Drew <$> Codec.decode PlayerId.codec pid <*> Common.decodeNatural nth
-    ("Revealed", Just (Value.Array (Array.MkArray [pid, pc]))) -> GameEvent.Revealed <$> Codec.decode PlayerId.codec pid <*> ProjectedCharacteristics.fromJson pc
+    ("Revealed", Just (Value.Array (Array.MkArray [pid, oid, cause, pc]))) ->
+      GameEvent.Revealed <$> Codec.decode PlayerId.codec pid <*> Codec.decode ObjectId.codec oid <*> Codec.decode RevealCause.codec cause <*> ProjectedCharacteristics.fromJson pc
     ("AttackerDeclared", Just (Value.Array (Array.MkArray [oid, pid, count]))) -> GameEvent.AttackerDeclared <$> Codec.decode ObjectId.codec oid <*> Codec.decode PlayerId.codec pid <*> Common.decodeNatural count
     ("BlockerDeclared", Just (Value.Array (Array.MkArray [blocker, attacker]))) -> GameEvent.BlockerDeclared <$> Codec.decode ObjectId.codec blocker <*> Codec.decode ObjectId.codec attacker
     ("BlocksDeclared", Just (Value.Array (Array.MkArray [blocker, count]))) -> GameEvent.BlocksDeclared <$> Codec.decode ObjectId.codec blocker <*> Common.decodeNatural count

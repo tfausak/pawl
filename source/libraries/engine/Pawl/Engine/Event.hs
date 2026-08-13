@@ -108,6 +108,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import Pawl.Types.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -273,7 +274,7 @@ movedOf event = case event of
   GameEvent.Drew _ _ -> Nothing
   -- CR 701.20b: a reveal is never a zone change, even when the card is about to
   -- make one.
-  GameEvent.Revealed _ _ -> Nothing
+  GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
   GameEvent.BlockerDeclared _ _ -> Nothing
   GameEvent.BlocksDeclared _ _ -> Nothing
@@ -307,7 +308,7 @@ damageOf event = case event of
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Drew _ _ -> Nothing
-  GameEvent.Revealed _ _ -> Nothing
+  GameEvent.Revealed {} -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
   GameEvent.BlockerDeclared _ _ -> Nothing
   GameEvent.BlocksDeclared _ _ -> Nothing
@@ -331,7 +332,7 @@ damageOf event = case event of
 -- Who revealed what, if the event is a reveal (CR 701.20a).
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
 revealOf event = case event of
-  GameEvent.Revealed pid snapshot -> Just (pid, snapshot)
+  GameEvent.Revealed pid _ _ snapshot -> Just (pid, snapshot)
   GameEvent.Moved _ _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented _ _ -> Nothing
@@ -2717,6 +2718,11 @@ recordTokenEntry newId = do
 -- card can ask (CR 702.94a). Both happen only when the card actually moved --
 -- an empty library draws nothing, and a CR 616.1 loop that cancelled the move
 -- means no card reached the hand, so neither is a draw to count.
+--
+-- CR 121.9's reveal window closes the draw, and it is inside this funnel rather
+-- than beside its callers because rule 121.9 says "as they draw it": every route
+-- that draws -- the draw step, an opening hand, a Draw effect -- opens the same
+-- window, and none of them learns that it did.
 drawCard :: PlayerId -> Game ()
 drawCard pid = do
   gs <- State.get
@@ -2726,11 +2732,50 @@ drawCard pid = do
       moved <- changeZoneReturning top Zone.Hand
       case moved of
         Nothing -> pure ()
-        Just _ -> do
+        Just drawn -> do
           nth <- State.state $ \g ->
             let tally = Map.insertWith (+) pid 1 (GameState.drawsThisTurn g)
              in (Map.findWithDefault 1 pid tally, g {GameState.drawsThisTurn = tally})
           State.modify' (recordEvent (GameEvent.Drew pid nth))
+          -- CR 702.94a's "if it's the FIRST card you've drawn this turn", asked
+          -- off the ordinal this draw was just stamped with rather than off a
+          -- second reading of the tally.
+          Monad.when (nth == 1) (offerMiracleReveal pid drawn)
+
+-- CR 702.94a's static half, and CR 121.9's window: "you may reveal this card from
+-- your hand as you draw it". Asked of the card that just arrived in the hand, and
+-- only when it has a miracle ability to ask about -- CR 702.94a is the whole of
+-- what puts a question here, so an ordinary draw of an ordinary card raises
+-- nothing.
+--
+-- The FIRST-DRAW gate is the caller's, since it is the ordinal the draw already
+-- carries. Dropping it would make pawl's miracle cards WEAKER than printed, which
+-- is the direction that is never admissible.
+--
+-- CR 121.9's "may look at that card as they draw it before choosing" is satisfied
+-- by the prompt naming the card. pawl has no per-player hidden-information filter
+-- at all (#322's last section), so nothing here could have shown the player less
+-- than the rule allows.
+--
+-- The reveal goes through the ordinary funnel with CR 702.94a's cause, which is
+-- what makes the linked trigger (CR 603.11) findable: `eventTriggers`' hand source
+-- reads that event and nothing else knows a miracle happened.
+--
+-- Not implemented: CR 702.94b's LASTING reveal -- the card stays revealed until it
+-- leaves the hand or the ability leaves the stack -- which needs the per-object
+-- flag #185 and #282 are about (#1408). Nor CR 121.8's face-down drawn card
+-- (#1409).
+offerMiracleReveal :: PlayerId -> ObjectId -> Game ()
+offerMiracleReveal pid drawn = do
+  gs <- State.get
+  case Game.faceOf drawn gs of
+    Just face | Maybe.isJust (Keyword.miracleCost (Face.keywords face)) -> do
+      let decider = Decide.deciderFor pid gs
+      decision <- Game.choose (Prompt.OfferedMiracleReveal decider pid drawn (Face.name face))
+      case decision of
+        OptionalDecision.Declines -> pure ()
+        OptionalDecision.Exercises -> reveal RevealCause.ForMiracle pid drawn
+    _ -> pure ()
 
 -- The single discard funnel (CR 701.9a). `pid` is the discarding player, whom that
 -- rule makes the card's owner either way, and `cause` is why (see DiscardCause).
@@ -2762,11 +2807,14 @@ discard cause pid oid = do
 -- has to show what a player at the table would see. They now AGREE on CR 208.2a's
 -- characteristic-defining power, which Projection.viewOfCardIn evaluates in every
 -- zone as CR 604.3 requires. No card in the pool makes them differ today.
-reveal :: PlayerId -> ObjectId -> Game ()
-reveal pid oid = do
+-- The `cause` is CR 702.94a's "this way" (see RevealCause): every caller but the
+-- draw funnel's miracle window shows a card for a reason no rule asks about
+-- again, and passes Ordinary.
+reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
+reveal cause pid oid = do
   gs <- State.get
   Monad.when (Maybe.isJust (Game.lookupObject oid gs)) $
-    State.modify' (recordEvent (GameEvent.Revealed pid (Projection.project oid gs)))
+    State.modify' (recordEvent (GameEvent.Revealed pid oid cause (Projection.project oid gs)))
 
 -- CR 508.3a / 608.2i: how many times this object has been declared as an attacker
 -- this turn, read out of the turn-scoped event log. Only Combat.declareAttackers
@@ -2829,7 +2877,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -2885,7 +2933,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -2916,7 +2964,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -2953,7 +3001,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3002,7 +3050,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3046,7 +3094,59 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+  -- CR 702.94a: the bearer IS the card that was revealed, and the reveal was
+  -- miracle's own. SelfCycled's shape one rule over, cause and all -- and for the
+  -- same reason: the same card shown by an ordinary reveal reaches the same log
+  -- through the same funnel and must fire nothing. That is rule 702.94a's "THIS
+  -- WAY", and CR 603.11 is what makes the two halves one ability.
+  --
+  -- The Ordinary arm is a REGRESSION FENCE rather than proven behaviour, and so
+  -- is `revealedInHand`'s: no printing reveals a card in a HAND for any other
+  -- reason -- an activation cost paid from a hidden zone is the pool's only
+  -- ordinary hand reveal, and no card carries both miracle and such an ability --
+  -- so no board tells the two readings apart, and neither gate can be broken on
+  -- its own while the other stands. Written because the rule says it.
+  --
+  -- The id in the event is the incarnation that reached the hand, which is the
+  -- object the hand source offers as the bearer -- no CR 400.7 step separates
+  -- them, since CR 701.20b moves nothing.
+  --
+  -- The FIRST-DRAW gate is NOT re-asked here. Rule 702.94a states it on the
+  -- static half, so it decides whether the reveal happens at all
+  -- (Event.offerMiracleReveal); a reveal that happened cannot have been the wrong
+  -- draw, and re-reading GameState.drawsThisTurn at the scan would ask about the
+  -- board one CR 117.5 boundary later.
+  TriggerCondition.SelfRevealedForMiracle -> case event of
+    GameEvent.Revealed _ oid RevealCause.ForMiracle _ -> oid == bearer
+    GameEvent.Revealed _ _ RevealCause.Ordinary _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew _ _ -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3094,7 +3194,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3140,7 +3240,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3185,7 +3285,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3233,7 +3333,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3289,7 +3389,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3334,7 +3434,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3384,7 +3484,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3428,7 +3528,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3465,7 +3565,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3500,7 +3600,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3551,7 +3651,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3590,7 +3690,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3636,7 +3736,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3678,7 +3778,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3713,7 +3813,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3755,7 +3855,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3797,7 +3897,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3852,7 +3952,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3897,7 +3997,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3942,7 +4042,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -3987,7 +4087,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4041,7 +4141,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4092,7 +4192,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4149,7 +4249,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4197,7 +4297,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4234,7 +4334,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4304,7 +4404,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4333,7 +4433,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.BecameMonarch _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4381,7 +4481,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4423,7 +4523,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4483,7 +4583,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4521,7 +4621,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4565,7 +4665,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4600,7 +4700,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4652,7 +4752,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4692,7 +4792,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4766,7 +4866,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4817,7 +4917,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4853,7 +4953,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew _ _ -> False
-    GameEvent.Revealed _ _ -> False
+    GameEvent.Revealed {} -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -4901,6 +5001,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
+  TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.PlayerDiscards _ -> False
   -- CR 121.1's draw is something that happens to a player, not an ability
   -- triggering.
@@ -5285,6 +5386,10 @@ eventBindingSlots cond = case cond of
   -- CR 702.29c's cycled card is the bearer itself, already bound as CR 113.7's
   -- source.
   TriggerCondition.SelfCycled -> Set.empty
+  -- CR 702.94a's revealed card is the bearer itself, already bound as CR 113.7's
+  -- source, and the revealing player is its owner -- the same seat CR 113.8 makes
+  -- the ability's controller, whom Binding.setYou already names.
+  TriggerCondition.SelfRevealedForMiracle -> Set.empty
   -- CR 701.9a's discarding player, which is nobody the bearer already names --
   -- Megrim's "that player" is the opponent whose hand the card left.
   TriggerCondition.PlayerDiscards _ -> Set.singleton Binding.triggerPlayer
@@ -5614,6 +5719,7 @@ looksBack condition = case condition of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
+  TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.PlayerDrawsNthCard _ _ -> False
   TriggerCondition.SelfAttacks _ -> False
@@ -5662,8 +5768,9 @@ looksBack condition = case condition of
 -- The battlefield is not the only scanned zone -- every GRAVEYARD and the whole
 -- EXILE zone are scanned for the abilities CR 113.6k puts there, a spell that
 -- just became cast is offered from the STACK for the same rule, and an EMBLEM is
--- offered from the command zone under CR 114.4. The hand is unscanned, and so is
--- the rest of the command zone (#348).
+-- offered from the command zone under CR 114.4, and the card a player revealed as
+-- they drew it is offered from their HAND under CR 113.6k. The rest of the command
+-- zone is unscanned (#348).
 --
 -- CR 603.10's FIRST sentence is a per-EVENT question, and the live battlefield set
 -- answers a per-BOUNDARY one: the scan runs once at CR 117.5, after CR 704.5's
@@ -5830,7 +5937,7 @@ eventTriggers events gs =
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.Discarded {} -> Map.empty
         GameEvent.Drew _ _ -> Map.empty
-        GameEvent.Revealed _ _ -> Map.empty
+        GameEvent.Revealed {} -> Map.empty
         GameEvent.AttackerDeclared {} -> Map.empty
         GameEvent.BlockerDeclared _ _ -> Map.empty
         GameEvent.BlocksDeclared _ _ -> Map.empty
@@ -5938,9 +6045,10 @@ eventTriggers events gs =
             Nothing -> Map.empty
             Just face -> Map.singleton oid (Object.owner obj, Face.triggeredAbilities face)
         GameEvent.Discarded _ _ DiscardCause.Ordinary -> Map.empty
-        -- A draw names no object either, and the card it puts in a hand bears no
-        -- ability that would trigger from there: CR 702.94a's miracle is the one
-        -- shape that would, and pawl has no such condition (#1351).
+        -- A draw names no object either. The card it puts in a hand may well bear
+        -- an ability that triggers from there -- CR 702.94a's miracle -- but that
+        -- one fires on the REVEAL rather than on the draw, and `revealedInHand`
+        -- below is its source.
         GameEvent.Drew _ _ -> Map.empty
         GameEvent.Moved _ _ -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
@@ -5948,9 +6056,9 @@ eventTriggers events gs =
         GameEvent.StepBegan _ _ -> Map.empty
         GameEvent.SpellCast {} -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
-        -- A reveal names no object at all, so there is nothing to hang an ability
-        -- on; a card triggering on a reveal would need a condition first (#322).
-        GameEvent.Revealed _ _ -> Map.empty
+        -- A reveal is not a cycling, whatever it showed. `revealedInHand` below is
+        -- what hangs an ability on the card a reveal names.
+        GameEvent.Revealed {} -> Map.empty
         GameEvent.AttackerDeclared {} -> Map.empty
         GameEvent.BlockerDeclared _ _ -> Map.empty
         GameEvent.BlocksDeclared _ _ -> Map.empty
@@ -6055,7 +6163,7 @@ eventTriggers events gs =
         GameEvent.DamagePrevented _ _ -> Map.empty
         GameEvent.StepBegan _ _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
-        GameEvent.Revealed _ _ -> Map.empty
+        GameEvent.Revealed {} -> Map.empty
         GameEvent.AttackerDeclared {} -> Map.empty
         GameEvent.BlockerDeclared _ _ -> Map.empty
         GameEvent.BlocksDeclared _ _ -> Map.empty
@@ -6117,6 +6225,68 @@ eventTriggers events gs =
       inCommand =
         Map.fromList
           (Maybe.mapMaybe emblemCandidate (Set.toAscList (GameState.command gs)))
+      -- CR 113.6k's last zone, and the one #348 was waiting on: the card a player
+      -- just revealed from their HAND as they drew it (CR 702.94a, CR 121.9). The
+      -- ability is borne by an object that is on nobody's battlefield, in nobody's
+      -- graveyard and on no stack -- rule 701.20b moved it nowhere -- so no source
+      -- above can reach it.
+      --
+      -- Scoped to the reveal EVENT rather than computed once over every hand,
+      -- which is `cycledCard`'s and `spellCast`'s shape rather than `inExile`'s.
+      -- The reason is the rule: rule 702.94a's trigger fires on a reveal and
+      -- nothing else, and no ability in the pool sits in a hand watching for
+      -- something no event names -- where a haunting card sits in exile
+      -- indefinitely and only a standing scan could find it. A standing walk of
+      -- every hand would answer alike at the cost of a scan per event.
+      --
+      -- FILTERED BY `functionsIn`, like `inExile` and unlike the command zone's
+      -- emblem source: the rule at issue here IS CR 113.6k. Without it a drawn
+      -- Doomed Traveler would be offered its dies trigger from a hand.
+      --
+      -- The abilities are the PRINTED ones plus the ones rule 702 MINTS from the
+      -- card's printed keywords -- and miracle's is entirely the latter, so
+      -- dropping the mint would leave this source with nothing to find. Printed
+      -- keywords rather than a projection's, for `cycledCard`'s reason (#160).
+      --
+      -- The controller is the OWNER, CR 113.8's second clause, for `inGraveyards`'
+      -- reason: CR 108.4 gives a card in a hand no controller. Rule 702.94a's
+      -- reveal is one a player makes from their own hand, so the owner is also the
+      -- revealer, and CR 109.5's "you" lands on the same seat either way.
+      revealedInHand event = case event of
+        GameEvent.Revealed _ oid RevealCause.ForMiracle _ -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
+          (Just obj, Just face) ->
+            case filter (functionsIn Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywords face)) of
+              [] -> Map.empty
+              abilities -> Map.singleton oid (Object.owner obj, abilities)
+          _ -> Map.empty
+        GameEvent.Revealed _ _ RevealCause.Ordinary _ -> Map.empty
+        GameEvent.Discarded {} -> Map.empty
+        GameEvent.Drew _ _ -> Map.empty
+        GameEvent.Moved _ _ -> Map.empty
+        GameEvent.DamageDealt _ -> Map.empty
+        GameEvent.DamagePrevented _ _ -> Map.empty
+        GameEvent.StepBegan _ _ -> Map.empty
+        GameEvent.SpellCast {} -> Map.empty
+        GameEvent.BecameMonarch _ -> Map.empty
+        GameEvent.AttackerDeclared {} -> Map.empty
+        GameEvent.BlockerDeclared _ _ -> Map.empty
+        GameEvent.BlocksDeclared _ _ -> Map.empty
+        GameEvent.AttackerBlocked _ _ -> Map.empty
+        GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.HalfUnlocked {} -> Map.empty
+        GameEvent.TurnedFaceUp _ -> Map.empty
+        GameEvent.BecameDesignated _ _ -> Map.empty
+        GameEvent.Evolved _ -> Map.empty
+        GameEvent.Mentored {} -> Map.empty
+        GameEvent.PermanentSacrificed {} -> Map.empty
+        GameEvent.AbilityTriggered {} -> Map.empty
+        GameEvent.LoyaltyAbilityActivated _ -> Map.empty
+        GameEvent.LifeLost _ _ -> Map.empty
+        GameEvent.LifeGained _ _ -> Map.empty
+        GameEvent.CountersPut {} -> Map.empty
+        GameEvent.CountersRemoved {} -> Map.empty
+        GameEvent.ControlChanged {} -> Map.empty
+        GameEvent.VentureMarkerEntered {} -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
         let -- The bearer's own slot environment, so a condition naming a slot
             -- (TriggerCondition.LoseControlOfBound) is read the same way here as it
@@ -6139,8 +6309,9 @@ eventTriggers events gs =
       -- emblem into the command zone, and no rule or effect in pawl moves one
       -- anywhere else -- Event.createEmblem is its only writer. Nor does
       -- `inExile`: CR 400.1 makes exile a zone of its own, and an id in it is in
-      -- no other.
-      candidates event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, inGraveyards, inCommand, inExile])
+      -- no other. Nor does `revealedInHand`: CR 701.20b leaves the revealed card
+      -- in the hand, which no other source reads.
+      candidates event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, inGraveyards, inCommand, inExile])
       scanOne later same event = concatMap (forOne event) (candidates event later same)
    in concat (List.zipWith3 (\block later same -> concatMap (scanOne later same . snd) block) groups laterGroups sameGroup)
 
@@ -6201,9 +6372,9 @@ functionsIn zone ability = case zoneFunctionedFrom ability of
 -- ability whose first condition functions from the battlefield and whose second
 -- functions from exile, and no single zone describes it.
 --
--- The graveyard, the stack and exile are the three non-battlefield answers
--- eventTriggers can act on, being the non-battlefield zones this rule sends it
--- to; the hand is still unscanned (#348). The command zone IS scanned too, but by
+-- The graveyard, the stack, exile and the hand are the four non-battlefield
+-- answers eventTriggers can act on, being the non-battlefield zones this rule
+-- sends it to. The command zone IS scanned too, but by
 -- a source CR 114.4 governs rather than this rule, so this function's one Command
 -- answer -- CR 309.4c's room ability -- still goes unconsulted.
 --
@@ -6299,12 +6470,17 @@ zonesTriggeredFrom cond = case cond of
   -- in, the graveyard for every printing in this pool, and a cycled card cannot be
   -- on the battlefield. eventTriggers' `cycledCard` is what actually serves it.
   TriggerCondition.SelfCycled -> Set.singleton Zone.Graveyard
+  -- CR 113.6k's fourth zone: rule 702.94a's reveal happens FROM a hand and rule
+  -- 701.20b leaves the card there, so this condition cannot trigger from the
+  -- battlefield at all and the hand is the one zone it can. eventTriggers'
+  -- `revealedInHand` is what serves it.
+  TriggerCondition.SelfRevealedForMiracle -> Set.singleton Zone.Hand
   -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
   -- graveyard does not see an opponent discard.
   TriggerCondition.PlayerDiscards _ -> battlefield
   -- CR 113.6's default again: Erudite Wizard watches its controller's draws from
-  -- the battlefield. CR 702.94a's miracle is the condition that would answer a
-  -- hand here, and is not this one (#1351).
+  -- the battlefield. CR 702.94a's miracle answers a hand below, and it is a
+  -- different condition -- it watches the REVEAL, not the draw.
   TriggerCondition.PlayerDrawsNthCard _ _ -> battlefield
   -- The condition this predicate exists for: a card cannot be put into a graveyard
   -- from a library while on the battlefield, so this can never trigger from there
@@ -6451,6 +6627,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.SelfCycled -> False
+  TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.PlayerDrawsNthCard _ _ -> False
   -- CR 508.1a makes this the ACTIVE player's turn, which is not the same thing:
@@ -6606,6 +6783,7 @@ stateTriggers gs
               TriggerCondition.SelfBecomesBlockedBy _ -> False
               TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
               TriggerCondition.SelfCycled -> False
+              TriggerCondition.SelfRevealedForMiracle -> False
               TriggerCondition.PlayerDiscards _ -> False
               TriggerCondition.PlayerDrawsNthCard _ _ -> False
               TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False

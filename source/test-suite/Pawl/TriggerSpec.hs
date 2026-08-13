@@ -147,7 +147,9 @@
 -- "only once when a card is cycled", with Megrim -- `discardTriggerSpec`.
 -- CR 121.1's draw read for WHICH draw of the turn it was, across a turn boundary
 -- so the count is shown to reset, with Erudite Wizard reading draws made by
--- Think Twice -- `drawTriggerSpec`.
+-- Think Twice -- `drawTriggerSpec`. CR 702.94a's miracle, whose reveal-as-drawn
+-- window (CR 121.9) is the pool's one ability borne by a card still in a HAND,
+-- with Thunderous Wrath -- `miracleSpec`.
 -- CR 603.3a's controller read AT THE TRIGGER MOMENT rather than at the CR 117.5
 -- scan, with a Megrim stolen until end of turn by Zealous Conscripts and handed
 -- back by CR 514.2 before CR 514.3a places the trigger --
@@ -284,6 +286,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -3038,6 +3041,165 @@ resolveCastBy :: PlayerId.PlayerId -> GameState.GameState -> ObjectId.ObjectId -
 resolveCastBy pid gs oid =
   let cast = S.runPure S.identityAnswer gs (S.cast pid oid)
    in S.runPure S.identityAnswer cast Engine.priorityLoop
+
+-- CR 702.94a's miracle: the reveal-as-you-drawn window (CR 121.9) and the linked
+-- triggered ability (CR 603.11) it opens.
+--
+-- Thunderous Wrath, {4}{R}{R} Instant, "Thunderous Wrath deals 5 damage to any
+-- target." plus "Miracle {R}", is the producer -- every clause expressible, and
+-- the cost gap between {4}{R}{R} and {R} is what makes the alternative cost
+-- observable at all: alice never has six mana on any of these boards, so a leg
+-- that dealt 5 damage can only have paid the miracle cost.
+--
+-- The draws are Think Twice's, {1}{U} Instant "Draw a card", and the draw step's,
+-- for `drawTriggerSpec`'s reasons. bob is the victim throughout and starts every
+-- leg at the same life, so "5 damage happened" is one subtraction either way.
+--
+-- Every assertion reads the BOARD -- bob's life, and which zone the Wrath is in
+-- -- rather than whether a prompt was raised.
+miracleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+miracleSpec s registry =
+  Spec.describe s "Miracle" $ do
+    -- THE case, and its two negatives on one board: the same first draw of the
+    -- same turn, answered three ways. CR 702.94a's two "may"s are separate
+    -- questions, so declining the reveal and declining the cast are different
+    -- boards -- the third leg reveals and still does not cast.
+    Spec.it s "CR 702.94a a revealed first draw may be cast for its miracle cost, and both 'may's are the player's" $ do
+      island <- S.printingOf s registry "Island"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      thunder <- S.printingOf s registry "Thunderous Wrath"
+      let (gs, thinks) = miracleBoard island mountain piker think thunder 1 0
+          wrath = S.printingName thunder
+      case thinks of
+        [thinkId] -> do
+          let cast = resolveCastWith (miracleAnswer OptionalDecision.Exercises OptionalDecision.Exercises) gs thinkId
+              hidden = resolveCastWith (miracleAnswer OptionalDecision.Declines OptionalDecision.Exercises) gs thinkId
+              shown = resolveCastWith (miracleAnswer OptionalDecision.Exercises OptionalDecision.Declines) gs thinkId
+          Spec.assertEqWith s "revealing and casting deals bob 5" (S.lifeOf S.bob cast) (fmap (subtract 5) (S.lifeOf S.bob gs))
+          Spec.assertEqWith s "and the Wrath resolved into alice's graveyard" (namedIn wrath Zone.Graveyard S.alice cast) 1
+          Spec.assertEqWith s "declining the reveal leaves bob alone" (S.lifeOf S.bob hidden) (S.lifeOf S.bob gs)
+          Spec.assertEqWith s "and the Wrath an ordinary card in her hand" (namedIn wrath Zone.Hand S.alice hidden) 1
+          Spec.assertEqWith s "revealing and then declining the cast leaves bob alone too" (S.lifeOf S.bob shown) (S.lifeOf S.bob gs)
+          Spec.assertEqWith s "and the Wrath still in her hand" (namedIn wrath Zone.Hand S.alice shown) 1
+          Spec.assertEqWith s "the reveal happened on that leg even so" (length (filter isMiracleReveal (S.eventsOf shown))) 1
+          Spec.assertEqWith s "and did not on the leg that declined it" (length (filter isMiracleReveal (S.eventsOf hidden))) 0
+        _ -> Spec.assertFailure s "fixture should put one Think Twice in alice's hand"
+    -- THE DISCRIMINATING CASE, and the turn boundary in the same pair. Two draws
+    -- on one board with a Goblin Piker ahead of the Wrath, so the Wrath arrives on
+    -- the SECOND draw -- and CR 702.94a's gate must keep the window shut. The
+    -- other leg is that board with a turn handoff between the two casts, which
+    -- makes the very same draw the new turn's first.
+    --
+    -- Both legs run the answerer that reveals and casts everything it is offered,
+    -- so a leg that does nothing did nothing because the engine never asked.
+    Spec.it s "CR 702.94a the second draw of a turn opens no window, and the handoff reopens it" $ do
+      island <- S.printingOf s registry "Island"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      thunder <- S.printingOf s registry "Thunderous Wrath"
+      let (gs, thinks) = miracleBoard island mountain piker think thunder 2 1
+          wrath = S.printingName thunder
+          step = resolveCastWith miracleTaken
+      case thinks of
+        [a, b] -> do
+          let afterFirst = step gs a
+              sameTurn = step afterFirst b
+              nextTurn = step (S.runPure miracleTaken afterFirst Engine.handoffTurn) b
+          Spec.assertEqWith s "the first draw took the Piker, not the Wrath" (namedIn wrath Zone.Hand S.alice afterFirst) 0
+          Spec.assertEqWith s "drawn second, the Wrath sits in hand" (namedIn wrath Zone.Hand S.alice sameTurn) 1
+          Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob sameTurn) (S.lifeOf S.bob gs)
+          Spec.assertEqWith s "after the handoff the same draw is the turn's first, so it is cast" (namedIn wrath Zone.Graveyard S.alice nextTurn) 1
+          Spec.assertEqWith s "and bob takes 5" (S.lifeOf S.bob nextTurn) (fmap (subtract 5) (S.lifeOf S.bob gs))
+        _ -> Spec.assertFailure s "fixture should put two Think Twice in alice's hand"
+    -- CR 121.1's other producer of a draw. The window is inside the draw funnel,
+    -- so the draw step's turn-based action opens it exactly as a spell's draw
+    -- does -- and no Think Twice is cast on this board at all.
+    Spec.it s "CR 121.9 the draw step's own draw opens the window" $ do
+      island <- S.printingOf s registry "Island"
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      think <- S.printingOf s registry "Think Twice"
+      thunder <- S.printingOf s registry "Thunderous Wrath"
+      let (base, _) = miracleBoard island mountain piker think thunder 0 0
+          gs = base {GameState.phase = Phase.Beginning BeginningStep.DrawStep}
+          drawn = S.runPure miracleTaken gs S.drawStep
+          after = S.runPure miracleTaken (drawn {GameState.phase = Phase.PrecombatMain}) Engine.priorityLoop
+      Spec.assertEqWith s "the draw step drew alice's first card" (Map.lookup S.alice (GameState.drawsThisTurn drawn)) (Just 1)
+      Spec.assertEqWith s "the Wrath was cast off it" (namedIn (S.printingName thunder) Zone.Graveyard S.alice after) 1
+      Spec.assertEqWith s "and bob takes 5" (S.lifeOf S.bob after) (fmap (subtract 5) (S.lifeOf S.bob gs))
+
+-- alice, in her precombat main phase on turn 2 (so CR 103.8a's skipped draw step
+-- is not in play), holding `copies` Think Twice, with two Islands per copy and one
+-- Mountain out -- {R} exactly, which is the miracle cost and nowhere near
+-- Thunderous Wrath's printed {4}{R}{R}.
+--
+-- Her library has `ahead` Goblin Pikers on top of one Thunderous Wrath, then ten
+-- more Pikers beneath it, so no leg decks her before an assertion runs (CR
+-- 104.3c). addLibraryCard puts each new card on top, so the stocking order below
+-- is bottom-up.
+--
+-- Returns the board and the Think Twice ids in hand order.
+miracleBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  Int ->
+  (GameState.GameState, [ObjectId.ObjectId])
+miracleBoard island mountain piker think thunder copies ahead =
+  let lands = S.landsFor mountain S.alice 1 (S.landsInPlay island (2 * copies))
+      addThink (ids, g) _ = let (oid, g') = S.addHandCard think S.alice g in (ids <> [oid], g')
+      (thinkIds, withHand) = List.foldl' addThink ([], lands) [1 .. copies]
+      pile g n = List.foldl' (\g' _ -> snd (S.addLibraryCard piker S.alice g')) g [1 .. n]
+      stocked = pile (snd (S.addLibraryCard thunder S.alice (pile withHand (10 :: Int)))) ahead
+   in ( stocked
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.turnNumber = 2
+          },
+        thinkIds
+      )
+
+-- Answer CR 702.94a's two "may"s with the pinned decisions, aim every target at
+-- bob, and cast nothing at a player's own timing.
+--
+-- The two answers are PINNED rather than searched for, so a mutation that broke
+-- which question is being asked cannot be repaired by the answerer picking the
+-- other one. ChooseAction passes: every cast on these boards is driven by the
+-- test calling Cast.castSpell directly, so nothing else can spend alice's
+-- Mountain.
+-- Both "may"s taken: the answerer the two gate cases run, so a leg where nothing
+-- happened is a leg the engine never asked.
+miracleTaken :: Prompt.Prompt r -> r
+miracleTaken = miracleAnswer OptionalDecision.Exercises OptionalDecision.Exercises
+
+-- Cast one spell under `answer` and let the stack empty. `resolveCastBy`'s shape
+-- with the answerer supplied, which is the whole of what these cases vary.
+resolveCastWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+resolveCastWith answer gs oid = S.runPure answer (S.runPure answer gs (S.cast S.alice oid)) Engine.priorityLoop
+
+miracleAnswer :: OptionalDecision.OptionalDecision -> OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+miracleAnswer reveal offer p = case p of
+  Prompt.OfferedMiracleReveal {} -> reveal
+  Prompt.OfferedCast {} -> offer
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter (== Recipient.ToPlayer S.bob) legal) sets
+  _ -> S.identityAnswer p
+
+-- How many cards named `name` this player has in that zone.
+namedIn :: CardName.CardName -> Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> Int
+namedIn name zone pid gs = length (filter ((== Just name) . fmap S.nameOf . flip Game.cardOf gs) (Game.zoneMembers zone pid gs))
+
+-- CR 702.94a's own reveal, told from CR 701.20a's ordinary one by its cause.
+isMiracleReveal :: GameEvent.GameEvent -> Bool
+isMiracleReveal event = case event of
+  GameEvent.Revealed _ _ RevealCause.ForMiracle _ -> True
+  _ -> False
 
 -- alice is the active player in her postcombat main phase, holding a Zealous
 -- Conscripts and eight uncastable Goblin Pikers, with five Mountains out; bob
@@ -7718,6 +7880,9 @@ representativeEvents cond =
         -- log, which is what Event.eventBindingSlots claims for it.
         TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost S.bob 2)
         TriggerCondition.SelfCycled -> one (GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost)
+        -- CR 702.94a's cause, so the event is one this condition genuinely
+        -- admits; an Ordinary reveal would pin nothing.
+        TriggerCondition.SelfRevealedForMiracle -> one (GameEvent.Revealed S.alice departed RevealCause.ForMiracle S.emptyCharacteristics)
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded S.alice departed DiscardCause.Ordinary)
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
@@ -7890,6 +8055,7 @@ everyTriggerCondition =
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
     TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,
+    TriggerCondition.SelfRevealedForMiracle,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.PlayerDrawsNthCard PlayerRelation.You 2,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
@@ -10686,6 +10852,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   kindredSpec s registry
   discardTriggerSpec s registry
   drawTriggerSpec s registry
+  miracleSpec s registry
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
   lifeGainTriggerSpec s registry

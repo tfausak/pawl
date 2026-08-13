@@ -35,6 +35,7 @@ codec =
       Arm.nullary "Fabricate" KeywordFamily.Fabricate,
       Arm.nullary "Afflict" KeywordFamily.Afflict,
       Arm.nullary "Afterlife" KeywordFamily.Afterlife,
+      Arm.nullary "Miracle" KeywordFamily.Miracle,
       Arm.nullary "Toxic" KeywordFamily.Toxic,
       Arm.nullary "Plot" KeywordFamily.Plot
     ]
@@ -61,5 +62,6 @@ codec =
       KeywordFamily.Fabricate -> "Fabricate"
       KeywordFamily.Afflict -> "Afflict"
       KeywordFamily.Afterlife -> "Afterlife"
+      KeywordFamily.Miracle -> "Miracle"
       KeywordFamily.Toxic -> "Toxic"
       KeywordFamily.Plot -> "Plot"

@@ -1053,6 +1053,28 @@ data Prompt r where
   -- nothing to ask -- the card is no longer where the effect left it (CR 608.2h),
   -- or the cast is one Cast.castableWhenOffered says cannot legally happen.
   OfferedCast :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 702.94a / CR 121.9: whether this player reveals the card they are
+  -- drawing, from their hand, as they draw it -- miracle's static half. The
+  -- ObjectId is the card just drawn and the CardName is its face, for
+  -- OfferedCast's reason: a bare id would leave what is being revealed invisible
+  -- to the answerer.
+  --
+  -- CR 121.9 is satisfied by the prompt itself: "that player may look at that
+  -- card as they draw it before choosing whether to reveal it", and the card is
+  -- named in the question. pawl has no hidden-information filter at all
+  -- (docs/design.md's PlayerView), so there is nothing here that could have shown
+  -- less.
+  --
+  -- Distinct from OfferedCast, which is the LINKED ability's own "may" one step
+  -- later. Two prompts for one keyword is what rule 702.94a says: the reveal is
+  -- the static ability's, and the cast belongs to the triggered ability that the
+  -- reveal put on the stack. A player who reveals may still decline the cast.
+  --
+  -- NEVER elided: revealing and not revealing reach plainly different boards --
+  -- one puts a triggered ability on the stack. Not asked at all when the rules
+  -- leave nothing to ask: no miracle on the card, or the draw was not the turn's
+  -- first (CR 702.94a's own gate).
+  OfferedMiracleReveal :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
   -- | CR 118.12 / 118.12a: whether this player pays a cost a RESOLVING spell or
   -- ability offers them -- Mana Leak's "unless its controller pays {3}", which CR
   -- 118.12a rewrites as "its controller may pay {3}. If they don't, counter it."

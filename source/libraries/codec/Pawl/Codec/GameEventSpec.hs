@@ -21,6 +21,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.Zone as Zone
@@ -112,8 +113,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.Revealed (PlayerId.MkPlayerId 0) ProjectedCharacteristicsSpec.testCharacteristics)
-      ("{\"type\":\"Revealed\",\"value\":[0," <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "]}")
+      (GameEvent.Revealed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) RevealCause.ForMiracle ProjectedCharacteristicsSpec.testCharacteristics)
+      ("{\"type\":\"Revealed\",\"value\":[0,7,{\"type\":\"ForMiracle\"}," <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "]}")
   -- An object, a player and CR 506.5's declaration size. Three distinct numbers,
   -- so a codec that permuted them would fail.
   Spec.it s "AttackerDeclared" $

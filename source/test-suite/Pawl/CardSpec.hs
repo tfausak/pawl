@@ -527,6 +527,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfBecomesBlockedBy _ -> []
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
   TriggerCondition.SelfCycled -> []
+  TriggerCondition.SelfRevealedForMiracle -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.PlayerDrawsNthCard _ _ -> []
@@ -1688,6 +1689,8 @@ keywordFilters keyword = case keyword of
   -- CR 702.170a: the plot cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
   Keyword.Plot cost -> costFilters cost
+  -- CR 702.94a's payload is a Cost too, so its filters are reached the same way.
+  Keyword.Miracle cost -> costFilters cost
   -- CR 702.37a: the morph cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
   Keyword.Morph cost _ -> costFilters cost
@@ -2034,6 +2037,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- blockers -- Serra Inquisitors' "black".
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> [f]
   TriggerCondition.SelfCycled -> []
+  TriggerCondition.SelfRevealedForMiracle -> []
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.PlayerDrawsNthCard _ _ -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.

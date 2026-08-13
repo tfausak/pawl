@@ -1,0 +1,88 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Miracle",
+          "value": {
+            "mana": [
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Thunderous Wrath",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 5
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": {
+              "target": {
+                "pool": {
+                  "type": "AnyTarget"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
