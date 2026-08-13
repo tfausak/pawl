@@ -17,7 +17,7 @@ toJson codec c =
   Value.object . concat $
     [ -- R2 again: CR 701.46a's "if" is the marked case, and stating no gate is
       -- what every other card in the corpus does.
-      Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (Clause.condition c),
+      Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (Clause.condition c),
       Common.optionalPair "effects" Seq.empty (Common.encodeSeq (Effect.toJson codec)) (Clause.effects c),
       -- R2 of the omit-defaults design: Mandatory is the absence of a rider
       -- (CR 603.5's "may" is the marked case).
@@ -30,7 +30,7 @@ toJson codec c =
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Clause.Clause card)
 fromJson decode value = do
   ps <- Common.asObject value
-  c <- Common.defaultedField "condition" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  c <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   es <- Common.defaultedField "effects" Seq.empty (Common.decodeSeq (Effect.fromJson decode)) ps
   o <- Common.defaultedField "optionality" Optionality.Mandatory (Codec.decode Optionality.codec) ps
   u <- Common.defaultedField "unlessPaid" Nothing (Common.decodeMaybe UnlessPaid.fromJson) ps

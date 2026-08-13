@@ -1,7 +1,6 @@
 module Pawl.Types.Condition where
 
-import qualified Pawl.Types.Comparison as Comparison
-import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Compares as Compares
 
 -- | A predicate over game STATE rather than over an event, with four customers
 -- and one vocabulary: a state trigger's condition (CR 603.8, checked at every
@@ -19,17 +18,6 @@ import qualified Pawl.Types.Quantity as Quantity
 -- 611.2b's "for as long as you control this creature" is a source-restricted
 -- count of one (Filter.IsSource), not a special arm.
 --
--- BOTH SIDES of Compares are a full Quantity, and both are evaluated
--- symmetrically -- Pawl.Engine.Condition.holds passes each through
--- Pawl.Engine.Quantity.evaluate against the same object and view, so a
--- Quantity.Power on either side reads the same object. Only the Comparison is
--- oriented, AtLeast meaning the first side is at least the second. That width is
--- what lets a condition read the object it is evaluated against rather than a set
--- swept out of a zone, which CR 603.4's intervening "if" on a
--- leaves-the-battlefield ability needs: the source is gone, so CR 608.2h answers
--- through Projection.viewWithLastKnownAnywhere -- which owes the same fallback to
--- an object the clause names through a SLOT, rule 702.100a's entrant being one.
---
 -- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
 -- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. Such a
 -- reference outlives its slot binding, so Pawl.Engine.Condition.bakeBound
@@ -37,8 +25,9 @@ import qualified Pawl.Types.Quantity as Quantity
 -- Garland, Royal Kidnapper group is what proves the stored condition still
 -- answers once the resolution that stored it is over.
 data Condition
-  = -- | One comparison: the first Quantity relates thus to the second.
-    Compares Quantity.Quantity Comparison.Comparison Quantity.Quantity
+  = -- | One comparison, whose three parts are Pawl.Types.Compares -- see there
+    -- for why both sides are a full Quantity.
+    Compares Compares.Compares
   | -- | True when ANY of these is -- CR 702.100a's "power is greater ... and/or
     -- toughness is greater", which is two comparisons of two different
     -- characteristics and so cannot be folded into one Compares.

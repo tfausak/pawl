@@ -17,6 +17,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
@@ -512,7 +513,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           Duration.UntilEndOfTurn
           Uses.Once
           ReplacementOrigin.SelfReplacement
-          (Just (Condition.Compares (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3)))
+          (Just (Condition.Compares (Compares.MkCompares (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3))))
           (ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing) (DamageRewrite.SetAmount 4))
       )
       """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"SelfReplacement"},{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},{"type":"DamageR","value":[{"whatSource":{"type":"IsSource"}},{"type":"SetAmount","value":4}]}]} """

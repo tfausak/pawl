@@ -28,6 +28,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -1654,9 +1655,11 @@ evolve =
     effect = Effect.Evolve Binding.triggerSource
     entrantExceeds quantity =
       Condition.Compares
-        (Quantity.AgainstSlot Binding.became quantity)
-        Comparison.AtLeast
-        (Quantity.Plus quantity (Quantity.Literal 1))
+        ( Compares.MkCompares
+            (Quantity.AgainstSlot Binding.became quantity)
+            Comparison.AtLeast
+            (Quantity.Plus quantity (Quantity.Literal 1))
+        )
 
 prowess :: TriggeredAbility Card
 prowess =
@@ -2230,7 +2233,7 @@ renown n =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
-        Just (Condition.Compares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0))
+        Just (Condition.Compares (Compares.MkCompares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0)))
     }
   where
     grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource)
@@ -2326,7 +2329,7 @@ returns kind =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton back))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
-        Just (Condition.Compares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0))
+        Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0)))
     }
   where
     back =
@@ -2671,7 +2674,7 @@ vanishingUpkeep =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
-        Just (Condition.Compares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1))
+        Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1)))
     }
   where
     effect = Effect.RemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource

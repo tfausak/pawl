@@ -7,6 +7,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
@@ -43,9 +44,11 @@ spec s = Spec.describe s "Pawl.Codec.AlternativeCost" $ do
         { AlternativeCost.condition =
             Just
               ( Condition.Compares
-                  (Quantity.CardsDiscardedThisTurn (PlayerRef.Relative PlayerRelation.You))
-                  Comparison.AtLeast
-                  (Quantity.Literal 1)
+                  ( Compares.MkCompares
+                      (Quantity.CardsDiscardedThisTurn (PlayerRef.Relative PlayerRelation.You))
+                      Comparison.AtLeast
+                      (Quantity.Literal 1)
+                  )
               ),
           AlternativeCost.cost =
             Cost.MkCost

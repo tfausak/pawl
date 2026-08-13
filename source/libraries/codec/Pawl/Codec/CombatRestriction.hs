@@ -43,7 +43,7 @@ payload :: Affected.Type.Affected -> Maybe Condition.Type.Condition -> Value.Val
 payload a c =
   Value.object
     ( Common.requiredPair "affected" Affected.toJson a
-        <> Common.optionalPair "unless" Nothing (Common.encodeMaybe Condition.toJson) c
+        <> Common.optionalPair "unless" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) c
     )
 
 -- | The PAIRWISE arm's payload: `payload` plus the object it names. "blockers"
@@ -55,7 +55,7 @@ blockerPayload a f c =
   Value.object
     ( Common.requiredPair "affected" Affected.toJson a
         <> Common.requiredPair "blockers" (Codec.encode (Filter.codec Keyword.codec)) f
-        <> Common.optionalPair "unless" Nothing (Common.encodeMaybe Condition.toJson) c
+        <> Common.optionalPair "unless" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) c
     )
 
 -- | The SIZE-BOUNDING arms' payload. "limit" and not "affected", because a bound
@@ -65,7 +65,7 @@ boundPayload :: Natural.Natural -> Maybe Condition.Type.Condition -> Value.Value
 boundPayload n c =
   Value.object
     ( Common.requiredPair "limit" Common.encodeNatural n
-        <> Common.optionalPair "unless" Nothing (Common.encodeMaybe Condition.toJson) c
+        <> Common.optionalPair "unless" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) c
     )
 
 -- | This dispatch is a STRING match, so a missing arm here compiles and fails
@@ -90,7 +90,7 @@ payloadFromJson ::
 payloadFromJson mk value = do
   ps <- Common.asObject value
   a <- Common.field "affected" ps >>= Affected.fromJson
-  c <- Common.defaultedField "unless" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  c <- Common.defaultedField "unless" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   pure $ mk a c
 
 blockerFromJson :: Value.Value -> Either Text.Text CombatRestriction.CombatRestriction
@@ -98,7 +98,7 @@ blockerFromJson value = do
   ps <- Common.asObject value
   a <- Common.field "affected" ps >>= Affected.fromJson
   f <- Common.field "blockers" ps >>= Codec.decode (Filter.codec Keyword.codec)
-  c <- Common.defaultedField "unless" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  c <- Common.defaultedField "unless" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   pure $ CombatRestriction.CantBeBlockedBy a f c
 
 boundFromJson ::
@@ -108,5 +108,5 @@ boundFromJson ::
 boundFromJson mk value = do
   ps <- Common.asObject value
   n <- Common.field "limit" ps >>= Common.decodeNatural
-  c <- Common.defaultedField "unless" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  c <- Common.defaultedField "unless" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   pure $ mk n c

@@ -21,7 +21,7 @@ toJson codec aa =
         <> Common.optionalPair "restrictions" [] (Common.encodeList ActivationRestriction.toJson) (ActivatedAbility.restrictions aa)
         -- CR 702.178a: emitted only for a GRANTED ability, so the absence of the
         -- key means the object simply has this ability.
-        <> Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (ActivatedAbility.condition aa)
+        <> Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (ActivatedAbility.condition aa)
     )
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility card)
@@ -30,5 +30,5 @@ fromJson decode value = do
   c <- Common.field "cost" ps >>= Codec.decode (Cost.codec Keyword.codec)
   m <- Common.field "modal" ps >>= Modal.fromJson decode
   t <- Common.defaultedField "restrictions" [] (Common.decodeList ActivationRestriction.fromJson) ps
-  g <- Common.defaultedField "condition" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  g <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   pure (ActivatedAbility.MkActivatedAbility c m t g)

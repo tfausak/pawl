@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -15,7 +16,7 @@ toJson codec ta =
   Value.object . concat $
     [ Common.requiredPair "condition" TriggerCondition.toJson (TriggeredAbility.condition ta),
       Common.requiredPair "modal" (Modal.toJson codec) (TriggeredAbility.modal ta),
-      Common.optionalPair "intervening" Nothing (Common.encodeMaybe Condition.toJson) (TriggeredAbility.intervening ta)
+      Common.optionalPair "intervening" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (TriggeredAbility.intervening ta)
     ]
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility card)
@@ -23,7 +24,7 @@ fromJson decode value = do
   ps <- Common.asObject value
   c <- Common.field "condition" ps >>= TriggerCondition.fromJson
   m <- Common.field "modal" ps >>= Modal.fromJson decode
-  i <- Common.defaultedField "intervening" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  i <- Common.defaultedField "intervening" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   pure
     TriggeredAbility.MkTriggeredAbility
       { TriggeredAbility.condition = c,

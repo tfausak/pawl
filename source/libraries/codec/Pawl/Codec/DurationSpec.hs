@@ -5,6 +5,7 @@ module Pawl.Codec.DurationSpec where
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Duration as Duration
@@ -41,7 +42,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       s
       Duration.toJson
       Duration.fromJson
-      (Duration.ForAsLongAs (Condition.Compares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
+      (Duration.ForAsLongAs (Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))))
       """ {"type":"ForAsLongAs","value":{"type":"Compares","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
   -- CR 500.5a: until end of combat.
   Spec.it s "UntilEndOfCombat" $
