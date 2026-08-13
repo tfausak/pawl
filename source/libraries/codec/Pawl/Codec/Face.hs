@@ -87,7 +87,7 @@ toJson encodeCard f =
       Common.optionalPair "blockRequirements" [] (Common.encodeList BlockRequirement.toJson) (Face.blockRequirements f),
       Common.optionalPair "blockPermissions" [] (Common.encodeList BlockPermission.toJson) (Face.blockPermissions f),
       Common.optionalPair "attackRequirements" [] (Common.encodeList AttackRequirement.toJson) (Face.attackRequirements f),
-      Common.optionalPair "combatRestrictions" [] (Common.encodeList CombatRestriction.toJson) (Face.combatRestrictions f),
+      Common.optionalPair "combatRestrictions" [] (Common.encodeList (Codec.encode CombatRestriction.codec)) (Face.combatRestrictions f),
       Common.optionalPair "sacrificeRestrictions" [] (Common.encodeList SacrificeRestriction.toJson) (Face.sacrificeRestrictions f),
       Common.optionalPair "untapRestrictions" [] (Common.encodeList UntapRestriction.toJson) (Face.untapRestrictions f),
       Common.optionalPair "attackCosts" [] (Common.encodeList AttackCost.toJson) (Face.attackCosts f),
@@ -138,7 +138,7 @@ fromJson decodeCard value = do
   blockRequirements <- Common.defaultedField "blockRequirements" [] (Common.decodeList BlockRequirement.fromJson) ps
   blockPermissions <- Common.defaultedField "blockPermissions" [] (Common.decodeList BlockPermission.fromJson) ps
   attackRequirements <- Common.defaultedField "attackRequirements" [] (Common.decodeList AttackRequirement.fromJson) ps
-  combatRestrictions <- Common.defaultedField "combatRestrictions" [] (Common.decodeList CombatRestriction.fromJson) ps
+  combatRestrictions <- Common.defaultedField "combatRestrictions" [] (Common.decodeList (Codec.decode CombatRestriction.codec)) ps
   sacrificeRestrictions <- Common.defaultedField "sacrificeRestrictions" [] (Common.decodeList SacrificeRestriction.fromJson) ps
   untapRestrictions <- Common.defaultedField "untapRestrictions" [] (Common.decodeList UntapRestriction.fromJson) ps
   attackCosts <- Common.defaultedField "attackCosts" [] (Common.decodeList AttackCost.fromJson) ps

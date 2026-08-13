@@ -14,6 +14,7 @@ import qualified Pawl.Codec.ActivationRestrictionSpec
 import qualified Pawl.Codec.AffectPlayersSpec
 import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
+import qualified Pawl.Codec.AffectedUnlessSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
@@ -24,6 +25,7 @@ import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockRequirementSpec
+import qualified Pawl.Codec.CantBeBlockedBySpec
 import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
@@ -31,6 +33,7 @@ import qualified Pawl.Codec.CastOfferSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
 import qualified Pawl.Codec.ChangeTextSpec
+import qualified Pawl.Codec.ChooseBetweenSpec
 import qualified Pawl.Codec.ChooserSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
@@ -86,6 +89,7 @@ import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LayoutSpec
 import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
+import qualified Pawl.Codec.LimitUnlessSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaCountSpec
@@ -322,6 +326,7 @@ spec s registry = do
   Pawl.Codec.AffectPlayersSpec.spec s
   Pawl.Codec.AffectedPlayersSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
+  Pawl.Codec.AffectedUnlessSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
@@ -332,6 +337,7 @@ spec s registry = do
   Pawl.Codec.BindingSpec.spec s
   Pawl.Codec.BlockPermissionSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
+  Pawl.Codec.CantBeBlockedBySpec.spec s
   Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
@@ -339,6 +345,7 @@ spec s registry = do
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s
   Pawl.Codec.ChangeTextSpec.spec s
+  Pawl.Codec.ChooseBetweenSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
@@ -394,6 +401,7 @@ spec s registry = do
   Pawl.Codec.LayoutSpec.spec s
   Pawl.Codec.LibraryPlacementSpec.spec s
   Pawl.Codec.LibraryPositionSpec.spec s
+  Pawl.Codec.LimitUnlessSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
   Pawl.Codec.ManaCountSpec.spec s

@@ -5,17 +5,18 @@ module Pawl.Codec.ModeSelectionSpec where
 import qualified Data.Either as Either
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ModeSelection as ModeSelection
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.ChooseBetween as ChooseBetween
 import qualified Pawl.Types.ModeSelection as ModeSelection
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ModeSelection" $ do
   Spec.it s "ChooseExactly" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ModeSelection.toJson
-      ModeSelection.fromJson
+      ModeSelection.codec
       (ModeSelection.ChooseExactly 1)
       """ {"type":"ChooseExactly","value":1} """
 
@@ -23,26 +24,27 @@ spec s = Spec.describe s "Pawl.Codec.ModeSelection" $ do
   -- what it was before this constructor existed, which is what let every card
   -- file stay as written.
   Spec.it s "ChooseExactlyWithRepeats" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ModeSelection.toJson
-      ModeSelection.fromJson
+      ModeSelection.codec
       (ModeSelection.ChooseExactlyWithRepeats 3)
       """ {"type":"ChooseExactlyWithRepeats","value":3} """
 
   -- CR 700.2's "Choose one or both --" (data/cards/vandalize.json). Named fields
   -- rather than a two-element list, so the bound a card means is written down.
   Spec.it s "ChooseBetween" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ModeSelection.toJson
-      ModeSelection.fromJson
-      (ModeSelection.ChooseBetween 1 2)
+      ModeSelection.codec
+      (ModeSelection.ChooseBetween (ChooseBetween.MkChooseBetween 1 2))
       """ {"type":"ChooseBetween","value":{"least":1,"most":2}} """
 
-  -- The one invariant Pawl.Types.ModeSelection states and this decoder keeps.
+  Spec.it s "has a schema" $ Common.assertHasSchema s ModeSelection.codec
+
+  -- The one invariant Pawl.Types.ModeSelection states, enforced by
+  -- Pawl.Codec.ChooseBetween and reached through this tag.
   Spec.it s "rejects a minimum above the maximum" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"type":"ChooseBetween","value":{"least":2,"most":1}} """) >>= ModeSelection.fromJson))
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"ChooseBetween","value":{"least":2,"most":1}} """) >>= Codec.decode ModeSelection.codec))
       "expected a decode failure"

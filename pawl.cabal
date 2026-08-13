@@ -74,6 +74,8 @@ library codec
     Pawl.Codec.AffectedPlayers
     Pawl.Codec.AffectedPlayersSpec
     Pawl.Codec.AffectedSpec
+    Pawl.Codec.AffectedUnless
+    Pawl.Codec.AffectedUnlessSpec
     Pawl.Codec.AffectPlayers
     Pawl.Codec.AffectPlayersSpec
     Pawl.Codec.Aggregation
@@ -96,6 +98,8 @@ library codec
     Pawl.Codec.BlockPermissionSpec
     Pawl.Codec.BlockRequirement
     Pawl.Codec.BlockRequirementSpec
+    Pawl.Codec.CantBeBlockedBy
+    Pawl.Codec.CantBeBlockedBySpec
     Pawl.Codec.Card
     Pawl.Codec.CardName
     Pawl.Codec.CardNameSpec
@@ -110,6 +114,8 @@ library codec
     Pawl.Codec.CastOfferSpec
     Pawl.Codec.ChangeText
     Pawl.Codec.ChangeTextSpec
+    Pawl.Codec.ChooseBetween
+    Pawl.Codec.ChooseBetweenSpec
     Pawl.Codec.Chooser
     Pawl.Codec.ChooserSpec
     Pawl.Codec.Clause
@@ -220,6 +226,8 @@ library codec
     Pawl.Codec.LibraryPlacementSpec
     Pawl.Codec.LibraryPosition
     Pawl.Codec.LibraryPositionSpec
+    Pawl.Codec.LimitUnless
+    Pawl.Codec.LimitUnlessSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
@@ -694,6 +702,7 @@ library types
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected
     Pawl.Types.AffectedPlayers
+    Pawl.Types.AffectedUnless
     Pawl.Types.AffectPlayers
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost
@@ -708,6 +717,7 @@ library types
     Pawl.Types.BlockPermission
     Pawl.Types.BlockRequirement
     Pawl.Types.CandidateId
+    Pawl.Types.CantBeBlockedBy
     Pawl.Types.Card
     Pawl.Types.CardName
     Pawl.Types.CardType
@@ -715,6 +725,7 @@ library types
     Pawl.Types.CastingRestriction
     Pawl.Types.CastOffer
     Pawl.Types.ChangeText
+    Pawl.Types.ChooseBetween
     Pawl.Types.Chooser
     Pawl.Types.Claim
     Pawl.Types.Clause
@@ -797,6 +808,7 @@ library types
     Pawl.Types.Layout
     Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition
+    Pawl.Types.LimitUnless
     Pawl.Types.Loyalty
     Pawl.Types.Mana
     Pawl.Types.ManaCost

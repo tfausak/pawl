@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -188,15 +189,17 @@ theRingIsLegendary =
 theRingCantBeBlockedByGreaterPower :: CombatRestriction.CombatRestriction
 theRingCantBeBlockedByGreaterPower =
   CombatRestriction.CantBeBlockedBy
-    ( Affected.Matching
-        ( Filter.And
-            [ Filter.IsRingBearer,
-              Filter.ControlledBy PlayerRelation.You
-            ]
-        )
-    )
-    Filter.PowerGreaterThanSource
-    Nothing
+    CantBeBlockedBy.MkCantBeBlockedBy
+      { CantBeBlockedBy.affected =
+          Affected.Matching
+            ( Filter.And
+                [ Filter.IsRingBearer,
+                  Filter.ControlledBy PlayerRelation.You
+                ]
+            ),
+        CantBeBlockedBy.blockers = Filter.PowerGreaterThanSource,
+        CantBeBlockedBy.unless = Nothing
+      }
 
 -- CR 701.54c: does this player already have an emblem named The Ring?
 --

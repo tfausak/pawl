@@ -1,6 +1,7 @@
 module Pawl.Types.ModeSelection where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.ChooseBetween as ChooseBetween
 
 -- | CR 700.2: the instruction preceding the bulleted list ("Choose one --"),
 -- carrying both halves of CR 700.2d. That rule states a default and an exception:
@@ -32,7 +33,7 @@ import qualified Numeric.Natural as Natural
 -- always did, so neither the exception nor the range rewrote a card file.
 --
 -- `least <= most` is an invariant nothing here maintains: a selection is card
--- DATA, so Pawl.Codec.ModeSelection rejects a range that breaks it. Not a safety
+-- DATA, so Pawl.Codec.ChooseBetween rejects a range that breaks it. Not a safety
 -- property -- an impossible range makes the spell uncastable rather than making
 -- anything crash.
 --
@@ -43,5 +44,5 @@ import qualified Numeric.Natural as Natural
 data ModeSelection
   = ChooseExactly Natural.Natural
   | ChooseExactlyWithRepeats Natural.Natural
-  | ChooseBetween Natural.Natural Natural.Natural
+  | ChooseBetween ChooseBetween.ChooseBetween
   deriving (Eq, Ord, Show)
