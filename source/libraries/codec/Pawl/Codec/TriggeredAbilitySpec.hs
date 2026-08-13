@@ -15,6 +15,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
@@ -87,9 +88,11 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             TriggeredAbility.intervening =
               Just
                 ( Condition.Compares
-                    (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Zombie) Aggregation.Members))
-                    Comparison.Exactly
-                    (Quantity.Literal 0)
+                    ( Compares.MkCompares
+                        (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Zombie) Aggregation.Members))
+                        Comparison.Exactly
+                        (Quantity.Literal 0)
+                    )
                 )
           }
       )

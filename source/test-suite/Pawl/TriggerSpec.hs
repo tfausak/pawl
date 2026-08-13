@@ -221,6 +221,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -7570,7 +7571,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
     TriggerCondition.PermanentDies Filter.Type.IsSource,
     TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn,
-    TriggerCondition.StateIs (Condition.Type.Compares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0)),
+    TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,

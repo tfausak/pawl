@@ -70,6 +70,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -407,7 +408,7 @@ countCounts count = case Count.Type.aggregation count of
 -- (Pawl.Types.Condition).
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
 conditionCounts condition = case condition of
-  Condition.Type.Compares measured _ threshold ->
+  Condition.Type.Compares (Compares.MkCompares measured _ threshold) ->
     quantityCounts measured <> quantityCounts threshold
   Condition.Type.Any conditions -> concatMap conditionCounts conditions
 
@@ -3988,7 +3989,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- The REJECTING direction, against hand-built offenders rather than card files,
   -- as the repeated-face-name lint above does it.
   Spec.it s "the lint itself catches a state trigger and a nested AnyOf inside an AnyOf" $ do
-    let never = Condition.Type.Compares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 1)
+    let never = Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 1))
         fine = TriggerCondition.AnyOf [TriggerCondition.SelfEnters, TriggerCondition.RoomFullyUnlocked PlayerRelation.You]
     Spec.assertBool s (not (anyOfOffends fine)) "the control: two event triggers side by side are fine"
     Spec.assertBool s (anyOfOffends (TriggerCondition.AnyOf [TriggerCondition.SelfEnters, TriggerCondition.StateIs never])) "a CR 603.8 state trigger inside an AnyOf is rejected"
@@ -4142,9 +4143,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let crowned =
           Condition.Type.Compares
-            (Quantity.Type.IsMonarch (PlayerRef.Specific (PlayerId.MkPlayerId 1)))
-            Comparison.AtLeast
-            (Quantity.Type.Literal 1)
+            ( Compares.MkCompares
+                (Quantity.Type.IsMonarch (PlayerRef.Specific (PlayerId.MkPlayerId 1)))
+                Comparison.AtLeast
+                (Quantity.Type.Literal 1)
+            )
         planted =
           (S.combinedFace piker)
             { Face.spell =

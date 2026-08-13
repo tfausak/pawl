@@ -112,6 +112,7 @@ library codec
     Pawl.Codec.CombatRestrictionSpec
     Pawl.Codec.CombatStep
     Pawl.Codec.CombatStepSpec
+    Pawl.Codec.Compares
     Pawl.Codec.Comparison
     Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
@@ -653,6 +654,7 @@ library types
     Pawl.Types.CombatRestriction
     Pawl.Types.CombatStep
     Pawl.Types.CommandZoneDecision
+    Pawl.Types.Compares
     Pawl.Types.Comparison
     Pawl.Types.Concession
     Pawl.Types.Condition

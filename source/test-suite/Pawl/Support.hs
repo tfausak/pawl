@@ -53,6 +53,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -401,15 +402,17 @@ giveControl oid pid gs =
 youControlSource :: Condition.Type.Condition
 youControlSource =
   Condition.Type.Compares
-    ( Quantity.Type.Count
-        ( Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-            (Filter.Type.And [Filter.Type.IsSource, Filter.Type.ControlledBy PlayerRelation.You])
-            Aggregation.Members
+    ( Compares.MkCompares
+        ( Quantity.Type.Count
+            ( Count.Type.MkCount
+                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Filter.Type.And [Filter.Type.IsSource, Filter.Type.ControlledBy PlayerRelation.You])
+                Aggregation.Members
+            )
         )
+        Comparison.Exactly
+        (Quantity.Type.Literal 1)
     )
-    Comparison.Exactly
-    (Quantity.Type.Literal 1)
 
 -- Barbarian Outcast's migrated StateIs (retired StateCondition.YouControlNo
 -- Swamp -- CR 603.8): "you control no Swamps" as a Count of exactly 0. Shared by
@@ -419,15 +422,17 @@ youControlSource =
 youControlNoSwamps :: Condition.Type.Condition
 youControlNoSwamps =
   Condition.Type.Compares
-    ( Quantity.Type.Count
-        ( Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-            (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
-            Aggregation.Members
+    ( Compares.MkCompares
+        ( Quantity.Type.Count
+            ( Count.Type.MkCount
+                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
+                Aggregation.Members
+            )
         )
+        Comparison.Exactly
+        (Quantity.Type.Literal 0)
     )
-    Comparison.Exactly
-    (Quantity.Type.Literal 0)
 
 -- Does a stored continuous effect target `target` specifically? Used to tell
 -- "nothing was stored FOR THIS OBJECT" apart from an unrelated entry already

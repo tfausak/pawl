@@ -20,11 +20,13 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Count as Count.Type
@@ -207,7 +209,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     -- Pawl.Codec.TriggerConditionSpec now.
     Spec.it s "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $
       mapM_
-        (roundTrip s "condition" Condition.toJson Condition.fromJson)
+        (roundTrip s "condition" (Codec.encode Condition.codec) (Codec.decode Condition.codec))
         [S.youControlNoSwamps, noZombiesOnBattlefield]
 
 -- AbilityName's own per-constructor coverage used no registry -- a literal
@@ -256,12 +258,14 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
 noZombiesOnBattlefield :: Condition.Type.Condition
 noZombiesOnBattlefield =
   Condition.Type.Compares
-    ( Quantity.Count
-        ( Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-            (Filter.Type.HasSubtype Subtype.Zombie)
-            Aggregation.Members
+    ( Compares.MkCompares
+        ( Quantity.Count
+            ( Count.Type.MkCount
+                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Filter.Type.HasSubtype Subtype.Zombie)
+                Aggregation.Members
+            )
         )
+        Comparison.Exactly
+        (Quantity.Literal 0)
     )
-    Comparison.Exactly
-    (Quantity.Literal 0)

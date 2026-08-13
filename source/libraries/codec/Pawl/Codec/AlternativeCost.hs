@@ -19,13 +19,13 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 toJson :: AlternativeCost.AlternativeCost -> Value.Value
 toJson a =
   Value.object
-    ( Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (AlternativeCost.condition a)
+    ( Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (AlternativeCost.condition a)
         <> Common.requiredPair "cost" (Codec.encode (Cost.codec Keyword.codec)) (AlternativeCost.cost a)
     )
 
 fromJson :: Value.Value -> Either Text.Text AlternativeCost.AlternativeCost
 fromJson value = do
   ps <- Common.asObject value
-  condition <- Common.defaultedField "condition" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  condition <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   cost <- Common.field "cost" ps >>= Codec.decode (Cost.codec Keyword.codec)
   pure AlternativeCost.MkAlternativeCost {AlternativeCost.condition = condition, AlternativeCost.cost = cost}

@@ -53,6 +53,7 @@ import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Clause as Clause
 import Pawl.Types.ClauseIndex (ClauseIndex)
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterCause as CounterCause
@@ -415,8 +416,8 @@ poolSlot pool = case pool of
 -- Both sides of a comparison are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Map.Map SlotName SlotArity
 conditionSlots condition = case condition of
-  Condition.Type.Compares measured _ threshold ->
-    joinTwo (quantitySlots measured) (quantitySlots threshold)
+  Condition.Type.Compares c ->
+    joinTwo (quantitySlots (Compares.measured c)) (quantitySlots (Compares.threshold c))
   Condition.Type.Any conditions -> joinSlots (fmap conditionSlots conditions)
 
 -- CR 603.3b: is slotsOf's answer for this effect the WHOLE of what APPLYING it
@@ -550,8 +551,8 @@ durationSlotsAreExhaustive duration = case duration of
 -- conditionSlots' mirror: both sides are a Quantity.
 conditionSlotsAreExhaustive :: Condition.Type.Condition -> Bool
 conditionSlotsAreExhaustive condition = case condition of
-  Condition.Type.Compares measured _ threshold ->
-    Quantity.slotsAreExhaustive measured && Quantity.slotsAreExhaustive threshold
+  Condition.Type.Compares c ->
+    Quantity.slotsAreExhaustive (Compares.measured c) && Quantity.slotsAreExhaustive (Compares.threshold c)
   Condition.Type.Any conditions -> all conditionSlotsAreExhaustive conditions
 
 -- Does any of these effects read X? A card that reads X must declare {X} in its

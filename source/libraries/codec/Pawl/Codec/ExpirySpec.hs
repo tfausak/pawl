@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Expiry as Expiry
@@ -38,7 +39,7 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       s
       Expiry.toJson
       Expiry.fromJson
-      (Expiry.While (PlayerId.MkPlayerId 0) (Condition.Compares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
+      (Expiry.While (PlayerId.MkPlayerId 0) (Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))))
       """ {"type":"While","value":[0,{"type":"Compares","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}]} """
   -- CR 611.2a, as a concrete player.
   Spec.it s "AtTurnOf carries its player" $

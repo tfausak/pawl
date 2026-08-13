@@ -9,6 +9,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -61,7 +62,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       s
       TriggerCondition.toJson
       TriggerCondition.fromJson
-      (TriggerCondition.StateIs (Condition.Compares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
+      (TriggerCondition.StateIs (Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))))
       """ {"type":"StateIs","value":{"type":"Compares","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
   -- CR 603.2 / 509-510: the bearer dealt combat damage to a player.
   Spec.it s "SelfDealsCombatDamageToPlayer" $

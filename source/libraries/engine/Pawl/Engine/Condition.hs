@@ -34,6 +34,7 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import Pawl.Types.GameState (GameState)
@@ -46,9 +47,9 @@ holds viewOf context gs oid condition = case condition of
   -- Both sides are evaluated against `oid` and with the same view, so a
   -- Quantity.Power on either side reads the same object and a Quantity.Count on
   -- either side sweeps the same board. Only the Comparison is oriented.
-  Condition.Type.Compares measured comparison threshold ->
-    case (evaluate measured, evaluate threshold) of
-      (Just n, Just t) -> case comparison of
+  Condition.Type.Compares c ->
+    case (evaluate (Compares.measured c), evaluate (Compares.threshold c)) of
+      (Just n, Just t) -> case Compares.comparison c of
         Comparison.Exactly -> n == t
         Comparison.AtLeast -> n >= t
         Comparison.AtMost -> n <= t
@@ -68,6 +69,10 @@ holds viewOf context gs oid condition = case condition of
 -- "if" (CR 603.4) is read while the bindings are still reachable.
 bakeBound :: Map.Map SlotName PlayerId -> Condition.Type.Condition -> Condition.Type.Condition
 bakeBound players condition = case condition of
-  Condition.Type.Compares measured comparison threshold ->
-    Condition.Type.Compares (Quantity.bakeBound players measured) comparison (Quantity.bakeBound players threshold)
+  Condition.Type.Compares c ->
+    Condition.Type.Compares
+      c
+        { Compares.measured = Quantity.bakeBound players (Compares.measured c),
+          Compares.threshold = Quantity.bakeBound players (Compares.threshold c)
+        }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (bakeBound players) conditions)

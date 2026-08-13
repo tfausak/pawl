@@ -32,6 +32,7 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
@@ -641,9 +642,11 @@ garlandBoard piker garland =
 garlandCondition :: Condition.Type.Condition
 garlandCondition =
   Condition.Type.Compares
-    (Quantity.Type.IsMonarch (PlayerRef.Specific S.bob))
-    Comparison.AtLeast
-    (Quantity.Type.Literal 1)
+    ( Compares.MkCompares
+        (Quantity.Type.IsMonarch (PlayerRef.Specific S.bob))
+        Comparison.AtLeast
+        (Quantity.Type.Literal 1)
+    )
 
 -- Garland, Royal Kidnapper {2}{U}{B} Legendary Creature -- Human Knight 3/4:
 -- "Whenever an opponent becomes the monarch, gain control of target creature
