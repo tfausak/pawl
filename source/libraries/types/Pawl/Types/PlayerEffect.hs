@@ -1,6 +1,7 @@
 module Pawl.Types.PlayerEffect where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -107,6 +108,33 @@ data PlayerEffect
     -- which would be this arm's sibling and needs the "unless they're mana
     -- abilities" rider besides (#1242).
     ReduceActivationCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost Natural.Natural
+  | -- | CR 613.11 / 601.2f / Brutal Suppression: the activated abilities of
+    -- matching permanents cost these additional NON-MANA components to activate
+    -- ("Activated abilities of nontoken Rebels cost an additional \"Sacrifice a
+    -- land\" to activate"). CR 601.2f's "plus all additional costs" clause,
+    -- reaching an activation cost by CR 602.2b.
+    --
+    -- A THIRD constructor beside ReduceActivationCost above rather than a field
+    -- on it, and not a non-mana twin of IncreaseSpellCost either. The two
+    -- reasons are the ones this whole family is split on: which MOMENT an arm is
+    -- asked at is the constructor's to say (a spell's additional costs come off
+    -- its own card text and never from here), and CR 601.2f's arithmetic --
+    -- increases, then reductions, then the {0} floor -- has nothing to do to a
+    -- component. Nothing reduces a "sacrifice a land" away.
+    --
+    -- The Filter is matched against the ability's SOURCE PERMANENT, exactly as
+    -- ReduceActivationCost's is, and for its reason: that is what the printing
+    -- narrows ("nontoken Rebels" is `And [HasSubtype Rebel, Not IsToken]`).
+    --
+    -- A LIST of components, matching Pawl.Types.Cost.components: one sentence
+    -- can name several actions ("sacrifice a land and discard a card"), and a
+    -- list needs no sibling constructor when one does.
+    --
+    -- Not implemented: an added component whose count scales with the cost being
+    -- adjusted -- Drought's "for each black mana symbol in their activation
+    -- costs" -- which needs the components to be a function of the cost rather
+    -- than a fixed list (#1417).
+    AddActivationCost (Filter.Filter Keyword.Keyword) [CostComponent.CostComponent Keyword.Keyword]
   | -- | CR 305.2 / Exploration, Azusa Lost but Seeking: this player may play this
     -- many lands each turn OVER the one CR 305.2 normally allows.
     --
