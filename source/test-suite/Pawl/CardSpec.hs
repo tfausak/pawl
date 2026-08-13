@@ -16,6 +16,7 @@ import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Event as Event
 -- Dotted, because Pawl.Types.Keyword already holds the short alias here (the
 -- reverse of TriggerSpec's split).
@@ -683,15 +684,33 @@ triggeredAbilityCounts ability =
 -- about. Static abilities are absent on purpose: a static ability's
 -- modification is never stored.
 --
--- CR 107.3: does this mana cost print an {X}? Asked of a CARD's mana cost for a
--- spell and of an ACTIVATION cost's mana part for an ability -- the two costs CR
--- 602.2b calls each other's analog -- so the two halves of the "reads X iff {X}
--- is declared" lint ask it in the same words. Nothing (CR 118.6, an unpayable
--- cost) declares nothing.
-declaresVariable :: Maybe ManaCost.ManaCost -> Bool
-declaresVariable m = case m of
-  Nothing -> False
-  Just (ManaCost.MkManaCost syms) -> elem ManaSymbol.Variable syms
+-- CR 107.3: does this cost declare an X? Asked of a SPELL's cost and of an
+-- ABILITY's activation cost -- the two costs CR 602.2b calls each other's analog
+-- -- so the two halves of the "reads X iff X is declared" lint ask it in the same
+-- words.
+--
+-- Pawl.Engine.Cost.hasVariable is the ENGINE's own reading, reused rather than
+-- restated so the lint and the announcement cannot disagree about which cards get
+-- asked. It reads BOTH halves of a cost: CR 601.2b's "such as an {X} in its mana
+-- cost" is an example, and CR 107.3a lists the additional cost beside the mana
+-- cost -- Hatred's only X is a CostComponent.PayLifeX. Nothing (CR 118.6, an
+-- unpayable cost) declares nothing.
+declaresVariable :: Cost.Type.Cost Keyword.Keyword -> Bool
+declaresVariable = Cost.hasVariable
+
+-- The costs a SPELL can be announced against: the printed one -- mana cost plus
+-- CR 118.8's additional costs -- and each alternative cost the card offers, which
+-- is the candidate list Pawl.Engine.Cost.costsFor builds. Any one of them
+-- declaring X is enough for casting to bind Binding.variableX, so the lint asks
+-- `any`.
+--
+-- The alternatives are taken UNWRAPPED, unlike costsFor's `withAdditional`: the
+-- printed cost in the head of this list already carries the additional costs, so
+-- wrapping them again would change no `any`.
+spellCostsOf :: Face.Face Card.Type.Card -> [Cost.Type.Cost Keyword.Keyword]
+spellCostsOf face =
+  Cost.Type.MkCost (Face.manaCost face) (Face.additionalCosts face)
+    : fmap AlternativeCost.cost (Face.alternativeCosts face)
 
 -- Every Count reachable from a combat restriction: only CR 508.1c's / CR
 -- 509.1b's "unless some condition is met" carries one, and the subject beside it
@@ -1174,7 +1193,7 @@ triggeredAbilityOffends ability =
 activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Bool
 activatedAbilityOffends ability =
   let announcedX =
-        if declaresVariable (Cost.Type.mana (ActivatedAbility.cost ability))
+        if declaresVariable (ActivatedAbility.cost ability)
           then Set.singleton Binding.variableX
           else Set.empty
    in modalSlotsOffend (Set.union (Set.fromList [Binding.triggerSource, Binding.you]) announcedX) (ActivatedAbility.modal ability)
@@ -1878,6 +1897,7 @@ costComponentFilters component = case component of
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
   CostComponent.PayLife _ -> []
+  CostComponent.PayLifeX -> []
   CostComponent.DiscardCards _ -> []
   CostComponent.DiscardThis -> []
   CostComponent.PayEnergy _ -> []
@@ -2703,16 +2723,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         --     Pawl.Engine.Cast.castSpell stamps the caster for EVERY spell at CR
         --     601.2i -- so Char's "and 2 damage to you" is a slot read on a spell
         --     exactly as Brothers of Fire's is on an activated ability.
-        --   * Binding.variableX, and only when the cost prints an {X}. CR 601.2b's
-        --     X is an ordinary slot read since #14 retired Quantity.X, so it
-        --     arrives here like any other -- but casting binds it, so it belongs
-        --     here exactly when the cost declares it. That IS the "reads X iff the
-        --     cost declares {X}" lint, now falling out of the ordinary comparison
+        --   * Binding.variableX, and only when the cost declares an X -- in
+        --     either half of it, per `declaresVariable`. CR 601.2b's X is an
+        --     ordinary slot read since #14 retired Quantity.X, so it arrives here
+        --     like any other -- but casting binds it, so it belongs here exactly
+        --     when the cost declares it. That IS the "reads X iff the cost
+        --     declares X" lint, now falling out of the ordinary comparison
         --     instead of needing its own pass. activatedAbilityOffends says the
         --     same thing about an activation cost.
         cardOffends card =
           let castBound =
-                if declaresVariable (Face.manaCost card)
+                if any declaresVariable (spellCostsOf card)
                   then Set.fromList [Binding.you, Binding.variableX]
                   else Set.singleton Binding.you
            in modalSlotsOffend castBound (Face.spell card)
@@ -2812,15 +2833,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3)))
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)) "misauthored card detected"
   -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
-  -- announced against the card's own mana cost.
-  Spec.it s "every printing that reads X declares {X}, and vice versa" $ do
+  -- announced against the card's own cost -- mana cost, additional costs and
+  -- alternative costs together (`spellCostsOf`), since CR 107.3a names all of them.
+  Spec.it s "every printing that reads X declares X, and vice versa" $ do
     ps <- S.allPrintings s
     let readsX c = Resolve.readsX (Card.allEffects c)
         offenders =
           filter
-            (anyFace (\f -> readsX f /= declaresVariable (Face.manaCost f)) . Printing.card)
+            (anyFace (\f -> readsX f /= any declaresVariable (spellCostsOf f)) . Printing.card)
             ps
-    Spec.assertEqWith s "X read iff {X} declared" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "X read iff X declared" (fmap (S.nameOf . Printing.card) offenders) []
   -- The ACTIVATED-ABILITY half, and it is a separate sweep because it is a
   -- separate cost: CR 602.2b makes "an activated ability's analog to a spell's
   -- mana cost (as referenced in rule 601.2f) ... its activation cost", so an
@@ -2835,13 +2857,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         abilities = concatMap abilitiesOf ps
         offends (_, ab) =
           Resolve.readsX (Modal.allEffects (ActivatedAbility.modal ab))
-            /= declaresVariable (Cost.Type.mana (ActivatedAbility.cost ab))
+            /= declaresVariable (ActivatedAbility.cost ab)
     -- Guards the sweep against passing vacuously, in both directions: an empty
-    -- pool of abilities, and a pool in which no activation cost prints an {X} at
+    -- pool of abilities, and a pool in which no activation cost declares an X at
     -- all (where the lint would hold for every card by agreeing on False).
     Spec.assertBool s (not (null abilities)) "the pool has activated abilities"
-    Spec.assertBool s (any (declaresVariable . Cost.Type.mana . ActivatedAbility.cost . snd) abilities) "and one of them prints an {X}"
-    Spec.assertEqWith s "X read iff {X} declared" (fmap fst (filter offends abilities)) []
+    Spec.assertBool s (any (declaresVariable . ActivatedAbility.cost . snd) abilities) "and one of them declares an X"
+    Spec.assertEqWith s "X read iff X declared" (fmap fst (filter offends abilities)) []
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
     -- Every FACE of every token, since CR 707.8a's double-faced token names two.

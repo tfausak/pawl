@@ -14,6 +14,7 @@
 module Pawl.CostSpec where
 
 import qualified Control.Monad as Monad
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -1165,11 +1166,151 @@ jaradSpec s registry =
         (namesIn Zone.Graveyard printedOrder)
         (names ["Jarad, Golgari Lich Lord"])
 
+-- Chooses this value of X; every other prompt takes the identity fallback, which
+-- aims Hatred's one target slot at the only creature on the board. The liar
+-- pattern ProjectionSpec's answerX4 uses.
+answerHatredXOf :: Natural.Natural -> Prompt.Prompt r -> r
+answerHatredXOf n p = case p of
+  Prompt.ChooseX {} -> n
+  _ -> S.identityAnswer p
+
+-- Answers Prompt.ChooseX with the bound the prompt carries and RECORDS it. An
+-- empty log is how a test sees that the question was never put at all, which is
+-- what the mana-cost-only reading of CR 601.2b leaves behind on this card.
+answerHatredAtBound :: Prompt.Prompt r -> State.State [Natural.Natural] r
+answerHatredAtBound p = case p of
+  Prompt.ChooseX _ _ _ bound -> do
+    State.modify' (\seen -> seen <> [bound])
+    pure bound
+  _ -> pure (S.identityAnswer p)
+
+-- alice controls five untapped Swamps -- exactly {3}{B}{B} -- and a Goblin Piker
+-- (2/1), with Hatred in hand and this life total, in her own precombat main
+-- phase.
+--
+-- FIVE Swamps and no more, so the mana is fixed across every case below: X moves
+-- only what the LIFE half of the cost can pay, which is what makes the announced
+-- value's bound a fact about life rather than about mana.
+hatredBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Integer -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hatredBoard swamp piker hatred life =
+  let base = S.landsInPlay swamp 5
+      (pikerId, withPiker) = S.addCreature piker S.alice base
+      (gs, hatredId) = S.handOne hatred withPiker
+   in ( pikerId,
+        hatredId,
+        gs {GameState.players = Map.adjust (\p -> p {Player.life = life}) S.alice (GameState.players gs)}
+      )
+
+-- Hatred {3}{B}{B} Instant: "As an additional cost to cast this spell, pay X
+-- life. Target creature gets +X/+0 until end of turn."
+--
+-- The card CR 601.2b's variable ADDITIONAL cost was waiting for: its mana cost
+-- holds no {X} at all, so an engine reading that rule's parenthetical ("such as
+-- an {X} in its mana cost") as the rule rather than as an example never asks for
+-- the value. CR 107.3a is the general statement -- "a mana cost, alternative
+-- cost, additional cost, and/or activation cost with an {X}, [-X], or X in it".
+hatredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hatredSpec s registry =
+  Spec.describe s "Hatred" $ do
+    -- The whole card. Falsifiers, in order: an X read as 0 leaves a 2/1 at 20
+    -- life; an X paid but not read back leaves a 2/1 at 17; an X read but not
+    -- paid leaves a 5/1 at 20.
+    Spec.it s "CR 601.2b/107.3a whole card: X=3 pays 3 life and the Piker is 5/1" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let (pikerId, hatredId, gs) = hatredBoard swamp piker hatred 20
+          after = S.runPure (answerHatredXOf 3) gs (do S.cast S.alice hatredId; Stack.resolveTop)
+      Spec.assertEqWith s "CR 119.4 subtracted the announced 3" (S.lifeOf S.alice after) (Just 17)
+      Spec.assertEqWith s "power 2 + 3" (Projection.powerOf pikerId after) (Just 5)
+      -- +X/+0 and not +X/+X: the toughness is the reading this card's own text
+      -- distinguishes from Untamed Might's.
+      Spec.assertEqWith s "toughness untouched" (Projection.toughnessOf pikerId after) (Just 1)
+      Spec.assertEqWith s "five Swamps paid {3}{B}{B}" (S.tappedCount S.alice after) 5
+      Spec.assertEqWith s "Hatred resolved out of hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+    -- The SAME board with one thing changed. CR 107.3i makes the cost's X and the
+    -- effect's X one value, so both readings move together; a board on which X=3
+    -- and X=5 agreed could not tell the announcement was read at all.
+    Spec.it s "CR 107.3i the cost and the effect read ONE announced value" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let at x =
+            let (pikerId, hatredId, gs) = hatredBoard swamp piker hatred 20
+                after = S.runPure (answerHatredXOf x) gs (do S.cast S.alice hatredId; Stack.resolveTop)
+             in (S.lifeOf S.alice after, Projection.powerOf pikerId after)
+      Spec.assertEqWith s "X=1 pays 1 and pumps 1" (at 1) (Just 19, Just 3)
+      Spec.assertEqWith s "X=5 pays 5 and pumps 5" (at 5) (Just 15, Just 7)
+    -- CR 119.4b: "Players can always pay 0 life, no matter what their (or their
+    -- team's) life total is." So X=0 is a legal announcement and the spell casts;
+    -- a floor that required X > 0 would leave Hatred in hand instead.
+    Spec.it s "CR 119.4b X=0 casts, pays nothing and pumps nothing" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let (pikerId, hatredId, gs) = hatredBoard swamp piker hatred 20
+          after = S.runPure (answerHatredXOf 0) gs (do S.cast S.alice hatredId; Stack.resolveTop)
+      Spec.assertEqWith s "life untouched" (S.lifeOf S.alice after) (Just 20)
+      Spec.assertEqWith s "still a 2/1" (Projection.powerOf pikerId after, Projection.toughnessOf pikerId after) (Just 2, Just 1)
+      Spec.assertEqWith s "five Swamps still paid {3}{B}{B}" (S.tappedCount S.alice after) 5
+      Spec.assertEqWith s "Hatred resolved out of hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+    -- CR 119.4: "the player may do so only if their life total is greater than or
+    -- equal to the amount of the payment". The PAIR is the assertion: one board,
+    -- one seat, one mana supply, four life -- X=3 casts and X=5 does not, so the
+    -- refusal cannot be want of mana, timing or a non-empty stack.
+    --
+    -- Four life and not five, so the paying half never reaches 0 and CR 704.5a
+    -- never takes alice out from under the assertion.
+    Spec.it s "CR 119.4 an X above the life total reverses the whole casting" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let at x =
+            let (pikerId, hatredId, gs) = hatredBoard swamp piker hatred 4
+                after = S.runPure (answerHatredXOf x) gs (do S.cast S.alice hatredId; Stack.resolveTop)
+             in ( S.lifeOf S.alice after,
+                  Projection.powerOf pikerId after,
+                  S.tappedCount S.alice after,
+                  length (Game.zoneMembers Zone.Hand S.alice after)
+                )
+      Spec.assertEqWith s "X=3 is affordable: 1 life left, a 5/1, five Swamps tapped, hand empty" (at 3) (Just 1, Just 5, 5, 0)
+      Spec.assertEqWith s "X=5 is not: nothing paid, nothing pumped, Hatred still in hand" (at 5) (Just 4, Just 2, 0, 1)
+    -- That the question is PUT at all, which no board state records. The bound is
+    -- the life total rather than anything about the mana -- five Swamps pay
+    -- {3}{B}{B} exactly at every value of X -- so it moves with the life and with
+    -- nothing else.
+    Spec.it s "CR 601.2b Hatred is asked for X, bounded by the life its cost can pay" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let boundsAt life =
+            let (_, hatredId, gs) = hatredBoard swamp piker hatred life
+             in State.execState (Engine.runGame answerHatredAtBound gs (S.cast S.alice hatredId)) []
+      Spec.assertEqWith s "at 20 life the bound is 20" (boundsAt 20) [20]
+      Spec.assertEqWith s "at 4 life the bound is 4" (boundsAt 4) [4]
+    -- The fence under the two functions above. CR 601.2 reverses a casting whose
+    -- steps a player cannot comply with; it never picks a value on their behalf,
+    -- so an unannounced X is simply unpayable. Unreachable from either cast path
+    -- -- hasVariable is what guarantees the announcement happens first -- and
+    -- asserted here rather than at gameplay level for exactly that reason.
+    Spec.it s "CR 601.2b an unannounced X is unpayable, and is what makes the cast ask" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      piker <- S.printingOf s registry "Goblin Piker"
+      hatred <- S.printingOf s registry "Hatred"
+      let (_, _, gs) = hatredBoard swamp piker hatred 20
+          printed = Cost.Type.MkCost (Face.manaCost (S.combinedFace hatred)) (Face.additionalCosts (S.combinedFace hatred))
+      Spec.assertEqWith s "the printed additional cost is CR 601.2b's variable" (Face.additionalCosts (S.combinedFace hatred)) [CostComponent.PayLifeX]
+      Spec.assertBool s (Cost.hasVariable printed) "so the cost has a variable, though its mana part has none"
+      Spec.assertBool s (notElem ManaSymbol.Variable (foldMap ManaCost.unwrap (Face.manaCost (S.combinedFace hatred)))) "the mana part really has none"
+      Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource CostComponent.PayLifeX gs)) "and it is unpayable until announced"
+      Spec.assertBool s (Cost.canPayComponent S.alice S.noSource (CostComponent.PayLife 20) gs) "while the announced 20 it substitutes to is payable"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
   jaradSpec s registry
   greedSpec s registry
+  hatredSpec s registry
   villageRitesSpec s registry
   altarsReapSpec s registry
   headlessSkaabSpec s registry

@@ -563,8 +563,9 @@ conditionSlotsAreExhaustive condition = case condition of
     Quantity.slotsAreExhaustive (Compares.measured c) && Quantity.slotsAreExhaustive (Compares.threshold c)
   Condition.Type.Any conditions -> all conditionSlotsAreExhaustive conditions
 
--- Does any of these effects read X? A card that reads X must declare {X} in its
--- cost (CR 107.3, CR 107.3a, CR 118.4) -- the same reads-equal-declares contract
+-- Does any of these effects read X? A card that reads X must declare it in its
+-- cost -- in the mana cost as an {X}, or in an additional cost as Hatred's "pay X
+-- life" (CR 107.3, CR 107.3a, CR 118.4) -- the same reads-equal-declares contract
 -- slotsOf draws for target slots. Quantity.readsX does the looking, so a nested
 -- X -- Vitalizing Cascade's "X plus 3", or an X inside a Count -- is seen here
 -- exactly as slotsOf sees a nested slot through Quantity.slots.

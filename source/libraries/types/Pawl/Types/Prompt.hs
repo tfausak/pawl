@@ -455,10 +455,14 @@ data Prompt r where
   --
   -- A bare Natural rather than a Maybe: the prompt is issued only for a cost that
   -- already passed the X=0 floor, so a greatest payable X always exists and 0 is a
-  -- real answer. There is no unbounded case -- a player's mana is finite.
+  -- real answer. There is no unbounded case -- a player's mana and life are both
+  -- finite.
   --
   -- Prompted before targets (CR 601.2b precedes 601.2c), and only when the cost
-  -- contains a Variable symbol.
+  -- declares an X -- a ManaSymbol.Variable in its mana part, or a
+  -- CostComponent.PayLifeX among its components (Hatred). CR 601.2b's "such as an
+  -- {X} in its mana cost" is an example rather than the rule; CR 107.3a is the
+  -- general statement.
   ChooseX :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | Rule 702.42a: whether this player uses the entwine ability of the modal spell
   -- they are casting. The ObjectId is the spell; the Cost is the additional cost
