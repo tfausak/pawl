@@ -70,6 +70,7 @@ import qualified Pawl.Codec.DiscardSpec
 import qualified Pawl.Codec.DungeonRoomSpec
 import qualified Pawl.Codec.DurationRefSpec
 import qualified Pawl.Codec.DurationSpec
+import qualified Pawl.Codec.DuringPhaseSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntryOptionSpec
@@ -382,6 +383,7 @@ spec s registry = do
   Pawl.Codec.DungeonRoomSpec.spec s
   Pawl.Codec.DurationRefSpec.spec s
   Pawl.Codec.DurationSpec.spec s
+  Pawl.Codec.DuringPhaseSpec.spec s
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s

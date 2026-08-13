@@ -188,6 +188,8 @@ library codec
     Pawl.Codec.DurationRef
     Pawl.Codec.DurationRefSpec
     Pawl.Codec.DurationSpec
+    Pawl.Codec.DuringPhase
+    Pawl.Codec.DuringPhaseSpec
     Pawl.Codec.Effect
     Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
@@ -775,6 +777,7 @@ library types
     Pawl.Types.DungeonRoom
     Pawl.Types.Duration
     Pawl.Types.DurationRef
+    Pawl.Types.DuringPhase
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption

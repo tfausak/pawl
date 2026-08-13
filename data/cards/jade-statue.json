@@ -87,14 +87,14 @@
           "restrictions": [
             {
               "type": "DuringPhase",
-              "value": [
-                {
-                  "type": "CombatPhase"
-                },
-                {
+              "value": {
+                "scope": {
                   "type": "EachTurn"
+                },
+                "window": {
+                  "type": "CombatPhase"
                 }
-              ]
+              }
             }
           ]
         }

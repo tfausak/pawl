@@ -1,21 +1,19 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.AttackRequirement where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 
 -- | The key is "subject" and not "attacker": CR 508.1d's requirement names the
 -- creatures REQUIRED to attack, where CR 509.1c's names the attacker to be
 -- blocked. Same shape, opposite axis (Pawl.Types.AttackRequirement).
-toJson :: AttackRequirement.AttackRequirement -> Value.Value
-toJson ar =
-  Value.object (Common.requiredPair "subject" (Codec.encode Affected.codec) (AttackRequirement.subject ar))
-
-fromJson :: Value.Value -> Either Text.Text AttackRequirement.AttackRequirement
-fromJson value = do
-  ps <- Common.asObject value
-  a <- Common.field "subject" ps >>= Codec.decode Affected.codec
-  pure (AttackRequirement.MkAttackRequirement a)
+--
+-- The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec AttackRequirement.AttackRequirement
+codec = Fields.object $ do
+  subject <- Fields.required "subject" Affected.codec AttackRequirement.subject
+  pure AttackRequirement.MkAttackRequirement {AttackRequirement.subject = subject}

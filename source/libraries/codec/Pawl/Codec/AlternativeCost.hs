@@ -1,12 +1,13 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.AlternativeCost where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 
 -- | 'cost' is required and 'condition' defaults to Nothing, which is the honest
@@ -16,16 +17,15 @@ import qualified Pawl.Types.AlternativeCost as AlternativeCost
 --
 -- NESTED rather than flattened into the Cost's own keys, so this codec states no
 -- opinion about what a Cost looks like.
-toJson :: AlternativeCost.AlternativeCost -> Value.Value
-toJson a =
-  Value.object
-    ( Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (AlternativeCost.condition a)
-        <> Common.requiredPair "cost" (Codec.encode (Cost.codec Keyword.codec)) (AlternativeCost.cost a)
-    )
-
-fromJson :: Value.Value -> Either Text.Text AlternativeCost.AlternativeCost
-fromJson value = do
-  ps <- Common.asObject value
-  condition <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
-  cost <- Common.field "cost" ps >>= Codec.decode (Cost.codec Keyword.codec)
-  pure AlternativeCost.MkAlternativeCost {AlternativeCost.condition = condition, AlternativeCost.cost = cost}
+--
+-- The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec AlternativeCost.AlternativeCost
+codec = Fields.object $ do
+  condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) AlternativeCost.condition
+  cost <- Fields.required "cost" (Cost.codec Keyword.codec) AlternativeCost.cost
+  pure
+    AlternativeCost.MkAlternativeCost
+      { AlternativeCost.condition = condition,
+        AlternativeCost.cost = cost
+      }

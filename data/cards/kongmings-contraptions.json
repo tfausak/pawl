@@ -49,8 +49,11 @@
           "restrictions": [
             {
               "type": "DuringPhase",
-              "value": [
-                {
+              "value": {
+                "scope": {
+                  "type": "EachTurn"
+                },
+                "window": {
                   "type": "Step",
                   "value": {
                     "type": "Combat",
@@ -58,11 +61,8 @@
                       "type": "DeclareAttackers"
                     }
                   }
-                },
-                {
-                  "type": "EachTurn"
                 }
-              ]
+              }
             },
             {
               "type": "AttackedThisStep"

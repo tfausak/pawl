@@ -22,10 +22,9 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.AlternativeCost" $ do
   -- CR 118.9's ordinary case, Fireblast's: no condition, so the key is omitted.
   Spec.it s "an unconditioned alternative omits the condition key" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      AlternativeCost.toJson
-      AlternativeCost.fromJson
+      AlternativeCost.codec
       AlternativeCost.MkAlternativeCost
         { AlternativeCost.condition = Nothing,
           AlternativeCost.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost []), Cost.components = []}
@@ -36,10 +35,9 @@ spec s = Spec.describe s "Pawl.Codec.AlternativeCost" $ do
   -- decoder could lose, so it is round-tripped alongside a mana part that is not
   -- {0}.
   Spec.it s "a conditioned alternative round-trips its condition" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      AlternativeCost.toJson
-      AlternativeCost.fromJson
+      AlternativeCost.codec
       AlternativeCost.MkAlternativeCost
         { AlternativeCost.condition =
             Just
@@ -57,3 +55,4 @@ spec s = Spec.describe s "Pawl.Codec.AlternativeCost" $ do
               }
         }
       """ {"condition":{"type":"Compares","value":{"measured":{"type":"CardsDiscardedThisTurn","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"cost":{"mana":[{"type":"Hybrid","value":[{"type":"Colored","value":{"type":"Black"}},{"type":"Colored","value":{"type":"Red"}}]}]}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s AlternativeCost.codec

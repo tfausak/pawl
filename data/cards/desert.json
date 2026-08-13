@@ -80,8 +80,11 @@
           "restrictions": [
             {
               "type": "DuringPhase",
-              "value": [
-                {
+              "value": {
+                "scope": {
+                  "type": "EachTurn"
+                },
+                "window": {
                   "type": "Step",
                   "value": {
                     "type": "Combat",
@@ -89,11 +92,8 @@
                       "type": "EndOfCombat"
                     }
                   }
-                },
-                {
-                  "type": "EachTurn"
                 }
-              ]
+              }
             }
           ]
         }

@@ -27,6 +27,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Card as Card
 import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
@@ -271,7 +272,7 @@ restrictionMet pid gs restriction = case restriction of
   -- 109.5 is why `pid` answers "your" -- for an activated ability that is the
   -- player who activated it, which `activatable` has already pinned to
   -- activatorOf -- so a stolen permanent's rider follows the thief.
-  ActivationRestriction.DuringPhase window scope ->
+  ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase window scope) ->
     Turn.inWindow window (GameState.phase gs)
       && Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
   -- CR 508.3b's question, asked of the ACTIVATING player, and the same reader the

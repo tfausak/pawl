@@ -24,7 +24,7 @@ toJson codec c =
       Common.optionalPair "optionality" Optionality.Mandatory (Codec.encode Optionality.codec) (Clause.optionality c),
       -- R2 again: CR 118.12a's "unless" is the marked case, and stating no such
       -- cost is what every other card in the corpus does.
-      Common.optionalPair "unlessPaid" Nothing (Common.encodeMaybe UnlessPaid.toJson) (Clause.unlessPaid c)
+      Common.optionalPair "unlessPaid" Nothing (Common.encodeMaybe (Codec.encode UnlessPaid.codec)) (Clause.unlessPaid c)
     ]
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Clause.Clause card)
@@ -33,5 +33,5 @@ fromJson decode value = do
   c <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   es <- Common.defaultedField "effects" Seq.empty (Common.decodeSeq (Effect.fromJson decode)) ps
   o <- Common.defaultedField "optionality" Optionality.Mandatory (Codec.decode Optionality.codec) ps
-  u <- Common.defaultedField "unlessPaid" Nothing (Common.decodeMaybe UnlessPaid.fromJson) ps
+  u <- Common.defaultedField "unlessPaid" Nothing (Common.decodeMaybe (Codec.decode UnlessPaid.codec)) ps
   pure (Clause.MkClause c o u es)

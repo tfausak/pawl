@@ -1,11 +1,11 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.AttackCost where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.ManaCost as ManaCost
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.AttackCost as AttackCost
 
 -- | "subject" is Pawl.Codec.AttackRequirement's key and names the same axis:
@@ -13,16 +13,15 @@ import qualified Pawl.Types.AttackCost as AttackCost
 -- "attacker", which is the object CR 509.1c's requirements carry instead.
 -- "perAttacker" is one attacker's share, not the card's whole cost -- a "for
 -- each" repeats it per taxed attacker before CR 508.1h totals the declaration.
-toJson :: AttackCost.AttackCost -> Value.Value
-toJson ac =
-  Value.object
-    ( Common.requiredPair "subject" (Codec.encode Affected.codec) (AttackCost.subject ac)
-        <> Common.requiredPair "perAttacker" (Codec.encode ManaCost.codec) (AttackCost.perAttacker ac)
-    )
-
-fromJson :: Value.Value -> Either Text.Text AttackCost.AttackCost
-fromJson value = do
-  ps <- Common.asObject value
-  subject <- Common.field "subject" ps >>= Codec.decode Affected.codec
-  perAttacker <- Common.field "perAttacker" ps >>= Codec.decode ManaCost.codec
-  pure (AttackCost.MkAttackCost subject perAttacker)
+--
+-- The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec AttackCost.AttackCost
+codec = Fields.object $ do
+  subject <- Fields.required "subject" Affected.codec AttackCost.subject
+  perAttacker <- Fields.required "perAttacker" ManaCost.codec AttackCost.perAttacker
+  pure
+    AttackCost.MkAttackCost
+      { AttackCost.subject = subject,
+        AttackCost.perAttacker = perAttacker
+      }
