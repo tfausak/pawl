@@ -100,9 +100,11 @@ data PlayerEffect
     -- The FLOOR is carried rather than assumed, because it is card text (CR
     -- 101.1) and not a rule: both printings say "This effect can't reduce the
     -- mana in that cost to less than one mana" and so carry 1, while an
-    -- activation-cost reducer that does not say it (Hero of Iroas) carries 0.
-    -- See Pawl.Types.CostAdjustments.minimumMana for what zero means and why the
-    -- clamp never raises a cost.
+    -- activation-cost reducer that does not say it (Blossoming Tortoise's
+    -- "Activated abilities of lands you control cost {1} less to activate")
+    -- carries 0. See Pawl.Types.CostAdjustments.reductions for what zero means,
+    -- why a floor never raises a cost, and why the two kinds cannot share one
+    -- floor over the pool.
     --
     -- Not implemented: nothing INCREASES an activation cost (Suppression Field),
     -- which would be this arm's sibling and needs the "unless they're mana

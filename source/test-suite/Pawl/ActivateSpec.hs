@@ -120,6 +120,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
   activationCostReductionSpec s registry
+  unflooredActivationCostReductionSpec s registry
   activationCostAdditionSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
@@ -2340,6 +2341,90 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
     Spec.assertBool s (Activate.activatable S.bob srcId ability board) "bob's creature is reduced too"
     Spec.assertEqWith s "two of bob's three Mountains paid it" (S.tappedCount S.bob after) 2
     Spec.assertEqWith s "and alice tapped nothing" (S.tappedCount S.alice after) 0
+
+-- Mutavault's SECOND printed ability, the {1} animation. `theAbility` takes the
+-- first, which here is the mana ability CR 605.3b keeps off the stack -- and one
+-- with no mana in its cost, so nothing could be measured on it.
+animationAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+animationAbility p = case drop 1 (Face.activatedAbilities (S.combinedFace p)) of
+  ab : _ -> ab
+  [] -> theAbility p
+
+-- alice's board: Mutavault, `lands` Mountains and Heartstone, plus Blossoming
+-- Tortoise when one is passed. The positive and the negative differ in that Maybe
+-- and in nothing else -- same seats, same lands, same permanents, same priority --
+-- which is what makes a tapped count attributable to the second reduction.
+mutavaultBoard ::
+  Printing.Printing ->
+  Int ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+mutavaultBoard mountain lands mutavault heartstone mTortoise =
+  let base = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. lands]
+      (srcId, g1) = S.addCreature mutavault S.alice base
+      g2 = snd (S.addCreature heartstone S.alice g1)
+      g3 = maybe g2 (\tortoise -> snd (S.addCreature tortoise S.alice g2)) mTortoise
+   in (srcId, g3 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
+
+-- CR 601.2f's floor read PER REDUCING EFFECT rather than as a clamp on the pooled
+-- result (#1243). The two readings agree on every board with one reduction, and on
+-- every board whose reductions all state the same floor, so what tells them apart
+-- is a FLOORED reduction beside an UNFLOORED one on one cost.
+--
+-- Heartstone {3} Artifact -- "Activated abilities of creatures cost {1} less to
+-- activate. This effect can't reduce the mana in that cost to less than one mana"
+-- -- is the floored half. Blossoming Tortoise {2}{G}{G} Creature -- Turtle 3/3 --
+-- "Activated abilities of lands you control cost {1} less to activate" is the
+-- unfloored half; it states no such sentence, so nothing forbids it taking the
+-- mana Heartstone's floor left behind. Mutavault's "{1}: This land becomes a 2/2
+-- creature with all creature types until end of turn. It's still a land" is the
+-- cost both reduce, and the animation is what puts one permanent inside both
+-- criteria at once. All three Oracle texts checked against api.scryfall.com.
+--
+-- The NUMBERS are why the board is honest: the printed {1} is at most what either
+-- reduction takes, so the two orders CR 601.2f leaves the player agree -- the
+-- Tortoise alone empties the cost, and Heartstone applied to an empty cost adds
+-- nothing back (its own ruling) -- and the assertion is not reading pawl's choice
+-- of order. A pooled clamp answers {1} on the same board, which is a different
+-- number of lands.
+unflooredActivationCostReductionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+unflooredActivationCostReductionSpec s registry = Spec.describe s "UnflooredActivationCostReduction" $ do
+  Spec.it s "CR 601.2f an unfloored reduction takes the mana a floored one may not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mutavault <- S.printingOf s registry "Mutavault"
+    heartstone <- S.printingOf s registry "Heartstone"
+    tortoise <- S.printingOf s registry "Blossoming Tortoise"
+    let animate = animationAbility mutavault
+        (withId, withBoard) = mutavaultBoard mountain 2 mutavault heartstone (Just tortoise)
+        (withoutId, withoutBoard) = mutavaultBoard mountain 2 mutavault heartstone Nothing
+        activate srcId gs = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId animate)
+        animated srcId gs = S.runPure S.identityAnswer (activate srcId gs) Stack.resolveTop
+        withAnimated = animated withId withBoard
+        withoutAnimated = animated withoutId withoutBoard
+    Spec.assertEqWith s "Mutavault prints two abilities, and the animation is the second" (length (Face.activatedAbilities (S.combinedFace mutavault))) 2
+    -- The first activation, made while Mutavault is still no creature: only the
+    -- Tortoise's criterion names it, so the board WITHOUT her pays the printed
+    -- {1}. That is also what proves the two boards are the same board otherwise.
+    Spec.assertEqWith s "the Tortoise alone pays the first activation" (S.tappedCount S.alice withAnimated) 0
+    Spec.assertEqWith s "where the printed {1} costs a land" (S.tappedCount S.alice withoutAnimated) 1
+    -- The animation resolved, so Mutavault is now a land AND a creature -- inside
+    -- both criteria at once. The Tortoise's third sentence is what tells the two
+    -- apart: "Land creatures you control get +1/+1".
+    Spec.assertEqWith s "an animated Mutavault under the Tortoise" (S.powerToughnessOf withId withAnimated) (Just (3, 3))
+    Spec.assertEqWith s "and 2/2 without her" (S.powerToughnessOf withoutId withoutAnimated) (Just (2, 2))
+    let withSecond = activate withId withAnimated
+        withoutSecond = activate withoutId withoutAnimated
+    -- THE ASSERTION. Heartstone may not take the last mana; the Tortoise may, and
+    -- does. A clamp on the pooled reduction leaves {1} here and taps a Mountain.
+    Spec.assertEqWith s "the second activation costs nothing at all" (S.tappedCount S.alice withSecond) 0
+    Spec.assertEqWith s "and is on the stack, so it was not merely refused" (length (GameState.stack withSecond)) 1
+    -- The floor, on the same pair: Heartstone alone leaves the {1} it may not
+    -- reduce, and one more land pays it. Not a refusal -- the ability reaches the
+    -- stack on this board too, so the difference is the mana and nothing else.
+    Spec.assertEqWith s "Heartstone's own floor leaves a mana to pay" (S.tappedCount S.alice withoutSecond) 2
+    Spec.assertEqWith s "which is paid, not refused" (length (GameState.stack withoutSecond)) 1
 
 -- alice's board: Saltfield Recluse, `lands` Plains, and a Goblin Piker under bob
 -- to aim the Recluse's ability at -- plus Brutal Suppression under BOB when one

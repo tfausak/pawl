@@ -1234,8 +1234,8 @@ data Prompt r where
   --
   -- One prompt per symbol, in the order the reductions are read. Two identical
   -- reductions ask two identical questions, which is sound because the answers
-  -- are interchangeable: the pooled bag applyAdjustments cancels against does not
-  -- record which prompt contributed which symbol.
+  -- are interchangeable: applyAdjustments folds the reductions one at a time, and
+  -- two that carry the same amount and the same floor commute.
   --
   -- NOT filtered by payability, unlike the two announcements above. CR 118.7e
   -- puts no such condition on the choice -- a player may take the half that
