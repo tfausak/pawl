@@ -7132,6 +7132,367 @@ blossomingTortoiseSpec s registry = Spec.describe s "BlossomingTortoise" $ do
                 (List.sort (named "Forest" : replicate 4 (named "Goblin Piker")))
               Spec.assertBool s (S.onBattlefield tortoiseId resolved) "and the Tortoise itself never moved"
 
+-- The same arm with a CHOOSER other than the resolving controller:
+-- Chooser.EachInScope, where portOfKarfellSpec above is Chooser.TheController.
+--
+-- Exhume {1}{B} Sorcery -- "Each player puts a creature card from their graveyard
+-- onto the battlefield." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com). Its whole text is that one sentence, so nothing else on the
+-- card can be what these assertions read.
+--
+-- CR 608.2d has the player an effect instructs announce the choices it offers,
+-- and this sentence instructs EACH PLAYER -- so each of them chooses, out of
+-- their own graveyard alone, in APNAP order (CR 608.2e, CR 101.4). CR 110.2a then
+-- gives each arrival to the player who put it there, which is the graveyard's own
+-- player: a graveyard is filed under the card's owner (CR 400.3), so the card
+-- writes EntryRiders' underOwner and every returning creature enters under its
+-- owner rather than under the caster's control. That is the whole difference from
+-- riseOfTheDarkRealmsSpec's "under your control".
+--
+-- THREE SEATS, with a board built so that the readings are told apart:
+--
+--   * EACH PLAYER as chooser versus the CONTROLLER as chooser. The answerer
+--     replies by WHICH PLAYER the prompt names -- alice and carol take their
+--     second candidate, bob his LAST, and bob's graveyard holds three so that
+--     his three readings come apart: an engine that asked alice about every
+--     graveyard would take bob's second card, one that chose for the player
+--     would take his first, and only the right one takes his third. An engine
+--     that asked one player about the union of the graveyards would return one
+--     card rather than three besides.
+--   * THE CHOSEN card versus the FIRST matching one. The paired leg below runs
+--     the same board through Replay.defaultAnswer, which takes every first.
+--   * EACH PLAYER'S OWN graveyard versus the union. No creature card ever
+--     crosses seats, which the per-owner control assertion is what pins.
+--   * A CREATURE CARD versus the whole zone. Each graveyard also holds a
+--     noncreature card, and each must stay buried.
+--   * ONE EACH versus a sweep. Two match per graveyard and one comes back.
+exhumeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exhumeSpec s registry =
+  let -- alice controls four Swamps -- twice what the spell costs, so a payment
+      -- that taps one source at a time cannot fail for reasons of its own -- and
+      -- holds an Exhume; `buried` goes into the named graveyards in the order
+      -- given. Returns the spell's id.
+      board exhume swamp buried =
+        let mana = S.landsFor swamp S.alice 4 S.threePlayerGame
+            withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) mana buried
+            (withSpell, spell) = S.handOne exhume withGraves
+         in (spell, withSpell {GameState.priority = Just S.alice})
+      -- Cast and resolve, keeping the RESPONSES beside the board so the same call
+      -- answers both "what came back" and "how many players were asked".
+      run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [Response.Response])
+      run answer spell gs =
+        let ((_, after), responses) = Replay.record answer gs (S.cast S.alice spell >> Stack.resolveTop)
+         in (after, responses)
+      named = Just . CardName.MkCardName . Text.pack
+      -- The whole battlefield minus alice's four Swamps, by NAME and CONTROLLER:
+      -- CR 400.7 mints a fresh id at the destination, so a returned card cannot
+      -- be found by the id it was buried under, and CR 110.2a is what decides
+      -- whose the arrival is.
+      arrivals gs =
+        List.sort
+          [ (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs)
+          | oid <- Set.toList (GameState.battlefield gs),
+            fmap S.nameOf (Game.cardOf oid gs) /= named "Swamp"
+          ]
+      choices responses =
+        length
+          [ () | Response.ChoseCardInGraveyard _ <- responses
+          ]
+      -- The prompt's candidates in the order it offers them, which is the order
+      -- Resolve.graveyardCardsOf sorts each graveyard into.
+      secondOf offered = case offered of
+        _ NonEmpty.:| (second : _) -> second
+        only NonEmpty.:| [] -> only
+   in Spec.describe s "Exhume" $ do
+        -- The headline: three players, three separate choices, three creatures
+        -- back under three different controllers.
+        Spec.it s "CR 608.2d each player chooses in their own graveyard, and keeps what they choose" $ do
+          exhume <- S.printingOf s registry "Exhume"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          murder <- S.printingOf s registry "Murder"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          cavalry <- S.printingOf s registry "Benalish Cavalry"
+          judgment <- S.printingOf s registry "Day of Judgment"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          hero <- S.printingOf s registry "Benalish Hero"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          forest <- S.printingOf s registry "Forest"
+          let buried =
+                [ (piker, S.alice),
+                  (murder, S.alice),
+                  (maiden, S.alice),
+                  (sentry, S.bob),
+                  (judgment, S.bob),
+                  (cavalry, S.bob),
+                  (wraith, S.bob),
+                  (hero, S.carol),
+                  (forest, S.carol),
+                  (berserkers, S.carol)
+                ]
+              (spell, gs) = board exhume swamp buried
+              -- BY THE PLAYER THE PROMPT NAMES, which is the whole assertion:
+              -- alice and carol take their second candidate and bob his last, so
+              -- no one answer can stand in for another's.
+              choosing p = case p of
+                Prompt.ChooseCardInGraveyard _ pid _ offered ->
+                  if pid == S.bob then NonEmpty.last offered else secondOf offered
+                _ -> S.identityAnswer p
+              (after, responses) = run choosing spell gs
+          Spec.assertEqWith s "all three players were asked" (choices responses) 3
+          Spec.assertEqWith
+            s
+            "each player's own choice is on the battlefield under their own control"
+            (arrivals after)
+            ( List.sort
+                [ (named "Bird Maiden", Just S.alice),
+                  (named "Bog Wraith", Just S.bob),
+                  (named "Berserkers of Blood Ridge", Just S.carol)
+                ]
+            )
+          Spec.assertEqWith
+            s
+            "the unchosen creature cards and the noncreature stay buried in every graveyard, and the spent sorcery joins alice's (CR 608.2n)"
+            ( List.sort (namesIn Zone.Graveyard S.alice after),
+              List.sort (namesIn Zone.Graveyard S.bob after),
+              List.sort (namesIn Zone.Graveyard S.carol after)
+            )
+            ( List.sort [named "Goblin Piker", named "Murder", named "Exhume"],
+              List.sort [named "Ogre Sentry", named "Benalish Cavalry", named "Day of Judgment"],
+              List.sort [named "Benalish Hero", named "Forest"]
+            )
+        -- The paired control, and the whole reason each graveyard buries TWO
+        -- creature cards: the same cast on the same board with the DEFAULT
+        -- answerer brings back the other one in every seat. If the engine were
+        -- picking, both legs would name the same three cards.
+        Spec.it s "CR 608.2d the engine does not pick: another answer returns the other card in every seat" $ do
+          exhume <- S.printingOf s registry "Exhume"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          murder <- S.printingOf s registry "Murder"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          cavalry <- S.printingOf s registry "Benalish Cavalry"
+          judgment <- S.printingOf s registry "Day of Judgment"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          hero <- S.printingOf s registry "Benalish Hero"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          forest <- S.printingOf s registry "Forest"
+          let buried =
+                [ (piker, S.alice),
+                  (murder, S.alice),
+                  (maiden, S.alice),
+                  (sentry, S.bob),
+                  (judgment, S.bob),
+                  (cavalry, S.bob),
+                  (wraith, S.bob),
+                  (hero, S.carol),
+                  (forest, S.carol),
+                  (berserkers, S.carol)
+                ]
+              (spell, gs) = board exhume swamp buried
+              (after, _) = run S.identityAnswer spell gs
+          Spec.assertEqWith
+            s
+            "each seat's first candidate comes back instead"
+            (arrivals after)
+            ( List.sort
+                [ (named "Goblin Piker", Just S.alice),
+                  (named "Ogre Sentry", Just S.bob),
+                  (named "Benalish Hero", Just S.carol)
+                ]
+            )
+        -- CR 101.3 and CR 609.3 applied PER PLAYER: a graveyard with nothing
+        -- matching drops that player out of the batch rather than the
+        -- instruction out of the effect, and a graveyard with exactly one
+        -- matching card leaves them nothing to decide, so they are not asked.
+        Spec.it s "CR 101.3 an empty share is skipped and a forced one is not asked" $ do
+          exhume <- S.printingOf s registry "Exhume"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          forest <- S.printingOf s registry "Forest"
+          let buried = [(piker, S.alice), (maiden, S.alice), (sentry, S.bob), (forest, S.carol)]
+              (spell, gs) = board exhume swamp buried
+              choosing p = case p of
+                Prompt.ChooseCardInGraveyard _ _ _ offered -> secondOf offered
+                _ -> S.identityAnswer p
+              (after, responses) = run choosing spell gs
+          Spec.assertEqWith s "only alice, who had two candidates, was asked" (choices responses) 1
+          Spec.assertEqWith
+            s
+            "alice's chosen card and bob's forced one came back; carol had no creature card and nothing happened for her"
+            (arrivals after)
+            (List.sort [(named "Bird Maiden", Just S.alice), (named "Ogre Sentry", Just S.bob)])
+          Spec.assertEqWith s "and carol's noncreature card is still buried" (namesIn Zone.Graveyard S.carol after) [named "Forest"]
+        -- Every graveyard empty: the spell resolves, asks nobody and returns
+        -- nothing. The spent sorcery in alice's graveyard is what keeps this from
+        -- passing because the spell never resolved at all.
+        Spec.it s "CR 609.3 empty graveyards are a no-op rather than a failure" $ do
+          exhume <- S.printingOf s registry "Exhume"
+          swamp <- S.printingOf s registry "Swamp"
+          let (spell, gs) = board exhume swamp []
+              (after, responses) = run S.identityAnswer spell gs
+          Spec.assertEqWith s "nobody was asked" (choices responses) 0
+          Spec.assertEqWith s "nothing arrived" (arrivals after) []
+          Spec.assertEqWith s "and the spell really did resolve" (namesIn Zone.Graveyard S.alice after) [named "Exhume"]
+
+-- TWO chosen graveyard cards in ONE resolution, where the second must not be the
+-- first: Blood for Bones, the card that made #1433 look like a missing exclusion.
+--
+-- Blood for Bones {3}{B} Sorcery -- "As an additional cost to cast this spell,
+-- sacrifice a creature. Return a creature card from your graveyard to the
+-- battlefield, then return another creature card from your graveyard to your
+-- hand." (name, cost, type line and Oracle text checked against
+-- api.scryfall.com). The whole card is transcribed.
+--
+-- "ANOTHER" NEEDS NO EXCLUSION HERE: the two returns are two effects of one
+-- resolution, each gathering its own candidates from the state it runs in (CR
+-- 608.2c), and the first return has already taken its card out of the graveyard
+-- -- CR 400.7 mints a new object at the destination and retires the old id --
+-- before the second is offered. So the second choice cannot see the first, and
+-- what the printed word forbids is already impossible.
+--
+-- The ANSWERER BELOW ASKS FOR IT ANYWAY, naming the first return's card at both
+-- prompts, which is what keeps that from being an assumption: a second gather
+-- that read a PRE-MOVE snapshot would put that id back on offer, the answerer
+-- would take it, and the move of an id that no longer resolves would leave the
+-- hand empty rather than holding the card these assertions name. No mutation
+-- makes the engine offer it, because nothing in the engine can -- so this leg is
+-- a regression fence for that property rather than a proof of an exclusion rule
+-- pawl does not have.
+--
+-- The additional cost is load-bearing beside that: the sacrificed creature is in
+-- the graveyard by the time the spell resolves, so it is a candidate for both
+-- returns.
+bloodForBonesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bloodForBonesSpec s registry =
+  let -- alice controls six Swamps -- slack over the spell's four, for
+      -- portOfKarfellSpec's reason -- and ONE creature, so the additional cost's
+      -- victim is forced and no prompt of its own can be mistaken for the
+      -- returns' prompts. `buried` goes into the named graveyards in the order
+      -- given.
+      board blood swamp victim buried =
+        let mana = S.landsFor swamp S.alice 6 S.threePlayerGame
+            (_, withVictim) = S.addCreature victim S.alice mana
+            withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) withVictim buried
+            (withSpell, spell) = S.handOne blood withGraves
+         in (spell, withSpell {GameState.priority = Just S.alice})
+      named = Just . CardName.MkCardName . Text.pack
+      arrivals gs =
+        List.sort
+          [ (fmap S.nameOf (Game.cardOf oid gs), Projection.controllerOf oid gs)
+          | oid <- Set.toList (GameState.battlefield gs),
+            fmap S.nameOf (Game.cardOf oid gs) /= named "Swamp"
+          ]
+      choices responses =
+        length
+          [ () | Response.ChoseCardInGraveyard _ <- responses
+          ]
+   in Spec.describe s "BloodForBones" $ do
+        -- The headline: the card alice chose is on the battlefield, a DIFFERENT
+        -- one she chose is in her hand, and the answerer asked for the first one
+        -- both times.
+        Spec.it s "CR 608.2c the second return cannot take the card the first one took" $ do
+          blood <- S.printingOf s registry "Blood for Bones"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          cavalry <- S.printingOf s registry "Benalish Cavalry"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          murder <- S.printingOf s registry "Murder"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(maiden, S.alice), (murder, S.alice), (cavalry, S.alice), (sentry, S.alice), (hero, S.bob)]
+              (spell, gs) = board blood swamp piker buried
+              -- Pinned BY NAME rather than by position: the Ogre Sentry is the
+              -- third of the four creature cards alice's graveyard holds once the
+              -- Piker has paid the cost, so it is neither the first candidate nor
+              -- next to it, and the Piker is the last.
+              wantedBy name gs1 =
+                Maybe.listToMaybe
+                  [ oid
+                  | oid <- Game.zoneMembers Zone.Graveyard S.alice gs1,
+                    fmap S.nameOf (Game.cardOf oid gs1) == named name
+                  ]
+              -- FIRST the Sentry, and then the Sentry AGAIN -- which the second
+              -- return cannot grant, so the fallback is the pinned Piker.
+              choosing sentryId pikerId p = case p of
+                Prompt.ChooseCardInGraveyard _ _ _ offered ->
+                  if List.elem sentryId (NonEmpty.toList offered) then sentryId else pikerId
+                _ -> S.identityAnswer p
+              afterCast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+          case (wantedBy "Ogre Sentry" afterCast, wantedBy "Goblin Piker" afterCast) of
+            (Just sentryId, Just pikerId) -> do
+              let answer :: Prompt.Prompt r -> r
+                  answer = choosing sentryId pikerId
+                  ((_, after), responses) = Replay.record answer afterCast Stack.resolveTop
+              Spec.assertEqWith s "alice was asked twice" (choices responses) 2
+              Spec.assertEqWith
+                s
+                "the Ogre Sentry she chose first is on the battlefield under her control"
+                (arrivals after)
+                [(named "Ogre Sentry", Just S.alice)]
+              Spec.assertEqWith
+                s
+                "and the Goblin Piker -- not the Sentry the answerer asked for twice -- is the card in her hand"
+                (namesIn Zone.Hand S.alice after)
+                [named "Goblin Piker"]
+              Spec.assertEqWith
+                s
+                "the two cards neither return took, the noncreature and the spent sorcery stay in her graveyard"
+                (List.sort (namesIn Zone.Graveyard S.alice after))
+                (List.sort [named "Bird Maiden", named "Benalish Cavalry", named "Murder", named "Blood for Bones"])
+              Spec.assertEqWith s "and bob's creature card was never a candidate" (namesIn Zone.Graveyard S.bob after) [named "Benalish Hero"]
+            _ -> Spec.assertBool s False "expected the sacrificed Piker and the buried Sentry in alice's graveyard after the cast"
+        -- The paired control on the same board: the default answerer takes the
+        -- first candidate each time, so BOTH returns name different cards than
+        -- the leg above -- and they are still different from each other.
+        Spec.it s "CR 608.2d the engine does not pick: another answer moves two other cards" $ do
+          blood <- S.printingOf s registry "Blood for Bones"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          cavalry <- S.printingOf s registry "Benalish Cavalry"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          murder <- S.printingOf s registry "Murder"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(maiden, S.alice), (murder, S.alice), (cavalry, S.alice), (sentry, S.alice), (hero, S.bob)]
+              (spell, gs) = board blood swamp piker buried
+              after = S.runPure S.identityAnswer gs (S.cast S.alice spell >> Stack.resolveTop)
+          Spec.assertEqWith
+            s
+            "the first candidate is on the battlefield"
+            (arrivals after)
+            [(named "Bird Maiden", Just S.alice)]
+          Spec.assertEqWith s "and the next one is in hand" (namesIn Zone.Hand S.alice after) [named "Benalish Cavalry"]
+        -- Where "another" and "a creature card" come apart: ONE creature card in
+        -- the whole graveyard. The first return takes it, the second has nothing
+        -- left to name and is ignored (CR 101.3, CR 609.3), and nobody is asked
+        -- at either step -- one candidate is not a choice.
+        Spec.it s "CR 101.3 a lone creature card returns to the battlefield and nothing goes to hand" $ do
+          blood <- S.printingOf s registry "Blood for Bones"
+          swamp <- S.printingOf s registry "Swamp"
+          piker <- S.printingOf s registry "Goblin Piker"
+          murder <- S.printingOf s registry "Murder"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(murder, S.alice), (hero, S.bob)]
+              (spell, gs) = board blood swamp piker buried
+              ((_, after), responses) = Replay.record S.identityAnswer gs (S.cast S.alice spell >> Stack.resolveTop)
+          Spec.assertEqWith s "neither return had anything to ask" (choices responses) 0
+          Spec.assertEqWith
+            s
+            "the sacrificed Piker is the lone candidate and it comes back"
+            (arrivals after)
+            [(named "Goblin Piker", Just S.alice)]
+          Spec.assertEqWith s "and alice's hand is empty" (namesIn Zone.Hand S.alice after) []
+          Spec.assertEqWith
+            s
+            "the noncreature card and the spent sorcery stay buried"
+            (List.sort (namesIn Zone.Graveyard S.alice after))
+            (List.sort [named "Murder", named "Blood for Bones"])
+
 -- CR 401.2's ordered pile named by POSITION rather than by characteristics:
 -- ObjectRef.TopOfLibrary, the arm no Filter could stand in for.
 --
@@ -8279,6 +8640,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   riseOfTheDarkRealmsSpec s registry
   portOfKarfellSpec s registry
   blossomingTortoiseSpec s registry
+  exhumeSpec s registry
+  bloodForBonesSpec s registry
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry

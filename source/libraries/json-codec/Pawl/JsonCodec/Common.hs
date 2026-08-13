@@ -421,6 +421,21 @@ tuple ca cb =
       Codec.schema = (\a b -> Schema.tupleOf [a, b]) <$> Codec.schema ca <*> Codec.schema cb
     }
 
+-- | 'tuple' with a third element. Its own function rather than a nesting of
+-- 'tuple', so a three-payload arm stays one flat array on the wire and in the
+-- schema instead of an array holding an array.
+tuple3 :: Codec.Codec a -> Codec.Codec b -> Codec.Codec c -> Codec.Codec (a, b, c)
+tuple3 ca cb cc =
+  Codec.MkCodec
+    { Codec.encode = \(a, b, c) -> Value.array [Codec.encode ca a, Codec.encode cb b, Codec.encode cc c],
+      Codec.decode = \value -> do
+        xs <- asArray value
+        case xs of
+          [av, bv, cv] -> (,,) <$> Codec.decode ca av <*> Codec.decode cb bv <*> Codec.decode cc cv
+          _ -> Left . Text.pack $ "expected a 3-element array but got " <> show value,
+      Codec.schema = (\a b c -> Schema.tupleOf [a, b, c]) <$> Codec.schema ca <*> Codec.schema cb <*> Codec.schema cc
+    }
+
 list :: Codec.Codec a -> Codec.Codec [a]
 list c =
   Codec.MkCodec
