@@ -1343,19 +1343,32 @@ powerToughnessSlots card =
 -- Not applied to the ability dataflow lints built on modalSlotsOffend, which
 -- still stop at the printed face (#1010).
 mintedFaces :: Face.Face Card.Type.Card -> [Face.Face Card.Type.Card]
-mintedFaces card =
+mintedFaces = fmap snd . mintedFacesTagged
+
+-- mintedFaces keeping WHICH KIND of object each face was minted for, because CR
+-- 111.4 and CR 114.3 disagree about one of them: a token has card types and an
+-- emblem has none. One traversal carries both, so the exhaustive case below is
+-- the only place that has to know.
+mintedFacesTagged :: Face.Face Card.Type.Card -> [(MintedKind, Face.Face Card.Type.Card)]
+mintedFacesTagged card =
   let minted = concatMap effectMintedFaces (cardResolutionEffects card)
-   in minted <> concatMap mintedFaces minted
+   in minted <> concatMap (mintedFacesTagged . snd) minted
+
+-- CR 111.1 and CR 114.1: the two kinds of object a card's own effects mint.
+data MintedKind
+  = MintedToken
+  | MintedEmblem
+  deriving (Eq, Show)
 
 -- The faces one effect mints. Exhaustive and hand-maintained, with
 -- effectReplacements' caveat: a NEW effect embedding a Card must be added here
 -- too, and the build breaks until it is.
-effectMintedFaces :: Effect.Effect Card.Type.Card -> [Face.Face Card.Type.Card]
+effectMintedFaces :: Effect.Effect Card.Type.Card -> [(MintedKind, Face.Face Card.Type.Card)]
 effectMintedFaces effect = case effect of
-  Effect.Create _ token _ _ -> NonEmpty.toList (Card.Type.faces token)
+  Effect.Create _ token _ _ -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
   -- Mints no face of its own: the token's text is the copied permanent's.
   Effect.CreateCopy {} -> []
-  Effect.CreateEmblem emblem -> NonEmpty.toList (Card.Type.faces emblem)
+  Effect.CreateEmblem emblem -> fmap ((,) MintedEmblem) (NonEmpty.toList (Card.Type.faces emblem))
   Effect.Replace {} -> []
   Effect.DealDamage _ _ -> []
   Effect.ModifyTarget {} -> []
@@ -2936,8 +2949,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- through a Printing.
   --
   -- Hand-built, in the two self-tests' posture above, because no card in the
-  -- pool names a reserved slot anywhere and none prints a CreateEmblem at all;
-  -- the corpus sweeps are a regression guard for this, never its proof. Each
+  -- pool names a reserved slot anywhere -- and only Ajani, Adversary of Tyrants
+  -- prints a CreateEmblem, whose emblem names none either; the corpus sweeps are
+  -- a regression guard for this, never its proof. Each
   -- case is asserted TWICE: the sweep sees the grafted offender, and the
   -- minting face's OWN slots stay empty. The second half is what makes this a
   -- test of the RECURSION rather than of a widened base case.
@@ -3008,8 +3022,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "a reserved slot on a two-faced token's back face is caught"
       (caught (overMint armBackFace traveler))
       offended
-    -- The emblem arm, which no card in the pool exercises: the minting effect
-    -- is swapped for a CreateEmblem carrying the same graft.
+    -- The emblem arm, which the pool's one CreateEmblem does not exercise --
+    -- Ajani, Adversary of Tyrants' emblem names no slot at all: the minting
+    -- effect is swapped for a CreateEmblem carrying the same graft.
     Spec.assertEqWith
       s
       "a reserved slot on a minted EMBLEM's face is caught"
@@ -3850,6 +3865,28 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- Frenzied Baloth's axis, which is authorable and must stay so: narrowing by
     -- KIND is not what this lint bans.
     Spec.assertBool s (not (offends (over kind))) "narrowing the same clause to combat damage is accepted"
+  -- CR 205.1 and CR 114.3, which is one biconditional read across the two kinds
+  -- of face a corpus file holds. A card's type line "contains the card's card
+  -- type(s)", which Pawl.Codec.TypeLine reads as at least one; CR 205.2c says
+  -- "tokens have card types even though they aren't cards", so a minted token's
+  -- face is held to the same bar. An EMBLEM is the one face with none: CR 114.3
+  -- gives it "no characteristics other than the abilities defined by the effect
+  -- that created it" and CR 114.5 adds that "Emblem isn't a card type".
+  --
+  -- A lint rather than a codec rule, because the wire cannot tell the three
+  -- apart: Pawl.Codec.Face decodes an absent `typeLine` as the empty one for the
+  -- emblem's sake, and this is what stops a card or a token quietly doing the
+  -- same. Pawl.Codec.TypeLine still rejects a type line that is PRESENT and empty.
+  Spec.it s "CR 205.1 / 114.3 only an emblem's face has no card type" $ do
+    ps <- S.allPrintings s
+    let typeless c = Set.null (TypeLine.types (Face.typeLine c))
+        offends card =
+          let printed = NonEmpty.toList (Card.Type.faces card)
+              minted = concatMap mintedFacesTagged printed
+           in any typeless printed
+                || any (\(kind, face) -> typeless face /= (kind == MintedEmblem)) minted
+        offenders = filter (offends . Printing.card) ps
+    Spec.assertEqWith s "only an emblem is typeless" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
   -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
   -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement

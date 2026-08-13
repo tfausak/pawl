@@ -1,0 +1,273 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "AddLoyaltyToThis",
+                "value": 1
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "PutCounters",
+                        "value": [
+                          {
+                            "type": "PlusOnePlusOne"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "creatures"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": {
+                  "creatures": {
+                    "count": {
+                      "least": 0,
+                      "most": 2
+                    },
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveLoyaltyFromThis",
+                "value": 2
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "creature"
+                          },
+                          {
+                            "type": "Battlefield"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": {
+                  "creature": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        },
+                        {
+                          "type": "ManaValueAtMost",
+                          "value": 2
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "CardsInGraveyard",
+                      "value": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "RemoveLoyaltyFromThis",
+                "value": 7
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "CreateEmblem",
+                        "value": {
+                          "faces": [
+                            {
+                              "name": "Ajani, Adversary of Tyrants Emblem",
+                              "triggeredAbilities": [
+                                {
+                                  "condition": {
+                                    "type": "StepBegins",
+                                    "value": [
+                                      {
+                                        "type": "Ending",
+                                        "value": {
+                                          "type": "EndStep"
+                                        }
+                                      },
+                                      {
+                                        "type": "ControllersTurn"
+                                      }
+                                    ]
+                                  },
+                                  "modal": {
+                                    "modes": [
+                                      {
+                                        "clauses": [
+                                          {
+                                            "effects": [
+                                              {
+                                                "type": "Create",
+                                                "value": [
+                                                  {
+                                                    "type": "Literal",
+                                                    "value": 3
+                                                  },
+                                                  {
+                                                    "faces": [
+                                                      {
+                                                        "colorIndicator": [
+                                                          {
+                                                            "type": "White"
+                                                          }
+                                                        ],
+                                                        "keywords": [
+                                                          {
+                                                            "type": "Lifelink"
+                                                          }
+                                                        ],
+                                                        "name": "Cat Token",
+                                                        "power": {
+                                                          "type": "Literal",
+                                                          "value": 1
+                                                        },
+                                                        "toughness": {
+                                                          "type": "Literal",
+                                                          "value": 1
+                                                        },
+                                                        "typeLine": {
+                                                          "subtypes": [
+                                                            {
+                                                              "type": "Cat"
+                                                            }
+                                                          ],
+                                                          "types": [
+                                                            {
+                                                              "type": "Creature"
+                                                            }
+                                                          ]
+                                                        }
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "loyalty": 4,
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Ajani, Adversary of Tyrants",
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Ajani"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Planeswalker"
+          }
+        ]
+      }
+    }
+  ]
+}

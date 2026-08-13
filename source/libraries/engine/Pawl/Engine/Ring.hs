@@ -76,13 +76,14 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- 613.11 puts a combat restriction outside the layers, so no static ability could
 -- have held it. CR 114.4 is what makes either do anything at all on an object in
 -- the command zone -- "abilities of emblems function in the command zone" -- and
--- Pawl.Engine.Projection.gatherGiven and
--- Pawl.Engine.CombatRestriction.inForce each walk the command zone for exactly
--- that.
+-- Pawl.Engine.Projection.gatherGiven,
+-- Pawl.Engine.CombatRestriction.inForce and Pawl.Engine.Event.eventTriggers each
+-- walk the command zone for exactly that.
 --
--- Not implemented: the two-, three- and four-temptation abilities are triggered,
--- and an emblem's triggered ability never fires because the trigger scans read
--- only the battlefield (#709).
+-- Not implemented: the two-, three- and four-temptation abilities, which the
+-- emblem gains as the temptations accumulate (#706). The scan that would gather
+-- them once they exist is in place -- they are triggered abilities, and
+-- eventTriggers offers an emblem's.
 theRingEmblem :: Card.Card
 theRingEmblem =
   Card.MkCard
@@ -92,7 +93,7 @@ theRingEmblem =
           Face.MkFace
             { Face.name = theRingName,
               Face.manaCost = Nothing,
-              Face.typeLine = TypeLine.MkTypeLine Set.empty Set.empty Set.empty,
+              Face.typeLine = TypeLine.empty,
               Face.power = Nothing,
               Face.toughness = Nothing,
               Face.loyalty = Nothing,
@@ -359,7 +360,8 @@ endOnControlChange = do
 -- Still read by no RULE -- what reads CR 701.54e in anger is the emblem's own
 -- text, and both of the base ability's clauses spell those conjuncts as a Filter
 -- instead (theRingIsLegendary, theRingCantBeBlockedByGreaterPower); the emblem's
--- remaining abilities are triggered and have no carrier (#709). Pawl.RingSpec
+-- remaining abilities are triggered and nothing mints them yet (#706).
+-- Pawl.RingSpec
 -- proves the designation through it.
 isRingBearerOf :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 isRingBearerOf pid oid gs =

@@ -52,6 +52,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.TypeLine as TypeLine
 
 -- `Eq card` because six of the fields below carry card-shaped payloads and
 -- 'Common.optionalPair' omits a key by comparing its value to the default.
@@ -59,7 +60,9 @@ toJson :: (Eq card) => (card -> Value.Value) -> Face.Face card -> Value.Value
 toJson encodeCard f =
   Value.object . concat $
     [ Common.requiredPair "name" (Codec.encode CardName.codec) (Face.name f),
-      Common.requiredPair "typeLine" (Codec.encode TypeLine.codec) (Face.typeLine f),
+      -- CR 205.1 gives every card a type line and CR 114.3 gives an emblem none,
+      -- so the key is optional and its absence means the latter -- see fromJson.
+      Common.optionalPair "typeLine" TypeLine.empty (Codec.encode TypeLine.codec) (Face.typeLine f),
       Common.optionalPair "manaCost" Nothing (Common.encodeMaybe (Codec.encode ManaCost.codec)) (Face.manaCost f),
       Common.optionalPair "power" Nothing (Common.encodeMaybe Power.toJson) (Face.power f),
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Toughness.toJson) (Face.toughness f),
@@ -104,7 +107,15 @@ fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text
 fromJson decodeCard value = do
   ps <- Common.asObject value
   name <- Common.field "name" ps >>= Codec.decode CardName.codec
-  typeLine <- Common.field "typeLine" ps >>= Codec.decode TypeLine.codec
+  -- CR 114.3: an emblem "has no characteristics other than the abilities defined
+  -- by the effect that created it. In particular, an emblem has no types" -- and
+  -- an emblem's face is authored as the payload of Effect.CreateEmblem, decoded
+  -- through this same codec. So an ABSENT key is CR 114.3's answer, while a key
+  -- that is present must still name a card type, which is Pawl.Codec.TypeLine's
+  -- own reading of CR 205.1. Which faces may leave it out is a question
+  -- about the corpus rather than about the wire, and Pawl.CardSpec's lint --
+  -- "only an emblem's face has no card type" -- is what asks it.
+  typeLine <- Common.defaultedField "typeLine" TypeLine.empty (Codec.decode TypeLine.codec) ps
   manaCost <- Common.defaultedField "manaCost" Nothing (Common.decodeMaybe (Codec.decode ManaCost.codec)) ps
   power <- Common.defaultedField "power" Nothing (Common.decodeMaybe Power.fromJson) ps
   toughness <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Toughness.fromJson) ps
