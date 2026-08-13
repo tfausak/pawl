@@ -54,6 +54,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
@@ -2206,7 +2207,7 @@ mixedLands first second n m =
    in List.foldl' (\g _ -> snd (S.addCreature second S.alice g)) base [1 .. m]
 
 redGreen :: ManaSymbol.ManaSymbol
-redGreen = ManaSymbol.Hybrid (ManaType.Colored Color.Red) (ManaType.Colored Color.Green)
+redGreen = ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.Red) (ManaType.Colored Color.Green))
 
 redSymbol :: ManaSymbol.ManaSymbol
 redSymbol = ManaSymbol.OfType (ManaType.Colored Color.Red)

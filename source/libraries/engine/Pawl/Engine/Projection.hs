@@ -56,6 +56,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Hybrid as Hybrid
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -1110,7 +1111,7 @@ symbolColors :: ManaSymbol.ManaSymbol -> [Color.Color]
 symbolColors symbol = case symbol of
   ManaSymbol.OfType (ManaType.Colored c) -> [c]
   ManaSymbol.OfType ManaType.Colorless -> []
-  ManaSymbol.Hybrid a b -> Maybe.mapMaybe colorOfManaType [a, b]
+  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Maybe.mapMaybe colorOfManaType [a, b]
   -- CR 107.4b/107.4e: a monocolored hybrid's other half is generic, which is not
   -- one of CR 107.4a's coloured symbols, so the named half is the whole
   -- contribution.

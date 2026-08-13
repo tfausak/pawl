@@ -4,37 +4,37 @@
       "manaCost": [
         {
           "type": "Hybrid",
-          "value": [
-            {
+          "value": {
+            "left": {
               "type": "Colored",
               "value": {
                 "type": "Red"
               }
             },
-            {
+            "right": {
               "type": "Colored",
               "value": {
                 "type": "Green"
               }
             }
-          ]
+          }
         },
         {
           "type": "Hybrid",
-          "value": [
-            {
+          "value": {
+            "left": {
               "type": "Colored",
               "value": {
                 "type": "Red"
               }
             },
-            {
+            "right": {
               "type": "Colored",
               "value": {
                 "type": "Green"
               }
             }
-          ]
+          }
         }
       ],
       "name": "Burning-Tree Emissary",

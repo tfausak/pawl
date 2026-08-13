@@ -39,6 +39,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
@@ -879,7 +880,7 @@ combatReplaySpec s =
                   decider
                   S.alice
                   oid
-                  (ManaSymbol.Hybrid (ManaType.Colored Color.Green) (ManaType.Colored Color.Blue))
+                  (ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.Green) (ManaType.Colored Color.Blue)))
                   (ManaType.Colored Color.Green NonEmpty.:| [ManaType.Colored Color.Blue])
           Spec.assertEqWith
             s
@@ -926,7 +927,7 @@ combatReplaySpec s =
                     decider
                     S.alice
                     oid
-                    (ManaSymbol.Hybrid (ManaType.Colored Color.Green) (ManaType.Colored Color.Blue))
+                    (ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.Green) (ManaType.Colored Color.Blue)))
                     (ManaType.Colored Color.Blue NonEmpty.:| [ManaType.Colored Color.Green])
                 )
             )

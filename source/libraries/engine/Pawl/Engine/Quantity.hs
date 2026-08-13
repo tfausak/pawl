@@ -750,7 +750,7 @@ symbolValue symbol = case symbol of
   ManaSymbol.OfType _ -> 1
   -- CR 202.3f: the largest component. Both halves of a colour/colour hybrid are
   -- one mana, so the largest is one.
-  ManaSymbol.Hybrid _ _ -> 1
+  ManaSymbol.Hybrid {} -> 1
   -- CR 202.3f again, but here the halves differ: {2/B}'s generic half is the
   -- larger, so the symbol is worth 2 rather than every other typed symbol's 1.
   ManaSymbol.MonocoloredHybrid _ -> 2

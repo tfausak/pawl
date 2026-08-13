@@ -11,6 +11,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -50,9 +51,9 @@ spec s = Spec.describe s "Pawl.Codec.AlternativeCost" $ do
               ),
           AlternativeCost.cost =
             Cost.MkCost
-              { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Hybrid (ManaType.Colored Color.Black) (ManaType.Colored Color.Red)]),
+              { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.Black) (ManaType.Colored Color.Red))]),
                 Cost.components = []
               }
         }
-      """ {"condition":{"type":"Compares","value":{"measured":{"type":"CardsDiscardedThisTurn","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"cost":{"mana":[{"type":"Hybrid","value":[{"type":"Colored","value":{"type":"Black"}},{"type":"Colored","value":{"type":"Red"}}]}]}} """
+      """ {"condition":{"type":"Compares","value":{"measured":{"type":"CardsDiscardedThisTurn","value":{"type":"Relative","value":{"type":"You"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"cost":{"mana":[{"type":"Hybrid","value":{"left":{"type":"Colored","value":{"type":"Black"}},"right":{"type":"Colored","value":{"type":"Red"}}}}]}} """
   Spec.it s "has a schema" $ Common.assertHasSchema s AlternativeCost.codec

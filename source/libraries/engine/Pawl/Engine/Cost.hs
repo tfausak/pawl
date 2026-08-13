@@ -60,6 +60,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
@@ -710,7 +711,7 @@ reductionHalvesOf :: ManaSymbol.ManaSymbol -> Maybe [ManaSymbol.ManaSymbol]
 reductionHalvesOf symbol = case symbol of
   ManaSymbol.Generic _ -> Nothing
   ManaSymbol.OfType _ -> Nothing
-  ManaSymbol.Hybrid a b -> Just (List.nub [ManaSymbol.OfType a, ManaSymbol.OfType b])
+  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Just (List.nub [ManaSymbol.OfType a, ManaSymbol.OfType b])
   ManaSymbol.MonocoloredHybrid manaType ->
     Just [ManaSymbol.OfType manaType, ManaSymbol.Generic Mana.monocoloredHybridGeneric]
   ManaSymbol.Phyrexian _ -> Nothing
@@ -2213,7 +2214,7 @@ applyAdjustments adjustments cost =
         -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated
         -- type, so it is no part of the generic component CR 118.7a reductions
         -- come off.
-        ManaSymbol.Hybrid _ _ -> 0
+        ManaSymbol.Hybrid {} -> 0
         -- A monocolored hybrid's {2} half IS generic mana once CR 601.2b's
         -- nonhybrid equivalent names it -- but a symbol still spelled {2/R} is one
         -- CR 601.2b has NOT named, so there is nothing yet for CR 118.7a to come
@@ -2257,7 +2258,7 @@ applyAdjustments adjustments cost =
         -- CR 107.4e's colour/colour hybrid has no generic half at all, so
         -- whichever way CR 118.7e's choice went it is the typed side below that
         -- reads the answer.
-        ManaSymbol.Hybrid _ _ -> 0
+        ManaSymbol.Hybrid {} -> 0
         -- A symbol still spelled {2/R} HERE is one CR 118.7e's choice has not
         -- been made for -- announceReductions leaves a Generic behind when the
         -- {2} half is taken, which the arm above reads, and the gate enumerates
@@ -2284,7 +2285,7 @@ applyAdjustments adjustments cost =
       isTyped symbol = case symbol of
         ManaSymbol.Generic _ -> False
         ManaSymbol.OfType _ -> True
-        ManaSymbol.Hybrid _ _ -> True
+        ManaSymbol.Hybrid {} -> True
         ManaSymbol.MonocoloredHybrid _ -> True
         ManaSymbol.Phyrexian _ -> True
         ManaSymbol.Snow -> True
@@ -2308,7 +2309,7 @@ applyAdjustments adjustments cost =
         -- Pawl.Engine.Mana.announce leaves an OfType behind when it does and the
         -- arm above reads that. What still arrives unannounced is CR 118.13b/c's
         -- costs (#373), and Edgewalker's ruling is what that costs.
-        ManaSymbol.Hybrid _ _ -> Nothing
+        ManaSymbol.Hybrid {} -> Nothing
         -- Same reason: a symbol still spelled {2/R} here is one CR 601.2b has not
         -- named -- Pawl.Engine.Mana.announce leaves an OfType behind when it
         -- does, which the arm above reads -- so there is nothing yet to cancel
@@ -2340,7 +2341,7 @@ applyAdjustments adjustments cost =
         -- announceReductions leaves the chosen half's OfType behind when they
         -- have -- and what reaches this arm is `total`'s unannounced reading,
         -- which nothing in the engine asks for.
-        ManaSymbol.Hybrid _ _ -> Nothing
+        ManaSymbol.Hybrid {} -> Nothing
         -- CR 118.7e's other shape, unread here for the same reason. Whichever
         -- half of a {2/R} the payer takes, announceReductions leaves behind the
         -- symbol that half is -- an OfType this arm reads, or a Generic

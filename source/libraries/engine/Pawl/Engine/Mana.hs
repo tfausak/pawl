@@ -28,6 +28,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import Pawl.Types.Mana (Mana)
@@ -474,7 +475,7 @@ waysOf symbol = case symbol of
   ManaSymbol.OfType t -> [(Just (ofTypes (Set.singleton t)), 0, 0)]
   -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated type
   -- either way, so it contributes nothing to the generic count.
-  ManaSymbol.Hybrid a b -> [(Just (ofTypes (Set.fromList [a, b])), 0, 0)]
+  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> [(Just (ofTypes (Set.fromList [a, b])), 0, 0)]
   -- CR 107.4e's two ways, and the one-mana way is FIRST -- see resolutions.
   ManaSymbol.MonocoloredHybrid t -> [(Just (ofTypes (Set.singleton t)), 0, 0), (Nothing, monocoloredHybridGeneric, 0)]
   -- CR 107.4f's two ways: one mana of its colour, or 2 life. The colour is a
@@ -765,7 +766,7 @@ announce capacity pid oid total outside claimed (ManaCost.MkManaCost symbols) = 
       -- is what sets it apart from the monocolored hybrid just above. What it
       -- decides is WHICH mana of an oversupplied pool is spent, and so what is
       -- left floating afterwards.
-      symbol@(ManaSymbol.Hybrid a b) : rest -> do
+      symbol@(ManaSymbol.Hybrid (Hybrid.MkHybrid a b)) : rest -> do
         gs <- State.get
         let offers = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) (hybridHalves a b)
         announced <-
@@ -804,7 +805,7 @@ completions symbols = case symbols of
   -- neither way commits life. Expanded here rather than ridden through so that
   -- every completion really is CR 601.2b's NONHYBRID equivalent cost -- the
   -- thing CR 601.2f is defined over.
-  ManaSymbol.Hybrid a b : rest ->
+  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) : rest ->
     concatMap
       (\half -> [(ManaSymbol.OfType half : tail_, life) | (tail_, life) <- completions rest])
       (hybridHalves a b)

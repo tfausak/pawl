@@ -105,6 +105,7 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -464,7 +465,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{W/U} offers {W} and {U}"
-        (Cost.reductionHalvesOf (ManaSymbol.Hybrid (ManaType.Colored Color.White) (ManaType.Colored Color.Blue)))
+        (Cost.reductionHalvesOf (ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.White) (ManaType.Colored Color.Blue))))
         (Just [white, blue])
       Spec.assertEqWith
         s
@@ -491,7 +492,7 @@ adjustmentSpec s =
       Spec.assertEqWith
         s
         "{W/W} offers {W}"
-        (Cost.reductionHalvesOf (ManaSymbol.Hybrid (ManaType.Colored Color.White) (ManaType.Colored Color.White)))
+        (Cost.reductionHalvesOf (ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.White) (ManaType.Colored Color.White))))
         (Just [white])
 
     -- Both halves of a colour/colour hybrid really do bite a cost that prints

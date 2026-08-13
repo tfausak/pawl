@@ -246,6 +246,8 @@ library codec
     Pawl.Codec.GraveyardScopeSpec
     Pawl.Codec.HalfUnlocked
     Pawl.Codec.HalfUnlockedSpec
+    Pawl.Codec.Hybrid
+    Pawl.Codec.HybridSpec
     Pawl.Codec.Keyword
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
@@ -875,6 +877,7 @@ library types
     Pawl.Types.HalfUnlocked
     Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
+    Pawl.Types.Hybrid
     Pawl.Types.HybridPayment
     Pawl.Types.IgnoredAbility
     Pawl.Types.Keyword

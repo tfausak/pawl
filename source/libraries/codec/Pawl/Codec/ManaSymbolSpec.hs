@@ -6,6 +6,7 @@ import qualified Pawl.Codec.ManaSymbol as ManaSymbol
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 
@@ -28,8 +29,8 @@ spec s = Spec.describe s "Pawl.Codec.ManaSymbol" $ do
     Common.assertCodec
       s
       ManaSymbol.codec
-      (ManaSymbol.Hybrid (ManaType.Colored Color.White) (ManaType.Colored Color.Blue))
-      """ {"type":"Hybrid","value":[{"type":"Colored","value":{"type":"White"}},{"type":"Colored","value":{"type":"Blue"}}]} """
+      (ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.White) (ManaType.Colored Color.Blue)))
+      """ {"type":"Hybrid","value":{"left":{"type":"Colored","value":{"type":"White"}},"right":{"type":"Colored","value":{"type":"Blue"}}}} """
   -- CR 107.4e's {2/B} shape.
   Spec.it s "MonocoloredHybrid" $
     Common.assertCodec
