@@ -3716,13 +3716,13 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just haunted -> do
-          -- The card this ability exiles is read LIVE off the resolving object
-          -- (CR 400.7j), never out of `chosen`: rule 702.55a's "it" is the
-          -- graveyard incarnation the death minted, which Event.eventBindings
-          -- bound under Binding.became, and CR 115.10a makes it no target. Nothing
-          -- there is CR 603.7c's "no longer in the zone it's expected to be in" --
-          -- the card left the graveyard before this resolved -- and the ability
-          -- exiles nothing.
+          -- The card this ability exiles is read LIVE off the resolving object,
+          -- never out of `chosen`: rule 702.55a's "it" is the graveyard
+          -- incarnation the death minted, which CR 400.7e lets the trigger find
+          -- and Event.eventBindings bound under Binding.became, and CR 115.10a
+          -- makes it no target. Nothing there is a card that left the graveyard
+          -- before this resolved -- CR 400.7 minted a new object for it and the
+          -- bound id names nothing -- and the ability exiles nothing.
           mCard <- State.gets (slotOne card resolving)
           case mCard of
             Nothing -> pure ()

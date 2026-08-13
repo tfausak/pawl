@@ -987,9 +987,9 @@ data Effect card
     -- died. The link is keyed on a THIRD id, the one the exile move mints.
     --
     -- TWO SLOTS and no ObjectRef, unlike MoveToZone: rule 702.55a exiles exactly
-    -- one named card, never a swept set, so the mover is a slot an earlier part of
-    -- this same trigger bound (CR 400.7j) and read live off the resolving object.
-    -- Only the second is a target (CR 115.10a); the first is a definition.
+    -- one named card, never a swept set, so the mover is the slot CR 400.7e's
+    -- rescue bound -- Pawl.Engine.Binding.became -- read live off the resolving
+    -- object. Only the second is a target (CR 115.10a); the first is a definition.
     ExileHaunting SlotName.SlotName SlotName.SlotName
   | -- | CR 729.1/729.1b: play a Magic subgame, then bind its outcome (the derived
     -- loser) into this slot for a later effect to read. DEFINED here, like

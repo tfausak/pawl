@@ -5883,10 +5883,9 @@ eventTriggers events gs =
       -- FILTERED BY `functionsIn`, unlike the command zone's emblem source: there
       -- the rule at issue is CR 114.4, which is about the OBJECT, and every emblem
       -- ability would fail a condition test; here the rule at issue IS CR 113.6k,
-      -- so the filter is the gate itself. Without it an exiled Lightning Bolt --
-      -- or a face-down card exiled by a Bounce, or anything suspended -- would be
-      -- offered its battlefield-and-stack abilities from a zone none of them
-      -- function in.
+      -- so the filter is the gate itself. Without it an exiled Doomed Traveler
+      -- would be offered its dies trigger, and an exiled Desolation Twin its cast
+      -- trigger, from a zone CR 113.6 says neither functions in.
       --
       -- ONE STANDING SCAN over the whole zone, computed outside the event loop for
       -- `inGraveyards`' reason: a haunting card sits in exile indefinitely and no
@@ -5894,7 +5893,7 @@ eventTriggers events gs =
       --
       -- Abilities come from the PRINTED card and the controller is the OWNER (CR
       -- 108.4a), also for `inGraveyards`' reasons: CR 108.4 gives a card in exile
-      -- no controller at all, so rule 702.55b's "you gain 2 life" pays the player
+      -- no controller at all, so Blind Hunter's "you gain 2 life" pays the player
       -- who owns the haunting card.
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
