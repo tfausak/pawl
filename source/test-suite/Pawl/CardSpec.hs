@@ -353,7 +353,8 @@ cardSpec s = Spec.describe s "Card" $ do
       [oneEffectTrigger TriggerCondition.SelfDies (youDraw 1), oneEffectTrigger TriggerCondition.SelfDies (youDraw 2)]
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
--- through Plus's two children (CR 208.2 composition -- a printed 1+*).
+-- through Plus's two children (CR 208.2 composition -- a printed 1+*) or
+-- Negate's one.
 quantityCounts :: Quantity.Type.Quantity -> [Count.Type.Count Quantity.Type.Quantity]
 quantityCounts quantity = case quantity of
   Quantity.Type.Literal _ -> []
@@ -368,6 +369,9 @@ quantityCounts quantity = case quantity of
   -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it
   -- halves may be one -- Malignus halves a fold over players.
   Quantity.Type.Halved _ inner -> quantityCounts inner
+  -- Not a leaf: a minus sign hides nothing, so the lints reach through it --
+  -- Toxic Deluge's -X, and any negated count a card comes to print.
+  Quantity.Type.Negate a -> quantityCounts a
   Quantity.Type.Count count -> count : countCounts count
   -- A fold over a MANA POOL (CR 106.4), not over a zone: it holds no
   -- Pawl.Types.Count and no Pawl.Types.Filter, so the lints below -- which are

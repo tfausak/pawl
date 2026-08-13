@@ -170,6 +170,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- propagates from the payload, Plus' posture: half of a number nobody could
   -- determine is not a number either.
   Quantity.Halved rounding inner -> fmap (halve rounding) (recur inner)
+  -- CR 107.1b: the negated value, with no floor here -- a creature's power may be
+  -- less than zero, and the readers that need a nonnegative count apply that
+  -- rule's "zero is used instead" themselves. Unanswerable stays unanswerable:
+  -- the negation of a value nothing could determine is not 0.
+  Quantity.Negate a -> fmap negate (recur a)
   -- CR 208.2a / 608.2h: delegate to the general Count fold (Pawl.Engine.Count),
   -- which reads the CR 613 projection through the injected ViewOf. The second
   -- injection is this function itself, aimed at whichever CANDIDATE the fold is
@@ -383,11 +388,12 @@ halve rounding n = case rounding of
 -- The recursion through Plus is what "inside a calculation" buys, and it is not
 -- the same answer as substituting at the top: Tarmogoyf's printed 1+* is 1 when
 -- its count cannot be determined, because it is the COUNT that becomes 0 and
--- not the sum. Plus and Halved are the calculations Pawl.Types.Quantity has, and
--- the descent means the same thing for both. It changes no answer at Halved --
--- half of CR 208.2a's substituted 0 is 0, whichever way it rounds -- so that arm
--- is consistency rather than behaviour; Malignus, whose whole CDA is a Halved,
--- reads 0 with no opponents either way.
+-- not the sum. Plus, Halved and Negate are the calculations Pawl.Types.Quantity
+-- has, and all three descend for that one reason -- but only Plus's descent
+-- changes an answer. Half of CR 208.2a's substituted 0 is 0 whichever way it
+-- rounds, so Malignus, whose whole CDA is a Halved, reads 0 with no opponents
+-- either way; and no printed characteristic-defining P/T contains a Negate at
+-- all. Both of those arms are consistency rather than a card's behaviour.
 --
 -- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is: the callers
 -- are Projection.applyCharacteristicPT on the battlefield and
@@ -403,6 +409,7 @@ determine :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Quantity
 determine viewOf context gs oid quantity = case quantity of
   Quantity.Plus a b -> determine viewOf context gs oid a + determine viewOf context gs oid b
   Quantity.Halved rounding inner -> halve rounding (determine viewOf context gs oid inner)
+  Quantity.Negate a -> negate (determine viewOf context gs oid a)
   _ -> Maybe.fromMaybe 0 (evaluate viewOf context gs oid quantity)
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
@@ -415,6 +422,9 @@ substituteStar star quantity = case quantity of
   -- halving is still the value the CDA supplies. No card prints one there --
   -- Malignus' star is the whole P/T box and its CDA carries the halving.
   Quantity.Halved rounding inner -> Quantity.Halved rounding (substituteStar star inner)
+  -- Plus's descent, for Plus's reason: a star under a minus sign is still the
+  -- star the characteristic-defining ability defines.
+  Quantity.Negate a -> Quantity.Negate (substituteStar star a)
   Quantity.Literal _ -> quantity
   Quantity.ManaValue -> quantity
   Quantity.Power -> quantity
@@ -459,6 +469,13 @@ slots quantity = case quantity of
   -- Composition, as Plus is: the rounding names no slot and the payload may name
   -- any.
   Quantity.Halved _ inner -> slots inner
+  -- Whatever the payload reads, since a minus sign changes no slot: Toxic
+  -- Deluge's -X is a Negate over the InSlot that names X. A REGRESSION FENCE
+  -- rather than proven behaviour -- emptying this arm leaves the suite green,
+  -- because the consumer that could tell (CR 603.3b's orderInert, through
+  -- Resolve.modeSlots) is reached only by a TRIGGERED ability, and no card in
+  -- the pool negates a slot read inside one.
+  Quantity.Negate a -> slots a
   -- Terminating for the reason evaluate's Count arm is: a Greatest's payload is
   -- a strictly smaller subterm.
   Quantity.Count c -> Count.slots slots c
@@ -522,6 +539,7 @@ slotsAreExhaustive quantity = case quantity of
   -- Plus' answer: the rounding hides no reference, so what the payload hides is
   -- the whole question.
   Quantity.Halved _ inner -> slotsAreExhaustive inner
+  Quantity.Negate a -> slotsAreExhaustive a
   -- Both halves `slots` skips: the Scope's PlayerRef, and the per-member
   -- quantity of a Greatest, which may hide one of its own.
   Quantity.Count c ->
@@ -590,6 +608,7 @@ bakeBound players quantity = case quantity of
      in Quantity.Count baked {Count.Type.scope = bakeScope players (Count.Type.scope c)}
   Quantity.Plus a b -> Quantity.Plus (bakeBound players a) (bakeBound players b)
   Quantity.Halved rounding inner -> Quantity.Halved rounding (bakeBound players inner)
+  Quantity.Negate a -> Quantity.Negate (bakeBound players a)
   Quantity.AgainstSlot slot inner -> Quantity.AgainstSlot slot (bakeBound players inner)
   -- Every arm below holds no PlayerRef and no Quantity. InSlot names an AMOUNT
   -- slot rather than a player one, so nothing here substitutes it -- an amount an
@@ -659,6 +678,10 @@ readsX quantity = case quantity of
   -- The same recursion, and a real reading: "half X, rounded down" (Wan Shi
   -- Tong, Librarian) is a Halved over an X that is not equal to one.
   Quantity.Halved _ inner -> readsX inner
+  -- Toxic Deluge's "-X" is Negate X, which reads X the same way. Without this
+  -- arm the CR 107.3 lint would call the card an unannounced-X reader on one
+  -- side and an unread announcement on the other.
+  Quantity.Negate a -> readsX a
   -- Terminating for the reason slots' Count arm is: a Greatest's payload is a
   -- strictly smaller subterm.
   Quantity.Count c -> Count.anyQuantity readsX c
