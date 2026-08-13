@@ -73,6 +73,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Power as Power
@@ -85,6 +86,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
+import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -1779,9 +1781,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- a subtype word, and "during an opponent's turn" holds no subtype -- so a
   -- rebuild that forgot the field would silently reset a text-changed Brineborn
   -- Cutthroat to firing on every turn.
-  TriggerCondition.SpellCast f scope -> TriggerCondition.SpellCast (Filter.rewrite pairs f) scope
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope)
   TriggerCondition.SelfEnters -> condition
-  TriggerCondition.StepBegins _ _ -> condition
+  TriggerCondition.StepBegins {} -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> condition
   -- Its watcher-scoped sibling carries a Filter, so CR 612.1 reaches it:
   -- Tovolar's "a Wolf or Werewolf you control" is two subtype words a text
@@ -1793,7 +1795,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfRevealedForMiracle -> condition
   TriggerCondition.SelfCast -> condition
   TriggerCondition.PlayerDiscards _ -> condition
-  TriggerCondition.PlayerDrawsNthCard _ _ -> condition
+  TriggerCondition.PlayerDrawsNthCard {} -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
   -- CR 702.149a's Filter is a predicate over the OTHER attackers, so a subtype
@@ -1830,7 +1832,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- CR 714.2b names a counter KIND and a number, neither of which is a subtype
   -- CR 612.1 can change: a text-changing effect swapping Merfolk for Knight
   -- leaves a chapter symbol reading the same chapter.
-  TriggerCondition.SelfCountersReached _ _ -> condition
+  TriggerCondition.SelfCountersReached {} -> condition
   TriggerCondition.SelfLastCounterRemoved _ -> condition
   -- CR 709.5h names a HALF by its own name (CR 709.4a), and a name is not a
   -- subtype: CR 612.1 changes subtype words, so nothing here can move a door.
@@ -1850,7 +1852,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PermanentTurnedFaceUp f -> TriggerCondition.PermanentTurnedFaceUp (Filter.rewrite pairs f)
   -- The same, one condition over: Valeron Wardens' "a creature you control" is a
   -- Filter, so CR 612.1 reaches it too.
-  TriggerCondition.PermanentBecomesDesignated d f -> TriggerCondition.PermanentBecomesDesignated d (Filter.rewrite pairs f)
+  TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d f) -> TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d (Filter.rewrite pairs f))
   TriggerCondition.SelfEvolves -> condition
   -- CR 702.134c's is nullary as well: the mentor is found through the source's
   -- attachment and the mentored creature through the event, so no subtype word of

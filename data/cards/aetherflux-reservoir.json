@@ -57,17 +57,17 @@
         {
           "condition": {
             "type": "SpellCast",
-            "value": [
-              {
+            "value": {
+              "filter": {
                 "type": "ControlledBy",
                 "value": {
                   "type": "You"
                 }
               },
-              {
+              "scope": {
                 "type": "EachTurn"
               }
-            ]
+            }
           },
           "modal": {
             "modes": [

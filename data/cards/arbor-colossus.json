@@ -146,14 +146,14 @@
         {
           "condition": {
             "type": "PermanentBecomesDesignated",
-            "value": [
-              {
+            "value": {
+              "designation": {
                 "type": "Monstrous"
               },
-              {
+              "filter": {
                 "type": "IsSource"
               }
-            ]
+            }
           },
           "modal": {
             "modes": [

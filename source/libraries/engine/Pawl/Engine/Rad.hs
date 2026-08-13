@@ -61,6 +61,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
@@ -134,7 +135,7 @@ ability =
       -- the active player's, so ControllersTurn plus the active player as this
       -- ability's controller IS rule 728.1's "each player's precombat main
       -- phase" -- the rule quantifies over turns, not over the players of one.
-      TriggeredAbility.condition = TriggerCondition.StepBegins Phase.PrecombatMain TurnScope.ControllersTurn,
+      TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins Phase.PrecombatMain TurnScope.ControllersTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           ( Seq.singleton

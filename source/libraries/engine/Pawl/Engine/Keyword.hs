@@ -87,6 +87,8 @@ import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -1739,8 +1741,10 @@ prowess =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition =
         TriggerCondition.SpellCast
-          (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Not (Filter.HasCardType CardType.Creature)])
-          TurnScope.EachTurn,
+          SpellCast.MkSpellCast
+            { SpellCast.filter = Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Not (Filter.HasCardType CardType.Creature)],
+              SpellCast.scope = TurnScope.EachTurn
+            },
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -2219,7 +2223,7 @@ decayedSacrificeName = AbilityName.MkAbilityName (Text.pack "decayed")
 decayedSacrifice :: TriggeredAbility Card
 decayedSacrifice =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn,
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
@@ -2875,7 +2879,7 @@ vanishing = [vanishingUpkeep, vanishingLastCounter]
 vanishingUpkeep :: TriggeredAbility Card
 vanishingUpkeep =
   TriggeredAbility.MkTriggeredAbility
-    { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn,
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
       TriggeredAbility.modal =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))

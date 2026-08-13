@@ -50,12 +50,12 @@ toJson e = case e of
     Common.tagged "CountersRemoved" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode (CounterKind.codec Keyword.codec) kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.HalfUnlocked oid name fully -> Common.tagged "HalfUnlocked" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode CardName.codec name, Value.boolean fully]
   GameEvent.TurnedFaceUp oid -> Common.tagged "TurnedFaceUp" . Just $ Codec.encode ObjectId.codec oid
-  GameEvent.BecameDesignated d oid -> Common.tagged "BecameDesignated" . Just . Value.array $ [Designation.toJson d, Codec.encode ObjectId.codec oid]
+  GameEvent.BecameDesignated d oid -> Common.tagged "BecameDesignated" . Just . Value.array $ [Codec.encode Designation.codec d, Codec.encode ObjectId.codec oid]
   GameEvent.Evolved oid -> Common.tagged "Evolved" . Just $ Codec.encode ObjectId.codec oid
   GameEvent.Mentored mentor mentored -> Common.tagged "Mentored" . Just . Value.array $ [Codec.encode ObjectId.codec mentor, Codec.encode ObjectId.codec mentored]
   GameEvent.PermanentSacrificed pid oid -> Common.tagged "PermanentSacrificed" . Just . Value.array $ [Codec.encode PlayerId.codec pid, Codec.encode ObjectId.codec oid]
   GameEvent.AbilityTriggered oid pid cond ->
-    Common.tagged "AbilityTriggered" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode PlayerId.codec pid, TriggerCondition.toJson cond]
+    Common.tagged "AbilityTriggered" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode PlayerId.codec pid, Codec.encode TriggerCondition.codec cond]
   GameEvent.ControlChanged oid before after ->
     Common.tagged "ControlChanged" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode PlayerId.codec before, Codec.encode PlayerId.codec after]
   GameEvent.VentureMarkerEntered pid oid room ->
@@ -91,13 +91,13 @@ fromJson value = do
     ("HalfUnlocked", Just (Value.Array (Array.MkArray [oid, name, fully]))) -> GameEvent.HalfUnlocked <$> Codec.decode ObjectId.codec oid <*> Codec.decode CardName.codec name <*> Common.asBoolean fully
     ("TurnedFaceUp", Just v) -> GameEvent.TurnedFaceUp <$> Codec.decode ObjectId.codec v
     ("BecameDesignated", Just (Value.Array (Array.MkArray [d, oid]))) ->
-      GameEvent.BecameDesignated <$> Designation.fromJson d <*> Codec.decode ObjectId.codec oid
+      GameEvent.BecameDesignated <$> Codec.decode Designation.codec d <*> Codec.decode ObjectId.codec oid
     ("Evolved", Just v) -> GameEvent.Evolved <$> Codec.decode ObjectId.codec v
     ("Mentored", Just (Value.Array (Array.MkArray [mentor, mentored]))) ->
       GameEvent.Mentored <$> Codec.decode ObjectId.codec mentor <*> Codec.decode ObjectId.codec mentored
     ("PermanentSacrificed", Just (Value.Array (Array.MkArray [pid, oid]))) -> GameEvent.PermanentSacrificed <$> Codec.decode PlayerId.codec pid <*> Codec.decode ObjectId.codec oid
     ("AbilityTriggered", Just (Value.Array (Array.MkArray [oid, pid, cond]))) ->
-      GameEvent.AbilityTriggered <$> Codec.decode ObjectId.codec oid <*> Codec.decode PlayerId.codec pid <*> TriggerCondition.fromJson cond
+      GameEvent.AbilityTriggered <$> Codec.decode ObjectId.codec oid <*> Codec.decode PlayerId.codec pid <*> Codec.decode TriggerCondition.codec cond
     ("ControlChanged", Just (Value.Array (Array.MkArray [oid, before, after]))) ->
       GameEvent.ControlChanged <$> Codec.decode ObjectId.codec oid <*> Codec.decode PlayerId.codec before <*> Codec.decode PlayerId.codec after
     ("VentureMarkerEntered", Just (Value.Array (Array.MkArray [pid, oid, room]))) ->

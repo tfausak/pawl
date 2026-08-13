@@ -29,12 +29,12 @@
         {
           "condition": {
             "type": "PlayerDrawsNthCard",
-            "value": [
-              {
+            "value": {
+              "nth": 2,
+              "player": {
                 "type": "You"
-              },
-              2
-            ]
+              }
+            }
           },
           "modal": {
             "modes": [

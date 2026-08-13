@@ -46,6 +46,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TapState as TapState
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -78,7 +79,7 @@ oneEffect cond eff =
 endStepDraw :: TriggeredAbility Card
 endStepDraw =
   oneEffect
-    (TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
+    (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn))
     (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))
 
 -- CR 725.2's crown steal. Controlled by the current monarch; makes a DIFFERENT
@@ -99,7 +100,7 @@ monarchAbilities = [endStepDraw, crownSteal]
 -- than Event.matchesTrigger.
 inherentMatch :: PlayerId -> TriggerCondition -> GameState -> GameEvent -> Maybe (Map SlotName.SlotName Binding)
 inherentMatch monarch cond gs event = case (cond, event) of
-  (TriggerCondition.StepBegins wanted scope, GameEvent.StepBegan began active)
+  (TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope), GameEvent.StepBegan began active)
     | began == wanted && scopeOk scope active -> Just Map.empty
   -- CR 725.2: bind the damaging creature under the reserved trigger-source slot
   -- so Effect.BecomeMonarch ControllerOfSource crowns THAT creature's

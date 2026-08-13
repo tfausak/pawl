@@ -271,9 +271,11 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
@@ -288,9 +290,12 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -397,7 +402,7 @@ scanSpec s registry =
       Spec.assertEqWith s "the end step's beginning is recorded exactly once" (Maybe.mapMaybe began (S.eventsOf after)) [(Phase.Ending EndingStep.EndStep, S.alice)]
     Spec.it s "CR 603.2b StepBegins matches its own step and no other" $ do
       let bearer = ObjectId.MkObjectId 1
-          cond = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn
+          cond = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn)
       Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)) "the end step matches"
       Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice))) "the upkeep does not"
     -- CR 603.3a / 109.5: "your upkeep" is the ABILITY CONTROLLER's (603.3a
@@ -405,7 +410,7 @@ scanSpec s registry =
     -- scope is read against the bearer's controller, not the card.
     Spec.it s "CR 603.3a ControllersTurn matches only the bearer's controller's turn" $ do
       let bearer = ObjectId.MkObjectId 1
-          cond = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn
+          cond = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
       Spec.assertBool s (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.alice)) "alice's upkeep matches for alice"
       Spec.assertBool s (not (Event.matchesTrigger (Setup.emptyGame S.bothPlayers) bearer S.alice cond (GameEvent.StepBegan (Phase.Beginning BeginningStep.Upkeep) S.bob))) "bob's upkeep does not"
     -- The widening falsifier: the scan now visits every battlefield permanent,
@@ -5422,7 +5427,7 @@ vanishingSpec s registry =
         -- assertion written that way says only that two copies are two copies,
         -- and a mint that dropped one of the pair would repair it silently.
         Spec.it s "CR 702.63c each instance is its own three abilities" $ do
-          let counted = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn
+          let counted = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)
               emptied = TriggerCondition.SelfLastCounterRemoved CounterKind.Time
           Spec.assertEqWith
             s
@@ -7863,7 +7868,7 @@ representativeEvents cond =
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
         TriggerCondition.PermanentEnters _ -> one (moved Zone.Stack Zone.Battlefield)
-        TriggerCondition.StepBegins phase _ -> one (GameEvent.StepBegan phase S.alice)
+        TriggerCondition.StepBegins (StepBegins.MkStepBegins phase _) -> one (GameEvent.StepBegan phase S.alice)
         -- CR 603.8: a state trigger matches a game STATE, so no log entry fires
         -- it at all (Event.matchesTrigger's StateIs arm answers False for every
         -- event). Any event is therefore as representative as any other.
@@ -7887,7 +7892,7 @@ representativeEvents cond =
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
         -- eventBindings being consulted only for a match.
-        TriggerCondition.PlayerDrawsNthCard _ nth -> one (GameEvent.Drew S.alice nth)
+        TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard _ nth) -> one (GameEvent.Drew S.alice nth)
         -- CR 508.5's defending player, and deliberately NOT the attacker's own
         -- controller: eventBindings binds this field under `thatPlayer`, so an
         -- arm that bound the attacking side instead would still agree with
@@ -7962,7 +7967,7 @@ representativeEvents cond =
         -- CR 714.2b: a placement on the BEARER that crosses the chapter. The
         -- bearer here is `departed`, the id Event.matchesTrigger is asked about
         -- below, and the counts straddle N so the event really matches.
-        TriggerCondition.SelfCountersReached kind n -> one (GameEvent.CountersPut departed kind 0 n)
+        TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind n) -> one (GameEvent.CountersPut departed kind 0 n)
         -- CR 310.11b: a removal on the BEARER that took the last counter, so the
         -- event really matches the condition Event.matchesTrigger is asked about.
         TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved departed kind 1 0)
@@ -7970,7 +7975,7 @@ representativeEvents cond =
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
         -- on the pair.
-        TriggerCondition.SpellCast _ _ -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
+        TriggerCondition.SpellCast {} -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
         -- The same event, and the only one this condition admits either. It binds
         -- nothing whichever ids the event names, since the spell IS the bearer.
         TriggerCondition.SelfCast -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
@@ -7998,7 +8003,7 @@ representativeEvents cond =
         TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp departed)
         -- CR 702.112b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
-        TriggerCondition.PermanentBecomesDesignated d _ -> one (GameEvent.BecameDesignated d departed)
+        TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated d _) -> one (GameEvent.BecameDesignated d departed)
         -- CR 702.100b's own event, and the only one this condition admits. The
         -- pair does NOT match -- the condition is self-scoped and `departed` is
         -- not the bearer -- which pins the floor for a matching pair too, since
@@ -8021,7 +8026,7 @@ representativeEvents cond =
         -- for what this pins: eventBindings contributes nothing for this
         -- condition under any event, so the floor is empty either way.
         TriggerCondition.SagaFinalChapterTriggers _ ->
-          one (GameEvent.AbilityTriggered departed S.alice (TriggerCondition.SelfCountersReached CounterKind.Lore 3))
+          one (GameEvent.AbilityTriggered departed S.alice (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 3)))
         -- CR 725.1's own event, and the only one this condition admits. CR 725.3
         -- makes it name exactly one player, so there is no second shape of the
         -- event for the floor to differ on. bob rather than the perspective
@@ -8048,7 +8053,7 @@ everyTriggerCondition =
   [ TriggerCondition.SelfEnters,
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
     TriggerCondition.PermanentDies Filter.Type.IsSource,
-    TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn,
+    TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn),
     TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0))),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
@@ -8057,7 +8062,7 @@ everyTriggerCondition =
     TriggerCondition.SelfCycled,
     TriggerCondition.SelfRevealedForMiracle,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
-    TriggerCondition.PlayerDrawsNthCard PlayerRelation.You 2,
+    TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard PlayerRelation.You 2),
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfAttacksWithAnother (Filter.Type.And []),
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
@@ -8078,15 +8083,15 @@ everyTriggerCondition =
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
     TriggerCondition.PlayerGainsLife PlayerRelation.You,
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
-    TriggerCondition.SelfCountersReached CounterKind.Lore 1,
+    TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 1),
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
     -- BOTH scopes, unlike StepBegins' one above: the TurnScope is new on this
     -- condition, and the pin below asserts eventBindingSlots against what
     -- eventBindings stamps for every event -- so an arm that had cased on the
     -- scope and stamped nothing under one of them would go unseen if only one
     -- were listed.
-    TriggerCondition.SpellCast Filter.Type.IsSource TurnScope.EachTurn,
-    TriggerCondition.SpellCast Filter.Type.IsSource TurnScope.OpponentsTurn,
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.OpponentsTurn),
     TriggerCondition.SelfCast,
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
@@ -8098,7 +8103,7 @@ everyTriggerCondition =
     TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
     TriggerCondition.SelfTurnedFaceUp,
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
-    TriggerCondition.PermanentBecomesDesignated Designation.Renowned (Filter.Type.And []),
+    TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Renowned (Filter.Type.And [])),
     TriggerCondition.SelfEvolves,
     TriggerCondition.AttachedCreatureMentors,
     TriggerCondition.PermanentSacrificed,

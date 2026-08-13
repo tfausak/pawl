@@ -21,12 +21,12 @@
         {
           "condition": {
             "type": "SelfCountersReached",
-            "value": [
-              {
+            "value": {
+              "amount": 1,
+              "kind": {
                 "type": "Lore"
-              },
-              1
-            ]
+              }
+            }
           },
           "modal": {
             "modes": [
@@ -100,12 +100,12 @@
         {
           "condition": {
             "type": "SelfCountersReached",
-            "value": [
-              {
+            "value": {
+              "amount": 2,
+              "kind": {
                 "type": "Lore"
-              },
-              2
-            ]
+              }
+            }
           },
           "modal": {
             "modes": [
@@ -179,12 +179,12 @@
         {
           "condition": {
             "type": "SelfCountersReached",
-            "value": [
-              {
+            "value": {
+              "amount": 3,
+              "kind": {
                 "type": "Lore"
-              },
-              3
-            ]
+              }
+            }
           },
           "modal": {
             "modes": [

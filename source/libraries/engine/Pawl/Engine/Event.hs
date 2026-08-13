@@ -93,9 +93,11 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
+import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
@@ -109,10 +111,13 @@ import Pawl.Types.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -2954,7 +2959,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
-  TriggerCondition.StepBegins wanted scope -> case event of
+  TriggerCondition.StepBegins (StepBegins.MkStepBegins wanted scope) -> case event of
     GameEvent.StepBegan began active ->
       began == wanted && turnScopeAdmits scope active you
     GameEvent.Moved _ _ -> False
@@ -3226,7 +3231,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- Equality on the ordinal, which is what makes "your second card" fire once in
   -- a turn with five draws.
-  TriggerCondition.PlayerDrawsNthCard relation nth -> case event of
+  TriggerCondition.PlayerDrawsNthCard (PlayerDrawsNthCard.MkPlayerDrawsNthCard relation nth) -> case event of
     GameEvent.Drew drawer ordinal ->
       ordinal
         == nth
@@ -4282,7 +4287,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- given two lore counters while it has none fires chapters I and II together.
   -- Read ahead (CR 702.155a) is the mechanic that wants the equality instead, and
   -- then only on the turn the Saga entered; it is not implemented (#841).
-  TriggerCondition.SelfCountersReached wanted n -> case event of
+  TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached wanted n) -> case event of
     GameEvent.CountersPut oid kind before after -> oid == bearer && kind == wanted && Saga.crossed before after n
     -- Rule 714.2b says "are PUT onto", so a removal crosses nothing: a Saga whose
     -- lore counters were taken off and put back fires its chapters again.
@@ -4380,7 +4385,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- cast happened in -- so the active player standing now is the one the cast
   -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
   -- 603.3a), exactly as the StepBegins arm above reads its own.
-  TriggerCondition.SpellCast f scope -> case event of
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope) -> case event of
     GameEvent.SpellCast caster spell _ -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
@@ -4674,7 +4679,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
-  TriggerCondition.PermanentBecomesDesignated wanted f -> case event of
+  TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated wanted f) -> case event of
     -- The designations must MATCH, not merely both be present: Valeron Wardens'
     -- renown trigger must not fire when a creature you control becomes monstrous.
     GameEvent.BecameDesignated got oid
@@ -4992,7 +4997,7 @@ reactsToAbilityTriggering cond = case cond of
   -- which is CR 603.3b's first class in as many words.
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters _ -> False
-  TriggerCondition.StepBegins _ _ -> False
+  TriggerCondition.StepBegins {} -> False
   -- CR 603.8: a state trigger's condition is a fact about the game state, and a
   -- game state is not an ability triggering.
   TriggerCondition.StateIs _ -> False
@@ -5005,7 +5010,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerDiscards _ -> False
   -- CR 121.1's draw is something that happens to a player, not an ability
   -- triggering.
-  TriggerCondition.PlayerDrawsNthCard _ _ -> False
+  TriggerCondition.PlayerDrawsNthCard {} -> False
   -- CR 725.1's crowning is something that happens TO a player, which is CR
   -- 603.3b's first class in as many words -- a designation changing hands is not
   -- an ability triggering, whatever put the crown there.
@@ -5037,15 +5042,15 @@ reactsToAbilityTriggering cond = case cond of
   -- CR 714.2b's own condition is a counter placement, which is what makes a
   -- chapter ability itself a FIRST-pass trigger -- the other half of the pair
   -- this whole classification exists to separate.
-  TriggerCondition.SelfCountersReached _ _ -> False
+  TriggerCondition.SelfCountersReached {} -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
-  TriggerCondition.SpellCast _ _ -> False
+  TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
   TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.PermanentTurnedFaceUp _ -> False
-  TriggerCondition.PermanentBecomesDesignated _ _ -> False
+  TriggerCondition.PermanentBecomesDesignated {} -> False
   TriggerCondition.SelfEvolves -> False
   -- CR 702.134c watches a mentor ability RESOLVING, which is neither of CR 603.3b's
   -- two classes' subjects read carelessly: an ability resolving is something the
@@ -5268,7 +5273,7 @@ eventBindings cond event = case (cond, event) of
   -- Filter in hand, so a slot it names has to hold for every cast the condition
   -- can match. Both do: GameEvent.SpellCast carries an ObjectId and a PlayerId
   -- unconditionally, so no shape of the event withholds either.
-  (TriggerCondition.SpellCast _ _, GameEvent.SpellCast caster spell _) ->
+  (TriggerCondition.SpellCast {}, GameEvent.SpellCast caster spell _) ->
     Binding.setTriggerPlayer caster (Binding.setCastSpell spell Map.empty)
   -- CR 509.3d's "that creature": the blocker whose declaration fired this, which
   -- rule 702.25a's payload gives -1/-1. Unconditional in the same sense as the
@@ -5360,7 +5365,7 @@ eventBindingSlots cond = case cond of
   TriggerCondition.PermanentEnters _ -> Set.singleton Binding.became
   -- CR 603.2b's step beginning names no object and no player but the active one,
   -- and the active player is not what CR 109.5's `you` means.
-  TriggerCondition.StepBegins _ _ -> Set.empty
+  TriggerCondition.StepBegins {} -> Set.empty
   -- CR 603.8: a state trigger matches a game STATE rather than an event
   -- (matchesTrigger's StateIs arm answers False for every event), so no event
   -- contributes anything to one.
@@ -5399,7 +5404,7 @@ eventBindingSlots cond = case cond of
   -- Mastermind's says "you". Ian Malcolm, Chaotician's "that player exiles" is the
   -- card that would add the slot, and it needs a PlayerRelation for "a player"
   -- that does not exist either.
-  TriggerCondition.PlayerDrawsNthCard _ _ -> Set.empty
+  TriggerCondition.PlayerDrawsNthCard {} -> Set.empty
   -- CR 508.5's defending player, which the declaration event carries -- rule
   -- 702.86a's annihilator is the reader. The DECLARED attacker itself is the
   -- bearer, already bound as CR 113.7a's source, so it needs no slot of its own.
@@ -5517,7 +5522,7 @@ eventBindingSlots cond = case cond of
   -- already names, so `became` would be a second name for it. The counts the
   -- event carries are the CONDITION's, not the payload's: no chapter ability in
   -- print says "that many", and eventBindings has no arm for this condition.
-  TriggerCondition.SelfCountersReached _ _ -> Set.empty
+  TriggerCondition.SelfCountersReached {} -> Set.empty
   TriggerCondition.SelfLastCounterRemoved _ -> Set.empty
   -- CR 709.5h names the permanent and the half, and CR 113.7a's source slot
   -- already names the permanent. The HALF is not bound: no printing says "that
@@ -5566,7 +5571,7 @@ eventBindingSlots cond = case cond of
   -- Another deliberate empty: Valeron Wardens draws a card and names no "it", so
   -- there is no subject to claim a slot for. The arm above says what a card
   -- reading the renowned permanent would have to settle first.
-  TriggerCondition.PermanentBecomesDesignated _ _ -> Set.empty
+  TriggerCondition.PermanentBecomesDesignated {} -> Set.empty
   -- Empty too: rule 702.100b's event names the creature that evolved, and that is
   -- the bearer -- Renegade Krasis says "this creature", so there is no "it" to
   -- bind that Binding.triggerSource does not already answer.
@@ -5601,7 +5606,7 @@ eventBindingSlots cond = case cond of
   -- Guaranteed for the reason the spell is -- GameEvent.SpellCast carries a
   -- PlayerId unconditionally -- so the promise holds for every cast the Filter
   -- can admit.
-  TriggerCondition.SpellCast _ _ -> Set.fromList [Binding.castSpell, Binding.triggerPlayer]
+  TriggerCondition.SpellCast {} -> Set.fromList [Binding.castSpell, Binding.triggerPlayer]
   -- Nothing, a deliberate empty rather than a default: the spell the event names
   -- is the BEARER, which every ability already reaches as its own source, and the
   -- caster is CR 109.5's "you", whom Binding.setYou already names. A slot would
@@ -5699,7 +5704,7 @@ looksBack condition = case condition of
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   -- CR 702.112b's designation is given to a permanent that stays where it is, so
   -- there is no departure here either.
-  TriggerCondition.PermanentBecomesDesignated _ _ -> False
+  TriggerCondition.PermanentBecomesDesignated {} -> False
   -- Nor here: rule 702.100b's counters are put on a permanent on the battlefield.
   TriggerCondition.SelfEvolves -> False
   -- Nor here, for the same reason one rule over: rule 702.134a's counter goes on a
@@ -5712,7 +5717,7 @@ looksBack condition = case condition of
   TriggerCondition.PermanentEnters _ -> False
   -- Turn structure, the stack, damage, life, counters and the rest: none names a
   -- zone change at all, so CR 603.10a's list cannot reach them.
-  TriggerCondition.StepBegins _ _ -> False
+  TriggerCondition.StepBegins {} -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
@@ -5721,7 +5726,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.PlayerDiscards _ -> False
-  TriggerCondition.PlayerDrawsNthCard _ _ -> False
+  TriggerCondition.PlayerDrawsNthCard {} -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
@@ -5737,9 +5742,9 @@ looksBack condition = case condition of
   TriggerCondition.DamageToPlayerPrevented _ -> False
   TriggerCondition.PlayerGainsLife _ -> False
   TriggerCondition.PlayerLosesLife _ -> False
-  TriggerCondition.SelfCountersReached _ _ -> False
+  TriggerCondition.SelfCountersReached {} -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
-  TriggerCondition.SpellCast _ _ -> False
+  TriggerCondition.SpellCast {} -> False
   TriggerCondition.SelfCast -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
@@ -6398,7 +6403,7 @@ zonesTriggeredFrom cond = case cond of
   -- battlefield when it fires.
   TriggerCondition.SelfEnters -> battlefield
   TriggerCondition.PermanentEnters _ -> battlefield
-  TriggerCondition.StepBegins _ _ -> battlefield
+  TriggerCondition.StepBegins {} -> battlefield
   -- CR 709.5c makes an unlocked designation something a permanent ON THE
   -- BATTLEFIELD has, so this condition cannot trigger from a graveyard at all.
   TriggerCondition.SelfHalfUnlocked _ -> battlefield
@@ -6431,7 +6436,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.PermanentTurnedFaceUp _ -> battlefield
   -- The same default: CR 702.112b's "only permanents can be or become renowned"
   -- keeps the subject on the battlefield, and Valeron Wardens watches from it.
-  TriggerCondition.PermanentBecomesDesignated _ _ -> battlefield
+  TriggerCondition.PermanentBecomesDesignated {} -> battlefield
   -- The same default again: rule 702.100b's marker goes to a creature, and
   -- Renegade Krasis is the creature watching itself.
   TriggerCondition.SelfEvolves -> battlefield
@@ -6480,7 +6485,7 @@ zonesTriggeredFrom cond = case cond of
   -- CR 113.6's default again: Erudite Wizard watches its controller's draws from
   -- the battlefield. CR 702.94a's miracle answers a hand below, and it is a
   -- different condition -- it watches the REVEAL, not the draw.
-  TriggerCondition.PlayerDrawsNthCard _ _ -> battlefield
+  TriggerCondition.PlayerDrawsNthCard {} -> battlefield
   -- The condition this predicate exists for: a card cannot be put into a graveyard
   -- from a library while on the battlefield, so this can never trigger from there
   -- and the graveyard it lands in is the one zone it can.
@@ -6527,11 +6532,11 @@ zonesTriggeredFrom cond = case cond of
   -- CR 122.1's first sentence puts counters on OBJECTS, and CR 714.3 keeps a
   -- Saga's lore counters on the permanent -- so CR 113.6's default holds and a
   -- chapter ability functions from the battlefield alone.
-  TriggerCondition.SelfCountersReached _ _ -> battlefield
+  TriggerCondition.SelfCountersReached {} -> battlefield
   TriggerCondition.SelfLastCounterRemoved _ -> battlefield
   -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
   -- and a card in a graveyard sees nothing cast.
-  TriggerCondition.SpellCast _ _ -> battlefield
+  TriggerCondition.SpellCast {} -> battlefield
   -- CR 113.6k, the second zone it reaches: CR 601.2a moves the object to the stack
   -- to cast it and leaves it there, so at CR 601.2i it is on the stack and not on
   -- the battlefield -- this condition cannot trigger from there at all. The stack
@@ -6571,14 +6576,14 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.RoomEntered _ -> False
   -- One of the two arms carrying a TurnScope, and the one the lint below this
   -- was written for (CR 603.3a, CR 109.5).
-  TriggerCondition.StepBegins _ TurnScope.ControllersTurn -> True
+  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ TurnScope.ControllersTurn) -> True
   -- "Each <step>" admits every player's turn, the pairing the lint rejects.
-  TriggerCondition.StepBegins _ TurnScope.EachTurn -> False
+  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ TurnScope.EachTurn) -> False
   -- And "during an opponent's <step>" admits every turn but the controller's,
   -- which is not the controller's turn either. No card prints it, so the lint
   -- cannot reach this arm; answering it any other way would make the
   -- classification wrong for the sake of an unreachable case.
-  TriggerCondition.StepBegins _ TurnScope.OpponentsTurn -> False
+  TriggerCondition.StepBegins (StepBegins.MkStepBegins _ TurnScope.OpponentsTurn) -> False
   -- CR 702.179d's "during YOUR turn" is the same restriction StepBegins spells
   -- with a TurnScope, written into the condition itself because rule 702.179d
   -- states it there. No card bears this condition, so the lint this feeds cannot
@@ -6610,7 +6615,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentTurnedFaceUp _ -> False
   -- CR 702.112a's ability fires on combat damage to a player, which any player's
   -- turn can carry, and the watcher's turn is not asked about at all.
-  TriggerCondition.PermanentBecomesDesignated _ _ -> False
+  TriggerCondition.PermanentBecomesDesignated {} -> False
   -- Rule 702.100b names no turn either: a creature can evolve on anyone's.
   TriggerCondition.SelfEvolves -> False
   -- Rule 702.134c names none either. CR 508.1 does make every mentoring happen on
@@ -6628,7 +6633,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfCycled -> False
   TriggerCondition.SelfRevealedForMiracle -> False
   TriggerCondition.PlayerDiscards _ -> False
-  TriggerCondition.PlayerDrawsNthCard _ _ -> False
+  TriggerCondition.PlayerDrawsNthCard {} -> False
   -- CR 508.1a makes this the ACTIVE player's turn, which is not the same thing:
   -- CR 109.5's "you" is the ability's controller, and a stolen creature attacks on
   -- its thief's turn.
@@ -6668,16 +6673,16 @@ controllerTurnScoped cond = case cond of
   -- which a flash effect or an opponent's Sneak Attack could make happen. Only CR
   -- 714.3c's turn-based action is the controller's own turn, and that is the
   -- action's restriction rather than this condition's.
-  TriggerCondition.SelfCountersReached _ _ -> False
+  TriggerCondition.SelfCountersReached {} -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
   -- CR 601.2i says nothing about whose turn it is and CR 117.1a lets an instant
   -- be cast on anybody's, so the answer is the condition's own TurnScope --
   -- StepBegins' arms one more time, and for its reason (CR 603.3a, CR 109.5).
   -- Brineborn Cutthroat's OpponentsTurn is turn-scoped and is not the
   -- CONTROLLER's turn, which is the only thing this classification asks.
-  TriggerCondition.SpellCast _ TurnScope.ControllersTurn -> True
-  TriggerCondition.SpellCast _ TurnScope.EachTurn -> False
-  TriggerCondition.SpellCast _ TurnScope.OpponentsTurn -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.ControllersTurn) -> True
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.EachTurn) -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.OpponentsTurn) -> False
   -- The same rule with no TurnScope to read: a spell can be cast on anybody's
   -- turn, so its own cast trigger is not the controller's-turn kind either.
   TriggerCondition.SelfCast -> False
@@ -6765,7 +6770,7 @@ stateTriggers gs
               -- CR 603.6a is an EVENT trigger, matched against the log; nothing
               -- about it is a CR 603.8 state.
               TriggerCondition.PermanentEnters _ -> False
-              TriggerCondition.StepBegins _ _ -> False
+              TriggerCondition.StepBegins {} -> False
               TriggerCondition.SelfDealsCombatDamageToPlayer -> False
               TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
               TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
@@ -6784,7 +6789,7 @@ stateTriggers gs
               TriggerCondition.SelfCycled -> False
               TriggerCondition.SelfRevealedForMiracle -> False
               TriggerCondition.PlayerDiscards _ -> False
-              TriggerCondition.PlayerDrawsNthCard _ _ -> False
+              TriggerCondition.PlayerDrawsNthCard {} -> False
               TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
               TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
               TriggerCondition.SelfDies -> False
@@ -6824,7 +6829,7 @@ stateTriggers gs
               TriggerCondition.PermanentTurnedFaceUp _ -> False
               -- CR 702.112b's designation is exactly that shape once more: the
               -- permanent keeps it, so a state read would fire every settle.
-              TriggerCondition.PermanentBecomesDesignated _ _ -> False
+              TriggerCondition.PermanentBecomesDesignated {} -> False
               -- CR 702.100b is an EVENT trigger and leaves no state at all behind:
               -- the counters it put are indistinguishable from any others.
               TriggerCondition.SelfEvolves -> False
@@ -6841,9 +6846,9 @@ stateTriggers gs
               -- are PUT ON, not on the count standing at or above N -- which is
               -- exactly the difference CR 603.8 draws, and the reason a Saga does
               -- not re-run its final chapter for as long as it sits there.
-              TriggerCondition.SelfCountersReached _ _ -> False
+              TriggerCondition.SelfCountersReached {} -> False
               TriggerCondition.SelfLastCounterRemoved _ -> False
-              TriggerCondition.SpellCast _ _ -> False
+              TriggerCondition.SpellCast {} -> False
               TriggerCondition.SelfCast -> False
               -- CR 709.5i is an EVENT trigger, for CR 709.5h's reason one arm up:
               -- it fires on the LAST designation arriving, and CR 709.5c leaves

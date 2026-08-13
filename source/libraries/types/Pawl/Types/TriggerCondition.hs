@@ -4,15 +4,17 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
+import qualified Pawl.Types.PlayerDrawsNthCard as PlayerDrawsNthCard
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
-import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | CR 603.2: the pattern that fires a triggered ability. Only Pawl.Engine.Event may case
 -- on it for RULES purposes; Pawl.Codec also cases on every constructor, but only
@@ -38,7 +40,7 @@ data TriggerCondition
     PermanentEnters (Filter.Filter Keyword.Keyword)
   | -- | CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
     -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies.
-    StepBegins Phase.Phase TurnScope.TurnScope
+    StepBegins StepBegins.StepBegins
   | -- | CR 603.8: a STATE trigger -- it fires whenever its condition is true, not
     -- when an event occurs, and not again until the ability has left the stack.
     -- That is why Pawl.Engine.Event derives armedness from the stack rather than
@@ -136,7 +138,7 @@ data TriggerCondition
     -- other, so a turn with four draws fires it once. A card reading "your second
     -- and each subsequent card" would be a different condition, and none is
     -- printed.
-    PlayerDrawsNthCard PlayerRelation.PlayerRelation Natural.Natural
+    PlayerDrawsNthCard PlayerDrawsNthCard.PlayerDrawsNthCard
   | -- | CR 508.3a: "whenever [a creature] attacks" -- Hanweir Garrison's.
     -- Self-scoped like SelfEnters.
     --
@@ -664,7 +666,7 @@ data TriggerCondition
     -- subtype's, and Pawl.Engine.Saga is where the Saga-only rules (CR 714.2d's
     -- final chapter number, CR 714.3c's turn-based action, CR 704.5s's state-based
     -- action) read the subtype.
-    SelfCountersReached (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
+    SelfCountersReached SelfCountersReached.SelfCountersReached
   | -- | CR 310.11b, generalized over the kind of counter: "when the LAST [kind]
     -- counter is removed from this permanent". SelfCountersReached's mirror,
     -- matched against a GameEvent.CountersRemoved whose before/after pair went from
@@ -737,7 +739,7 @@ data TriggerCondition
     --
     -- The same type StepBegins carries above, read against the same player: CR
     -- 109.5's "you", the ability's controller when it triggered (CR 603.3a).
-    SpellCast (Filter.Filter Keyword.Keyword) TurnScope.TurnScope
+    SpellCast SpellCast.SpellCast
   | -- | CR 601.2i again, read off the spell BEING cast rather than off a bystander
     -- -- "when you cast this spell", Desolation Twin's. Self-scoped like
     -- SelfEnters, and a sibling of SpellCast above rather than
@@ -891,7 +893,7 @@ data TriggerCondition
     -- A LIVE read of the permanent, PermanentTurnedFaceUp's posture: nothing here
     -- is a zone change, so CR 603.10a's look-back does not reach it and the
     -- designation is written while the permanent is still on the battlefield.
-    PermanentBecomesDesignated Designation.Designation (Filter.Filter Keyword.Keyword)
+    PermanentBecomesDesignated PermanentBecomesDesignated.PermanentBecomesDesignated
   | -- | CR 702.100b: the BEARER evolved -- Renegade Krasis' "whenever this
     -- creature evolves". Matched against GameEvent.Evolved by an id comparison,
     -- SelfEnters' shape.
