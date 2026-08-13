@@ -85,6 +85,13 @@ say:
 Re-run at least the load-bearing mutations after any merge from `origin/main`.
 A bad conflict resolution can neuter a test while leaving the suite green.
 
+Run the suite before anything else after that merge, too. A card file written in
+a superseded wire spelling makes the registry throw `InvalidCorpus` and aborts
+the WHOLE corpus load, so every case dies at once and it reads as a
+catastrophic regression. It is usually one stale card file, and the loader stops
+at the first bad one -- so grep the corpus for the old spelling rather than
+eyeballing your own diff.
+
 ## Vacuity traps
 
 These have each shipped a green-but-meaningless test in this repository:

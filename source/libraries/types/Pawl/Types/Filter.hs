@@ -242,6 +242,38 @@ data Filter keyword
     -- card representing a permanent or spell, so the two are never both answerable
     -- for one candidate.
     IsPlayer PlayerRelation.PlayerRelation
+  | -- | CR 110.2: the candidate PLAYER controls strictly more permanents matching
+    -- this filter than the perspective player does (CR 109.5) -- Oreskos
+    -- Explorer's "the number of players who control more lands than you", whose
+    -- nested filter is `HasCardType Land`.
+    --
+    -- The one atom that RE-FRAMES the perspective. Every other player-relating
+    -- atom here asks how the candidate STANDS to "you" -- a relation, answered off
+    -- the candidate alone -- while this asks a question about the candidate's own
+    -- board and compares the answer against yours. That is what CR 109.1 makes
+    -- awkward: a player is not an object, so Pawl.Engine.Filter.playerView has no
+    -- field to read this off, and a board is not a characteristic in any case.
+    --
+    -- Answered by REWRITING rather than by a View field or a Context one, the
+    -- shape ControlledByBound above has: Pawl.Engine.Count.bakePerspective holds
+    -- the game state, counts both sides for one candidate, and replaces the atom
+    -- with a trivially true or trivially false predicate before the match.
+    -- Vacuously False if it survives to Pawl.Engine.Filter.matches, which is every
+    -- position but a Pawl.Types.Scope.OverPlayers count's filter -- the only place
+    -- the candidate is a player and the only place anything bakes it.
+    --
+    -- STRICT, and asked of every player INCLUDING you: "more lands than you"
+    -- excludes you by arithmetic rather than by a relation, which is why Oreskos'
+    -- scope is EachPlayer rather than an opponent relation. Surveyor's Scope's "at
+    -- least two more lands than you" wants a margin beside the filter; that card
+    -- needs a search destination pawl does not have either, so neither half is
+    -- built (#1381).
+    --
+    -- CARRIES A FILTER rather than naming lands: the question is CR 110.2's
+    -- control of some described permanent, and the description is a Filter like
+    -- any other -- matched against each battlefield permanent through the same
+    -- CR 613 projection every other count reads.
+    ControlsMoreThanYou (Filter keyword)
   | -- | CR 508.1k: the candidate is an ATTACKING creature -- declared as an
     -- attacker this combat phase and not since removed from combat (CR 506.4).
     -- Kill Shot's "target attacking creature".

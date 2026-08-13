@@ -89,7 +89,10 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   -- (#1315).
   Scope.OverPlayers ref -> do
     pids <- playersFor context gs ref
-    let kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just . Filter.playerView) pids)
+    -- The predicate is baked PER CANDIDATE (see bakePerspective): CR 110.2's
+    -- comparison is answered here, where the board is, and the match below is the
+    -- same pure one every other scope makes.
+    let kept = fmap ((,) Nothing) (Maybe.mapMaybe (\pid -> keep (bakePerspective viewOf context gs pid predicate) context (Just (Filter.playerView pid))) pids)
     aggregate quantityOf aggregation kept
   where
     predicate = Count.Type.filter count
@@ -128,6 +131,93 @@ mapQuantity f count =
         Aggregation.DistinctCardTypes -> Aggregation.DistinctCardTypes
         Aggregation.Greatest quantity -> Aggregation.Greatest (f quantity)
     }
+
+-- CR 110.2 / 109.5: answer every perspective-reframing atom in a predicate
+-- against ONE candidate player, rewriting each to a trivially true or trivially
+-- false predicate so the match itself stays the pure fold Pawl.Engine.Filter
+-- performs. That module cannot answer the atom: it holds no game state, and
+-- "controls more lands than you" is a question about the board rather than about
+-- the candidate. This is Filter.bakeBound's shape, with a board where that one has
+-- a binding map.
+--
+-- The candidate is held as "you" for the INNER count only; the outer context rides
+-- through unchanged, so a nested atom reading the perspective still reads the real
+-- one. That is the asymmetry the whole atom exists for.
+--
+-- Exhaustive rather than a catch-all, bakeBound's posture: a later atom that must
+-- be answered against the board has to fail to compile here rather than silently
+-- go unbaked and answer False.
+bakePerspective :: ViewOf -> Filter.Context -> GameState -> PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> Filter.Type.Filter Keyword.Type.Keyword
+bakePerspective viewOf context gs candidate predicate = case predicate of
+  -- STRICTLY more, and False when no perspective frames the match (CR 109.5) --
+  -- the vacuous posture every player-referencing atom takes.
+  Filter.Type.ControlsMoreThanYou inner ->
+    let theirs = controlledMatching viewOf context gs inner candidate
+        yours = fmap (controlledMatching viewOf context gs inner) (Filter.perspective context)
+     in truth (maybe False (theirs >) yours)
+  Filter.Type.And fs -> Filter.Type.And (fmap recur fs)
+  Filter.Type.Or fs -> Filter.Type.Or (fmap recur fs)
+  Filter.Type.Not f -> Filter.Type.Not (recur f)
+  Filter.Type.HasCardType _ -> predicate
+  Filter.Type.HasSupertype _ -> predicate
+  Filter.Type.HasColor _ -> predicate
+  Filter.Type.HasSubtype _ -> predicate
+  Filter.Type.HasKeyword _ -> predicate
+  Filter.Type.HasKeywordFamily _ -> predicate
+  Filter.Type.PowerAtLeast _ -> predicate
+  Filter.Type.PowerAtMost _ -> predicate
+  Filter.Type.PowerLessThanSource -> predicate
+  Filter.Type.PowerGreaterThanSource -> predicate
+  Filter.Type.ManaValueAtMost _ -> predicate
+  Filter.Type.ManaValueIsEven -> predicate
+  Filter.Type.ControlledBy _ -> predicate
+  Filter.Type.ControlledByDefendingPlayer -> predicate
+  Filter.Type.ControlledByBound _ -> predicate
+  Filter.Type.ControlledByPlayer _ -> predicate
+  Filter.Type.OwnedBy _ -> predicate
+  Filter.Type.IsSource -> predicate
+  Filter.Type.IsPlayer _ -> predicate
+  Filter.Type.IsAttacking -> predicate
+  Filter.Type.IsBlocking -> predicate
+  Filter.Type.AttackedThisTurn -> predicate
+  Filter.Type.IsAttachedToCreature -> predicate
+  Filter.Type.IsAttachedToPermanent -> predicate
+  Filter.Type.IsAttachedToSource -> predicate
+  Filter.Type.CanHostSubject -> predicate
+  Filter.Type.IsToken -> predicate
+  Filter.Type.IsTapped -> predicate
+  Filter.Type.IsRingBearer -> predicate
+  Filter.Type.HasDesignation _ -> predicate
+  Filter.Type.HasCounters _ -> predicate
+  Filter.Type.HasNonManaActivatedAbility -> predicate
+  where
+    recur = bakePerspective viewOf context gs candidate
+
+-- A baked answer as a Filter. `And []` is the trivial predicate by
+-- Pawl.Types.Filter's own note, so its negation is the trivially false one --
+-- there is no Always atom to reach for and deliberately so.
+truth :: Bool -> Filter.Type.Filter keyword
+truth b = if b then Filter.Type.And [] else Filter.Type.Not (Filter.Type.And [])
+
+-- CR 110.2: how many permanents that player CONTROLS match the filter.
+--
+-- Control is read off the projected view rather than off Game.zoneMembers, which
+-- slices the shared battlefield by OWNER (#161): rule 110.2 makes the two come
+-- apart, and control is what the card asks about. The view is the injected one
+-- every other candidate is seen through, so a land animated or taken at CR 613's
+-- layers counts as the layers leave it, and an object the caller's projection
+-- cannot describe counts for nobody.
+--
+-- The inner filter is matched under the UNCHANGED context, so what it says about
+-- CR 109.5's "you" or about the source is still said about the real ones. The
+-- candidate's own board is expressed by the controller test here rather than by a
+-- ControlledBy conjunct, which could only ever name a relation.
+controlledMatching :: ViewOf -> Filter.Context -> GameState -> Filter.Type.Filter Keyword.Type.Keyword -> PlayerId -> Integer
+controlledMatching viewOf context gs inner pid =
+  let matching oid = case viewOf oid of
+        Nothing -> False
+        Just view -> Filter.controller view == Just pid && Filter.matches context view inner
+   in toInteger (length (Prelude.filter matching (Set.toList (GameState.battlefield gs))))
 
 keep :: Filter.Type.Filter Keyword.Type.Keyword -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
 keep predicate context mv = case mv of

@@ -1573,6 +1573,10 @@ canHostSubjects predicate = case predicate of
   Filter.Type.And fs -> sum (fmap canHostSubjects fs)
   Filter.Type.Or fs -> sum (fmap canHostSubjects fs)
   Filter.Type.Not f -> canHostSubjects f
+  -- A Filter position like the combinators above, and the only ATOM that is one:
+  -- CR 110.2's comparison carries the description of what is being counted, which
+  -- a card author writes exactly as they write any other filter.
+  Filter.Type.ControlsMoreThanYou f -> canHostSubjects f
   -- CR 702.29e's "[type]cycling" carries a Filter of its own, and any Cost a
   -- keyword names can carry one through a Sacrifice component. Never EVALUATED
   -- against a candidate -- HasKeyword asks whether the key is present in the
