@@ -72,31 +72,31 @@
                     "effects": [
                       {
                         "type": "LoseLife",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "InSlot",
                             "value": "thatPlayer"
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 2
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "GainLife",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 2
                           }
-                        ]
+                        }
                       }
                     ]
                   }

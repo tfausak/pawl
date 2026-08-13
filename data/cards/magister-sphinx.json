@@ -61,16 +61,16 @@
                     "effects": [
                       {
                         "type": "SetLifeTotal",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "InSlot",
                             "value": "target"
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 10
                           }
-                        ]
+                        }
                       }
                     ]
                   }

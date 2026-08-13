@@ -28,6 +28,7 @@ import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -283,7 +284,7 @@ data Effect card
     --
     -- PlayerRef rather than a `Draw SlotName Quantity` sibling: the sibling leaves
     -- two draw opcodes to keep in step, which the effect DSL otherwise avoids.
-    Draw PlayerRef.PlayerRef Quantity.Quantity
+    Draw PlayerQuantity.PlayerQuantity
   | -- | CR 701.17: the players the PlayerRef names each mill this many. A short or
     -- empty library mills fewer, no penalty (CR 701.17b) -- unlike Draw, which
     -- loses.
@@ -330,7 +331,7 @@ data Effect card
     -- GameEvent.Revealed being the wrong event. Not implemented: a standalone
     -- look-at-the-top-card opcode (#1338), and CR 701.22d's "whenever a player
     -- scries" trigger (#1339).
-    Scry PlayerRef.PlayerRef Quantity.Quantity
+    Scry PlayerQuantity.PlayerQuantity
   | -- | CR 701.25a: the players the PlayerRef names each surveil this many -- look
     -- at the top N of their own library, then put any number of them into their
     -- GRAVEYARD and the rest back on top in any order.
@@ -352,7 +353,7 @@ data Effect card
     --
     -- Not implemented: CR 701.25b's "additional cards" rider (#1343), and CR
     -- 701.25d's "whenever a player surveils" trigger (#1342).
-    Surveil PlayerRef.PlayerRef Quantity.Quantity
+    Surveil PlayerQuantity.PlayerQuantity
   | -- | CR 701.29a: the players the PlayerRef names each fateseal this many -- look
     -- at the top N cards of AN OPPONENT'S library, then put any number of them on
     -- the bottom of that library in any order and the rest on top in any order.
@@ -372,7 +373,7 @@ data Effect card
     -- Rule 701.29 is one sentence, so there is no zero case, no "even if
     -- impossible" trigger clause and no additional-cards rider to defer, unlike
     -- CR 701.22 and CR 701.25.
-    Fateseal PlayerRef.PlayerRef Quantity.Quantity
+    Fateseal PlayerQuantity.PlayerQuantity
   | -- | CR 701.44a: the permanents the ObjectRef names each explore. Each one's
     -- controller reveals the top card of their library; a land card goes to
     -- their hand, and otherwise a +1/+1 counter goes on the exploring permanent
@@ -425,13 +426,13 @@ data Effect card
     -- GainLife is a SEPARATE opcode rather than a signed amount: CR 119.3 states
     -- both in one sentence, but they are distinct events for triggers ("whenever
     -- you gain life"), which a sign would fuse.
-    LoseLife PlayerRef.PlayerRef Quantity.Quantity
+    LoseLife PlayerQuantity.PlayerQuantity
   | -- | CR 119.3: the players the PlayerRef names each gain this much life -- Soul
     -- Warden's "you gain 1 life" is `Relative You`. LoseLife's mirror but for the
     -- sign, and separate from it for the reason that comment gives. No state-based
     -- action follows a gain (CR 704.5a is about a total of 0 or less), so this one
     -- can never kill anybody.
-    GainLife PlayerRef.PlayerRef Quantity.Quantity
+    GainLife PlayerQuantity.PlayerQuantity
   | -- | CR 701.12c: the two players the ExchangeSides names exchange life totals
     -- -- Mirror Universe's controller and its target (WithController), or Soul
     -- Conduit's "two target players" (BetweenTargets). Each of the two gains or
@@ -459,7 +460,7 @@ data Effect card
     -- GainLife append, and a "whenever you gain life" trigger reads them.
     -- ExchangeLifeTotals took that posture first, under CR 701.12c's parallel
     -- wording.
-    SetLifeTotal PlayerRef.PlayerRef Quantity.Quantity
+    SetLifeTotal PlayerQuantity.PlayerQuantity
   | -- | Reverse the Sands' "redistribute any number of players' life totals": the
     -- resolving controller chooses any number of the players in the game and then
     -- hands each of them one of THOSE players' previous totals, using each total
@@ -504,7 +505,7 @@ data Effect card
     -- speed. A decrease one does want, and that is #808's. Either would also have
     -- to say what happens to a player with no speed, which is exactly the question
     -- CR 702.179c answers for this one.
-    IncreaseSpeed PlayerRef.PlayerRef Quantity.Quantity
+    IncreaseSpeed PlayerQuantity.PlayerQuantity
   | -- | CR 111: create this many tokens with the given effect-defined
     -- characteristics (CR 111.3). The `card` is the token's text, embedded
     -- literally (tied to Card by Card's own instantiation); Create (Literal 2)

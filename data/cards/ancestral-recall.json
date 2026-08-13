@@ -21,16 +21,16 @@
                 "effects": [
                   {
                     "type": "Draw",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "InSlot",
                         "value": "target"
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 3
                       }
-                    ]
+                    }
                   }
                 ]
               }

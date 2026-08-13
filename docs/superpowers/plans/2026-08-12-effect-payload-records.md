@@ -105,6 +105,19 @@ pre-migration corpus is what proves the decoder drops nothing.
 Per arm, so the corpus is rewritten many times rather than once. That is fine --
 the rewrite is mechanical and verified each time.
 
+## Rebase before marking ready
+
+A migrating branch is stale the moment another session lands a card, and a green
+local suite CANNOT detect it: the branch migrated the corpus as it stood when the
+branch was cut, while CI builds the merge with main. #1403 failed CI exactly this
+way, on a card that arrived mid-review.
+
+So: fetch, rebase onto main, re-run the migration over any cards the rebase
+brought in, and re-run the suite --- immediately before pushing, not when the
+work feels finished. For one or two arriving cards a direct JSON transform is
+enough, provided it ASSERTS the shape it expects rather than assuming it; for
+more, rebuild the shim and re-run the migrator.
+
 ## Carried over
 
 `Pawl.Types.Effect`'s per-constructor documentation is extensive and is the real

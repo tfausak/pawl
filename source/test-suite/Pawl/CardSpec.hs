@@ -116,6 +116,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -214,7 +215,7 @@ instantLine = spellLine CardType.Instant Set.empty Set.empty
 -- "You draw this many cards" -- the smallest payload an ability can carry, used
 -- below only so that two abilities can be told apart by their effect.
 youDraw :: Integer -> Effect.Effect Card.Type.Card
-youDraw n = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal n)
+youDraw n = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal n))
 
 -- "This object has [keyword]" as a static ability (CR 604.1), the smallest
 -- carrier Face.staticAbilities takes.
@@ -589,21 +590,21 @@ effectCounts effect = case effect of
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
-  Effect.Draw _ quantity -> quantityCounts quantity
+  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
-  Effect.Scry _ quantity -> quantityCounts quantity
-  Effect.Surveil _ quantity -> quantityCounts quantity
-  Effect.Fateseal _ quantity -> quantityCounts quantity
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   -- No Quantity at all: rule 701.44a's counter is a literal one and its card is
   -- the one on top, so there is no number a card author writes.
   Effect.Explore {} -> []
   Effect.Discard _ quantity -> quantityCounts quantity
-  Effect.LoseLife _ quantity -> quantityCounts quantity
-  Effect.GainLife _ quantity -> quantityCounts quantity
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
-  Effect.SetLifeTotal _ quantity -> quantityCounts quantity
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.RedistributeLifeTotals -> []
-  Effect.IncreaseSpeed _ quantity -> quantityCounts quantity
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's.
@@ -900,19 +901,19 @@ effectReplacements effect = case effect of
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
-  Effect.Draw _ _ -> []
+  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.Mill {} -> []
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
   Effect.Discard _ _ -> []
-  Effect.LoseLife _ _ -> []
-  Effect.GainLife _ _ -> []
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
-  Effect.SetLifeTotal _ _ -> []
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.RedistributeLifeTotals -> []
-  Effect.IncreaseSpeed _ _ -> []
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.SkipNextPhase _ _ -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
   Effect.PreventNextDamage _ _ _ rider -> concatMap effectReplacements rider
@@ -1425,19 +1426,19 @@ effectMintedFaces effect = case effect of
   Effect.Destroy {} -> []
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
-  Effect.Draw _ _ -> []
+  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.Mill {} -> []
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
   Effect.Explore {} -> []
   Effect.Discard _ _ -> []
-  Effect.LoseLife _ _ -> []
-  Effect.GainLife _ _ -> []
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.ExchangeLifeTotals _ -> []
-  Effect.SetLifeTotal _ _ -> []
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.RedistributeLifeTotals -> []
-  Effect.IncreaseSpeed _ _ -> []
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.SkipNextPhase _ _ -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
   Effect.PreventNextDamage _ _ _ rider -> concatMap effectMintedFaces rider
@@ -2439,23 +2440,23 @@ effectFilters effect = case effect of
   -- same shape -- the lint is about the positions a card author can write, not
   -- about which of them the pool has used.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ riders _ _ _) -> unframed (objectRefFilters ref <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders)))
-  Effect.Draw _ quantity -> unframed (quantityFilters quantity)
+  Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
   Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
-  Effect.Scry _ quantity -> unframed (quantityFilters quantity)
-  Effect.Surveil _ quantity -> unframed (quantityFilters quantity)
-  Effect.Fateseal _ quantity -> unframed (quantityFilters quantity)
+  Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   -- The ObjectRef's Filter is a position a card author writes, so the lint
   -- reaches it, as PutCounters' does.
   Effect.Explore ref -> unframed (objectRefFilters ref)
   Effect.Discard _ quantity -> unframed (quantityFilters quantity)
-  Effect.LoseLife _ quantity -> unframed (quantityFilters quantity)
-  Effect.GainLife _ quantity -> unframed (quantityFilters quantity)
+  Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
-  Effect.SetLifeTotal _ quantity -> unframed (quantityFilters quantity)
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.RedistributeLifeTotals -> []
-  Effect.IncreaseSpeed _ quantity -> unframed (quantityFilters quantity)
+  Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
   Effect.Create quantity card riders _ -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
@@ -3342,7 +3343,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let -- Endless Cockroaches' own payload: "return it to its owner's hand".
         returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
         -- Rule 702.70a's shape, as a targetless read of "that player".
-        thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
+        thatPlayerDraws = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1))
     Spec.assertBool
       s
       (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfEnters returnIt))
@@ -3466,13 +3467,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
         returnIt = Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPlacement.defaultValue)
-        thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
+        thatPlayerDraws = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1))
         -- CR 113.7's source slot, which every activation DOES bind.
         tapSelf = Effect.Tap (ObjectRef.InSlot Binding.triggerSource)
         -- An ordinary slot this ability neither declares nor mints.
         tapGhost = Effect.Tap (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost")))
         -- CR 601.2b's announced value, read as a slot rather than as Quantity.X.
-        drawX = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.InSlot Binding.variableX)
+        drawX = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.InSlot Binding.variableX))
     Spec.assertBool
       s
       (not (activatedAbilityOffends (oneEffectActivated free youDiscards)))
@@ -4347,7 +4348,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.triggeredAbilities =
                     [ oneEffectTrigger
                         (TriggerCondition.PermanentEnters buried)
-                        (Effect.Draw (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1))
+                        (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1)))
                     ]
                 }
             ),

@@ -19,6 +19,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -43,7 +44,7 @@ drawOne =
   Modal.MkModal
     ( Seq.singleton
         ( Mode.MkMode
-            (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))))
+            (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))))))
             Map.empty
         )
     )
@@ -65,7 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.DungeonRoom" $ do
             DungeonRoom.exits = Set.empty
           }
       )
-      """ {"name":"Temple of Dumathoin","ability":{"modes":[{"clauses":[{"effects":[{"type":"Draw","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":1}]}]}]}]}} """
+      """ {"name":"Temple of Dumathoin","ability":{"modes":[{"clauses":[{"effects":[{"type":"Draw","value":{"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":1}}}]}]}]}} """
   -- CR 309.5a: a room with two arrows out of it. The ability is left at its
   -- default, which is what a room whose printed effect pawl cannot express writes.
   Spec.it s "MkDungeonRoom, Cave Entrance's two arrows and no expressible ability" $

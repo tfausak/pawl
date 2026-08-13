@@ -52,6 +52,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
+import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
@@ -327,14 +328,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
-      """ {"type":"Draw","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2}]} """
+      (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)))
+      """ {"type":"Draw","value":{"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":2}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Draw (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3))
-      """ {"type":"Draw","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":3}]} """
+      (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)))
+      """ {"type":"Draw","value":{"player":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3}}} """
   -- Both of Scry's PlayerRef shapes: Crystal Ball's controller scry and
   -- Kozilek's Command's "target player scries 2".
   Spec.it s "Scry" $ do
@@ -342,14 +343,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Scry (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
-      """ {"type":"Scry","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2}]} """
+      (Effect.Scry (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)))
+      """ {"type":"Scry","value":{"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":2}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Scry (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
-      """ {"type":"Scry","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":2}]} """
+      (Effect.Scry (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2)))
+      """ {"type":"Scry","value":{"player":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":2}}} """
   -- Curate's "Surveil 2", and a distinct tag from Scry's above: the two carry the
   -- same payload and differ only in where the unwanted cards go, so a shared tag
   -- would decode one card's text as the other's.
@@ -358,8 +359,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Surveil (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
-      """ {"type":"Surveil","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2}]} """
+      (Effect.Surveil (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)))
+      """ {"type":"Surveil","value":{"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":2}}} """
   -- Spin into Myth's "then fateseal 2". The PlayerRef is the FATESEALER, so the
   -- controller spelling is the one a card writes; the opponent whose library is
   -- looked at is chosen as the effect applies and appears nowhere in the data.
@@ -368,8 +369,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Fateseal (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))
-      """ {"type":"Fateseal","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2}]} """
+      (Effect.Fateseal (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)))
+      """ {"type":"Fateseal","value":{"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":2}}} """
   -- Merfolk Branchwalker's "it explores", against the trigger-source slot, and
   -- the swept-set shape the ObjectRef also admits.
   Spec.it s "Explore" $ do
@@ -423,15 +424,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.LoseLife (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2))
-      """ {"type":"LoseLife","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":2}]} """
+      (Effect.LoseLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2)))
+      """ {"type":"LoseLife","value":{"player":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":2}}} """
   Spec.it s "GainLife" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
-      """ {"type":"GainLife","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":1}]} """
+      (Effect.GainLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))
+      """ {"type":"GainLife","value":{"player":{"type":"Relative","value":{"type":"You"}},"quantity":{"type":"Literal","value":1}}} """
   Spec.it s "ExchangeLifeTotals" $
     Common.assertJsonCodec
       s
@@ -451,8 +452,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.SetLifeTotal (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 10))
-      """ {"type":"SetLifeTotal","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":10}]} """
+      (Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 10)))
+      """ {"type":"SetLifeTotal","value":{"player":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":1e1}}} """
   -- Nullary: the whole choice is the resolving controller's, so there is nothing
   -- for card data to carry.
   Spec.it s "RedistributeLifeTotals" $
