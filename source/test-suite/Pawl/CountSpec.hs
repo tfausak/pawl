@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers Pawl.Engine.Count, Pawl.Types.Count, Pawl.Types.Scope, Pawl.Types.PlayerRef,
 -- Pawl.Types.EventShape and Pawl.Types.Aggregation. Unit-level: the fold is driven
 -- against a stubbed ViewOf so the evaluator is tested apart from the projection
@@ -17,6 +19,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
@@ -39,6 +42,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
@@ -344,6 +348,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
   tobiasSpec s registry
   roothaSpec s registry
   tyranidInvasionSpec s registry
+  oreskosExplorerSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -726,3 +731,85 @@ tyranidInvasionSpec s registry =
               after = castInvasion invasion base
           Spec.assertEqWith s "one opponent left, so one token" (length (S.tokensOf after)) 1
           Spec.assertEqWith s "the spell resolved" (GameState.stack after) []
+
+-- CR 110.2 compared against CR 109.5's "you": the first Filter that RE-FRAMES the
+-- perspective, asking a question about a candidate player's own board rather than
+-- how that player stands to you. GAMEPLAY LEVEL for the Tyranid Invasion group's
+-- reason and for one more of its own -- the atom is answered by a rewrite inside
+-- Pawl.Engine.Count.bakePerspective rather than by Pawl.Engine.Filter.matches, so
+-- a unit-level match would read the vacuous False and prove nothing.
+--
+-- Oreskos Explorer, {1}{W} Cat Scout: "When this creature enters, search your
+-- library for up to X Plains cards, where X is the number of players who control
+-- more lands than you. Reveal those cards, put them into your hand, then
+-- shuffle."
+--
+-- THREE SEATS with DISTINCT land counts, one seat above alice and one below, and
+-- the pair of boards differs in exactly one thing -- carol's third land. No two
+-- readings agree on both rows:
+--
+--                              CR 110.2 (>)   non-strict (>=)   every opponent   nobody
+--   alice 2, bob 4, carol 3          2               3                2             0
+--   alice 2, bob 4, carol 2          1               3                2             0
+--
+-- The tied row is the one that tells strict from non-strict, which is invisible
+-- on a board where no seat ties you; the first row is what tells either from a
+-- count of opponents. Alice's own 2 is distinct from both other seats, so a
+-- reading that folded the wrong seat's board would not land on the right number
+-- by coincidence.
+--
+-- X is OBSERVED as the size of alice's hand afterwards: her library holds three
+-- Plains and one Forest, so the search is never capped by what is there to find
+-- (a fourth reading, "as many as the library holds", would answer 3), and the
+-- Forest is what proves the filter still ran.
+oreskosExplorerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+oreskosExplorerSpec s registry =
+  let board plains forest island carolLands =
+        let withLands = S.landsFor island S.carol carolLands (S.landsFor forest S.bob 4 (S.landsFor plains S.alice 2 S.threePlayerGame))
+            withLibrary = List.foldl' (\g p -> snd (S.addLibraryCard p S.alice g)) withLands [plains, plains, plains, forest]
+         in withLibrary
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castExplorer explorer gs =
+        let (oid, gs1) = S.addHandCard explorer S.alice gs
+            cast = S.runPure findsWhatItCan gs1 (S.cast S.alice oid)
+         in S.runPure findsWhatItCan cast Engine.priorityLoop
+      -- Alice cast the Explorer out of an otherwise empty hand, so what is in her
+      -- hand afterwards is exactly what the search found.
+      inHand gs = length (Game.zoneMembers Zone.Hand S.alice gs)
+      plainsName = Set.singleton (CardName.MkCardName (Text.pack "Plains"))
+   in Spec.describe s "Oreskos Explorer" $ do
+        Spec.it s "CR 110.2 X counts the one seat with more lands than alice and the one with fewer" $ do
+          explorer <- S.printingOf s registry "Oreskos Explorer"
+          plains <- S.printingOf s registry "Plains"
+          forest <- S.printingOf s registry "Forest"
+          island <- S.printingOf s registry "Island"
+          let after = castExplorer explorer (board plains forest island 3)
+          Spec.assertEqWith s "bob and carol are both ahead, so two cards found" (inHand after) 2
+          Spec.assertEqWith s "both were Plains, revealed" (S.revealsOf after) [(S.alice, plainsName), (S.alice, plainsName)]
+          Spec.assertEqWith s "and the Forest and the third Plains stayed behind" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+          Spec.assertEqWith s "everything resolved" (GameState.stack after) []
+        -- The discriminating case. Carol's board is the only difference, and CR
+        -- 110.2's comparison is STRICT, so a seat level with alice is not one that
+        -- controls more lands than she does.
+        Spec.it s "CR 110.2 a seat TIED with alice controls no more lands than she does" $ do
+          explorer <- S.printingOf s registry "Oreskos Explorer"
+          plains <- S.printingOf s registry "Plains"
+          forest <- S.printingOf s registry "Forest"
+          island <- S.printingOf s registry "Island"
+          let after = castExplorer explorer (board plains forest island 2)
+          Spec.assertEqWith s "only bob is ahead, so one card found" (inHand after) 1
+          Spec.assertEqWith s "and it was a Plains, revealed" (S.revealsOf after) [(S.alice, plainsName)]
+          Spec.assertEqWith s "three cards left in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 3
+          Spec.assertEqWith s "everything resolved" (GameState.stack after) []
+
+-- Finds as many matching cards as the search allows, off the head of the offered
+-- list. It reads the engine's own cap, which is the number under test, rather
+-- than searching for a card by name -- an answerer that picked by name would find
+-- the same Plains again after a mutation and repair the assertion.
+findsWhatItCan :: Prompt.Prompt r -> r
+findsWhatItCan p = case p of
+  Prompt.SearchLibrary _ _ matches cap -> List.genericTake cap matches
+  _ -> S.identityAnswer p

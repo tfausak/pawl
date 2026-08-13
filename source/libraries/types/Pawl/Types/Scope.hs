@@ -30,12 +30,13 @@ data Scope
     -- first scope folding over players rather than over their objects would
     -- observe the difference. This is that scope.
     --
-    -- The Filter still runs, and every player candidate answers exactly one
-    -- atom -- Filter.IsPlayer -- so nothing in the pool needs it and every
-    -- producer pairs this with an empty conjunction. Saying "opponents" HERE
-    -- rather than through that atom is the convention, since the reference is
-    -- the only spelling the sibling arm has. Anything narrower than a relation
-    -- ("each player who controls more lands than you") is expressible by
-    -- neither and is a Filter question (#283).
+    -- The Filter runs over the players, and two atoms answer for one:
+    -- Filter.IsPlayer, which relates the candidate to the perspective, and
+    -- Filter.ControlsMoreThanYou, which compares the candidate's board against
+    -- yours -- Oreskos Explorer's "players who control more lands than you".
+    -- Saying "opponents" through the REFERENCE rather than through the first atom
+    -- is the convention, since the reference is the only spelling the sibling arm
+    -- has; a question about a candidate's own board has no spelling but the
+    -- second, and Pawl.Engine.Count.bakePerspective is where it is answered.
     OverPlayers PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)
