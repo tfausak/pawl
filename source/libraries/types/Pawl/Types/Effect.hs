@@ -1037,6 +1037,37 @@ data Effect card
     -- per-effect binding re-read in resolveSpellWith. Generic: the engine reaches
     -- subgames through this opcode, never Shahrazad's identity.
     PlaySubgame SlotName.SlotName
+  | -- | CR 608.2d: the resolving controller chooses one of their opponents, and the
+    -- player chosen is bound into this slot for a LATER EFFECT of the same
+    -- resolution to name -- Skullwinder's "choose an opponent. That player returns
+    -- a card from their graveyard to their hand", where the sentence after this
+    -- one reads the slot through Pawl.Types.Chooser's BoundInSlot. Infernal
+    -- Offering says the same words twice.
+    --
+    -- CHOOSE, not target, Proliferate's posture and the reason this is an effect
+    -- rather than a target spec: CR 115.10a makes a player a target only where
+    -- the text identifies them with the word "target", and neither producer does.
+    -- So the pick happens while applying the effect (CR 608.2d) rather than on
+    -- announcement (CR 601.2c), and CR 608.2b has nothing to re-validate -- an
+    -- opponent who becomes an illegal choice between the ask and the read cannot
+    -- fizzle anything.
+    --
+    -- The slot is a DEFINITION and never a target (CR 115.10a), PlaySubgame's
+    -- loser slot one opcode over: both bind a player the resolution derives, and
+    -- both are read back through the per-effect binding re-read. Pawl.CardSpec's
+    -- dataflow lint sees it through Pawl.Engine.Resolve.definedSlots for that
+    -- reason.
+    --
+    -- OPPONENTS ONLY, which is what both producers print, so the candidates are
+    -- every other player still in the game -- CR 806.1's free-for-all makes each
+    -- of them an opponent by construction, CR 102.2 says the same for two, and a
+    -- seat that has left (CR 104.3a) is not among them. The prompt is
+    -- Prompt.ChooseOpponent, the same question Null Chamber and
+    -- fateseal ask. Elided at one candidate: CR 102.2 leaves a two-player game
+    -- exactly one opponent, so there is nothing to decide. Not implemented: "choose
+    -- a player", which would offer the controller too and so needs a scope beside
+    -- the slot (#1444).
+    ChooseOpponent SlotName.SlotName
   | -- | CR 103.5b (Serum Powder): exile every card in the resolving controller's
     -- hand, then draw that many. Targetless and controller-scoped, unlike Draw.
     --

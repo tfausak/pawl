@@ -7493,6 +7493,197 @@ bloodForBonesSpec s registry =
             (List.sort (namesIn Zone.Graveyard S.alice after))
             (List.sort [named "Murder", named "Blood for Bones"])
 
+-- The third CHOOSER, and the effect that fills it: Chooser.BoundInSlot over a
+-- slot Effect.ChooseOpponent bound as the same resolution ran.
+--
+-- Skullwinder {2}{G} Creature -- Snake 1/3: "Deathtouch. When this creature
+-- enters, return target card from your graveyard to your hand, then choose an
+-- opponent. That player returns a card from their graveyard to their hand."
+-- (name, cost, type line, power, toughness and Oracle text checked against
+-- api.scryfall.com). The whole card is transcribed; nothing is elided.
+--
+-- TWO CHOICES AND AN ORDER BETWEEN THEM, which is the unit:
+--
+--   * WHICH OPPONENT, announced by the RESOLVING CONTROLLER as the effect is
+--     applied (CR 608.2c, CR 608.2d). Not a target -- CR 115.10a makes a player
+--     a target only where the text identifies them with the word, and this
+--     sentence does not -- so no slot was announced at CR 601.2c and CR 608.2b
+--     re-validates nothing.
+--   * WHICH CARD, announced by THAT PLAYER, out of their own graveyard (CR
+--     608.2d again: the player an effect instructs is the one who announces its
+--     choices). "That player ... their graveyard" is the possessive Exhume's
+--     "each player ... their graveyard" is, over one seat instead of every seat.
+--
+-- The order is the printed one (CR 608.2c "in the order written"): the opponent
+-- must be chosen before there is a player for the second sentence to instruct.
+--
+-- CR 603.3d is why every leg stocks ALICE's graveyard: the first sentence has a
+-- required target, and a trigger that can choose no legal target is removed from
+-- the stack, taking the sentences after it along.
+--
+-- THREE SEATS, with the board built so the readings come apart -- a duel would
+-- collapse "an opponent" onto the only other player and prove nothing:
+--
+--   * SOMEBODY ELSE CHOSE versus THE CONTROLLER CHOSE, twice over. The opponent
+--     answer is pinned to CAROL, the LAST candidate, where the default answerer
+--     takes bob; and the card answer is pinned to carol's THIRD, where the
+--     default takes her first. The paired leg below runs the same board through
+--     that default answerer and lands two different cards in a different hand.
+--   * THE CHOSEN PLAYER was asked versus THE CONTROLLER was asked about their
+--     graveyard. The answerer replies by the player the prompt NAMES: only a
+--     prompt aimed at carol gets the third candidate, and one aimed at anybody
+--     else gets the first.
+--   * THEIR OWN graveyard versus the union of all of them. Alice's remaining
+--     card and bob's three come before carol's in the union's ascending order,
+--     so the THIRD candidate of a union is one of BOB's -- a different card, in a
+--     different hand, than the third of carol's own.
+--   * A GRAVEYARD RETURN at all versus a battlefield sweep: bob's graveyard must
+--     be untouched in every leg.
+skullwinderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+skullwinderSpec s registry =
+  let -- alice controls four Forests -- slack over the creature's {2}{G}, so no
+      -- payment order can fail for reasons of its own -- and holds a
+      -- Skullwinder. `buried` goes into the named graveyards in the order given,
+      -- which is also the ascending-id order the prompts offer them in.
+      board skullwinder forest buried =
+        let mana = S.landsFor forest S.alice 4 S.threePlayerGame
+            withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) mana buried
+            (withCard, handId) = S.handOne skullwinder withGraves
+         in (handId, withCard {GameState.priority = Just S.alice})
+      -- Cast, let the creature enter, let CR 603.3b put the enters trigger on the
+      -- stack (which is where CR 603.3d picks its target), then resolve it.
+      run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, [Response.Response])
+      run answer handId gs =
+        let ((_, after), responses) =
+              Replay.record answer gs $ do
+                S.cast S.alice handId
+                Stack.resolveTop
+                Engine.settleForPriority
+                Stack.resolveTop
+         in (after, responses)
+      named = Just . CardName.MkCardName . Text.pack
+      opponentChoices responses = length [() | Response.ChoseOpponent _ <- responses]
+      cardChoices responses = length [() | Response.ChoseCardInGraveyard _ <- responses]
+      -- The third candidate the prompt offers, by POSITION rather than by name:
+      -- a name would be found again in a union of every graveyard, and the
+      -- position is what tells the two offers apart.
+      thirdOf offered = Maybe.fromMaybe (NonEmpty.head offered) (Maybe.listToMaybe (drop 2 (NonEmpty.toList offered)))
+      -- Pinned to CAROL and to her THIRD card. Keyed on the player the prompt
+      -- NAMES, so a prompt put to anybody else takes the first candidate and
+      -- lands a different card in a different hand.
+      choosing p = case p of
+        Prompt.ChooseOpponent _ _ _ offered -> NonEmpty.last offered
+        Prompt.ChooseCardInGraveyard _ pid _ offered ->
+          if pid == S.carol then thirdOf offered else NonEmpty.head offered
+        _ -> S.identityAnswer p
+      -- alice's two, bob's three and carol's three, all distinct names so no
+      -- assertion can read one seat's card as another's.
+      stock hero cavalry berserkers murder maiden sentry judgment wraith =
+        [ (murder, S.alice),
+          (maiden, S.alice),
+          (sentry, S.bob),
+          (judgment, S.bob),
+          (wraith, S.bob),
+          (hero, S.carol),
+          (cavalry, S.carol),
+          (berserkers, S.carol)
+        ]
+   in Spec.describe s "Skullwinder" $ do
+        -- The headline: alice picks the opponent, carol picks the card, and the
+        -- card that moves is the one CAROL named out of CAROL's graveyard.
+        Spec.it s "CR 608.2d the chosen opponent chooses in their own graveyard, and keeps what they choose" $ do
+          skullwinder <- S.printingOf s registry "Skullwinder"
+          forest <- S.printingOf s registry "Forest"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          judgment <- S.printingOf s registry "Day of Judgment"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          hero <- S.printingOf s registry "Benalish Hero"
+          cavalry <- S.printingOf s registry "Benalish Cavalry"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          let (handId, gs) = board skullwinder forest (stock hero cavalry berserkers murder maiden sentry judgment wraith)
+              (after, responses) = run choosing handId gs
+          Spec.assertEqWith s "one opponent was chosen" (opponentChoices responses) 1
+          Spec.assertEqWith s "and exactly one graveyard card choice was put, not one per seat" (cardChoices responses) 1
+          Spec.assertEqWith
+            s
+            "carol's THIRD card is in carol's hand"
+            (namesIn Zone.Hand S.carol after)
+            [named "Berserkers of Blood Ridge"]
+          Spec.assertEqWith
+            s
+            "her other two stay buried"
+            (List.sort (namesIn Zone.Graveyard S.carol after))
+            (List.sort [named "Benalish Hero", named "Benalish Cavalry"])
+          Spec.assertEqWith
+            s
+            "bob was not the opponent chosen, so his graveyard is whole and his hand empty"
+            (List.sort (namesIn Zone.Graveyard S.bob after), namesIn Zone.Hand S.bob after)
+            (List.sort [named "Ogre Sentry", named "Day of Judgment", named "Bog Wraith"], [])
+          Spec.assertEqWith
+            s
+            "alice got her own targeted card back and nothing else"
+            (namesIn Zone.Hand S.alice after, namesIn Zone.Graveyard S.alice after)
+            ([named "Murder"], [named "Bird Maiden"])
+          Spec.assertEqWith
+            s
+            "and the Snake itself is on the battlefield"
+            (List.sort [fmap S.nameOf (Game.cardOf oid after) | oid <- Set.toList (GameState.battlefield after), fmap S.nameOf (Game.cardOf oid after) /= named "Forest"])
+            [named "Skullwinder"]
+        -- The paired control, on the SAME board with only the answerer changed:
+        -- the default takes the first opponent and the first card, so a different
+        -- seat is asked and a different card moves. Two seats' worth of
+        -- difference from one answerer swap is what tells "the engine chose" from
+        -- "the players chose".
+        Spec.it s "CR 608.2d the engine picks neither choice: another answer names another seat and another card" $ do
+          skullwinder <- S.printingOf s registry "Skullwinder"
+          forest <- S.printingOf s registry "Forest"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          judgment <- S.printingOf s registry "Day of Judgment"
+          wraith <- S.printingOf s registry "Bog Wraith"
+          hero <- S.printingOf s registry "Benalish Hero"
+          cavalry <- S.printingOf s registry "Benalish Cavalry"
+          berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
+          let (handId, gs) = board skullwinder forest (stock hero cavalry berserkers murder maiden sentry judgment wraith)
+              (after, _) = run S.identityAnswer handId gs
+          Spec.assertEqWith s "bob is the first opponent, and his first card comes back" (namesIn Zone.Hand S.bob after) [named "Ogre Sentry"]
+          Spec.assertEqWith s "carol is untouched" (namesIn Zone.Hand S.carol after, length (namesIn Zone.Graveyard S.carol after)) ([], 3)
+        -- CR 101.3 / CR 609.3 for the chosen player: an empty graveyard leaves
+        -- nothing to name, so that share of the instruction is ignored rather
+        -- than the trigger failing. The first sentence's return is what proves
+        -- the ability really did resolve.
+        Spec.it s "CR 101.3 a chosen opponent with an empty graveyard is a no-op rather than a failure" $ do
+          skullwinder <- S.printingOf s registry "Skullwinder"
+          forest <- S.printingOf s registry "Forest"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let buried = [(murder, S.alice), (maiden, S.alice), (sentry, S.bob)]
+              (handId, gs) = board skullwinder forest buried
+              (after, responses) = run choosing handId gs
+          Spec.assertEqWith s "carol was chosen and had nothing to be asked about" (opponentChoices responses, cardChoices responses) (1, 0)
+          Spec.assertEqWith s "nothing came out of any graveyard but alice's own target" (namesIn Zone.Hand S.carol after, namesIn Zone.Hand S.bob after) ([], [])
+          Spec.assertEqWith s "bob's graveyard is whole" (namesIn Zone.Graveyard S.bob after) [named "Ogre Sentry"]
+          Spec.assertEqWith s "and the trigger really did resolve" (namesIn Zone.Hand S.alice after) [named "Murder"]
+        -- One candidate is not a choice: the chosen player is NOT asked, and the
+        -- lone card still comes back. Paired with the leg above on the same
+        -- board, one card apart.
+        Spec.it s "CR 608.2d a lone card in the chosen player's graveyard is not put to them" $ do
+          skullwinder <- S.printingOf s registry "Skullwinder"
+          forest <- S.printingOf s registry "Forest"
+          murder <- S.printingOf s registry "Murder"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(murder, S.alice), (maiden, S.alice), (sentry, S.bob), (hero, S.carol)]
+              (handId, gs) = board skullwinder forest buried
+              (after, responses) = run choosing handId gs
+          Spec.assertEqWith s "the opponent was chosen, the card was not asked about" (opponentChoices responses, cardChoices responses) (1, 0)
+          Spec.assertEqWith s "and carol's only card came back anyway" (namesIn Zone.Hand S.carol after, namesIn Zone.Graveyard S.carol after) ([named "Benalish Hero"], [])
+
 -- CR 401.2's ordered pile named by POSITION rather than by characteristics:
 -- ObjectRef.TopOfLibrary, the arm no Filter could stand in for.
 --
@@ -8642,6 +8833,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   blossomingTortoiseSpec s registry
   exhumeSpec s registry
   bloodForBonesSpec s registry
+  skullwinderSpec s registry
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry

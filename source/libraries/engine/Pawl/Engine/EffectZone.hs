@@ -124,6 +124,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
+  Effect.ChooseOpponent _ -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.OfferCast {} -> Nothing
