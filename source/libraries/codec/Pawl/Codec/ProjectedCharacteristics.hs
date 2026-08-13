@@ -8,11 +8,11 @@ import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
-import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
@@ -24,9 +24,6 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 
 -- | The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
---
--- Not implemented: a record behind the @characteristicPT@ pair, which stays a
--- two-element array of same-typed Quantities (#1457).
 codec :: Codec.Codec PC.ProjectedCharacteristics
 codec = Fields.object $ do
   names <- Fields.required "names" (Common.set CardName.codec) PC.names
@@ -38,7 +35,7 @@ codec = Fields.object $ do
   toughness <- Fields.defaulted "toughness" Nothing (Common.maybe Common.integer) PC.toughness
   loyalty <- Fields.defaulted "loyalty" Nothing (Common.maybe Loyalty.codec) PC.loyalty
   defense <- Fields.defaulted "defense" Nothing (Common.maybe Defense.codec) PC.defense
-  characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe Quantity.pairCodec) PC.characteristicPT
+  characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe CharacteristicPT.codec) PC.characteristicPT
   cardTypes <- Fields.required "cardTypes" (Common.set CardType.codec) PC.cardTypes
   subtypes <- Fields.defaulted "subtypes" Set.empty (Common.set Subtype.codec) PC.subtypes
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec)) PC.activatedAbilities

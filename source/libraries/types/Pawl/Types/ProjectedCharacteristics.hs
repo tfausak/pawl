@@ -7,11 +7,11 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
-import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -114,7 +114,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- from the card, so it rides copiableCharacteristics and a Clone acquires the
     -- ability rather than the number (CR 707.2a); emptied by LoseAllAbilities at
     -- layer 6 and by CR 305.7's strip at layer 4, both of which are BEFORE 7a.
-    characteristicPT :: Maybe (Quantity.Quantity, Quantity.Quantity),
+    characteristicPT :: Maybe CharacteristicPT.CharacteristicPT,
     cardTypes :: Set.Set CardType.CardType,
     subtypes :: Set.Set Subtype.Subtype,
     -- | CR 602 / 613 layer 6: the object's activated abilities after the layer

@@ -111,5 +111,8 @@ codec =
 
 -- | CR 208.2's characteristic-defining [power, toughness] pair, which
 -- Pawl.Codec.ProjectedCharacteristics stores.
+-- | The @[a, b]@ payload 'Quantity.Plus' writes. Under the #1305 decision this
+-- arm owes a record like every other multi-payload one; it is the last reader of
+-- this helper now that ProjectedCharacteristics' CDA pair has one (#1464).
 pairCodec :: Codec.Codec (Quantity.Quantity, Quantity.Quantity)
 pairCodec = Common.tuple codec codec

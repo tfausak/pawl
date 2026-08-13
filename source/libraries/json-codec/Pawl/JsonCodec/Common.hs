@@ -6,7 +6,8 @@
 -- 'Pawl.Json.Value'; this module adapts them to the codec's @Either Text@ error
 -- channel.
 --
--- 'optionalPair' and 'defaultedField' carry one invariant between them: the
+-- 'Pawl.JsonCodec.Fields.defaulted' and 'defaultedField' carry one invariant
+-- between them: the
 -- default a per-type module passes to each for a given field must be the same
 -- binding, or encoding a default value and decoding it back stops being the
 -- identity.
@@ -150,19 +151,7 @@ withValue mv f = case mv of
   Just v -> f v
   Nothing -> Left $ Text.pack "missing tagged value"
 
--- | A field that is always written, whatever its value. The singleton list is
--- so that 'Value.object . concat' can take required and optional fields in one
--- list, with which is which readable down the left edge.
-requiredPair :: String -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
-requiredPair k f x = [Value.pair k (f x)]
-
--- | A field written only when it differs from the default that an absent key
--- means. The default passed here and the one 'defaultedField' supplies must be
--- the same binding.
-optionalPair :: (Eq a) => String -> a -> (a -> Value.Value) -> a -> [Pair.Pair Value.Value]
-optionalPair k d f x = if x == d then [] else [Value.pair k (f x)]
-
--- | Reads a field that may be absent, supplying the default 'optionalPair'
+-- | Reads a field that may be absent, supplying the default the writer
 -- omits. A key that is present but null goes to the decoder rather than
 -- short-circuiting, so composing with 'decodeMaybe' accepts an absent key, an
 -- explicit null, and a value alike.

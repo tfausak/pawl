@@ -126,6 +126,8 @@ library codec
     Pawl.Codec.CastOfferSpec
     Pawl.Codec.ChangeText
     Pawl.Codec.ChangeTextSpec
+    Pawl.Codec.CharacteristicPT
+    Pawl.Codec.CharacteristicPTSpec
     Pawl.Codec.ChooseBetween
     Pawl.Codec.ChooseBetweenSpec
     Pawl.Codec.Chooser
@@ -789,6 +791,7 @@ library types
     Pawl.Types.CastingRestriction
     Pawl.Types.CastOffer
     Pawl.Types.ChangeText
+    Pawl.Types.CharacteristicPT
     Pawl.Types.ChooseBetween
     Pawl.Types.Chooser
     Pawl.Types.Claim

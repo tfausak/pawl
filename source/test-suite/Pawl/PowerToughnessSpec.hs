@@ -39,6 +39,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
@@ -93,7 +94,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
       s
       "the CDA pair"
       (PC.characteristicPT (Projection.baseCharacteristics goyfId gs))
-      (Just (count, Quantity.Type.Plus (Quantity.Type.Literal 1) count))
+      (Just (CharacteristicPT.MkCharacteristicPT count (Quantity.Type.Plus (Quantity.Type.Literal 1) count)))
   Spec.it s "CR 613.4a no P/T value exists before layer 7a applies one" $ do
     -- The seed evaluates the printed Star, which is deliberately Nothing.
     tarmogoyf <- S.printingOf s registry "Tarmogoyf"
@@ -732,7 +733,7 @@ woodElementalSpec s registry = Spec.describe s "Wood Elemental" $ do
     forest <- S.printingOf s registry "Forest"
     woodElemental <- S.printingOf s registry "Wood Elemental"
     let (gs, held) = S.handOne woodElemental (S.landsInPlay forest 8)
-    Spec.assertEqWith s "the seed is the slot the entry replacement fills" (PC.characteristicPT (Projection.baseCharacteristics held gs)) (Just (sacrificedCount, sacrificedCount))
+    Spec.assertEqWith s "the seed is the slot the entry replacement fills" (PC.characteristicPT (Projection.baseCharacteristics held gs)) (Just (CharacteristicPT.MkCharacteristicPT sacrificedCount sacrificedCount))
     Spec.assertEqWith s "0/0" (S.powerToughnessOf held gs) (Just (0, 0))
   -- The proving pair's first half. Eight Forests, four of which pay for the
   -- {3}{G}: the four still untapped are the whole of the offer, a greedy answer
@@ -1006,7 +1007,7 @@ serraAvatarSpec s registry = Spec.describe s "Serra Avatar" $ do
     avatar <- S.printingOf s registry "Serra Avatar"
     let (avatarId, gs) = S.addCreature avatar S.alice (Setup.emptyGame S.bothPlayers)
         yourLife = Quantity.Type.LifeTotal (PlayerRef.Relative PlayerRelation.You)
-    Spec.assertEqWith s "both boxes are the same quantity" (PC.characteristicPT (Projection.baseCharacteristics avatarId gs)) (Just (yourLife, yourLife))
+    Spec.assertEqWith s "both boxes are the same quantity" (PC.characteristicPT (Projection.baseCharacteristics avatarId gs)) (Just (CharacteristicPT.MkCharacteristicPT yourLife yourLife))
   Spec.it s "CR 119.1 a starting life total of 20 makes it a 20/20" $ do
     avatar <- S.printingOf s registry "Serra Avatar"
     let (avatarId, gs) = S.addCreature avatar S.alice (Setup.emptyGame S.bothPlayers)
@@ -1351,7 +1352,7 @@ malignusSpec s registry = Spec.describe s "Malignus" $ do
                     (Aggregation.Greatest (Quantity.Type.LifeTotal PlayerRef.Candidate))
                 )
             )
-    Spec.assertEqWith s "both boxes are the same quantity" (PC.characteristicPT (Projection.baseCharacteristics malignusId gs)) (Just (halfTheHighest, halfTheHighest))
+    Spec.assertEqWith s "both boxes are the same quantity" (PC.characteristicPT (Projection.baseCharacteristics malignusId gs)) (Just (CharacteristicPT.MkCharacteristicPT halfTheHighest halfTheHighest))
   Spec.it s "CR 107.1a half of the opponents' highest life total, rounded UP" $ do
     malignus <- S.printingOf s registry "Malignus"
     let (malignusId, gs) = malignusBoard malignus

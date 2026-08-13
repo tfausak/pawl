@@ -29,6 +29,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
@@ -718,18 +719,18 @@ viewOfCardIn gs oid face =
 characteristicPowerIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
 characteristicPowerIn gs oid face = case seedCharacteristicPT face of
   Nothing -> printedPower face
-  Just (power, _) ->
+  Just (CharacteristicPT.MkCharacteristicPT power _) ->
     let context = Filter.contextFor (controllerOf oid gs) (Just oid)
         viewOf candidate = fmap viewOfCard (Game.faceOf candidate gs)
      in Just (Quantity.determine viewOf context gs oid power)
 
 -- characteristicPowerIn's mirror, reading CR 208.2a's other half. Every argument
 -- that function's comment makes is this one's too, the two differing only in
--- which member of the pair they take.
+-- which field of the pair they take.
 characteristicToughnessIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
 characteristicToughnessIn gs oid face = case seedCharacteristicPT face of
   Nothing -> printedToughness face
-  Just (_, toughness) ->
+  Just (CharacteristicPT.MkCharacteristicPT _ toughness) ->
     let context = Filter.contextFor (controllerOf oid gs) (Just oid)
         viewOf candidate = fmap viewOfCard (Game.faceOf candidate gs)
      in Just (Quantity.determine viewOf context gs oid toughness)
@@ -925,11 +926,15 @@ copiableCharacteristics oid gs =
 -- unless the card declares a CDA *and* has a printed power and toughness box for
 -- the star to sit in (CR 208.1) -- a card with one and not the other is
 -- malformed data, and yields no CDA rather than a partial one.
-seedCharacteristicPT :: Face.Face Card.Type.Card -> Maybe (Quantity.Type.Quantity, Quantity.Type.Quantity)
+seedCharacteristicPT :: Face.Face Card.Type.Card -> Maybe CharacteristicPT.CharacteristicPT
 seedCharacteristicPT face =
   case (Face.characteristicPT face, Face.power face, Face.toughness face) of
     (Just star, Just (Power.MkPower p), Just (Toughness.MkToughness t)) ->
-      Just (Quantity.substituteStar star p, Quantity.substituteStar star t)
+      Just
+        CharacteristicPT.MkCharacteristicPT
+          { CharacteristicPT.power = Quantity.substituteStar star p,
+            CharacteristicPT.toughness = Quantity.substituteStar star t
+          }
     _ -> Nothing
 
 -- Printed characteristics before any effect: CR 613.1's starting point.
@@ -3022,11 +3027,11 @@ project oid gs = projectFrom (gather gs) oid gs
 applyCharacteristicPT :: Count.ViewOf -> GameState -> ObjectId -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyCharacteristicPT viewOf gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
-  Just (p, t) ->
+  Just cda ->
     let context = Filter.contextFor (controllerOf oid gs) (Just oid)
      in pc
-          { PC.power = Just (Quantity.determine viewOf context gs oid p),
-            PC.toughness = Just (Quantity.determine viewOf context gs oid t)
+          { PC.power = Just (Quantity.determine viewOf context gs oid (CharacteristicPT.power cda)),
+            PC.toughness = Just (Quantity.determine viewOf context gs oid (CharacteristicPT.toughness cda))
           }
 
 -- projectDeciding with the decision memo dropped, which is what all but one

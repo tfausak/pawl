@@ -284,7 +284,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Halved Rounding.Up (Quantity.LifeTotal PlayerRef.Candidate))
       """ {"type":"Halved","value":[{"type":"Up"},{"type":"LifeTotal","value":{"type":"Candidate"}}]} """
-  Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
+  Spec.describe s "fromJsonPair" . Spec.it s "the [a, b] pair Plus writes" $
     Common.assertFromJson
       s
       (Codec.decode Quantity.pairCodec)
@@ -296,4 +296,4 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
   -- definition that failed to emit a $ref on re-entry would hang here rather
   -- than pass.
   Spec.it s "has a schema" $ Common.assertHasSchema s Quantity.codec
-  Spec.it s "the [power, toughness] pair has a schema" $ Common.assertHasSchema s Quantity.pairCodec
+  Spec.it s "the [a, b] pair has a schema" $ Common.assertHasSchema s Quantity.pairCodec
