@@ -104,7 +104,10 @@
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
 -- zone off a triggered ability's EFFECT rather than its condition, with Squee,
 -- Goblin Nabob against a Bitterblossom in the same graveyard --
--- `graveyardEffectZoneTriggerSpec`. CR 400.7e's OTHER reference inside a
+-- `graveyardEffectZoneTriggerSpec`, and CR 114.4's command-zone scan, whose
+-- membership is decided by the OBJECT rather than the condition, with Ajani,
+-- Adversary of Tyrants' emblem at three seats -- `commandZoneTriggerSpec`.
+-- CR 400.7e's OTHER reference inside a
 -- look-back trigger, the card it became in the first zone it went to, with
 -- Endless Cockroaches -- `becameSlotSpec`, which also pins
 -- Event.eventBindingSlots (the per-condition slot set the card lint asks)
@@ -6338,6 +6341,73 @@ gaeasBlessingSpec s registry =
 --     simply offered every graveyard card's every ability would pass.
 --   * Squee ON the battlefield at the same upkeep fires nothing, which is the
 --     "functions ONLY in that zone" half.
+graveyardEffectZoneTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graveyardEffectZoneTriggerSpec s registry =
+  let squeeName = CardName.MkCardName (Text.pack "Squee, Goblin Nabob")
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      settle answer gs = S.runPure answer gs Engine.settleForPriority
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+      -- Takes every "may". Squee's is the only one `buriedBoard` can raise --
+      -- Bitterblossom's mode is mandatory -- so this is not a blanket yes
+      -- standing in for a specific answer.
+      takeOptional :: Prompt.Prompt r -> r
+      takeOptional p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      -- alice's graveyard: Squee, and Bitterblossom as the control. Returns
+      -- Squee's graveyard id and the board with alice's upkeep begun.
+      buriedBoard = do
+        squee <- S.printingOf s registry "Squee, Goblin Nabob"
+        bitterblossom <- S.printingOf s registry "Bitterblossom"
+        let (_, g1) = S.addGraveyardCard bitterblossom S.alice (Setup.emptyGame S.bothPlayers)
+            (squeeId, g2) = S.addGraveyardCard squee S.alice g1
+        pure (squeeId, beginUpkeep g2)
+   in Spec.describe s "GraveyardEffectZoneTrigger" $ do
+        -- The gathering itself: one trigger, and it is Squee's. The count is what
+        -- the Bitterblossom control turns on -- two would mean the scan read the
+        -- graveyard indiscriminately.
+        Spec.it s "CR 113.6m Squee's upkeep trigger is gathered from the graveyard, on its effect's word alone" $ do
+          (squeeId, gs) <- buriedBoard
+          Spec.assertEqWith
+            s
+            "exactly one trigger, from Squee"
+            (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs)))
+            [TriggerSource.OfObject squeeId]
+        -- End to end through the real engine: the trigger is placed, resolves,
+        -- and CR 400.7's funnel moves the card to alice's hand.
+        Spec.it s "CR 113.6m whole card: it resolves and Squee returns to its owner's hand" $ do
+          (_, gs) <- buriedBoard
+          let placed = settle takeOptional gs
+              after = S.runPure takeOptional placed Stack.resolveTop
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertBool s (Set.member squeeName (namesIn Zone.Hand S.alice after)) "Squee is in hand"
+          Spec.assertBool s (not (Set.member squeeName (namesIn Zone.Graveyard S.alice after))) "and no longer in the graveyard"
+          -- The control, in the same graveyard and under the same condition:
+          -- Bitterblossom's effect names no zone, so CR 113.6's default leaves it
+          -- on the battlefield and its "you lose 1 life" never runs.
+          Spec.assertEqWith s "the Bitterblossom in the graveyard cost alice nothing" (S.lifeOf S.alice after) (Just 20)
+        -- CR 603.5: the "may" is a real choice. The trigger is placed either way,
+        -- so declining tells the zone gate apart from the mode gate.
+        Spec.it s "CR 603.5 declining the may leaves Squee in the graveyard" $ do
+          (_, gs) <- buriedBoard
+          let placed = settle S.identityAnswer gs
+              after = S.runPure S.identityAnswer placed Stack.resolveTop
+          Spec.assertEqWith s "the trigger reached the stack anyway" (length (GameState.stack placed)) 1
+          Spec.assertBool s (Set.member squeeName (namesIn Zone.Graveyard S.alice after)) "Squee is still in the graveyard"
+          Spec.assertBool s (not (Set.member squeeName (namesIn Zone.Hand S.alice after))) "and not in hand"
+        -- "Functions ONLY in that zone", the other direction: the same card, the
+        -- same upkeep, one zone away. Nothing but CR 113.6m can withhold it --
+        -- the condition matches a battlefield permanent perfectly well, which is
+        -- exactly what Bitterblossom does from there.
+        Spec.it s "CR 113.6m the same card on the battlefield triggers for nobody" $ do
+          squee <- S.printingOf s registry "Squee, Goblin Nabob"
+          let (_, gs) = S.addCreature squee S.alice (Setup.emptyGame S.bothPlayers)
+              begun = beginUpkeep gs
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped begun) begun))) []
+
 -- CR 114.4: "abilities of emblems function in the command zone" -- the third zone
 -- Pawl.Engine.Event.eventTriggers scans, and the only one whose membership is
 -- decided by the OBJECT rather than by the trigger condition (CR 113.6p).
@@ -6414,73 +6484,6 @@ commandZoneTriggerSpec s registry =
               after = resolveAll (settle atBobs)
           Spec.assertEqWith s "no trigger gathered" (length (fst (Event.gatherTriggers (Event.unscannedGrouped atBobs) atBobs))) 0
           Spec.assertEqWith s "no Cats" (cats after) 0
-
-graveyardEffectZoneTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-graveyardEffectZoneTriggerSpec s registry =
-  let squeeName = CardName.MkCardName (Text.pack "Squee, Goblin Nabob")
-      upkeep = Phase.Beginning BeginningStep.Upkeep
-      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
-      settle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-      settle answer gs = S.runPure answer gs Engine.settleForPriority
-      namesIn zone pid gs =
-        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
-      -- Takes every "may". Squee's is the only one `buriedBoard` can raise --
-      -- Bitterblossom's mode is mandatory -- so this is not a blanket yes
-      -- standing in for a specific answer.
-      takeOptional :: Prompt.Prompt r -> r
-      takeOptional p = case p of
-        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
-        _ -> S.identityAnswer p
-      -- alice's graveyard: Squee, and Bitterblossom as the control. Returns
-      -- Squee's graveyard id and the board with alice's upkeep begun.
-      buriedBoard = do
-        squee <- S.printingOf s registry "Squee, Goblin Nabob"
-        bitterblossom <- S.printingOf s registry "Bitterblossom"
-        let (_, g1) = S.addGraveyardCard bitterblossom S.alice (Setup.emptyGame S.bothPlayers)
-            (squeeId, g2) = S.addGraveyardCard squee S.alice g1
-        pure (squeeId, beginUpkeep g2)
-   in Spec.describe s "GraveyardEffectZoneTrigger" $ do
-        -- The gathering itself: one trigger, and it is Squee's. The count is what
-        -- the Bitterblossom control turns on -- two would mean the scan read the
-        -- graveyard indiscriminately.
-        Spec.it s "CR 113.6m Squee's upkeep trigger is gathered from the graveyard, on its effect's word alone" $ do
-          (squeeId, gs) <- buriedBoard
-          Spec.assertEqWith
-            s
-            "exactly one trigger, from Squee"
-            (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs)))
-            [TriggerSource.OfObject squeeId]
-        -- End to end through the real engine: the trigger is placed, resolves,
-        -- and CR 400.7's funnel moves the card to alice's hand.
-        Spec.it s "CR 113.6m whole card: it resolves and Squee returns to its owner's hand" $ do
-          (_, gs) <- buriedBoard
-          let placed = settle takeOptional gs
-              after = S.runPure takeOptional placed Stack.resolveTop
-          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
-          Spec.assertBool s (Set.member squeeName (namesIn Zone.Hand S.alice after)) "Squee is in hand"
-          Spec.assertBool s (not (Set.member squeeName (namesIn Zone.Graveyard S.alice after))) "and no longer in the graveyard"
-          -- The control, in the same graveyard and under the same condition:
-          -- Bitterblossom's effect names no zone, so CR 113.6's default leaves it
-          -- on the battlefield and its "you lose 1 life" never runs.
-          Spec.assertEqWith s "the Bitterblossom in the graveyard cost alice nothing" (S.lifeOf S.alice after) (Just 20)
-        -- CR 603.5: the "may" is a real choice. The trigger is placed either way,
-        -- so declining tells the zone gate apart from the mode gate.
-        Spec.it s "CR 603.5 declining the may leaves Squee in the graveyard" $ do
-          (_, gs) <- buriedBoard
-          let placed = settle S.identityAnswer gs
-              after = S.runPure S.identityAnswer placed Stack.resolveTop
-          Spec.assertEqWith s "the trigger reached the stack anyway" (length (GameState.stack placed)) 1
-          Spec.assertBool s (Set.member squeeName (namesIn Zone.Graveyard S.alice after)) "Squee is still in the graveyard"
-          Spec.assertBool s (not (Set.member squeeName (namesIn Zone.Hand S.alice after))) "and not in hand"
-        -- "Functions ONLY in that zone", the other direction: the same card, the
-        -- same upkeep, one zone away. Nothing but CR 113.6m can withhold it --
-        -- the condition matches a battlefield permanent perfectly well, which is
-        -- exactly what Bitterblossom does from there.
-        Spec.it s "CR 113.6m the same card on the battlefield triggers for nobody" $ do
-          squee <- S.printingOf s registry "Squee, Goblin Nabob"
-          let (_, gs) = S.addCreature squee S.alice (Setup.emptyGame S.bothPlayers)
-              begun = beginUpkeep gs
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped begun) begun))) []
 
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), second line: "When
 -- Serra Avatar is put into a graveyard from anywhere, shuffle it into its

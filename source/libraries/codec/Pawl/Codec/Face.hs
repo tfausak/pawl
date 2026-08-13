@@ -60,8 +60,9 @@ toJson :: (Eq card) => (card -> Value.Value) -> Face.Face card -> Value.Value
 toJson encodeCard f =
   Value.object . concat $
     [ Common.requiredPair "name" (Codec.encode CardName.codec) (Face.name f),
-      -- CR 205.1 gives every card a type line and CR 114.3 gives an emblem none,
-      -- so the key is optional and its absence means the latter -- see fromJson.
+      -- CR 205.1 puts a type line on every card and CR 114.3 gives an emblem no
+      -- types at all, so the key is optional and its absence means the latter --
+      -- see fromJson.
       Common.optionalPair "typeLine" TypeLine.empty (Codec.encode TypeLine.codec) (Face.typeLine f),
       Common.optionalPair "manaCost" Nothing (Common.encodeMaybe (Codec.encode ManaCost.codec)) (Face.manaCost f),
       Common.optionalPair "power" Nothing (Common.encodeMaybe Power.toJson) (Face.power f),

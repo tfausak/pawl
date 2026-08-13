@@ -1347,8 +1347,8 @@ mintedFaces :: Face.Face Card.Type.Card -> [Face.Face Card.Type.Card]
 mintedFaces = fmap snd . mintedFacesTagged
 
 -- mintedFaces keeping WHICH KIND of object each face was minted for, because CR
--- 111.4 and CR 114.3 disagree about one of them: a token has card types and an
--- emblem has none. One traversal carries both, so the exhaustive case below is
+-- 205.2c and CR 114.3 disagree about one of them: "tokens have card types even
+-- though they aren't cards", and an emblem has none. One traversal carries both, so the exhaustive case below is
 -- the only place that has to know.
 mintedFacesTagged :: Face.Face Card.Type.Card -> [(MintedKind, Face.Face Card.Type.Card)]
 mintedFacesTagged card =
