@@ -602,6 +602,7 @@ effectCounts effect = case effect of
   Effect.GainLife _ quantity -> quantityCounts quantity
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal _ quantity -> quantityCounts quantity
+  Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
   -- No embedded card -- the copied permanent supplies the text -- but the count
@@ -910,6 +911,7 @@ effectReplacements effect = case effect of
   Effect.GainLife _ _ -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal _ _ -> []
+  Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed _ _ -> []
   Effect.SkipNextPhase _ _ -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
@@ -1434,6 +1436,7 @@ effectMintedFaces effect = case effect of
   Effect.GainLife _ _ -> []
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal _ _ -> []
+  Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed _ _ -> []
   Effect.SkipNextPhase _ _ -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
@@ -2444,6 +2447,7 @@ effectFilters effect = case effect of
   Effect.GainLife _ quantity -> unframed (quantityFilters quantity)
   Effect.ExchangeLifeTotals _ -> []
   Effect.SetLifeTotal _ quantity -> unframed (quantityFilters quantity)
+  Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed _ quantity -> unframed (quantityFilters quantity)
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.

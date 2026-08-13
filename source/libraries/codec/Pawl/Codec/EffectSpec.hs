@@ -453,6 +453,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.SetLifeTotal (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 10))
       """ {"type":"SetLifeTotal","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":10}]} """
+  -- Nullary: the whole choice is the resolving controller's, so there is nothing
+  -- for card data to carry.
+  Spec.it s "RedistributeLifeTotals" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.RedistributeLifeTotals
+      """ {"type":"RedistributeLifeTotals"} """
   -- Create's EntryRiders and bound slot are each ELIDED when they are the
   -- default, exactly like MoveToZone above: four emitted forms, the middle two
   -- told apart at decode by JSON TYPE.

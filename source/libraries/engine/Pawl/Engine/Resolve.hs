@@ -270,6 +270,7 @@ slotsOf effect = case effect of
   Effect.GainLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
   Effect.SetLifeTotal ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.RedistributeLifeTotals -> Map.empty
   Effect.IncreaseSpeed ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
@@ -489,6 +490,7 @@ slotsAreExhaustive effect = case effect of
   Effect.GainLife _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
   Effect.SetLifeTotal _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.RedistributeLifeTotals -> True
   Effect.IncreaseSpeed _ quantity -> Quantity.slotsAreExhaustive quantity
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
@@ -615,6 +617,7 @@ readsX = any effectReadsX
       Effect.GainLife _ quantity -> Quantity.readsX quantity
       Effect.ExchangeLifeTotals _ -> False
       Effect.SetLifeTotal _ quantity -> Quantity.readsX quantity
+      Effect.RedistributeLifeTotals -> False
       Effect.IncreaseSpeed _ quantity -> Quantity.readsX quantity
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
@@ -696,6 +699,7 @@ searchesLibrary effect = case effect of
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals _ -> False
   Effect.SetLifeTotal {} -> False
+  Effect.RedistributeLifeTotals -> False
   Effect.IncreaseSpeed {} -> False
   Effect.Create {} -> False
   Effect.CreateCopy {} -> False
@@ -836,6 +840,7 @@ boundSlots effect = case effect of
   Effect.GainLife {} -> Set.empty
   Effect.ExchangeLifeTotals _ -> Set.empty
   Effect.SetLifeTotal {} -> Set.empty
+  Effect.RedistributeLifeTotals -> Set.empty
   Effect.IncreaseSpeed {} -> Set.empty
   Effect.Replace {} -> Set.empty
   Effect.SkipNextPhase {} -> Set.empty
@@ -3058,6 +3063,57 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         -- delta, so there is nothing to fall back to.
         Monad.forM_ (Map.lookup pid (GameState.players gs)) $ \player ->
           changeLife pid (total - Player.life player)
+  -- Reverse the Sands: "Redistribute any number of players' life totals. (Each of
+  -- those players gets one life total back.)" CR 119.7 and CR 119.8 name the
+  -- action, and every seat's new total is CR 119.5's gain or loss of the
+  -- necessary amount -- SetLifeTotal's arm above, once per recipient, through the
+  -- same changeLife.
+  --
+  -- The roster is CR 102.1's players IN the game (Game.stillPlaying), not the keys
+  -- of GameState.players, which keep a departed seat's row -- Proliferate's arm
+  -- makes the same distinction. Offering a seat that left would hand a live
+  -- player a dead one's total.
+  --
+  -- Every total is read ONCE, before the prompt and before any life moves (CR
+  -- 608.2h), and every delta is computed against that snapshot. Reading a total
+  -- this effect had already overwritten is the bug a permutation makes
+  -- unmissable: a rotation would otherwise leave two seats on one number.
+  --
+  -- FILTERED, NOT TRUSTED (#222), but all-or-nothing rather than per entry: only
+  -- a whole permutation is a legal answer, so there is no honest way to keep part
+  -- of a bad one. An answer that names a non-candidate, drops a player it hands a
+  -- total to, or gives two players the same total is refused entire, and the
+  -- fallback is the answer that is always legal -- redistribute among nobody.
+  -- Refusing whole is what makes "you can't split up a life total" hold:
+  -- honouring {alice -> carol} alone would leave carol's total on two seats.
+  --
+  -- Not implemented: CR 119.7-8's own restrictions, under which a player who
+  -- can't gain life may not be given a higher total (and the mirror for losing).
+  -- Vacuous rather than elided, ExchangeLifeTotals' position for the same reason:
+  -- nothing in the pool stops a player gaining or losing life, Pawl.Types.
+  -- PlayerEffect having no such arm to consult.
+  --
+  -- CR 810.9f's "not more than one member of each team" is not expressed either,
+  -- pawl having no teams (#175).
+  Effect.RedistributeLifeTotals -> do
+    gs <- State.get
+    let candidates = Game.stillPlaying gs
+        lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
+        offered = fmap (\pid -> (pid, lifeOf pid)) candidates
+    -- One candidate leaves only the identity, and no candidates leave not even
+    -- that: either way every assignment is the same assignment, so there is
+    -- nothing to ask.
+    Monad.when (length candidates > 1) $ do
+      assignment <- Game.choose (Prompt.ChooseRedistribution (Decide.deciderFor controller gs) controller offered)
+      let takers = Map.keysSet assignment
+          givers = Set.fromList (Map.elems assignment)
+          -- A permutation of the chosen subset: the keys are candidates, and the
+          -- totals handed out are exactly the takers' own. Set equality also
+          -- settles injectivity, a Map's keys being distinct -- a repeated giver
+          -- would make `givers` smaller than `takers` and fail here.
+          isPermutation = Set.isSubsetOf takers (Set.fromList candidates) && takers == givers
+      Monad.when isPermutation . Monad.forM_ (Map.toList assignment) $ \(taker, giver) ->
+        changeLife taker (lifeOf giver - lifeOf taker)
   -- CR 702.179c: each named player's speed increases by this much. Pawl.Engine.
   -- Speed's inherent triggered ability (CR 702.179d) is one producer and card data
   -- is the other, so the PlayerRef is genuinely read rather than known --

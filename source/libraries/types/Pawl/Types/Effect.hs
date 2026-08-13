@@ -460,6 +460,28 @@ data Effect card
     -- ExchangeLifeTotals took that posture first, under CR 701.12c's parallel
     -- wording.
     SetLifeTotal PlayerRef.PlayerRef Quantity.Quantity
+  | -- | Reverse the Sands' "redistribute any number of players' life totals": the
+    -- resolving controller chooses any number of the players in the game and then
+    -- hands each of them one of THOSE players' previous totals, using each total
+    -- exactly once. CR 119.7 and CR 119.8 name the action ("if an effect
+    -- redistributes life totals"); every seat's new total is a gain or a loss of
+    -- the necessary amount, exactly as SetLifeTotal's CR 119.5 makes it.
+    --
+    -- CHOOSE, not target, Proliferate's posture and why this carries no SlotName:
+    -- the card declares no target spec, the whole assignment is picked on
+    -- RESOLUTION via Prompt.ChooseRedistribution, and nothing is subject to CR
+    -- 608.2b's illegal-target check.
+    --
+    -- Nullary for Proliferate's reason as well: the printed words leave nothing
+    -- for an author to vary. The roster is CR 102.1's players in the game, the
+    -- subset and the assignment are the controller's at resolution, and the
+    -- totals handed out are the ones those players already had -- there is no
+    -- quantity, scope or filter anywhere in the sentence.
+    --
+    -- NOT a composition of SetLifeTotals: each one would read a total an earlier
+    -- one had already overwritten, and no card data could name the permutation a
+    -- player picks while the spell resolves.
+    RedistributeLifeTotals
   | -- | CR 702.179c: the players the PlayerRef names each have their speed
     -- increased by this much -- "if a player has no speed and they are instructed
     -- to increase their speed by a certain value, their speed becomes that value",
