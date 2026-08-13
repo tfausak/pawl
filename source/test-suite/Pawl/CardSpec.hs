@@ -67,6 +67,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -1955,10 +1956,10 @@ objectRefFilters ref = case ref of
   -- no Filter either; its PlayerRef names players, and its depth counts cards --
   -- neither is a characteristic.
   ObjectRef.TopOfLibrary _ _ -> []
-  -- Port of Karfell's "a creature card from your graveyard"; its PlayerScope
-  -- names players, so the Filter is the whole of what there is to lint, exactly
-  -- as for the graveyard sweep above.
-  ObjectRef.ChosenCardInGraveyard _ f -> [f]
+  -- Port of Karfell's "a creature card from your graveyard"; its PlayerScope and
+  -- its Chooser name players, so the Filter is the whole of what there is to
+  -- lint, exactly as for the graveyard sweep above.
+  ObjectRef.ChosenCardInGraveyard _ _ f -> [f]
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -3756,9 +3757,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               -- no fold supplies a candidate, so this names nobody and moves
               -- nothing -- which is at most one.
               PlayerRef.Candidate -> True
-          -- One card, whatever the scope: the choice is singular however many
-          -- graveyards it draws candidates from.
-          ObjectRef.ChosenCardInGraveyard _ _ -> True
+          -- One card per CHOOSER: the resolving controller chooses once however
+          -- many graveyards the scope draws candidates from, where Exhume's
+          -- "each player" is one choice each and so several cards on any board
+          -- with more than one stocked graveyard.
+          ObjectRef.ChosenCardInGraveyard chooser _ _ -> case chooser of
+            Chooser.TheController -> True
+            Chooser.EachInScope -> False
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           _ -> []

@@ -26,6 +26,7 @@ import qualified Pawl.Codec.CardTypeSpec
 import qualified Pawl.Codec.CastOfferSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
+import qualified Pawl.Codec.ChooserSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.ColorSpec
@@ -307,6 +308,7 @@ spec s registry = do
   Pawl.Codec.CastOfferSpec.spec s
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s
+  Pawl.Codec.ChooserSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
   Pawl.Codec.ColorSpec.spec s

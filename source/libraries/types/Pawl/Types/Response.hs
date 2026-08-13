@@ -81,8 +81,9 @@ data Response
     ChoseRedistribution (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   | -- | CR 701.54a: the creature a tempted player chose as their Ring-bearer.
     ChoseRingBearer ObjectId.ObjectId
-  | -- | CR 608.2d: the graveyard card the resolving controller chose for an
-    -- Pawl.Types.ObjectRef.ChosenCardInGraveyard.
+  | -- | CR 608.2d: the graveyard card a player chose for an
+    -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a
+    -- transcript of Exhume resolving holds one for each stocked graveyard.
     --
     -- Its own constructor rather than ChoseRingBearer reused, though both name
     -- one object: Pawl.Engine.Replay gives every prompt its own response so a

@@ -265,12 +265,18 @@ data Prompt r where
   -- omission: the player is tempted anyway, so Pawl.Engine.Ring.tempt still counts
   -- the temptation and still gives them the emblem.
   ChooseRingBearer :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
-  -- | CR 608.2d: which card in a graveyard the resolving controller chooses for an
+  -- | CR 608.2d: which card in a graveyard a player chooses for an
   -- Pawl.Types.ObjectRef.ChosenCardInGraveyard -- Port of Karfell's "return a
   -- creature card from your graveyard to the battlefield tapped". The PlayerId is
-  -- the CHOOSER (CR 608.2c's controller of the spell or ability, who need not own
-  -- the graveyard); the ObjectId is the spell or ability being resolved; the
-  -- NonEmpty is the matching cards, engine-pre-filtered in the sweep's own order.
+  -- the CHOOSER, which the ref's Pawl.Types.Chooser decides: CR 608.2c's
+  -- controller of the spell or ability, who need not own the graveyard, or each
+  -- player the ref's scope names, asked about their own. The ObjectId is the
+  -- spell or ability being resolved; the NonEmpty is the matching cards,
+  -- engine-pre-filtered in the sweep's own order.
+  --
+  -- One question per chooser, so Exhume's "each player puts a creature card from
+  -- their graveyard onto the battlefield" raises this once per stocked graveyard,
+  -- in APNAP order (CR 608.2e, CR 101.4).
   --
   -- CHOOSE, not target, ChooseRingBearer's posture and for CR 115.1's reason: the
   -- card does not say "target", so nothing is declared on the stack (CR 601.2c) and

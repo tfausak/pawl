@@ -1,5 +1,6 @@
 module Pawl.Codec.ObjectRef where
 
+import qualified Pawl.Codec.Chooser as Chooser
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerRef as PlayerRef
@@ -22,8 +23,9 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- was waiting on. The wire format is unchanged by that conversion -- the same
 -- five tags, emitted identically -- and what it adds is the schema.
 --
--- 'EachCardInGraveyard', 'TopOfLibrary' and 'ChosenCardInGraveyard' are the arms
--- with two payloads, so each takes a 'Common.tuple'. Under the #1305 decision they owe records of
+-- 'EachCardInGraveyard' and 'TopOfLibrary' are the arms with two payloads and
+-- 'ChosenCardInGraveyard' the one with three, so each takes a 'Common.tuple' or
+-- 'Common.tuple3'. Under the #1305 decision they owe records of
 -- their own like every other multi-payload arm; that lands with the
 -- payload-records unit.
 codec :: Codec.Codec ObjectRef.ObjectRef
@@ -35,7 +37,7 @@ codec =
       Arm.payload "EachCardInGraveyard" (Common.tuple PlayerScope.codec filterCodec) (uncurry ObjectRef.EachCardInGraveyard),
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
       Arm.payload "TopOfLibrary" (Common.tuple PlayerRef.codec Common.natural) (uncurry ObjectRef.TopOfLibrary),
-      Arm.payload "ChosenCardInGraveyard" (Common.tuple PlayerScope.codec filterCodec) (uncurry ObjectRef.ChosenCardInGraveyard)
+      Arm.payload "ChosenCardInGraveyard" (Common.tuple3 Chooser.codec PlayerScope.codec filterCodec) (\(c, s, f) -> ObjectRef.ChosenCardInGraveyard c s f)
     ]
   where
     -- Written once so the encoder, the decoder and the schema cannot disagree
@@ -51,6 +53,6 @@ codec =
       ObjectRef.TopOfLibrary p n ->
         Common.tagged "TopOfLibrary" . Just . Value.array $
           [Codec.encode PlayerRef.codec p, Common.encodeNatural n]
-      ObjectRef.ChosenCardInGraveyard s f ->
+      ObjectRef.ChosenCardInGraveyard c s f ->
         Common.tagged "ChosenCardInGraveyard" . Just . Value.array $
-          [Codec.encode PlayerScope.codec s, Codec.encode filterCodec f]
+          [Codec.encode Chooser.codec c, Codec.encode PlayerScope.codec s, Codec.encode filterCodec f]

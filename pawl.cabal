@@ -102,6 +102,8 @@ library codec
     Pawl.Codec.CastingRestrictionSpec
     Pawl.Codec.CastOffer
     Pawl.Codec.CastOfferSpec
+    Pawl.Codec.Chooser
+    Pawl.Codec.ChooserSpec
     Pawl.Codec.Clause
     Pawl.Codec.ClauseIndex
     Pawl.Codec.ClauseIndexSpec
@@ -661,6 +663,7 @@ library types
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
     Pawl.Types.CastOffer
+    Pawl.Types.Chooser
     Pawl.Types.Claim
     Pawl.Types.Clause
     Pawl.Types.ClauseIndex
