@@ -3014,7 +3014,9 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- CR 119.5: each named player "gains or loses the necessary amount of life to
   -- end up with the new total". So this is a DELTA per player, computed against
   -- that player's own current total -- one seat may gain while another loses on
-  -- the same resolution, which is why nothing here is a GainLife or a LoseLife.
+  -- the same resolution, which is why a card cannot spell this with a GainLife or
+  -- a LoseLife of its own: neither can name an amount it has to subtract a live
+  -- life total to find.
   --
   -- Written through changeLife exactly as ExchangeLifeTotals is, and for CR
   -- 119.5's sake rather than for tidiness: a raw write to Player.life would leave

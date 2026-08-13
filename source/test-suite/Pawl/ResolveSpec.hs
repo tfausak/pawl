@@ -3983,16 +3983,19 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
 --
 --   * Magister Sphinx, {4}{W}{U}{B} Artifact Creature -- Sphinx 5/5 with flying,
 --     "When this creature enters, target player's life total becomes 10." The
---     literal, so the SAME card is a gain at one seat and a loss at another, and
---     the three cases below differ in nothing but which seat it names.
+--     literal, so the SAME card is a gain at one seat and a loss at another --
+--     and the first two cases below are one board differing in nothing but which
+--     seat the trigger names.
 --   * Arbiter of Knollridge, {6}{W} Creature -- Giant Wizard 5/5 with vigilance,
 --     "When this creature enters, each player's life total becomes the highest
 --     life total among all players." The fold, and the several-recipients shape a
 --     targeted card cannot reach.
 --
--- Three seats at 4, 27 and 13. Distinct, and distinct from 10, so the Sphinx
--- cases tell a gain from a loss; and 27 is not the sum (44), the count (3) or
--- the least (4), so Arbiter's one number falsifies every other fold.
+-- Three seats at 4, 27 and 13 -- distinct, and one above 10 and two below, so the
+-- Sphinx cases tell a gain from a loss. 27 is not the sum (44), the count (3) or
+-- the least (4), so Arbiter's one number falsifies every other fold. Only the
+-- CR 119.9 case changes a starting total, moving carol to 10 so that the seat the
+-- trigger names is already there.
 --
 -- The watchers are what make the claim about EVENTS rather than about totals.
 -- Ajani's Pridemate ("whenever you gain life, put a +1/+1 counter on this

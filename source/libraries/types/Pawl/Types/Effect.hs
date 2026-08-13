@@ -457,7 +457,8 @@ data Effect card
     -- "gains or loses the necessary amount of life to end up with the new total",
     -- so this resolves into the same CR 608.2i gain and loss events LoseLife and
     -- GainLife append, and a "whenever you gain life" trigger reads them.
-    -- ExchangeLifeTotals took that posture first and for the same rule's sake.
+    -- ExchangeLifeTotals took that posture first, under CR 701.12c's parallel
+    -- wording.
     SetLifeTotal PlayerRef.PlayerRef Quantity.Quantity
   | -- | CR 702.179c: the players the PlayerRef names each have their speed
     -- increased by this much -- "if a player has no speed and they are instructed
