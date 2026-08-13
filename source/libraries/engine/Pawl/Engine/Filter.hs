@@ -798,6 +798,8 @@ rewriteKeyword pairs keyword = case keyword of
   -- own step and the ability it arms is written in Pawl.Engine.Keyword.
   Keyword.Type.Decayed -> keyword
   Keyword.Type.Toxic _ -> keyword
+  -- CR 702.170a states a cost, so rewriteCost reaches it as flashback's does.
+  Keyword.Type.Plot cost -> Keyword.Type.Plot (rewriteCost pairs cost)
   Keyword.Type.StartYourEngines -> keyword
   Keyword.Type.Persist -> keyword
   Keyword.Type.Undying -> keyword

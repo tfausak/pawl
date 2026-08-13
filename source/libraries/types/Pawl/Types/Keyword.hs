@@ -919,6 +919,28 @@ data Keyword
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --
     -- including two with the same N, which the projection counts separately.
     Toxic Natural.Natural
+  | -- | 702.170a: plot [cost]. "Any time you have priority during your main phase
+    -- while the stack is empty, you may exile this card from your hand and pay
+    -- [cost]. It becomes a plotted card." CR 702.170b makes taking it CR 116.2k's
+    -- special action, and CR 702.170d is what a plotted card is FOR -- its owner
+    -- may cast it from exile without paying its mana cost on a later turn.
+    --
+    -- The cost rides the constructor, as Flashback's and Morph's do, because rule
+    -- 702.170a states it as part of the keyword. It is the cost of the SPECIAL
+    -- ACTION and never of the cast, which rule 702.170d makes free -- the opposite
+    -- split from Flashback, whose one cost is the cast's.
+    --
+    -- A STATIC ability functioning in the hand (CR 702.170a's "this card in a
+    -- player's hand"), so nothing here mints an ability on the battlefield;
+    -- Pawl.Engine.Plot reads the cost off the card the way Pawl.Engine.Room reads
+    -- an unlock cost off a face.
+    --
+    -- Not implemented: CR 702.170c's other producers -- an effect that makes an
+    -- exiled card plotted without this keyword (Jace Reawakened, Kellan Joins Up)
+    -- -- and CR 702.170f's plot from a zone other than a hand (Fblthp, Lost on the
+    -- Range) (#1390). Nor CR 702.170e's "when this card becomes plotted" trigger
+    -- (#1391).
+    Plot (Cost.Cost Keyword)
   | -- | 702.179a: "start your engines!". A STATIC ability whose whole content is
     -- a state-based action -- CR 704.5z gives a player with no speed who controls
     -- a permanent with this keyword a speed of 1 -- so nothing mints an ability
