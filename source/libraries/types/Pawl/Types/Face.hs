@@ -88,8 +88,10 @@ data Face card = MkFace
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
     -- keyword whose ability functions in a zone pawl's projection does not reach
-    -- (#160) -- rule 702.34a's flashback, read here while the card sits in a
-    -- graveyard -- the same carve-out castingPermissions and additionalCosts take.
+    -- (#160) -- a HAND, where flash is read here -- the same carve-out
+    -- castingPermissions and additionalCosts take. A GRAVEYARD is no longer one
+    -- of those zones: rule 702.34a's flashback is read there through the
+    -- projection, so a granted one reaches the cost (Pawl.Engine.Cost.costsFor).
     keywords :: Set.Set Keyword.Keyword,
     -- | CR 204.1/204.2: the colour indicator printed left of the type line. An
     -- object is each colour it denotes, IN ADDITION to the colours of its mana
@@ -149,7 +151,8 @@ data Face card = MkFace
     -- | CR 601.3: this face's PRINTED casting permissions -- zone or condition
     -- exceptions to normal timing (Panglacial Wurm). Read directly from the card
     -- and NOT the projection: the permission functions in the library (CR 113.6),
-    -- which Projection.gather does not reach, walking the battlefield only (#160).
+    -- which Projection.gather does not reach -- it walks the battlefield, the
+    -- command zone, the stack and the graveyard, and no other zone (#160).
     -- Not a claim about the rules: CR 613.1 names no zone, and CR 122.1b / 613.1f
     -- reach a card outside the battlefield.
     --
