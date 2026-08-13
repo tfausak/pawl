@@ -262,9 +262,10 @@ data Filter keyword
     -- position but a Pawl.Types.Scope.OverPlayers count's filter -- the only place
     -- the candidate is a player and the only place anything bakes it.
     --
-    -- STRICT, and asked of every player INCLUDING you: "more lands than you"
-    -- excludes you by arithmetic rather than by a relation, which is why Oreskos'
-    -- scope is EachPlayer rather than an opponent relation. Surveyor's Scope's "at
+    -- STRICT, which is what lets Oreskos ask it of EVERY player: "more lands than
+    -- you" excludes you by arithmetic rather than by a relation, so the card's
+    -- scope is EachPlayer rather than an opponent relation, and a seat merely LEVEL
+    -- with you is not one that controls more. Surveyor's Scope's "at
     -- least two more lands than you" wants a margin beside the filter; that card
     -- needs a search destination pawl does not have either, so neither half is
     -- built (#1381).
