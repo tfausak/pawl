@@ -68,3 +68,4 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWho = Just ControllerRelation.Anyones
         }
       """ {"byWhom":{"type":"Opponents"},"onWhat":{"type":"And","value":[]},"onWho":{"type":"Anyones"}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s CounterPattern.codec

@@ -139,3 +139,4 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.codec
       (EntryRewrite.SacrificeAnyNumber (Filter.And [Filter.HasSubtype Subtype.Forest, Filter.Not Filter.IsTapped]) Nothing)
       """ {"type":"SacrificeAnyNumber","value":[{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Forest"}},{"type":"Not","value":{"type":"IsTapped"}}]},null]} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s EntryRewrite.codec

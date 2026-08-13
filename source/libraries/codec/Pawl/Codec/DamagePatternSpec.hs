@@ -44,3 +44,4 @@ spec s = Spec.describe s "Pawl.Codec.DamagePattern" $ do
       DamagePattern.codec
       (DamagePattern.MkDamagePattern Nothing (Filter.And []) (Just (Recipient.ToCreature (ObjectId.MkObjectId 7))))
       """ {"whichRecipient":{"type":"ToCreature","value":7}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s DamagePattern.codec

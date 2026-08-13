@@ -59,3 +59,4 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.codec
       (DamageRewrite.Redirect (Recipient.ToCreature (ObjectId.MkObjectId 7)))
       """ {"type":"Redirect","value":{"type":"ToCreature","value":7}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s DamageRewrite.codec

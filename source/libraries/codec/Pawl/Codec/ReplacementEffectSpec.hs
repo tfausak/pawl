@@ -198,3 +198,4 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ReplacementEffect.codec
       (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters CounterKind.PlusOnePlusOne 1))
       """ {"type":"TurnUpR","value":[{"type":"IsSource"},{"type":"WithCounters","value":[{"type":"PlusOnePlusOne"},1]}]} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s ReplacementEffect.codec

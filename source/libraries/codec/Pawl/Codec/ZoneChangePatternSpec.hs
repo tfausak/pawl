@@ -39,3 +39,4 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
           ZoneChangePattern.whoseObject = ControllerRelation.Opponents
         }
       """ {"whatObject":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Not","value":{"type":"IsToken"}}]},"whenDestination":{"type":"Graveyard"},"whoseObject":{"type":"Opponents"}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s ZoneChangePattern.codec

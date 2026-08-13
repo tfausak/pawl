@@ -24,3 +24,4 @@ spec s = Spec.describe s "Pawl.Codec.TokenPattern" $ do
       TokenPattern.codec
       TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Anyones}
       """ {} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s TokenPattern.codec

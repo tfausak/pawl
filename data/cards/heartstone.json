@@ -12,21 +12,21 @@
         {
           "effect": {
             "type": "ReduceActivationCost",
-            "value": [
-              {
-                "type": "HasCardType",
-                "value": {
-                  "type": "Creature"
-                }
-              },
-              [
+            "value": {
+              "floor": 1,
+              "reduction": [
                 {
                   "type": "Generic",
                   "value": 1
                 }
               ],
-              1
-            ]
+              "whichAbilities": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Creature"
+                }
+              }
+            }
           },
           "scope": {
             "type": "EachPlayer"

@@ -277,6 +277,7 @@ library codec
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientSpec
     Pawl.Codec.ReduceActivationCost
+    Pawl.Codec.ReduceActivationCostSpec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.ReplacementEffect

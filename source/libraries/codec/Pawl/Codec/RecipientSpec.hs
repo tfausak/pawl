@@ -44,3 +44,4 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
       Recipient.codec
       (Recipient.ToObject (ObjectId.MkObjectId 4))
       """ {"type":"ToObject","value":4} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s Recipient.codec
