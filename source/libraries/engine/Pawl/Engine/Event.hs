@@ -2754,7 +2754,7 @@ drawCard pid = do
 --
 -- CR 121.9's "may look at that card as they draw it before choosing" is satisfied
 -- by the prompt naming the card. pawl has no per-player hidden-information filter
--- at all (#322's last section), so nothing here could have shown the player less
+-- at all (#1412), so nothing here could have shown the player less
 -- than the rule allows.
 --
 -- The reveal goes through the ordinary funnel with CR 702.94a's cause, which is
@@ -4930,7 +4930,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- dungeon card the marker is on must be the bearer and the room must be this
   -- ability's own. Never reached today -- eventTriggers' command-zone source is
   -- CR 114.4's and takes emblems alone, so a dungeon card is not offered and
-  -- Pawl.Engine.Dungeon.roomPending is still what gathers a room ability (#348)
+  -- Pawl.Engine.Dungeon.roomPending is still what gathers a room ability (#1411)
   -- -- so this is a regression fence rather than a proven path, and it is written
   -- to agree with that gatherer rather than to differ.
   TriggerCondition.RoomEntered room -> case event of
@@ -5767,10 +5767,10 @@ looksBack condition = case condition of
 --
 -- The battlefield is not the only scanned zone -- every GRAVEYARD and the whole
 -- EXILE zone are scanned for the abilities CR 113.6k puts there, a spell that
--- just became cast is offered from the STACK for the same rule, and an EMBLEM is
--- offered from the command zone under CR 114.4, and the card a player revealed as
--- they drew it is offered from their HAND under CR 113.6k. The rest of the command
--- zone is unscanned (#348).
+-- just became cast is offered from the STACK for the same rule, the card a player
+-- revealed as they drew it is offered from their HAND for it too, and an EMBLEM is
+-- offered from the command zone under CR 114.4. The rest of the command zone is
+-- unscanned (#1411).
 --
 -- CR 603.10's FIRST sentence is a per-EVENT question, and the live battlefield set
 -- answers a per-BOUNDARY one: the scan runs once at CR 117.5, after CR 704.5's
@@ -6147,7 +6147,7 @@ eventTriggers events gs =
       -- zonesTriggeredFrom puts on the stack and it matches no other event, so a
       -- standing scan of every spell would answer alike at more cost. A future
       -- condition that functions on the stack and watches some other event is
-      -- what widens this (#348).
+      -- what would widen this.
       --
       -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#160).
       spellCast event = case event of
@@ -6225,11 +6225,10 @@ eventTriggers events gs =
       inCommand =
         Map.fromList
           (Maybe.mapMaybe emblemCandidate (Set.toAscList (GameState.command gs)))
-      -- CR 113.6k's last zone, and the one #348 was waiting on: the card a player
-      -- just revealed from their HAND as they drew it (CR 702.94a, CR 121.9). The
-      -- ability is borne by an object that is on nobody's battlefield, in nobody's
-      -- graveyard and on no stack -- rule 701.20b moved it nowhere -- so no source
-      -- above can reach it.
+      -- CR 113.6k's last zone: the card a player just revealed from their HAND as
+      -- they drew it (CR 702.94a, CR 121.9). The ability is borne by an object that
+      -- is on nobody's battlefield, in nobody's graveyard and on no stack -- rule
+      -- 701.20b moved it nowhere -- so no source above can reach it.
       --
       -- Scoped to the reveal EVENT rather than computed once over every hand,
       -- which is `cycledCard`'s and `spellCast`'s shape rather than `inExile`'s.
@@ -6393,7 +6392,7 @@ zonesTriggeredFrom cond = case cond of
   -- CR 309.4c: "as long as a dungeon card is in the command zone, its abilities
   -- may trigger". The honest answer, and inert: eventTriggers' command-zone source
   -- is CR 114.4's and takes emblems alone, so nothing consults this arm --
-  -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability (#348).
+  -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability (#1411).
   TriggerCondition.RoomEntered _ -> Set.singleton Zone.Command
   -- CR 603.6a is an enters-the-battlefield ability; its bearer is on the
   -- battlefield when it fires.

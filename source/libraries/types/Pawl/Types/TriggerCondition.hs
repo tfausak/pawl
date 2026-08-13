@@ -129,8 +129,8 @@ data TriggerCondition
     -- cleared at the handoff -- so the count restarts without this condition
     -- saying so. What the Natural picks out is WHICH draw, which is the same
     -- question CR 702.94a asks with the answer 1 -- though miracle is not this
-    -- condition, triggering on the reveal rather than on the draw, and there is
-    -- no reveal-as-you-draw window for it to hang on (#1351).
+    -- condition: it triggers on the REVEAL that CR 121.9's window offers, which
+    -- is SelfRevealedForMiracle above.
     --
     -- EQUALITY, not "at least": Erudite Wizard fires on the second draw and on no
     -- other, so a turn with four draws fires it once. A card reading "your second
