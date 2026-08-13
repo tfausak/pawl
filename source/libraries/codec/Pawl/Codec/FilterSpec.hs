@@ -115,6 +115,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.ControlledByPlayer (PlayerId.MkPlayerId 1))
       """ {"type":"ControlledByPlayer","value":1} """
+  Spec.it s "ControlledByRecipient" $
+    Common.assertCodec
+      s
+      codec
+      Filter.ControlledByRecipient
+      """ {"type":"ControlledByRecipient"} """
   Spec.it s "ManaValueAtMost" $
     Common.assertCodec
       s

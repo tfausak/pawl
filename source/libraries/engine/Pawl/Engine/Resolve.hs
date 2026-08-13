@@ -3028,13 +3028,22 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- the log silent, and "whenever you gain life" is supposed to see this. The
   -- rule spends its whole sentence saying so.
   --
-  -- The target total is evaluated ONCE, before any life moves, and every delta is
-  -- read off that same pre-effect state -- ExchangeLifeTotals' posture. A
-  -- REGRESSION FENCE rather than proven behaviour: re-reading the board per
-  -- recipient leaves the suite green, since setting everyone to the maximum leaves
-  -- the maximum where it was and no other producer has several recipients. A card
-  -- folding a MINIMUM over the same players would tell the two apart, and reading
-  -- a total this effect had already overwritten is the bug that gives.
+  -- The total is evaluated ONCE PER RECIPIENT, because a card may name a number
+  -- that is each recipient's own: Biorhythm's "each player's life total becomes
+  -- the number of creatures THEY control" gives three seats three answers, where
+  -- Magister Sphinx's literal and Arbiter of Knollridge's fold give one number to
+  -- the whole table. Which recipient the evaluation has reached rides in
+  -- Filter.Context's `recipient`, and Filter.ControlledByRecipient is the one atom
+  -- that reads it; a quantity naming no such atom cannot tell the loop from a
+  -- single evaluation.
+  --
+  -- Every evaluation and every delta is read off `gs`, the state BEFORE any life
+  -- moves (CR 608.2f) -- ExchangeLifeTotals' posture -- so the deltas cannot see
+  -- each other and a fold over life totals answers the same for every seat. Still
+  -- a REGRESSION FENCE rather than proven behaviour, as it was before the loop
+  -- went per-recipient: Biorhythm counts creatures, which this effect does not
+  -- move, and Arbiter's maximum is where it was after the first seat reaches it.
+  -- A card folding a MINIMUM over the same players is what would tell them apart.
   --
   -- changeLife's zero case is CR 119.9's, and here it is the load-bearing one:
   -- Arbiter's own highest-life seat is already at the new total, so it gains
@@ -3042,26 +3051,24 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   --
   -- CR 104.3b's state-based action follows a total driven to 0 or less, and it is
   -- the existing one in Pawl.Engine.Sba -- reached through changeLife's ordinary
-  -- subtraction, with nothing here to arrange.
-  --
-  -- Not implemented: a total that differs PER RECIPIENT -- Biorhythm's "each
-  -- player's life total becomes the number of creatures they control" -- which
-  -- would need both a reference an effect's recipient answers and an evaluation
-  -- per player rather than the one below (#1424).
+  -- subtraction, with nothing here to arrange. Biorhythm's seat controlling no
+  -- creature is the producer that gets there.
   Effect.SetLifeTotal ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
         recipients = playerRefPlayers legal controller gs ref
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      -- An undeterminable total is no instruction at all, LoseLife's and
-      -- GainLife's posture for the same reason: there is no number to reach.
-      Nothing -> pure ()
-      Just total -> Monad.forM_ recipients $ \pid ->
-        -- A player with no row is nobody to move, which is the same no-op an
-        -- unfilled slot already gave; the lookup is what makes the delta a
-        -- delta, so there is nothing to fall back to.
-        Monad.forM_ (Map.lookup pid (GameState.players gs)) $ \player ->
+    Monad.forM_ recipients $ \pid ->
+      -- A player with no row is nobody to move, which is the same no-op an
+      -- unfilled slot already gave; the lookup is what makes the delta a delta, so
+      -- there is nothing to fall back to.
+      Monad.forM_ (Map.lookup pid (GameState.players gs)) $ \player ->
+        -- An undeterminable total is no instruction at all, LoseLife's and
+        -- GainLife's posture for the same reason: there is no number to reach.
+        -- Asked per recipient rather than for the effect as a whole, which is what
+        -- a per-recipient number means -- one seat's unanswerable count leaves
+        -- that seat alone and says nothing about the others.
+        Monad.forM_ (Quantity.evaluateFor viewOf (context {Filter.recipient = Just pid}) gs resolving source quantity) $ \total ->
           changeLife pid (total - Player.life player)
   -- Reverse the Sands: "Redistribute any number of players' life totals. (Each of
   -- those players gets one life total back.)" CR 119.7 and CR 119.8 name the

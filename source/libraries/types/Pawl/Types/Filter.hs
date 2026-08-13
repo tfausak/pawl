@@ -202,6 +202,29 @@ data Filter keyword
     -- Perspective-free, unlike every other player-relating atom here: the player is
     -- named outright, so CR 109.5's "you" does not enter into it.
     ControlledByPlayer PlayerId.PlayerId
+  | -- | The candidate's controller is the player the surrounding effect is
+    -- CURRENTLY BEING APPLIED TO -- Biorhythm's "each player's life total becomes
+    -- the number of creatures THEY control", where "they" is each recipient in
+    -- turn rather than any one player.
+    --
+    -- NOT ControlledBy You, and the difference is a wrong answer rather than a
+    -- nicety: CR 109.5's "you" is the spell's controller, so that filter would hand
+    -- every seat the controller's own count. Nor ControlledBy Opponent, which names
+    -- a set rather than the one seat being looked at.
+    --
+    -- Context-relative like ControlledByDefendingPlayer above, and by the same
+    -- machinery: the answer depends on which recipient the effect has reached
+    -- rather than on the candidate, so Pawl.Engine.Filter.Context's `recipient` is
+    -- where it arrives, filled by Pawl.Engine.Resolve per recipient and Nothing
+    -- everywhere else. Vacuously False there, which is every position but a
+    -- per-recipient effect's quantity.
+    --
+    -- Deliberately NOT PlayerRef.Candidate, which is the word one type over for the
+    -- player a Scope.OverPlayers fold is looking at. A fold's candidate SHADOWS
+    -- inside the fold and this does not: Arbiter of Knollridge's "the highest life
+    -- total among all players" is a fold nested inside a per-recipient set, and one
+    -- word for both would make its inner reading ambiguous.
+    ControlledByRecipient
   | -- | CR 108.3 / 110.2: the candidate's OWNER relates thus to the perspective --
     -- Garland, Royal Kidnapper's "creatures you control but don't own", which is
     -- `And [ControlledBy You, Not (OwnedBy You)]`.

@@ -1669,6 +1669,9 @@ canHostSubjects predicate = case predicate of
   -- PlayerId, and neither holds a Filter for a card author to reach.
   Filter.Type.ControlledByBound _ -> 0
   Filter.Type.ControlledByPlayer _ -> 0
+  -- Zero for the two above's reason: a nullary atom holds no Filter for a card
+  -- author to reach.
+  Filter.Type.ControlledByRecipient -> 0
   Filter.Type.ManaValueAtMost _ -> 0
   Filter.Type.ManaValueIsEven -> 0
   Filter.Type.ControlledBy _ -> 0

@@ -335,6 +335,22 @@ data Context = MkContext
     -- LAZY like sourcePower, and load-bearingly so: filling it costs a
     -- control-grant walk, and no filter that omits the atom ever forces it.
     defendingPlayer :: Maybe PlayerId.PlayerId,
+    -- The player the surrounding effect is CURRENTLY BEING APPLIED TO, for the one
+    -- atom that asks (ControlledByRecipient) -- Biorhythm's "the number of
+    -- creatures they control". Supplied by the caller for defendingPlayer's
+    -- reason, and by one caller: Pawl.Engine.Resolve's SetLifeTotal arm, which
+    -- re-evaluates its quantity once per recipient with this field pointed at each
+    -- in turn.
+    --
+    -- NOT `perspective` re-pointed, which would be the cheap version of the same
+    -- thing and a wrong one: CR 109.5's "you" is the resolving spell's controller
+    -- for the whole quantity, so a card reading both "they control" and "you
+    -- control" in one sentence needs the two to disagree.
+    --
+    -- Nothing wherever the atom cannot appear, which is everywhere else. Not
+    -- implemented: any other per-player opcode filling it, so no card may write a
+    -- per-recipient amount for a life loss, a gain, a draw or a speed (#1427).
+    recipient :: Maybe PlayerId.PlayerId,
     -- The objects the surrounding resolution's LEGAL slots name, for
     -- Quantity.AgainstSlot to aim an evaluation at one (CR 608.2b keeps an
     -- illegal slot out). No Filter atom reads it -- it rides here because this
@@ -355,8 +371,14 @@ data Context = MkContext
 -- Pawl.Engine.Ring's emblem, and CR 702.39a's defending-player atom only through
 -- provoke; Pawl.CardSpec's lints keep all three out of card data, so no other
 -- position can read the Nothings this leaves.
+--
+-- CR 119.5's recipient atom is the one a CARD may write (Biorhythm), so the
+-- Nothing it leaves here is reachable: a card naming "they control" outside a
+-- per-recipient effect matches nothing, which is PlayerRef.Candidate's posture one
+-- type over rather than a hole -- an evaluation that has reached no recipient has
+-- no honest player to substitute.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, slotObjects = Map.empty}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty}
 
 -- contextFor with the resolution's slot objects supplied. The one caller is
 -- Pawl.Engine.Resolve.effectContext; see slotObjects above.
@@ -370,7 +392,7 @@ contextWithSlots p s m = (contextFor p s) {slotObjects = m}
 -- match and CR 509.1b's blocking gate -- since rule 702.39a's atom lives only in a
 -- target slot.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, slotObjects = Map.empty}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -464,6 +486,15 @@ matches context view predicate = case predicate of
   -- to relate it to. Vacuously False off an object, `controller` being Nothing for a
   -- player view and for a card in a hidden zone (CR 108.4).
   Filter.ControlledByPlayer pid -> controller view == Just pid
+  -- The candidate's controller IS the recipient the effect has currently reached,
+  -- which the Context supplies because it is a fact about how far the surrounding
+  -- effect has got rather than about the candidate. False unless both are
+  -- readable, ControlledByDefendingPlayer's posture: a candidate with no
+  -- controller has nothing to compare, and no recipient at all is every position
+  -- but a per-recipient effect's quantity.
+  Filter.ControlledByRecipient -> case (controller view, recipient context) of
+    (Just c, Just r) -> c == r
+    _ -> False
   -- CR 108.3 / 110.2: the same comparison ControlledBy makes, against the other
   -- player -- so Garland's "creatures you control but don't own" is the two atoms
   -- conjoined. Every other player is an Opponent by construction, for the reason
@@ -624,6 +655,8 @@ rewrite pairs predicate = case predicate of
   -- is a word CR 612.1's swap can find in the text.
   Filter.ControlledByBound _ -> predicate
   Filter.ControlledByPlayer _ -> predicate
+  -- Untouched for ControlledBy's reason.
+  Filter.ControlledByRecipient -> predicate
   -- Untouched for ControlledBy's reason: CR 612.1 swaps a WORD in the text, and
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
@@ -892,6 +925,9 @@ bakeBound players predicate = case predicate of
   -- match or it can never be answered.
   Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (bakeBound players f)
   Filter.ControlledByPlayer _ -> predicate
+  -- Untouched: CR 603.2's slot is not the recipient an effect has reached, and no
+  -- binding could answer this atom -- Pawl.Engine.Filter.Context carries it.
+  Filter.ControlledByRecipient -> predicate
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
@@ -969,6 +1005,7 @@ manaValueThresholds predicate = case predicate of
   Filter.ControlledByDefendingPlayer -> []
   Filter.ControlledByBound _ -> []
   Filter.ControlledByPlayer _ -> []
+  Filter.ControlledByRecipient -> []
   Filter.OwnedBy _ -> []
   Filter.IsSource -> []
   Filter.IsPlayer _ -> []
@@ -1035,6 +1072,7 @@ statesAQuality predicate = case predicate of
   Filter.ControlledByDefendingPlayer -> True
   Filter.ControlledByBound _ -> True
   Filter.ControlledByPlayer _ -> True
+  Filter.ControlledByRecipient -> True
   Filter.OwnedBy _ -> True
   Filter.IsSource -> True
   Filter.IsPlayer _ -> True
