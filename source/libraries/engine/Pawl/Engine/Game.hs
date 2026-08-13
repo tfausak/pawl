@@ -15,6 +15,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.Discarded as Discarded
 import Pawl.Types.Face (Face)
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -37,6 +38,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -651,7 +653,7 @@ honourShuffle offered answer =
 -- Pawl.Engine.Projection and Pawl.Engine.Count already case on it too.
 castOf :: GameEvent -> Maybe PlayerId
 castOf event = case event of
-  GameEvent.SpellCast pid _ _ -> Just pid
+  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid _ _) -> Just pid
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.BecameDesignated {} -> Nothing
@@ -695,7 +697,7 @@ castOf event = case event of
 -- The CAUSE is not consulted, CR 702.29a making a cycled card a discarded one.
 discardOf :: GameEvent -> Maybe PlayerId
 discardOf event = case event of
-  GameEvent.Discarded pid _ _ -> Just pid
+  GameEvent.Discarded (Discarded.MkDiscarded pid _ _) -> Just pid
   -- CR 701.9a's discard moves a card OUT of a hand; CR 121.1's draw moves one
   -- in. Opposite directions, and neither event stands in for the other.
   GameEvent.Drew {} -> Nothing

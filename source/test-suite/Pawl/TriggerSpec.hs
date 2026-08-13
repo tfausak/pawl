@@ -226,10 +226,12 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
@@ -243,7 +245,9 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.Create as Create
@@ -255,6 +259,7 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -265,6 +270,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
@@ -300,12 +306,14 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
@@ -319,6 +327,7 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnWindow as TurnWindow
+import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -462,7 +471,7 @@ scanSpec s registry =
     -- so "the first time" is "this is the only one so far".
     Spec.it s "SelfAttacks FirstTimeEachTurn matches only the first declaration" $ do
       let bearer = ObjectId.MkObjectId 1
-          declared = GameEvent.AttackerDeclared bearer S.bob 1
+          declared = GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared bearer S.bob 1)
           gsWith events = S.withEvents events (Setup.emptyGame S.bothPlayers)
           matches frequency events =
             Event.matchesTrigger (gsWith events) bearer S.alice (TriggerCondition.SelfAttacks frequency) declared
@@ -473,7 +482,7 @@ scanSpec s registry =
       Spec.assertBool s (matches TriggerFrequency.EveryTime [declared, declared]) "EveryTime matches the second too"
       -- The count is per bearer, not per turn: two creatures declared
       -- together are each attacking for the first time.
-      Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (ObjectId.MkObjectId 2) S.bob 1, declared]) "another creature's declaration does not spend this one's first time"
+      Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 2) S.bob 1), declared]) "another creature's declaration does not spend this one's first time"
       -- CR 508.3a's last sentence, unchanged by the frequency: a
       -- non-declaration event never matches.
       Spec.assertBool s (not (Event.matchesTrigger (gsWith [declared]) bearer S.alice (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn) (GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Combat CombatStep.DeclareAttackers) S.alice)))) "a step beginning is not an attack"
@@ -2461,7 +2470,7 @@ annihilatorSpec s registry =
         -- "defending player" reads. The falsifier is an arm that binds the
         -- attacking side instead.
         Spec.it s "CR 603.2 the defending player rides the declaration in the reserved slot" $ do
-          let bindings = Event.eventBindings (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (ObjectId.MkObjectId 7) S.carol 1)
+          let bindings = Event.eventBindings (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared (ObjectId.MkObjectId 7) S.carol 1))
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 613.8's dependency, read off the projection before any attack: WHICH
         -- permanents actually carry the granted keyword. Without this the two
@@ -3215,7 +3224,7 @@ namedIn name zone pid gs = length (filter ((== Just name) . fmap S.nameOf . flip
 -- CR 702.94a's own reveal, told from CR 701.20a's ordinary one by its cause.
 isMiracleReveal :: GameEvent.GameEvent -> Bool
 isMiracleReveal event = case event of
-  GameEvent.Revealed _ _ RevealCause.ForMiracle _ -> True
+  GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.ForMiracle _) -> True
   _ -> False
 
 -- alice is the active player in her postcombat main phase, holding a Zealous
@@ -6303,7 +6312,7 @@ rampageSpec s registry =
           (gs, mine, _) <- board ["Wolverine Pack"] ["Goblin Piker"]
           case mine of
             [pack] -> do
-              let fired after = elem (GameEvent.AbilityTriggered pack S.alice TriggerCondition.SelfBecomesBlocked) (S.eventsOf after)
+              let fired after = elem (GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered pack S.alice TriggerCondition.SelfBecomesBlocked)) (S.eventsOf after)
               Spec.assertBool s (not (fired (S.runToStep (Phase.Combat CombatStep.CombatDamage) noBlocks gs))) "nothing blocked, so nothing triggered"
               Spec.assertBool s (fired (atDamage gs)) "and the same board with the block taken does trigger"
             _ -> Spec.assertFailure s "fixture should give alice one Pack"
@@ -7896,11 +7905,11 @@ representativeEvents cond =
         -- so the pin here is that an inherent condition binds nothing from the
         -- log, which is what Event.eventBindingSlots claims for it.
         TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost (LifeChange.MkLifeChange S.bob 2))
-        TriggerCondition.SelfCycled -> one (GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost)
+        TriggerCondition.SelfCycled -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.ToPayCyclingCost))
         -- CR 702.94a's cause, so the event is one this condition genuinely
         -- admits; an Ordinary reveal would pin nothing.
-        TriggerCondition.SelfRevealedForMiracle -> one (GameEvent.Revealed S.alice departed RevealCause.ForMiracle S.emptyCharacteristics)
-        TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded S.alice departed DiscardCause.Ordinary)
+        TriggerCondition.SelfRevealedForMiracle -> one (GameEvent.Revealed (Revealed.MkRevealed S.alice departed RevealCause.ForMiracle S.emptyCharacteristics))
+        TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded (Discarded.MkDiscarded S.alice departed DiscardCause.Ordinary))
         -- The ordinal matches the condition's own, so the event is one this
         -- condition genuinely admits -- an event it rejected would pin nothing,
         -- eventBindings being consulted only for a match.
@@ -7909,19 +7918,19 @@ representativeEvents cond =
         -- controller: eventBindings binds this field under `thatPlayer`, so an
         -- arm that bound the attacking side instead would still agree with
         -- eventBindingSlots here if the two coincided.
-        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol 1)
+        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol 1))
         -- The same declaration event. This one binds NOTHING off it, which is
         -- what eventBindingSlots claims and what the pin here checks -- the
         -- defending player the event carries is not rule 702.149a's to read.
-        TriggerCondition.SelfAttacksWithAnother _ -> one (GameEvent.AttackerDeclared departed S.carol 1)
+        TriggerCondition.SelfAttacksWithAnother _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol 1))
         -- The same declaration event, with the count that makes it CR 506.5's
         -- alone -- and the ATTACKER is what this one binds, where SelfAttacks
         -- above binds the defending player off the very same event.
-        TriggerCondition.CreatureAttacksAlone _ -> one (GameEvent.AttackerDeclared departed S.carol 1)
+        TriggerCondition.CreatureAttacksAlone _ -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol 1))
         -- The same declaration event once more. Rule 702.105a binds NOTHING off
         -- it, SelfAttacksWithAnother's case: the player it compares is read from
         -- Combat.attackers and then never named again.
-        TriggerCondition.SelfAttacksPlayerWithMostLife -> one (GameEvent.AttackerDeclared departed S.carol 1)
+        TriggerCondition.SelfAttacksPlayerWithMostLife -> one (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared departed S.carol 1))
         -- The GROUPED blocking event, which is CR 509.3a's arity: one per blocking
         -- creature, whatever it was declared against.
         TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared departed 1))
@@ -7979,26 +7988,26 @@ representativeEvents cond =
         -- CR 714.2b: a placement on the BEARER that crosses the chapter. The
         -- bearer here is `departed`, the id Event.matchesTrigger is asked about
         -- below, and the counts straddle N so the event really matches.
-        TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind n) -> one (GameEvent.CountersPut departed kind 0 n)
+        TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind n) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 n))
         -- CR 310.11b: a removal on the BEARER that took the last counter, so the
         -- event really matches the condition Event.matchesTrigger is asked about.
-        TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved departed kind 1 0)
+        TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed kind 1 0))
         -- CR 601.2i's own event, and the only one this condition admits. Both
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
         -- on the pair.
-        TriggerCondition.SpellCast {} -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
+        TriggerCondition.SpellCast {} -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics))
         -- The same event, and the only one this condition admits either. It binds
         -- nothing whichever ids the event names, since the spell IS the bearer.
-        TriggerCondition.SelfCast -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
+        TriggerCondition.SelfCast -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics))
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
-        TriggerCondition.SelfHalfUnlocked half -> one (GameEvent.HalfUnlocked departed half False)
+        TriggerCondition.SelfHalfUnlocked half -> one (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked departed half False))
         -- CR 709.5i's own event, with the flag SET -- an unset one matches
         -- nothing, and would pin the floor against an event this condition does
         -- not admit.
-        TriggerCondition.RoomFullyUnlocked _ -> one (GameEvent.HalfUnlocked departed (CardName.MkCardName (Text.pack "Steaming Sauna")) True)
+        TriggerCondition.RoomFullyUnlocked _ -> one (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked departed (CardName.MkCardName (Text.pack "Steaming Sauna")) True))
         -- EVERY event any branch admits, concatenated, which is what makes the
         -- intersection below the honest floor for an AnyOf: a slot one branch
         -- binds and another does not must not be claimed.
@@ -8038,7 +8047,7 @@ representativeEvents cond =
         -- for what this pins: eventBindings contributes nothing for this
         -- condition under any event, so the floor is empty either way.
         TriggerCondition.SagaFinalChapterTriggers _ ->
-          one (GameEvent.AbilityTriggered departed S.alice (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 3)))
+          one (GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered departed S.alice (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 3))))
         -- CR 725.1's own event, and the only one this condition admits. CR 725.3
         -- makes it name exactly one player, so there is no second shape of the
         -- event for the floor to differ on. bob rather than the perspective
@@ -8051,11 +8060,11 @@ representativeEvents cond =
         -- same-player shape for the floor to come apart on. The ids and seats are
         -- arbitrary -- this condition binds nothing from the log, which is what
         -- Event.eventBindingSlots claims for it.
-        TriggerCondition.LoseControlOfBound _ -> one (GameEvent.ControlChanged departed S.alice S.bob)
+        TriggerCondition.LoseControlOfBound _ -> one (GameEvent.ControlChanged (ControlChanged.MkControlChanged departed S.alice S.bob))
         -- CR 309.4c's own event. The dungeon id and the room are arbitrary: this
         -- condition binds nothing from the log, which is what
         -- Event.eventBindingSlots claims for it.
-        TriggerCondition.RoomEntered _ -> one (GameEvent.VentureMarkerEntered S.alice departed RoomIndex.topmost)
+        TriggerCondition.RoomEntered _ -> one (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered S.alice departed RoomIndex.topmost))
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -10781,7 +10790,7 @@ rayOfCommandSpec s registry = Spec.describe s "RayOfCommand" $ do
     -- handoff.
     Spec.assertEqWith s "CR 514.3a the turn has not handed off" (GameState.turnNumber afterCleanup) (GameState.turnNumber scheduled)
     -- The observation point fired at all.
-    Spec.assertBool s (elem (GameEvent.ControlChanged bobPiker S.alice S.bob) (S.eventsOf afterCleanup)) "Engine.sampleControl minted CR 603.2's event for the reversion"
+    Spec.assertBool s (elem (GameEvent.ControlChanged (ControlChanged.MkControlChanged bobPiker S.alice S.bob)) (S.eventsOf afterCleanup)) "Engine.sampleControl minted CR 603.2's event for the reversion"
   where
     -- Narrows every target slot to one object, `aimedCast`'s filter without its cast
     -- pinning: the board holds two stealable creatures on purpose, so the engine's

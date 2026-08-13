@@ -24,6 +24,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttachTarget as AttachTarget
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -778,7 +779,7 @@ printedToughness face = case Face.characteristicPT face of
 -- out of the answer.
 declaredIt :: ObjectId -> GameEvent.GameEvent -> Bool
 declaredIt oid event = case event of
-  GameEvent.AttackerDeclared declared _ _ -> declared == oid
+  GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _) -> declared == oid
   _ -> False
 
 -- Shared assembly: fill a View from a projection's characteristics, a supplied

@@ -1,29 +1,29 @@
 module Pawl.Types.GameEvent where
 
-import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
-import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
-import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
-import qualified Pawl.Types.RevealCause as RevealCause
-import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StepBegan as StepBegan
-import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 
 -- | CR 608.2i: one entry of the turn-scoped record of what happened. Effects
 -- that look back in time read it, so entries are APPENDED by the
@@ -104,7 +104,7 @@ data GameEvent
     -- a spell there and says in as many words that it "isn't cast", and CR 601.2
     -- can reverse a proposed cast after the move has already happened -- which is
     -- why Pawl.Engine.Cast emits this only past the last step that can fail.
-    SpellCast PlayerId.PlayerId ObjectId.ObjectId !ProjectedCharacteristics.ProjectedCharacteristics
+    SpellCast SpellWasCast.SpellWasCast
   | -- | CR 725.1: a player became the monarch. What Palace Jailer's exile duration
     -- keys off, and the substrate for any future "whenever a player becomes the
     -- monarch" trigger.
@@ -133,7 +133,7 @@ data GameEvent
     -- is the rule that says they must stay apart -- a card a replacement sent to
     -- a hidden zone instead has still been discarded, so a reader matching the
     -- hand-to-graveyard zone pair would lose the case Rest in Peace creates.
-    Discarded PlayerId.PlayerId ObjectId.ObjectId DiscardCause.DiscardCause
+    Discarded Discarded.Discarded
   | -- | CR 121.1: a player DREW a card, and which of that player's draws this
     -- turn it was -- 1 for the first, counting up. Emitted by
     -- Pawl.Engine.Event.drawCard, the one funnel every draw goes through.
@@ -204,7 +204,7 @@ data GameEvent
     -- NOT the AttackTarget itself. That is a wider payload for a different
     -- question -- CR 508.3a's attacks-a-permanent form, CR 508.3b and CR 508.3e,
     -- which need trigger conditions no card in the pool declares (#538).
-    AttackerDeclared ObjectId.ObjectId PlayerId.PlayerId Natural.Natural
+    AttackerDeclared AttackerDeclared.AttackerDeclared
   | -- | CR 509.1i: a blocker was DECLARED -- one entry per creature the defending
     -- player chose in CR 509.1's turn-based action, naming the blocker and one
     -- attacking creature chosen for it (CR 509.1a). AttackerDeclared's mirror,
@@ -300,7 +300,7 @@ data GameEvent
     -- revealed to pay a cost, and one that stays revealed while a triggered
     -- ability it caused is on the stack -- need a per-object flag that no card
     -- in the pool asks for (#185, #282).
-    Revealed PlayerId.PlayerId !ObjectId.ObjectId !RevealCause.RevealCause !ProjectedCharacteristics.ProjectedCharacteristics
+    Revealed Revealed.Revealed
   | -- | CR 701.6a: a spell was COUNTERED. Emitted by Pawl.Engine.Event.counter,
     -- the one funnel every countering in the engine goes through, alongside the
     -- Moved event that same removal records.
@@ -417,7 +417,7 @@ data GameEvent
     -- before > after pair here. CR 122.6 is about putting counters on and every
     -- rule reading this constructor is phrased that way, so widening the pair
     -- would make every such reader ask which direction it went.
-    CountersPut ObjectId.ObjectId (CounterKind.CounterKind Keyword.Keyword) Natural.Natural Natural.Natural
+    CountersPut CounterChange.CounterChange
   | -- | Counters were REMOVED from an object -- the object, the kind, and the
     -- counts of that kind on it BEFORE and AFTER. CountersPut's mirror, and shaped
     -- the same way for the same reason: CR 310.11b's Siege ability asks whether the
@@ -434,7 +434,7 @@ data GameEvent
     -- cost, CR 306.8's damage to a planeswalker, CR 704.5q's annihilation -- stay
     -- direct writes and emit nothing, so a card triggering off one of those would
     -- not see it (#900).
-    CountersRemoved ObjectId.ObjectId (CounterKind.CounterKind Keyword.Keyword) Natural.Natural Natural.Natural
+    CountersRemoved CounterChange.CounterChange
   | -- | CR 709.5c: a permanent was given an UNLOCKED DESIGNATION -- the permanent,
     -- and the half the designation names. Emitted by Pawl.Engine.Event.unlockHalf,
     -- the one place a designation is given, and only when the permanent did not
@@ -471,7 +471,7 @@ data GameEvent
     -- write sites from one helper (Pawl.Engine.Event.fullyUnlockedAfter), so the
     -- entry designation (CR 709.5d) and the later one (CR 709.5f) cannot disagree
     -- about what "fully" means.
-    HalfUnlocked ObjectId.ObjectId CardName.CardName Bool
+    HalfUnlocked HalfUnlocked.HalfUnlocked
   | -- | CR 708.7: a face-down permanent was turned face up. CR 708.8 makes that a
     -- change to one permanent's copiable values rather than a zone change, so no
     -- Moved event describes it and nothing else in this list carries it.
@@ -602,7 +602,7 @@ data GameEvent
     -- No entry for a SOURCELESS inherent ability (CR 725.2's monarch pair, CR
     -- 702.179d's speed increase, CR 728.1's rad counters) and none for a CR 603.7
     -- delayed ability, so nothing can trigger off one of those triggering (#1026).
-    AbilityTriggered ObjectId.ObjectId PlayerId.PlayerId TriggerCondition.TriggerCondition
+    AbilityTriggered AbilityTriggered.AbilityTriggered
   | -- | A permanent's CONTROLLER CHANGED: the permanent, the player who controlled
     -- it when the game last looked, and the player who controls it now. The event
     -- Ray of Command's "when you lose control of the creature" matches (CR 603.7).
@@ -626,7 +626,7 @@ data GameEvent
     -- though its controller stops controlling it. CR 400.7 makes what comes back a
     -- new object with a new id, so nothing can observe the difference through a
     -- binding taken before the move.
-    ControlChanged ObjectId.ObjectId PlayerId.PlayerId PlayerId.PlayerId
+    ControlChanged ControlChanged.ControlChanged
   | -- | CR 309.4c \/ 701.49a\/b: a player moved their venture marker into a room --
     -- the player, the dungeon card it is on, and which room. What CR 309.4c's
     -- unprinted trigger condition ("When you move your venture marker into this
@@ -641,5 +641,5 @@ data GameEvent
     -- Carries the dungeon's ObjectId as well as the room, because the room index
     -- alone names nothing: two players may be in room 1 of two different dungeons,
     -- and CR 309.4c makes each room ability the dungeon card's own.
-    VentureMarkerEntered PlayerId.PlayerId ObjectId.ObjectId RoomIndex.RoomIndex
+    VentureMarkerEntered VentureMarkerEntered.VentureMarkerEntered
   deriving (Eq, Ord, Show)

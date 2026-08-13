@@ -43,6 +43,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -176,7 +177,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
       let (ratId, gs) = S.addCreature typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
           zc = ZoneChange.MkZoneChange ratId ratId Zone.Battlefield Zone.Graveyard
           snapshot = Projection.project ratId gs
-      roundTrip s "moved" GameEvent.Codec.toJson GameEvent.Codec.fromJson (GameEvent.Moved (Moved.MkMoved zc snapshot))
+      roundTrip s "moved" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Moved (Moved.MkMoved zc snapshot))
     -- The snapshot's keywords are counted per keyword (CR 702.164b), so a
     -- COUNT has to survive the wire and not just a membership: the
     -- array-with-repeats encoding is what carries it. A Set-shaped encoder
@@ -190,7 +191,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
           snapshot = Projection.project oid (grant 101 (grant 100 gs0))
           zc = ZoneChange.MkZoneChange oid oid Zone.Battlefield Zone.Graveyard
       Spec.assertEqWith s "the fixture really does carry toxic 1 twice" (Map.lookup (Keyword.Toxic 1) (PC.keywords snapshot)) (Just 2)
-      roundTrip s "moved" GameEvent.Codec.toJson GameEvent.Codec.fromJson (GameEvent.Moved (Moved.MkMoved zc snapshot))
+      roundTrip s "moved" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Moved (Moved.MkMoved zc snapshot))
     -- GameEvent's own per-constructor coverage (DamageDealt, both a player
     -- and a CR 120.3c planeswalker Recipient; StepBegan; SpellCast;
     -- BecameMonarch; Discarded, both causes; AttackerDeclared;
@@ -206,7 +207,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     Spec.it s "GameEvent.Revealed round-trips with its snapshot" $ do
       typhoidRats <- S.printingOf s registry "Typhoid Rats"
       let (ratId, gs) = S.addLibraryCard typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
-      roundTrip s "revealed" GameEvent.Codec.toJson GameEvent.Codec.fromJson (GameEvent.Revealed S.alice ratId RevealCause.ForMiracle (Projection.project ratId gs))
+      roundTrip s "revealed" (Codec.encode GameEvent.Codec.codec) (Codec.decode GameEvent.Codec.codec) (GameEvent.Revealed (Revealed.MkRevealed S.alice ratId RevealCause.ForMiracle (Projection.project ratId gs)))
     -- TriggerCondition's own per-constructor coverage lives in
     -- Pawl.Codec.TriggerConditionSpec now.
     Spec.it s "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $

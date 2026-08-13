@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardType as CardType
@@ -1548,7 +1549,7 @@ declareAttackers pid = do
                 ( \g ->
                     let defendingFor oid = Maybe.fromMaybe defender ((\t -> Defender.playerOf t g) =<< Map.lookup oid recorded)
                         declared = Natural.length attacking
-                     in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid (defendingFor oid) declared) h) g attacking
+                     in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid (defendingFor oid) declared)) h) g attacking
                 )
 
 -- CR 508.4: a creature put onto the battlefield attacking has its controller

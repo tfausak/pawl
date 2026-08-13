@@ -47,9 +47,11 @@ import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import Pawl.Types.Binding (Binding)
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
@@ -61,7 +63,9 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterCause as CounterCause
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
@@ -75,6 +79,7 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -88,6 +93,7 @@ import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -121,11 +127,13 @@ import Pawl.Types.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellCast as SpellCast
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.StepBegins as StepBegins
@@ -141,6 +149,7 @@ import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import Pawl.Types.TurnWindow (TurnWindow)
 import qualified Pawl.Types.TurnWindow as TurnWindow
+import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
@@ -348,7 +357,7 @@ damageOf event = case event of
 -- Who revealed what, if the event is a reveal (CR 701.20a).
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
 revealOf event = case event of
-  GameEvent.Revealed pid _ _ snapshot -> Just (pid, snapshot)
+  GameEvent.Revealed (Revealed.MkRevealed pid _ _ snapshot) -> Just (pid, snapshot)
   GameEvent.Moved {} -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented {} -> Nothing
@@ -1495,7 +1504,7 @@ unlockHalf oid half = do
         State.modify' $ \g ->
           let open o = o {Object.unlockedHalves = opened}
            in g {GameState.objects = Map.adjust open oid (GameState.objects g)}
-        State.modify' (recordEvent (GameEvent.HalfUnlocked oid half (fullyUnlockedAfter opened (Game.cardOf oid gs))))
+        State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid half (fullyUnlockedAfter opened (Game.cardOf oid gs)))))
 
 -- CR 709.5i's "fully unlocks", answered about the designations a permanent has
 -- ONCE a write has landed: "such an ability triggers when that permanent has one
@@ -1628,7 +1637,7 @@ putCounters cause oid kind n = do
               -- Guarded by the same `settledCount > 0` the write is: an event
               -- recorded for a placement that did not happen would fire a chapter
               -- ability off nothing.
-              State.modify' (recordEvent (GameEvent.CountersPut target settledKind before (before + settledCount)) . bumped)
+              State.modify' (recordEvent (GameEvent.CountersPut (CounterChange.MkCounterChange target settledKind before (before + settledCount))) . bumped)
               pure settledCount
 
 -- CR 122.6a: putCounters with the rule's DEFAULT putter -- "if the effect doesn't
@@ -1691,7 +1700,7 @@ removeCounters oid kind n =
             -- which is the guard putCounters puts on its own write.
             if before == 0
               then gs
-              else recordEvent (GameEvent.CountersRemoved oid kind before after) dropped
+              else recordEvent (GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind before after)) dropped
 
 -- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
 --
@@ -2301,7 +2310,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
           -- permanent that "has neither designation and gains both" -- is
           -- therefore unreachable and untested (#962).
           Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
-            State.modify' (recordEvent (GameEvent.HalfUnlocked newId half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs))))
+            State.modify' (recordEvent (GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked newId half (fullyUnlockedAfter (foldMap Set.singleton shown) (Game.cardOf oid gs)))))
           -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
           -- what an enters trigger scans -- alongside the id it had in `fromZone`,
           -- which is the key `lastKnown` is filed under and so the only route back
@@ -2810,7 +2819,7 @@ discard cause pid oid = do
   moved <- changeZoneReturning oid Zone.Graveyard
   case moved of
     Nothing -> pure ()
-    Just newId -> State.modify' (recordEvent (GameEvent.Discarded pid newId cause))
+    Just newId -> State.modify' (recordEvent (GameEvent.Discarded (Discarded.MkDiscarded pid newId cause)))
 
 -- The single reveal funnel (CR 701.20a): `pid` shows `oid` to all players, which
 -- here means appending what was shown to the public log. No-op for an unknown id.
@@ -2830,7 +2839,7 @@ reveal :: RevealCause.RevealCause -> PlayerId -> ObjectId -> Game ()
 reveal cause pid oid = do
   gs <- State.get
   Monad.when (Maybe.isJust (Game.lookupObject oid gs)) $
-    State.modify' (recordEvent (GameEvent.Revealed pid oid cause (Projection.project oid gs)))
+    State.modify' (recordEvent (GameEvent.Revealed (Revealed.MkRevealed pid oid cause (Projection.project oid gs))))
 
 -- CR 508.3a / 608.2i: how many times this object has been declared as an attacker
 -- this turn, read out of the turn-scoped event log. Only Combat.declareAttackers
@@ -2839,7 +2848,7 @@ reveal cause pid oid = do
 declarationsOf :: ObjectId -> GameState -> Int
 declarationsOf bearer gs =
   let declaredIt event = case event of
-        GameEvent.AttackerDeclared oid _ _ -> oid == bearer
+        GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _) -> oid == bearer
         _ -> False
    in length (Seq.filter (declaredIt . snd) (GameState.events gs))
 
@@ -3101,8 +3110,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- ordinary discard of a card that HAS cycling reaches the same graveyard through
   -- the same funnel and must fire nothing.
   TriggerCondition.SelfCycled -> case event of
-    GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> oid == bearer
-    GameEvent.Discarded _ _ DiscardCause.Ordinary -> False
+    GameEvent.Discarded (Discarded.MkDiscarded _ oid DiscardCause.ToPayCyclingCost) -> oid == bearer
+    GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary) -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -3153,8 +3162,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- draw, and re-reading GameState.drawsThisTurn at the scan would ask about the
   -- board one CR 117.5 boundary later.
   TriggerCondition.SelfRevealedForMiracle -> case event of
-    GameEvent.Revealed _ oid RevealCause.ForMiracle _ -> oid == bearer
-    GameEvent.Revealed _ _ RevealCause.Ordinary _ -> False
+    GameEvent.Revealed (Revealed.MkRevealed _ oid RevealCause.ForMiracle _) -> oid == bearer
+    GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.Ordinary _) -> False
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
@@ -3200,7 +3209,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- TriggerSpec's "CR 702.29d cycling a card fires the discard trigger exactly
   -- once" is the test that proves it.
   TriggerCondition.PlayerDiscards relation -> case event of
-    GameEvent.Discarded discarder _ _ -> case relation of
+    GameEvent.Discarded (Discarded.MkDiscarded discarder _ _) -> case relation of
       PlayerRelation.You -> discarder == you
       PlayerRelation.Opponent -> discarder /= you
     GameEvent.Drew {} -> False
@@ -3326,7 +3335,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- sentence true -- a creature put onto the battlefield attacking is in the
   -- record and has no event here.
   TriggerCondition.SelfAttacks frequency -> case event of
-    GameEvent.AttackerDeclared oid _ _ ->
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _) ->
       oid == bearer && case frequency of
         TriggerFrequency.EveryTime -> True
         -- "For the first time each turn". The declaration being matched is
@@ -3383,7 +3392,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- a REGRESSION FENCE rather than a live path: the bearer was declared an
   -- attacker a moment ago and nothing has had priority since.
   TriggerCondition.SelfAttacksWithAnother f -> case event of
-    GameEvent.AttackerDeclared oid _ _
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _)
       | oid == bearer ->
           let viewOf = Projection.viewWithLastKnown bearer gs
               context = Filter.contextComparingPower (Just you) bearer (Filter.power =<< viewOf bearer)
@@ -3433,7 +3442,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- and CR 508.2's triggers go on the stack before any player gets priority.
   -- viewWithLastKnown for PermanentEnters' reason.
   TriggerCondition.CreatureAttacksAlone f -> case event of
-    GameEvent.AttackerDeclared attacker _ count
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ count)
       | count == 1 ->
           case Projection.viewWithLastKnown attacker gs attacker of
             Nothing -> False
@@ -3479,7 +3488,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Game.stillPlaying rather than every seat the game began with: a player who has
   -- left (CR 800.4a) has no life total left to be beaten.
   TriggerCondition.SelfAttacksPlayerWithMostLife -> case event of
-    GameEvent.AttackerDeclared oid _ _
+    GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _)
       | oid == bearer ->
           case Map.lookup bearer (Combat.attackers (GameState.combat gs)) of
             Just (AttackTarget.OfPlayer attacked) ->
@@ -4299,7 +4308,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- Read ahead (CR 702.155a) is the mechanic that wants the equality instead, and
   -- then only on the turn the Saga entered; it is not implemented (#841).
   TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached wanted n) -> case event of
-    GameEvent.CountersPut oid kind before after -> oid == bearer && kind == wanted && Saga.crossed before after n
+    GameEvent.CountersPut (CounterChange.MkCounterChange oid kind before after) -> oid == bearer && kind == wanted && Saga.crossed before after n
     -- Rule 714.2b says "are PUT onto", so a removal crosses nothing: a Saga whose
     -- lore counters were taken off and put back fires its chapters again.
     GameEvent.CountersRemoved {} -> False
@@ -4338,7 +4347,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- nothing is not in the log to match. That invariant is the record's, stated on
   -- the constructor, exactly as CountersPut's "before < after" is.
   TriggerCondition.SelfLastCounterRemoved wanted -> case event of
-    GameEvent.CountersRemoved oid kind _ after -> oid == bearer && kind == wanted && after == 0
+    GameEvent.CountersRemoved (CounterChange.MkCounterChange oid kind _ after) -> oid == bearer && kind == wanted && after == 0
     GameEvent.CountersPut {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
@@ -4397,7 +4406,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
   -- 603.3a), exactly as the StepBegins arm above reads its own.
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope) -> case event of
-    GameEvent.SpellCast caster spell _ -> case Game.lookupObject spell gs of
+    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
         turnScopeAdmits scope (GameState.activePlayer gs) you
@@ -4441,7 +4450,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- carries: CR 601.2a puts the card on the stack as it is cast and leaves it
   -- there, so eventTriggers' `spellCast` source offers exactly that incarnation.
   TriggerCondition.SelfCast -> case event of
-    GameEvent.SpellCast _ spell _ -> spell == bearer
+    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast _ spell _) -> spell == bearer
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
@@ -4478,7 +4487,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 709.5h fires "when a player unlocks a PARTICULAR half", so a Room whose
   -- other door was the one that opened must not fire this ability.
   TriggerCondition.SelfHalfUnlocked half -> case event of
-    GameEvent.HalfUnlocked oid name _ -> oid == bearer && name == half
+    GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid name _) -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -4744,7 +4753,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   --
   -- Whose ACTION opened the door is a different question, and not this one (#961).
   TriggerCondition.RoomFullyUnlocked relation -> case event of
-    GameEvent.HalfUnlocked oid _ fully ->
+    GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid _ fully) ->
       fully && case Projection.controllerOf oid gs of
         Nothing -> False
         Just controller -> case relation of
@@ -4856,7 +4865,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- as an object with no subtypes, which Saga.tracksLore declines -- the same
   -- silence CR 603.10 would give a look-back that found nothing (#1028).
   TriggerCondition.SagaFinalChapterTriggers relation -> case event of
-    GameEvent.AbilityTriggered srcId controller fired ->
+    GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered srcId controller fired) ->
       ( case relation of
           PlayerRelation.You -> controller == you
           PlayerRelation.Opponent -> controller /= you
@@ -4913,7 +4922,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- whose controller can lose control of a DIFFERENT permanent while this entry is
   -- armed is what would observe it.
   TriggerCondition.LoseControlOfBound slot -> case event of
-    GameEvent.ControlChanged oid before _ ->
+    GameEvent.ControlChanged (ControlChanged.MkControlChanged oid before _) ->
       Map.lookup slot (Binding.objectSlots bindings) == Just oid && before == you
     GameEvent.VentureMarkerEntered {} -> False
     GameEvent.AbilityTriggered {} -> False
@@ -4950,7 +4959,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- -- so this is a regression fence rather than a proven path, and it is written
   -- to agree with that gatherer rather than to differ.
   TriggerCondition.RoomEntered room -> case event of
-    GameEvent.VentureMarkerEntered _ oid entered -> oid == bearer && entered == room
+    GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered _ oid entered) -> oid == bearer && entered == room
     GameEvent.ControlChanged {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -5181,7 +5190,7 @@ eventBindings cond event = case (cond, event) of
   -- carries directly. The same reserved slot CR 702.70a's poisonous uses, for the
   -- same reason -- a player the EVENT names, which CR 109.5's `you` cannot stand
   -- in for.
-  (TriggerCondition.PlayerDiscards _, GameEvent.Discarded discarder _ _) ->
+  (TriggerCondition.PlayerDiscards _, GameEvent.Discarded (Discarded.MkDiscarded discarder _ _)) ->
     Binding.setTriggerPlayer discarder Map.empty
   -- CR 702.86a's "defending player": CR 508.5 resolves that phrase through what
   -- the attacking creature is attacking, and Pawl.Engine.Combat.declareAttackers
@@ -5194,13 +5203,13 @@ eventBindings cond event = case (cond, event) of
   -- Read off the event rather than derived, which is what makes this arm possible
   -- at all: this function takes no game state, and both the planeswalker and the
   -- battle forms of CR 508.5 need the board.
-  (TriggerCondition.SelfAttacks _, GameEvent.AttackerDeclared _ defending _) ->
+  (TriggerCondition.SelfAttacks _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared _ defending _)) ->
     Binding.setTriggerPlayer defending Map.empty
   -- CR 702.83a's "that creature": the creature that attacked alone, which is the
   -- id the same event names -- and NOT the bearer, since rule 702.83a's condition
   -- watches every creature its controller has. The defending player the event
   -- also carries is not bound, because rule 702.83a names no player.
-  (TriggerCondition.CreatureAttacksAlone _, GameEvent.AttackerDeclared attacker _ _) ->
+  (TriggerCondition.CreatureAttacksAlone _, GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared attacker _ _)) ->
     Binding.setAttackingCreature attacker Map.empty
   -- CR 702.130a's "defending player", the same phrase and the same reserved slot
   -- as the arm above -- CR 508.5 resolves it for an ability of an ATTACKING
@@ -5284,7 +5293,7 @@ eventBindings cond event = case (cond, event) of
   -- Filter in hand, so a slot it names has to hold for every cast the condition
   -- can match. Both do: GameEvent.SpellCast carries an ObjectId and a PlayerId
   -- unconditionally, so no shape of the event withholds either.
-  (TriggerCondition.SpellCast {}, GameEvent.SpellCast caster spell _) ->
+  (TriggerCondition.SpellCast {}, GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _)) ->
     Binding.setTriggerPlayer caster (Binding.setCastSpell spell Map.empty)
   -- CR 509.3d's "that creature": the blocker whose declaration fired this, which
   -- rule 702.25a's payload gives -1/-1. Unconditional in the same sense as the
@@ -6055,12 +6064,12 @@ eventTriggers events gs =
       -- about cycling specifically. An ordinary discard's card reaches the
       -- graveyard too and is offered by `inGraveyards` under CR 113.6k.
       cycledCard event = case event of
-        GameEvent.Discarded _ oid DiscardCause.ToPayCyclingCost -> case Game.lookupObject oid gs of
+        GameEvent.Discarded (Discarded.MkDiscarded _ oid DiscardCause.ToPayCyclingCost) -> case Game.lookupObject oid gs of
           Nothing -> Map.empty
           Just obj -> case Game.faceOf oid gs of
             Nothing -> Map.empty
             Just face -> Map.singleton oid (Object.owner obj, Face.triggeredAbilities face)
-        GameEvent.Discarded _ _ DiscardCause.Ordinary -> Map.empty
+        GameEvent.Discarded (Discarded.MkDiscarded _ _ DiscardCause.Ordinary) -> Map.empty
         -- A draw names no object either. The card it puts in a hand may well bear
         -- an ability that triggers from there -- CR 702.94a's miracle -- but that
         -- one fires on the REVEAL rather than on the draw, and `revealedInHand`
@@ -6167,7 +6176,7 @@ eventTriggers events gs =
       --
       -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#160).
       spellCast event = case event of
-        GameEvent.SpellCast caster spell _ -> case Game.faceOf spell gs of
+        GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
           Just face -> case filter (functionsIn Zone.Stack) (Face.triggeredAbilities face) of
             [] -> Map.empty
@@ -6268,13 +6277,13 @@ eventTriggers events gs =
       -- reveal is one a player makes from their own hand, so the owner is also the
       -- revealer, and CR 109.5's "you" lands on the same seat either way.
       revealedInHand event = case event of
-        GameEvent.Revealed _ oid RevealCause.ForMiracle _ -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
+        GameEvent.Revealed (Revealed.MkRevealed _ oid RevealCause.ForMiracle _) -> case (Game.lookupObject oid gs, Game.faceOf oid gs) of
           (Just obj, Just face) ->
             case filter (functionsIn Zone.Hand) (Face.triggeredAbilities face <> Keyword.printedTriggeredAbilitiesOf (Face.keywords face)) of
               [] -> Map.empty
               abilities -> Map.singleton oid (Object.owner obj, abilities)
           _ -> Map.empty
-        GameEvent.Revealed _ _ RevealCause.Ordinary _ -> Map.empty
+        GameEvent.Revealed (Revealed.MkRevealed _ _ RevealCause.Ordinary _) -> Map.empty
         GameEvent.Discarded {} -> Map.empty
         GameEvent.Drew {} -> Map.empty
         GameEvent.Moved {} -> Map.empty

@@ -31,6 +31,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
@@ -236,7 +237,7 @@ awaitingChapter pcs events gs oid =
       -- permanent that crossed one of its chapters. The same comparison
       -- Pawl.Engine.Event.matchesTrigger makes, through the same `crossed`.
       pending event = case event of
-        GameEvent.CountersPut target CounterKind.Lore before after ->
+        GameEvent.CountersPut (CounterChange.MkCounterChange target CounterKind.Lore before after) ->
           target == oid && any (crossed before after) chapters
         _ -> False
    in any onStack (GameState.stack gs) || any pending events

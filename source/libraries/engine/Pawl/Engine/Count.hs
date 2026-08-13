@@ -37,6 +37,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- The characteristics of a candidate, as of the layers the CALLER has already
@@ -385,7 +386,7 @@ snapshotView gs shape event = case event of
   -- that spell has resolved or been countered, so the live object is gone.
   -- TriggerCondition.SpellCast is the other reader and does read it live, which
   -- it can -- CR 601.2i's trigger is checked while the spell is still there.
-  GameEvent.SpellCast caster _spell snapshot -> case shape of
+  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster _spell snapshot) -> case shape of
     -- CR 601.2a: "that player becomes its controller", so the caster the event
     -- recorded IS the view's controller and Filter.ControlledBy You answers "a
     -- spell you've cast". The spell's id is deliberately left out of the view

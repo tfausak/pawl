@@ -50,6 +50,7 @@ import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Uses as Uses
@@ -1217,7 +1218,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
                           -- have nothing to read. CR 601.2i has already applied
                           -- the effects that modify the spell as it is cast, so
                           -- this records what became cast.
-                          State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast pid sid (Projection.project sid g)) g)
+                          State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g))) g)
                           -- Stamped on `sid` itself, the incarnation CR 601.2a
                           -- put on the stack, rather than on whatever is on top
                           -- of it now.
