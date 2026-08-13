@@ -11,7 +11,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
--- | Tagged like every other sum. The five arms were previously told apart by
+-- | Tagged like every other sum. The arms were previously told apart by
 -- JSON TYPE -- a string was a slot, an object the battlefield sweep's Filter,
 -- and everything else an array leading with its own word -- which no schema can
 -- state as a claim the decoder guarantees (#1304). The word an array led with
@@ -22,8 +22,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- was waiting on. The wire format is unchanged by that conversion -- the same
 -- five tags, emitted identically -- and what it adds is the schema.
 --
--- 'EachCardInGraveyard' and 'TopOfLibrary' are the arms with two payloads, so
--- each takes a 'Common.tuple'. Under the #1305 decision they owe records of
+-- 'EachCardInGraveyard', 'TopOfLibrary' and 'ChosenCardInGraveyard' are the arms
+-- with two payloads, so each takes a 'Common.tuple'. Under the #1305 decision they owe records of
 -- their own like every other multi-payload arm; that lands with the
 -- payload-records unit.
 codec :: Codec.Codec ObjectRef.ObjectRef
@@ -34,7 +34,8 @@ codec =
       Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching,
       Arm.payload "EachCardInGraveyard" (Common.tuple PlayerScope.codec filterCodec) (uncurry ObjectRef.EachCardInGraveyard),
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
-      Arm.payload "TopOfLibrary" (Common.tuple PlayerRef.codec Common.natural) (uncurry ObjectRef.TopOfLibrary)
+      Arm.payload "TopOfLibrary" (Common.tuple PlayerRef.codec Common.natural) (uncurry ObjectRef.TopOfLibrary),
+      Arm.payload "ChosenCardInGraveyard" (Common.tuple PlayerScope.codec filterCodec) (uncurry ObjectRef.ChosenCardInGraveyard)
     ]
   where
     -- Written once so the encoder, the decoder and the schema cannot disagree
@@ -50,3 +51,6 @@ codec =
       ObjectRef.TopOfLibrary p n ->
         Common.tagged "TopOfLibrary" . Just . Value.array $
           [Codec.encode PlayerRef.codec p, Common.encodeNatural n]
+      ObjectRef.ChosenCardInGraveyard s f ->
+        Common.tagged "ChosenCardInGraveyard" . Just . Value.array $
+          [Codec.encode PlayerScope.codec s, Codec.encode filterCodec f]

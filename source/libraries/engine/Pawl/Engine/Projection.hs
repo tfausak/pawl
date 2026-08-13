@@ -1619,10 +1619,11 @@ swapWordIn family pairs word = List.foldl' step word pairs
     step s (from, to) = if s == from && Subtype.inFamily family from then to else s
 
 -- CR 612.1 through an ObjectRef. InSlot names an object chosen at cast time
--- rather than a word on the card; the two sweeping arms' Filters are card text
--- like any other, and a graveyard sweep's PlayerScope names players rather than
--- subtypes. EachPlayer and TopOfLibrary carry no word at all -- CR 612.1 changes
--- subtype words, and "each player" and "the top card of your library" have none.
+-- rather than a word on the card; the sweeping arms' Filters and the chosen
+-- card's are card text like any other, and a graveyard arm's PlayerScope names
+-- players rather than subtypes. EachPlayer and TopOfLibrary carry no word at all
+-- -- CR 612.1 changes subtype words, and "each player" and "the top card of your
+-- library" have none.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
@@ -1630,6 +1631,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachCardInGraveyard s f -> ObjectRef.EachCardInGraveyard s (Filter.rewrite pairs f)
   ObjectRef.EachPlayer -> ref
   ObjectRef.TopOfLibrary _ _ -> ref
+  ObjectRef.ChosenCardInGraveyard s f -> ObjectRef.ChosenCardInGraveyard s (Filter.rewrite pairs f)
 
 -- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --

@@ -81,6 +81,17 @@ data Response
     ChoseRedistribution (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   | -- | CR 701.54a: the creature a tempted player chose as their Ring-bearer.
     ChoseRingBearer ObjectId.ObjectId
+  | -- | CR 608.2d: the graveyard card the resolving controller chose for an
+    -- Pawl.Types.ObjectRef.ChosenCardInGraveyard.
+    --
+    -- Its own constructor rather than ChoseRingBearer reused, though both name
+    -- one object: Pawl.Engine.Replay gives every prompt its own response so a
+    -- decode can reject one that does not match the prompt asked, and the two
+    -- questions differ in what the candidates ARE -- permanents on the
+    -- battlefield against cards in a graveyard, the split
+    -- Prompt.ChooseExilesFromGraveyard already draws against
+    -- Prompt.ChooseSacrifices.
+    ChoseCardInGraveyard ObjectId.ObjectId
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.
     ChoseRoom RoomIndex.RoomIndex
   | -- | CR 704.5j: the legendary permanent its controller kept.
