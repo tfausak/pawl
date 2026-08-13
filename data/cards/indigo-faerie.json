@@ -24,11 +24,11 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "modification": {
                             "type": "AddColor",
                             "value": [
                               {
@@ -36,11 +36,11 @@
                               }
                             ]
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

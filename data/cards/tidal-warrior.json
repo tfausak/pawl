@@ -19,21 +19,21 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "modification": {
                             "type": "SetLandSubtype",
                             "value": {
                               "type": "Island"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

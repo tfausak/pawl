@@ -11,6 +11,7 @@ import qualified Pawl.CastSpec
 import qualified Pawl.Codec.AbilityNameSpec
 import qualified Pawl.Codec.ActivatedAbilitySpec
 import qualified Pawl.Codec.ActivationRestrictionSpec
+import qualified Pawl.Codec.AffectPlayersSpec
 import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AggregationSpec
@@ -21,11 +22,13 @@ import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockRequirementSpec
+import qualified Pawl.Codec.CardNameSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
 import qualified Pawl.Codec.CastOfferSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
+import qualified Pawl.Codec.ChangeTextSpec
 import qualified Pawl.Codec.ChooserSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
@@ -90,6 +93,7 @@ import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
 import qualified Pawl.Codec.ModeSpec
 import qualified Pawl.Codec.ModificationSpec
+import qualified Pawl.Codec.ModifyTargetSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveToZoneSpec
@@ -107,6 +111,7 @@ import qualified Pawl.Codec.PlayerIdSpec
 import qualified Pawl.Codec.PlayerQuantitySpec
 import qualified Pawl.Codec.PlayerRefSpec
 import qualified Pawl.Codec.PlayerRelationSpec
+import qualified Pawl.Codec.PlayerSacrificesSpec
 import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PlayerStaticAbilitySpec
 import qualified Pawl.Codec.PoolSpec
@@ -121,6 +126,7 @@ import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.RemoveCountersSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
+import qualified Pawl.Codec.RequireBlockSpec
 import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
@@ -299,6 +305,7 @@ spec s registry = do
   Pawl.Codec.AbilityNameSpec.spec s
   Pawl.Codec.ActivatedAbilitySpec.spec s
   Pawl.Codec.ActivationRestrictionSpec.spec s
+  Pawl.Codec.AffectPlayersSpec.spec s
   Pawl.Codec.AffectedPlayersSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
@@ -309,11 +316,13 @@ spec s registry = do
   Pawl.Codec.BindingSpec.spec s
   Pawl.Codec.BlockPermissionSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
+  Pawl.Codec.CardNameSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
   Pawl.Codec.CastOfferSpec.spec s
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s
+  Pawl.Codec.ChangeTextSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
@@ -378,6 +387,7 @@ spec s registry = do
   Pawl.Codec.ModeSelectionSpec.spec s
   Pawl.Codec.ModeSpec.spec s
   Pawl.Codec.ModificationSpec.spec s
+  Pawl.Codec.ModifyTargetSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.MorphVariantSpec.spec s
   Pawl.Codec.MoveToZoneSpec.spec s
@@ -395,6 +405,7 @@ spec s registry = do
   Pawl.Codec.PlayerQuantitySpec.spec s
   Pawl.Codec.PlayerRefSpec.spec s
   Pawl.Codec.PlayerRelationSpec.spec s
+  Pawl.Codec.PlayerSacrificesSpec.spec s
   Pawl.Codec.PlayerScopeSpec.spec s
   Pawl.Codec.PlayerStaticAbilitySpec.spec s
   Pawl.Codec.PoolSpec.spec s
@@ -407,6 +418,7 @@ spec s registry = do
   Pawl.Codec.ReduceActivationCostSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
+  Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s

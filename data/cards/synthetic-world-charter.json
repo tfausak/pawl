@@ -25,21 +25,21 @@
                 "effects": [
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "AddSupertype",
                         "value": {
                           "type": "World"
                         }
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

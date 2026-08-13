@@ -19,47 +19,47 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfCombat"
                           },
-                          {
+                          "modification": {
                             "type": "AddCardType",
                             "value": {
                               "type": "Creature"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfCombat"
                           },
-                          {
+                          "modification": {
                             "type": "SetCreatureSubtype",
                             "value": {
                               "type": "Golem"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfCombat"
                           },
-                          {
+                          "modification": {
                             "type": "SetBasePowerToughness",
                             "value": [
                               {
@@ -72,11 +72,11 @@
                               }
                             ]
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

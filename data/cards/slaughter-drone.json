@@ -21,21 +21,21 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "modification": {
                             "type": "GainKeyword",
                             "value": {
                               "type": "Deathtouch"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

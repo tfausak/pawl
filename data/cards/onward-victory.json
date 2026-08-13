@@ -25,11 +25,11 @@
                 "effects": [
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "ModifyPowerToughness",
                         "value": [
                           {
@@ -41,11 +41,11 @@
                           }
                         ]
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }
@@ -98,21 +98,21 @@
                 "effects": [
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "GainKeyword",
                         "value": {
                           "type": "DoubleStrike"
                         }
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

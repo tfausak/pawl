@@ -3,8 +3,9 @@ module Pawl.Types.Effect where
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
-import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -19,26 +20,25 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.Mill as Mill
-import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
-import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
-import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Uses as Uses
 
 -- | The ISA (design.md section 1): first-order, non-recursive in CONTROL FLOW --
@@ -78,7 +78,7 @@ data Effect card
     -- projection would pump a creature that became attacking later. The one-shot
     -- ObjectRef opcodes (Destroy, Untap) are under CR 608.2c/608.2f and store
     -- nothing.
-    ModifyTarget Duration.Duration Modification.Modification ObjectRef.ObjectRef
+    ModifyTarget ModifyTarget.ModifyTarget
   | -- | CR 612: rewrite subtype words in the target spell or permanent. The
     -- SubtypeFamily is which words the card's own text names -- Magical Hack's
     -- "one basic land type", Artificial Evolution's "one creature type" -- and so
@@ -90,7 +90,7 @@ data Effect card
     -- The family is not stored alongside the pair: CR 612.2's gate reads the
     -- family of the word being REPLACED, which Pawl.Engine.Subtype answers from
     -- the word itself.
-    ChangeText SubtypeFamily.SubtypeFamily (Set.Set Subtype.Subtype) SlotName.SlotName
+    ChangeText ChangeText.ChangeText
   | -- | CR 605: add one unit of mana, of the type the ManaProduction names -- one
     -- fixed type, or one colour its controller chooses (CR 105.4). ONE unit, so a
     -- mode adding more holds the opcode more than once: Sol Ring's "{T}: Add
@@ -900,7 +900,7 @@ data Effect card
     -- GameState.playerEffects with this effect's source, its controller (CR 109.5,
     -- baked in -- the source may be in a graveyard by the time anyone asks), a
     -- fresh timestamp and Expiry.arm's answer.
-    AffectPlayers Duration.Duration (AffectedPlayers.AffectedPlayers SlotName.SlotName) PlayerEffect.PlayerEffect
+    AffectPlayers AffectPlayers.AffectPlayers
   | -- | CR 509.1c / 613.11: install a stored BLOCKING REQUIREMENT for a duration
     -- -- "that creature blocks this creature this combat if able". Provoke (CR
     -- 702.39a) is `RequireBlock UntilEndOfCombat (InSlot provokeTarget)
@@ -916,7 +916,7 @@ data Effect card
     -- effect's source, a fresh timestamp and Expiry.arm's answer. Only the
     -- one-of-each shape has a producer; the refs are the vocabulary the pool
     -- already uses to name "the target" and "this creature".
-    RequireBlock Duration.Duration ObjectRef.ObjectRef ObjectRef.ObjectRef
+    RequireBlock RequireBlock.RequireBlock
   | -- | CR 114.2: the resolving controller gets an emblem with the given abilities,
     -- put into the command zone. Targetless; the abilities ride a Card so the
     -- emblem reuses the whole ability pipeline, first-order and tied to Card by
@@ -1162,7 +1162,7 @@ data Effect card
     --
     -- CR 609.3: a player with fewer matching permanents sacrifices all of them and
     -- one with none sacrifices nothing -- forced, so neither case is prompted.
-    PlayerSacrifices SlotName.SlotName (Filter.Filter Keyword.Keyword) Quantity.Quantity
+    PlayerSacrifices PlayerSacrifices.PlayerSacrifices
   | -- | CR 500.7: the players the PlayerRef names each get one extra turn, added
     -- directly after the turn this resolves in. Time Warp is `InSlot`, reading a
     -- slot TARGETING filled (CR 601.2c); PlayerRef rather than a bare SlotName for

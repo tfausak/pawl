@@ -25,26 +25,26 @@
                 "effects": [
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "LoseAllAbilities"
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "SetColor",
                         "value": [
                           {
@@ -52,37 +52,37 @@
                           }
                         ]
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "SetCreatureSubtype",
                         "value": {
                           "type": "Frog"
                         }
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "SetBasePowerToughness",
                         "value": [
                           {
@@ -95,11 +95,11 @@
                           }
                         ]
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

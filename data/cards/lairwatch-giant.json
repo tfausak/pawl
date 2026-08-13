@@ -53,21 +53,21 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "modification": {
                             "type": "GainKeyword",
                             "value": {
                               "type": "FirstStrike"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

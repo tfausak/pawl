@@ -50,44 +50,44 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "modification": {
                             "type": "AddCardType",
                             "value": {
                               "type": "Creature"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "modification": {
                             "type": "AddEveryCreatureSubtype"
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "modification": {
                             "type": "SetBasePowerToughness",
                             "value": [
                               {
@@ -100,11 +100,11 @@
                               }
                             ]
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

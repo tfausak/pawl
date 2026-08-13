@@ -21,19 +21,19 @@
                 "effects": [
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "Indefinite"
                       },
-                      {
+                      "modification": {
                         "type": "SetColor",
                         "value": []
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

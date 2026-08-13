@@ -38,8 +38,8 @@
                     "effects": [
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "ForAsLongAs",
                             "value": {
                               "type": "Compares",
@@ -76,22 +76,22 @@
                               }
                             }
                           },
-                          {
+                          "modification": {
                             "type": "AddCardType",
                             "value": {
                               "type": "Artifact"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "ForAsLongAs",
                             "value": {
                               "type": "Compares",
@@ -128,22 +128,22 @@
                               }
                             }
                           },
-                          {
+                          "modification": {
                             "type": "AddCardType",
                             "value": {
                               "type": "Creature"
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "ModifyTarget",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "ForAsLongAs",
                             "value": {
                               "type": "Compares",
@@ -180,7 +180,7 @@
                               }
                             }
                           },
-                          {
+                          "modification": {
                             "type": "SetBasePowerToughness",
                             "value": [
                               {
@@ -193,11 +193,11 @@
                               }
                             ]
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

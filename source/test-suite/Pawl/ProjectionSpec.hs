@@ -57,6 +57,7 @@ import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
@@ -849,7 +850,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
           ability : _ -> concatMap (Maybe.mapMaybe landTypeSet . Foldable.toList . Mode.allEffects) (Modal.modes (ActivatedAbility.modal ability))
           [] -> []
         landTypeSet effect = case effect of
-          Effect.ModifyTarget _ (Modification.SetLandSubtype st) _ -> Just st
+          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ (Modification.SetLandSubtype st) _) -> Just st
           _ -> Nothing
     -- The control: unhacked, the printed word stands.
     Spec.assertEqWith s "unhacked, the ability sets Island" (setsTo plain) [Subtype.Type.Island]

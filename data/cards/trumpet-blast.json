@@ -25,11 +25,11 @@
                 "effects": [
                   {
                     "type": "ModifyTarget",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
+                      "modification": {
                         "type": "ModifyPowerToughness",
                         "value": [
                           {
@@ -42,7 +42,7 @@
                           }
                         ]
                       },
-                      {
+                      "ref": {
                         "type": "EachMatching",
                         "value": {
                           "type": "And",
@@ -59,7 +59,7 @@
                           ]
                         }
                       }
-                    ]
+                    }
                   }
                 ]
               }
