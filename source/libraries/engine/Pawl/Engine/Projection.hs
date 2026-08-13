@@ -1590,6 +1590,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Mentor _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
+  Effect.ExileHaunting {} -> effect
   Effect.Attach _ -> effect
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
   Effect.PlaySubgame _ -> effect
@@ -1795,6 +1796,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition
   TriggerCondition.SelfDies -> condition
   TriggerCondition.SelfLeavesTheBattlefield -> condition
+  TriggerCondition.HauntedCreatureDies -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
   TriggerCondition.DamageToPlayerPrevented _ -> condition
   TriggerCondition.PlayerGainsLife _ -> condition

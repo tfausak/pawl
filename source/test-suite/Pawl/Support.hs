@@ -1490,6 +1490,7 @@ oneMountainState mountain ph =
           GameState.daytime = Nothing,
           GameState.spellsCastLastTurn = 0,
           GameState.exiledUntilMonarch = Map.empty,
+          GameState.haunting = Map.empty,
           GameState.extraTurns = [],
           GameState.turnAnchor = Nothing
         }

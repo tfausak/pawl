@@ -713,6 +713,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Flash -> keyword
   Keyword.Type.Banding -> keyword
   Keyword.Type.Flanking -> keyword
+  Keyword.Type.Haunt -> keyword
   Keyword.Type.Phasing -> keyword
   Keyword.Type.Shadow -> keyword
   Keyword.Type.Horsemanship -> keyword

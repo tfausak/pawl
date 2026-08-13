@@ -270,6 +270,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfLeavesTheBattlefield
       """ {"type":"SelfLeavesTheBattlefield"} """
+  -- CR 702.55b/702.55c's exile-zone death watch. Nullary: the link it matches on
+  -- is board state, so nothing about it rides the condition.
+  Spec.it s "HauntedCreatureDies" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.HauntedCreatureDies
+      """ {"type":"HauntedCreatureDies"} """
   -- CR 701.6a's countering. Both relations, for the same reason
   -- PlayerDiscards has both.
   Spec.it s "SpellOrAbilityCounters round-trips both relations" $ do

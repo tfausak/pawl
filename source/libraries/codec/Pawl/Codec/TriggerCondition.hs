@@ -47,6 +47,7 @@ toJson c = case c of
   TriggerCondition.SelfDies -> Common.nullary "SelfDies"
   TriggerCondition.PermanentDies f -> Common.tagged "PermanentDies" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   TriggerCondition.SelfLeavesTheBattlefield -> Common.nullary "SelfLeavesTheBattlefield"
+  TriggerCondition.HauntedCreatureDies -> Common.nullary "HauntedCreatureDies"
   TriggerCondition.SpellOrAbilityCounters r -> Common.tagged "SpellOrAbilityCounters" . Just $ Codec.encode PlayerRelation.codec r
   TriggerCondition.DamageToPlayerPrevented r -> Common.tagged "DamageToPlayerPrevented" . Just $ Codec.encode PlayerRelation.codec r
   TriggerCondition.PlayerGainsLife r -> Common.tagged "PlayerGainsLife" . Just $ Codec.encode PlayerRelation.codec r
@@ -101,6 +102,7 @@ fromJson value = do
     ("SelfDies", _) -> Right TriggerCondition.SelfDies
     ("PermanentDies", Just v) -> TriggerCondition.PermanentDies <$> Codec.decode (Filter.codec Keyword.codec) v
     ("SelfLeavesTheBattlefield", _) -> Right TriggerCondition.SelfLeavesTheBattlefield
+    ("HauntedCreatureDies", _) -> Right TriggerCondition.HauntedCreatureDies
     ("SpellOrAbilityCounters", Just v) -> TriggerCondition.SpellOrAbilityCounters <$> Codec.decode PlayerRelation.codec v
     ("DamageToPlayerPrevented", Just v) -> TriggerCondition.DamageToPlayerPrevented <$> Codec.decode PlayerRelation.codec v
     ("PlayerGainsLife", Just v) -> TriggerCondition.PlayerGainsLife <$> Codec.decode PlayerRelation.codec v

@@ -537,6 +537,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
+  TriggerCondition.HauntedCreatureDies -> []
   -- CR 701.6a's countering condition is a PlayerRelation, which holds no Count,
   -- exactly as the discard condition above.
   TriggerCondition.SpellOrAbilityCounters _ -> []
@@ -627,6 +628,7 @@ effectCounts effect = case effect of
   Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
+  Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
@@ -905,6 +907,7 @@ effectReplacements effect = case effect of
   Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
+  Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
@@ -1414,6 +1417,7 @@ effectMintedFaces effect = case effect of
   Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
+  Effect.ExileHaunting {} -> []
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
   Effect.PlaySubgame _ -> []
@@ -1741,6 +1745,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.46a names no quality either: "Spirit card with mana value N or less"
   -- is written into the ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Soulshift _ -> []
+  -- CR 702.55a names no quality either: its minted ability's bare "target
+  -- creature" pool carries no Filter at all.
+  Keyword.Haunt -> []
   -- CR 702.61a names no quality: the sentence speaks about what OTHER players
   -- may do, and "mana ability" is CR 605.1a's classification rather than a
   -- Filter.
@@ -2023,6 +2030,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
+  TriggerCondition.HauntedCreatureDies -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
   TriggerCondition.DamageToPlayerPrevented _ -> []
   TriggerCondition.PlayerGainsLife _ -> []
@@ -2422,6 +2430,7 @@ effectFilters effect = case effect of
   Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
+  Effect.ExileHaunting {} -> []
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and
   -- carries no destination filter at all.
   Effect.Attach _ -> []

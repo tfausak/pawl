@@ -334,6 +334,7 @@ slotsOf effect = case effect of
   Effect.Mentor slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
   Effect.ExileUntilMonarch slot -> oneSlot slot
+  Effect.ExileHaunting card slot -> joinSlots [oneSlot card, oneSlot slot]
   Effect.Attach slot -> oneSlot slot
   Effect.AttachTarget slot _ -> oneSlot slot
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
@@ -532,6 +533,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Mentor _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
+  Effect.ExileHaunting _ _ -> True
   Effect.Attach _ -> True
   Effect.AttachTarget _ _ -> True
   -- CR 729.1b: the slot is a DEFINITION, and the subgame itself reads no binding
@@ -635,6 +637,7 @@ readsX = any effectReadsX
       Effect.Mentor _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
+      Effect.ExileHaunting {} -> False
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
@@ -716,6 +719,7 @@ searchesLibrary effect = case effect of
   Effect.Mentor _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
+  Effect.ExileHaunting {} -> False
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
@@ -850,6 +854,7 @@ boundSlots effect = case effect of
   Effect.Mentor _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
+  Effect.ExileHaunting {} -> Set.empty
   Effect.Attach _ -> Set.empty
   Effect.AttachTarget {} -> Set.empty
   Effect.TakeExtraTurn {} -> Set.empty
@@ -3705,6 +3710,37 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                         MonarchWatch.lastMonarch = monarchNow
                       }
               State.modify' (\g -> g {GameState.exiledUntilMonarch = Map.insert newId watch (GameState.exiledUntilMonarch g)})
+      _ -> pure ()
+  Effect.ExileHaunting card slot ->
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just haunted -> do
+          -- The card this ability exiles is read LIVE off the resolving object
+          -- (CR 400.7j), never out of `chosen`: rule 702.55a's "it" is the
+          -- graveyard incarnation the death minted, which Event.eventBindings
+          -- bound under Binding.became, and CR 115.10a makes it no target. Nothing
+          -- there is CR 603.7c's "no longer in the zone it's expected to be in" --
+          -- the card left the graveyard before this resolved -- and the ability
+          -- exiles nothing.
+          mCard <- State.gets (slotOne card resolving)
+          case mCard of
+            Nothing -> pure ()
+            Just oid -> do
+              -- CR 400.7 mints the exiled incarnation; CR 702.55b's link is filed
+              -- against THAT id, which is what puts the ability in exile for CR
+              -- 113.6k. A cancelled move (CR 614.6) leaves no id and so no link,
+              -- which is right: nothing is haunting anything.
+              --
+              -- The link names the object the ability TARGETED, the permanent as
+              -- it was on the battlefield -- rule 702.55b's "the object targeted
+              -- by the haunt ability" -- so it goes on matching after that object
+              -- has stopped being a creature, and is what
+              -- TriggerCondition.HauntedCreatureDies compares ZoneChange.departed
+              -- against.
+              mNew <- Event.changeZoneReturning oid Zone.Exile
+              Monad.forM_ mNew $ \newId ->
+                State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
       _ -> pure ()
   Effect.Counter slot ->
     case legalOne slot legal of

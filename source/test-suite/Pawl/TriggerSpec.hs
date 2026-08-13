@@ -125,6 +125,10 @@
 -- Glint-Sleeve Artisan and Weaponcraft Enthusiast -- `fabricateSpec`.
 -- CR 702.46 soulshift, the first minted keyword ability that TARGETS a card in a
 -- graveyard, with Kami of Empty Graves -- `soulshiftSpec`.
+-- CR 702.55 haunt, and with it the first ability to fire FROM EXILE (CR 113.6k,
+-- CR 702.55c) -- the exile candidate source, the CR 702.55b link, and CR 113.6k's
+-- second sentence, one ability whose two conditions function in two zones -- with
+-- Blind Hunter at three seats -- `hauntSpec`.
 -- CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
 -- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
@@ -7552,6 +7556,11 @@ representativeEvents cond =
         -- here for the floor to be the honest answer.
         TriggerCondition.SelfLeavesTheBattlefield ->
           moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand]
+        -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
+        -- is put into a graveyard from the battlefield. Which permanent it is
+        -- rides GameState.haunting rather than the event, so one event says all
+        -- there is to say here.
+        TriggerCondition.HauntedCreatureDies -> one (moved Zone.Battlefield Zone.Graveyard)
         TriggerCondition.SpellOrAbilityCounters _ ->
           one (GameEvent.SpellCountered (Countering.MkCountering departed arrived S.alice))
         -- CR 615.13: the recipient has to be a PLAYER, this condition being
@@ -7676,6 +7685,7 @@ everyTriggerCondition =
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
+    TriggerCondition.HauntedCreatureDies,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
     TriggerCondition.PlayerGainsLife PlayerRelation.You,
@@ -8427,6 +8437,123 @@ fabricateSpec s registry =
           Spec.assertEqWith s "fabricate 1 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Fabricate 1) 2)) [Keyword.fabricate 1, Keyword.fabricate 1]
           Spec.assertEqWith s "and fabricate 2 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Fabricate 2) 1)) [Keyword.fabricate 2]
           Spec.assertBool s (Keyword.fabricate 1 /= Keyword.fabricate 2) "and the N reaches the minted ability"
+
+-- Blind Hunter, a Creature -- Bat: "Flying / Haunt (When this creature dies,
+-- exile it haunting target creature.) / When this creature enters or the
+-- creature it haunts dies, target player loses 2 life and you gain 2 life."
+-- The pool's witness for an ability that functions FROM EXILE (CR 113.6k, CR
+-- 702.55c), and the card rule 113.6k's own example is written about.
+--
+-- THREE SEATS, because the rule names three different players: alice owns the
+-- Blind Hunter and so controls both of its triggers (CR 603.3a on the
+-- battlefield, CR 108.4a in exile), bob controls the creature it haunts, and
+-- carol is what "target player loses 2 life" names. A two-player board would
+-- collapse the last two and could not tell "the haunted creature's controller"
+-- from "the target".
+--
+-- The board is played out rather than assembled: alice bolts her own Blind
+-- Hunter, haunt's dies trigger exiles the card haunting bob's Piker, and a
+-- second bolt kills that Piker. Only then is the exile-zone ability asked for.
+hauntSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hauntSpec s registry =
+  let -- Every target slot pinned at one recipient, never "the least legal one":
+      -- both Pikers are legal haunt targets and all three players are legal
+      -- "target player"s, so S.identityAnswer would answer by sort order and the
+      -- assertions could not tell which object the effect reached.
+      aimAt :: Recipient.Recipient -> Prompt.Prompt r -> r
+      aimAt r p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton r)) sets
+        _ -> S.identityAnswer p
+      board = do
+        mountain <- S.printingOf s registry "Mountain"
+        bolt <- S.printingOf s registry "Lightning Bolt"
+        hunter <- S.printingOf s registry "Blind Hunter"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let g0 = S.landsFor mountain S.alice 2 S.threePlayerGame
+            (hunterId, g1) = S.addCreature hunter S.alice g0
+            (victimId, g2) = S.addCreature piker S.bob g1
+            -- An IDENTICAL second Piker under the same player, never haunted:
+            -- the pair is what makes the link observable, since the two differ
+            -- in nothing else.
+            (bystanderId, g3) = S.addCreature piker S.bob g2
+            (g4, firstBolt) = S.handOne bolt g3
+            (secondBolt, g5) = S.addHandCard bolt S.alice g4
+            -- CR 104.3c: nothing here draws, but an empty library is a loss
+            -- waiting for any leg that advances a turn.
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard mountain S.alice g)) g5 [1 .. 5 :: Int]
+        pure (hunterId, victimId, bystanderId, firstBolt, secondBolt, stocked)
+      -- Cast a Lightning Bolt at one creature and resolve it. The bolt's own
+      -- target is pinned here; whatever the death triggers ask is pinned by the
+      -- caller's own answerer, since the two choices are different questions.
+      boltAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      boltAt oid spell gs =
+        let cast = S.runPure (aimAt (Recipient.ToCreature oid)) gs (S.cast S.alice spell)
+         in S.runPure (aimAt (Recipient.ToCreature oid)) cast Stack.resolveTop
+      -- CR 704 kills the creature and CR 603.3 puts the death trigger on the
+      -- stack, choosing its targets (CR 603.3d) under `answer`; then the trigger
+      -- resolves.
+      settleAndResolve :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> (GameState.GameState, GameState.GameState)
+      settleAndResolve answer gs =
+        let settled = S.runPure answer gs Engine.settleForPriority
+         in (settled, S.runPure answer settled Stack.resolveTop)
+      -- The whole first half: the Blind Hunter dies and haunt exiles it haunting
+      -- bob's Piker.
+      haunted (hunterId, victimId, _, firstBolt, _, gs) =
+        settleAndResolve (aimAt (Recipient.ToCreature victimId)) (boltAt hunterId firstBolt gs)
+      -- The one difference between the pair below and the board above: the
+      -- haunting card sits in a graveyard instead of exile. CR 400.7 mints a
+      -- fresh id for it, so rule 702.55b's link is re-filed under that id --
+      -- otherwise the two boards would differ in the LINK as well as in the zone
+      -- and the negative would pass for the wrong reason.
+      fromExileToGraveyard gs = case Set.toList (GameState.exile gs) of
+        [oid] ->
+          let (mNew, moved) = S.runPureWith S.identityAnswer gs (Event.changeZoneReturning oid Zone.Graveyard)
+              link = Map.lookup oid (GameState.haunting gs)
+           in case (mNew, link) of
+                (Just newId, Just hauntedId) -> moved {GameState.haunting = Map.insert newId hauntedId (Map.delete oid (GameState.haunting moved))}
+                _ -> moved
+        _ -> gs
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+   in Spec.describe s "CR 702.55 haunt" $ do
+        -- The proving case for the whole unit: the ability fires from EXILE.
+        Spec.it s "CR 702.55c whole card: the haunting card in exile sees the creature it haunts die" $ do
+          fixture@(_, victimId, _, _, secondBolt, _) <- board
+          let (_, exiled) = haunted fixture
+              killed = boltAt victimId secondBolt exiled
+              (placed, after) = settleAndResolve (aimAt (Recipient.ToPlayer S.carol)) killed
+          Spec.assertEqWith s "one card is in exile" (Set.size (GameState.exile exiled)) 1
+          Spec.assertEqWith s "and it haunts exactly one object" (Map.size (GameState.haunting exiled)) 1
+          Spec.assertEqWith s "haunt itself changed nobody's life total" (lives exiled) (Just 20, Just 20, Just 20)
+          Spec.assertEqWith s "the exile-zone trigger reached the stack in that settle" (length (GameState.stack placed)) 1
+          -- Three different answers on three different seats, which is what the
+          -- three seats are for: the target loses, the haunting card's OWNER
+          -- gains (CR 108.4a gives a card in exile no other controller), and the
+          -- player whose creature died is untouched.
+          Spec.assertEqWith s "carol lost 2, alice gained 2, bob is untouched" (lives after) (Just 22, Just 20, Just 18)
+        -- The link, not the zone: same board, same exile, and the creature that
+        -- dies is the OTHER Piker.
+        Spec.it s "CR 702.55b only the creature the card haunts fires it" $ do
+          fixture@(_, _, bystanderId, _, secondBolt, _) <- board
+          let (_, exiled) = haunted fixture
+              killed = boltAt bystanderId secondBolt exiled
+              (placed, after) = settleAndResolve (aimAt (Recipient.ToPlayer S.carol)) killed
+          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "and no life total moved" (lives after) (Just 20, Just 20, Just 20)
+        -- The zone, not the link: the same haunting card, still haunting the same
+        -- Piker, moved to a graveyard. CR 113.6k puts this ability in exile alone,
+        -- so a graveyard reading of it must find nothing -- which is what
+        -- eventTriggers' `inExile` source is for, since `inGraveyards` filters on
+        -- the same functionsIn call and rejects it.
+        Spec.it s "CR 113.6k the same ability does not fire from a graveyard" $ do
+          fixture@(_, victimId, _, _, secondBolt, _) <- board
+          let (_, exiled) = haunted fixture
+              moved = fromExileToGraveyard exiled
+              killed = boltAt victimId secondBolt moved
+              (placed, after) = settleAndResolve (aimAt (Recipient.ToPlayer S.carol)) killed
+          Spec.assertEqWith s "the card is out of exile" (Set.size (GameState.exile moved)) 0
+          Spec.assertEqWith s "and still haunts the Piker" (Map.size (GameState.haunting moved)) 1
+          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack placed)) 0
+          Spec.assertEqWith s "and no life total moved" (lives after) (Just 20, Just 20, Just 20)
 
 soulshiftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulshiftSpec s registry =
@@ -10328,6 +10455,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   afterlifeSpec s registry
   fabricateSpec s registry
   soulshiftSpec s registry
+  hauntSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
   bystanderZoneSpec s registry

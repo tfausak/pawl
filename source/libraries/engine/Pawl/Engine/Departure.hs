@@ -133,6 +133,13 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     cannot reach is CR 102.3's teammates (#175). NOT CR 102.2 -- this function
 --     only runs behind continuesAfterDeparture, so the game began with more than
 --     two players (CR 800.1).
+--
+--   * a GameState.haunting entry whose VALUE is the departing player's permanent,
+--     for the same reason and one rule over: CR 702.55b's link is not an effect
+--     that gives anybody control, and rule 702.55b keeps naming the object the
+--     haunt ability targeted after that object is gone. Only an entry whose KEY --
+--     the haunting card itself -- belongs to the departing player is dropped,
+--     because that card is leaving the game.
 objectsLeaveWith :: PlayerId -> GameState -> GameState
 objectsLeaveWith pid gs =
   let owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid) (GameState.objects gs))
@@ -147,7 +154,8 @@ objectsLeaveWith pid gs =
                     { Combat.attackers = Map.delete oid (Combat.attackers combat),
                       Combat.struckFirst = fmap (Set.delete oid) (Combat.struckFirst combat)
                     },
-                GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1)
+                GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
+                GameState.haunting = Map.delete oid (GameState.haunting g1)
               }
    in List.foldl' leave gs owned
 
