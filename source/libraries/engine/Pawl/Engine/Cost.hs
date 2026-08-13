@@ -404,6 +404,13 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 --
 -- A no-op for every SPELL cost, whose adjustments carry no components at all
 -- (Pawl.Engine.PlayerEffect.spellCostAdjustments).
+--
+-- Applied AFTER `substituteX`, which is why an ADDED component may not carry CR
+-- 601.2b's X: a CostComponent.PayLifeX arriving this way would never be
+-- substituted, and `canPayComponent` would refuse the whole cost. No effect in
+-- the pool adds one -- CR 601.2b announces the variables of the cost as printed,
+-- and an increase that named an unannounced X would be an amount nobody chose --
+-- so this is a bound on the open half rather than an elision.
 plusComponents :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 plusComponents adjustments cost = cost {Cost.components = Cost.components cost <> CostAdjustments.components adjustments}
 
