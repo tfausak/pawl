@@ -487,6 +487,13 @@ matches context view predicate = case predicate of
       PlayerRelation.You -> candidate == you
       PlayerRelation.Opponent -> candidate /= you
     _ -> False
+  -- CR 110.2's board comparison, and False WHEREVER IT IS REACHED, exactly as
+  -- ControlledByBound above is: Pawl.Engine.Count.bakePerspective replaces the
+  -- atom with a trivially true or trivially false predicate before the candidate
+  -- is matched, because answering it means counting permanents and this module
+  -- holds no game state. An atom that survives to here is one in a position
+  -- nothing bakes -- any filter but a Scope.OverPlayers count's.
+  Filter.ControlsMoreThanYou _ -> False
   -- CR 508.1k: a creature stays attacking until it is removed from combat or the
   -- combat phase ends, so this is a live read of the combat record, never a stamp
   -- on the object.
@@ -591,6 +598,10 @@ rewrite pairs predicate = case predicate of
   -- rewriteKeyword below is the descent, shared with the two sites that rewrite
   -- a keyword rather than a filter over one.
   Filter.HasKeyword k -> Filter.HasKeyword (rewriteKeyword pairs k)
+  -- DESCENT, like And/Or/Not above: the nested filter describes the permanents
+  -- being counted ("more LANDS than you"), so a word swap reaches it exactly as it
+  -- reaches the same description written at the top level.
+  Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (rewrite pairs f)
   -- Untouched, where the atom above is rewritten, and the contrast is CR 612's
   -- rather than an omission: rule 612.1's swap acts on a WORD in the text, and a
   -- family names no word. Magical Hack turning "Swamp" into "Island" turns a
@@ -872,6 +883,10 @@ bakeBound players predicate = case predicate of
   Filter.And fs -> Filter.And (fmap (bakeBound players) fs)
   Filter.Or fs -> Filter.Or (fmap (bakeBound players) fs)
   Filter.Not f -> Filter.Not (bakeBound players f)
+  -- Descended into for the reason `rewrite` descends: the nested filter is a
+  -- filter like any other, and a slot named inside it must be baked before the
+  -- match or it can never be answered.
+  Filter.ControlsMoreThanYou f -> Filter.ControlsMoreThanYou (bakeBound players f)
   Filter.ControlledByPlayer _ -> predicate
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
@@ -927,6 +942,12 @@ manaValueThresholds predicate = case predicate of
   Filter.And fs -> concatMap manaValueThresholds fs
   Filter.Or fs -> concatMap manaValueThresholds fs
   Filter.Not f -> manaValueThresholds f
+  -- Descended into, which OVER-reports: the literals inside bound the mana value
+  -- of the permanents being counted, never the candidate's own. Reporting them
+  -- only widens CR 601.3a's sample, and the alternative -- an empty list -- would
+  -- have to argue that no nested atom can ever matter, which is a claim about the
+  -- inner filter rather than about this atom.
+  Filter.ControlsMoreThanYou f -> manaValueThresholds f
   -- Reads the mana value and compares it against NO literal, so it bounds
   -- nothing: parity is what the sample's two-past-the-greatest tail is for.
   Filter.ManaValueIsEven -> []
@@ -990,6 +1011,10 @@ statesAQuality predicate = case predicate of
   Filter.And fs -> any statesAQuality fs
   Filter.Or fs -> all statesAQuality fs
   Filter.Not _ -> True
+  -- A quality like any other atom's, whatever the nested filter says: a search
+  -- whose predicate is this one is looking for cards with a stated quality, so CR
+  -- 701.23b applies and no descent could change that.
+  Filter.ControlsMoreThanYou _ -> True
   Filter.ManaValueAtMost _ -> True
   Filter.ManaValueIsEven -> True
   Filter.HasCardType _ -> True
@@ -1038,4 +1063,10 @@ boundSlots predicate = case predicate of
   Filter.And fs -> foldMap boundSlots fs
   Filter.Or fs -> foldMap boundSlots fs
   Filter.Not f -> boundSlots f
+  -- Descended into because `bakeBound` descends into it, which is the pairing this
+  -- function's comment above insists on. The catch-all below would have absorbed
+  -- it silently, this being the first atom to carry a Filter DIRECTLY -- a
+  -- keyword's own filter (CR 702.29e) is out of both functions' reach alike, so
+  -- the pairing holds there by both sides declining.
+  Filter.ControlsMoreThanYou f -> boundSlots f
   _ -> Set.empty

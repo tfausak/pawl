@@ -466,6 +466,28 @@ multiset c =
       Codec.schema = Schema.array <$> Codec.schema c
     }
 
+-- | A name-keyed map as a JSON object, 'encodeTextMap'\/'decodeTextMap' bundled
+-- with 'Schema.mapOf'. The key's unwrap and wrap are passed rather than a
+-- @Codec k@, because a JSON object's key is a string rather than a
+-- 'Value.Value'; this module cannot name the key type either, since
+-- @pawl:json-codec@ does not depend on @pawl:types@.
+--
+-- The wrap is total. Both key types in the corpus are unvalidated @Text@
+-- newtypes, and 'Schema.mapOf' constrains no key, so a fallible wrap would
+-- reject documents the schema says are valid.
+textMap ::
+  (Ord k) =>
+  (k -> Text.Text) ->
+  (Text.Text -> k) ->
+  Codec.Codec v ->
+  Codec.Codec (Map.Map k v)
+textMap unwrapKey wrapKey c =
+  Codec.MkCodec
+    { Codec.encode = encodeTextMap unwrapKey (Codec.encode c),
+      Codec.decode = decodeTextMap wrapKey (Codec.decode c),
+      Codec.schema = Schema.mapOf <$> Codec.schema c
+    }
+
 -- | 'assertJsonCodec' against a bundle rather than a loose pair.
 assertCodec ::
   (Stack.HasCallStack, Monad m, Eq a, Show a) =>

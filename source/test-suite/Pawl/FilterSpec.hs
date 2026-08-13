@@ -395,6 +395,16 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       (Filter.manaValueThresholds Filter.Type.ManaValueIsEven)
       []
 
+  -- CR 110.2's board comparison is answered by Pawl.Engine.Count.bakePerspective,
+  -- which holds the game state; this module holds none, so the atom is vacuously
+  -- False wherever it reaches a match unbaked. ControlledByBound's posture, pinned
+  -- here for the same reason it is pinned there -- Pawl.CountSpec's Oreskos
+  -- Explorer group is what proves the BAKED answer.
+  Spec.it s "ControlsMoreThanYou is False unbaked, for a player and for an object alike" $ do
+    let lands = Filter.Type.ControlsMoreThanYou (Filter.Type.HasCardType CardType.Land)
+    Spec.assertBool s (not (Filter.matches self aPlayer lands)) "player"
+    Spec.assertBool s (not (Filter.matches self blackCreature lands)) "object"
+
   Spec.it s "ControlledBy You holds for own object" $ do
     Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.ControlledBy PlayerRelation.You)) "you"
 

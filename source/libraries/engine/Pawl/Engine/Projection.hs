@@ -2595,6 +2595,12 @@ filterReads f = case f of
   Filter.Type.OwnedBy _ -> Set.empty
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
+  -- Over-declared deliberately, the posture CanHostSubject takes below: the atom
+  -- reads the CONTROLLER of every permanent on the battlefield, plus whatever its
+  -- nested filter reads of each, and Aspect names an aspect of ONE object's
+  -- projection with no way to say "another object's". Nothing in the pool puts
+  -- this atom in an affected set -- Oreskos Explorer writes it into a count.
+  Filter.Type.ControlsMoreThanYou g -> Set.insert Controller (filterReads g)
   Filter.Type.IsAttacking -> Set.empty
   -- Reads nothing, for IsAttacking's reason: Combat.blockers is the same kind of
   -- record, written by the CR 509.1 declaration, edited by CR 506.4's removals and

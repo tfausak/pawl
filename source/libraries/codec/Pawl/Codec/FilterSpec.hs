@@ -148,6 +148,14 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.IsPlayer PlayerRelation.Opponent)
       """ {"type":"IsPlayer","value":{"type":"Opponent"}} """
+  -- Nested, unlike every atom above: the payload is a whole Filter, so this pins
+  -- the recursion as well as the tag.
+  Spec.it s "ControlsMoreThanYou" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.ControlsMoreThanYou (Filter.HasCardType CardType.Land))
+      """ {"type":"ControlsMoreThanYou","value":{"type":"HasCardType","value":{"type":"Land"}}} """
   Spec.it s "IsSource" $
     Common.assertCodec
       s
@@ -281,6 +289,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
         labyrinthOfSkophos = Filter.Or [Filter.IsAttacking, Filter.IsBlocking]
         auraGraftTarget = Filter.And [Filter.HasSubtype Subtype.Aura, Filter.IsAttachedToPermanent]
         auraGraftDestination = Filter.CanHostSubject
+        oreskosExplorer = Filter.ControlsMoreThanYou (Filter.HasCardType CardType.Land)
         roundTrip f v = Spec.assertEqWith s "preserved" (Codec.decode codec (Codec.encode codec f)) (Right v)
      in mapM_
           (\f -> roundTrip f f)
@@ -298,7 +307,8 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
             crownOfTheAges,
             labyrinthOfSkophos,
             auraGraftTarget,
-            auraGraftDestination
+            auraGraftDestination,
+            oreskosExplorer
           ]
   Spec.describe s "Common.maybe codec" $ do
     Spec.it s "CR 702.29e's typecycling filter, present" $

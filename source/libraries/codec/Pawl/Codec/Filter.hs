@@ -57,6 +57,9 @@ codec keywordCodec =
       Arm.payload "ControlledBy" PlayerRelation.codec Filter.ControlledBy,
       Arm.payload "OwnedBy" PlayerRelation.codec Filter.OwnedBy,
       Arm.payload "IsPlayer" PlayerRelation.codec Filter.IsPlayer,
+      -- Recursive like Not below, and for the atom's own reason rather than the
+      -- combinator's: the payload describes the permanents being counted.
+      Arm.payload "ControlsMoreThanYou" (codec keywordCodec) Filter.ControlsMoreThanYou,
       Arm.nullary "IsSource" Filter.IsSource,
       Arm.nullary "IsAttacking" Filter.IsAttacking,
       Arm.nullary "IsBlocking" Filter.IsBlocking,
@@ -95,6 +98,7 @@ codec keywordCodec =
       Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ Codec.encode PlayerRelation.codec r
       Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ Codec.encode PlayerRelation.codec r
       Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ Codec.encode PlayerRelation.codec r
+      Filter.ControlsMoreThanYou f -> Common.tagged "ControlsMoreThanYou" . Just $ Codec.encode (codec keywordCodec) f
       Filter.IsSource -> Common.nullary "IsSource"
       Filter.IsAttacking -> Common.nullary "IsAttacking"
       Filter.IsBlocking -> Common.nullary "IsBlocking"
