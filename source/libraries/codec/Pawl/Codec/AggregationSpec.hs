@@ -3,7 +3,6 @@
 module Pawl.Codec.AggregationSpec where
 
 import qualified Pawl.Codec.Aggregation as Aggregation
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
@@ -14,23 +13,21 @@ import qualified Pawl.Types.Aggregation as Aggregation
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Aggregation" $ do
   Spec.it s "Members" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      (Aggregation.toJson Value.integer)
-      (Aggregation.fromJson Common.asInteger)
+      (Aggregation.codec Common.integer)
       Aggregation.Members
       """ {"type":"Members"} """
   Spec.it s "DistinctCardTypes" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      (Aggregation.toJson Value.integer)
-      (Aggregation.fromJson Common.asInteger)
+      (Aggregation.codec Common.integer)
       Aggregation.DistinctCardTypes
       """ {"type":"DistinctCardTypes"} """
   Spec.it s "Greatest" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      (Aggregation.toJson Value.integer)
-      (Aggregation.fromJson Common.asInteger)
+      (Aggregation.codec Common.integer)
       (Aggregation.Greatest 3)
       """ {"type":"Greatest","value":3} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s (Aggregation.codec Common.integer)

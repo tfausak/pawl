@@ -18,15 +18,17 @@ import qualified Pawl.Types.Condition as Condition
 -- still rejected rather than decoding into the wrong condition.
 --
 -- Still a loose toJson\/fromJson pair rather than an 'Pawl.JsonCodec.Arm.tagged'
--- bundle: 'Pawl.Codec.Quantity' is not a bundle yet, so neither arm has a
--- 'Codec.Codec' to hand 'Pawl.JsonCodec.Arm.payload' (#1263).
+-- bundle, but no longer for the reason it was: 'Pawl.Codec.Quantity' IS a bundle
+-- now. What is left is @Compares@'s three-field payload, which has no Haskell
+-- record for 'Pawl.JsonCodec.Fields.object' to name -- so this waits on the
+-- payload records rather than on the conversion DAG (#1305).
 toJson :: Condition.Condition -> Value.Value
 toJson condition = case condition of
   Condition.Compares m c t ->
     Common.tagged "Compares" . Just . Value.object . concat $
-      [ Common.requiredPair "measured" Quantity.toJson m,
+      [ Common.requiredPair "measured" (Codec.encode Quantity.codec) m,
         Common.requiredPair "comparison" (Codec.encode Comparison.codec) c,
-        Common.requiredPair "threshold" Quantity.toJson t
+        Common.requiredPair "threshold" (Codec.encode Quantity.codec) t
       ]
   Condition.Any cs -> Common.tagged "Any" . Just $ Common.encodeList toJson cs
 
@@ -37,8 +39,8 @@ fromJson value = do
     "Compares" -> Common.withValue mv $ \v -> do
       ps <- Common.asObject v
       Condition.Compares
-        <$> (Common.field "measured" ps >>= Quantity.fromJson)
+        <$> (Common.field "measured" ps >>= Codec.decode Quantity.codec)
         <*> (Common.field "comparison" ps >>= Codec.decode Comparison.codec)
-        <*> (Common.field "threshold" ps >>= Quantity.fromJson)
+        <*> (Common.field "threshold" ps >>= Codec.decode Quantity.codec)
     "Any" -> Common.withValue mv $ fmap Condition.Any . Common.decodeList fromJson
     _ -> Left . Text.pack $ "unknown Condition: " <> t

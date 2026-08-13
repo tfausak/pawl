@@ -1,30 +1,17 @@
 module Pawl.Codec.ManaCount where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.ManaFilter as ManaFilter
 import qualified Pawl.Codec.PlayerRef as PlayerRef
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ManaCount as ManaCount
 
 -- | A BARE OBJECT keyed by the record's field names, the shape every
 -- single-constructor record in this codec writes. The tag that picks it is
 -- written by Pawl.Codec.Quantity's ManaCount arm, this codec's only caller.
-toJson :: ManaCount.ManaCount -> Value.Value
-toJson count =
-  Value.object
-    ( Common.requiredPair "player" (Codec.encode PlayerRef.codec) (ManaCount.player count)
-        <> Common.requiredPair "filter" (Codec.encode ManaFilter.codec) (ManaCount.filter count)
-    )
-
-fromJson :: Value.Value -> Either Text.Text ManaCount.ManaCount
-fromJson value = do
-  ps <- Common.asObject value
-  p <- Common.field "player" ps >>= Codec.decode PlayerRef.codec
-  f <- Common.field "filter" ps >>= Codec.decode ManaFilter.codec
-  pure
+codec :: Codec.Codec ManaCount.ManaCount
+codec =
+  Fields.object $
     ManaCount.MkManaCount
-      { ManaCount.player = p,
-        ManaCount.filter = f
-      }
+      <$> Fields.required "player" PlayerRef.codec ManaCount.player
+      <*> Fields.required "filter" ManaFilter.codec ManaCount.filter
