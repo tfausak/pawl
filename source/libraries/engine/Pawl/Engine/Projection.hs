@@ -1544,6 +1544,7 @@ rewriteEffect pairs effect = case effect of
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect
   Effect.ExchangeLifeTotals _ -> effect
+  Effect.SetLifeTotal {} -> effect
   Effect.IncreaseSpeed {} -> effect
   -- CR 612.2a: a token-creating spell defines the token's creature types and its
   -- name with the same words, so a text change reaches both. Those words live in

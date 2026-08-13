@@ -443,6 +443,23 @@ data Effect card
     -- has exactly two sides, where a PlayerRef may name every player at once.
     -- Pawl.Types.ExchangeSides has the rest of that argument.
     ExchangeLifeTotals ExchangeSides.ExchangeSides
+  | -- | CR 119.5: the players the PlayerRef names each end up with this life total
+    -- -- Magister Sphinx' "target player's life total becomes 10" is `InSlot` over
+    -- a Literal, Arbiter of Knollridge's "each player's life total becomes the
+    -- highest life total among all players" is `EachPlayer` over a fold.
+    --
+    -- NOT expressible as a GainLife or a LoseLife, which is why it is an opcode
+    -- rather than sugar: the amount is the DIFFERENCE between a total nobody wrote
+    -- down and the new one, and its sign varies per player -- one seat gains while
+    -- another loses on the same resolution.
+    --
+    -- Also not a raw write. CR 119.5 spends its whole sentence saying the player
+    -- "gains or loses the necessary amount of life to end up with the new total",
+    -- so this resolves into the same CR 608.2i gain and loss events LoseLife and
+    -- GainLife append, and a "whenever you gain life" trigger reads them.
+    -- ExchangeLifeTotals took that posture first, under CR 701.12c's parallel
+    -- wording.
+    SetLifeTotal PlayerRef.PlayerRef Quantity.Quantity
   | -- | CR 702.179c: the players the PlayerRef names each have their speed
     -- increased by this much -- "if a player has no speed and they are instructed
     -- to increase their speed by a certain value, their speed becomes that value",

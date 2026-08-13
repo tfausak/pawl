@@ -3973,6 +3973,150 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
         Spec.assertEqWith s "no loss" (lifeLosses after) []
       other -> Spec.assertFailure s ("expected exactly one activated ability on the Conduit, got " <> show (length other))
 
+-- CR 119.5: "If an effect sets a player's life total to a specific number, the
+-- player gains or loses the necessary amount of life to end up with the new
+-- total." So a set is NOT a third kind of life event: it is a gain or a loss,
+-- whichever the arithmetic makes it, and everything that watches gaining or
+-- losing life sees it. The whole group exists to hold that reading in place.
+--
+-- Two cards prove it, and it takes two because neither reaches both directions:
+--
+--   * Magister Sphinx, {4}{W}{U}{B} Artifact Creature -- Sphinx 5/5 with flying,
+--     "When this creature enters, target player's life total becomes 10." The
+--     literal, so the SAME card is a gain at one seat and a loss at another --
+--     and the first two cases below are one board differing in nothing but which
+--     seat the trigger names.
+--   * Arbiter of Knollridge, {6}{W} Creature -- Giant Wizard 5/5 with vigilance,
+--     "When this creature enters, each player's life total becomes the highest
+--     life total among all players." The fold, and the several-recipients shape a
+--     targeted card cannot reach.
+--
+-- Three seats at 4, 27 and 13 -- distinct, and one above 10 and two below, so the
+-- Sphinx cases tell a gain from a loss. 27 is not the sum (44), the count (3) or
+-- the least (4), so Arbiter's one number falsifies every other fold. Only the
+-- CR 119.9 case changes a starting total, moving carol to 10 so that the seat the
+-- trigger names is already there.
+--
+-- The watchers are what make the claim about EVENTS rather than about totals.
+-- Ajani's Pridemate ("whenever you gain life, put a +1/+1 counter on this
+-- creature") is on the board for the gain side and Mindcrank ("whenever an
+-- opponent loses life, that player mills that many cards") for the loss side, so
+-- every case asserts which of the two fired -- and a set that wrote Player.life
+-- directly would leave both silent while every life total still came out right.
+setLifeTotalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+setLifeTotalSpec s registry =
+  let -- Cast, then settle-and-resolve until the stack runs dry: the spell, then
+      -- CR 603.6a's entry trigger, then whatever the life change itself
+      -- triggered. Deliberately NOT Engine.priorityLoop, which advances the turn
+      -- and clears GameState.events out from under lifeGains and lifeLosses. Six
+      -- passes is more than the deepest case needs, and settling or resolving an
+      -- empty stack is a no-op.
+      castAndTrigger :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      castAndTrigger answer spellId gs =
+        let step board = S.runPure answer (S.runPure answer board Engine.settleForPriority) Stack.resolveTop
+         in List.foldl' (\board _ -> step board) (S.runPure answer gs (S.cast S.alice spellId)) [1 .. 6 :: Int]
+      -- Pinned, not searched: the trigger's target slot takes `who` and nothing
+      -- else, so a mutation cannot be repaired by an answerer that goes looking
+      -- for a legal option. Three players and a count of one, so there is a real
+      -- choice to pin.
+      aimedAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      aimedAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer who) sets
+        _ -> S.identityAnswer p
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      graveyardSize pid gs = Seq.length (Map.findWithDefault Seq.empty pid (GameState.graveyard gs))
+      -- The three seats, alice holding the mana and both watchers, and every
+      -- library stocked so Mindcrank has something to mill and CR 104.3c never
+      -- fires. `lands` is the mana base the spell needs; everything else is
+      -- shared by all four cases.
+      setBoard lands pridemate mindcrank filler spell aliceLife bobLife carolLife =
+        let withLands = List.foldl' (\board (printing, n) -> S.landsFor printing S.alice n board) S.threePlayerGame lands
+            (aliceMate, withAliceMate) = S.addCreature pridemate S.alice withLands
+            (bobMate, withBobMate) = S.addCreature pridemate S.bob withAliceMate
+            (_, withCrank) = S.addCreature mindcrank S.alice withBobMate
+            stocked = List.foldl' (\board pid -> stockLibrary filler pid 30 board) withCrank [S.alice, S.bob, S.carol]
+            at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+            lifed = stocked {GameState.players = at S.alice aliceLife (at S.bob bobLife (at S.carol carolLife (GameState.players stocked)))}
+            (gs, spellId) = S.handOne spell lifed
+         in (aliceMate, bobMate, spellId, gs)
+      sphinxBoard aliceLife bobLife carolLife = do
+        plains <- S.printingOf s registry "Plains"
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        mindcrank <- S.printingOf s registry "Mindcrank"
+        piker <- S.printingOf s registry "Goblin Piker"
+        sphinx <- S.printingOf s registry "Magister Sphinx"
+        pure (setBoard [(plains, 5), (island, 1), (swamp, 1)] pridemate mindcrank piker sphinx aliceLife bobLife carolLife)
+   in Spec.describe s "SetLifeTotal" $ do
+        -- The gain direction. alice is BELOW 10, so reaching it is a gain of 6 --
+        -- and her Pridemate sees it, which is the whole CR 119.5 claim.
+        Spec.it s "CR 119.5 Magister Sphinx sets a total UPWARD, and that is a life gain" $ do
+          (aliceMate, bobMate, spellId, gs) <- sphinxBoard 4 27 13
+          let after = castAndTrigger (aimedAt S.alice) spellId gs
+          Spec.assertEqWith s "alice reached 10" (S.lifeOf S.alice after) (Just 10)
+          Spec.assertEqWith s "bob, untargeted, keeps his 27" (S.lifeOf S.bob after) (Just 27)
+          Spec.assertEqWith s "carol, untargeted, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "logged as a gain of exactly 6" (lifeGains after) [(S.alice, 6)]
+          Spec.assertEqWith s "and as no loss at all" (lifeLosses after) []
+          Spec.assertEqWith s "alice's Pridemate saw the gain" (countersOn aliceMate after) (Just 1)
+          Spec.assertEqWith s "bob's did not: it was not his life" (countersOn bobMate after) (Just 0)
+          Spec.assertEqWith s "and Mindcrank stayed silent: nobody lost life" (graveyardSize S.bob after) 0
+        -- The control twin, differing in ONE thing: the seat the trigger names.
+        -- bob is ABOVE 10, so the identical card is a LOSS of 17 -- Mindcrank
+        -- fires and the Pridemate does not, which is the pair that tells a set
+        -- from a gain.
+        Spec.it s "CR 119.5 the control: the same card set DOWNWARD is a life loss" $ do
+          (aliceMate, bobMate, spellId, gs) <- sphinxBoard 4 27 13
+          let after = castAndTrigger (aimedAt S.bob) spellId gs
+          Spec.assertEqWith s "bob came down to 10" (S.lifeOf S.bob after) (Just 10)
+          Spec.assertEqWith s "alice, untargeted, keeps her 4" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "carol, untargeted, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "logged as a loss of exactly 17" (lifeLosses after) [(S.bob, 17)]
+          Spec.assertEqWith s "and as no gain at all" (lifeGains after) []
+          Spec.assertEqWith s "Mindcrank milled bob for exactly 17" (graveyardSize S.bob after) 17
+          Spec.assertEqWith s "alice's Pridemate stayed silent" (countersOn aliceMate after) (Just 0)
+          Spec.assertEqWith s "and so did bob's: losing life is not gaining it" (countersOn bobMate after) (Just 0)
+        -- CR 119.9's own last sentence, on the set: carol is ALREADY at 10, so
+        -- the necessary amount is 0, no life event occurs, and neither watcher
+        -- may fire. The Sphinx really entered, so a spell that did nothing cannot
+        -- pass this by leaving the board alone.
+        Spec.it s "CR 119.9 setting a total to the number it already holds is neither a gain nor a loss" $ do
+          (aliceMate, bobMate, spellId, gs) <- sphinxBoard 4 27 10
+          let after = castAndTrigger (aimedAt S.carol) spellId gs
+          Spec.assertEqWith s "carol is still at 10" (S.lifeOf S.carol after) (Just 10)
+          Spec.assertEqWith s "no gain" (lifeGains after) []
+          Spec.assertEqWith s "no loss" (lifeLosses after) []
+          Spec.assertEqWith s "no Pridemate counter anywhere" (fmap (\oid -> countersOn oid after) [aliceMate, bobMate]) [Just 0, Just 0]
+          Spec.assertEqWith s "and Mindcrank milled nobody" (graveyardSize S.carol after) 0
+          Spec.assertEqWith s "and the Sphinx really entered, so a spell that never resolved cannot pass this" (Set.size (GameState.battlefield after)) (Set.size (GameState.battlefield gs) + 1)
+        -- Arbiter of Knollridge: SEVERAL recipients from one instruction, and a
+        -- folded number rather than a literal. 27 is the highest, and it is not
+        -- the sum (44), the count (3), the least (4) or any seat's own total, so
+        -- one set of three assertions falsifies every other reading.
+        --
+        -- bob is the seat that is ALREADY highest, and his own Pridemate is the
+        -- point of the case: he ends on the number he started on, so CR 119.9
+        -- says no life gain event happened to him even though the effect named
+        -- him. That is the assertion a raw "write the total to every player"
+        -- implementation fails.
+        Spec.it s "CR 119.5 Arbiter of Knollridge raises every seat to the HIGHEST total, gaining only where the total moves" $ do
+          plains <- S.printingOf s registry "Plains"
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          mindcrank <- S.printingOf s registry "Mindcrank"
+          piker <- S.printingOf s registry "Goblin Piker"
+          arbiter <- S.printingOf s registry "Arbiter of Knollridge"
+          let (aliceMate, bobMate, spellId, gs) = setBoard [(plains, 7)] pridemate mindcrank piker arbiter 4 27 13
+              after = castAndTrigger S.identityAnswer spellId gs
+          Spec.assertEqWith s "alice rose from 4 to 27" (S.lifeOf S.alice after) (Just 27)
+          Spec.assertEqWith s "bob, already highest, stayed at 27" (S.lifeOf S.bob after) (Just 27)
+          Spec.assertEqWith s "carol rose from 13 to 27" (S.lifeOf S.carol after) (Just 27)
+          Spec.assertEqWith s "exactly the two seats that moved gained, by exactly their deltas" (lifeGains after) [(S.alice, 23), (S.carol, 14)]
+          Spec.assertEqWith s "nobody lost life" (lifeLosses after) []
+          Spec.assertEqWith s "alice's Pridemate saw her gain" (countersOn aliceMate after) (Just 1)
+          Spec.assertEqWith s "bob's did not: a total set to itself is no gain (CR 119.9)" (countersOn bobMate after) (Just 0)
+          Spec.assertEqWith s "and Mindcrank milled nobody" (graveyardSize S.carol after) 0
+
 -- One with the Machine, the card that proves Aggregation.Greatest (#254):
 -- "Draw cards equal to the greatest mana value among artifacts you control."
 -- Nothing but the fold is new -- the effect is the existing Draw, the scope and
@@ -7560,6 +7704,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   drawCardSpec s registry
   loseLifeSpec s registry
   exchangeLifeTotalsSpec s registry
+  setLifeTotalSpec s registry
   greatestSpec s registry
   soulsMajestySpec s registry
   counterSpec s registry
