@@ -87,6 +87,23 @@ data TriggerCondition
     -- bearer is the card in the zone it landed in, which is that rule's second
     -- sentence -- the graveyard, for every printing today.
     SelfCycled
+  | -- | CR 702.94a: "when you reveal this card this way" -- the triggered half of
+    -- miracle, linked (CR 603.11) to the static half that opened the window.
+    -- Self-scoped like SelfCycled: the bearer is the card that was revealed, and
+    -- CR 701.20b left it exactly where it was, so it is still in its owner's
+    -- HAND. That is the whole of why this condition needs a hand candidate source
+    -- (CR 113.6k) where SelfCycled needed a graveyard one.
+    --
+    -- "THIS WAY" is the link, and it is why the match is not merely "this card
+    -- was revealed": a miracle card shown by any other effect must not fire. The
+    -- event carries Pawl.Types.RevealCause for that, so this condition reads the
+    -- cause rather than trusting that a reveal of a miracle card can only have
+    -- been a miracle reveal.
+    --
+    -- No PlayerRelation. CR 702.94a's reveal is one a player makes from their OWN
+    -- hand as they draw, and CR 113.8 makes the card's owner the ability's
+    -- controller, so "you" and the revealer are the same seat by construction.
+    SelfRevealedForMiracle
   | -- | CR 701.9a: "whenever [a player] discards a card" -- Megrim's. Matched
     -- against GameEvent.Discarded, whose PlayerId is the discarding player; the
     -- PlayerRelation reads that player against CR 109.5's "you", the ability's
@@ -112,8 +129,8 @@ data TriggerCondition
     -- cleared at the handoff -- so the count restarts without this condition
     -- saying so. What the Natural picks out is WHICH draw, which is the same
     -- question CR 702.94a asks with the answer 1 -- though miracle is not this
-    -- condition, triggering on the reveal rather than on the draw, and there is
-    -- no reveal-as-you-draw window for it to hang on (#1351).
+    -- condition: it triggers on the REVEAL that CR 121.9's window offers, which
+    -- is SelfRevealedForMiracle above.
     --
     -- EQUALITY, not "at least": Erudite Wizard fires on the second draw and on no
     -- other, so a turn with four draws fires it once. A card reading "your second

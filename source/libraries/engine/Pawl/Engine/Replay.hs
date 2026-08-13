@@ -106,6 +106,7 @@ encode p answer = case p of
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
   Prompt.OfferedCast {} -> Response.ChoseOfferedCast answer
+  Prompt.OfferedMiracleReveal {} -> Response.ChoseMiracleReveal answer
   Prompt.ChooseToPay {} -> Response.ChoseToPay answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
   Prompt.AnnounceHybridPayment {} -> Response.AnnouncedHybridPayment answer
@@ -292,6 +293,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.OfferedCast {} -> case response of
     Response.ChoseOfferedCast decision -> Just decision
+    _ -> Nothing
+  Prompt.OfferedMiracleReveal {} -> case response of
+    Response.ChoseMiracleReveal decision -> Just decision
     _ -> Nothing
   Prompt.ChooseToPay {} -> case response of
     Response.ChoseToPay decision -> Just decision
@@ -537,6 +541,9 @@ defaultAnswer p = case p of
   -- CR 608.2g: declining an offered cast is always legal, and it leaves the card
   -- exactly where the resolving effect put it.
   Prompt.OfferedCast {} -> OptionalDecision.Declines
+  -- CR 702.94a: declining the reveal is always legal, and it leaves the drawn
+  -- card an ordinary card in hand.
+  Prompt.OfferedMiracleReveal {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is always legal, and it
   -- spends nothing -- which keeps a short transcript from tapping a payer's board.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines

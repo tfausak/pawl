@@ -280,6 +280,8 @@ library codec
     Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.ReplacementOrigin
     Pawl.Codec.ReplacementOriginSpec
+    Pawl.Codec.RevealCause
+    Pawl.Codec.RevealCauseSpec
     Pawl.Codec.RoomIndex
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.SacrificeRestriction
@@ -798,6 +800,7 @@ library types
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.Result
+    Pawl.Types.RevealCause
     Pawl.Types.RoomIndex
     Pawl.Types.SacrificeRestriction
     Pawl.Types.Scaling

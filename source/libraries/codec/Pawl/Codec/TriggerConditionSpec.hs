@@ -105,6 +105,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfCycled
       """ {"type":"SelfCycled"} """
+  -- CR 702.94a's linked half.
+  Spec.it s "SelfRevealedForMiracle" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfRevealedForMiracle
+      """ {"type":"SelfRevealedForMiracle"} """
   -- CR 701.9a's discard. Both relations, since the PlayerRelation is the whole
   -- content of the "whenever an opponent discards" phrasing.
   Spec.it s "PlayerDiscards round-trips both relations" $ do

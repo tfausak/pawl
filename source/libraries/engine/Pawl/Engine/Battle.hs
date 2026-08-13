@@ -292,7 +292,7 @@ siegeDefeat =
     offer =
       Effect.OfferCast
         Binding.became
-        CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True}
+        CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing}
 
 -- The intrinsic triggered abilities rule 310 gives a permanent, read off the
 -- finished projection. Pawl.Engine.Keyword.triggeredAbilitiesOf's sibling, and

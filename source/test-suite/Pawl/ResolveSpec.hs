@@ -5464,7 +5464,7 @@ exploreReveals :: GameState.GameState -> [String]
 exploreReveals gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
   where
     revealedName event = case event of
-      GameEvent.Revealed pid pc
+      GameEvent.Revealed pid _ _ pc
         | pid == S.alice ->
             fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
       _ -> Nothing

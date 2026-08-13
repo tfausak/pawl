@@ -212,6 +212,11 @@ data Response
     -- mode, and from CastWhileSearched, which records the same rule's
     -- library-search producer and names which card was cast.
     ChoseOfferedCast OptionalDecision.OptionalDecision
+  | -- | CR 702.94a / CR 121.9: whether a player revealed the card they were
+    -- drawing as they drew it. Distinct from ChoseOfferedCast, which records the
+    -- LINKED ability's later "may": one reveal can be followed by a declined
+    -- cast, so two answers in one replay are not a duplicate.
+    ChoseMiracleReveal OptionalDecision.OptionalDecision
   | -- | CR 118.12a: whether the player a resolving spell or ability offered a
     -- cost to chose to pay it. Distinct from ChoseOptional, which records CR
     -- 603.5's "may" and is always answered by the resolving controller.

@@ -98,6 +98,7 @@ codec =
       Arm.nullary "Nightbound" Keyword.Nightbound,
       Arm.nullary "Decayed" Keyword.Decayed,
       Arm.nullary "Training" Keyword.Training,
+      Arm.payload "Miracle" (Cost.codec codec) Keyword.Miracle,
       Arm.payload "Toxic" Common.natural Keyword.Toxic,
       Arm.payload "Plot" (Cost.codec codec) Keyword.Plot,
       Arm.nullary "StartYourEngines" Keyword.StartYourEngines
@@ -182,6 +183,7 @@ codec =
       Keyword.Nightbound -> Common.nullary "Nightbound"
       Keyword.Decayed -> Common.nullary "Decayed"
       Keyword.Training -> Common.nullary "Training"
+      Keyword.Miracle cost -> Common.tagged "Miracle" . Just $ Codec.encode (Cost.codec codec) cost
       Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Common.encodeNatural n
       Keyword.Plot cost -> Common.tagged "Plot" . Just $ Codec.encode (Cost.codec codec) cost
       Keyword.StartYourEngines -> Common.nullary "StartYourEngines"

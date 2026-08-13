@@ -115,6 +115,7 @@ import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
+import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.ScalingSpec
@@ -394,6 +395,7 @@ spec s registry = do
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s
+  Pawl.Codec.RevealCauseSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s

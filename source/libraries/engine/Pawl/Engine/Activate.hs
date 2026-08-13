@@ -41,6 +41,7 @@ import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
@@ -432,7 +433,7 @@ revealIfHidden :: PlayerId -> ObjectId -> Game ()
 revealIfHidden pid srcId = do
   gs <- State.get
   case fmap Object.zone (Game.lookupObject srcId gs) of
-    Just zone | Game.isHiddenZone zone -> Event.reveal pid srcId
+    Just zone | Game.isHiddenZone zone -> Event.reveal RevealCause.Ordinary pid srcId
     _ -> pure ()
 
 -- CR 602.2: announce the activation, revealing the card if it is coming from a
