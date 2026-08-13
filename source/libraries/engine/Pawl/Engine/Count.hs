@@ -89,8 +89,8 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   -- A per-PLAYER quantity DOES answer, and reaches the candidate through that
   -- same view: Filter.playerView records the player's identity, and
   -- Pawl.Types.PlayerRef.Candidate is what a card writes to read it -- Malignus'
-  -- "the highest life total among your opponents". Nothing here has to carry the
-  -- candidate separately, which is what #1315 proposed and the view already did.
+  -- "the highest life total among your opponents". So nothing here carries the
+  -- candidate beside the view: the view already names it.
   Scope.OverPlayers ref -> do
     pids <- playersFor context gs ref
     -- The predicate is baked PER CANDIDATE (see bakePerspective): CR 110.2's

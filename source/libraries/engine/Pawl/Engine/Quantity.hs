@@ -675,8 +675,10 @@ readsX quantity = case quantity of
   -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
   -- Plus X (Literal 3), which reads X without being equal to it.
   Quantity.Plus a b -> readsX a || readsX b
-  -- The same recursion, and a real reading: "half X, rounded down" (Wan Shi
-  -- Tong, Librarian) is a Halved over an X that is not equal to one.
+  -- The same recursion: "half X, rounded down" would be a Halved over an X that
+  -- is not equal to one. A REGRESSION FENCE rather than proven behaviour --
+  -- neither producer halves an announced value, so answering False here leaves
+  -- the suite green.
   Quantity.Halved _ inner -> readsX inner
   -- Toxic Deluge's "-X" is Negate X, which reads X the same way. Without this
   -- arm the CR 107.3 lint would call the card an unannounced-X reader on one
