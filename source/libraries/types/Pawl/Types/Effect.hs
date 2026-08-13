@@ -1079,10 +1079,10 @@ data Effect card
     -- every other player still in the game -- CR 806.1's free-for-all makes each
     -- of them an opponent by construction, CR 102.2 says the same for two, and a
     -- seat that has left (CR 104.3a) is not among them. The prompt is
-    -- Prompt.ChooseOpponent, the same question Null Chamber and
-    -- fateseal ask. Elided at one candidate: CR 102.2 leaves a two-player game
-    -- exactly one opponent, so there is nothing to decide. Not implemented: "choose
-    -- a player", which would offer the controller too and so needs a scope beside
+    -- Prompt.ChooseOpponent, the same question Null Chamber and fateseal ask.
+    -- Elided at one candidate: CR 102.2 leaves a two-player game exactly one
+    -- opponent, so there is nothing to decide. Not implemented: "choose a
+    -- player", which would offer the controller too and so needs a scope beside
     -- the slot (#1444).
     ChooseOpponent SlotName.SlotName
   | -- | CR 103.5b (Serum Powder): exile every card in the resolving controller's

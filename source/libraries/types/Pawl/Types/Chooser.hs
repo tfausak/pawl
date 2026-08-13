@@ -46,10 +46,14 @@ data Chooser
   | -- | The ONE player a slot names -- Skullwinder's "choose an opponent. That
     -- player returns a card from their graveyard to their hand", where the slot
     -- was filled by Pawl.Types.Effect's ChooseOpponent earlier in the same
-    -- resolution, and Obscura Confluence's "target player returns a creature card
-    -- from their graveyard to their hand", where CR 601.2c filled it at cast.
-    -- One chooser and so ONE card, EachInScope's cardinality with the scope's
-    -- fold replaced by a single seat.
+    -- resolution. One chooser and so ONE card, EachInScope's cardinality with the
+    -- scope's fold replaced by a single seat.
+    --
+    -- The same arm would serve a slot CR 601.2c filled at CAST -- Obscura
+    -- Confluence's "target player returns a creature card from their graveyard to
+    -- their hand" -- since the read below goes through the resolution's
+    -- CR 608.2b-filtered slots either way. No card in the pool prints one, so
+    -- that reading is untested.
     --
     -- Reads a slot exactly as Pawl.Types.PlayerRef's InSlot does, and answers
     -- nothing under the same conditions: a slot that is unfilled, illegal (CR

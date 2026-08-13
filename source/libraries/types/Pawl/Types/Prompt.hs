@@ -271,9 +271,9 @@ data Prompt r where
   -- the CHOOSER, which the ref's Pawl.Types.Chooser decides: CR 608.2c's
   -- controller of the spell or ability, who need not own the graveyard, or each
   -- player the ref's scope names, or the one player a slot names -- the last two
-  -- asked about their own. The ObjectId is the
-  -- spell or ability being resolved; the NonEmpty is the matching cards,
-  -- engine-pre-filtered in the sweep's own order.
+  -- asked about their own. The ObjectId is the spell or ability being resolved;
+  -- the NonEmpty is the matching cards, engine-pre-filtered in the sweep's own
+  -- order.
   --
   -- One question per chooser, so Exhume's "each player puts a creature card from
   -- their graveyard onto the battlefield" raises this once per stocked graveyard,
