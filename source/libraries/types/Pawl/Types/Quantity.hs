@@ -95,6 +95,42 @@ data Quantity
     Star
   | -- | CR 208.2: composition, so a printed 1+* needs no constructor of its own.
     Plus Quantity Quantity
+  | -- | The negation of the quantity inside it -- Toxic Deluge's "all creatures
+    -- get -X/-X until end of turn", where the minus sign is in front of a value
+    -- the card does not print.
+    --
+    -- Literal already takes a signed Integer, so a printed -5/-5 (Dismember) is
+    -- writable without this; what is not is a minus in front of anything else,
+    -- since Plus is the only other arithmetic arm and this type has no inverse.
+    -- CR 107.3a's "[-X]" and CR 107.1b together are the licence: X is announced
+    -- as a nonnegative number (CR 107.1b forbids CHOOSING a negative one), and
+    -- the card's own minus sign is what makes the modification negative.
+    --
+    -- A negative result is legal where it lands. CR 107.1b: "it's possible for a
+    -- game value, such as a creature's power, to be less than zero", and
+    -- Pawl.Engine.Projection.addPT does not floor -- CR 704.5f's state-based
+    -- action is what a toughness of 0 or less means. Where the reader wants a
+    -- COUNT instead, CR 107.1b's other half ("if a calculation ... yields a
+    -- negative number, zero is used instead") is already applied by
+    -- Pawl.Extra.Integer.toNaturalSaturating at every such reader, so a negated
+    -- draw or token count is 0 rather than an error.
+    --
+    -- NOT a product node. Pawl.Engine.Keyword.rampage rejected one for its "N
+    -- times the number of creatures blocking it", on the grounds that it would be
+    -- a second way to write numbers Plus already writes; -1 is the only
+    -- coefficient no composition of Plus can reach, so it is the only one that
+    -- earns an arm. NOT a Minus either: Negate composes with Plus into the
+    -- subtraction a card might one day print, where a Minus arm would leave the
+    -- negation of a single value spelled as a subtraction from zero.
+    --
+    -- Not a leaf: the payload is a whole Quantity, so every fold recurses through
+    -- it as it does through Plus, and it terminates for Plus's reason -- the
+    -- payload is a strictly smaller subterm.
+    --
+    -- Nor is this the Num instance the header rules out: a SYNTAX node, whose
+    -- evaluation is unanswered exactly where its payload's is (the negation of a
+    -- bare Star is not 0), where a Num method would have to answer everywhere.
+    Negate Quantity
   | -- | A quantity that counts game state (CR 208.2a, CR 608.2h). See
     -- Pawl.Types.Count for why the payload is its own type.
     --

@@ -12,7 +12,8 @@
 -- objects have (Hand of the Praetors), and CR 208.5's 0 for a creature left
 -- with no value for its power or toughness (Ashaya, Soul of the Wild under
 -- Blood Moon), plus CR 109.5's static-ability perspective on a player-scoped
--- count (Empyrial Armor on an opponent's creature).
+-- count (Empyrial Armor on an opponent's creature) and CR 613.4c's NEGATIVE
+-- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -23,6 +24,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -556,6 +558,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   handOfThePraetorsSpec s registry
   ashayaBloodMoonSpec s registry
   empyrialArmorSpec s registry
+  toxicDelugeSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -1246,3 +1249,112 @@ aimRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
 aimRecipient recipient p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton recipient)) sets
   _ -> S.identityAnswer p
+
+-- Chooses this value of X. Toxic Deluge names no target, so every other prompt
+-- takes the identity fallback -- Pawl.CostSpec's answerHatredXOf pattern.
+answerDelugeXOf :: Natural.Natural -> Prompt.Prompt r -> r
+answerDelugeXOf n p = case p of
+  Prompt.ChooseX {} -> n
+  _ -> S.identityAnswer p
+
+-- alice controls three untapped Swamps -- exactly {2}{B} -- a Goblin Piker (2/1)
+-- and Jedit Ojanen (5/5); bob controls Russet Wolves (3/3); Toxic Deluge is in
+-- alice's hand, in her own precombat main phase.
+--
+-- THE TOUGHNESSES STRADDLE the X every case below announces: 1 is below it, 3 is
+-- exactly it, 5 is above it. So which creatures died is an observation and not a
+-- coincidence, and the powers are distinct too (2, 3, 5) so a survivor's numbers
+-- name one reading only. The 3/3 is BOB's: "all creatures" is neither "creatures
+-- you control" nor "creatures an opponent controls", and a board where every
+-- creature shared a controller could not tell those apart.
+delugeBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+delugeBoard swamp piker wolves jedit deluge =
+  let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay swamp 3)
+      (wolvesId, withWolves) = S.addCreature wolves S.bob withPiker
+      (jeditId, withJedit) = S.addCreature jedit S.alice withWolves
+      (gs, delugeId) = S.handOne deluge withJedit
+   in (pikerId, wolvesId, jeditId, delugeId, gs)
+
+-- Cast Toxic Deluge announcing this X, resolve it, and let CR 704 run.
+castDeluge :: Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castDeluge x delugeId gs =
+  S.runPure (answerDelugeXOf x) gs (S.cast S.alice delugeId >> Stack.resolveTop >> Engine.settleForPriority)
+
+-- Toxic Deluge ({2}{B} Sorcery, Oracle text verified against Scryfall): "As an
+-- additional cost to cast this spell, pay X life. All creatures get -X/-X until
+-- end of turn."
+--
+-- The card CR 613.4c's NEGATIVE half was waiting for on a value the card does
+-- not print. Dismember's -5/-5 is a printed literal, which Quantity.Literal's
+-- signed Integer already says; this one's minus sign sits in front of CR 107.3a's
+-- announced X, and Quantity.Plus has no inverse -- so it needs Quantity.Negate or
+-- it cannot be written at all. Writing it as +X/+X instead would be weaker in the
+-- controller's favour, which is why the card waited (#1419).
+--
+-- The layer is 7c (CR 613.4c, "effects and counters that modify power and/or
+-- toughness"), the same one Trumpet Blast's +2/+0 lands in, over the same
+-- filter-selected set CR 611.2c freezes at resolution. What is new is the sign.
+--
+-- CR 107.1b is what makes the result legal: a creature's power may be less than
+-- zero, and CR 704.5f is what a toughness of 0 or less then means.
+toxicDelugeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+toxicDelugeSpec s registry = Spec.describe s "Toxic Deluge" $ do
+  -- THE PROVING CASE. Falsifiers, in order: +X/+X leaves all three alive with the
+  -- Jedit an 8/8; an X read as 0 leaves all three alive at 20 life; an X read but
+  -- not paid leaves the same board at 20 life; an X paid but not read leaves
+  -- three live creatures at 17.
+  Spec.it s "CR 613.4c/107.3a whole card: X=3 buries the 2/1 and the 3/3, leaves the 5/5 a 2/2, and costs 3 life" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    deluge <- S.printingOf s registry "Toxic Deluge"
+    let (pikerId, wolvesId, jeditId, delugeId, gs) = delugeBoard swamp piker wolves jedit deluge
+        after = castDeluge 3 delugeId gs
+    Spec.assertEqWith s "the printed boxes before the spell" (fmap (`S.powerToughnessOf` gs) [pikerId, wolvesId, jeditId]) [Just (2, 1), Just (3, 3), Just (5, 5)]
+    Spec.assertEqWith s "the spell resolved" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "CR 119.4 subtracted the announced 3" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "bob paid nothing: the cost is the caster's" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertBool s (not (Set.member pikerId (GameState.battlefield after))) "CR 704.5f buried the 2/1, whose toughness went to -2"
+    Spec.assertBool s (not (Set.member wolvesId (GameState.battlefield after))) "and bob's 3/3, whose toughness went to exactly 0"
+    Spec.assertBool s (Set.member jeditId (GameState.battlefield after)) "the 5/5 survived"
+    Spec.assertEqWith s "as a 2/2: BOTH halves moved, and downwards" (S.powerToughnessOf jeditId after) (Just (2, 2))
+    Spec.assertEqWith s "three Swamps paid {2}{B}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "Toxic Deluge resolved out of hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+  -- CR 107.3i: the cost's X and the effect's X are ONE value, so both move
+  -- together. The same board with one thing changed, and at X=5 the survivor of
+  -- the case above dies too -- 5/5 modified to 0/0, which is CR 704.5f's own
+  -- boundary read from the other side.
+  Spec.it s "CR 107.3i at X=5 the 5/5 goes to 0/0 and dies too, for 5 life" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    deluge <- S.printingOf s registry "Toxic Deluge"
+    let (_, _, jeditId, delugeId, gs) = delugeBoard swamp piker wolves jedit deluge
+        after = castDeluge 5 delugeId gs
+    Spec.assertEqWith s "5 life paid" (S.lifeOf S.alice after) (Just 15)
+    Spec.assertBool s (not (Set.member jeditId (GameState.battlefield after))) "nothing is left on the battlefield to be a creature"
+    Spec.assertEqWith s "no creature survived, either player's" (S.creaturesInPlay S.alice after + S.creaturesInPlay S.bob after) 0
+  -- CR 119.4b: 0 life is always payable, so X=0 is a legal announcement -- and
+  -- CR 613.4c still applies a modification, of -0/-0. Every creature survives
+  -- with its printed box, which is also the board a sign error CANNOT produce at
+  -- any other X.
+  Spec.it s "CR 119.4b X=0 casts, pays nothing and kills nothing" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    deluge <- S.printingOf s registry "Toxic Deluge"
+    let (pikerId, wolvesId, jeditId, delugeId, gs) = delugeBoard swamp piker wolves jedit deluge
+        after = castDeluge 0 delugeId gs
+    Spec.assertEqWith s "life untouched" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "every printed box is intact" (fmap (`S.powerToughnessOf` after) [pikerId, wolvesId, jeditId]) [Just (2, 1), Just (3, 3), Just (5, 5)]
+    Spec.assertEqWith s "three Swamps still paid {2}{B}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "Toxic Deluge resolved out of hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
