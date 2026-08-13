@@ -24,7 +24,10 @@ codec =
       Arm.payload "Specific" PlayerId.codec PlayerRef.Specific,
       -- The fold's own candidate, which a card DOES write: Malignus names it
       -- inside an Aggregation.Greatest over Scope.OverPlayers.
-      Arm.nullary "Candidate" PlayerRef.Candidate
+      Arm.nullary "Candidate" PlayerRef.Candidate,
+      -- CR 608.2h's reference, which a card writes: Spikeshell Harrier names the
+      -- controller of the permanent its trigger targeted.
+      Arm.payload "ControllerOfBound" SlotName.codec PlayerRef.ControllerOfBound
     ]
   where
     encode r = case r of
@@ -33,3 +36,4 @@ codec =
       PlayerRef.InSlot n -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec n
       PlayerRef.Specific pid -> Common.tagged "Specific" . Just $ Codec.encode PlayerId.codec pid
       PlayerRef.Candidate -> Common.nullary "Candidate"
+      PlayerRef.ControllerOfBound n -> Common.tagged "ControllerOfBound" . Just $ Codec.encode SlotName.codec n

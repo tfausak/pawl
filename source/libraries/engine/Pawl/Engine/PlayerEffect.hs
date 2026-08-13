@@ -52,6 +52,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerScope (PlayerScope)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import Pawl.Types.Subtype (Subtype)
 import Pawl.Types.Timestamp (Timestamp)
 
@@ -367,7 +368,7 @@ rewritePlayerEffect pairs effect = case effect of
   -- does, and Haakon's "Knight spells" would.
   PlayerEffect.IncreaseSpellCost f n -> PlayerEffect.IncreaseSpellCost (Filter.rewrite pairs f) n
   PlayerEffect.ReduceSpellCost f cost -> PlayerEffect.ReduceSpellCost (Filter.rewrite pairs f) cost
-  PlayerEffect.ReduceActivationCost f cost floor_ -> PlayerEffect.ReduceActivationCost (Filter.rewrite pairs f) cost floor_
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) cost floor_)
   -- The one arm with a word in TWO places: its own criterion ("nontoken Rebels"),
   -- and the criterion inside each component it adds ("sacrifice a LAND"). Both
   -- descend, which is Filter.rewriteCost's reading of CR 612.2 carried to a
@@ -882,7 +883,7 @@ spellCostAdjustments pid oid gs =
 activationCostAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments
 activationCostAdjustments pid srcId gs =
   let reductionOf effect = case effect of
-        PlayerEffect.ReduceActivationCost criterion amount floor_ ->
+        PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost criterion amount floor_) ->
           if matchesObject criterion srcId gs then Just (amount, floor_) else Nothing
         -- The non-mana addition, gathered by `additionOf` below: CR 601.2f's
         -- arithmetic has nothing to do to a component, so it never joins the

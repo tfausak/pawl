@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.CreateCopy where
 
 import qualified Pawl.Codec.ObjectRef as ObjectRef
@@ -15,8 +17,11 @@ import qualified Pawl.Types.CreateCopy as CreateCopy
 -- the encoder's @q == Quantity.Literal 1@ guard and the decoder's fallback had
 -- to agree, or a round trip stopped being the identity.
 codec :: Codec.Codec CreateCopy.CreateCopy
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  quantity <- Fields.defaulted "quantity" CreateCopy.defaultQuantity Quantity.codec CreateCopy.quantity
+  ref <- Fields.required "ref" ObjectRef.codec CreateCopy.ref
+  pure
     CreateCopy.MkCreateCopy
-      <$> Fields.defaulted "quantity" CreateCopy.defaultQuantity Quantity.codec CreateCopy.quantity
-      <*> Fields.required "ref" ObjectRef.codec CreateCopy.ref
+      { CreateCopy.quantity = quantity,
+        CreateCopy.ref = ref
+      }

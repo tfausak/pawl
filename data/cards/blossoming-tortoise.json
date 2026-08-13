@@ -30,21 +30,21 @@
         {
           "effect": {
             "type": "ReduceActivationCost",
-            "value": [
-              {
-                "type": "HasCardType",
-                "value": {
-                  "type": "Land"
-                }
-              },
-              [
+            "value": {
+              "floor": 0,
+              "reduction": [
                 {
                   "type": "Generic",
                   "value": 1
                 }
               ],
-              0
-            ]
+              "whichAbilities": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Land"
+                }
+              }
+            }
           },
           "scope": {
             "type": "You"

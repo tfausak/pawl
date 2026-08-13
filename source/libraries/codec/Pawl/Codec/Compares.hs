@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.Compares where
 
 import qualified Pawl.Codec.Comparison as Comparison
@@ -12,9 +14,13 @@ import qualified Pawl.Types.Compares as Compares
 -- Naming the sides is the point: both are a Quantity, so a positional payload
 -- would let a card file that swapped them decode into the wrong comparison.
 codec :: Codec.Codec Compares.Compares
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  measured <- Fields.required "measured" Quantity.codec Compares.measured
+  comparison <- Fields.required "comparison" Comparison.codec Compares.comparison
+  threshold <- Fields.required "threshold" Quantity.codec Compares.threshold
+  pure
     Compares.MkCompares
-      <$> Fields.required "measured" Quantity.codec Compares.measured
-      <*> Fields.required "comparison" Comparison.codec Compares.comparison
-      <*> Fields.required "threshold" Quantity.codec Compares.threshold
+      { Compares.measured = measured,
+        Compares.comparison = comparison,
+        Compares.threshold = threshold
+      }

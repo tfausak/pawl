@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.Mill where
 
 import qualified Pawl.Codec.MillTally as MillTally
@@ -10,9 +12,13 @@ import qualified Pawl.Types.Mill as Mill
 
 -- | The tally is ELIDED when absent, as Destroy's bound slot is.
 codec :: Codec.Codec Mill.Mill
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  player <- Fields.required "player" PlayerRef.codec Mill.player
+  quantity <- Fields.required "quantity" Quantity.codec Mill.quantity
+  tally <- Fields.defaulted "tally" Nothing (Common.maybe MillTally.codec) Mill.tally
+  pure
     Mill.MkMill
-      <$> Fields.required "player" PlayerRef.codec Mill.player
-      <*> Fields.required "quantity" Quantity.codec Mill.quantity
-      <*> Fields.defaulted "tally" Nothing (Common.maybe MillTally.codec) Mill.tally
+      { Mill.player = player,
+        Mill.quantity = quantity,
+        Mill.tally = tally
+      }

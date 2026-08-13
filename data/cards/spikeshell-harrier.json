@@ -1,0 +1,183 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Spikeshell Harrier",
+      "power": {
+        "type": "Literal",
+        "value": 4
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "permanent"
+                          },
+                          "zone": {
+                            "type": "Hand"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "condition": {
+                      "type": "Compares",
+                      "value": {
+                        "comparison": {
+                          "type": "AtLeast"
+                        },
+                        "measured": {
+                          "type": "Speed",
+                          "value": {
+                            "type": "ControllerOfBound",
+                            "value": "permanent"
+                          }
+                        },
+                        "threshold": {
+                          "type": "Plus",
+                          "value": [
+                            {
+                              "type": "Count",
+                              "value": {
+                                "aggregation": {
+                                  "type": "Greatest",
+                                  "value": {
+                                    "type": "Speed",
+                                    "value": {
+                                      "type": "Candidate"
+                                    }
+                                  }
+                                },
+                                "filter": {
+                                  "type": "Not",
+                                  "value": {
+                                    "type": "IsControllerOfBound",
+                                    "value": "permanent"
+                                  }
+                                },
+                                "scope": {
+                                  "type": "OverPlayers",
+                                  "value": {
+                                    "type": "EachPlayer"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "Literal",
+                              "value": 1
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "effects": [
+                      {
+                        "type": "DecreaseSpeed",
+                        "value": {
+                          "floor": 1,
+                          "player": {
+                            "type": "ControllerOfBound",
+                            "value": "permanent"
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": {
+                  "permanent": {
+                    "filter": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "Or",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "HasSubtype",
+                              "value": {
+                                "type": "Vehicle"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "Opponent"
+                          }
+                        }
+                      ]
+                    },
+                    "pool": {
+                      "type": "Permanents"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Robot"
+          },
+          {
+            "type": "Turtle"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

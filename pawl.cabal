@@ -278,6 +278,8 @@ library codec
     Pawl.Codec.QuantitySpec
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientSpec
+    Pawl.Codec.ReduceActivationCost
+    Pawl.Codec.ReduceActivationCostSpec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.ReplacementEffect
@@ -302,6 +304,8 @@ library codec
     Pawl.Codec.SlotNameSpec
     Pawl.Codec.SpecialAction
     Pawl.Codec.SpecialActionSpec
+    Pawl.Codec.SpeedDecrease
+    Pawl.Codec.SpeedDecreaseSpec
     Pawl.Codec.StaticAbility
     Pawl.Codec.StaticAbilitySpec
     Pawl.Codec.Subtype
@@ -799,6 +803,7 @@ library types
     Pawl.Types.ProposedEvent
     Pawl.Types.Quantity
     Pawl.Types.Recipient
+    Pawl.Types.ReduceActivationCost
     Pawl.Types.Regenerability
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate
@@ -820,6 +825,7 @@ library types
     Pawl.Types.SlotName
     Pawl.Types.Source
     Pawl.Types.SpecialAction
+    Pawl.Types.SpeedDecrease
     Pawl.Types.StaticAbility
     Pawl.Types.Status
     Pawl.Types.Subtype

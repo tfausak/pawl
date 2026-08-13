@@ -154,6 +154,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.IsPlayer PlayerRelation.Opponent)
       """ {"type":"IsPlayer","value":{"type":"Opponent"}} """
+  Spec.it s "IsControllerOfBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.IsControllerOfBound (SlotName.MkSlotName (Text.pack "permanent")))
+      """ {"type":"IsControllerOfBound","value":"permanent"} """
   -- Nested, unlike every atom above: the payload is a whole Filter, so this pins
   -- the recursion as well as the tag.
   Spec.it s "ControlsMoreThanYou" $

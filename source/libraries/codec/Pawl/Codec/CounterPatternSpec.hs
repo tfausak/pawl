@@ -15,10 +15,9 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
   -- A fixed kind and a real filter.
   Spec.it s "Hardened Scales (a fixed kind, a real filter)" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CounterPattern.toJson
-      CounterPattern.fromJson
+      CounterPattern.codec
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
           CounterPattern.byWhom = Nothing,
@@ -30,10 +29,9 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
   -- whichKind = Nothing means ANY kind, never "no kind", and the trivial filter
   -- matches every permanent. An omitted key is what that Nothing means.
   Spec.it s "Doubling Season (any kind, the trivial filter)" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CounterPattern.toJson
-      CounterPattern.fromJson
+      CounterPattern.codec
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Nothing,
           CounterPattern.byWhom = Nothing,
@@ -45,10 +43,9 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
   -- CR 109.5: whichKind's Nothing and whose's Anyones are both what a pattern
   -- that says nothing means, so only the required onWhat key survives.
   Spec.it s "an all-default value omits every optional key" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CounterPattern.toJson
-      CounterPattern.fromJson
+      CounterPattern.codec
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Nothing,
           CounterPattern.byWhom = Nothing,
@@ -60,10 +57,9 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
   -- CR 122.6: Vorinclex, Monstrous Raider's halving clause -- narrowed by who is
   -- PUTTING the counters, and reaching players as well as permanents.
   Spec.it s "Vorinclex (a putter relation, and players too)" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      CounterPattern.toJson
-      CounterPattern.fromJson
+      CounterPattern.codec
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Nothing,
           CounterPattern.byWhom = Just ControllerRelation.Opponents,
@@ -72,3 +68,4 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
           CounterPattern.onWho = Just ControllerRelation.Anyones
         }
       """ {"byWhom":{"type":"Opponents"},"onWhat":{"type":"And","value":[]},"onWho":{"type":"Anyones"}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s CounterPattern.codec

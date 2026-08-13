@@ -114,6 +114,7 @@ import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
+import qualified Pawl.Codec.ReduceActivationCostSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
@@ -126,6 +127,7 @@ import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SpecialActionSpec
+import qualified Pawl.Codec.SpeedDecreaseSpec
 import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
@@ -396,6 +398,7 @@ spec s registry = do
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
+  Pawl.Codec.ReduceActivationCostSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
@@ -408,6 +411,7 @@ spec s registry = do
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s
+  Pawl.Codec.SpeedDecreaseSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s

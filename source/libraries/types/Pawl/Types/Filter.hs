@@ -265,6 +265,27 @@ data Filter keyword
     -- card representing a permanent or spell, so the two are never both answerable
     -- for one candidate.
     IsPlayer PlayerRelation.PlayerRelation
+  | -- | The candidate PLAYER is the controller of the object a slot names --
+    -- Spikeshell Harrier's "each OTHER player", which is `Not` of this atom over
+    -- every player, the other player being the opponent whose permanent the
+    -- ability targeted.
+    --
+    -- IsPlayer's sibling in what it asks of the candidate (who they ARE, not what
+    -- they control) and Pawl.Types.PlayerRef.ControllerOfBound's twin one type
+    -- over: that reference NAMES the player, this one tests a candidate against
+    -- them, and a card excluding them from a fold needs the second. NOT
+    -- ControlledByBound, which asks after an OBJECT candidate's controller: a
+    -- Scope.OverPlayers candidate is a player, and CR 108.4 gives a player no
+    -- controller, so that atom is vacuously False for every one of them.
+    --
+    -- Answered by REWRITING at Pawl.Engine.Count.bakePerspective, the shape
+    -- ControlsMoreThanYou above takes and for its reason: Pawl.Engine.Filter holds
+    -- no board and cannot project a controller, while the fold that supplies the
+    -- player candidates holds both the board and the view. CR 608.2h reaches it
+    -- through that view -- see ControllerOfBound, which carries the argument.
+    -- Vacuously False if it survives to Pawl.Engine.Filter.matches, which is every
+    -- position but a Scope.OverPlayers count's filter.
+    IsControllerOfBound SlotName.SlotName
   | -- | CR 110.2: the candidate PLAYER controls strictly more permanents matching
     -- this filter than the perspective player does (CR 109.5) -- Oreskos
     -- Explorer's "the number of players who control more lands than you", whose

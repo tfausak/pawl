@@ -11,18 +11,17 @@ import qualified Pawl.Types.TokenPattern as TokenPattern
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TokenPattern" $ do
   Spec.it s "MkTokenPattern" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      TokenPattern.toJson
-      TokenPattern.fromJson
+      TokenPattern.codec
       TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours}
       """ {"whose":{"type":"Yours"}} """
   -- CR 109.5: Anyones is what a pattern that says nothing about the
   -- controller means, so the sole field's key is omitted.
   Spec.it s "an all-default value omits every optional key" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      TokenPattern.toJson
-      TokenPattern.fromJson
+      TokenPattern.codec
       TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Anyones}
       """ {} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s TokenPattern.codec
