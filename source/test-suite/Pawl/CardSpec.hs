@@ -87,6 +87,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -139,6 +140,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -636,7 +638,7 @@ effectCounts effect = case effect of
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   -- The floor beside it is a printed literal and holds no Count.
   Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
-  Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
+  Effect.Create (Create.MkCreate quantity card _ _) -> quantityCounts quantity <> overFaces cardCounts card
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> quantityCounts quantity
@@ -647,7 +649,7 @@ effectCounts effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider is an effect list a card authors, so its Counts are this
   -- card's Counts -- the same recursion Create takes into a minted token.
-  Effect.PreventNextDamage duration _ quantity rider -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationCounts duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationCounts duration
   Effect.TurnFaceDown _ -> []
@@ -915,7 +917,7 @@ cardReplacementEffects card =
 effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
 effectReplacements effect = case effect of
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> [replacement]
-  Effect.Create _ token _ _ -> overFaces cardReplacementEffects token
+  Effect.Create (Create.MkCreate _ token _ _) -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
   Effect.DealDamage (DealDamage.MkDealDamage _ _) -> []
@@ -949,7 +951,7 @@ effectReplacements effect = case effect of
   Effect.DecreaseSpeed _ -> []
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
-  Effect.PreventNextDamage _ _ _ rider -> concatMap effectReplacements rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ rider) -> concatMap effectReplacements rider
   Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
@@ -1440,7 +1442,7 @@ data MintedKind
 -- too, and the build breaks until it is.
 effectMintedFaces :: Effect.Effect Card.Type.Card -> [(MintedKind, Face.Face Card.Type.Card)]
 effectMintedFaces effect = case effect of
-  Effect.Create _ token _ _ -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
+  Effect.Create (Create.MkCreate _ token _ _) -> fmap ((,) MintedToken) (NonEmpty.toList (Card.Type.faces token))
   -- Mints no face of its own: the token's text is the copied permanent's.
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> fmap ((,) MintedEmblem) (NonEmpty.toList (Card.Type.faces emblem))
@@ -1476,7 +1478,7 @@ effectMintedFaces effect = case effect of
   Effect.DecreaseSpeed _ -> []
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
-  Effect.PreventNextDamage _ _ _ rider -> concatMap effectMintedFaces rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ rider) -> concatMap effectMintedFaces rider
   Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
@@ -2497,7 +2499,7 @@ effectFilters effect = case effect of
   Effect.DecreaseSpeed d -> unframed (quantityFilters (SpeedDecrease.quantity d))
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
-  Effect.Create quantity card riders _ -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
+  Effect.Create (Create.MkCreate quantity card riders _) -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
@@ -2506,7 +2508,7 @@ effectFilters effect = case effect of
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
   -- landwalk's payload once, so a nested effect list is exactly what it must not
   -- stop at.
-  Effect.PreventNextDamage duration ref quantity rider ->
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration ref quantity rider) ->
     unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity) <> concatMap effectFilters rider
   Effect.PreventAllDamage (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
@@ -2712,7 +2714,7 @@ jsonAtoms tag value = case value of
 canHostSubjectOffends :: Face.Face Card.Type.Card -> Bool
 canHostSubjectOffends card =
   let (framed, unframedCount) = canHostSubjectCounts card
-   in unframedCount /= 0 || framed + unframedCount /= jsonAtoms (Text.pack "CanHostSubject") (Face.Codec.toJson Card.toJson card)
+   in unframedCount /= 0 || framed + unframedCount /= jsonAtoms (Text.pack "CanHostSubject") (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- A lint fixture built as a FACE, put back into the one-face card an
 -- Effect.Create's token payload has to be.
@@ -2937,7 +2939,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "CR 111.4 every token a card creates is named its subtypes plus \"Token\"" $ do
     ps <- S.allPrintings s
     -- Every FACE of every token, since CR 707.8a's double-faced token names two.
-    let tokensOf face = concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create _ token _ _ <- cardResolutionEffects face]
+    let tokensOf face = concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _) <- cardResolutionEffects face]
         tokens = concatMap (overFaces tokensOf . Printing.card) ps
     -- Guards the sweep against passing vacuously if Create ever moves out
     -- from under cardResolutionEffects.
@@ -2945,7 +2947,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no token is misnamed" (fmap Face.name (filter tokenNameOffends tokens)) []
   Spec.it s "the lint itself catches a token named without the suffix" $ do
     doomedTraveler <- S.printingOf s registry "Doomed Traveler"
-    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create _ token _ _ <- cardResolutionEffects (S.combinedFace doomedTraveler)] of
+    case concatMap (NonEmpty.toList . Card.Type.faces) [token | Effect.Create (Create.MkCreate _ token _ _) <- cardResolutionEffects (S.combinedFace doomedTraveler)] of
       [token] -> do
         Spec.assertBool s (not (tokenNameOffends token)) "the real token passes"
         -- The exact misauthoring CR 111.4 forbids: the bare subtype, with
@@ -3105,13 +3107,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         onEveryFace f card = card {Card.Type.faces = fmap f (Card.Type.faces card)}
         -- The graft on the minted TOKEN, on every face of it.
         armToken effect = case effect of
-          Effect.Create quantity token riders slot -> Effect.Create quantity (onEveryFace arm token) riders slot
+          Effect.Create (Create.MkCreate quantity token riders slot) -> Effect.Create (Create.MkCreate quantity (onEveryFace arm token) riders slot)
           other -> other
         -- The same, on the BACK face of a two-faced token whose front is clean.
         armBackFace effect = case effect of
-          Effect.Create quantity token riders slot ->
+          Effect.Create (Create.MkCreate quantity token riders slot) ->
             let front = NonEmpty.head (Card.Type.faces token)
-             in Effect.Create quantity (token {Card.Type.faces = front NonEmpty.:| [arm front]}) riders slot
+             in Effect.Create (Create.MkCreate quantity (token {Card.Type.faces = front NonEmpty.:| [arm front]}) riders slot)
           other -> other
         -- The same, on a minted EMBLEM in place of the token.
         armEmblem effect = case effect of
@@ -3747,7 +3749,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no Create carries CR 712.14a's transformed entry rider" $ do
     ps <- S.allPrintings s
     let creates effect = case effect of
-          Effect.Create _ _ riders _ -> EntryRiders.transformed riders
+          Effect.Create (Create.MkCreate _ _ riders _) -> EntryRiders.transformed riders
           _ -> False
         moves effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.transformed riders
@@ -4216,8 +4218,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- them, and this is what keeps that true.
   Spec.it s "CR 702.134a / CR 702.149a no card writes a source-power comparison" $ do
     ps <- S.allPrintings s
-    let atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Face.Codec.toJson Card.toJson c)
-        greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Face.Codec.toJson Card.toJson c)
+    let atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Codec.encode (Face.Codec.codec Card.codec) c)
+        greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Codec.encode (Face.Codec.codec Card.codec) c)
         offenders = filter (anyFace (\c -> atoms c /= 0 || greater c /= 0) . Printing.card) ps
     Spec.assertEqWith s "the atoms are the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous, the way the sweep above would be on its own: the same counter
@@ -4250,7 +4252,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- silent False. Only Pawl.Engine.Keyword.provoke writes it.
   Spec.it s "CR 702.39a no card writes ControlledByDefendingPlayer" $ do
     ps <- S.allPrintings s
-    let atoms c = jsonAtoms (Text.pack "ControlledByDefendingPlayer") (Face.Codec.toJson Card.toJson c)
+    let atoms c = jsonAtoms (Text.pack "ControlledByDefendingPlayer") (Codec.encode (Face.Codec.codec Card.codec) c)
         offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
     Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- Not vacuous, for the sibling sweep's reason: the same counter over a
@@ -4274,7 +4276,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- it names is one the ability's condition binds.
   Spec.it s "CR 603.2 no card writes ControlledByPlayer" $ do
     ps <- S.allPrintings s
-    let atoms c = jsonAtoms (Text.pack "ControlledByPlayer") (Face.Codec.toJson Card.toJson c)
+    let atoms c = jsonAtoms (Text.pack "ControlledByPlayer") (Codec.encode (Face.Codec.codec Card.codec) c)
         offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
     Spec.assertEqWith s "the baked atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- Not vacuous, for the sibling sweep's reason: the same counter over a
@@ -4298,7 +4300,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- card data -- Garland, Royal Kidnapper writes it -- and is not swept.
   Spec.it s "CR 611.2b no card writes a Specific PlayerRef" $ do
     ps <- S.allPrintings s
-    let atoms c = jsonAtoms (Text.pack "Specific") (Face.Codec.toJson Card.toJson c)
+    let atoms c = jsonAtoms (Text.pack "Specific") (Codec.encode (Face.Codec.codec Card.codec) c)
         offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
     Spec.assertEqWith s "the baked reference is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- Not vacuous, for the sibling sweeps' reason: the same counter over a
@@ -4434,10 +4436,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.spell =
                     spellOf
                       [ Effect.Create
-                          (Quantity.Type.Literal 1)
-                          (oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}))
-                          EntryRiders.defaultValue
-                          Nothing
+                          Create.MkCreate
+                            { Create.quantity = Quantity.Type.Literal 1,
+                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
+                              Create.riders = EntryRiders.defaultValue,
+                              Create.slot = Nothing
+                            }
                       ]
                       Map.empty
                 }
@@ -4457,7 +4461,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "and the codec counts exactly the atoms the traversal does"
-      (fmap (\(_, card) -> jsonAtoms (Text.pack "CanHostSubject") (Face.Codec.toJson Card.toJson card)) planted)
+      (fmap (\(_, card) -> jsonAtoms (Text.pack "CanHostSubject") (Codec.encode (Face.Codec.codec Card.codec) card)) planted)
       (fmap (const 1) planted)
     -- The nesting, stated on its own: a top-level-only check would score every
     -- one of these zero but the first.

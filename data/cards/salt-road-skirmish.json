@@ -71,12 +71,8 @@
                   },
                   {
                     "type": "Create",
-                    "value": [
-                      {
-                        "type": "Literal",
-                        "value": 2
-                      },
-                      {
+                    "value": {
+                      "card": {
                         "faces": [
                           {
                             "colorIndicator": [
@@ -108,8 +104,12 @@
                           }
                         ]
                       },
-                      "tokens"
-                    ]
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      "slot": "tokens"
+                    }
                   },
                   {
                     "type": "ModifyTarget",

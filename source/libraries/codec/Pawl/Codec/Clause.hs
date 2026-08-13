@@ -1,37 +1,32 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.Clause where
 
 import qualified Data.Sequence as Seq
-import qualified Data.Text as Text
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Optionality as Optionality
 import qualified Pawl.Codec.UnlessPaid as UnlessPaid
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Optionality as Optionality
 
-toJson :: (Eq card) => (card -> Value.Value) -> Clause.Clause card -> Value.Value
-toJson codec c =
-  Value.object . concat $
-    [ -- R2 again: CR 701.46a's "if" is the marked case, and stating no gate is
-      -- what every other card in the corpus does.
-      Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (Clause.condition c),
-      Common.optionalPair "effects" Seq.empty (Common.encodeSeq (Effect.toJson codec)) (Clause.effects c),
-      -- R2 of the omit-defaults design: Mandatory is the absence of a rider
-      -- (CR 603.5's "may" is the marked case).
-      Common.optionalPair "optionality" Optionality.Mandatory (Codec.encode Optionality.codec) (Clause.optionality c),
-      -- R2 again: CR 118.12a's "unless" is the marked case, and stating no such
-      -- cost is what every other card in the corpus does.
-      Common.optionalPair "unlessPaid" Nothing (Common.encodeMaybe (Codec.encode UnlessPaid.codec)) (Clause.unlessPaid c)
-    ]
-
-fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Clause.Clause card)
-fromJson decode value = do
-  ps <- Common.asObject value
-  c <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
-  es <- Common.defaultedField "effects" Seq.empty (Common.decodeSeq (Effect.fromJson decode)) ps
-  o <- Common.defaultedField "optionality" Optionality.Mandatory (Codec.decode Optionality.codec) ps
-  u <- Common.defaultedField "unlessPaid" Nothing (Common.decodeMaybe (Codec.decode UnlessPaid.codec)) ps
-  pure (Clause.MkClause c o u es)
+-- | The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema. Every rider is the marked case and so is elided when absent: CR
+-- 701.46a's "if", CR 603.5's "may", and CR 118.12a's "unless".
+codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Clause.Clause card)
+codec cardCodec = Fields.object $ do
+  condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) Clause.condition
+  effects <- Fields.defaulted "effects" Seq.empty (Common.seq (Effect.codec cardCodec)) Clause.effects
+  optionality <- Fields.defaulted "optionality" Optionality.Mandatory Optionality.codec Clause.optionality
+  unlessPaid <- Fields.defaulted "unlessPaid" Nothing (Common.maybe UnlessPaid.codec) Clause.unlessPaid
+  pure
+    Clause.MkClause
+      { Clause.condition = condition,
+        Clause.optionality = optionality,
+        Clause.unlessPaid = unlessPaid,
+        Clause.effects = effects
+      }

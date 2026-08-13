@@ -8,6 +8,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -19,6 +20,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -41,19 +43,19 @@ import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout.
--- 'TriggeredAbility.toJson'/'TriggeredAbility.fromJson' reach it only through
+-- 'TriggeredAbility.codec' reach it only through
 -- the supplied Modal codec, so any type proves the shape.
-cardToJson :: Text.Text -> Value.Value
-cardToJson = Value.text
+cardCodec :: Codec.Codec Text.Text
+cardCodec = Common.text
 
-cardFromJson :: Value.Value -> Either Text.Text Text.Text
-cardFromJson = Common.asText
+codec :: Codec.Codec (TriggeredAbility.TriggeredAbility Text.Text)
+codec = TriggeredAbility.codec cardCodec
 
 toJson :: TriggeredAbility.TriggeredAbility Text.Text -> Value.Value
-toJson = TriggeredAbility.toJson cardToJson
+toJson = Codec.encode codec
 
 fromJson :: Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility Text.Text)
-fromJson = TriggeredAbility.fromJson cardFromJson
+fromJson = Codec.decode codec
 
 -- One constructor, so three cases: both states of CR 603.4's `intervening`
 -- field, and every field left at its default.
@@ -68,12 +70,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           { TriggeredAbility.condition = TriggerCondition.SelfEnters,
             TriggeredAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Create (Quantity.Literal 1) (Text.pack "Zombie Token") EntryRiders.defaultValue Nothing)))) Map.empty))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Create (Create.MkCreate (Quantity.Literal 1) (Text.pack "Zombie Token") EntryRiders.defaultValue Nothing))))) Map.empty))
                 (ModeSelection.ChooseExactly 1),
             TriggeredAbility.intervening = Nothing
           }
       )
-      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Create","value":[{"type":"Literal","value":1},"Zombie Token"]}]}]}]}} """
+      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Create","value":{"quantity":{"type":"Literal","value":1},"card":"Zombie Token"}}]}]}]}} """
   -- CR 603.4's intervening "if" clause is emitted only when the ability states
   -- one, so this case writes the key and the one above omits it.
   Spec.it s "MkTriggeredAbility, Sarcomancy's upkeep trigger (an intervening if)" $
@@ -106,8 +108,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
   Spec.it s "toJsonDelayed/fromJsonDelayed sorts by name (Full Throttle, Tidal Wave)" $
     Common.assertJsonCodec
       s
-      (TriggeredAbility.toJsonDelayed cardToJson)
-      (TriggeredAbility.fromJsonDelayed cardFromJson)
+      (Codec.encode (TriggeredAbility.codecDelayed cardCodec))
+      (Codec.decode (TriggeredAbility.codecDelayed cardCodec))
       ( Map.fromList
           [ ( AbilityName.MkAbilityName (Text.pack "sacrifice it"),
               TriggeredAbility.MkTriggeredAbility

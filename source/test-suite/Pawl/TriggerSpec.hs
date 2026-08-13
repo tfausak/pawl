@@ -242,6 +242,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
+import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
@@ -2122,7 +2123,7 @@ interveningSpec s registry =
 zombieTokenOf :: Printing.Printing -> Printing.Printing -> Card.Type.Card
 zombieTokenOf sarcomancy pikerFallback =
   let created effect = case effect of
-        Effect.Create _ card _ _ -> Just card
+        Effect.Create (Create.MkCreate _ card _ _) -> Just card
         _ -> Nothing
       abilityEffects = concatMap (Modal.allEffects . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace sarcomancy))
    in case Maybe.mapMaybe created abilityEffects of

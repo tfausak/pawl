@@ -38,12 +38,8 @@
                     "effects": [
                       {
                         "type": "Create",
-                        "value": [
-                          {
-                            "type": "Literal",
-                            "value": 1
-                          },
-                          {
+                        "value": {
+                          "card": {
                             "faces": [
                               {
                                 "keywords": [
@@ -74,8 +70,12 @@
                                 }
                               }
                             ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }

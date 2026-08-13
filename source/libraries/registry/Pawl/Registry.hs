@@ -26,6 +26,7 @@ import qualified Paths_pawl as Paths
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Exceptions.InvalidCorpus as InvalidCorpus
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
@@ -148,7 +149,7 @@ cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 parseCard :: ByteString.ByteString -> Either Text.Text Card.Card
 parseCard bytes = do
   contents <- either (\err -> Left (Text.pack ("not valid UTF-8: " <> show err))) Right (Encoding.decodeUtf8' bytes)
-  Common.parse contents >>= Card.fromJson
+  Common.parse contents >>= Codec.decode Card.codec
 
 -- The slug a card's file is named for: its face names joined, slugified.
 --

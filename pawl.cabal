@@ -152,8 +152,10 @@ library codec
     Pawl.Codec.CounterPattern
     Pawl.Codec.CounterPatternSpec
     Pawl.Codec.CountSpec
+    Pawl.Codec.Create
     Pawl.Codec.CreateCopy
     Pawl.Codec.CreateCopySpec
+    Pawl.Codec.CreateSpec
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
@@ -310,6 +312,8 @@ library codec
     Pawl.Codec.PoolSpec
     Pawl.Codec.Power
     Pawl.Codec.PowerSpec
+    Pawl.Codec.PreventNextDamage
+    Pawl.Codec.PreventNextDamageSpec
     Pawl.Codec.Printing
     Pawl.Codec.PrintingSpec
     Pawl.Codec.ProjectedCharacteristics
@@ -763,6 +767,7 @@ library types
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterPattern
+    Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.DamageEvent
     Pawl.Types.DamageKind
@@ -879,6 +884,7 @@ library types
     Pawl.Types.Power
     Pawl.Types.Prevention
     Pawl.Types.PreventionRider
+    Pawl.Types.PreventNextDamage
     Pawl.Types.Printing
     Pawl.Types.ProductionTag
     Pawl.Types.Program

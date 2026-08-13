@@ -21,19 +21,19 @@
                 "effects": [
                   {
                     "type": "PreventNextDamage",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 4
+                      },
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

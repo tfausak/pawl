@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.DungeonRoom as DungeonRoom
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -27,17 +28,17 @@ import qualified Pawl.Types.RoomIndex as RoomIndex
 
 -- | The `card` parameter is instantiated at 'Text.Text', TriggeredAbilitySpec's
 -- posture: the codec reaches it only through the supplied Modal codec.
-cardToJson :: Text.Text -> Value.Value
-cardToJson = Value.text
+cardCodec :: Codec.Codec Text.Text
+cardCodec = Common.text
 
-cardFromJson :: Value.Value -> Either Text.Text Text.Text
-cardFromJson = Common.asText
+codec :: Codec.Codec (DungeonRoom.DungeonRoom Text.Text)
+codec = DungeonRoom.codec cardCodec
 
 toJson :: DungeonRoom.DungeonRoom Text.Text -> Value.Value
-toJson = DungeonRoom.toJson cardToJson
+toJson = Codec.encode codec
 
 fromJson :: Value.Value -> Either Text.Text (DungeonRoom.DungeonRoom Text.Text)
-fromJson = DungeonRoom.fromJson cardFromJson
+fromJson = Codec.decode codec
 
 drawOne :: Modal.Modal Text.Text
 drawOne =

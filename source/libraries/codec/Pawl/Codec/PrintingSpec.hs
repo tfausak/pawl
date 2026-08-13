@@ -15,9 +15,8 @@ import qualified Pawl.Types.Printing as Printing
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.Printing" . Spec.it s "MkPrinting delegates to Card's own codec" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Printing.toJson
-      Printing.fromJson
+      Printing.codec
       (Printing.MkPrinting CardSpec.mountainCard)
       """ {"faces":[{"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]}}]} """

@@ -10,6 +10,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Face as Face
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -71,11 +72,14 @@ import qualified Pawl.Types.UntapRestriction as UntapRestriction
 -- | The face codec at the card knot Pawl.Codec.Card ties, which is the only
 -- instantiation of it that exists: the six card-shaped fields need a card codec
 -- passed in, and Card's is the one.
+faceCodec :: Codec.Codec (Face.Face Card.Card)
+faceCodec = Face.codec Card.codec
+
 encodeFace :: Face.Face Card.Card -> Value.Value
-encodeFace = Face.toJson Card.toJson
+encodeFace = Codec.encode faceCodec
 
 decodeFace :: Value.Value -> Either Text.Text (Face.Face Card.Card)
-decodeFace = Face.fromJson Card.fromJson
+decodeFace = Codec.decode faceCodec
 
 -- | CR 700.2's non-modal shape, which is what a land or vanilla creature's
 -- spell payload is: one mode, no effects, forced.

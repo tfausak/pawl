@@ -7,6 +7,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -33,19 +34,19 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout.
--- 'ActivatedAbility.toJson'/'ActivatedAbility.fromJson' reach it only through
+-- 'ActivatedAbility.codec' reach it only through
 -- the supplied Modal codec, so any type proves the shape.
-cardToJson :: Text.Text -> Value.Value
-cardToJson = Value.text
+cardCodec :: Codec.Codec Text.Text
+cardCodec = Common.text
 
-cardFromJson :: Value.Value -> Either Text.Text Text.Text
-cardFromJson = Common.asText
+codec :: Codec.Codec (ActivatedAbility.ActivatedAbility Text.Text)
+codec = ActivatedAbility.codec cardCodec
 
 toJson :: ActivatedAbility.ActivatedAbility Text.Text -> Value.Value
-toJson = ActivatedAbility.toJson cardToJson
+toJson = Codec.encode codec
 
 fromJson :: Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility Text.Text)
-fromJson = ActivatedAbility.fromJson cardFromJson
+fromJson = Codec.decode codec
 
 -- One constructor, so three cases: an equip ability (CR 702.6a) carrying CR
 -- 602.5d's printed SorcerySpeed clause, CR 602.2's default of no clause at all,

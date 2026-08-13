@@ -1,19 +1,17 @@
 module Pawl.Types.Effect where
 
-import qualified Data.Sequence as Seq
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Discard as Discard
-import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
-import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
@@ -27,8 +25,8 @@ import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
+import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
-import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
@@ -531,17 +529,17 @@ data Effect card
     -- never a choice. NOT a copy-token (CR 707) and NOT a predefined token (CR
     -- 111.10): given, not derived.
     --
-    -- The EntryRiders is what the effect says about the tokens beyond their text
+    -- Create.riders is what the effect says about the tokens beyond their text
     -- -- Hanweir Garrison's "tapped and attacking" -- and is not part of the
     -- embedded card for the reason that type's comment gives (CR 109.3: neither is
     -- a characteristic). Resolve reads it; it never cases on it.
     --
-    -- The Maybe SlotName BINDS what this Create minted into the resolving
+    -- Create.slot BINDS what this Create minted into the resolving
     -- object's LIVE bindings, so a delayed ability armed by this same resolution
     -- can name it. A DEFINITION, not a read: never a target, never in
     -- targetSlots.
     --
-    -- WHAT it binds is decided by the PRINTED Quantity, which is the only thing
+    -- WHAT it binds is decided by the PRINTED Create.quantity, which is the only thing
     -- that can tell CR 603.7c's singular "it" from a card's plural "those
     -- tokens": Literal 1 binds the one token (and, if CR 614.16 multiplied the
     -- count, asks which of them "it" names), and any other quantity binds every
@@ -553,7 +551,7 @@ data Effect card
     -- single-object slot rides the target map, which both resolveSpellWith and
     -- resolveModes re-read before each effect. Harried Dronesmith's "It gains
     -- haste until end of turn" is the singular case, on a triggered ability.
-    Create Quantity.Quantity card EntryRiders.EntryRiders (Maybe SlotName.SlotName)
+    Create (Create.Create card)
   | -- | CR 707.1 / 111.3: create this many tokens that are copies of each object
     -- the ObjectRef names -- Cackling Counterpart's "create a token that's a copy
     -- of target creature you control", Rite of Replication's five. Create's
@@ -629,7 +627,7 @@ data Effect card
     SkipNextPhase SkipNextPhase.SkipNextPhase
   | -- | CR 615.7: install a prevention SHIELD over the recipients an ObjectRef
     -- names, for a duration -- Mending Hands' "Prevent the next 4 damage that
-    -- would be dealt to any target this turn". The Quantity is the shield's
+    -- would be dealt to any target this turn". The quantity is the shield's
     -- printed size, which then counts DAMAGE down (see
     -- Pawl.Types.DamageRewrite.PreventNext).
     --
@@ -649,7 +647,7 @@ data Effect card
     -- CR 615.7's shield is spent in damage, not in applications, so Resolve
     -- installs it Unlimited.
     --
-    -- The trailing Seq is CR 615.5's ADDITIONAL EFFECT -- Test of Faith's "for
+    -- PreventNextDamage.riders is CR 615.5's ADDITIONAL EFFECT -- Test of Faith's "for
     -- each 1 damage prevented this way, put a +1/+1 counter on that creature".
     -- It rides the shield rather than being a sibling effect of the same
     -- resolution because it fires when the shield does, once per application and
@@ -666,7 +664,7 @@ data Effect card
     -- PreventAllDamage below deliberately has no such field: no unbounded shield
     -- in the pool carries a rider, and an unread one would be speculative
     -- (#1107).
-    PreventNextDamage Duration.Duration ObjectRef.ObjectRef Quantity.Quantity (Seq.Seq (Effect card))
+    PreventNextDamage (PreventNextDamage.PreventNextDamage (Effect card))
   | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the recipients
     -- an ObjectRef names, for a duration -- Selfless Squire's "prevent all damage
     -- that would be dealt to you this turn".

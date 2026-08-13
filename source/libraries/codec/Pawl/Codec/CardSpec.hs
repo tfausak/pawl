@@ -9,6 +9,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Card as Card
@@ -90,10 +91,9 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
   -- "faces" is the only required key: CR 709-722's Normal is the absence of a
   -- card saying otherwise, so every single-face file says nothing about layout.
   Spec.it s "a single-face card carries only faces, and no layout key" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Card.toJson
-      Card.fromJson
+      Card.codec
       mountainCard
       """ {"faces":[{"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]}}]} """
   Spec.it s "a card with two faces round-trips, and layout is omitted when Normal" $ do
@@ -109,10 +109,9 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
     -- assertJsonCodec rather than a bare encode-then-decode round trip: only
     -- pinning the literal proves the "layout" key is ABSENT for Normal, which a
     -- round trip through the defaulting decoder could not see.
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Card.toJson
-      Card.fromJson
+      Card.codec
       card
       """ {"faces":[{"name":"Wax","typeLine":{"types":[{"type":"Instant"}]}},{"name":"Wane","typeLine":{"types":[{"type":"Instant"}]}}]} """
   -- Omission is permitted on input, never required: a file that spells the
@@ -120,7 +119,7 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
   Spec.it s "a card that spells its layout out still decodes" $
     Common.assertFromJson
       s
-      Card.fromJson
+      (Codec.decode Card.codec)
       """ {"faces":[{"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]}}],"layout":{"type":"Normal"}} """
       mountainCard
   -- Where the at-least-one-face invariant is enforced: Card.faces is a NonEmpty
@@ -129,5 +128,5 @@ spec s = Spec.describe s "Pawl.Codec.Card" $ do
   Spec.it s "a card with no faces is rejected rather than decoded" $
     Spec.assertBool
       s
-      (Either.isLeft (Common.parse (Text.pack """ {"faces":[]} """) >>= Card.fromJson))
+      (Either.isLeft (Common.parse (Text.pack """ {"faces":[]} """) >>= Codec.decode Card.codec))
       "expected an empty faces array to fail to decode"
