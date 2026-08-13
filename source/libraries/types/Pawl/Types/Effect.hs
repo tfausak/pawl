@@ -218,9 +218,13 @@ data Effect card
     --
     -- ObjectRef for Destroy's reason: Unsummon's "return target creature to its
     -- owner's hand" and Evacuation's "return all creatures to their owners'
-    -- hands" are one opcode, and only InSlot is a target (CR 115.10a). A one-shot
-    -- under CR 608.2c/608.2f, so unlike ModifyTarget and GainControl it stores
-    -- nothing and owes CR 611.2c no frozen set.
+    -- hands" are one opcode, and only InSlot is a target (CR 115.10a). That same
+    -- InSlot reads a slot bound to a GROUP -- Feral Lightning's "exile them" over
+    -- the three tokens the sentence before it made -- which is a definition and
+    -- so not a target either.
+    --
+    -- A one-shot under CR 608.2c/608.2f, so unlike ModifyTarget and GainControl
+    -- it stores nothing and owes CR 611.2c no frozen set.
     --
     -- The EntryRiders are what the effect says about the object AS IT ENTERS the
     -- battlefield, beyond its own text -- Meandering Towershell's "tapped and
@@ -650,6 +654,9 @@ data Effect card
     -- on rule 701's list, carrying both of the funnel's can't-be-countered gates
     -- (CR 113.6g's and CR 613.11's), and recording for a SPELL a distinct "was
     -- countered" event the zone change alone could not be told apart from.
+    --
+    -- A bare SlotName, so this counters ONE object: countering a swept set --
+    -- Swift Silence's "counter all other spells" -- is not implemented (#1397).
     Counter SlotName.SlotName
   | -- | CR 122.6: put this many counters of this kind on the permanents the
     -- ObjectRef names. A counter is persistent object state, NOT a zone change --
@@ -775,8 +782,10 @@ data Effect card
     --
     -- Removal ONLY: CR 506.4's second sentence is the whole effect, nothing in
     -- rule 506 puts a creature back, so there is no inverse opcode and no
-    -- duration. A bare SlotName rather than Destroy's ObjectRef, since no card
-    -- here sweeps a set. CR 506.4a and CR 506.4b bound what removal is NOT and
+    -- duration. A bare SlotName rather than Destroy's ObjectRef: removing a
+    -- swept SET from combat is not implemented (#1397).
+    --
+    -- CR 506.4a and CR 506.4b bound what removal is NOT and
     -- neither reaches this opcode: both are about effects that do something ELSE,
     -- where this one says "remove from combat" in as many words.
     RemoveFromCombat SlotName.SlotName

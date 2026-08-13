@@ -17,7 +17,10 @@
 -- holds every token it minted, so a card can say "those tokens", with Thatcher
 -- Revolt -- `tokenSetSpec`, and that group read back through ObjectRef.InSlot by
 -- a second opcode of the same resolution, with Salt Road Skirmish --
--- `tokenGroupReadSpec`, and that group's SINGULAR -- one token bound into the
+-- `tokenGroupReadSpec`, and that same group read by the one opcode that names
+-- objects WITHOUT the shared sweep, Effect.MoveToZone's hand-written InSlot arm,
+-- with Feral Lightning -- `tokenGroupMoveSpec`, and that group's SINGULAR --
+-- one token bound into the
 -- target field and read back by a later effect of the same TRIGGERED ability,
 -- with Harried Dronesmith -- `singleTokenSlotReadSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
@@ -1507,6 +1510,86 @@ tokenGroupReadSpec s registry =
           -- Otherwise "no Warriors" would also be true of a spell still sitting
           -- on the stack, which is a different bug wearing the same result.
           Spec.assertEqWith s "the spell left the stack rather than stalling on it" (GameState.stack after) []
+
+-- Feral Lightning {3}{R}{R}{R} Sorcery: "Create three 3/1 red Elemental creature
+-- tokens with haste. Exile them at the beginning of the next end step."
+--
+-- tokenGroupReadSpec's third reader, and the one that is not an ObjectRef sweep:
+-- Effect.MoveToZone's ObjectRef.InSlot arm branches by hand rather than going
+-- through objectRefObjects (it has to -- an incarnation an earlier effect of the
+-- same resolution bound is invisible to `chosen`), so the group read had to be
+-- written there too. "Them" is all three tokens, moved as one batch.
+--
+-- THE OBSERVABLE IS THE BATTLEFIELD, not the exile zone: CR 111.7 makes a token
+-- in any other zone cease to exist, so a token that reached exile is not there to
+-- be counted. What discriminates is that all three leave and that nothing else
+-- does.
+tokenGroupMoveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tokenGroupMoveSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      elementals gs = filter (\oid -> Set.member Subtype.Elemental (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
+      -- Six Mountains for the {3}{R}{R}{R}, and TWO bystanders that are not
+      -- Elementals: one alice's own, so "them" is told from "every creature you
+      -- control", and one bob's, so it is told from "every creature".
+      board mountain piker rats =
+        let (pikerId, gs1) = S.addCreature piker S.alice (S.landsInPlay mountain 6)
+            (ratsId, gs2) = S.addCreature rats S.bob gs1
+         in (pikerId, ratsId, gs2)
+      castLightning lightning base =
+        let (gs, oid) = S.handOne lightning base
+         in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
+   in Spec.describe s "Group move through InSlot" $ do
+        Spec.it s "CR 111.3 the spell mints three 3/1 Elementals and arms one delayed ability" $ do
+          lightning <- S.printingOf s registry "Feral Lightning"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let (_, _, base) = board mountain piker rats
+              armed = castLightning lightning base
+          case elementals armed of
+            tokens@[_, _, _] -> do
+              Spec.assertEqWith s "each is 3/1" (fmap (\oid -> (Projection.powerOf oid armed, Projection.toughnessOf oid armed)) tokens) [(Just 3, Just 1), (Just 3, Just 1), (Just 3, Just 1)]
+              Spec.assertBool s (all (\oid -> Projection.hasKeyword Keyword.Type.Haste oid armed) tokens) "each has haste"
+              Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers armed)) 1
+            other -> Spec.assertFailure s ("expected exactly three Elemental tokens, got " <> show (length other))
+        -- THE PROVING CASE. Before Effect.MoveToZone's InSlot arm read a group
+        -- binding, the slot held no single object (Pawl.Engine.Resolve.slotOne
+        -- answers Nothing for a group) and "exile them" moved NOBODY, while the
+        -- three tokens were still minted and the ability was still spent -- so
+        -- only the after-count discriminates.
+        Spec.it s "CR 406.2 \"exile them\" moves all three, and only them" $ do
+          lightning <- S.printingOf s registry "Feral Lightning"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let (pikerId, ratsId, base) = board mountain piker rats
+              armed = castLightning lightning base
+              after = resolveAll (settle (beginEndStep armed))
+          Spec.assertEqWith s "three were minted" (length (elementals armed)) 3
+          Spec.assertEqWith s "and none is left" (elementals after) []
+          Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "alice's own non-token creature stayed"
+          Spec.assertBool s (Set.member ratsId (GameState.battlefield after)) "bob's creature stayed"
+          Spec.assertEqWith s "the store is empty" (Seq.length (GameState.delayedTriggers after)) 0
+          Spec.assertEqWith s "nothing stuck on the stack" (GameState.stack after) []
+        -- CR 603.7c's "no longer in the zone it's expected to be in": one token
+        -- already gone does not spare the other two.
+        Spec.it s "CR 603.7c one token already gone leaves the rest exiled" $ do
+          lightning <- S.printingOf s registry "Feral Lightning"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let (pikerId, _, base) = board mountain piker rats
+              armed = castLightning lightning base
+              killed = case elementals armed of
+                token : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable [token]))
+                [] -> armed
+              after = resolveAll (settle (beginEndStep killed))
+          Spec.assertEqWith s "two were left to exile" (length (elementals killed)) 2
+          Spec.assertEqWith s "and both are gone" (elementals after) []
+          Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "the bystander is still untouched"
 
 -- Harried Dronesmith {3}{R} Creature -- Human Artificer 2/3: "At the beginning of
 -- combat on your turn, create a 1/1 colorless Thopter artifact creature token with
@@ -10190,6 +10273,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   delayedSpec s registry
   tokenSetSpec s registry
   tokenGroupReadSpec s registry
+  tokenGroupMoveSpec s registry
   singleTokenSlotReadSpec s registry
   towershellOnsetSpec s registry
   towershellSkipSpec s registry

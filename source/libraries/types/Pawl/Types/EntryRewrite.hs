@@ -24,10 +24,12 @@ import qualified Pawl.Types.Keyword as Keyword
 -- load-bearing here too: a copied "as [this] enters" ability takes effect, so a
 -- Clone of a Primal Plasma runs the COPIED choice rather than skipping it.
 --
--- SacrificeAnyNumber is the one constructor whose choice COSTS something. CR
--- 614.12b's combined-affordability check across permanents entering
--- simultaneously is still not implemented -- the entry loop has no budget to
--- measure a batch against (#72).
+-- SacrificeAnyNumber is the one constructor whose choice COSTS something, and
+-- CR 614.12b's combined budget across permanents entering simultaneously holds
+-- for it without a budget being carried anywhere: the choice is paid for inside
+-- the entry loop that made it, so the next member of the batch cannot choose
+-- what an earlier one already spent (CR 614.13b). Pawl.Engine.Event's arm
+-- states the argument in full and names the board that proves it.
 data EntryRewrite
   = -- | CR 707.5 / 614.1c: "you may have this permanent enter as a copy of ...".
     -- The list is CR 707.9's exceptions to the copying process -- the "except
