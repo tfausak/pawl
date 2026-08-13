@@ -204,6 +204,14 @@ affectedPlayersSlots affected = case affected of
   AffectedPlayers.Scoped _ -> Map.empty
   AffectedPlayers.Named slot -> Map.singleton slot SlotArity.One
 
+-- The slots a Chooser reads. Only the slot-named chooser does, and only ever one
+-- player -- Pawl.Types.PlayerRef's InSlot arity, for its reason.
+chooserSlots :: Chooser.Chooser -> Map.Map SlotName SlotArity
+chooserSlots chooser = case chooser of
+  Chooser.TheController -> Map.empty
+  Chooser.EachInScope -> Map.empty
+  Chooser.BoundInSlot slot -> Map.singleton slot SlotArity.One
+
 -- The slots an ObjectRef reads. Only InSlot names one directly; the sweeping
 -- arms are swept at resolution and name nothing at cast, so a card whose only
 -- object reference is a set declares no target spec and CR 608.2b has nothing to
@@ -218,8 +226,10 @@ objectRefSlots ref = case ref of
   ObjectRef.EachPlayer -> Map.empty
   ObjectRef.TopOfLibrary player _ -> playerRefSlots player
   -- A PlayerScope names players by their relation to the effect's controller (CR
-  -- 109.5) rather than out of a slot, so the chosen card's arm reads none either.
-  ObjectRef.ChosenCardInGraveyard {} -> Map.empty
+  -- 109.5) rather than out of a slot, so whose graveyards are drawn from names
+  -- none. WHO CHOOSES may: Skullwinder's chosen opponent is read out of the slot
+  -- an earlier effect bound.
+  ObjectRef.ChosenCardInGraveyard chooser _ _ -> chooserSlots chooser
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -370,6 +380,9 @@ slotsOf effect = case effect of
   -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
   -- bound once the subgame ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Map.empty
+  -- A DEFINITION too, PlaySubgame's exactly: the opponent is chosen as this
+  -- effect is applied (CR 608.2d) and bound, never read.
+  Effect.ChooseOpponent _ -> Map.empty
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
   Effect.TakeExtraTurn ref _ -> playerRefSlots ref
   -- Both halves may name a slot: the ObjectRef names what is shuffled, and the
@@ -572,6 +585,9 @@ slotsAreExhaustive effect = case effect of
   -- CR 729.1b: the slot is a DEFINITION, and the subgame itself reads no binding
   -- of the game that spawned it.
   Effect.PlaySubgame _ -> True
+  -- PlaySubgame's answer: a definition reads no slot, so slotsOf's empty map is
+  -- exhaustive.
+  Effect.ChooseOpponent _ -> True
   Effect.TakeExtraTurn _ _ -> True
   Effect.ShuffleIntoLibrary _ _ -> True
   Effect.OfferCast _ _ -> True
@@ -678,6 +694,7 @@ readsX = any effectReadsX
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
       Effect.PlaySubgame _ -> False
+      Effect.ChooseOpponent _ -> False
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary {} -> False
       Effect.OfferCast {} -> False
@@ -763,6 +780,7 @@ searchesLibrary effect = case effect of
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
   Effect.PlaySubgame _ -> False
+  Effect.ChooseOpponent _ -> False
   -- CR 701.24 shuffles a library but never LOOKS at one, which is what CR 701.23a
   -- makes a search, so this opens no window.
   Effect.ShuffleIntoLibrary {} -> False
@@ -833,6 +851,9 @@ boundSlots effect = case effect of
   Effect.CreateCopy {} -> Set.empty
   -- CR 729.1b: the subgame's loser, derived rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
+  -- CR 608.2d: the opponent this effect chose, so a later effect naming the slot
+  -- passes the dataflow lint -- PlaySubgame's loser, chosen rather than derived.
+  Effect.ChooseOpponent slot -> Set.singleton slot
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
   -- each ... destroyed this way" to read as a Quantity.
   Effect.Destroy (Destroy.MkDestroy _ _ mSlot) -> foldMap Set.singleton mSlot
@@ -2450,9 +2471,40 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     order <- State.gets Game.stillPlayingInOrder
     case result of
       Result.Won winner -> case List.find (/= winner) order of
-        Just loser -> State.modify' (bindLoserSlot source slot loser)
+        Just loser -> State.modify' (bindPlayerSlot source slot loser)
         Nothing -> pure ()
       Result.Drawn -> pure ()
+  -- CR 608.2d: "choose an opponent", announced by the resolving controller as
+  -- this effect is applied, and bound so the sentence AFTER it can say "that
+  -- player". Skullwinder is the producer; Infernal Offering prints the same
+  -- words.
+  --
+  -- NOT A TARGET (CR 115.10a: the card does not say the word), so no slot was
+  -- announced at CR 601.2c and CR 608.2b has nothing to re-validate. The pick is
+  -- therefore made HERE, against the board as this effect runs -- which is what
+  -- lets an earlier effect of the same resolution change who the opponents are.
+  --
+  -- The opponents are Game.stillPlaying's, not GameState.turnOrder's, so a
+  -- seat that has left (CR 104.3a) is not offered -- fatesealOne's rule, and the
+  -- same three-case shape, elision included: CR 102.2 leaves a two-player game
+  -- exactly one opponent and nothing to decide. An answer naming somebody never
+  -- offered falls back to the first candidate (Pawl.Engine.Ring.tempt's posture),
+  -- since the instruction is mandatory.
+  --
+  -- NO OPPONENT AT ALL binds nothing, so the following sentence names no player
+  -- and does nothing -- CR 101.3 applied to the impossible half rather than to
+  -- the whole effect.
+  Effect.ChooseOpponent slot -> do
+    gs <- State.get
+    let opponents = filter (/= controller) (Game.stillPlaying gs)
+    chosenOpponent <- case opponents of
+      [] -> pure Nothing
+      [sole] -> pure (Just sole)
+      first : second : rest -> do
+        let offered = first NonEmpty.:| (second : rest)
+        answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller source offered)
+        pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
+    Monad.forM_ chosenOpponent $ \pid -> State.modify' (bindPlayerSlot resolving slot pid)
   Effect.ControlPlayerNextTurn slot ->
     State.modify' $ \gs ->
       case legalOne slot legal of
@@ -2817,6 +2869,25 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                 Chooser.EachInScope ->
                   fmap concat . Monad.mapM (\pid -> ask pid (graveyardCardsOf controller source gs pid filter_)) $
                     graveyardPlayers controller gs scope
+                -- Skullwinder's "that player returns a card from their graveyard
+                -- to their hand": ONE chooser, read out of the slot the
+                -- ChooseOpponent before it bound, choosing out of their own
+                -- graveyard -- EachInScope's per-player ask over a single seat.
+                --
+                -- Through playerRefPlayers so the slot is read exactly as every
+                -- other slot read is (CR 608.2b): an unfilled, illegal or
+                -- non-player slot names nobody, and so does a slot naming
+                -- several. Nobody asked is nothing moved, CR 101.3's answer for
+                -- this share of the instruction.
+                --
+                -- Intersected with the scope, which is the only thing left for it
+                -- to say once the chooser fixes whose graveyard: a chooser the
+                -- scope does not name is offered nothing. Skullwinder's sentence
+                -- restricts nothing and so writes EachPlayer.
+                Chooser.BoundInSlot slot ->
+                  case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
+                    [pid] | List.elem pid (graveyardPlayers controller gs scope) -> ask pid (graveyardCardsOf controller source gs pid filter_)
+                    _ -> pure []
           arrived <- Monad.mapM moveOne =<< settleArrivals zone placement targets
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries.
@@ -4556,24 +4627,31 @@ bindObjectsSlot holder slot targets gs =
 noSubgame :: Game Result
 noSubgame = pure Result.Drawn
 
--- CR 729.1b: bind the subgame's derived loser (a player) into `slot` on the
--- resolving object, so a later effect (DealDamage) can read it. Mirrors bindSlot,
--- but the recipient is a player (ToPlayer), not an object.
+-- Bind a PLAYER a resolution named into `slot` on `holder`, so a later effect of
+-- the same resolution can read it. Mirrors bindSlot, but the recipient is a
+-- player (ToPlayer), not an object.
 --
--- `holder` is the effect's `source` and not `resolving`, which is where its
--- READER looks: the follow-on effect reads it through resolveSpellWith's
--- re-read of the resolving SPELL's bindings, and only a spell can play a subgame
--- (a subgame from an ability is deferred, see noSubgame), so for every producer
--- that can exist the two ids are the same object.
-bindLoserSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
-bindLoserSlot holder slot loser gs =
-  let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer loser) (Object.bindings obj)}
+-- TWO CALLERS, and each passes the holder its own READER looks at:
+--
+--   * CR 729.1b's derived subgame loser, held on the effect's `source`. The
+--     follow-on reads it through resolveSpellWith's re-read of the resolving
+--     SPELL's bindings, and only a spell can play a subgame (an ability-driven
+--     one is deferred, see noSubgame), so for every producer that can exist the
+--     two ids are the same object.
+--   * CR 608.2d's chosen opponent, held on `resolving` -- Skullwinder's is a
+--     TRIGGERED ability, where the two ids differ, and the reader is the next
+--     effect's `legalNow`, which resolveModes recomputes off the STACK object's
+--     bindings. Binding it to `source` would leave the permanent holding a slot
+--     nothing reads.
+bindPlayerSlot :: ObjectId -> SlotName -> PlayerId -> GameState -> GameState
+bindPlayerSlot holder slot player gs =
+  let put obj = obj {Object.bindings = Map.insert slot (Binding.toPlayer player) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- CR 701.8b: bind how many permanents a destruction actually destroyed into
 -- `slot` on `holder`, so a later effect of the same resolution can read it as
 -- Quantity.InSlot. The third of the same shape, after bindSlot (an object) and
--- bindLoserSlot (a player); this one binds a NUMBER, which rides the binding
+-- bindPlayerSlot (a player); this one binds a NUMBER, which rides the binding
 -- field CR 601.2b's chosen X rides.
 --
 -- Left behind on the holder after the resolution ends, exactly as the other two

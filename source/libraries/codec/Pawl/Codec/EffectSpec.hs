@@ -941,6 +941,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PlaySubgame (SlotName.MkSlotName (Text.pack "loser")))
       """ {"type":"PlaySubgame","value":"loser"} """
+  Spec.it s "ChooseOpponent" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ChooseOpponent (SlotName.MkSlotName (Text.pack "opponent")))
+      """ {"type":"ChooseOpponent","value":"opponent"} """
   Spec.it s "ExileHandThenDraw" $
     Common.assertJsonCodec
       s

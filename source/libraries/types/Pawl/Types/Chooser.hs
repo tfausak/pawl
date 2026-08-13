@@ -1,5 +1,7 @@
 module Pawl.Types.Chooser where
 
+import qualified Pawl.Types.SlotName as SlotName
+
 -- | WHO announces a choice an effect offers as it is applied (CR 608.2d), for
 -- Pawl.Types.ObjectRef's ChosenCardInGraveyard.
 --
@@ -41,4 +43,29 @@ data Chooser
     -- the battlefield under YOUR control" is the same chooser with the rider
     -- left off.
     EachInScope
+  | -- | The ONE player a slot names -- Skullwinder's "choose an opponent. That
+    -- player returns a card from their graveyard to their hand", where the slot
+    -- was filled by Pawl.Types.Effect's ChooseOpponent earlier in the same
+    -- resolution. One chooser and so ONE card, EachInScope's cardinality with the
+    -- scope's fold replaced by a single seat.
+    --
+    -- The same arm would serve a slot CR 601.2c filled at CAST -- Obscura
+    -- Confluence's "target player returns a creature card from their graveyard to
+    -- their hand" -- since the read below goes through the resolution's
+    -- CR 608.2b-filtered slots either way. No card in the pool prints one, so
+    -- that reading is untested.
+    --
+    -- Reads a slot exactly as Pawl.Types.PlayerRef's InSlot does, and answers
+    -- nothing under the same conditions: a slot that is unfilled, illegal (CR
+    -- 608.2b) or bound to something that is not a player names no chooser, and
+    -- that share of the instruction is ignored (CR 101.3).
+    --
+    -- CHOOSES FROM THEIR OWN GRAVEYARD, EachInScope's rule with one chooser
+    -- rather than several: "that player ... their graveyard" is the same
+    -- possessive "each player ... their graveyard" is. The PlayerScope beside
+    -- this is therefore the outer bound the sentence puts on which graveyards
+    -- the instruction reaches rather than a second answer to "whose" -- a
+    -- sentence that puts none writes EachPlayer, and a chooser the scope does not
+    -- name is offered nothing.
+    BoundInSlot SlotName.SlotName
   deriving (Eq, Ord, Show)

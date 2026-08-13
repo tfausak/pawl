@@ -146,6 +146,7 @@ toJson codec e = case e of
   Effect.Attach s -> Common.tagged "Attach" (Just (Codec.encode SlotName.codec s))
   Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Value.array [Codec.encode SlotName.codec s, Codec.encode (Filter.codec Keyword.codec) f]))
   Effect.PlaySubgame s -> Common.tagged "PlaySubgame" (Just (Codec.encode SlotName.codec s))
+  Effect.ChooseOpponent s -> Common.tagged "ChooseOpponent" (Just (Codec.encode SlotName.codec s))
   Effect.TakeExtraTurn r skips -> Common.tagged "TakeExtraTurn" (Just (Value.array [Codec.encode PlayerRef.codec r, Common.encodeSet (Codec.encode PhaseSelector.codec) skips]))
   -- The library-naming PlayerRef is ELIDED when absent, Mill's tally posture:
   -- Riftsweeper's derived owner (CR 701.24) keeps the bare ObjectRef it has
@@ -285,6 +286,7 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [s, f])) -> Effect.AttachTarget <$> Codec.decode SlotName.codec s <*> Codec.decode (Filter.codec Keyword.codec) f
       _ -> Left . Text.pack $ "AttachTarget expects [slot, filter]"
     "PlaySubgame" -> Common.withValue mv (fmap Effect.PlaySubgame . Codec.decode SlotName.codec)
+    "ChooseOpponent" -> Common.withValue mv (fmap Effect.ChooseOpponent . Codec.decode SlotName.codec)
     "TakeExtraTurn" -> case mv of
       Just (Value.Array (Array.MkArray [r, skips])) -> Effect.TakeExtraTurn <$> Codec.decode PlayerRef.codec r <*> Common.decodeSet (Codec.decode PhaseSelector.codec) skips
       _ -> Left . Text.pack $ "TakeExtraTurn expects [playerRef, phaseSelectors]"

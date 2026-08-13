@@ -1609,6 +1609,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Attach _ -> effect
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)
   Effect.PlaySubgame _ -> effect
+  Effect.ChooseOpponent _ -> effect
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary named ref -> Effect.ShuffleIntoLibrary named (rewriteObjectRef pairs ref)
   Effect.OfferCast {} -> effect
