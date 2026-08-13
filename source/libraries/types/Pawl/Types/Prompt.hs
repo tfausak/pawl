@@ -218,6 +218,36 @@ data Prompt r where
   -- Deliberately not elided for a single candidate, ChooseManaSource's posture:
   -- "any number" includes none, so even one candidate is a real yes or no.
   ChooseProliferate :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [PlayerId.PlayerId] -> Prompt (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)
+  -- | Reverse the Sands' redistribution (CR 119.7-8 name the action): which
+  -- players the resolving controller redistributes life totals among, and who
+  -- ends up with whose. The [(PlayerId, Integer)] is every player in the game
+  -- beside the total they hold, read once before anything moves (CR 608.2h).
+  --
+  -- The answer maps each CHOSEN player to the player whose previous total they
+  -- take. A permutation of the chosen subset, and it has to be one: the ruling
+  -- "you can't split up a life total when you redistribute it" and the printed
+  -- reminder "each of those players gets one life total back" together say each
+  -- total is handed out exactly once. Mapping a player to themselves is legal and
+  -- is how a chosen seat keeps what it had.
+  --
+  -- A player -> PLAYER map rather than a player -> total map, so that inventing a
+  -- number is not expressible at all: a total can only be named by whose it was.
+  -- What is left to check is that the answer is a permutation -- keys drawn from
+  -- the candidates, and the values exactly the keys again -- which is
+  -- Pawl.Engine.Resolve's job, since #222 has answers validated rather than
+  -- trusted.
+  --
+  -- CHOOSE, not target: the card declares no target spec, so nothing is
+  -- re-checked at resolution (CR 608.2b).
+  --
+  -- Elided only below two candidates, where the identity is the only assignment
+  -- there is and every subset of it does nothing. Deliberately still asked when
+  -- the candidates all hold the SAME total, ChooseProliferate's posture: "any
+  -- number" makes even a doomed-to-be-quiet choice the player's to make.
+  --
+  -- CR 810.9f's "not more than one member of each team" is not expressed, pawl
+  -- having no teams (#175).
+  ChooseRedistribution :: Decider.Decider -> PlayerId.PlayerId -> [(PlayerId.PlayerId, Integer)] -> Prompt (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   -- | CR 701.54a: which creature a tempted player controls becomes their
   -- Ring-bearer. The NonEmpty is the creatures they control; the answer is the ONE
   -- that takes the designation.
