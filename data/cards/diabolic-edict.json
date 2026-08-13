@@ -42,7 +42,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "target": {
                 "pool": {
                   "type": "Players"

@@ -63,12 +63,12 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 
--- "target nonblack creature", the spec Doom Blade and the CR 115.1a cases share.
-nonblackCreature :: TargetSpec.TargetSpec
-nonblackCreature = TargetSpec.required Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
+-- "target nonblack creature", the target slot Doom Blade and the CR 115.1a cases share.
+nonblackCreature :: TargetSlot.TargetSlot
+nonblackCreature = TargetSlot.required Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
 
 -- Red Elemental Blast's two modes, in printed order (CR 700.2 /
 -- data/cards/red-elemental-blast.json):
@@ -80,13 +80,13 @@ counterMode = ModeIndex.MkModeIndex 0
 destroyMode :: ModeIndex.ModeIndex
 destroyMode = ModeIndex.MkModeIndex 1
 
--- The one TargetSpec a mode of a printing's spell declares, read out of the
+-- The one TargetSlot a mode of a printing's spell declares, read out of the
 -- JSON-loaded card BY INDEX -- so a swapped mode order is as visible to a
 -- legality assertion here as a wrong pool or a wrong filter is. Nothing when the
 -- index is out of range or the mode does not declare exactly one slot; the
--- callers assert on that rather than defaulting to a hand-built spec.
-modeSpec :: Printing.Printing -> ModeIndex.ModeIndex -> Maybe TargetSpec.TargetSpec
-modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (S.combinedFace printing)) of
+-- callers assert on that rather than defaulting to a hand-built target slot.
+modeTargetSlot :: Printing.Printing -> ModeIndex.ModeIndex -> Maybe TargetSlot.TargetSlot
+modeTargetSlot printing idx = case fmap Map.elems (Card.modeTargetSlots idx (S.combinedFace printing)) of
   Just [only] -> Just only
   _ -> Nothing
 
@@ -428,7 +428,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- colour. Red Elemental Blast's destroy mode reads blue, and the drone is
     -- outside its set until Indigo Faerie's ability resolves. Both halves are
     -- driven through real cards -- a real activation and a real cast, not
-    -- S.withEffect and not a hand-built TargetSpec -- so the two JSON files, not
+    -- S.withEffect and not a hand-built TargetSlot -- so the two JSON files, not
     -- just the projection, are under test.
     island <- S.printingOf s registry "Island"
     mountain <- S.printingOf s registry "Mountain"
@@ -449,16 +449,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         after = snd (Engine.runGamePure answer cast Stack.resolveTop)
     Spec.assertEqWith s "colourless before" (Projection.colorsOf droneId gs) Set.empty
     Spec.assertEqWith s "blue after" (Projection.colorsOf droneId blued) $ Set.singleton Color.Blue
-    case modeSpec redElementalBlast destroyMode of
+    case modeTargetSlot redElementalBlast destroyMode of
       Nothing -> Spec.assertFailure s "Red Elemental Blast's destroy mode declares exactly one target slot"
-      Just destroySpec -> do
+      Just destroySlot -> do
         Spec.assertBool
           s
-          (not (Set.member (Recipient.ToObject droneId) (Target.legalRecipients Nothing S.noSource destroySpec gs)))
+          (not (Set.member (Recipient.ToObject droneId) (Target.legalRecipients Nothing S.noSource destroySlot gs)))
           "the colourless drone is not a legal 'target blue permanent'"
         Spec.assertBool
           s
-          (Set.member (Recipient.ToObject droneId) (Target.legalRecipients Nothing S.noSource destroySpec blued))
+          (Set.member (Recipient.ToObject droneId) (Target.legalRecipients Nothing S.noSource destroySlot blued))
           "the blue drone is"
     Spec.assertBool s (not (Set.member droneId (GameState.battlefield after))) "and Red Elemental Blast destroys it"
     Spec.assertBool s (Set.member faerieId (GameState.battlefield after)) "the blast hit the drone, not the equally blue Faerie"
@@ -641,7 +641,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- are fillable, so CR 601.2b's ChooseModes is really asked here rather than
     -- elided (contrast the gate test above, where only one mode is fillable),
     -- and mode 0 is really chosen. Mode ORDER is not unique to this test --
-    -- Indigo Faerie's `modeSpec ... destroyMode` reads by index too and would
+    -- Indigo Faerie's `modeTargetSlot ... destroyMode` reads by index too and would
     -- also fail if the two modes were swapped -- but swapping them here makes
     -- mode 0 "destroy target blue permanent", which cannot name a spell on the
     -- stack, so the cast no-ops and the drone resolves.
@@ -661,12 +661,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         blasted = snd (Engine.runGamePure answer gs (S.cast S.alice rebId))
         after = snd (Engine.runGamePure answer blasted Stack.resolveTop)
     Spec.assertEqWith s "the spell is blue" (Projection.colorsOf spellId gs) $ Set.singleton Color.Blue
-    case modeSpec redElementalBlast counterMode of
+    case modeTargetSlot redElementalBlast counterMode of
       Nothing -> Spec.assertFailure s "Red Elemental Blast's counter mode declares exactly one target slot"
-      Just counterSpec ->
+      Just counterSlot ->
         Spec.assertBool
           s
-          (Set.member (Recipient.ToObject spellId) (Target.legalRecipients Nothing S.noSource counterSpec gs))
+          (Set.member (Recipient.ToObject spellId) (Target.legalRecipients Nothing S.noSource counterSlot gs))
           "and a legal 'target blue spell'"
     Spec.assertBool s (notElem spellId (GameState.stack after)) "the drone spell is off the stack"
     Spec.assertEqWith s "countered into its owner's graveyard, so it never entered the battlefield" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
@@ -729,16 +729,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     Spec.assertEqWith s "before: the Recall on the stack is blue" (Projection.colorsOf recallId gs) $ Set.singleton Color.Blue
     Spec.assertEqWith s "after: colourless (CR 105.2c), not merely 'not blue'" (Projection.colorsOf recallId after) Set.empty
     Spec.assertBool s (elem recallId (GameState.stack after)) "and it is still a spell on the stack, not countered"
-    case modeSpec redElementalBlast counterMode of
+    case modeTargetSlot redElementalBlast counterMode of
       Nothing -> Spec.assertFailure s "Red Elemental Blast's counter mode declares exactly one target slot"
-      Just counterSpec -> do
+      Just counterSlot -> do
         Spec.assertBool
           s
-          (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSpec gs))
+          (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSlot gs))
           "before: a legal 'target blue spell'"
         Spec.assertBool
           s
-          (not (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSpec after)))
+          (not (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSlot after)))
           "after: no longer a legal 'target blue spell'"
 
   Spec.it s "CR 611.2a Moonlace states no duration, so a permanent it made colourless stays colourless past cleanup" $ do
@@ -810,10 +810,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
             after = snd (Engine.runGamePure answer activated Stack.resolveTop)
         Spec.assertEqWith s "before: blue" (Projection.colorsOf recallId gs) $ Set.singleton Color.Blue
         Spec.assertEqWith s "after: colourless" (Projection.colorsOf recallId after) Set.empty
-        case modeSpec redElementalBlast counterMode of
+        case modeTargetSlot redElementalBlast counterMode of
           Nothing -> Spec.assertFailure s "Red Elemental Blast's counter mode declares exactly one target slot"
-          Just counterSpec ->
+          Just counterSlot ->
             Spec.assertBool
               s
-              (not (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSpec after)))
+              (not (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSlot after)))
               "and no longer a legal 'target blue spell'"

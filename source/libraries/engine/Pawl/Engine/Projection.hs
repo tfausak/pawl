@@ -89,7 +89,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -250,7 +250,7 @@ applyModification viewOf src gs oid m pc =
         -- Combat.landwalkAllowsGiven reads membership, never the count.
         --
         -- Not implemented: the swap does not reach PC.replacementEffects, a
-        -- mode's targetSpecs, or an activated ability's cost (#635).
+        -- mode's targetSlots, or an activated ability's cost (#635).
         Modification.ChangeSubtypeWord from to ->
           let pairs = [(from, to)]
               pc' =
@@ -1740,13 +1740,13 @@ rewriteTriggeredAbility pairs ability =
     }
 
 -- The modal payload both abilities carry, rewritten once so the two cannot drift.
--- Both halves of a mode: its clauses' effects, and its TARGET SPECS -- Arbor Elf's
+-- Both halves of a mode: its clauses' effects, and its TARGET SLOTS -- Arbor Elf's
 -- "{T}: Untap target Forest" must ask for an Island once a Magical Hack has named
 -- Forest, and CR 601.2c (imported by CR 602.2b) is the step whose candidate set
--- the spec defines. Proven by Pawl.ActivateSpec's "CR 612.1 whole card: hacking
+-- the slot defines. Proven by Pawl.ActivateSpec's "CR 612.1 whole card: hacking
 -- Arbor Elf moves which land its ability may target".
 --
--- Only the TargetSpec's Filter is rewritten, and the Pool is not an omission: a
+-- Only the TargetSlot's Filter is rewritten, and the Pool is not an omission: a
 -- Pool names a rules category (CR 115's "any target", the permanents on the
 -- battlefield) rather than a word printed on the card, so CR 612.2's "used in the
 -- correct way" finds nothing in it to swap.
@@ -1759,11 +1759,11 @@ rewriteModal pairs modal =
             -- printed words a text change must reach too.
             Clause.condition = fmap (rewriteCondition pairs) (Clause.condition c)
           }
-      rewriteTargetSpec ts = ts {TargetSpec.filter = fmap (Filter.rewrite pairs) (TargetSpec.filter ts)}
+      rewriteTargetSlot slot = slot {TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot)}
       rewriteMode m =
         m
           { Mode.clauses = fmap rewriteClause (Mode.clauses m),
-            Mode.targetSpecs = fmap rewriteTargetSpec (Mode.targetSpecs m)
+            Mode.targetSlots = fmap rewriteTargetSlot (Mode.targetSlots m)
           }
    in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
 

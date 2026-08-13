@@ -57,7 +57,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "damage": {
                     "pool": {
                       "type": "AnyTarget"

@@ -36,7 +36,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "pool": {
                       "type": "Spells"
@@ -81,7 +81,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "pool": {
                       "type": "Permanents"

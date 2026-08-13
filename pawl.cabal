@@ -370,8 +370,8 @@ library codec
     Pawl.Codec.TapStateSpec
     Pawl.Codec.TargetCount
     Pawl.Codec.TargetCountSpec
-    Pawl.Codec.TargetSpec
-    Pawl.Codec.TargetSpecSpec
+    Pawl.Codec.TargetSlot
+    Pawl.Codec.TargetSlotSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
     Pawl.Codec.Toughness
@@ -911,7 +911,7 @@ library types
     Pawl.Types.TakeExtraTurn
     Pawl.Types.TapState
     Pawl.Types.TargetCount
-    Pawl.Types.TargetSpec
+    Pawl.Types.TargetSlot
     Pawl.Types.Timestamp
     Pawl.Types.TokenPattern
     Pawl.Types.Toughness

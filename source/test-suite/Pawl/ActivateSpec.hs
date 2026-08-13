@@ -73,7 +73,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -101,9 +101,9 @@ theAbility p = case Face.activatedAbilities (S.combinedFace p) of
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
-singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
-singleModeAbility effects specs =
-  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) specs)) (ModeSelection.ChooseExactly 1)
+singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card
+singleModeAbility effects slots =
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots)) (ModeSelection.ChooseExactly 1)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
@@ -864,8 +864,8 @@ reinforceSpec s registry = Spec.describe s "Reinforce" $ do
         Spec.assertEqWith
           s
           "one slot, 'target creature' with nothing narrowing it"
-          (foldMap (Map.elems . Mode.targetSpecs) (Modal.modes (ActivatedAbility.modal ability)))
-          [TargetSpec.required Pool.Creatures Nothing]
+          (foldMap (Map.elems . Mode.targetSlots) (Modal.modes (ActivatedAbility.modal ability)))
+          [TargetSlot.required Pool.Creatures Nothing]
       abilities -> Spec.assertFailure s ("expected one reinforce ability, got " <> show (length abilities))
 
   -- The whole card, aimed across the table. The Guard is in the graveyard while
@@ -1911,14 +1911,14 @@ textChangedCostSpec s registry =
           Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
           Spec.assertEqWith s "the Forest survives" (S.countOnBattlefieldByName forestName S.alice after) 1
 
--- CR 612.1 reaching a mode's TARGET SPEC, end to end.
+-- CR 612.1 reaching a mode's TARGET SLOT, end to end.
 --
 -- Arbor Elf {G} Creature -- Elf Druid 1/1, "{T}: Untap target Forest." (checked
 -- against Scryfall). Magical Hack changes Forest to Island, and the ability must
 -- then be able to target only the Island.
 --
 -- CR 601.2c, imported for an activated ability by CR 602.2b, is the step whose
--- candidate set the target spec defines, and CR 602.2a puts the projected text on
+-- candidate set the target slot defines, and CR 602.2a puts the projected text on
 -- the ability object that does the untapping.
 --
 -- Arbor Elf IS a creature and its cost IS the tap symbol, so CR 302.6 gates it,
@@ -1941,7 +1941,7 @@ textChangedTargetSpec s registry =
         Nothing -> []
         Just ability -> case Seq.lookup 0 (Modal.modes (ActivatedAbility.modal ability)) of
           Nothing -> []
-          Just mode -> fmap Set.toList (Map.elems (Target.legalSets (Just S.alice) elfId (Mode.targetSpecs mode) gs))
+          Just mode -> fmap Set.toList (Map.elems (Target.legalSets (Just S.alice) elfId (Mode.targetSlots mode) gs))
       run hacked = do
         arborElf <- S.printingOf s registry "Arbor Elf"
         forest <- S.printingOf s registry "Forest"

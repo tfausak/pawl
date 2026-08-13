@@ -161,7 +161,7 @@ import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.UnlessPaid as UnlessPaid
@@ -228,7 +228,7 @@ chooserSlots chooser = case chooser of
 
 -- The slots an ObjectRef reads. Only InSlot names one directly; the sweeping
 -- arms are swept at resolution and name nothing at cast, so a card whose only
--- object reference is a set declares no target spec and CR 608.2b has nothing to
+-- object reference is a set declares no target slot and CR 608.2b has nothing to
 -- fizzle (CR 115.10a). TopOfLibrary names no object slot either -- it reads a
 -- POSITION -- but the PlayerRef saying whose library may name a player slot, and
 -- that read is playerRefSlots' already.
@@ -421,8 +421,8 @@ durationSlots duration = case duration of
   Duration.UntilEndOfCombat -> Map.empty
 
 -- Every slot a whole MODE reads: every clause's effects', plus every payer CR
--- 118.12a's "unless [a player] pays" names, plus every slot a TARGET SPEC's own
--- pool or filter names. What the D4 dataflow lint asks, since a payer slot no
+-- 118.12a's "unless [a player] pays" names, plus every slot named by a TARGET
+-- SLOT's own pool or filter. What the D4 dataflow lint asks, since a payer slot no
 -- effect ALSO reads would otherwise dangle unnoticed. Mana Leak's Counter happens to read
 -- the very slot its "unless" names, so the lint's answer is the same either way
 -- for the one card in the pool; a card whose payer and target differ is what
@@ -438,19 +438,19 @@ modeSlots mode =
   joinSlots
     [ joinSlots (fmap slotsOf (Foldable.toList (Mode.allEffects mode))),
       joinSlots (fmap payerSlot (Foldable.toList (Mode.clauses mode))),
-      joinSlots (fmap (poolSlot . TargetSpec.pool) (Map.elems (Mode.targetSpecs mode))),
+      joinSlots (fmap (poolSlot . TargetSlot.pool) (Map.elems (Mode.targetSlots mode))),
       -- And every slot a target slot's own FILTER names -- CR 603.2's "target
       -- artifact or enchantment that player controls", where the player is read
       -- from the trigger's bindings rather than from an effect's operand.
       -- Without this the lint would never see that read, and a card naming "that
       -- player" under a condition that binds no player would quietly admit
       -- nothing.
-      joinSlots (fmap specSlots (Map.elems (Mode.targetSpecs mode)))
+      joinSlots (fmap filterSlots (Map.elems (Mode.targetSlots mode)))
     ]
   where
-    specSlots =
+    filterSlots =
       maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots)
-        . TargetSpec.filter
+        . TargetSlot.filter
     -- Every clause's payer, not just one: CR 118.12a scopes an "unless" to the
     -- clause it is printed on, so a mode may state more than one and each names
     -- a slot the card owes a declaration for.
@@ -1005,10 +1005,10 @@ bakeTokenCharacteristics eval card = card {Card.Type.faces = fmap bakeFace (Card
 -- printed words -- a clause's effects and its CR 701.46a gate -- so optionality
 -- passes through untouched.
 --
--- Not implemented: a SPELL's mode target specs are left unrewritten, so CR
+-- Not implemented: a SPELL's mode target slots are left unrewritten, so CR
 -- 608.2b's re-validation in targetsAllIllegal below measures the printed clause
 -- (#635). An ACTIVATED ability has no such gap -- Projection.rewriteModal rewrites
--- its specs and CR 602.2a's stack object carries them.
+-- its slots and CR 602.2a's stack object carries them.
 modesOf :: ObjectId -> GameState -> [(ModeInstance, Mode.Mode Card.Type.Card)]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
@@ -1048,7 +1048,7 @@ modesOf oid gs = case Game.lookupObject oid gs of
 spellController :: Object.Object -> ObjectId -> GameState -> PlayerId
 spellController obj oid gs = Maybe.fromMaybe (Projection.defaultControllerOf obj) (Projection.controllerOf oid gs)
 
--- CR 608.2b: are ALL of this spell's targets illegal? A spell with no target spec
+-- CR 608.2b: are ALL of this spell's targets illegal? A spell with no target slot
 -- never fizzles, and one with several survives if any one is still legal. Reserved
 -- slots are not targets and are vacuously legal.
 --
@@ -1061,15 +1061,15 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
   Just obj -> case Game.faceOf oid gs of
     Nothing -> False
     Just face ->
-      let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) face
+      let slots = Card.modesTargetSlots (Binding.modesOf (Object.bindings obj)) face
           chosen = Binding.targetsOf (Object.bindings obj)
-          legalSlot slot recipients = case Map.lookup slot specs of
+          legalSlot slot recipients = case Map.lookup slot slots of
             Nothing -> recipients
             -- CR 608.2b's perspective is the SPELL's controller (CR 405.4), read
             -- through the same function resolveSpellWith uses for execution.
-            Just spec -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) chosen oid recipient spec gs) recipients
+            Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) chosen oid recipient targetSlot gs) recipients
           legal = Map.mapWithKey legalSlot chosen
-          targeted = Map.restrictKeys legal (Map.keysSet specs)
+          targeted = Map.restrictKeys legal (Map.keysSet slots)
        in -- Measured on the TARGETS actually chosen, not on the slots declared: CR
           -- 115.6 makes a spell that chose zero targets untargeted, so CR 608.2b's
           -- "all its targets, for every instance of the word 'target,' are now
@@ -1079,11 +1079,11 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
           -- been filled at CR 601.2c.
           not (Map.null targeted) && all Set.null (Map.elems targeted)
 
--- CR 608.2b then CR 608.2: re-validate every filled slot against its spec; if the
--- spell has slots and ALL are now illegal it fizzles, moving to the graveyard with
--- no effect applied. Otherwise the effects run in order (CR 608.2c), each skipping
--- a slot whose target is illegal, and the spell goes to its owner's graveyard as
--- the final part of resolution (CR 608.2n).
+-- CR 608.2b then CR 608.2: re-validate every filled slot against what it
+-- declares; if the spell has slots and ALL are now illegal it fizzles, moving to
+-- the graveyard with no effect applied. Otherwise the effects run in order (CR
+-- 608.2c), each skipping a slot whose target is illegal, and the spell goes to
+-- its owner's graveyard as the final part of resolution (CR 608.2n).
 --
 -- Extended for CR 729.1b: the resolving object's bindings are re-read before EACH
 -- effect, so a slot DEFINED mid-resolution is visible to a later one. Target-slot
@@ -1102,23 +1102,23 @@ resolveSpellWith runSubgame oid = do
         -- unchosen mode's slot was never filled and is not part of this
         -- resolution's legality question.
         let chosenSelection = Binding.modesOf (Object.bindings obj)
-            specs = Card.modesTargetSpecs chosenSelection face
+            slots = Card.modesTargetSlots chosenSelection face
             -- The slots as FILLED, which a slot-scoped pool is re-derived
             -- against (Target.stillLegal).
             chosen = Binding.targetsOf (Object.bindings obj)
-            -- CR 700.2d: the slots the MODES own, which is `specs` minus CR
+            -- CR 700.2d: the slots the MODES own, which is `slots` minus CR
             -- 303.4a's enchant slot -- the one the card itself declares, and so
             -- the one every chosen instance can still read.
-            modeSpecs = Modal.modesTargetSpecs chosenSelection (Face.spell face)
-            legalSlot slot recipients = case Map.lookup slot specs of
-              -- CR 608.2b is about TARGETS. A slot with no target spec is a
-              -- RESERVED binding -- a trigger's source, a token this resolution
+            modeOwnedSlots = Modal.modesTargetSlots chosenSelection (Face.spell face)
+            legalSlot slot recipients = case Map.lookup slot slots of
+              -- CR 608.2b is about TARGETS. A slot that declares no target is
+              -- a RESERVED binding -- a trigger's source, a token this resolution
               -- minted -- and was never targeted.
               Nothing -> recipients
               -- Per RECIPIENT and not per slot: CR 608.2b's "illegal targets, if
               -- any, won't be affected" leaves the slot's surviving targets to be
               -- affected as usual.
-              Just spec -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) chosen oid recipient spec gs) recipients
+              Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just (spellController obj oid gs)) chosen oid recipient targetSlot gs) recipients
          in if targetsAllIllegal oid gs
               then Event.changeZone oid Zone.Graveyard
               else do
@@ -1136,8 +1136,8 @@ resolveSpellWith runSubgame oid = do
                           oid
                           oid
                           effectController
-                          (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) legalNow)
-                          (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenNow)
+                          (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) legalNow)
+                          (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) chosenNow)
                           eff
                   -- CR 608.2e's clause is the unit all three gates cover, so they
                   -- are asked once per clause rather than once per mode --
@@ -1146,7 +1146,7 @@ resolveSpellWith runSubgame oid = do
                     -- CR 701.46a's printed "if" first: it precedes the
                     -- instructions in written order (CR 608.2c), and a clause
                     -- that cannot happen is no question to ask.
-                    gated <- gateHolds effectController oid (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosen) clause
+                    gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) chosen) clause
                     -- CR 603.5 / 608.2d: then the printed "may".
                     taken <- if gated then exercises oid effectController idx cIdx clause else pure False
                     -- CR 118.12a: and then this clause's "unless [a player]
@@ -1162,7 +1162,7 @@ resolveSpellWith runSubgame oid = do
                     -- Both maps are projected into THIS instance's view (CR 700.2d):
                     -- the legality is decided against the instance-named slot, then
                     -- renamed to the printed one the mode's own text reads. Deciding
-                    -- it after the rename would look every slot up in `specs` and
+                    -- it after the rename would look every slot up in `slots` and
                     -- miss, and CR 608.2b's re-validation would silently pass.
                     gatePaid <-
                       if taken
@@ -1173,7 +1173,7 @@ resolveSpellWith runSubgame oid = do
                                 oid
                                 idx
                                 cIdx
-                                (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) (Map.mapWithKey legalSlot chosenAtStart))
+                                (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
                                 clause
                         else pure False
                     Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Clause.effects clause))
@@ -1233,7 +1233,7 @@ resolveSpell = resolveSpellWith noSubgame
 -- (CR 113.7) and asking about any printed "may" (CR 603.5), then the ability
 -- ceases (CR 608.2n). `stackId` is the ability object's own id.
 --
--- Takes the modes rather than a flat effect list plus a spec map: the specs ARE
+-- Takes the modes rather than a flat effect list plus a slot map: the slots ARE
 -- the union of those modes' own (CR 700.2c).
 --
 -- The resolving object's bindings are re-read before EACH effect, exactly as
@@ -1256,15 +1256,16 @@ resolveModes stackId srcId modes = do
       -- CR 700.2d: instance-named, not printed-named -- two instances of one
       -- repeated mode declare one printed slot and fill two, and this union would
       -- otherwise collapse them.
-      -- CR 608.2b re-judges the slot against the SAME spec CR 603.3d offered, so
-      -- the "that player controls" atoms are baked here too, off the bindings the
-      -- placement stamped on this very object (Pawl.Engine.Target.bakeSpecs). An
-      -- ability whose environment binds no player leaves them standing, which
-      -- admits nothing -- see Pawl.Engine.Filter.bakeBound.
-      let specs = Target.bakeSpecs (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (\(mi, mode) -> Map.mapKeys (Modal.instanceSlot mi) (Mode.targetSpecs mode)) modes))
+      -- CR 608.2b re-judges the slot against the SAME declaration CR 603.3d
+      -- offered, so the "that player controls" atoms are baked here too, off the
+      -- bindings the placement stamped on this very object
+      -- (Pawl.Engine.Target.bakeSlots). An ability whose environment binds no
+      -- player leaves them standing, which admits nothing -- see
+      -- Pawl.Engine.Filter.bakeBound.
+      let slots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (\(mi, mode) -> Map.mapKeys (Modal.instanceSlot mi) (Mode.targetSlots mode)) modes))
           chosen = Binding.targetsOf (Object.bindings obj)
-          legalSlot slot recipients = case Map.lookup slot specs of
-            -- CR 608.2b is about TARGETS. A slot with no target spec is a
+          legalSlot slot recipients = case Map.lookup slot slots of
+            -- CR 608.2b is about TARGETS. A slot that declares no target is a
             -- RESERVED binding -- the trigger's source (Pawl.Engine.Binding.triggerSource),
             -- a token this resolution minted -- and was never targeted, so it can
             -- never have become an illegal target.
@@ -1274,13 +1275,13 @@ resolveModes stackId srcId modes = do
             -- and may well be gone -- exactly the case this rule is about, and why
             -- the perspective is not read from it. Judged per RECIPIENT, the spell
             -- path's reason.
-            Just spec -> Set.filter (\recipient -> Target.stillLegal (Just effectController) chosen srcId recipient spec gs) recipients
+            Just targetSlot -> Set.filter (\recipient -> Target.stillLegal (Just effectController) chosen srcId recipient targetSlot gs) recipients
           legal = Map.mapWithKey legalSlot chosen
           -- CR 608.2b's fizzle asks about the TARGETED slots only, so the
           -- reserved slots above cannot rescue an ability whose every target is
           -- gone. Measured on the slots FILLED rather than declared, for the
           -- reason targetsAllIllegal above gives (CR 115.6).
-          targeted = Map.restrictKeys legal (Map.keysSet specs)
+          targeted = Map.restrictKeys legal (Map.keysSet slots)
           fizzles = not (Map.null targeted) && all Set.null (Map.elems targeted)
           -- CR 113.8 / 603.3a: an activated ability's controller is who activated
           -- it, a triggered ability's is whoever controlled its source when it
@@ -1293,7 +1294,7 @@ resolveModes stackId srcId modes = do
                 -- CR 700.2d: this instance's own slots under the names its mode
                 -- prints, with every other instance's removed -- the spell path's
                 -- projection, applied to both maps so they cannot disagree.
-                instanceView = Modal.instanceView specs mi (Mode.targetSpecs mode)
+                instanceView = Modal.instanceView slots mi (Mode.targetSlots mode)
                 applyOne eff = do
                   -- Re-read the LIVE bindings for THIS effect (CR 608.2c), the
                   -- same shape resolveSpellWith's applyOne has: a Create's single
@@ -1463,9 +1464,10 @@ paid resolving source idx cIdx legal clause = case Clause.unlessPaid clause of
 -- "your" on an object; this card says "its controller" instead.
 --
 -- Legality is asked as every other slot read asks it (CR 608.2b): a target that
--- has since become illegal is already out of `legal`, and a reserved slot has no
--- target spec, so legalSlot dropped nothing from it. A slot naming SEVERAL pays
--- nothing -- an "unless [a player] pays" names one payer (`legalOne`).
+-- has since become illegal is already out of `legal`, and a reserved slot
+-- declares no target, so legalSlot dropped nothing from it. A slot naming
+-- SEVERAL pays nothing -- an "unless [a player] pays" names one payer
+-- (`legalOne`).
 payerOf :: SlotName -> Map.Map SlotName (Set Recipient) -> GameState -> Maybe PlayerId
 payerOf slot legal gs = case legalOne slot legal of
   Just (Recipient.ToPlayer pid) -> Just pid
@@ -1580,7 +1582,7 @@ legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
 --
 -- A slot's legality is asked as every other slot read asks it (CR 608.2b): a
 -- target that has since become illegal is already out of `legal`, and a reserved
--- slot has no target spec, so legalSlot dropped nothing from it. A slot naming
+-- slot declares no target, so legalSlot dropped nothing from it. A slot naming
 -- SEVERAL names nobody here -- a PlayerRef points at one player (`legalOne`).
 --
 -- CR 102.1: a player who has left keeps their row in GameState.players with a
@@ -1907,9 +1909,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
 -- types.
 --
 -- It is ruled out by a lint instead. A card can only reach it by declaring a
--- delayed ability's target spec under a name its own Create defines, which is
+-- delayed ability's target slot under a name its own Create defines, which is
 -- the card saying two different things with one word, and the Pawl.CardSpec lint
--- "no delayed ability declares a target spec under a slot its card defines"
+-- "no delayed ability declares a target slot under a name its card defines"
 -- rejects it. So this arm never actually chooses, and the ordering is which way
 -- to fail if that lint were ever removed.
 slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
@@ -2767,7 +2769,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- answer is what keeps the two apart: a slot cannot be both, and a
             -- target never loses its re-validation to a binding that happens to
             -- share its name. No card observes the difference -- the CardSpec lint
-            -- "no delayed ability declares a target spec under a slot its card
+            -- "no delayed ability declares a target slot under a name its card
             -- defines" is what rules the collision out -- so the membership test
             -- buys the ordering rather than a passing test.
             ObjectRef.InSlot slot -> do
@@ -4087,7 +4089,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           destination <- Attach.chooseHost controller subject (Attach.hostsFor controller source subject filter_ gs)
           -- The destination was chosen as an object off the battlefield, so it is
           -- proposed as a bare ToObject and Attach.attach re-tags it the way the
-          -- subject's own enchant spec references it. Always a DIFFERENT object
+          -- subject's own enchant slot references it. Always a DIFFERENT object
           -- than the current host, which hostsFor never offers, so CR 701.3c's
           -- restamp is always earned -- and CR 303.4j's refusal, for a
           -- destination the subject may not go to, happens inside Attach.attach.

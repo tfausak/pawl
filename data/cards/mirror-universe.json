@@ -30,7 +30,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "filter": {
                       "type": "IsPlayer",

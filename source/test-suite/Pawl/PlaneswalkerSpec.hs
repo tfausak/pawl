@@ -257,7 +257,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "six plus two, not six plus four" (S.counterOf CounterKind.Loyalty jaceId after) 8
 
   -- CR 115.4: "These targets may be creatures, players, planeswalkers, or
-  -- battles." Read off Lightning Bolt's OWN committed spec rather than a
+  -- battles." Read off Lightning Bolt's OWN committed target slot rather than a
   -- hand-built one, so what is under test is the pool the card data selects.
   Spec.it s "CR 115.4 an 'any target' spell offers the planeswalker alongside the players" $ do
     island <- S.printingOf s registry "Island"
@@ -265,7 +265,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     jace <- S.printingOf s registry "Jace Beleren"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (jaceId, _, gs) = burnAtJace island mountain jace lightningBolt
-        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) S.noSource theSpec gs) (S.spellTargetSpec lightningBolt)
+        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) S.noSource theSlot gs) (S.spellTargetSlot lightningBolt)
     Spec.assertEqWith s "the planeswalker is a legal target" (fmap (Set.member (Recipient.ToPlaneswalker jaceId)) offered) (Just True)
     Spec.assertEqWith s "and so are both players" (fmap (Set.isSubsetOf (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])) offered) (Just True)
     -- CR 115.4's other half: "Other game objects, such as noncreature artifacts

@@ -86,7 +86,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 
 -- Cast `creature` off `nLands` copies of `land`, then resolve it.
@@ -97,11 +97,11 @@ resolvedCreature land creature nLands =
    in snd (Engine.runGamePure S.identityAnswer afterCast Stack.resolveTop)
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) wrapping one
--- ability's effects and target specs -- the fixture shape every pre-M4h
+-- ability's effects and target slots -- the fixture shape every pre-M4h
 -- single-mode ActivatedAbility now takes.
-singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
-singleModeAbility effects specs =
-  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) specs)) (ModeSelection.ChooseExactly 1)
+singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSlot.TargetSlot -> Modal.Modal card
+singleModeAbility effects slots =
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots)) (ModeSelection.ChooseExactly 1)
 
 -- Answers Prompt.ChooseManaSource with `wanted` whenever it is on offer, and
 -- defers everything else to S.identityAnswer. Its sibling avoids that source
@@ -359,7 +359,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.modal =
                 singleModeAbility
                   [Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))]
-                  (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.required Pool.AnyTarget Nothing)),
+                  (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
@@ -372,7 +372,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.modal =
                 singleModeAbility
                   [Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1))]
-                  (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.required Pool.AnyTarget Nothing)),
+                  (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }

@@ -52,7 +52,7 @@ These are the expensive-to-change ones. Everything else can be discovered along 
 ```haskell
 data Prompt r where
   ChooseAction   :: Decider -> PlayerId -> [LegalAction] -> Prompt LegalAction
-  ChooseTargets  :: Decider -> PlayerId -> TargetSpec   -> Prompt [EntityId]
+  ChooseTargets  :: Decider -> PlayerId -> TargetSlot   -> Prompt [EntityId]
   OrderTriggers  :: Decider -> PlayerId -> [EntityId]   -> Prompt [EntityId]
   OrderGraveyard :: Decider -> PlayerId -> [EntityId]   -> Prompt [EntityId]
   Shuffle        :: [EntityId] -> Prompt [EntityId]

@@ -37,8 +37,8 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
-import Pawl.Types.TargetSpec (TargetSpec)
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import Pawl.Types.TargetSlot (TargetSlot)
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TypeLine as TypeLine
 
@@ -286,9 +286,9 @@ merge2 l r =
       Face.specialActions = Face.specialActions l <> Face.specialActions r,
       -- CR 709.4c again, and CR 702.5a: an enchant ability IS an ability in a
       -- half's text box, so both halves' survive here -- and CR 702.5c says what
-      -- a combined view carrying two of them means, which is Card.enchantSpec's
-      -- conjunction. Concatenated rather than left-biased for that reason, unlike
-      -- the four boxes below.
+      -- a combined view carrying two of them means, which is
+      -- Card.enchantTargetSlot's conjunction. Concatenated rather than
+      -- left-biased for that reason, unlike the four boxes below.
       Face.enchant = Face.enchant l <> Face.enchant r,
       -- The first half that has one. CR 709.4 does not say how two printed
       -- power/toughness/loyalty/defense boxes combine, and taking the left half's
@@ -887,22 +887,22 @@ faceNamed n card = List.find (\f -> Face.name f == n) (NonEmpty.toList (Card.fac
 allEffects :: Face.Face Card.Card -> [Effect Card.Card]
 allEffects face = Modal.allEffects (Face.spell face)
 
--- The union of every mode's target specs, plus the enchant slot. CR 303.4a: an
+-- The union of every mode's target slots, plus the enchant slot. CR 303.4a: an
 -- Aura spell's target is defined by its enchant ability rather than by a mode,
 -- and merging here is what puts that slot in front of Cast's prompt and
 -- Resolve's CR 608.2b re-validation without either learning what an Aura is.
 --
 -- Union is left-biased, and the CardSpec lint holds that no mode declares this
 -- slot name, so the bias is never exercised.
-allTargetSpecs :: Face.Face Card.Card -> Map SlotName TargetSpec
-allTargetSpecs face = Map.union (enchantSpecs face) (Modal.allTargetSpecs (Face.spell face))
+allTargetSlots :: Face.Face Card.Card -> Map SlotName TargetSlot
+allTargetSlots face = Map.union (enchantSlotMap face) (Modal.allTargetSlots (Face.spell face))
 
--- The target specs of one mode by index (CR 700.2c: only the chosen mode's
+-- The target slots of one mode by index (CR 700.2c: only the chosen mode's
 -- slots). Nothing if the index is out of range (total). The enchant slot is
 -- NOT part of this -- it answers "what does mode i declare", and CR 303.4a's
 -- slot is declared by the card, not by any mode.
-modeTargetSpecs :: ModeIndex.ModeIndex -> Face.Face Card.Card -> Maybe (Map SlotName TargetSpec)
-modeTargetSpecs idx face = Modal.modeTargetSpecs idx (Face.spell face)
+modeTargetSlots :: ModeIndex.ModeIndex -> Face.Face Card.Card -> Maybe (Map SlotName TargetSlot)
+modeTargetSlots idx face = Modal.modeTargetSlots idx (Face.spell face)
 
 -- CR 608.2c/700.2: the CHOSEN modes only, each with the instance naming which
 -- mode and which occurrence of it, in printed order -- the Seq is kept sorted by
@@ -912,11 +912,11 @@ modeTargetSpecs idx face = Modal.modeTargetSpecs idx (Face.spell face)
 chosenModes :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> [(ModeInstance.ModeInstance, Mode.Mode Card.Card)]
 chosenModes chosen face = Modal.chosenModes chosen (Face.spell face)
 
--- CR 601.2c/700.2c: the target specs of the CHOSEN modes only (union), plus
+-- CR 601.2c/700.2c: the target slots of the CHOSEN modes only (union), plus
 -- the card's enchant slot (CR 303.4a) if it has one. Only these slots are
 -- prompted at cast and re-validated at CR 608.2b.
-modesTargetSpecs :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSpec
-modesTargetSpecs chosen face = Map.union (enchantSpecs face) (Modal.modesTargetSpecs chosen (Face.spell face))
+modesTargetSlots :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSlot
+modesTargetSlots chosen face = Map.union (enchantSlotMap face) (Modal.modesTargetSlots chosen (Face.spell face))
 
 isLand :: Face.Face Card.Card -> Bool
 isLand f = Set.member CardType.Land (TypeLine.types (Face.typeLine f))
@@ -997,29 +997,29 @@ isAdventure f = Set.member Subtype.Adventure (TypeLine.subtypes (Face.typeLine f
 enchantSlot :: SlotName
 enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
 
--- CR 303.4a / 702.5a: the enchant abilities' target spec as a one-entry slot
--- map, empty for every non-Aura. ONE slot however many instances of enchant the
+-- CR 303.4a / 702.5a: the enchant abilities' target slot as a one-entry map,
+-- empty for every non-Aura. ONE slot however many instances of enchant the
 -- face has, since CR 303.4a gives an Aura spell a single target and CR 702.5c
--- makes the instances narrow it together (enchantSpec below). Merged into the two
--- functions above, and passed to Target.fillableModes by Pawl.Engine.Cast so
--- castability accounts for it.
-enchantSpecs :: Face.Face Card.Card -> Map SlotName TargetSpec
-enchantSpecs face = case enchantSpec face of
+-- makes the instances narrow it together (enchantTargetSlot below). Merged into
+-- the two functions above, and passed to Target.fillableModes by Pawl.Engine.Cast
+-- so castability accounts for it.
+enchantSlotMap :: Face.Face Card.Card -> Map SlotName TargetSlot
+enchantSlotMap face = case enchantTargetSlot face of
   Nothing -> Map.empty
-  Just spec -> Map.singleton enchantSlot spec
+  Just slot -> Map.singleton enchantSlot slot
 
 -- CR 702.5c: "If an Aura has multiple instances of enchant, all of them apply.
 -- The Aura's target must follow the restrictions from all the instances of
--- enchant." This is where that rule lives -- the ONE spec every reader of an
--- enchant ability gets, so CR 601.2c's target legality (Pawl.Engine.Cast), CR
+-- enchant." This is where that rule lives -- the ONE target slot every reader of
+-- an enchant ability gets, so CR 601.2c's target legality (Pawl.Engine.Cast), CR
 -- 303.4c's admission re-check (Pawl.Engine.Sba.fallsOff) and CR 701.3a's attach
 -- (Pawl.Engine.Attach.attachmentFor) cannot disagree about what "all of them"
 -- means. Nothing for a face with no enchant ability at all, which is every
 -- non-Aura (the CardSpec lint holds the biconditional).
 --
 -- The conjunction is Filter.And, which already means "matches all of these", so
--- no new predicate vocabulary is involved. A spec with no Filter narrows nothing
--- (TargetSpec's own note), so it contributes no conjunct rather than an empty
+-- no new predicate vocabulary is involved. A slot with no Filter narrows nothing
+-- (TargetSlot's own note), so it contributes no conjunct rather than an empty
 -- one -- which keeps a lone bare "enchant creature" folding to ITSELF, and that
 -- matters: Sba.stillLegalEnchant's fast arm matches on exactly that shape.
 --
@@ -1032,16 +1032,16 @@ enchantSpecs face = case enchantSpec face of
 -- taking the first instance is not merely inexact, it is ORDER-DEPENDENT even
 -- where the answer could be written down. No card can reach it: the CardSpec lint
 -- rejects a face whose enchant abilities disagree about their pool, and states
--- the rule (#797). A record update over the first spec, so its pool and its CR
--- 115.6 requirement ride along; CR 702.5a's "Enchant [object or player]" has no
--- "up to" in it, so an enchant slot is always required.
-enchantSpec :: Face.Face card -> Maybe TargetSpec
-enchantSpec face = case Face.enchant face of
+-- the rule (#797). A record update over the first instance's slot, so its pool
+-- and its CR 115.6 requirement ride along; CR 702.5a's "Enchant [object or
+-- player]" has no "up to" in it, so an enchant slot is always required.
+enchantTargetSlot :: Face.Face card -> Maybe TargetSlot
+enchantTargetSlot face = case Face.enchant face of
   [] -> Nothing
-  spec : specs ->
+  first : rest ->
     Just
-      spec
-        { TargetSpec.filter = case Maybe.mapMaybe TargetSpec.filter (spec : specs) of
+      first
+        { TargetSlot.filter = case Maybe.mapMaybe TargetSlot.filter (first : rest) of
             [] -> Nothing
             [one] -> Just one
             many -> Just (Filter.And many)

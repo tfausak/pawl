@@ -39,7 +39,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "target": {
                 "filter": {
                   "type": "Or",

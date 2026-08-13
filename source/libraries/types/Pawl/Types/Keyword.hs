@@ -841,8 +841,8 @@ data Keyword
     -- the stack and each chooses its own target.
     --
     -- The power comparison rides the ability's TARGET SLOT rather than anything
-    -- here: it is a fact about the pair, so it is Filter.PowerLessThanSource in the
-    -- minted spec, the way rule 702.118b's comparison is written into
+    -- here: it is a fact about the pair, so it is Filter.PowerLessThanSource on the
+    -- slot it mints, the way rule 702.118b's comparison is written into
     -- Pawl.Engine.Combat rather than into Skulk.
     --
     -- CR 702.134c -- "an ability that triggers whenever a creature mentors another

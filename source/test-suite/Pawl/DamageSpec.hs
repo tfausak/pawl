@@ -164,10 +164,10 @@ creaturePlaneswalkerSpec s registry =
           Spec.assertEqWith s "CR 306.5b: three loyalty counters" (S.counterOf CounterKind.Loyalty jaceId coated) 3
           Spec.assertEqWith s "and nothing marked on him yet" (S.damageOf jaceId coated) (Just 0)
           -- CR 115.4 offers a PERMANENT, not a card type. Read off Prodigal
-          -- Sorcerer's own committed spec rather than a hand-built one.
+          -- Sorcerer's own committed target slot rather than a hand-built one.
           let slot = SlotName.MkSlotName (Text.pack "target")
-              offered = Map.lookup slot (Modal.allTargetSpecs (ActivatedAbility.modal ping))
-              namingJace = fmap (\theSpec -> Set.filter (\r -> Recipient.objectOf r == Just jaceId) (Target.legalRecipients (Just S.alice) sorcererId theSpec coated)) offered
+              offered = Map.lookup slot (Modal.allTargetSlots (ActivatedAbility.modal ping))
+              namingJace = fmap (\targetSlot -> Set.filter (\r -> Recipient.objectOf r == Just jaceId) (Target.legalRecipients (Just S.alice) sorcererId targetSlot coated)) offered
           Spec.assertEqWith s "CR 115.4: Jace is one candidate, not one per card type" (fmap Set.size namingJace) (Just 1)
           -- Both of CR 120.3's results, off one damage.
           let pinged = S.runPure (aimedAt jaceId) coated (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop)

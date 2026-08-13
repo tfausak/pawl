@@ -58,7 +58,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 301.5 / 702.6: Equipment. Shares the attachment substrate with Auras --
@@ -220,7 +220,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
 -- An answerer that aims every target slot at one object, deferring everything
 -- else to S.identityAnswer (ModalSpec.chooseModeAt's shape). The CR 303.4d case
 -- below needs it because both of its target choices are real ones -- alice
--- controls other permanents that each spec admits -- so they cannot be forced by
+-- controls other permanents that each target slot admits -- so they cannot be forced by
 -- board construction the way the sibling cases above force theirs.
 aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAt oid p = case p of
@@ -355,7 +355,7 @@ unattachableSpec s registry = Spec.describe s "Unattachable" $ do
 -- players. Such Auras can't target permanents and can't be attached to
 -- permanents." Curse of Death's Hold is the proving card -- "Enchant player.
 -- Creatures enchanted player controls get -1/-1" -- and it is the one that needs
--- BOTH halves of an enchant-player Aura: the Pool.Players enchant spec, which
+-- BOTH halves of an enchant-player Aura: the Pool.Players enchant slot, which
 -- Face.enchant could already express, and a static ability whose affected set is
 -- reached THROUGH the enchanted player (Affected.AttachedPlayerControls).
 enchantPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -433,22 +433,22 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
         (onPlayer, g3) = S.addCreature curse S.alice g2
         (crownId, g4) = S.addCreature crown S.alice g3
         gs = S.attachTo onPlayer (Recipient.ToPlayer S.bob) (S.attach onCreature creature g4)
-    case crownTargetSpec crown of
+    case crownTargetSlot crown of
       Nothing -> Spec.assertFailure s "the fixture wanted Crown of the Ages' one printed target slot"
-      Just theSpec ->
+      Just theSlot ->
         Spec.assertEqWith
           s
           "only the Aura on a creature is offered"
-          (Target.legalRecipients (Just S.alice) crownId theSpec gs)
+          (Target.legalRecipients (Just S.alice) crownId theSlot gs)
           (Set.singleton (Recipient.ToObject onCreature))
 
 -- CR 702.5c: "If an Aura has multiple instances of enchant, all of them apply.
 -- The Aura's target must follow the restrictions from all the instances of
 -- enchant. The Aura can enchant only objects or players that match all of its
--- enchant abilities." Pawl.Engine.Card.enchantSpec is the conjunction, and this
--- group is what proves it applies at all three doors CR 702.5a opens: the cast's
--- target legality (CR 601.2c), the state-based re-check (CR 704.5m / 303.4c) and
--- attachment admission (CR 701.3a, through the same spec).
+-- enchant abilities." Pawl.Engine.Card.enchantTargetSlot is the conjunction, and
+-- this group is what proves it applies at all three doors CR 702.5a opens: the
+-- cast's target legality (CR 601.2c), the state-based re-check (CR 704.5m /
+-- 303.4c) and attachment admission (CR 701.3a, through the same slot).
 --
 -- SYNTHETIC, and the last rank in design.md section 6's order: no printing has
 -- ever carried two instances of enchant, so nothing better exists. Both halves
@@ -468,7 +468,8 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
 twoEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
   -- CR 601.2c through CR 702.5a's first job: what the Aura SPELL may target.
-  -- Read out of the committed card through Card.enchantSpec, never hand-built.
+  -- Read out of the committed card through Card.enchantTargetSlot, never
+  -- hand-built.
   Spec.it s "CR 702.5c whole card: only a creature matching BOTH instances of enchant is a legal host" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -479,7 +480,7 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
         (theirsTapped, base3) = S.addCreature piker S.bob base2
         base4 = S.tapObject theirsTapped (S.tapObject mineTapped base3)
         (gs, spellId) = S.handOne twofold base4
-        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Card.enchantSpec (S.combinedFace twofold))
+        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) spellId theSlot gs) (Card.enchantTargetSlot (S.combinedFace twofold))
         cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature mineTapped)) gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         settled = S.settleSba after
@@ -548,7 +549,7 @@ twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
         Spec.assertBool s (not (S.onBattlefield aura after)) "the two-enchant Aura is off the battlefield"
         Spec.assertEqWith s "in ALICE's graveyard, not the thief's" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
         Spec.assertEqWith s "exactly one Aura is left on the creature" (length (attachedTo creature after)) 1
-        Spec.assertEqWith s "and it is Control Magic, whose enchant spec narrows nothing" (fmap (\oid -> Game.cardOf oid after) (attachedTo creature after)) [Just (Printing.card controlMagic)]
+        Spec.assertEqWith s "and it is Control Magic, whose enchant slot narrows nothing" (fmap (\oid -> Game.cardOf oid after) (attachedTo creature after)) [Just (Printing.card controlMagic)]
       _ -> Spec.assertFailure s "the Aura should have entered attached to alice's tapped Piker"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -662,7 +663,7 @@ attachments gs =
 -- incarnation, so the spell's own id names nothing afterwards.
 --
 -- Compared through Recipient.objectOf rather than against a fixed tag, because
--- the tag is the enchant spec's, not the host's: a Pool.Creatures slot stores
+-- the tag is the enchant slot's, not the host's: a Pool.Creatures slot stores
 -- ToCreature and Convincing Mirage's Pool.Permanents slot stores ToObject. This
 -- read only wants to know WHICH object is named, which is exactly the question
 -- Affected.Attached asks (Pawl.Engine.Projection.affects).
@@ -673,11 +674,11 @@ attachedTo host gs =
     (Set.toList (GameState.battlefield gs))
 
 -- Crown of the Ages' one target slot, read off its printed activated ability --
--- the committed spec, not a restatement of it, so a test asserting what it admits
+-- the committed declaration, not a restatement of it, so a test asserting what it admits
 -- is asserting what the card really says.
-crownTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
-crownTargetSpec printing = case Face.activatedAbilities (S.combinedFace printing) of
-  ability : _ -> Map.lookup (SlotName.MkSlotName (Text.pack "target")) (Modal.allTargetSpecs (ActivatedAbility.modal ability))
+crownTargetSlot :: Printing.Printing -> Maybe TargetSlot.TargetSlot
+crownTargetSlot printing = case Face.activatedAbilities (S.combinedFace printing) of
+  ability : _ -> Map.lookup (SlotName.MkSlotName (Text.pack "target")) (Modal.allTargetSlots (ActivatedAbility.modal ability))
   [] -> Nothing
 
 -- CR 701.3 Attach, aimed at the effect's TARGET rather than at its source: an
@@ -763,7 +764,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
         (crownObj, g4) = S.addCreature crown S.alice g3
         onCreature = S.attach aura creature g4
         onLand = S.attach aura land g4
-        offered gs = fmap (\theSpec -> Target.legalRecipients (Just S.alice) crownObj theSpec gs) (crownTargetSpec crown)
+        offered gs = fmap (\theSlot -> Target.legalRecipients (Just S.alice) crownObj theSlot gs) (crownTargetSlot crown)
         admits oid gs = fmap (Set.member (Recipient.ToObject oid)) (offered gs)
     Spec.assertEqWith s "on the Piker the Aura is a legal target" (admits aura onCreature) (Just True)
     Spec.assertEqWith s "on the Mountain it is not" (admits aura onLand) (Just False)
@@ -1033,8 +1034,8 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
         attached =
           S.attachTo onPlayer (Recipient.ToPlayer S.bob) $
             S.attach onLand land (S.attach onCreature creature gs)
-        graftOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\theSpec -> Target.legalRecipients (Just S.alice) graft theSpec attached)) (S.spellTargetSpec auraGraft)
-        crownOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\theSpec -> Target.legalRecipients (Just S.alice) crownId theSpec attached)) (crownTargetSpec crown)
+        graftOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\theSlot -> Target.legalRecipients (Just S.alice) graft theSlot attached)) (S.spellTargetSlot auraGraft)
+        crownOffers oid = fmap (Set.member (Recipient.ToObject oid) . (\theSlot -> Target.legalRecipients (Just S.alice) crownId theSlot attached)) (crownTargetSlot crown)
     Spec.assertEqWith s "an Aura on a creature is a legal target" (graftOffers onCreature) (Just True)
     Spec.assertEqWith s "and so is one on a land" (graftOffers onLand) (Just True)
     -- The pair that makes IsAttachedToPermanent do work the Crown's atom
@@ -1063,7 +1064,7 @@ auraGraftSpec s registry = Spec.describe s "AuraGraft" $ do
         (aura, g2) = S.addCreature unholyStrength S.alice g1
         (gs, graft) = S.handOne auraGraft (S.attach aura creature g2)
         bounced = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Hand)
-        offers g = fmap (Set.member (Recipient.ToObject aura) . (\theSpec -> Target.legalRecipients (Just S.alice) graft theSpec g)) (S.spellTargetSpec auraGraft)
+        offers g = fmap (Set.member (Recipient.ToObject aura) . (\theSlot -> Target.legalRecipients (Just S.alice) graft theSlot g)) (S.spellTargetSlot auraGraft)
     Spec.assertEqWith s "while the Piker is there the Aura is a legal target" (offers gs) (Just True)
     -- CR 400.7 minted a new object in the hand, so the recipient the Aura
     -- still holds names an id nothing on the battlefield answers to.
@@ -1216,7 +1217,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     Spec.assertBool s (not (Set.member aura (GameState.battlefield pass2))) "the Aura is gone from the battlefield after pass two"
     Spec.assertEqWith s "and is in its OWNER's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice pass2)) 1
   -- CR 704.5m's remaining clause: unattached. Its third clause -- attached to an
-  -- object the enchant spec no longer admits (CR 303.4c) -- is the Control Magic
+  -- object the enchant slot no longer admits (CR 303.4c) -- is the Control Magic
   -- and Setessan Training case below; nothing in the pool strips creature-ness
   -- from a permanent, so a CONTROL change is how that clause is reached.
   Spec.it s "CR 704.5m: an unattached Aura on the battlefield goes to the graveyard" $ do
@@ -1233,7 +1234,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- The first pair of assertions is the one the filter exists for: CR 109.5's
   -- "you" on an enchant ability is the Aura's would-be controller while the
   -- spell is being cast, so alice's creature is offered and bob's is withheld.
-  -- The spec is read out of the committed card, never hand-built.
+  -- The enchant slot is read out of the committed card, never hand-built.
   Spec.it s "CR 702.5a whole card: Setessan Training enchants only its caster's creature, draws, and grants +1/+0 and trample" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1245,7 +1246,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
         -- attempted draw from an empty library (CR 704.5b).
         (_, base3) = S.addLibraryCard forest S.alice base2
         (gs, spellId) = S.handOne setessanTraining base3
-        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Card.enchantSpec (S.combinedFace setessanTraining))
+        offered = fmap (\theSlot -> Target.legalRecipients (Just S.alice) spellId theSlot gs) (Card.enchantTargetSlot (S.combinedFace setessanTraining))
         cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature mine)) gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- CR 704.3: the enters trigger waits until a player would get priority,
@@ -1274,7 +1275,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
   -- battlefield, owned by a player still in the game -- would answer "legal"
   -- here, because none of those three facts changed.
   --
-  -- Discriminating on one board and one pass: Control Magic's own enchant spec
+  -- Discriminating on one board and one pass: Control Magic's own enchant slot
   -- is a bare "enchant creature", so it stays attached to the very creature
   -- Setessan Training just fell off.
   Spec.it s "CR 704.5m whole cards: Control Magic steals the enchanted creature, so Setessan Training is buried and Control Magic is not" $ do
@@ -1312,7 +1313,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
         Spec.assertEqWith s "and in its OWNER's graveyard, not the thief's" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 1
         Spec.assertEqWith s "bob's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 0
         Spec.assertEqWith s "exactly one Aura is left on the creature" (length survivors) 1
-        Spec.assertEqWith s "and it is Control Magic, whose enchant spec narrows nothing" (fmap (\oid -> Game.cardOf oid settled) survivors) [Just (Printing.card controlMagic)]
+        Spec.assertEqWith s "and it is Control Magic, whose enchant slot narrows nothing" (fmap (\oid -> Game.cardOf oid settled) survivors) [Just (Printing.card controlMagic)]
         Spec.assertEqWith s "so the creature is a plain 2/1 again" (S.powerToughnessOf creature settled) (Just (2, 1))
         Spec.assertBool s (not (Projection.hasKeyword Keyword.Trample creature settled)) "and has lost trample"
       _ -> Spec.assertFailure s "Setessan Training should have entered attached to alice's Piker"

@@ -89,7 +89,7 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -439,7 +439,7 @@ reinforce n cost =
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reinforceTarget spec)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reinforceTarget slot)))
           (ModeSelection.ChooseExactly 1),
       -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
       -- default, and gives the ability outright with no "as long as".
@@ -447,7 +447,7 @@ reinforce n cost =
       ActivatedAbility.condition = Nothing
     }
   where
-    spec = TargetSpec.required Pool.Creatures Nothing
+    slot = TargetSlot.required Pool.Creatures Nothing
     effect =
       Effect.PutCounters
         ( PutCounters.MkPutCounters
@@ -2046,13 +2046,14 @@ afflict n =
 -- cry's -- SelfAttacks, EveryTime, rule 702.134a stating no "for the first time
 -- each turn" narrowing.
 --
--- The spec's three parts are the rule's three printed words. Pool.Creatures is
--- "creature" (CR 109.2 draws it from the battlefield), IsAttacking is "attacking"
--- (CR 508.1k), and Filter.PowerLessThanSource is "with power less than this
--- creature's power" -- a comparison against the SOURCE, which is why that atom
--- carries no literal. No controller conjunct, because rule 702.134a states none:
--- CR 508.1 makes every attacking creature the active player's, so a creature an
--- opponent controls is never in the set to be excluded.
+-- The target slot's three parts are the rule's three printed words.
+-- Pool.Creatures is "creature" (CR 109.2 draws it from the battlefield),
+-- IsAttacking is "attacking" (CR 508.1k), and Filter.PowerLessThanSource is
+-- "with power less than this creature's power" -- a comparison against the
+-- SOURCE, which is why that atom carries no literal. No controller conjunct,
+-- because rule 702.134a states none: CR 508.1 makes every attacking creature
+-- the active player's, so a creature an opponent controls is never in the set
+-- to be excluded.
 --
 -- The BEARER excludes itself with no `Not IsSource` of its own -- nothing has
 -- power less than its own power -- which is why the atom is strict rather than
@@ -2077,12 +2078,12 @@ mentor =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget spec)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
   where
-    spec = TargetSpec.required Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
+    slot = TargetSlot.required Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
     effect = Effect.Mentor mentorTarget
 
 -- The slot rule 702.134a's one target is chosen into. Named here rather than in
@@ -2237,11 +2238,11 @@ decayedSacrifice =
 -- CR 508.3a is what "attacks" means, so the condition is mentor's -- SelfAttacks,
 -- EveryTime, rule 702.39a stating no once-a-turn narrowing.
 --
--- The spec is Pool.Creatures ("creature", drawn from the battlefield by CR 109.2)
--- narrowed by Filter.ControlledByDefendingPlayer ("defending player controls",
--- CR 508.5). One atom rather than ControlledBy Opponent, which CR 506.2a makes
--- too wide: with three seats only one opponent is the defending player, and CR
--- 508.5a says an ability means that one.
+-- The target slot is Pool.Creatures ("creature", drawn from the battlefield by
+-- CR 109.2) narrowed by Filter.ControlledByDefendingPlayer ("defending player
+-- controls", CR 508.5). One atom rather than ControlledBy Opponent, which CR
+-- 506.2a makes too wide: with three seats only one opponent is the defending
+-- player, and CR 508.5a says an ability means that one.
 --
 -- ONE clause holding BOTH effects, under one Optionality.Optional. That is CR
 -- 608.2e's span: rule 702.39a prints one "may", and its "if you do" makes the
@@ -2270,12 +2271,12 @@ provoke =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget spec)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
   where
-    spec = TargetSpec.required Pool.Creatures (Just Filter.ControlledByDefendingPlayer)
+    slot = TargetSlot.required Pool.Creatures (Just Filter.ControlledByDefendingPlayer)
     requirement =
       Effect.RequireBlock
         ( RequireBlock.MkRequireBlock
@@ -2698,13 +2699,13 @@ soulshift n =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget spec)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
   where
-    spec =
-      TargetSpec.required
+    slot =
+      TargetSlot.required
         (Pool.CardsInGraveyard (GraveyardScope.Scoped PlayerScope.You))
         (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.ManaValueAtMost (toInteger n)]))
     back =
@@ -2759,12 +2760,12 @@ haunt =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget spec)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
   where
-    spec = TargetSpec.required Pool.Creatures Nothing
+    slot = TargetSlot.required Pool.Creatures Nothing
     exile = Effect.ExileHaunting (ExileHaunting.MkExileHaunting Binding.became hauntTarget)
 
 -- The slot rule 702.55a's one target is chosen into, on soulshiftTarget's terms.
@@ -2952,12 +2953,12 @@ modular =
     { TriggeredAbility.condition = TriggerCondition.SelfDies,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton effect))) (Map.singleton modularTarget spec)))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton effect))) (Map.singleton modularTarget slot)))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
   where
-    spec = TargetSpec.required Pool.Creatures (Just (Filter.HasCardType CardType.Artifact))
+    slot = TargetSlot.required Pool.Creatures (Just (Filter.HasCardType CardType.Artifact))
     effect =
       Effect.PutCounters
         ( PutCounters.MkPutCounters

@@ -602,10 +602,10 @@ activateAbility pid srcId ability = do
           -- in view would be offered against a board that has one land too many.
           let gathered = Cost.activationAdjustments pid srcId gs
           announcedCost <- Cost.announce pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
-          let specs = Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)
-              sets = Target.legalSets (Just pid) srcId specs gs
-          chosen <- Target.chooseTargets decider pid abilId specs sets
-          if not (Target.selectionLegal (Just pid) srcId specs sets chosen gs)
+          let slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
+              sets = Target.legalSets (Just pid) srcId slots gs
+          chosen <- Target.chooseTargets decider pid abilId slots sets
+          if not (Target.selectionLegal (Just pid) srcId slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op
             else do
               -- CR 113.7: bind the source permanent under the reserved self slot, so

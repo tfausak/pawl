@@ -166,7 +166,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TargetCount as TargetCount
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -834,8 +834,8 @@ cardOffendsSharedZoneScope card =
 -- claim is an EQUALITY -- what ONE MODE reads, less what that mode mints and less
 -- what the carrier binds on its own, is exactly what that mode DECLARES. So a
 -- read nothing binds is rejected (an effect naming CR 400.7e's `became` under a
--- condition that never binds it would silently no-op), and so is a declared spec
--- no effect reads (a card announcing a target it ignores).
+-- condition that never binds it would silently no-op), and so is a declared
+-- target slot no effect reads (a card announcing a target it ignores).
 --
 -- `abilityBound` is the only part that differs between the carriers: the slots
 -- that carrier binds whichever mode is chosen. It is subtracted from the READ
@@ -844,11 +844,11 @@ cardOffendsSharedZoneScope card =
 -- below forbids a card DECLARING any of these names, so adding them to the
 -- declared side would make the two rules mutually unsatisfiable (#1043).
 --
--- PER MODE, never through Modal.allEffects and Modal.allTargetSpecs. Those are
+-- PER MODE, never through Modal.allEffects and Modal.allTargetSlots. Those are
 -- unions across every mode, and comparing one union against the other lets a
 -- mode read a slot only ANOTHER mode declares -- unbound at runtime, because
 -- Pawl.Engine.Activate.activateAbility and Pawl.Engine.Engine's trigger placement
--- both stamp Modal.modesTargetSpecs, the CHOSEN modes' specs alone. CR 700.2c is
+-- both stamp Modal.modesTargetSlots, the CHOSEN modes' slots alone. CR 700.2c is
 -- the rule: "If a spell or ability targets one or more targets only if a
 -- particular mode is chosen for it, its controller will need to choose those
 -- targets only if they chose that mode" (#570).
@@ -867,7 +867,7 @@ modalSlotsOffend abilityBound modal =
             -- The whole MODE's reads, not just its effect list's: CR 118.12a's
             -- "unless [a player] pays" names its payer by slot too.
             wanted = Map.keysSet (Resolve.modeSlots mode)
-         in Set.difference (Set.difference wanted defined) abilityBound /= Map.keysSet (Mode.targetSpecs mode)
+         in Set.difference (Set.difference wanted defined) abilityBound /= Map.keysSet (Mode.targetSlots mode)
    in any modeOffends (Modal.modes modal)
 
 -- CR 601.2c's OTHER dataflow question, asked of the same modes: a slot whose
@@ -883,9 +883,9 @@ modalCountsOffend :: Modal.Modal Card.Type.Card -> Bool
 modalCountsOffend modal =
   let modeOffends mode =
         let read_ = Resolve.modeSlots mode
-            plural theSpec = TargetCount.most (TargetSpec.count theSpec) > 1
-            offends slot theSpec = plural theSpec && Map.lookup slot read_ == Just SlotArity.One
-         in or (Map.elems (Map.mapWithKey offends (Mode.targetSpecs mode)))
+            plural targetSlot = TargetCount.most (TargetSlot.count targetSlot) > 1
+            offends slot targetSlot = plural targetSlot && Map.lookup slot read_ == Just SlotArity.One
+         in or (Map.elems (Map.mapWithKey offends (Mode.targetSlots mode)))
    in any modeOffends (Modal.modes modal)
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
@@ -1098,7 +1098,7 @@ slotNamesCollide sets = Set.size (Set.unions sets) /= sum (fmap Set.size sets)
 -- CR 700.2c: do two modes of one modal declare the same slot NAME -- or does a
 -- spell mode collide with CR 303.4a's enchant slot?
 --
--- Modal.modesTargetSpecs, Modal.allTargetSpecs and Card.allTargetSpecs are all
+-- Modal.modesTargetSlots, Modal.allTargetSlots and Card.allTargetSlots are all
 -- Map.unions, so a shared name collapses to ONE entry: the controller is
 -- prompted once and every mode holding that name reads the one answer. Harmless
 -- while exactly one mode can ever be chosen, and a silent wrong answer the
@@ -1113,15 +1113,15 @@ slotNamesCollide sets = Set.size (Set.unions sets) /= sum (fmap Set.size sets)
 -- does.
 --
 -- The enchant slot joins the SPELL's modes and no ability's, because the unions
--- that add it -- Card.modesTargetSpecs and Card.allTargetSpecs -- are both over
+-- that add it -- Card.modesTargetSlots and Card.allTargetSlots -- are both over
 -- the spell. CR 303.4a's slot is announced when the Aura spell is cast, and
--- Activate stamps Modal.modesTargetSpecs, which has no enchant half. Each ability is checked on
+-- Activate stamps Modal.modesTargetSlots, which has no enchant half. Each ability is checked on
 -- its own for the same reason: two abilities are two separate announcements, so
 -- a name they share is never fused.
 cardSlotNamesCollide :: Face.Face Card.Type.Card -> Bool
 cardSlotNamesCollide card =
-  let modeSlots modal = fmap (Map.keysSet . Mode.targetSpecs) (Foldable.toList (Modal.modes modal))
-   in slotNamesCollide (Map.keysSet (Card.enchantSpecs card) : modeSlots (Face.spell card))
+  let modeSlots modal = fmap (Map.keysSet . Mode.targetSlots) (Foldable.toList (Modal.modes modal))
+   in slotNamesCollide (Map.keysSet (Card.enchantSlotMap card) : modeSlots (Face.spell card))
         || any (slotNamesCollide . modeSlots . ActivatedAbility.modal) (Face.activatedAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Face.triggeredAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
@@ -1158,7 +1158,7 @@ cardSlotNamesCollide card =
 --   * Resolve.definedSlots covers a slot the ability's own effects MINT rather
 --     than read: a Create's token (CR 603.7c's "it"), a PlaySubgame's loser.
 --     The same exemption every carrier takes.
---   * the ability's own declared target specs (CR 601.2c / 700.2c) are the
+--   * the ability's own declared target slots (CR 601.2c / 700.2c) are the
 --     ordinary chosen targets -- the side modalSlotsOffend compares AGAINST, one
 --     MODE's at a time, so a mode reading a slot only another mode declares is
 --     caught and so is a mode declaring a slot only another mode reads.
@@ -1192,7 +1192,7 @@ triggeredAbilityOffends ability =
 --     the stack is the object whose ability was activated" -- stamped for every
 --     activation, so Longtusk Cub's "put a +1/+1 counter on Longtusk Cub" is a
 --     slot read.
---   * the ability's own declared target specs, one MODE's at a time
+--   * the ability's own declared target slots, one MODE's at a time
 --     (modalSlotsOffend). CR 602.2b: "The remainder of the process for
 --     activating an ability is identical to the process for casting a spell
 --     listed in rules 601.2b-i", which is what routes an activation through CR
@@ -1317,7 +1317,7 @@ lintMode :: [Effect.Effect Card.Type.Card] -> [SlotName.SlotName] -> Mode.Mode C
 lintMode effects slots =
   Mode.MkMode
     (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects)))
-    (Map.fromList (fmap (\slot -> (slot, TargetSpec.required Pool.AnyTarget Nothing)) slots))
+    (Map.fromList (fmap (\slot -> (slot, TargetSlot.required Pool.AnyTarget Nothing)) slots))
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
 -- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
@@ -1336,17 +1336,17 @@ modalActivated modes =
 -- modalActivated's TRIGGERED twin, so the per-mode lint can be shown to hand
 -- `abilityBound` -- the condition's event slots and CR 109.5's `you` -- to EVERY
 -- mode rather than only the first.
--- Does any of these abilities DECLARE a target spec under a name already in
+-- Does any of these abilities DECLARE a target slot under a name already in
 -- `defined`? Split from the sweep below so the rejecting direction can be put to
 -- a hand-built ability, which no committed card supplies.
 shadowsSlots :: Set.Set SlotName.SlotName -> [TriggeredAbility.TriggeredAbility Card.Type.Card] -> Bool
 shadowsSlots defined abilities =
   let declaredOf ability =
-        foldMap (Map.keysSet . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
+        foldMap (Map.keysSet . Mode.targetSlots) (Modal.modes (TriggeredAbility.modal ability))
    in not (Set.disjoint defined (foldMap declaredOf abilities))
 
 -- shadowsSlots for one face: the slots its own effects define, against the target
--- specs its delayed abilities declare.
+-- slots its delayed abilities declare.
 shadowsDefinedSlot :: Face.Face Card.Type.Card -> Bool
 shadowsDefinedSlot card =
   shadowsSlots
@@ -1510,7 +1510,7 @@ effectMintedFaces effect = case effect of
   Effect.ChangeText {} -> []
 
 -- Every slot ONE FACE declares as a target: its spell modes plus CR 303.4a's
--- enchant slot (Card.allTargetSpecs), and its activated, triggered and delayed
+-- enchant slot (Card.allTargetSlots), and its activated, triggered and delayed
 -- abilities' modes. The base case of declaredTargetSlots below, named so the
 -- self-test can hold it against the widened view.
 --
@@ -1525,9 +1525,9 @@ effectMintedFaces effect = case effect of
 ownDeclaredTargetSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 ownDeclaredTargetSlots card =
   Set.unions
-    ( Map.keysSet (Card.allTargetSpecs card)
+    ( Map.keysSet (Card.allTargetSlots card)
         : fmap
-          (Map.keysSet . Modal.allTargetSpecs)
+          (Map.keysSet . Modal.allTargetSlots)
           ( fmap ActivatedAbility.modal (Face.activatedAbilities card)
               <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
               <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
@@ -1542,7 +1542,7 @@ ownDeclaredTargetSlots card =
 -- bindings -- Ray of Command's "when you lose control of the creature" reads the
 -- creature the spell targeted.
 --
--- Its own declared specs are EXCLUDED on purpose: the delayed-ability read lint
+-- Its own declared target slots are EXCLUDED on purpose: the delayed-ability read lint
 -- compares against those separately, per mode, and folding them in here would make
 -- that comparison vacuous.
 --
@@ -1553,9 +1553,9 @@ ownDeclaredTargetSlots card =
 armingTargetSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 armingTargetSlots card =
   Set.unions
-    ( Map.keysSet (Card.allTargetSpecs card)
+    ( Map.keysSet (Card.allTargetSlots card)
         : fmap
-          (Map.keysSet . Modal.allTargetSpecs)
+          (Map.keysSet . Modal.allTargetSlots)
           ( fmap ActivatedAbility.modal (Face.activatedAbilities card)
               <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
           )
@@ -1588,8 +1588,8 @@ reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 -- an effect from (cardResolutionEffects), which is the spell modes plus the
 -- activated, triggered and delayed abilities.
 --
--- ownDeclaredTargetSlots' sibling and the other half of the same question. A
--- target spec is not the only way a card names a slot: MoveToZone and Create
+-- ownDeclaredTargetSlots' sibling and the other half of the same question.
+-- Declaring a target slot is not the only way a card names a slot: MoveToZone and Create
 -- name the incarnation CR 400.7 mints, PlaySubgame names CR 729.1b's loser, and
 -- Destroy names how many it destroyed.
 --
@@ -1958,9 +1958,9 @@ costComponentFilters component = case component of
   CostComponent.ExileThisFromGraveyard -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
--- flying" -- and CR 303.4a's enchant slot, which is a TargetSpec too.
-targetSpecFilters :: TargetSpec.TargetSpec -> [Filter.Type.Filter Keyword.Keyword]
-targetSpecFilters = Maybe.maybeToList . TargetSpec.filter
+-- flying" -- and CR 303.4a's enchant slot, which is a TargetSlot too.
+targetSlotFilters :: TargetSlot.TargetSlot -> [Filter.Type.Filter Keyword.Keyword]
+targetSlotFilters = Maybe.maybeToList . TargetSlot.filter
 
 -- A continuous effect's affected set (Pawl.Types.Affected), wherever one is
 -- written -- a static ability, a combat restriction, an attack or block
@@ -2118,7 +2118,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition holds a SlotName, which is no Filter -- what
-  -- the slot holds was selected by the arming spell's own target spec.
+  -- the slot holds was selected by the arming spell's own target slot.
   TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.RoomEntered _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
@@ -2550,7 +2550,7 @@ effectFilters effect = case effect of
   -- take them out of the lint without failing anything.
   Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
 
--- Per MODE rather than through Modal.allTargetSpecs, which is a Map.unions and so
+-- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
 -- below counts occurrences, and a collapse there would read as a Filter this
 -- traversal cannot see.
@@ -2560,7 +2560,7 @@ modalFilters modal =
     ( \mode ->
         concatMap effectFilters (Mode.allEffects mode)
           <> unframed (concatMap conditionFilters (modeClauseConditions mode))
-          <> unframed (concatMap targetSpecFilters (Map.elems (Mode.targetSpecs mode)))
+          <> unframed (concatMap targetSlotFilters (Map.elems (Mode.targetSlots mode)))
     )
     (Modal.modes modal)
 
@@ -2592,7 +2592,7 @@ activatedAbilityFilters ability =
 --   * `staticAbilities` -- the affected set, CR 604.2's "as long as" condition,
 --     and the layer-6/7 modifications' own keywords and Counts.
 --   * `replacementEffects` -- CR 614.1's counter-placement pattern.
---   * `enchant` -- CR 303.4a's enchant ability, a TargetSpec.
+--   * `enchant` -- CR 303.4a's enchant ability, a TargetSlot.
 --   * `additionalCosts` -- CR 601.2f's sacrifice component.
 --   * `alternativeCosts` -- that same component, plus CR 604.2's "as long as"
 --     condition gating one.
@@ -2604,7 +2604,7 @@ activatedAbilityFilters ability =
 --     `attackRequirements` (CR 508.1d), `blockRequirements`
 --     (CR 509.1c) and `attackCosts` (CR 508.1h) -- six more affected sets.
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
---     every mode's target specs and effects, plus an activation cost, a
+--     every mode's target slots and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
 --   * `mulliganActions` (CR 103.5b) and `openingHandActions` (CR 103.6) -- the two
 --     pregame actions, which `cardResolutionEffects` above does not reach.
@@ -2614,7 +2614,7 @@ activatedAbilityFilters ability =
 -- `castingRestrictions`. That is checkable rather than
 -- asserted: exactly sixteen modules under Pawl.Types import Pawl.Types.Filter --
 -- Affected, CostComponent, Count, CounterPattern, Effect, EntryRewrite, Keyword,
--- MillTally, ObjectRef, PlayerEffect, Prompt, ReplacementEffect, TargetSpec,
+-- MillTally, ObjectRef, PlayerEffect, Prompt, ReplacementEffect, TargetSlot,
 -- TriggerCondition, TurnUpRewrite and ZoneChangePattern -- and nothing those nine
 -- fields reach is one of them.
 --
@@ -2634,7 +2634,7 @@ cardFilters card =
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap staticAbilityFilters (Face.staticAbilities card)
         <> concatMap replacementEffectFilters (Face.replacementEffects card)
-        <> concatMap targetSpecFilters (Face.enchant card)
+        <> concatMap targetSlotFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
         <> concatMap alternativeCostFilters (Face.alternativeCosts card)
         <> concatMap specialActionFilters (Face.specialActions card)
@@ -2689,7 +2689,7 @@ jsonAtoms tag value = case value of
 
 -- CR 701.3a is answerable only where an attach FRAMES the match, and
 -- Filter.CanHostSubject is vacuously False in every other Filter position. A card
--- author who wrote it into a target spec, a static ability's affected set, a Count
+-- author who wrote it into a target slot, a static ability's affected set, a Count
 -- filter or a Search filter would otherwise get a False predicate and no failure
 -- at all -- neither the codec, the type nor any other lint says a word -- so this
 -- is where that is made loud.
@@ -2770,7 +2770,7 @@ anyOfOffends condition = case condition of
 lintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 lintSpec s registry = Spec.describe s "Lint" $ do
   -- The SPELL half of the D4 dataflow lint: every slot an effect reads is
-  -- declared, and every declared slot is read. Equality, not subset: a spec no
+  -- declared, and every declared slot is read. Equality, not subset: a slot no
   -- effect reads is a card announcing a target it ignores -- representable in
   -- Magic, not in this pool. Loosen to superset if such a card ever lands.
   --
@@ -2778,7 +2778,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- modalSlotsOffend, in the three sweeps further down (#1043).
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
-    let -- What CASTING binds rather than a target spec declaring it, subtracted
+    let -- What CASTING binds rather than a target slot declaring it, subtracted
         -- from the READ side. It cannot be added to the declared side instead:
         -- the "no reserved binding slot is ever a declared target slot" sweep
         -- below forbids a card declaring either of these, so the two rules would
@@ -2811,13 +2811,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no dangling or unused slots" (fmap (S.nameOf . Printing.card) offenders) []
   -- The D4 lint above is strictly per mode, so two modes of one card sharing a
   -- slot NAME pass it. This is the missing half, and the check both
-  -- Modal.allTargetSpecs and Modal.modesTargetSpecs now name in their own
+  -- Modal.allTargetSlots and Modal.modesTargetSlots now name in their own
   -- comments as the thing that lets them union safely (#475). See
   -- cardSlotNamesCollide for what a shared name silently does.
   Spec.it s "no card's modes share a target slot name" $ do
     ps <- S.allPrintings s
     let declaring modal =
-          length (filter (not . Map.null . Mode.targetSpecs) (Foldable.toList (Modal.modes modal)))
+          length (filter (not . Map.null . Mode.targetSlots) (Foldable.toList (Modal.modes modal)))
         -- Every modal cardSlotNamesCollide sweeps, so the guard below ranges over
         -- the same four scopes the lint does rather than over the spell alone.
         modalsOf card =
@@ -2848,7 +2848,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- Dream's Grip's own two modes, renamed to one shared slot: the exact
         -- authoring the card avoids, and the CR 702.42a fusion it would cause.
         face = S.combinedFace dreamsGrip
-        fuse mode = mode {Mode.targetSpecs = Map.mapKeys (const creature) (Mode.targetSpecs mode)}
+        fuse mode = mode {Mode.targetSlots = Map.mapKeys (const creature) (Mode.targetSlots mode)}
         fused = face {Face.spell = (Face.spell face) {Modal.modes = fmap fuse (Modal.modes (Face.spell face))}}
     Spec.assertBool s (cardSlotNamesCollide (face {Face.activatedAbilities = [shared]})) "two modes sharing one name are rejected"
     Spec.assertBool s (not (cardSlotNamesCollide (face {Face.activatedAbilities = [distinct]}))) "and two modes naming distinct slots are accepted"
@@ -2898,7 +2898,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       stems
   Spec.it s "the lint itself catches a dangling reference" $
     let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3))))
-     in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSpec.TargetSpec)) "misauthored card detected"
+     in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSlot.TargetSlot)) "misauthored card detected"
   -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
   -- announced against the card's own cost -- mana cost, additional costs and
   -- alternative costs together (`spellCostsOf`), since CR 107.3a names all of them.
@@ -2951,7 +2951,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       other -> Spec.assertFailure s ("expected exactly one Create, got " <> show (length other))
   -- ONE sweep over the whole reserved set, replacing the five per-name
   -- cases this grew out of. Those five each filtered on
-  -- Card.allTargetSpecs, so they saw a card's spell modes and enchant slot
+  -- Card.allTargetSlots, so they saw a card's spell modes and enchant slot
   -- and nothing else; they also covered only five of the seven reserved
   -- names, leaving `copySource` and `thatPlayer` with no declaration case
   -- at all. See reservedDeclarations for why declaring one is a discarded
@@ -2986,7 +2986,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- The sweep above's other half: declaring a reserved slot as a target is not
   -- the only way a card names one. Four opcodes carry a SlotName they
   -- BIND, and a card is free to write a reserved name into any of them, which
-  -- the declaration sweep cannot see because none of the four is a target spec.
+  -- the declaration sweep cannot see because none of the four is a target slot.
   -- See reservedBindings for why that is the worse of the two failures.
   --
   -- SCOPE: the declaration sweep's, exactly -- every face the card prints, and
@@ -3078,7 +3078,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   ( Seq.singleton
                       ( Mode.MkMode
                           (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount))))))
-                          (Map.singleton Binding.you (TargetSpec.required Pool.AnyTarget Nothing))
+                          (Map.singleton Binding.you (TargetSlot.required Pool.AnyTarget Nothing))
                       )
                   )
                   (ModeSelection.ChooseExactly 1),
@@ -3172,7 +3172,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- ability.
   --
   -- Each carrier is asserted TWICE: the sweep sees the offender, and
-  -- Card.allTargetSpecs -- the spell-modes-and-enchant view the five old
+  -- Card.allTargetSlots -- the spell-modes-and-enchant view the five old
   -- cases filtered on -- does not. The second half is the regression guard:
   -- it is the hole itself, and it fails if the sweep is ever narrowed back.
   Spec.it s "the lint itself catches an ability that declares a reserved slot" $ do
@@ -3182,7 +3182,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let -- A one-mode, effectless modal declaring exactly one target slot.
         declaring slot =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.required Pool.AnyTarget Nothing))))
+            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSlot.required Pool.AnyTarget Nothing))))
             (ModeSelection.ChooseExactly 1)
         withTriggered slot card =
           card
@@ -3200,7 +3200,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           card {Face.delayedAbilities = fmap (\t -> t {TriggeredAbility.modal = declaring slot}) (Face.delayedAbilities card)}
         catches slot graft printing =
           let face = graft slot (S.combinedFace printing)
-           in (reservedDeclarations face, Map.member slot (Card.allTargetSpecs face))
+           in (reservedDeclarations face, Map.member slot (Card.allTargetSlots face))
     Spec.assertEqWith
       s
       "CR 109.5 you declared on a triggered ability is caught, and the spell-modes view misses it"
@@ -3217,14 +3217,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (catches Binding.became withDelayed tidalWave)
       (Set.singleton Binding.became, False)
     -- Not vacuous the other way either: the sweep reaches an ability's
-    -- ORDINARY slots, which Card.allTargetSpecs cannot see -- Prodigal
+    -- ORDINARY slots, which Card.allTargetSlots cannot see -- Prodigal
     -- Sorcerer's spell is a creature's empty mode, so its "target" is
     -- declared by its activated ability alone.
     let target = SlotName.MkSlotName (Text.pack "target")
     Spec.assertEqWith
       s
       "an activated ability's ordinary slot is in the sweep but not the spell-modes view"
-      (Set.member target (declaredTargetSlots (S.combinedFace sorcerer)), Map.member target (Card.allTargetSpecs (S.combinedFace sorcerer)))
+      (Set.member target (declaredTargetSlots (S.combinedFace sorcerer)), Map.member target (Card.allTargetSlots (S.combinedFace sorcerer)))
       (True, False)
     Spec.assertEqWith
       s
@@ -3273,13 +3273,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- that arms, not only in a spell mode.
   --
   -- Through modalSlotsOffend, so a delayed ability with modes is read PER MODE
-  -- (#570) -- and so a mode's own declared target specs count, which this lint
+  -- (#570) -- and so a mode's own declared target slots count, which this lint
   -- omitted entirely. CR 603.3d puts a delayed ability on the stack "identical
   -- to the process for casting a spell listed in rules 601.2c-d", so a slot it
   -- declares really is announced; declaredTargetSlots already counts delayed
-  -- abilities' specs on the DECLARING side, and this is the matching read side.
-  -- Since #1043 that comparison is the spell lint's EQUALITY, so a delayed
-  -- ability declaring a spec no effect of its reads fails here too.
+  -- abilities' target slots on the DECLARING side, and this is the matching read
+  -- side. Since #1043 that comparison is the spell lint's EQUALITY, so a delayed
+  -- ability declaring a slot no effect of its reads fails here too.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
     let cardOffends card =
@@ -3287,7 +3287,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
            in any (modalSlotsOffend bound . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
-  -- A delayed ability may not DECLARE a target spec under a name its own card
+  -- A delayed ability may not DECLARE a target slot under a name its own card
   -- already DEFINES, because the two would land in one slot and the reader would
   -- have to pick. Pawl.Engine.Engine.placeOne merges the ability's placement-time
   -- choices with the environment captured when it was armed, per FIELD, so a
@@ -3303,11 +3303,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- appearing in both passed it twice over. Under #1043's equality it rejects the
   -- same shape as a side effect, whether or not the ability reads the name back
   -- -- a read is answered by the bound side and so cancels, and no read leaves the
-  -- read side empty, so either way the declared spec goes unmatched. Kept anyway:
+  -- read side empty, so either way the declared slot goes unmatched. Kept anyway:
   -- it states the claim that is actually true of the data (a name may not be both
   -- declared and defined) rather than deriving it from a dataflow count, and it
   -- names the offending card outright.
-  Spec.it s "no delayed ability declares a target spec under a slot its card defines" $ do
+  Spec.it s "no delayed ability declares a target slot under a name its card defines" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace shadowsDefinedSlot . Printing.card) ps
     Spec.assertEqWith s "no delayed ability shadows a defined slot" (fmap (S.nameOf . Printing.card) offenders) []
@@ -3321,7 +3321,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         reads_ = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice tokens] []]
         declares = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice tokens] [tokens]]
     Spec.assertBool s (not (shadowsSlots (Set.singleton tokens) [reads_])) "reading a Create's slot is legal"
-    Spec.assertBool s (shadowsSlots (Set.singleton tokens) [declares]) "declaring a target spec under the same name is not"
+    Spec.assertBool s (shadowsSlots (Set.singleton tokens) [declares]) "declaring a target slot under the same name is not"
   -- The pairing Pawl.Types.Onset.FromYourNextTurn depends on and cannot enforce
   -- alone. See onsetOffends for why the onset and the condition's TurnScope
   -- are two halves of one printed "your next turn", and what goes wrong when a
@@ -3411,7 +3411,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         narrowed =
           Mode.MkMode
             (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Tap (ObjectRef.InSlot target)))))
-            (Map.singleton target (TargetSpec.required Pool.Permanents (Just (Filter.Type.ControlledByBound Binding.triggerPlayer))))
+            (Map.singleton target (TargetSlot.required Pool.Permanents (Just (Filter.Type.ControlledByBound Binding.triggerPlayer))))
     Spec.assertBool
       s
       (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfEnters [narrowed]))
@@ -3453,7 +3453,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     <> fmap TriggeredAbility.modal (Face.triggeredAbilities face)
         modals = concatMap carriers ps
         takesSeveral (_, modal) =
-          any (any ((> 1) . TargetCount.most . TargetSpec.count) . Mode.targetSpecs) (Modal.modes modal)
+          any (any ((> 1) . TargetCount.most . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
     -- The pool must actually contain one, or the sweep says nothing.
     Spec.assertBool s (any takesSeveral modals) "the pool has a slot that takes more than one target"
     Spec.assertEqWith s "no multi-target slot is read one at a time" (fmap fst (filter (modalCountsOffend . snd) modals)) []
@@ -3461,11 +3461,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- takes two targets and whose only reader is Effect.Sacrifice, a bare SlotName.
   Spec.it s "the lint itself catches a multi-target slot read one at a time" $ do
     let slot = SlotName.MkSlotName (Text.pack "creature")
-        modeWith theSpec reader =
+        modeWith targetSlot reader =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton reader))) (Map.singleton slot theSpec)))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton reader))) (Map.singleton slot targetSlot)))
             (ModeSelection.ChooseExactly 1)
-        two = TargetSpec.upTo 2 Pool.Creatures Nothing
+        two = TargetSlot.upTo 2 Pool.Creatures Nothing
     Spec.assertBool
       s
       (modalCountsOffend (modeWith two (Effect.Sacrifice slot)))
@@ -3476,7 +3476,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and the same slot read through an ObjectRef does not"
     Spec.assertBool
       s
-      (not (modalCountsOffend (modeWith (TargetSpec.required Pool.Creatures Nothing) (Effect.Sacrifice slot))))
+      (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.Sacrifice slot))))
       "nor does a one-target slot read as one object"
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
@@ -3573,7 +3573,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         tap slot = Effect.Tap (ObjectRef.InSlot slot)
         -- Mode 0 declares `creature` and reads it; mode 1 reads it and declares
         -- nothing. Under ChooseExactly 1, choosing mode 1 alone stamps mode 1's
-        -- specs -- which is nothing -- so the read is unbound at runtime.
+        -- target slots -- which is nothing -- so the read is unbound at runtime.
         crossDeclared = modalActivated [lintMode [tap creature] [creature], lintMode [tap creature] []]
         -- The same two reads, each mode declaring the slot it reads.
         ownDeclared = modalActivated [lintMode [tap creature] [creature], lintMode [tap victim] [victim]]
@@ -3618,7 +3618,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let creature = SlotName.MkSlotName (Text.pack "creature")
         victim = SlotName.MkSlotName (Text.pack "victim")
         tap slot = Effect.Tap (ObjectRef.InSlot slot)
-        -- One mode declaring two specs and reading only one of them: Denethor's
+        -- One mode declaring two slots and reading only one of them: Denethor's
         -- exact shape under a slotsOf arm that forgot a read.
         unread = [lintMode [tap creature] [creature, victim]]
         read_ = [lintMode [tap creature] [creature]]
@@ -3653,13 +3653,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "a card with no enchant ability declares no enchant slot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let card = S.combinedFace piker
-    Spec.assertEqWith s "no enchant spec" (Face.enchant card) []
+    Spec.assertEqWith s "no enchant slot" (Face.enchant card) []
     Spec.assertBool s (not (Card.isAura card)) "not an Aura"
-    Spec.assertEqWith s "no enchant slot" (Card.enchantSpecs card) Map.empty
+    Spec.assertEqWith s "no enchant slot" (Card.enchantSlotMap card) Map.empty
   -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
   -- target and could never be cast; a non-Aura with enchant declares a restriction
   -- nothing reads. The D4 lint cannot see either, because it walks
-  -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
+  -- Mode.targetSlots and the enchant slot is not there (#184's shape).
   --
   -- "AT LEAST one", since CR 702.5c lets an Aura have several -- the count is not
   -- what makes a card an Aura, only the presence.
@@ -3671,18 +3671,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 702.5c makes every instance of enchant apply at once, and its last
   -- sentence -- "The Aura can enchant only objects or players that match all of
   -- its enchant abilities" -- conjoins the POOLS exactly as it does the Filters.
-  -- Pawl.Engine.Card.enchantSpec folds the instances into ONE spec by Anding
-  -- their Filters and keeping the FIRST instance's Pool. This lint is what makes
-  -- that fold exact, and the rule it enforces is that CR 115's Pool enum is not
-  -- closed under intersection. Three shapes, one expressible: a NESTED pair has a
-  -- Pool naming the intersection (Creatures against Permanents is Creatures); a
-  -- DISJOINT pair intersects to nothing (Creatures against Players, which is CR
-  -- 702.5d keeping an enchant-player Aura off permanents), and no Pool names the
-  -- empty set; and an OVERLAPPING pair can name a set the enum simply lacks
-  -- (AnyTarget against Permanents is creatures-and-planeswalkers). Taking the
-  -- first instance is order-dependent even in the expressible case, so a card
-  -- whose enchant abilities disagreed would be silently judged by whichever pool
-  -- was written down first.
+  -- Pawl.Engine.Card.enchantTargetSlot folds the instances into ONE target slot
+  -- by Anding their Filters and keeping the FIRST instance's Pool. This lint is
+  -- what makes that fold exact, and the rule it enforces is that CR 115's Pool
+  -- enum is not closed under intersection. Three shapes, one expressible: a
+  -- NESTED pair has a Pool naming the intersection (Creatures against Permanents
+  -- is Creatures); a DISJOINT pair intersects to nothing (Creatures against
+  -- Players, which is CR 702.5d keeping an enchant-player Aura off permanents),
+  -- and no Pool names the empty set; and an OVERLAPPING pair can name a set the
+  -- enum simply lacks (AnyTarget against Permanents is
+  -- creatures-and-planeswalkers). Taking the first instance is order-dependent
+  -- even in the expressible case, so a card whose enchant abilities disagreed
+  -- would be silently judged by whichever pool was written down first.
   --
   -- The disjoint case is INCOHERENT rather than merely unrepresentable, and the
   -- CR says what becomes of such an Aura without needing a pool for it: CR 303.4a
@@ -3700,10 +3700,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- (#797).
   Spec.it s "every enchant ability on a card draws from the same pool" $ do
     ps <- S.allPrintings s
-    let offends c = length (List.nub (fmap TargetSpec.pool (Face.enchant c))) > 1
+    let offends c = length (List.nub (fmap TargetSlot.pool (Face.enchant c))) > 1
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card mixes enchant pools, since CR 702.5c intersects them and Pool is not closed under intersection" (fmap (S.nameOf . Printing.card) offenders) []
-  -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
+  -- Pawl.Engine.Card.allTargetSlots binds the enchant slot under this name (Task 6), so a
   -- mode declaring it would be silently shadowed.
   -- #199: no card authors a layer-2 control modification into an effect that
   -- RESOLVES. SetControllerToSource is the payload-free constructor and is
@@ -4163,7 +4163,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (anyOfOffends (TriggerCondition.StateIs never))) "a bare state trigger is left alone"
   Spec.it s "no mode declares a slot named enchant" $ do
     ps <- S.allPrintings s
-    let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Face.spell c))
+    let offends c = any (Map.member Card.enchantSlot . Mode.targetSlots) (Modal.modes (Face.spell c))
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "the enchant slot is never hand-declared" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 701.3a: "An Aura, Equipment, or Fortification can't be attached to an
@@ -4190,7 +4190,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and it is the pool's only one"
       (sum (fmap (\p -> uncurry (+) (canHostSubjectCounts (S.combinedFace p))) ps))
       1
-    -- The traversal reaches a Filter position no effect, target spec or affected
+    -- The traversal reaches a Filter position no effect, target slot or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real
     -- card. Its absence would not show up in the sweep above, because Ash Barrens
     -- does not author the atom -- only in this.
@@ -4219,16 +4219,16 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "the atoms are the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous, the way the sweep above would be on its own: the same counter
     -- over a hand-built face that DOES carry the atom -- buried under all three
-    -- combinators, in a target spec, the one position a card author would reach
+    -- combinators, in a target slot, the one position a card author would reach
     -- for -- finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerLessThanSource]]
-        slotSpec = TargetSpec.required Pool.Creatures (Just buried)
+        targetSlot = TargetSlot.required Pool.Creatures (Just buried)
         planted =
           (S.combinedFace piker)
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slotSpec)))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
@@ -4237,7 +4237,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           planted
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.required Pool.Creatures (Just buriedGreater)))))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just buriedGreater)))))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
@@ -4251,15 +4251,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
     Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- Not vacuous, for the sibling sweep's reason: the same counter over a
-    -- hand-built face carrying the atom in a target spec finds it.
+    -- hand-built face carrying the atom in a target slot finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ControlledByDefendingPlayer]]
-        slotSpec = TargetSpec.required Pool.Creatures (Just buried)
+        targetSlot = TargetSlot.required Pool.Creatures (Just buried)
         planted =
           (S.combinedFace piker)
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slotSpec)))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
@@ -4275,15 +4275,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
     Spec.assertEqWith s "the baked atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- Not vacuous, for the sibling sweep's reason: the same counter over a
-    -- hand-built face carrying the atom in a target spec finds it.
+    -- hand-built face carrying the atom in a target slot finds it.
     piker <- S.printingOf s registry "Goblin Piker"
     let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.ControlledByPlayer (PlayerId.MkPlayerId 1))]]
-        slotSpec = TargetSpec.required Pool.Creatures (Just buried)
+        targetSlot = TargetSlot.required Pool.Creatures (Just buried)
         planted =
           (S.combinedFace piker)
             { Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slotSpec)))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) targetSlot)))
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
@@ -4316,7 +4316,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   ( Seq.singleton
                       ( Mode.MkMode
                           (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.GainControl (DurationRef.MkDurationRef (Duration.ForAsLongAs crowned) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))))
-                          (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.required Pool.Creatures Nothing))
+                          (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures Nothing))
                       )
                   )
                   (ModeSelection.ChooseExactly 1)
@@ -4343,10 +4343,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
         -- A one-mode, one-clause, mandatory spell running these effects and
         -- declaring these slots -- the smallest carrier that reaches a mode's
-        -- clauses and its targetSpecs at once.
-        spellOf effects specs =
+        -- clauses and its targetSlots at once.
+        spellOf effects slots =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) specs))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
             (ModeSelection.ChooseExactly 1)
         boostedBy quantity =
           StaticAbility.MkStaticAbility
@@ -4355,11 +4355,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             Nothing
             (NonEmpty.singleton (Modification.ModifyPowerToughness quantity (Quantity.Type.Literal 0)))
         planted =
-          [ ( "a target spec",
-              base {Face.spell = spellOf [] (Map.singleton slot (TargetSpec.required Pool.Permanents (Just buried)))}
+          [ ( "a target slot",
+              base {Face.spell = spellOf [] (Map.singleton slot (TargetSlot.required Pool.Permanents (Just buried)))}
             ),
             ( "CR 303.4a's enchant ability",
-              base {Face.enchant = [TargetSpec.required Pool.Permanents (Just buried)]}
+              base {Face.enchant = [TargetSlot.required Pool.Permanents (Just buried)]}
             ),
             ( "a static ability's affected set",
               base
@@ -4480,7 +4480,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "Aura Graft is accepted"
       (canHostSubjectOffends (S.combinedFace graft), canHostSubjectCounts (S.combinedFace graft))
       (False, (1, 0))
-    let grafted = base {Face.spell = spellOf [Effect.AttachTarget (AttachTarget.MkAttachTarget slot buried)] (Map.singleton slot (TargetSpec.required Pool.Permanents Nothing))}
+    let grafted = base {Face.spell = spellOf [Effect.AttachTarget (AttachTarget.MkAttachTarget slot buried)] (Map.singleton slot (TargetSlot.required Pool.Permanents Nothing))}
     Spec.assertEqWith
       s
       "a buried atom in an AttachTarget destination is accepted"

@@ -281,13 +281,13 @@ turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
     ainok <- S.printingOf s registry "Ainok Tracker"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, spell, morphling, vanilla) = backslideBoard island backslide ainok piker
-    case S.spellTargetSpec backslide of
+    case S.spellTargetSlot backslide of
       Nothing -> Spec.assertFailure s "Backslide declares no target slot"
-      Just theSpec ->
+      Just theSlot ->
         Spec.assertEqWith
           s
           "CR 702.37e only the creature with a morph ability is a legal target"
-          (Target.legalRecipients (Just S.alice) spell theSpec gs)
+          (Target.legalRecipients (Just S.alice) spell theSlot gs)
           (Set.singleton (Recipient.ToCreature morphling))
     -- THE BEFORE control: the Tracker really is its printed self to begin with,
     -- so every assertion below is about the resolution and not about the fixture.

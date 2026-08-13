@@ -32,7 +32,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "players": {
                     "count": {
                       "least": 2,

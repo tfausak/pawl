@@ -65,7 +65,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "target": {
                 "pool": {
                   "type": "Creatures"

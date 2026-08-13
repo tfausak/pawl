@@ -41,7 +41,7 @@
                 }
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "spell": {
                 "pool": {
                   "type": "Spells"

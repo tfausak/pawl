@@ -1106,7 +1106,7 @@ statesAQuality predicate = case predicate of
   Filter.HasNonManaActivatedAbility -> True
 
 -- The slots a Filter READS -- today exactly the ControlledByBound atoms in it.
--- Pawl.Engine.Resolve.modeSlots folds this over a mode's target specs, which is
+-- Pawl.Engine.Resolve.modeSlots folds this over a mode's target slots, which is
 -- what makes the card dataflow lint see a slot named in a FILTER rather than in
 -- an effect: a card reading "that player" under a condition that never binds one
 -- is then a failing test rather than a slot that silently admits nothing.

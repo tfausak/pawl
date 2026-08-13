@@ -28,7 +28,7 @@ import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout.
@@ -63,7 +63,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
               ( Seq.singleton
                   ( Mode.MkMode
                       (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
-                      (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.required Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
+                      (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
                   )
               )
               (ModeSelection.ChooseExactly 1)
@@ -71,7 +71,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           [ActivationRestriction.SorcerySpeed]
           Nothing
       )
-      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}}]},"restrictions":[{"type":"SorcerySpeed"}]} """
+      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSlots":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}}]},"restrictions":[{"type":"SorcerySpeed"}]} """
   -- CR 602.5's conjunction, in the JSON: two clauses in printed order, which is
   -- the shape a single tagged object could not hold.
   Spec.it s "MkActivatedAbility, Kongming's Contraptions' two clauses" $

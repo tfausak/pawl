@@ -5,13 +5,13 @@ import qualified Data.Sequence as Seq
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 
 -- | CR 700.2: one mode of a modal spell or ability -- its own clauses and its own
 -- target namespace. `clauses` is a Seq (ordered; CR 608.2c resolves in written
 -- order; duplicates allowed), and CR 608.2e is what makes the clause the unit
 -- inside a mode: "multiple steps or actions, denoted by separate sentences or
--- clauses". `targetSpecs` is per-mode: CR 601.2c/700.2c fill only
+-- clauses". `targetSlots` is per-mode: CR 601.2c/700.2c fill only
 -- the CHOSEN mode's slots. Parametric in `card` like Effect (a concrete Effect Card
 -- would cycle with Card, which embeds the payload; Card ties the knot at Mode Card).
 -- A non-modal payload is a single Mode.
@@ -25,7 +25,7 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- They rode the mode until a card needed a "may" narrower than one (#335).
 data Mode card = MkMode
   { clauses :: Seq.Seq (Clause.Clause card),
-    targetSpecs :: Map.Map SlotName.SlotName TargetSpec.TargetSpec
+    targetSlots :: Map.Map SlotName.SlotName TargetSlot.TargetSlot
   }
   deriving (Eq, Ord, Show)
 

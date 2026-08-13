@@ -136,7 +136,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "player": {
                     "filter": {
                       "type": "IsPlayer",
@@ -200,7 +200,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "filter": {
                       "type": "And",

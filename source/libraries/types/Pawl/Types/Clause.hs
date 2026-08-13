@@ -17,7 +17,7 @@ import qualified Pawl.Types.UnlessPaid as UnlessPaid
 -- applying the effect". Pawl.Types.Mode carried both jobs until a card needed
 -- them apart (#335).
 --
--- No `targetSpecs` here, and that asymmetry is the design rather than an
+-- No `targetSlots` here, and that asymmetry is the design rather than an
 -- omission: CR 601.2c fills a target slot as the spell is cast, which is the
 -- mode's business, so a clause has no namespace of its own.
 --

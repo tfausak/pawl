@@ -42,7 +42,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "bounced": {
                     "filter": {
                       "type": "And",
@@ -89,7 +89,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "exiled": {
                     "filter": {
                       "type": "And",

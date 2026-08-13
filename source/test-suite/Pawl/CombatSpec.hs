@@ -64,7 +64,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 
 combatDamageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -3646,11 +3646,11 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
     piker <- S.printingOf s registry "Goblin Piker"
     rayOfCommand <- S.printingOf s registry "Ray of Command"
     killShot <- S.printingOf s registry "Kill Shot"
-    case (rayBoard island piker rayOfCommand, S.spellTargetSpec killShot) of
-      ((gs, [stolen, other, homebody]), Just attackingSpec) -> do
+    case (rayBoard island piker rayOfCommand, S.spellTargetSlot killShot) of
+      ((gs, [stolen, other, homebody]), Just attackingSlot) -> do
         let atEnd = runToEndOfCombat (steal homebody stolen) gs
             attackers = Combat.Type.attackers (GameState.combat atEnd)
-            legal = Target.legalRecipients Nothing S.noSource attackingSpec atEnd
+            legal = Target.legalRecipients Nothing S.noSource attackingSlot atEnd
         Spec.assertEqWith s "the leg really reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
         Spec.assertEqWith s "bob really did gain control of it" (Projection.controllerOf stolen atEnd) (Just S.bob)
         Spec.assertBool s (Map.notMember stolen attackers) "CR 506.4: so it is no longer an attacking creature"
@@ -3659,7 +3659,7 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
         -- Piker in the record and deals its 2 alongside the other's.
         Spec.assertEqWith s "CR 510.1: bob takes only the surviving attacker's 2" (S.lifeOf S.bob atEnd) (Just 18)
         -- CR 508.1k through the door a card actually uses: Kill Shot's own
-        -- committed target spec is Pool.Creatures narrowed by IsAttacking.
+        -- committed target slot is Pool.Creatures narrowed by IsAttacking.
         Spec.assertBool s (not (Set.member (Recipient.ToCreature stolen) legal)) "Filter.IsAttacking no longer finds the stolen creature"
         Spec.assertBool s (Set.member (Recipient.ToCreature other) legal) "and still finds the one that is attacking"
       _ -> Spec.assertFailure s "fixture should have three Pikers and Kill Shot a 'target' slot"
@@ -3717,7 +3717,7 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
 -- Labyrinth of Skophos' SECOND activated ability -- "{4}, {T}: Remove target
 -- attacking or blocking creature from combat" -- read off the JSON-loaded
 -- printing rather than hand-built, so every leg below exercises the codec's
--- parse of the committed card data (S.spellTargetSpec's posture, for an
+-- parse of the committed card data (S.spellTargetSlot's posture, for an
 -- activated ability rather than a spell). The first is the land's "{T}: Add
 -- {C}".
 removalAbility :: Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
@@ -3725,14 +3725,14 @@ removalAbility printing = case Face.activatedAbilities (S.combinedFace printing)
   [_, ability] -> Just ability
   _ -> Nothing
 
--- That ability's "target" slot spec: CR 601.2c's narrowing, reached for an
+-- That ability's "target" slot: CR 601.2c's narrowing, reached for an
 -- activated ability through CR 602.2b, which for this card is Pool.Creatures
 -- under `Or [IsAttacking, IsBlocking]`.
-removalSpec :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Maybe TargetSpec.TargetSpec
-removalSpec ability =
+removalTargetSlot :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Maybe TargetSlot.TargetSlot
+removalTargetSlot ability =
   Map.lookup
     (SlotName.MkSlotName (Text.pack "target"))
-    (Modal.allTargetSpecs (ActivatedAbility.modal ability))
+    (Modal.allTargetSlots (ActivatedAbility.modal ability))
 
 -- alice is mid-combat with one creature per printing in `mine`; bob defends with
 -- one per printing in `theirs`. `who` also controls a Labyrinth of Skophos and
@@ -3838,7 +3838,7 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
       (Just ability, (gs, [attacker], _, mazeId)) -> do
         let atEnd = runToEndOfCombatWith (mazeAnswer mazeId ability attacker) gs
             quiet = runToEndOfCombat S.aggressiveAnswer gs
-            legal = fmap (\theSpec -> Target.legalRecipients Nothing S.noSource theSpec atEnd) (removalSpec ability)
+            legal = fmap (\theSlot -> Target.legalRecipients Nothing S.noSource theSlot atEnd) (removalTargetSlot ability)
         Spec.assertEqWith s "the leg really reached the end of combat step, where the record still reads live (CR 511.3)" (GameState.phase atEnd) (Phase.Combat CombatStep.EndOfCombat)
         Spec.assertEqWith s "the ability really was activated: its {T} component was paid" (tapStateOf mazeId atEnd) (Just TapState.Tapped)
         Spec.assertBool s (Map.notMember attacker (Combat.Type.attackers (GameState.combat atEnd))) "CR 506.4: the Piker stopped being an attacking creature"
@@ -3889,7 +3889,7 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
         -- The combat damage step is the vantage point: blockers have been
         -- declared and nothing has died yet.
         let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) (stayHomeAnswer homebody) gs
-            legal = fmap (\theSpec -> Target.legalRecipients Nothing S.noSource theSpec atDamage) (removalSpec ability)
+            legal = fmap (\theSlot -> Target.legalRecipients Nothing S.noSource theSlot atDamage) (removalTargetSlot ability)
             admits oid = fmap (Set.member (Recipient.ToCreature oid)) legal
         Spec.assertEqWith s "the fixture reached the combat damage step with blocks declared" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
         Spec.assertBool s (Set.member blocker (Combat.blockersOf attacker atDamage)) "the blocker really is blocking the attacker"

@@ -48,7 +48,7 @@ import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetCount as TargetCount
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 704.5a (life <= 0), CR 704.5b (drawing from an empty library), CR 704.5c
@@ -208,7 +208,7 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 -- types this cases on are exactly what CR 613's layer 4 changes. "Aura" and
 -- "Equipment" are subtypes (CR 205.3h, CR 301.5), so they come from PC.subtypes
 -- -- unlike CR 704.5m's fallsOff, which asks the printed card for an enchant
--- ability because it needs that ability's spec.
+-- ability because it needs that ability's target slot.
 --
 -- Subtype.Fortification is the one clause of the rule with no constructor to case
 -- on, and is therefore unreachable rather than elided. The BATTLE clause is
@@ -251,9 +251,9 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- to an id that is no longer a permanent, and attached to one its own enchant
 -- ability no longer admits (CR 303.4c).
 --
--- ABILITIES, plural, where CR 702.5c applies: Card.enchantSpec is the conjunction
--- of every instance, so the third clause fires when the host stops matching ANY
--- of them. Nothing here has to know how many there were.
+-- ABILITIES, plural, where CR 702.5c applies: Card.enchantTargetSlot is the
+-- conjunction of every instance, so the third clause fires when the host stops
+-- matching ANY of them. Nothing here has to know how many there were.
 --
 -- CR 303.4c's own wording splits that last clause differently, and both halves
 -- land in the SAME place here because a pool's candidate list already excludes
@@ -263,11 +263,11 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- every other Aura, with no player-only branch.
 --
 -- The third clause goes through stillLegalEnchant below rather than calling
--- Target.stillAdmitted directly, so that the common enchant spec is answered off
+-- Target.stillAdmitted directly, so that the common enchant slot is answered off
 -- `pcs` -- the SAME pre-pass Projection.projectAll performStateBasedActions
 -- computed once for every other CR 704.3 classification. Calling stillAdmitted
 -- here instead means a fresh `gather` PER Aura, which is the O(permanents^3)
--- shape Projection.hs's `liveGiven` comment warns about, one level down. (A spec
+-- shape Projection.hs's `liveGiven` comment warns about, one level down. (A slot
 -- carrying a Filter still reaches stillAdmitted by that function's fallthrough.)
 --
 -- CR 303.4d's first clause -- an Aura can't enchant itself -- is the `oid == self`
@@ -282,19 +282,20 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 fallsOff pcs gs oid = case Game.faceOf oid gs of
   Nothing -> False
-  Just face -> case Card.enchantSpec face of
+  Just face -> case Card.enchantTargetSlot face of
     Nothing -> False
-    Just spec -> case Game.lookupObject oid gs of
+    Just slot -> case Game.lookupObject oid gs of
       Nothing -> False
       Just obj -> case Object.attachedTo obj of
         Nothing -> True
         Just recipient ->
           Recipient.objectOf recipient == Just oid
-            || not (stillLegalEnchant pcs gs oid spec recipient)
+            || not (stillLegalEnchant pcs gs oid slot recipient)
 
--- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s spec ADMITS?
+-- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s enchant
+-- slot ADMITS?
 -- Answered off `pcs` -- the pre-pass projection every other classification in
--- performStateBasedActions shares (CR 704.3 simultaneity) -- for the one spec
+-- performStateBasedActions shares (CR 704.3 simultaneity) -- for the one slot
 -- shape that reduces to a lookup, and by the general Target.stillAdmitted for
 -- every other.
 --
@@ -305,9 +306,9 @@ fallsOff pcs gs oid = case Game.faceOf oid gs of
 -- restrict targeting and nothing else -- so an Aura stays attached to a host that
 -- gains either. See Target.admittedRecipients.
 --
--- Pool.Creatures with no Filter is the shape MOST folded enchant specs in this
--- pool carry (Unholy Strength) -- Card.enchantSpec leaves a lone unfiltered
--- instance exactly as printed, which is what keeps this arm reachable at all. Target.creatureRecipients tags every candidate
+-- Pool.Creatures with no Filter is the shape MOST folded enchant slots in this
+-- pool carry (Unholy Strength) -- Card.enchantTargetSlot leaves a lone
+-- unfiltered instance exactly as printed, which is what keeps this arm reachable at all. Target.creatureRecipients tags every candidate
 -- ToCreature, drawn from the battlefield objects owned by a still-playing player,
 -- so with no Filter to narrow that set "still legal" reduces EXACTLY to "still a
 -- creature, on the battlefield, owned by a player still in the game" -- a
@@ -322,21 +323,21 @@ fallsOff pcs gs oid = case Game.faceOf oid gs of
 -- whose ControlledBy You conjunct is unanswerable from `pcs` -- CR 109.5 makes
 -- that "you" the AURA's controller (CR 702.5a), so the answer changes when an
 -- opponent steals the enchanted creature -- and CR 702.5d's enchant-player Auras
--- carry a Pool.Players spec. A CR 702.5c conjunction of several instances is a
+-- carry a Pool.Players slot. A CR 702.5c conjunction of several instances is a
 -- third: Filter.And is a Filter, so it lands here too. The fallthrough pays the per-Aura re-projection the
--- reduction exists to avoid, but only for those. Serving a filtered spec off
+-- reduction exists to avoid, but only for those. Serving a filtered slot off
 -- `pcs` would mean answering Filter.matches against the pre-pass projection
 -- instead of a fresh one, which is #430.
 --
 -- That fallback is general in its recipient TAG as well as in its pool and
 -- filter, which is the whole reason Object.attachedTo stores a Recipient: the tag
 -- is the one the Aura's own pool produced when it attached, with nothing here to
--- keep in step. So the fast arm is matched on the PAIR, not on the spec alone --
+-- keep in step. So the fast arm is matched on the PAIR, not on the slot alone --
 -- it reduces Pool.Creatures' candidate list specifically, and a recipient of any
 -- other shape falls through rather than being read as an object id it is not.
-stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSpec.TargetSpec -> Recipient.Recipient -> Bool
-stillLegalEnchant pcs gs source spec recipient = case (spec, recipient) of
-  (TargetSpec.MkTargetSpec Pool.Creatures Nothing count, Recipient.ToCreature target) | count == TargetCount.one ->
+stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSlot.TargetSlot -> Recipient.Recipient -> Bool
+stillLegalEnchant pcs gs source slot recipient = case (slot, recipient) of
+  (TargetSlot.MkTargetSlot Pool.Creatures Nothing count, Recipient.ToCreature target) | count == TargetCount.one ->
     case Map.lookup target pcs of
       Nothing -> False
       Just pc ->
@@ -346,7 +347,7 @@ stillLegalEnchant pcs gs source spec recipient = case (spec, recipient) of
             Just obj -> List.elem (Object.owner obj) (Game.stillPlaying gs)
   -- The Aura is on the battlefield when this SBA asks, so its controller is
   -- live -- the CR 608.2b case this perspective exists for cannot arise here.
-  _ -> Target.stillAdmitted (Projection.controllerOf source gs) source recipient spec gs
+  _ -> Target.stillAdmitted (Projection.controllerOf source gs) source recipient slot gs
 
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the

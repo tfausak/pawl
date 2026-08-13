@@ -69,7 +69,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "target": {
                 "pool": {
                   "type": "AnyTarget"

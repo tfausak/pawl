@@ -34,18 +34,18 @@ import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.TargetCount as TargetCount
-import Pawl.Types.TargetSpec (TargetSpec)
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import Pawl.Types.TargetSlot (TargetSlot)
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Zone as Zone
 
--- CR 115: a target slot's legal recipients -- the set its spec admits
+-- CR 115: a target slot's legal recipients -- the set the slot itself admits
 -- (admittedRecipients below), less every candidate rule 702 forbids TARGETING
 -- (targetable below, where shroud, hexproof and the restrictions after them
 -- live), less CR 115.5's one candidate, a spell or ability on the stack being an
 -- illegal target for itself.
 --
 -- CR 115.5 is subtracted HERE and not in admittedGiven because it is a TARGETING
--- rule, exactly as rule 702's restrictions are: what an enchant spec admits (CR
+-- rule, exactly as rule 702's restrictions are: what an enchant slot admits (CR
 -- 303.4c, Sba.stillLegalEnchant) asks no targeting question at all. Both of CR
 -- 115's moments honour it, since both route through this function -- CR 601.2c's
 -- choosing and CR 608.2b's re-validation.
@@ -88,12 +88,12 @@ import qualified Pawl.Types.Zone as Zone
 -- slot map that was never supplied, and it is the vacuous posture every
 -- player-referencing question here takes. legalSets below is where the bindings
 -- come from at CR 601.2c, and Pawl.Engine.Resolve's stillLegal calls are where
--- they come from at CR 608.2b; a caller with a slot-scoped spec and neither must
+-- they come from at CR 608.2b; a caller with a slot-scoped pool and neither must
 -- use legalRecipientsGiven directly.
-legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-legalRecipients perspective source spec gs =
+legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSlot -> GameState -> Set Recipient
+legalRecipients perspective source slot gs =
   let pcs = Projection.projectAll gs
-   in legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective Map.empty source spec gs
+   in legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective Map.empty source slot gs
 
 -- The same set given a board the CALLER has already walked. `pcs` and `grants`
 -- are one whole-board projection and one control-grant walk, and threading them
@@ -116,8 +116,8 @@ legalRecipients perspective source spec gs =
 --
 -- `bindings` is what the OTHER slots of the same announcement hold -- the map a
 -- GraveyardScope.InSlot pool is resolved against. See graveyardRecipients.
-legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-legalRecipientsGiven pcs grants pools perspective bindings source spec gs =
+legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> TargetSlot -> GameState -> Set Recipient
+legalRecipientsGiven pcs grants pools perspective bindings source slot gs =
   -- The SAME thunk both halves read, so the whole-board projection is taken at
   -- most once per slot even when this is reached through the wrapper above, and
   -- once per enumeration when it is not (admittedGiven's own note).
@@ -142,9 +142,9 @@ legalRecipientsGiven pcs grants pools perspective bindings source spec gs =
       keep recipient =
         not (sourceOnStack && Recipient.objectOf recipient == Just source)
           && targetable pcs perspective source sourceView gs recipient
-   in Set.filter keep (admittedGiven pcs grants pools perspective bindings source spec gs)
+   in Set.filter keep (admittedGiven pcs grants pools perspective bindings source slot gs)
 
--- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SPEC itself admits -- its
+-- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SLOT itself admits -- its
 -- Pool's base candidate set (CR 115.4's "any target" is creatures, planeswalkers
 -- and battles on the battlefield plus players still in the game) narrowed by its
 -- Filter. Rule 702's targeting restrictions are NOT applied.
@@ -158,21 +158,21 @@ legalRecipientsGiven pcs grants pools perspective bindings source spec gs =
 --
 -- Hence the two callers here rather than at legalRecipients:
 -- Sba.stillLegalEnchant's general path (CR 303.4c) and Attach.attachmentFor (CR
--- 701.3a). Both ask what the enchant SPEC admits; neither is a player choosing a
+-- 701.3a). Both ask what the enchant SLOT admits; neither is a player choosing a
 -- target.
 --
 -- No slot bindings, and neither caller can want any: both ask what an ENCHANT
--- spec admits, and CR 303.4a's spec draws from the battlefield, which no
--- GraveyardScope reaches.
-admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-admittedRecipients perspective source spec gs =
+-- slot admits, and the slot CR 303.4a declares draws from the battlefield,
+-- which no GraveyardScope reaches.
+admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSlot -> GameState -> Set Recipient
+admittedRecipients perspective source slot gs =
   let pcs = Projection.projectAll gs
-   in admittedGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective Map.empty source spec gs
+   in admittedGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective Map.empty source slot gs
 
-admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-admittedGiven pcs grants pools perspective bindings source spec gs =
-  let pool = TargetSpec.pool spec
-      narrowing = TargetSpec.filter spec
+admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> TargetSlot -> GameState -> Set Recipient
+admittedGiven pcs grants pools perspective bindings source slot gs =
+  let pool = TargetSlot.pool slot
+      narrowing = TargetSlot.filter slot
       -- THE one site that fills Filter.sourcePower and Filter.defendingPlayer,
       -- because it is the one site that matches a TARGET SLOT's Filter -- both of
       -- CR 115's moments (CR 601.2c's choosing and CR 608.2b's re-check) reach
@@ -215,7 +215,7 @@ admittedGiven pcs grants pools perspective bindings source spec gs =
         -- CR 115.1: a player candidate is narrowed too ("target opponent"), by a
         -- Filter that asks about the player rather than about an object -- the
         -- IsPlayer atom (#168). Every object-shaped atom is vacuously False
-        -- against a player view, so a spec that says "target creature you
+        -- against a player view, so a slot that says "target creature you
         -- control" cannot accidentally admit a player.
         Recipient.ToPlayer pid -> against (Filter.playerView pid)
         Recipient.ToCreature oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
@@ -229,7 +229,7 @@ admittedGiven pcs grants pools perspective bindings source spec gs =
 
 -- CR 702.18a (shroud) and CR 702.11b/702.11d (hexproof): THE
 -- targeting-restriction gate, the one every restriction rule 702 states lands
--- in. It is asked of a candidate the spec has already admitted, and it answers
+-- in. It is asked of a candidate the slot has already admitted, and it answers
 -- with CR 101.2's "can't": what it rejects is gone, so no Filter can put it back.
 -- Both of CR 115's moments route through legalRecipients, so neither needs a
 -- clause of its own here.
@@ -667,23 +667,23 @@ exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameStat
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is
--- otherwise re-judged against the spec in the current state.
+-- otherwise re-judged against the slot in the current state.
 --
 -- `bindings` is the resolving object's OWN chosen targets, which is what makes
 -- CR 608.2b exact where CR 601.2c could only be a superset: a
 -- GraveyardScope.InSlot pool re-derived here reads the one player the spell
 -- actually named, so a card that has since moved to somebody else's graveyard is
 -- no longer a legal target for it.
-stillLegal :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
-stillLegal perspective bindings source recipient spec gs =
+stillLegal :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
+stillLegal perspective bindings source recipient slot gs =
   let pcs = Projection.projectAll gs
-   in Set.member recipient (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective bindings source spec gs)
+   in Set.member recipient (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective bindings source slot gs)
 
--- CR 303.4c: is `recipient` still one the spec ADMITS -- the same membership
+-- CR 303.4c: is `recipient` still one the slot ADMITS -- the same membership
 -- question stillLegal asks, minus rule 702's targeting restrictions. See
 -- admittedRecipients for why an attached Aura is not asked a targeting question.
-stillAdmitted :: Maybe PlayerId -> ObjectId -> Recipient -> TargetSpec -> GameState -> Bool
-stillAdmitted perspective source recipient spec gs = Set.member recipient (admittedRecipients perspective source spec gs)
+stillAdmitted :: Maybe PlayerId -> ObjectId -> Recipient -> TargetSlot -> GameState -> Bool
+stillAdmitted perspective source recipient slot gs = Set.member recipient (admittedRecipients perspective source slot gs)
 
 -- One legal set per named slot; casting prompts with exactly this map. `source`
 -- is the object the targeting is relative to -- the spell object at cast, the
@@ -693,10 +693,10 @@ stillAdmitted perspective source recipient spec gs = Set.member recipient (admit
 -- (CR 115.4). CR 115.5's self-exclusion is
 -- a DIFFERENT rule: unconditional, and firing only where its own words do, for a
 -- source that is itself on the stack -- see legalRecipients.
-legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
-legalSets perspective source specs gs =
+legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
+legalSets perspective source slots gs =
   let pcs = Projection.projectAll gs
-   in legalSetsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective source specs gs
+   in legalSetsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective source slots gs
 
 -- The same map on a board the caller already walked -- see legalRecipientsGiven.
 --
@@ -713,14 +713,14 @@ legalSets perspective source specs gs =
 -- another dependent slot reads that slot's first-pass answer, which is empty.
 -- No card writes one, and nothing here would loop if one did.
 --
--- Ordinary cards pay nothing: `dependent` is empty for every spec map with no
+-- Ordinary cards pay nothing: `dependent` is empty for every slot map with no
 -- slot-scoped pool in it, so the second pass is a Map.filter over a map with at
 -- most a handful of keys.
-legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
-legalSetsGiven pcs grants pools perspective source specs gs =
-  let answer bindings spec = legalRecipientsGiven pcs grants pools perspective bindings source spec gs
-      independent = fmap (answer Map.empty) specs
-      dependent = fmap (answer independent) (Map.filter (dependsOnSlot . TargetSpec.pool) specs)
+legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
+legalSetsGiven pcs grants pools perspective source slots gs =
+  let answer bindings slot = legalRecipientsGiven pcs grants pools perspective bindings source slot gs
+      independent = fmap (answer Map.empty) slots
+      dependent = fmap (answer independent) (Map.filter (dependsOnSlot . TargetSlot.pool) slots)
    in -- Map.union is left-biased, so the second pass wins wherever it answered.
       Map.union dependent independent
 
@@ -747,9 +747,9 @@ dependsOnSlot pool = case pool of
 -- and a slot whose range has collapsed to a single number is not a variable
 -- number of targets at all ("in some cases, the number of targets will be
 -- defined by the spell's text").
-announcedRange :: TargetSpec -> Set Recipient -> (Natural, Natural)
-announcedRange spec legal =
-  let count = TargetSpec.count spec
+announcedRange :: TargetSlot -> Set Recipient -> (Natural, Natural)
+announcedRange slot legal =
+  let count = TargetSlot.count slot
       ceiling_ = min (TargetCount.most count) (Natural.length legal)
    in (min (TargetCount.least count) ceiling_, ceiling_)
 
@@ -763,11 +763,11 @@ announcedRange spec legal =
 --
 -- The answer is NOT validated here -- `selectionLegal` below is that, asked by
 -- the callers that reverse an announcement (CR 601.2e, CR 602.2).
-chooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName TargetSpec -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
-chooseTargets decider pid oid specs sets = do
-  let ranges = Map.intersectionWith announcedRange specs sets
+chooseTargets :: Decider -> PlayerId -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Game (Map SlotName (Set Recipient))
+chooseTargets decider pid oid slots sets = do
+  let ranges = Map.intersectionWith announcedRange slots sets
       variable = Map.keysSet (Map.filter (uncurry (/=)) ranges)
-      offers = Map.restrictKeys (Map.intersectionWith (\spec legal -> (TargetSpec.count spec, legal)) specs sets) variable
+      offers = Map.restrictKeys (Map.intersectionWith (\targetSlot legal -> (TargetSlot.count targetSlot, legal)) slots sets) variable
   announced <-
     if Map.null offers
       then pure Map.empty
@@ -806,23 +806,23 @@ chooseTargets decider pid oid specs sets = do
 -- returns the game to before the spell was proposed, the same posture CR 601.2b's
 -- unaffordable X announcement already takes (#417). Narrowing the offered count
 -- to what a coherent answer could reach is not implemented (#1296).
-selectionLegal :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
-selectionLegal perspective source specs sets chosen gs =
+selectionLegal :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
+selectionLegal perspective source slots sets chosen gs =
   Set.isSubsetOf (Map.keysSet chosen) (Map.keysSet sets)
-    && and (Map.elems (Map.mapWithKey slotLegal specs))
-    && and (Map.elems (Map.mapWithKey coherent (Map.filter (dependsOnSlot . TargetSpec.pool) specs)))
+    && and (Map.elems (Map.mapWithKey slotLegal slots))
+    && and (Map.elems (Map.mapWithKey coherent (Map.filter (dependsOnSlot . TargetSlot.pool) slots)))
   where
     pcs = Projection.projectAll gs
-    slotLegal slot spec =
+    slotLegal slot targetSlot =
       let legal = Map.findWithDefault Set.empty slot sets
           picked = Map.findWithDefault Set.empty slot chosen
-          (lo, hi) = announcedRange spec legal
+          (lo, hi) = announcedRange targetSlot legal
           size = Natural.length picked
        in Set.isSubsetOf picked legal && size >= lo && size <= hi
-    coherent slot spec =
+    coherent slot targetSlot =
       Set.isSubsetOf
         (Map.findWithDefault Set.empty slot chosen)
-        (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective chosen source spec gs)
+        (legalRecipientsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective chosen source targetSlot gs)
 
 -- CR 700.2a: the mode indices every one of whose target slots can be filled --
 -- that is, has at least as many legal recipients as its count demands (a mode
@@ -833,8 +833,8 @@ selectionLegal perspective source specs sets chosen gs =
 -- `extra` is the slots EVERY mode carries in addition to its own -- CR 303.4a's
 -- enchant slot, declared by the card rather than by a mode, which castability
 -- must see or an Aura with no legal creature would be castable and then countered
--- on resolution (CR 601.2c). An ability has no enchant spec and passes Map.empty.
-fillableModes :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex
+-- on resolution (CR 601.2c). An ability has no enchant slot and passes Map.empty.
+fillableModes :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card -> GameState -> Set ModeIndex
 fillableModes perspective source extra modal gs =
   let pcs = Projection.projectAll gs
    in fillableModesGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective source extra modal gs
@@ -843,22 +843,22 @@ fillableModes perspective source extra modal gs =
 -- This is the half Action.legalActions' activation gate wants: it asks this
 -- question once per permanent, and the wrapper above takes a whole-board sweep
 -- apiece to answer it (#716).
-fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card -> GameState -> Set ModeIndex
 fillableModesGiven pcs grants pools perspective source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)
       fillable i m =
-        let specs = Map.union extra (Mode.targetSpecs m)
-            sets = legalSetsGiven pcs grants pools perspective source specs gs
+        let slots = Map.union extra (Mode.targetSlots m)
+            sets = legalSetsGiven pcs grants pools perspective source slots gs
          in -- CR 115.6 / 601.2c: a slot is unfillable when the board cannot supply
             -- the MINIMUM its count demands. An "up to one" slot with no legal
             -- recipient demands none, and is answered with zero targets.
-            if or (Map.elems (Map.intersectionWith short specs sets))
+            if or (Map.elems (Map.intersectionWith short slots sets))
               then Nothing
               else Just (ModeIndex.MkModeIndex i)
-      short spec legal = Natural.length legal < TargetCount.least (TargetSpec.count spec)
+      short slot legal = Natural.length legal < TargetCount.least (TargetSlot.count slot)
    in Set.fromList (Maybe.mapMaybe (uncurry fillable) (zip [0 :: Natural ..] ms))
 
--- CR 603.2: every slot's spec with its "that player" atoms baked against this
+-- CR 603.2: every target slot with its "that player" atoms baked against this
 -- binding environment (Pawl.Engine.Filter.bakeBound). The whole of what makes
 -- "target creature that player controls" answerable, and it is applied at both
 -- of CR 115's moments -- Pawl.Engine.Engine.placeBorne's CR 603.3d choosing and
@@ -866,22 +866,22 @@ fillableModesGiven pcs grants pools perspective source extra modal gs =
 -- what the choice was offered against.
 --
 -- A REWRITE rather than a Context field, and no signature here widens: the
--- bindings are known where these two callers stand and nowhere else, so the spec
+-- bindings are known where these two callers stand and nowhere else, so the slot
 -- reaching this module is already answerable. The order is not CR 601.2c's
 -- simultaneity problem that a slot depending on ANOTHER SLOT is
 -- (Pawl.Types.GraveyardScope's InSlot, two passes in legalSetsGiven): a trigger's
 -- event bindings are fixed before the ability is put on the stack, so nothing
 -- being chosen now can change them.
-bakeSpecs :: Map SlotName PlayerId -> Map SlotName TargetSpec -> Map SlotName TargetSpec
-bakeSpecs players = fmap (bakeSpec players)
+bakeSlots :: Map SlotName PlayerId -> Map SlotName TargetSlot -> Map SlotName TargetSlot
+bakeSlots players = fmap (bakeSlot players)
 
-bakeSpec :: Map SlotName PlayerId -> TargetSpec -> TargetSpec
-bakeSpec players spec = spec {TargetSpec.filter = fmap (Filter.bakeBound players) (TargetSpec.filter spec)}
+bakeSlot :: Map SlotName PlayerId -> TargetSlot -> TargetSlot
+bakeSlot players slot = slot {TargetSlot.filter = fmap (Filter.bakeBound players) (TargetSlot.filter slot)}
 
--- bakeSpecs over a whole modal payload, for the caller that must bake BEFORE the
+-- bakeSlots over a whole modal payload, for the caller that must bake BEFORE the
 -- modes are chosen: CR 700.2b's mode selection asks which modes are fillable
 -- (fillableModes), and an unbaked slot admits nothing, which would take a
 -- perfectly fillable trigger off the stack under CR 603.3c.
 bakeModal :: Map SlotName PlayerId -> Modal.Modal Card -> Modal.Modal Card
 bakeModal players modal =
-  modal {Modal.modes = fmap (\m -> m {Mode.targetSpecs = bakeSpecs players (Mode.targetSpecs m)}) (Modal.modes modal)}
+  modal {Modal.modes = fmap (\m -> m {Mode.targetSlots = bakeSlots players (Mode.targetSlots m)}) (Modal.modes modal)}

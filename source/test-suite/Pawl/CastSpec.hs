@@ -1293,7 +1293,7 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
 -- mode and a Face.enchant of "target creature" (CardSpec's auraCardSpec).
--- Task 6 merges Card.enchantSpecs into allTargetSpecs/modesTargetSpecs and
+-- Task 6 merges Card.enchantSlotMap into allTargetSlots/modesTargetSlots and
 -- teaches Target.fillableModes the extra slots a card declares outside its
 -- modes, so castability sees the enchant slot too -- without either function
 -- learning what an Aura is.
@@ -1306,15 +1306,15 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
-        specs = Card.modesTargetSpecs (Seq.singleton (ModeIndex.MkModeIndex 0)) (S.combinedFace unholyStrength)
-    Spec.assertEqWith s "one slot, the enchant slot" (Set.singleton Card.enchantSlot) (Map.keysSet specs)
+        slots = Card.modesTargetSlots (Seq.singleton (ModeIndex.MkModeIndex 0)) (S.combinedFace unholyStrength)
+    Spec.assertEqWith s "one slot, the enchant slot" (Set.singleton Card.enchantSlot) (Map.keysSet slots)
     Spec.assertEqWith
       s
       "its legal set is the one creature"
-      (Target.legalSets Nothing spellId specs gs)
+      (Target.legalSets Nothing spellId slots gs)
       (Map.singleton Card.enchantSlot (Set.singleton (Recipient.ToCreature creature)))
   -- CR 601.2c: a spell whose required target has no legal choice cannot be
-  -- cast at all. Reading only Mode.targetSpecs would call this castable and
+  -- cast at all. Reading only Mode.targetSlots would call this castable and
   -- let it be countered on resolution instead.
   Spec.it s "CR 601.2c: an Aura with no creature on the battlefield is not castable" $ do
     swamp <- S.printingOf s registry "Swamp"

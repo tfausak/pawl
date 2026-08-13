@@ -45,7 +45,7 @@ import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -80,9 +80,9 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   -- openingHandActions round-trip-plus-byte-stability pairs formerly here needed
   -- no registry fixture -- a synthetic Card proves them just as well -- so they
   -- moved to Pawl.Codec.FaceSpec with the rest of a face's own coverage.
-  -- TargetSpec's own per-constructor coverage (a bare pool, a filtered pool,
+  -- TargetSlot's own per-constructor coverage (a bare pool, a filtered pool,
   -- and the Not IsSource conjunct that carries CR 601.2c's "another", #163)
-  -- lives in Pawl.Codec.TargetSpecSpec now; Filter's own per-constructor and
+  -- lives in Pawl.Codec.TargetSlotSpec now; Filter's own per-constructor and
   -- nested-And/Or/Not coverage lives in Pawl.Codec.FilterSpec.
   -- EntryRewrite's own per-constructor coverage lives in
   -- Pawl.Codec.EntryRewriteSpec now. GameEvent's own per-constructor
@@ -122,9 +122,9 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
         [Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))]
       Spec.assertEqWith
         s
-        "target spec"
-        (Card.allTargetSpecs card)
-        (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.required Pool.Spells Nothing))
+        "target slot"
+        (Card.allTargetSlots card)
+        (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSlot.required Pool.Spells Nothing))
     -- Stifle beside it, and the pair is the point: ONE Counter opcode, TWO
     -- pools. CR 113.9 -- "activated and triggered abilities on the stack aren't
     -- spells, and therefore can't be countered by anything that counters only
@@ -144,9 +144,9 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
         [Effect.Counter (SlotName.MkSlotName (Text.pack "ability"))]
       Spec.assertEqWith
         s
-        "target spec"
-        (Card.allTargetSpecs card)
-        (Map.singleton (SlotName.MkSlotName (Text.pack "ability")) (TargetSpec.required Pool.Abilities Nothing))
+        "target slot"
+        (Card.allTargetSlots card)
+        (Map.singleton (SlotName.MkSlotName (Text.pack "ability")) (TargetSlot.required Pool.Abilities Nothing))
     -- The key is omitted when Counterable, so this pins BOTH directions of
     -- that default: the one card that prints the clause decodes as
     -- CantBeCountered, and a card that says nothing decodes as Counterable
