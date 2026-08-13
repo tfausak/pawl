@@ -1645,12 +1645,13 @@ objectRefObjects legal resolving controller source gs ref = case ref of
      in concatMap
           (\pid -> List.genericTake depth (Game.zoneMembers Zone.Library pid gs))
           (filter (`elem` named) (Game.apnapOrder gs))
-  -- A card somebody CHOOSES, which is a QUESTION rather than a
-  -- read -- and this function has no way to ask one. Empty here, and answered for
-  -- real by the MoveToZone arm's own gather, which runs in the Game monad and
-  -- raises Prompt.ChooseCardInGraveyard over graveyardCards below. A card that
-  -- writes the ref under any other opcode gets this empty answer, which is the
-  -- inert card-data error Pawl.Types.ObjectRef's own note describes.
+  -- A card somebody CHOOSES, which is a QUESTION rather than a read -- and this
+  -- function has no way to ask one. Empty here, and answered for real by the
+  -- MoveToZone arm's own gather, which runs in the Game monad and raises
+  -- Prompt.ChooseCardInGraveyard over the candidates graveyardCards and
+  -- graveyardCardsOf below give it. A card that writes the ref under any other
+  -- opcode gets this empty answer, which is the inert card-data error
+  -- Pawl.Types.ObjectRef's own note describes.
   ObjectRef.ChosenCardInGraveyard {} -> []
 
 -- The players a graveyard scope names, in APNAP order: the seat half of
