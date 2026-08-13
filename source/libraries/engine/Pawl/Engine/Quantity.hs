@@ -165,6 +165,11 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.Plus a b -> case (recur a, recur b) of
     (Just x, Just y) -> Just (x + y)
     _ -> Nothing
+  -- CR 107.1b: the negated value, with no floor here -- a creature's power may be
+  -- less than zero, and the readers that need a nonnegative count apply that
+  -- rule's "zero is used instead" themselves. Unanswerable stays unanswerable:
+  -- the negation of a value nothing could determine is not 0.
+  Quantity.Negate a -> fmap negate (recur a)
   -- CR 208.2a / 608.2h: delegate to the general Count fold (Pawl.Engine.Count),
   -- which reads the CR 613 projection through the injected ViewOf. The second
   -- injection is this function itself, aimed at whichever CANDIDATE the fold is
@@ -350,7 +355,9 @@ attackedOpponent pid target = case target of
 -- The recursion through Plus is what "inside a calculation" buys, and it is not
 -- the same answer as substituting at the top: Tarmogoyf's printed 1+* is 1 when
 -- its count cannot be determined, because it is the COUNT that becomes 0 and
--- not the sum. Plus is the only calculation Pawl.Types.Quantity has.
+-- not the sum. Negate is the only other calculation Pawl.Types.Quantity has, and
+-- recurses for the same reason; no printed characteristic-defining P/T contains
+-- one, so that arm is consistency rather than a card's behaviour.
 --
 -- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is: the callers
 -- are Projection.applyCharacteristicPT on the battlefield and
@@ -365,6 +372,7 @@ attackedOpponent pid target = case target of
 determine :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Quantity -> Integer
 determine viewOf context gs oid quantity = case quantity of
   Quantity.Plus a b -> determine viewOf context gs oid a + determine viewOf context gs oid b
+  Quantity.Negate a -> negate (determine viewOf context gs oid a)
   _ -> Maybe.fromMaybe 0 (evaluate viewOf context gs oid quantity)
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
@@ -373,6 +381,9 @@ substituteStar :: Quantity -> Quantity -> Quantity
 substituteStar star quantity = case quantity of
   Quantity.Star -> star
   Quantity.Plus a b -> Quantity.Plus (substituteStar star a) (substituteStar star b)
+  -- Plus's descent, for Plus's reason: a star under a minus sign is still the
+  -- star the characteristic-defining ability defines.
+  Quantity.Negate a -> Quantity.Negate (substituteStar star a)
   Quantity.Literal _ -> quantity
   Quantity.ManaValue -> quantity
   Quantity.Power -> quantity
@@ -414,6 +425,13 @@ slots quantity = case quantity of
   Quantity.InSlot slot -> Set.singleton slot
   Quantity.Star -> Set.empty
   Quantity.Plus a b -> Set.union (slots a) (slots b)
+  -- Whatever the payload reads, since a minus sign changes no slot: Toxic
+  -- Deluge's -X is a Negate over the InSlot that names X. A REGRESSION FENCE
+  -- rather than proven behaviour -- emptying this arm leaves the suite green,
+  -- because the consumer that could tell (CR 603.3b's orderInert, through
+  -- Resolve.modeSlots) is reached only by a TRIGGERED ability, and no card in
+  -- the pool negates a slot read inside one.
+  Quantity.Negate a -> slots a
   -- Terminating for the reason evaluate's Count arm is: a Greatest's payload is
   -- a strictly smaller subterm.
   Quantity.Count c -> Count.slots slots c
@@ -474,6 +492,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.InSlot _ -> True
   Quantity.Star -> True
   Quantity.Plus a b -> slotsAreExhaustive a && slotsAreExhaustive b
+  Quantity.Negate a -> slotsAreExhaustive a
   -- Both halves `slots` skips: the Scope's PlayerRef, and the per-member
   -- quantity of a Greatest, which may hide one of its own.
   Quantity.Count c ->
@@ -538,6 +557,7 @@ bakeBound players quantity = case quantity of
     let baked = Count.mapQuantity (bakeBound players) c
      in Quantity.Count baked {Count.Type.scope = bakeScope players (Count.Type.scope c)}
   Quantity.Plus a b -> Quantity.Plus (bakeBound players a) (bakeBound players b)
+  Quantity.Negate a -> Quantity.Negate (bakeBound players a)
   Quantity.AgainstSlot slot inner -> Quantity.AgainstSlot slot (bakeBound players inner)
   -- Every arm below holds no PlayerRef and no Quantity. InSlot names an AMOUNT
   -- slot rather than a player one, so nothing here substitutes it -- an amount an
@@ -599,6 +619,10 @@ readsX quantity = case quantity of
   -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
   -- Plus X (Literal 3), which reads X without being equal to it.
   Quantity.Plus a b -> readsX a || readsX b
+  -- Toxic Deluge's "-X" is Negate X, which reads X the same way. Without this
+  -- arm the CR 107.3 lint would call the card an unannounced-X reader on one
+  -- side and an unread announcement on the other.
+  Quantity.Negate a -> readsX a
   -- Terminating for the reason slots' Count arm is: a Greatest's payload is a
   -- strictly smaller subterm.
   Quantity.Count c -> Count.anyQuantity readsX c

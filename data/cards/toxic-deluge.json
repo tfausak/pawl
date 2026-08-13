@@ -1,0 +1,82 @@
+{
+  "faces": [
+    {
+      "additionalCosts": [
+        {
+          "type": "PayLifeX"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Toxic Deluge",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Negate",
+                            "value": {
+                              "type": "InSlot",
+                              "value": "X"
+                            }
+                          },
+                          {
+                            "type": "Negate",
+                            "value": {
+                              "type": "InSlot",
+                              "value": "X"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "type": "EachMatching",
+                        "value": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

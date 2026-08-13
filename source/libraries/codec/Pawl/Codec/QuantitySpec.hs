@@ -77,6 +77,22 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Plus (Quantity.Literal 1) Quantity.Star)
       """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"Star"}]} """
+  -- Toxic Deluge's -X on the wire: one whole Quantity under the tag, not a pair.
+  -- The second case nests a NEGATIVE Literal under it -- the other way this type
+  -- says a negative number -- so a decoder that folded the two into one could not
+  -- round-trip it.
+  Spec.it s "Negate, over a slot read and over a literal" $ do
+    let slot = SlotName.MkSlotName (Text.pack "X")
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.Negate (Quantity.InSlot slot))
+      """ {"type":"Negate","value":{"type":"InSlot","value":"X"}} """
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.Negate (Quantity.Literal (-2)))
+      """ {"type":"Negate","value":{"type":"Literal","value":-2}} """
   -- Quantity.Count's arm is tagged here and nowhere else: Pawl.Codec.Count
   -- writes a bare object, so a Count payload can never be double-tagged.
   Spec.it s "Count is tagged by Quantity, and the payload is Count's bare object" $

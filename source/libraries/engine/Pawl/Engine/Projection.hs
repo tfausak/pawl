@@ -1884,6 +1884,9 @@ rewriteQuantity pairs quantity = case quantity of
           Count.Type.aggregation = rewriteAggregation pairs (Count.Type.aggregation c)
         }
   Quantity.Type.Plus x y -> Quantity.Type.Plus (rewriteQuantity pairs x) (rewriteQuantity pairs y)
+  -- Plus's descent through one child rather than two: a minus sign hides no
+  -- subtype word of its own, but its payload may.
+  Quantity.Type.Negate x -> Quantity.Type.Negate (rewriteQuantity pairs x)
   Quantity.Type.Literal _ -> quantity
   Quantity.Type.ManaValue -> quantity
   Quantity.Type.Power -> quantity
@@ -2823,7 +2826,8 @@ modificationReads m = case m of
 -- Three ways to read one. A Count folds a population its Filter keeps, so it
 -- reads whatever that filter reads (plus whatever its aggregation reads); Power
 -- and Toughness read CR 613.4's own layer off the object the evaluation is aimed
--- at; and Plus and AgainstSlot are composition, reading what they contain.
+-- at; and Plus, Negate and AgainstSlot are composition, reading what they
+-- contain.
 --
 -- Everything else reads nothing a Modification writes, each for the reason its
 -- sibling filter atom gives: ManaValue is computed from the printed mana cost
@@ -2841,6 +2845,7 @@ quantityReads q = case q of
   Quantity.Type.Power -> Set.singleton PowerA
   Quantity.Type.Toughness -> Set.singleton PowerA
   Quantity.Type.Plus a b -> quantityReads a <> quantityReads b
+  Quantity.Type.Negate a -> quantityReads a
   Quantity.Type.AgainstSlot _ a -> quantityReads a
   Quantity.Type.Literal _ -> Set.empty
   Quantity.Type.ManaValue -> Set.empty

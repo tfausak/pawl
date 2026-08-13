@@ -18,9 +18,9 @@ import qualified Pawl.Types.Quantity as Quantity
 -- writes a bare object, so the tag that picks this arm has to come from the
 -- dispatching type, which is this one.
 --
--- RECURSIVE, and directly so: @Plus@, @AgainstSlot@ and the @Count@ arm all name
--- 'codec' itself, where the loose pair named its own 'toJson'. That ties the same
--- knot Pawl.Codec.Filter already ties at the value level, and
+-- RECURSIVE, and directly so: @Plus@, @Negate@, @AgainstSlot@ and the @Count@
+-- arm all name 'codec' itself, where the loose pair named its own 'toJson'. That
+-- ties the same knot Pawl.Codec.Filter already ties at the value level, and
 -- Pawl.JsonSchema.Define.define breaks it at the schema level by registering the
 -- name before running the body -- so the schema emits a @$ref@ on re-entry rather
 -- than diverging.
@@ -39,6 +39,9 @@ codec =
       Arm.payload "InSlot" SlotName.codec Quantity.InSlot,
       Arm.nullary "Star" Quantity.Star,
       Arm.payload "Plus" pairCodec (uncurry Quantity.Plus),
+      -- CR 107.1b's negative game value: one whole Quantity on the wire, since a
+      -- minus sign carries nothing of its own.
+      Arm.payload "Negate" codec Quantity.Negate,
       Arm.payload "Count" (Count.codec codec) Quantity.Count,
       Arm.payload "ManaCount" ManaCount.codec Quantity.ManaCount,
       Arm.payload "LifeTotal" PlayerRef.codec Quantity.LifeTotal,
@@ -80,6 +83,7 @@ codec =
       Quantity.InSlot s -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec s
       Quantity.Star -> Common.nullary "Star"
       Quantity.Plus a b -> Common.tagged "Plus" . Just . Value.array $ [encode a, encode b]
+      Quantity.Negate a -> Common.tagged "Negate" . Just $ encode a
       Quantity.Count c -> Common.tagged "Count" . Just $ Codec.encode (Count.codec codec) c
       Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ Codec.encode ManaCount.codec c
       Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ Codec.encode PlayerRef.codec p
