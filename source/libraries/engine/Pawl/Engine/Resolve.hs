@@ -1772,7 +1772,9 @@ slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bin
 -- binding exists at all.
 --
 -- Nothing when the slot is unbound, holds a group, names several targets, or
--- names a player: a cast offer and a zone move both want one object or none.
+-- names a player: both callers want one object or none. A cast offer (CR 608.2g)
+-- has nothing else to be; a zone move asks slotGroup FIRST and reaches here only
+-- once the slot is known not to hold a group.
 slotOne :: SlotName -> ObjectId -> GameState -> Maybe ObjectId
 slotOne slot resolving gs = do
   obj <- Game.lookupObject resolving gs
@@ -2552,8 +2554,10 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- the first minted. Sending InSlot through the shared sweep would find
             -- nothing for it.
             --
-            -- The slot therefore names EITHER a target this ability declared or an
-            -- incarnation such an earlier effect bound (the mSlot above, CR 400.7).
+            -- The slot therefore names a target this ability declared, an
+            -- incarnation such an earlier effect bound (the mSlot above, CR 400.7),
+            -- or a whole GROUP one bound (a Create's tokens, an earlier move's
+            -- arrivals).
             -- A declared target is read out of `chosen` behind CR 608.2b's
             -- re-validation, which is what a target is owed; a slot `chosen` does
             -- not mention was never targeted and owes it nothing, so it is read LIVE
@@ -2566,14 +2570,28 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- defines" is what rules the collision out -- so the membership test
             -- buys the ordering rather than a passing test.
             ObjectRef.InSlot slot -> do
-              bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
-              pure $ case bound of
-                Just oid -> [oid]
-                Nothing -> case legalOne slot legal of
-                  Just recipient -> Maybe.maybeToList (Recipient.objectOf recipient)
-                  -- Illegal slot (CR 608.2b), a non-object recipient, or a slot
-                  -- nothing ever bound.
-                  _ -> []
+              -- A slot bound to a GROUP names every member, which is Feral
+              -- Lightning's "exile them" over the three tokens the sentence
+              -- before it made. Read FIRST and not subject to `legal`, the
+              -- ordering objectRefObjects takes for its own InSlot arm and for
+              -- the same reason: a group binding is a definition, never a target
+              -- (CR 115.10a), so CR 608.2b has nothing to re-validate. The batch
+              -- is in mint order: CR 608.2f's APNAP primary key has nothing to
+              -- separate, since one Create's tokens all enter under one player,
+              -- and its secondary sentence would have that player order them
+              -- (#379) where this takes the order they were made in.
+              group <- State.gets (slotGroup slot resolving)
+              case group of
+                Just objects -> pure (Foldable.toList objects)
+                Nothing -> do
+                  bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
+                  pure $ case bound of
+                    Just oid -> [oid]
+                    Nothing -> case legalOne slot legal of
+                      Just recipient -> Maybe.maybeToList (Recipient.objectOf recipient)
+                      -- Illegal slot (CR 608.2b), a non-object recipient, or a slot
+                      -- nothing ever bound.
+                      _ -> []
             -- Evacuation's "return all creatures to their owners' hands". Swept
             -- ONCE from the PRE-MOVE state, which is CR 608.2c's "in the order
             -- written" read together with CR 608.2f's "each such action is
