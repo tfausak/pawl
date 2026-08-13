@@ -17,6 +17,7 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
@@ -253,6 +254,20 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.Plus (Quantity.Literal 1) (Quantity.AgainstSlot slot (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)))
       """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"AgainstSlot","value":["creature",{"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}}]}]} """
+  -- CR 107.1a's direction and the value it applies to, in that order. Nested
+  -- once for AgainstSlot's reason -- a recursive decoder is where a payload gets
+  -- lost -- and over a Count, which is the shape both producers print.
+  Spec.it s "Halved, both directions" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.Halved Rounding.Down (Quantity.Literal 5))
+      """ {"type":"Halved","value":[{"type":"Down"},{"type":"Literal","value":5}]} """
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.Halved Rounding.Up (Quantity.LifeTotal PlayerRef.Candidate))
+      """ {"type":"Halved","value":[{"type":"Up"},{"type":"LifeTotal","value":{"type":"Candidate"}}]} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s

@@ -164,9 +164,9 @@ insertOne slot = joinTwo (oneSlot slot)
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
 
--- The slots a PlayerRef reads. Only InSlot names one; the other three are
--- answered from the evaluation context alone. Factored out of slotsOf below
--- so the recursion into PlayerRef is stated once.
+-- The slots a PlayerRef reads. Only InSlot names one; the others are answered
+-- from the evaluation context alone. Factored out of slotsOf below so the
+-- recursion into PlayerRef is stated once.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
@@ -175,6 +175,9 @@ playerRefSlots ref = case ref of
   -- InSlot's baked half names a seat, not a slot. Unreachable from card data,
   -- which this lint's whole input is (Pawl.CardSpec sweeps the pool for one).
   PlayerRef.Specific _ -> Map.empty
+  -- A fold's candidate is not a slot either: it comes from the member being
+  -- read, and a card writes it (Malignus), so this arm is reachable and empty.
+  PlayerRef.Candidate -> Map.empty
 
 -- The slots an AffectedPlayers reads. Only the Named arm does, and only ever one
 -- player: a card writes AffectedPlayers SlotName, whose Named payload is a slot
@@ -1518,6 +1521,11 @@ playerRefPlayers legal controller gs ref = case ref of
   -- reason InSlot is not: it names one specific player who arrived from
   -- elsewhere.
   PlayerRef.Specific pid -> [pid]
+  -- NOBODY, and not a hole: an effect names the players it acts on, and there is
+  -- no fold running over a resolution's opcodes for a candidate to come from.
+  -- The reference is only ever answerable inside a Count (Pawl.Engine.Quantity's
+  -- playersOf), so here it names an empty set and the opcode is a no-op.
+  PlayerRef.Candidate -> []
   where
     everyone = Game.stillPlaying gs
 

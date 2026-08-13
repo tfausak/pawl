@@ -39,6 +39,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
       PlayerRef.codec
       (PlayerRef.Specific (PlayerId.MkPlayerId 1))
       """ {"type":"Specific","value":1} """
+  Spec.it s "Candidate" $
+    Common.assertCodec
+      s
+      PlayerRef.codec
+      PlayerRef.Candidate
+      """ {"type":"Candidate"} """
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool
       s

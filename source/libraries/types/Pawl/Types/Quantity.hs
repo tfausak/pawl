@@ -7,6 +7,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | A number that may not be a literal number.
@@ -15,7 +16,8 @@ import qualified Pawl.Types.SlotName as SlotName
 -- object's whole characteristic set (name, mana cost, color, type line, rules
 -- text, abilities, power, toughness, loyalty, defense, …). This is just a value.
 --
--- Grows further: Half (Little Girl), Infinite (Mox Lotus). Plus is binary and
+-- Grows further: OneHalf (Little Girl's printed ½ power, which is a fractional
+-- LITERAL and not the Halved arm below), Infinite (Mox Lotus). Plus is binary and
 -- recursive so composition covers the awkward printed values without new cases:
 -- 1+* is Plus (Literal 1) Star.
 --
@@ -95,6 +97,24 @@ data Quantity
     Star
   | -- | CR 208.2: composition, so a printed 1+* needs no constructor of its own.
     Plus Quantity Quantity
+  | -- | CR 107.1a: half the inner quantity, rounded the way the card prints --
+    -- Malignus' "half the highest life total among your opponents, rounded up",
+    -- Aspect of Wolf's "half the number of Forests you control, rounded down".
+    --
+    -- The DIVISOR is in the constructor and the DIRECTION is a payload, which is
+    -- what the printed text distinguishes: every card that halves says which way
+    -- it rounds, and Aspect of Wolf says both ways in one sentence, so no engine
+    -- rule could pick. See Pawl.Types.Rounding.
+    --
+    -- Two rather than a general divisor, for BlockersBeyondFirst's reason: only
+    -- "half" is printed on a card that computes a value this way. "Divided
+    -- evenly" (Fireball) is a division among TARGETS rather than of a value, and
+    -- would be an announcement (CR 601.2d) rather than a quantity.
+    --
+    -- Not a leaf: the payload is a whole Quantity, so composition reaches
+    -- everything the type can read -- half a count, half a life total, half a
+    -- slot's amount.
+    Halved Rounding.Rounding Quantity
   | -- | A quantity that counts game state (CR 208.2a, CR 608.2h). See
     -- Pawl.Types.Count for why the payload is its own type.
     --

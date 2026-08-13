@@ -84,9 +84,13 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   -- injected ViewOf, which answers about OBJECTS (CR 109.1) and has no id to
   -- be asked with here. So the members are objectless, as InHistory's are, and
   -- an Aggregation.Greatest over this scope folds a per-OBJECT quantity against
-  -- a player, which CR 208.1 and CR 202.3 give no answer to. Not implemented:
-  -- a maximum over a per-PLAYER quantity, which is what such a card would mean
-  -- (#1315).
+  -- a player, which CR 208.1 and CR 202.3 give no answer to.
+  --
+  -- A per-PLAYER quantity DOES answer, and reaches the candidate through that
+  -- same view: Filter.playerView records the player's identity, and
+  -- Pawl.Types.PlayerRef.Candidate is what a card writes to read it -- Malignus'
+  -- "the highest life total among your opponents". Nothing here has to carry the
+  -- candidate separately, which is what #1315 proposed and the view already did.
   Scope.OverPlayers ref -> do
     pids <- playersFor context gs ref
     -- The predicate is baked PER CANDIDATE (see bakePerspective): CR 110.2's
@@ -300,6 +304,13 @@ playersFor context gs ref =
         -- off a player as they leave, so Quantity.IsMonarch reads 0 for one and
         -- Garland's duration ends.
         PlayerRef.Specific pid -> Just [pid]
+        -- The fold's own candidate, which this function cannot answer: it holds
+        -- no view, and the candidate is a fact about the member being read
+        -- rather than about the board. Pawl.Engine.Quantity answers it where the
+        -- view is, so what reaches here is a reference in a position that has no
+        -- candidate at all -- a Scope naming it, or a ManaCount -- and Nothing is
+        -- the honest answer for those.
+        PlayerRef.Candidate -> Nothing
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event
 -- recorded rather than from any object that may no longer exist.
