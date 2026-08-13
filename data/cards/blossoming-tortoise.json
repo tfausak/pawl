@@ -140,6 +140,33 @@
                             "value": 3
                           }
                         }
+                      },
+                      {
+                        "type": "MoveToZone",
+                        "value": {
+                          "ref": {
+                            "type": "ChosenCardInGraveyard",
+                            "value": [
+                              {
+                                "type": "You"
+                              },
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Land"
+                                }
+                              }
+                            ]
+                          },
+                          "riders": {
+                            "tapped": {
+                              "type": "Tapped"
+                            }
+                          },
+                          "zone": {
+                            "type": "Battlefield"
+                          }
+                        }
                       }
                     ]
                   }

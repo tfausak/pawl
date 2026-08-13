@@ -60,6 +60,7 @@ encode p answer = case p of
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
   Prompt.ChooseRedistribution {} -> Response.ChoseRedistribution answer
   Prompt.ChooseRingBearer {} -> Response.ChoseRingBearer answer
+  Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseRoom {} -> Response.ChoseRoom answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
@@ -171,6 +172,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseRingBearer {} -> case response of
     Response.ChoseRingBearer oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseCardInGraveyard {} -> case response of
+    Response.ChoseCardInGraveyard oid -> Just oid
     _ -> Nothing
   Prompt.ChooseRoom {} -> case response of
     Response.ChoseRoom room -> Just room
@@ -392,6 +396,9 @@ defaultAnswer p = case p of
   -- CR 701.54a: the prompt is only raised with two or more creatures the player
   -- controls, and every one of them is a legal Ring-bearer.
   Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
+  -- CR 608.2d: the prompt is only raised with two or more matching cards in the
+  -- named graveyards, and every one of them is a legal choice.
+  Prompt.ChooseCardInGraveyard _ _ _ candidates -> NonEmpty.head candidates
   -- CR 309.5a: the prompt is only raised where two or more arrows leave the
   -- room, and every one of them is a room the marker may move into.
   Prompt.ChooseRoom _ _ _ candidates -> NonEmpty.head candidates

@@ -265,6 +265,24 @@ data Prompt r where
   -- omission: the player is tempted anyway, so Pawl.Engine.Ring.tempt still counts
   -- the temptation and still gives them the emblem.
   ChooseRingBearer :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 608.2d: which card in a graveyard the resolving controller chooses for an
+  -- Pawl.Types.ObjectRef.ChosenCardInGraveyard -- Port of Karfell's "return a
+  -- creature card from your graveyard to the battlefield tapped". The PlayerId is
+  -- the CHOOSER (CR 608.2c's controller of the spell or ability, who need not own
+  -- the graveyard); the ObjectId is the spell or ability being resolved; the
+  -- NonEmpty is the matching cards, engine-pre-filtered in the sweep's own order.
+  --
+  -- CHOOSE, not target, ChooseRingBearer's posture and for CR 115.1's reason: the
+  -- card does not say "target", so nothing is declared on the stack (CR 601.2c) and
+  -- nothing is re-checked at resolution (CR 608.2b). A graveyard being a public
+  -- zone (CR 400.2) is what would ALLOW such a card to target; it does not make
+  -- this one do so.
+  --
+  -- Raised only for TWO OR MORE candidates, ChooseRingBearer's shape and reason:
+  -- one matching card is the whole of "a creature card in your graveyard", so the
+  -- instruction has exactly one legal answer and performing it decides nothing.
+  -- Not raised at all for zero, where CR 101.3 ignores the instruction.
+  ChooseCardInGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 309.5a \/ 701.49b: which arrow a venturing player follows. The ObjectId is
   -- the dungeon card their marker is on; the NonEmpty is the rooms the arrows out
   -- of their current room lead to, and the answer is the ONE they move into.

@@ -80,24 +80,42 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       s
       (Either.isLeft (Common.parse (Text.pack """ {"type":"TopOfLibrary","value":[{"type":"Relative","value":{"type":"You"}},-1]} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
+  -- The graveyard's OTHER arm: one card the resolving controller chooses rather
+  -- than the whole matching set. Its payload is EachCardInGraveyard's exactly,
+  -- so only the tag tells them apart -- which is what the distinctness case
+  -- below is for.
+  Spec.it s "ChosenCardInGraveyard" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.ChosenCardInGraveyard PlayerScope.You (Filter.HasCardType CardType.Creature))
+      """ {"type":"ChosenCardInGraveyard","value":[{"type":"You"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
+  Spec.it s "ChosenCardInGraveyard rejects a bare filter with no scope" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"ChosenCardInGraveyard","value":{"type":"HasCardType","value":{"type":"Creature"}}} """) >>= Codec.decode ObjectRef.codec))
+      "expected a decode failure"
   -- Guards against a decoder that read every payload as one arm. The arms are
   -- all objects, so only the tag separates them, and a duplicated tag would
-  -- collapse two of these.
-  Spec.it s "the five arms carry five distinct tags" $
+  -- collapse two of these. The two graveyard arms are the pair it really
+  -- guards: they carry the SAME payload, so a copied tag would quietly turn one
+  -- card's chosen return into a mass one.
+  Spec.it s "the six arms carry six distinct tags" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, the player sweep and a library's top card all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, the player sweep, a library's top card and a chosen graveyard card all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
-                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)
+                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3),
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
               ]
           )
       )
-      5
+      6
   -- A tag the decoder does not know is an error rather than a silent slot.
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool

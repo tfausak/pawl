@@ -6867,6 +6867,271 @@ riseOfTheDarkRealmsSpec s registry = Spec.describe s "RiseOfTheDarkRealms" $ do
       )
     Spec.assertBool s (S.onBattlefield heroId after) "bob's creature was never moved, so nothing swept the battlefield"
 
+-- CR 608.2d's choice made WHILE APPLYING an effect, over a graveyard:
+-- ObjectRef.ChosenCardInGraveyard, where riseOfTheDarkRealmsSpec above is the
+-- same zone swept as a set.
+--
+-- Port of Karfell -- Land, "This land enters tapped. {T}: Add {U}. {3}{U}{B}{B},
+-- {T}, Sacrifice this land: Mill four cards, then return a creature card from
+-- your graveyard to the battlefield tapped." (name, type line and Oracle text
+-- checked against api.scryfall.com). The whole card is transcribed.
+--
+-- NOT A TARGET, which is the distinction the arm exists for: the card never says
+-- the word, so CR 115.1c leaves the ability untargeted, nothing is announced as
+-- it goes on the stack (CR 601.2c) and nothing is re-checked at resolution (CR
+-- 608.2b). A graveyard being a public zone (CR 400.2) is what would ALLOW such a
+-- card to target -- it is not what makes this one choose.
+--
+-- THREE SEATS, and a board built so that five readings of "a creature card from
+-- your graveyard" are told apart:
+--
+--   * THE CHOSEN card versus the FIRST matching one. alice buries two creature
+--     cards; the answer is pinned to the second, and Replay.defaultAnswer -- what
+--     S.identityAnswer falls through to -- picks the first. The two legs below
+--     differ in the answerer and in nothing else, so an engine that picked for
+--     the player would give the same card twice.
+--   * A CREATURE CARD versus the whole zone. alice buries a Murder as well, and
+--     the four Swamps her own mill puts there are candidates for no reading.
+--   * YOUR graveyard versus each player's, and versus an opponent's. bob and
+--     carol each bury a creature card of a printing alice does not have, and
+--     both must stay buried.
+--   * A GRAVEYARD versus the battlefield. carol controls a Benalish Hero, which
+--     a battlefield reading of the same sentence could hand to alice.
+--   * A CHOICE versus a sweep. Exactly one card comes back, though two match.
+--
+-- Ten lands rather than the six the ability costs: the payment taps sources one
+-- prompt at a time, and a board with no slack could fail to cover {U}{B}{B} for
+-- reasons that have nothing to do with what is under test.
+portOfKarfellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+portOfKarfellSpec s registry =
+  let -- alice controls five Swamps, five Islands and one untapped Port of
+      -- Karfell; `buried` goes into the named graveyards in the order given, and
+      -- `stock` into alice's library. Returns the Port's id.
+      board port swamp island hero buried stock =
+        let mana = S.landsFor island S.alice 5 (S.landsFor swamp S.alice 5 S.threePlayerGame)
+            (_, withHero) = S.addCreature hero S.carol mana
+            (portId, withPort) = S.addCreature port S.alice withHero
+            withGraves = List.foldl' (\g (printing, pid) -> snd (S.addGraveyardCard printing pid g)) withPort buried
+            withStock = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) withGraves stock
+         in (portId, withStock {GameState.priority = Just S.alice})
+      -- The ability that mills and returns, told from the mana ability by the
+      -- sacrifice its cost carries -- never by position in the list, which no
+      -- rule fixes.
+      returnAbility portId gs =
+        filter
+          (elem CostComponent.SacrificeThis . Cost.Type.components . ActivatedAbility.cost)
+          (Activate.abilitiesFor portId gs)
+      -- Activate the ability and resolve it, keeping the RESPONSES beside the
+      -- board so the same call answers both "what happened" and "who was asked".
+      run :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Maybe (GameState.GameState, [Response.Response])
+      run answer portId gs = case returnAbility portId gs of
+        [ability] ->
+          let ((_, after), responses) = Replay.record answer gs (Activate.activateAbility S.alice portId ability >> Stack.resolveTop)
+           in Just (after, responses)
+        _ -> Nothing
+      named = Just . CardName.MkCardName . Text.pack
+      -- The WHOLE battlefield minus the basic lands: after the ability resolves
+      -- that is carol's Benalish Hero, which nothing may move, and whatever came
+      -- back -- the Port sacrificed itself to pay for the ability. By NAME, TAP
+      -- STATE and CONTROLLER, because CR 400.7 mints a fresh id at the
+      -- destination and CR 110.2a is what decides whose the arrival is.
+      arrivals gs =
+        List.sort
+          [ (fmap S.nameOf (Game.cardOf oid gs), fmap Object.tapped (Game.lookupObject oid gs), Projection.controllerOf oid gs)
+          | oid <- Set.toList (GameState.battlefield gs),
+            notElem (fmap S.nameOf (Game.cardOf oid gs)) [named "Swamp", named "Island"]
+          ]
+      -- The board with nothing returned: carol's creature and nothing else.
+      untouched = [(named "Benalish Hero", Just TapState.Untapped, Just S.carol)]
+      wasAsked responses =
+        let isChoice r = case r of
+              Response.ChoseCardInGraveyard _ -> True
+              _ -> False
+         in any isChoice responses
+   in Spec.describe s "PortOfKarfell" $ do
+        -- The headline: the SECOND buried creature card comes back, tapped, and
+        -- everything else stays where it was.
+        Spec.it s "CR 608.2d the creature card the controller chose returns tapped" $ do
+          port <- S.printingOf s registry "Port of Karfell"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          murder <- S.printingOf s registry "Murder"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          cavalry <- S.printingOf s registry "Benalish Cavalry"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(piker, S.alice), (murder, S.alice), (maiden, S.alice), (sentry, S.bob), (cavalry, S.carol)]
+              (portId, gs) = board port swamp island hero buried (replicate 4 swamp)
+              -- The Bird Maiden's id, which is the SECOND of alice's two
+              -- creature cards in ascending order -- graveyardCards' own order,
+              -- and the order the prompt offers.
+              maidenId = case Game.zoneMembers Zone.Graveyard S.alice gs of
+                [_, _, third] -> Just third
+                _ -> Nothing
+              choosing wanted p = case p of
+                Prompt.ChooseCardInGraveyard {} -> wanted
+                _ -> S.identityAnswer p
+          case (maidenId, maidenId >>= \wanted -> run (choosing wanted) portId gs) of
+            (Just _, Just (after, responses)) -> do
+              Spec.assertBool s (wasAsked responses) "the controller was asked which card to return"
+              Spec.assertEqWith
+                s
+                "the Bird Maiden is on alice's battlefield, tapped, and nothing else arrived"
+                (arrivals after)
+                (List.sort ((named "Bird Maiden", Just TapState.Tapped, Just S.alice) : untouched))
+              Spec.assertEqWith
+                s
+                "the unchosen creature card, the noncreature card, the four milled Swamps and the spent land stay in alice's graveyard"
+                (List.sort (namesIn Zone.Graveyard S.alice after))
+                (List.sort ([named "Goblin Piker", named "Murder", named "Port of Karfell"] <> replicate 4 (named "Swamp")))
+              Spec.assertEqWith
+                s
+                "and neither opponent's graveyard was touched"
+                (namesIn Zone.Graveyard S.bob after, namesIn Zone.Graveyard S.carol after)
+                ([named "Ogre Sentry"], [named "Benalish Cavalry"])
+            _ -> Spec.assertBool s False "expected exactly one returning ability and three cards in alice's graveyard"
+        -- The paired control, and the whole reason the board buries TWO creature
+        -- cards: the same activation on the same board with the DEFAULT answerer
+        -- brings back the other one. If the engine were picking, both legs would
+        -- name the same card.
+        Spec.it s "CR 608.2d the engine does not pick: another answer returns the other card" $ do
+          port <- S.printingOf s registry "Port of Karfell"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          piker <- S.printingOf s registry "Goblin Piker"
+          maiden <- S.printingOf s registry "Bird Maiden"
+          murder <- S.printingOf s registry "Murder"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(piker, S.alice), (murder, S.alice), (maiden, S.alice)]
+              (portId, gs) = board port swamp island hero buried (replicate 4 swamp)
+          case run S.identityAnswer portId gs of
+            Just (after, _) ->
+              Spec.assertEqWith
+                s
+                "the first candidate comes back instead"
+                (arrivals after)
+                (List.sort ((named "Goblin Piker", Just TapState.Tapped, Just S.alice) : untouched))
+            Nothing -> Spec.assertBool s False "expected exactly one returning ability"
+        -- Where the rules leave nothing to ask, don't prompt: one matching card
+        -- is the whole of "a creature card in your graveyard". The board differs
+        -- from the leg above in the Bird Maiden and nothing else.
+        Spec.it s "one candidate elides the prompt and still returns the card" $ do
+          port <- S.printingOf s registry "Port of Karfell"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          piker <- S.printingOf s registry "Goblin Piker"
+          murder <- S.printingOf s registry "Murder"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(piker, S.alice), (murder, S.alice)]
+              (portId, gs) = board port swamp island hero buried (replicate 4 swamp)
+          case run S.identityAnswer portId gs of
+            Just (after, responses) -> do
+              Spec.assertBool s (not (wasAsked responses)) "no choice was put to the player"
+              Spec.assertEqWith
+                s
+                "the lone candidate came back anyway"
+                (arrivals after)
+                (List.sort ((named "Goblin Piker", Just TapState.Tapped, Just S.alice) : untouched))
+            Nothing -> Spec.assertBool s False "expected exactly one returning ability"
+        -- CR 101.3 and CR 609.3: a graveyard with nothing matching makes the
+        -- instruction impossible, so it is ignored -- and nobody is asked. The
+        -- mill still happens, which is what keeps this from passing because the
+        -- ability never resolved at all.
+        Spec.it s "CR 101.3 no matching card returns nothing and asks nothing" $ do
+          port <- S.printingOf s registry "Port of Karfell"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          murder <- S.printingOf s registry "Murder"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let buried = [(murder, S.alice), (sentry, S.bob)]
+              (portId, gs) = board port swamp island hero buried (replicate 4 swamp)
+          case run S.identityAnswer portId gs of
+            Just (after, responses) -> do
+              Spec.assertBool s (not (wasAsked responses)) "no choice was put to the player"
+              Spec.assertEqWith s "nothing arrived, and carol keeps the creature she controls" (arrivals after) untouched
+              Spec.assertEqWith
+                s
+                "the mill still ran, so the ability really did resolve"
+                (List.sort (namesIn Zone.Graveyard S.alice after))
+                (List.sort ([named "Murder", named "Port of Karfell"] <> replicate 4 (named "Swamp")))
+              Spec.assertEqWith s "and the opponent's creature card is not a candidate" (namesIn Zone.Graveyard S.bob after) [named "Ogre Sentry"]
+            Nothing -> Spec.assertBool s False "expected exactly one returning ability"
+        -- An EMPTY graveyard and an empty library: the ability resolves, mills
+        -- nothing (CR 701.17b), and returns nothing.
+        Spec.it s "CR 609.3 an empty graveyard is a no-op rather than a failure" $ do
+          port <- S.printingOf s registry "Port of Karfell"
+          swamp <- S.printingOf s registry "Swamp"
+          island <- S.printingOf s registry "Island"
+          hero <- S.printingOf s registry "Benalish Hero"
+          let (portId, gs) = board port swamp island hero [] []
+          case run S.identityAnswer portId gs of
+            Just (after, responses) -> do
+              Spec.assertBool s (not (wasAsked responses)) "no choice was put to the player"
+              Spec.assertEqWith s "nothing arrived, and carol keeps the creature she controls" (arrivals after) untouched
+              Spec.assertEqWith s "only the land that paid for the ability is in the graveyard" (namesIn Zone.Graveyard S.alice after) [named "Port of Karfell"]
+            Nothing -> Spec.assertBool s False "expected exactly one returning ability"
+
+-- The same arm reached from a TRIGGER rather than an activated ability, and over
+-- LAND cards rather than creature cards -- the two axes portOfKarfellSpec above
+-- holds fixed.
+--
+-- Blossoming Tortoise {2}{G}{G} Creature -- Turtle 3/3, "Whenever this creature
+-- enters or attacks, mill three cards, then return a land card from your
+-- graveyard to the battlefield tapped. Activated abilities of lands you control
+-- cost {1} less to activate. Land creatures you control get +1/+1." (name, cost,
+-- type line and Oracle text checked against api.scryfall.com). Only the trigger
+-- is read here; the two static abilities are Pawl.ActivateSpec's.
+--
+-- Two land cards are buried and the answer is pinned to the SECOND, so the
+-- assertion cannot be met by taking the first; a creature card is buried beside
+-- them and the three cards the trigger's own mill adds are creature cards too, so
+-- an arm that ignored the Filter would have five candidates rather than two.
+blossomingTortoiseSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+blossomingTortoiseSpec s registry = Spec.describe s "BlossomingTortoise" $ do
+  Spec.it s "CR 608.2d the enters trigger returns the land card its controller chose, tapped" $ do
+    tortoise <- S.printingOf s registry "Blossoming Tortoise"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (tortoiseId, entered) = S.entersWithTrigger tortoise S.alice (Setup.emptyGame S.bothPlayers)
+        buried = List.foldl' (\g printing -> snd (S.addGraveyardCard printing S.alice g)) entered [forest, piker, island]
+        gs = List.foldl' (\g printing -> snd (S.addLibraryCard printing S.alice g)) buried [piker, piker, piker]
+        named = Just . CardName.MkCardName . Text.pack
+        -- The Island, buried last and so the SECOND of the two land cards in the
+        -- ascending order the prompt offers.
+        wanted = case Game.zoneMembers Zone.Graveyard S.alice gs of
+          [_, _, third] -> Just third
+          _ -> Nothing
+        choosing chosen p = case p of
+          Prompt.ChooseCardInGraveyard {} -> chosen
+          _ -> S.identityAnswer p
+        onBattlefield gs1 =
+          List.sort
+            [ (fmap S.nameOf (Game.cardOf oid gs1), fmap Object.tapped (Game.lookupObject oid gs1))
+            | oid <- Set.toList (GameState.battlefield gs1)
+            ]
+    case wanted of
+      Nothing -> Spec.assertBool s False "expected three cards in alice's graveyard"
+      Just chosen ->
+        let answer :: Prompt.Prompt r -> r
+            answer = choosing chosen
+            placed = S.runPure answer gs Engine.placePendingTriggers
+            resolved = S.runPure answer placed Stack.resolveTop
+         in do
+              Spec.assertEqWith
+                s
+                "the Island is on the battlefield tapped, beside the untapped Tortoise"
+                (onBattlefield resolved)
+                (List.sort [(named "Blossoming Tortoise", Just TapState.Untapped), (named "Island", Just TapState.Tapped)])
+              Spec.assertEqWith
+                s
+                "the unchosen Forest, the buried creature card and the three milled ones stay put"
+                (List.sort (namesIn Zone.Graveyard S.alice resolved))
+                (List.sort (named "Forest" : replicate 4 (named "Goblin Piker")))
+              Spec.assertBool s (S.onBattlefield tortoiseId resolved) "and the Tortoise itself never moved"
+
 -- CR 401.2's ordered pile named by POSITION rather than by characteristics:
 -- ObjectRef.TopOfLibrary, the arm no Filter could stand in for.
 --
@@ -8012,6 +8277,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   destroyAllSpec s registry
   returnAllSpec s registry
   riseOfTheDarkRealmsSpec s registry
+  portOfKarfellSpec s registry
+  blossomingTortoiseSpec s registry
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry
