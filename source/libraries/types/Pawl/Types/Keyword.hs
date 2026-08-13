@@ -406,6 +406,19 @@ data Keyword
     -- reader takes the per-keyword COUNT rather than membership -- Forked-Branch
     -- Garami prints "soulshift 4, soulshift 4" and returns two cards.
     Soulshift Natural.Natural
+  | -- | 702.55a: haunt, a TRIGGERED ability. On a permanent it means "When this
+    -- permanent is put into a graveyard from the battlefield, exile it haunting
+    -- target creature" -- soulshift's CR 700.4 dies event again, so the condition
+    -- is TriggerCondition.SelfDies and the mint is Pawl.Engine.Keyword.haunt.
+    --
+    -- Rule 702.55a's OTHER sentence, haunt on an instant or sorcery, is not minted
+    -- (#1404): the mint is handed a keyword and a count, never a card type, so the
+    -- two sentences cannot be told apart there.
+    --
+    -- No payload, so no KeywordFamily constructor: rule 702.55a states one
+    -- ability, and CR 702.55b's haunted object is board state
+    -- (GameState.haunting), not a characteristic of the keyword.
+    Haunt
   | -- | 702.61a: split second. "As long as this spell is on the stack, players
     -- can't cast spells or activate abilities that aren't mana abilities."
     --

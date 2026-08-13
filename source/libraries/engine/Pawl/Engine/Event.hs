@@ -3830,6 +3830,50 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.CountersRemoved {} -> False
     GameEvent.ControlChanged {} -> False
     GameEvent.VentureMarkerEntered {} -> False
+  -- CR 702.55b/702.55c: SelfDies' zone pair, asked of the object the BEARER
+  -- HAUNTS rather than of the bearer itself -- so the id compared against
+  -- ZoneChange.departed is the one GameState.haunting files the bearer under, and
+  -- a bearer that haunts nothing matches nothing.
+  --
+  -- Matched on `departed` for PermanentDies' reason (CR 603.10a): the haunt
+  -- ability targeted the permanent as it was on the battlefield, and that is the
+  -- id the link was written with.
+  --
+  -- NO characteristic of the deceased is read, where PermanentDies reads a whole
+  -- Filter: rule 702.55b keeps "the creature it haunts" pointing at the object
+  -- targeted "regardless of whether or not that object is still a creature", so a
+  -- creature that was turned into a Treasure and then destroyed still fires this.
+  TriggerCondition.HauntedCreatureDies -> case event of
+    GameEvent.Moved zc _ ->
+      ZoneChange.from zc == Zone.Battlefield
+        && ZoneChange.to zc == Zone.Graveyard
+        && Map.lookup bearer (GameState.haunting gs) == Just (ZoneChange.departed zc)
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated _ _ -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -4771,6 +4815,8 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
+  -- CR 702.55b watches a death, not another ability triggering.
+  TriggerCondition.HauntedCreatureDies -> False
   -- CR 701.6a's countering is a spell or ability DOING something, not one
   -- triggering, so Baral takes the first pass like every other watcher.
   TriggerCondition.SpellOrAbilityCounters _ -> False
@@ -5058,7 +5104,7 @@ eventBindings cond event = case (cond, event) of
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
 -- CLASSIFICATION of a rule 603 trigger condition -- the sibling of
--- zoneTriggeredFrom below, which asks the other structural question about the
+-- zonesTriggeredFrom below, which asks the other structural question about the
 -- same closed type -- so it never reaches an ability's payload and no reader of
 -- it learns what any effect IS.
 --
@@ -5209,6 +5255,11 @@ eventBindingSlots cond = case cond of
   -- empty. A card whose leaves-the-battlefield payload names `became` is therefore
   -- rejected by the lint (#505).
   TriggerCondition.SelfLeavesTheBattlefield -> Set.empty
+  -- Nothing, where PermanentDies binds CR 400.7e's graveyard card: rule 702.55b's
+  -- ability speaks about the creature it HAUNTS and never about the card that
+  -- creature became, so no printing of haunt names the arrival. eventBindings has
+  -- no arm for this condition either, which is what the empty floor pins.
+  TriggerCondition.HauntedCreatureDies -> Set.empty
   -- CR 701.6a's countering names two objects and a player and this binds none of
   -- them -- eventBindings has no arm for it. Empty by decision rather than
   -- default: both ids are dead by the time the trigger resolves, and CR 400.7e
@@ -5398,6 +5449,11 @@ looksBack condition = case condition of
   TriggerCondition.SelfDies -> True
   TriggerCondition.PermanentDies _ -> True
   TriggerCondition.SelfLeavesTheBattlefield -> True
+  -- CR 603.10a's first family again, read off the event rather than off the
+  -- bearer: this triggers when a permanent leaves the battlefield. Inert today --
+  -- the bearer is a card in exile, which no look-back source can offer -- but a
+  -- classification the rule decides, not the scan.
+  TriggerCondition.HauntedCreatureDies -> True
   -- CR 603.10a's second family in as many words: "abilities that trigger when a
   -- player sacrifices a permanent".
   TriggerCondition.PermanentSacrificed -> True
@@ -5485,10 +5541,11 @@ looksBack condition = case condition of
 -- the whole-board `gather` fold on every call, which made this scan quadratic in
 -- board size.
 --
--- The battlefield is not the only scanned zone -- every GRAVEYARD is scanned for
--- the abilities CR 113.6k puts there, a spell that just became cast is offered
--- from the STACK for the same rule, and an EMBLEM is offered from the command
--- zone under CR 114.4. The hand and exile are unscanned (#348).
+-- The battlefield is not the only scanned zone -- every GRAVEYARD and the whole
+-- EXILE zone are scanned for the abilities CR 113.6k puts there, a spell that
+-- just became cast is offered from the STACK for the same rule, and an EMBLEM is
+-- offered from the command zone under CR 114.4. The hand is unscanned, and so is
+-- the rest of the command zone (#348).
 --
 -- CR 603.10's FIRST sentence is a per-EVENT question, and the live battlefield set
 -- answers a per-BOUNDARY one: the scan runs once at CR 117.5, after CR 704.5's
@@ -5817,6 +5874,34 @@ eventTriggers events gs =
       inGraveyards =
         Map.fromList
           (concatMap (Maybe.mapMaybe graveyardCandidate . Foldable.toList) (Map.elems (GameState.graveyard gs)))
+      -- CR 113.6k's third zone, `inGraveyards` one zone over: every card in exile
+      -- carrying an ability that functions from there. Rule 702.55c is the
+      -- sentence it exists for -- "triggered abilities of cards with haunt that
+      -- refer to the haunted creature can trigger in the exile zone" -- and CR
+      -- 113.6k's own example is the card that bears one.
+      --
+      -- FILTERED BY `functionsIn`, unlike the command zone's emblem source: there
+      -- the rule at issue is CR 114.4, which is about the OBJECT, and every emblem
+      -- ability would fail a condition test; here the rule at issue IS CR 113.6k,
+      -- so the filter is the gate itself. Without it an exiled Doomed Traveler
+      -- would be offered its dies trigger, and an exiled Desolation Twin its cast
+      -- trigger, from a zone CR 113.6 says neither functions in.
+      --
+      -- ONE STANDING SCAN over the whole zone, computed outside the event loop for
+      -- `inGraveyards`' reason: a haunting card sits in exile indefinitely and no
+      -- event names it, so nothing narrower could find it.
+      --
+      -- Abilities come from the PRINTED card and the controller is the OWNER (CR
+      -- 108.4a), also for `inGraveyards`' reasons: CR 108.4 gives a card in exile
+      -- no controller at all, so Blind Hunter's "you gain 2 life" pays the player
+      -- who owns the haunting card.
+      exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
+        (Just obj, Just face) ->
+          case filter (functionsIn Zone.Exile) (Face.triggeredAbilities face) of
+            [] -> Nothing
+            abilities -> Just (oid, (Object.owner obj, abilities))
+        _ -> Nothing
+      inExile = Map.fromList (Maybe.mapMaybe exileCandidate (Set.toAscList (GameState.exile gs)))
       -- CR 113.6k's other zone: the spell that just became cast, offered from the
       -- STACK, where CR 601.2a leaves it. Desolation Twin's "when you cast this
       -- spell" is borne by an object that is on nobody's battlefield and in
@@ -5828,7 +5913,7 @@ eventTriggers events gs =
       -- Projection.defaultControllerOf reads it back, so a standing scan would
       -- find the caster rather than falling back to the owner. The narrower scope
       -- is what the WORK asks for -- SelfCast is the only condition
-      -- zoneTriggeredFrom puts on the stack and it matches no other event, so a
+      -- zonesTriggeredFrom puts on the stack and it matches no other event, so a
       -- standing scan of every spell would answer alike at more cost. A future
       -- condition that functions on the stack and watches some other event is
       -- what widens this (#348).
@@ -5928,8 +6013,10 @@ eventTriggers events gs =
       -- `spellCast` overlaps nothing: CR 601.2a keeps its object on the stack,
       -- which no other source reads. Neither does `inCommand`: CR 114.1 puts an
       -- emblem into the command zone, and no rule or effect in pawl moves one
-      -- anywhere else -- Event.createEmblem is its only writer.
-      candidates event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, inGraveyards, inCommand])
+      -- anywhere else -- Event.createEmblem is its only writer. Nor does
+      -- `inExile`: CR 400.1 makes exile a zone of its own, and an id in it is in
+      -- no other.
+      candidates event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, inGraveyards, inCommand, inExile])
       scanOne later same event = concatMap (forOne event) (candidates event later same)
    in concat (List.zipWith3 (\block later same -> concatMap (scanOne later same . snd) block) groups laterGroups sameGroup)
 
@@ -5980,16 +6067,21 @@ zoneFunctionedFrom ability =
 functionsIn :: Zone -> TriggeredAbility.TriggeredAbility Card -> Bool
 functionsIn zone ability = case zoneFunctionedFrom ability of
   Just named -> zone == named
-  Nothing -> case zoneTriggeredFrom (TriggeredAbility.condition ability) of
-    Just triggered -> zone == triggered
-    Nothing -> zone == Zone.Battlefield
+  Nothing -> Set.member zone (zonesTriggeredFrom (TriggeredAbility.condition ability))
 
--- CR 113.6k: a trigger condition that can't trigger from the battlefield functions
--- in all zones it can trigger from -- WHICH zone, for the conditions that have
--- one. The graveyard and the stack are the two answers eventTriggers can act on;
--- the hand and exile are still unscanned (#348). The command zone IS scanned now,
--- but by a source CR 114.4 governs rather than this rule, so this function's one
--- Command answer -- CR 309.4c's room ability -- still goes unconsulted.
+-- CR 113.6k, both sentences: "a trigger condition that can't trigger from the
+-- battlefield functions in all zones it can trigger from. OTHER TRIGGER
+-- CONDITIONS OF THE SAME TRIGGERED ABILITY MAY FUNCTION IN DIFFERENT ZONES."
+-- Which is why the answer is a SET: rule 113.6k's own example is Absolver
+-- Thrull's "when this creature enters or the creature it haunts dies", one
+-- ability whose first condition functions from the battlefield and whose second
+-- functions from exile, and no single zone describes it.
+--
+-- The graveyard, the stack and exile are the three non-battlefield answers
+-- eventTriggers can act on, being the non-battlefield zones this rule sends it
+-- to; the hand is still unscanned (#348). The command zone IS scanned too, but by
+-- a source CR 114.4 governs rather than this rule, so this function's one Command
+-- answer -- CR 309.4c's room ability -- still goes unconsulted.
 --
 -- One of the three sentences `functionsIn` above reads, and the only one that
 -- looks at the CONDITION -- so an ability whose effect already names its zone
@@ -5998,91 +6090,98 @@ functionsIn zone ability = case zoneFunctionedFrom ability of
 -- A CLASSIFICATION of a trigger condition rather than an effect: it asks which
 -- zone a rule 603 condition functions in and never reaches the ability's payload.
 --
--- The default is Nothing, which is CR 113.6's own: abilities usually function only
--- from the battlefield. Every Nothing arm below is that sentence, not an omission.
-zoneTriggeredFrom :: TriggerCondition -> Maybe Zone
-zoneTriggeredFrom cond = case cond of
+-- The default is `battlefield`, which is CR 113.6's own: abilities usually
+-- function only while the object is on the battlefield. Every `battlefield` arm
+-- below is that sentence, not an omission.
+zonesTriggeredFrom :: TriggerCondition -> Set.Set Zone
+zonesTriggeredFrom cond = case cond of
   -- CR 309.4c: "as long as a dungeon card is in the command zone, its abilities
   -- may trigger". The honest answer, and inert: eventTriggers' command-zone source
   -- is CR 114.4's and takes emblems alone, so nothing consults this arm --
   -- Pawl.Engine.Dungeon.roomPending is what gathers a room ability (#348).
-  TriggerCondition.RoomEntered _ -> Just Zone.Command
+  TriggerCondition.RoomEntered _ -> Set.singleton Zone.Command
   -- CR 603.6a is an enters-the-battlefield ability; its bearer is on the
   -- battlefield when it fires.
-  TriggerCondition.SelfEnters -> Nothing
-  TriggerCondition.PermanentEnters _ -> Nothing
-  TriggerCondition.StepBegins _ _ -> Nothing
+  TriggerCondition.SelfEnters -> battlefield
+  TriggerCondition.PermanentEnters _ -> battlefield
+  TriggerCondition.StepBegins _ _ -> battlefield
   -- CR 709.5c makes an unlocked designation something a permanent ON THE
   -- BATTLEFIELD has, so this condition cannot trigger from a graveyard at all.
-  TriggerCondition.SelfHalfUnlocked _ -> Nothing
+  TriggerCondition.SelfHalfUnlocked _ -> battlefield
   -- CR 709.5c again, one object over: the permanent that became fully unlocked is
   -- on the battlefield, and CR 113.6 leaves the WATCHER where it usually is.
   -- Balemurk Leech is a creature and does nothing from a graveyard.
-  TriggerCondition.RoomFullyUnlocked _ -> Nothing
-  -- One agreed answer or none, which is the `all` this arm used to be read over a
-  -- zone instead of over a Bool: CR 113.6's default is that an ability functions
-  -- from the battlefield, so the exception has to hold for the WHOLE ability, and
-  -- an ability whose clauses name different zones -- or one clause that names none
-  -- -- is not an ability of either zone. The empty list falls to the default too,
-  -- and no card writes one.
-  TriggerCondition.AnyOf conditions -> case List.nub (fmap zoneTriggeredFrom conditions) of
-    [one] -> one
-    _ -> Nothing
+  TriggerCondition.RoomFullyUnlocked _ -> battlefield
+  -- THE UNION, which is CR 113.6k's second sentence read literally: each condition
+  -- of a multi-condition ability functions where it functions, and the ability is
+  -- offered from every zone any of them reaches. Blind Hunter's ability is the
+  -- producer -- battlefield for "when this creature enters", exile for "or the
+  -- creature it haunts dies" -- and it is the rule's own example.
+  --
+  -- Offering the ability in both zones cannot double-fire it: `matchesTrigger`
+  -- still has to admit the bearer, and the two conditions are about different ids
+  -- in different zones, so at most one of them matches any event.
+  --
+  -- The empty list falls to CR 113.6's default rather than to the empty union,
+  -- which would say the ability functions nowhere. No card writes one.
+  TriggerCondition.AnyOf conditions -> case conditions of
+    [] -> battlefield
+    _ -> Set.unions (fmap zonesTriggeredFrom conditions)
   -- CR 708.7 is about a PERMANENT being turned face up, and CR 110.1 puts
   -- permanents on the battlefield alone, so CR 113.6k never reaches this.
-  TriggerCondition.SelfTurnedFaceUp -> Nothing
+  TriggerCondition.SelfTurnedFaceUp -> battlefield
   -- CR 113.6's default, one object over: the WATCHER is an ordinary permanent
   -- doing its watching from the battlefield -- Aven Farseer is a creature -- so CR
   -- 113.6k's exception, which is for a condition that cannot trigger from the
   -- battlefield at all, does not apply.
-  TriggerCondition.PermanentTurnedFaceUp _ -> Nothing
+  TriggerCondition.PermanentTurnedFaceUp _ -> battlefield
   -- The same default: CR 702.112b's "only permanents can be or become renowned"
   -- keeps the subject on the battlefield, and Valeron Wardens watches from it.
-  TriggerCondition.PermanentBecomesDesignated _ _ -> Nothing
+  TriggerCondition.PermanentBecomesDesignated _ _ -> battlefield
   -- The same default again: rule 702.100b's marker goes to a creature, and
   -- Renegade Krasis is the creature watching itself.
-  TriggerCondition.SelfEvolves -> Nothing
+  TriggerCondition.SelfEvolves -> battlefield
   -- The same default a third time, from the Equipment's side: CR 301.5c unattaches
   -- an Equipment rather than moving it, so one that equips anything is on the
   -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
   -- is for a condition that cannot trigger from the battlefield at all.
-  TriggerCondition.AttachedCreatureMentors -> Nothing
+  TriggerCondition.AttachedCreatureMentors -> battlefield
   -- CR 113.6's default: an ability of a permanent functions only while that
   -- permanent is on the battlefield. CR 113.6k's exception is for a trigger
   -- condition that CANNOT trigger from the battlefield, and this one plainly can
   -- -- Mayhem Devil watches every sacrifice from the board it stands on.
-  TriggerCondition.PermanentSacrificed -> Nothing
+  TriggerCondition.PermanentSacrificed -> battlefield
   -- CR 603.8's state triggers are not event triggers, so this scan is not their
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
-  TriggerCondition.StateIs _ -> Nothing
-  TriggerCondition.SelfDealsCombatDamageToPlayer -> Nothing
-  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Nothing
-  TriggerCondition.CreatureDealtCombatDamageToMonarch -> Nothing
-  TriggerCondition.OpponentLostLifeDuringYourTurn -> Nothing
+  TriggerCondition.StateIs _ -> battlefield
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> battlefield
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> battlefield
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> battlefield
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> battlefield
   -- CR 302.6 / 508.1a: only a permanent on the battlefield can be declared as an
   -- attacker, so CR 113.6k never reaches this.
-  TriggerCondition.SelfAttacks _ -> Nothing
-  TriggerCondition.SelfAttacksWithAnother _ -> Nothing
-  TriggerCondition.CreatureAttacksAlone _ -> Nothing
-  TriggerCondition.SelfAttacksPlayerWithMostLife -> Nothing
-  TriggerCondition.SelfBlocks -> Nothing
-  TriggerCondition.SelfBlocksCreature -> Nothing
-  TriggerCondition.SelfBlocksAtLeast _ -> Nothing
-  TriggerCondition.SelfBlocksOneOrMore _ -> Nothing
-  TriggerCondition.SelfBecomesBlocked -> Nothing
-  TriggerCondition.SelfBecomesBlockedBy _ -> Nothing
-  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> Nothing
+  TriggerCondition.SelfAttacks _ -> battlefield
+  TriggerCondition.SelfAttacksWithAnother _ -> battlefield
+  TriggerCondition.CreatureAttacksAlone _ -> battlefield
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> battlefield
+  TriggerCondition.SelfBlocks -> battlefield
+  TriggerCondition.SelfBlocksCreature -> battlefield
+  TriggerCondition.SelfBlocksAtLeast _ -> battlefield
+  TriggerCondition.SelfBlocksOneOrMore _ -> battlefield
+  TriggerCondition.SelfBecomesBlocked -> battlefield
+  TriggerCondition.SelfBecomesBlockedBy _ -> battlefield
+  TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> battlefield
   -- CR 702.29c: a cycling ability triggers from whatever zone the card winds up
   -- in, the graveyard for every printing in this pool, and a cycled card cannot be
   -- on the battlefield. eventTriggers' `cycledCard` is what actually serves it.
-  TriggerCondition.SelfCycled -> Just Zone.Graveyard
+  TriggerCondition.SelfCycled -> Set.singleton Zone.Graveyard
   -- CR 113.6's default: the bearer watches from the battlefield, so a card in a
   -- graveyard does not see an opponent discard.
-  TriggerCondition.PlayerDiscards _ -> Nothing
+  TriggerCondition.PlayerDiscards _ -> battlefield
   -- The condition this predicate exists for: a card cannot be put into a graveyard
   -- from a library while on the battlefield, so this can never trigger from there
   -- and the graveyard it lands in is the one zone it can.
-  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Just Zone.Graveyard
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Set.singleton Zone.Graveyard
   -- The graveyard for a NEARER reason than the library condition's, and the one
   -- that matters: this condition CAN follow a battlefield-to-graveyard move, but CR
   -- 603.6c's last sentence denies it the leaves-the-battlefield look-back, so
@@ -6090,62 +6189,71 @@ zoneTriggeredFrom cond = case cond of
   -- that arrived in the graveyard. Nothing it can trigger from is the
   -- battlefield, so CR 113.6k puts it in every zone it can, and the graveyard is
   -- where the scan meets it whatever zone the card came from.
-  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Just Zone.Graveyard
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Set.singleton Zone.Graveyard
   -- The mirror image, defaulting for a reason rather than by omission: a dies trigger CAN
   -- trigger from the battlefield, which CR 603.10a's look-back is what makes true
   -- of a permanent that is a graveyard card by the time the scan runs.
   -- `leftBattlefield` serves it from CR 608.2h; `inGraveyards` must NOT, or the
   -- ability would be read off the printed text and credited to its owner.
-  TriggerCondition.SelfDies -> Nothing
+  TriggerCondition.SelfDies -> battlefield
   -- The same answer one step further: this condition's bearer is not the permanent
   -- that died at all, and watches from the battlefield.
-  TriggerCondition.PermanentDies _ -> Nothing
+  TriggerCondition.PermanentDies _ -> battlefield
   -- The same CR 603.10a answer as both dies conditions, and harder to miss here:
   -- the destination may be a hand or library, and an ability found in a GRAVEYARD
   -- could not be what fired for a permanent that went somewhere else.
-  TriggerCondition.SelfLeavesTheBattlefield -> Nothing
+  TriggerCondition.SelfLeavesTheBattlefield -> battlefield
+  -- CR 113.6k's third zone, and rule 702.55c states it outright: "triggered
+  -- abilities of cards with haunt that refer to the haunted creature can trigger
+  -- in the exile zone". A permanent on the battlefield haunts nothing -- only a
+  -- card Effect.ExileHaunting put in exile is in GameState.haunting at all -- so
+  -- this condition cannot trigger from the battlefield, and exile is the one zone
+  -- it can trigger from. eventTriggers' `inExile` is what serves it.
+  TriggerCondition.HauntedCreatureDies -> Set.singleton Zone.Exile
   -- CR 113.6's default again: the bearer watches from the battlefield.
-  TriggerCondition.SpellOrAbilityCounters _ -> Nothing
+  TriggerCondition.SpellOrAbilityCounters _ -> battlefield
   -- The same default: Selfless Squire watches damage addressed to its controller from
   -- the battlefield, and a card in a graveyard sees nothing prevented.
-  TriggerCondition.DamageToPlayerPrevented _ -> Nothing
+  TriggerCondition.DamageToPlayerPrevented _ -> battlefield
   -- CR 113.6's default once more: Ajani's Pridemate has to be on the battlefield
   -- to receive the counter its own ability puts on it.
-  TriggerCondition.PlayerGainsLife _ -> Nothing
+  TriggerCondition.PlayerGainsLife _ -> battlefield
   -- And once more: Exquisite Blood is an enchantment, and CR 113.6 leaves its
   -- ability functioning only where the permanent is.
-  TriggerCondition.PlayerLosesLife _ -> Nothing
+  TriggerCondition.PlayerLosesLife _ -> battlefield
   -- CR 122.1's first sentence puts counters on OBJECTS, and CR 714.3 keeps a
   -- Saga's lore counters on the permanent -- so CR 113.6's default holds and a
   -- chapter ability functions from the battlefield alone.
-  TriggerCondition.SelfCountersReached _ _ -> Nothing
-  TriggerCondition.SelfLastCounterRemoved _ -> Nothing
+  TriggerCondition.SelfCountersReached _ _ -> battlefield
+  TriggerCondition.SelfLastCounterRemoved _ -> battlefield
   -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
   -- and a card in a graveyard sees nothing cast.
-  TriggerCondition.SpellCast _ _ -> Nothing
+  TriggerCondition.SpellCast _ _ -> battlefield
   -- CR 113.6k, the second zone it reaches: CR 601.2a moves the object to the stack
   -- to cast it and leaves it there, so at CR 601.2i it is on the stack and not on
   -- the battlefield -- this condition cannot trigger from there at all. The stack
   -- is the one zone it can, and eventTriggers' `spellCast` is what serves it.
-  TriggerCondition.SelfCast -> Just Zone.Stack
+  TriggerCondition.SelfCast -> Set.singleton Zone.Stack
   -- CR 113.6's default a last time: Historian's Boon is an enchantment watching
   -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
-  TriggerCondition.SagaFinalChapterTriggers _ -> Nothing
+  TriggerCondition.SagaFinalChapterTriggers _ -> battlefield
   -- CR 113.6's default once more: Custodi Lich is a creature and watches the
   -- crown from the battlefield, so the card sees no crowning from a graveyard.
-  TriggerCondition.PlayerBecomesMonarch _ -> Nothing
+  TriggerCondition.PlayerBecomesMonarch _ -> battlefield
   -- CR 113.6's default, and never actually consulted: this condition's only carrier
   -- is a CR 603.7 delayed entry, which Event.delayedPending gathers out of
   -- GameState.delayedTriggers rather than out of a zone. The default is right
   -- anyway -- the event it matches happens on the battlefield.
-  TriggerCondition.LoseControlOfBound _ -> Nothing
+  TriggerCondition.LoseControlOfBound _ -> battlefield
+  where
+    battlefield = Set.singleton Zone.Battlefield
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
 -- <step>" and for nothing else.
 --
 -- A CLASSIFICATION of a trigger condition, the third of the same kind as
--- eventBindingSlots and zoneTriggeredFrom above.
+-- eventBindingSlots and zonesTriggeredFrom above.
 --
 -- Its customer is the card lint. Onset.FromYourNextTurn delivers both halves of
 -- "your next turn" on its own, so this no longer guards the firing -- it guards
@@ -6235,6 +6343,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
+  -- Rule 702.55b names no turn.
+  TriggerCondition.HauntedCreatureDies -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
   -- Damage can be prevented on anybody's turn.
   TriggerCondition.DamageToPlayerPrevented _ -> False
@@ -6373,6 +6483,7 @@ stateTriggers gs
               TriggerCondition.SelfDies -> False
               TriggerCondition.PermanentDies _ -> False
               TriggerCondition.SelfLeavesTheBattlefield -> False
+              TriggerCondition.HauntedCreatureDies -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False
               TriggerCondition.PlayerGainsLife _ -> False

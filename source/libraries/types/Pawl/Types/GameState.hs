@@ -368,6 +368,20 @@ data GameState = MkGameState
     -- an Expiry: the Expiry sweeps are delete-and-recompute and cannot perform
     -- the return zone change.
     exiledUntilMonarch :: Map.Map ObjectId.ObjectId MonarchWatch.MonarchWatch,
+    -- | CR 702.55b: which object each haunting card haunts, keyed by the exiled
+    -- incarnation Effect.ExileHaunting minted and answering with the object that
+    -- haunt ability targeted. Read by TriggerCondition.HauntedCreatureDies, which
+    -- is the only thing rule 702.55b's link is for.
+    --
+    -- Board state rather than a field on the exiled Object, for exiledUntilMonarch's
+    -- reason one field up: it is a relation between two ids that outlives neither,
+    -- and CR 400.7 would strip it from an object that moved again anyway.
+    --
+    -- Never cleaned up on the VALUE side: rule 702.55b keeps naming the object the
+    -- haunt ability targeted after that object is gone (the haunted creature dying
+    -- is the whole point), so only Pawl.Engine.Departure's CR 800.4a sweep removes
+    -- an entry, and only by its key.
+    haunting :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
     -- | CR 500.7: the extra turns that have been created and not yet taken, MOST
     -- RECENTLY CREATED FIRST. A stack, not a queue, and a list precisely because
     -- the style guide reserves lists for stacks (GameState.stack is the other

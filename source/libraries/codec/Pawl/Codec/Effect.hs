@@ -138,6 +138,7 @@ toJson codec e = case e of
   Effect.Mentor s -> Common.tagged "Mentor" (Just (Codec.encode SlotName.codec s))
   Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Codec.encode Daytime.codec d))
   Effect.ExileUntilMonarch s -> Common.tagged "ExileUntilMonarch" (Just (Codec.encode SlotName.codec s))
+  Effect.ExileHaunting c s -> Common.tagged "ExileHaunting" (Just (Value.array [Codec.encode SlotName.codec c, Codec.encode SlotName.codec s]))
   Effect.Attach s -> Common.tagged "Attach" (Just (Codec.encode SlotName.codec s))
   Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Value.array [Codec.encode SlotName.codec s, Codec.encode (Filter.codec Keyword.codec) f]))
   Effect.PlaySubgame s -> Common.tagged "PlaySubgame" (Just (Codec.encode SlotName.codec s))
@@ -302,6 +303,9 @@ fromJson decode value = do
     "Mentor" -> Common.withValue mv (fmap Effect.Mentor . Codec.decode SlotName.codec)
     "ItBecomes" -> Common.withValue mv (fmap Effect.ItBecomes . Codec.decode Daytime.codec)
     "ExileUntilMonarch" -> Common.withValue mv (fmap Effect.ExileUntilMonarch . Codec.decode SlotName.codec)
+    "ExileHaunting" -> case mv of
+      Just (Value.Array (Array.MkArray [c, s])) -> Effect.ExileHaunting <$> Codec.decode SlotName.codec c <*> Codec.decode SlotName.codec s
+      _ -> Left . Text.pack $ "ExileHaunting expects [slotName, slotName]"
     "Attach" -> Common.withValue mv (fmap Effect.Attach . Codec.decode SlotName.codec)
     "AttachTarget" -> case mv of
       Just (Value.Array (Array.MkArray [s, f])) -> Effect.AttachTarget <$> Codec.decode SlotName.codec s <*> Codec.decode (Filter.codec Keyword.codec) f

@@ -141,6 +141,7 @@ emptyGame order =
           GameState.daytime = Nothing,
           GameState.spellsCastLastTurn = 0,
           GameState.exiledUntilMonarch = Map.empty,
+          GameState.haunting = Map.empty,
           GameState.extraTurns = [],
           GameState.turnAnchor = Nothing
         }
@@ -393,6 +394,7 @@ restartGame perform starter = do
             GameState.daytime = Nothing,
             GameState.spellsCastLastTurn = 0,
             GameState.exiledUntilMonarch = Map.empty,
+            GameState.haunting = Map.empty,
             -- CR 727.1: the game that scheduled them has ended, so no extra
             -- turn survives into the new one.
             GameState.extraTurns = [],
@@ -488,6 +490,7 @@ subgameStateFrom starter parent =
           GameState.daytime = Nothing,
           GameState.spellsCastLastTurn = 0,
           GameState.exiledUntilMonarch = Map.empty,
+          GameState.haunting = Map.empty,
           -- CR 729.1a: the subgame is its own game and starts from turn 1, so
           -- the main game's pending extra turns are not in it. Its own copy
           -- sits untouched in the outer frame, still waiting when the subgame

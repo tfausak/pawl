@@ -64,6 +64,7 @@ codec =
       Arm.payload "Modular" Common.natural Keyword.Modular,
       Arm.payload "Bushido" Common.natural Keyword.Bushido,
       Arm.payload "Soulshift" Common.natural Keyword.Soulshift,
+      Arm.nullary "Haunt" Keyword.Haunt,
       Arm.nullary "SplitSecond" Keyword.SplitSecond,
       Arm.payload "Vanishing" Common.natural Keyword.Vanishing,
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous,
@@ -145,6 +146,7 @@ codec =
       Keyword.Modular n -> Common.tagged "Modular" . Just $ Common.encodeNatural n
       Keyword.Bushido n -> Common.tagged "Bushido" . Just $ Common.encodeNatural n
       Keyword.Soulshift n -> Common.tagged "Soulshift" . Just $ Common.encodeNatural n
+      Keyword.Haunt -> Common.nullary "Haunt"
       Keyword.SplitSecond -> Common.nullary "SplitSecond"
       Keyword.Vanishing n -> Common.tagged "Vanishing" . Just $ Common.encodeNatural n
       Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n

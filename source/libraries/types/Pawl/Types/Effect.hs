@@ -973,6 +973,23 @@ data Effect card
     -- returned by Pawl.Engine.Monarch's settle-loop sweep. NOT MoveToZone, which
     -- has no duration and schedules no return.
     ExileUntilMonarch SlotName.SlotName
+  | -- | CR 702.55a: exile the object the ObjectRef names, HAUNTING the creature the
+    -- SlotName's target names -- the second half of haunt's minted ability. The
+    -- LINK is the novelty: the exiled incarnation is filed in GameState.haunting
+    -- against the object targeted, which is what CR 702.55b's "creature it haunts"
+    -- reads and what TriggerCondition.HauntedCreatureDies matches on. NOT
+    -- MoveToZone, which exiles without recording anything.
+    --
+    -- TWO INCARNATIONS, undying's and persist's split (CR 400.7): the ObjectRef is
+    -- Pawl.Engine.Binding.became, the graveyard card the death minted, since rule
+    -- 702.55a's "it" is the card and the ability's source is the permanent that
+    -- died. The link is keyed on a THIRD id, the one the exile move mints.
+    --
+    -- TWO SLOTS and no ObjectRef, unlike MoveToZone: rule 702.55a exiles exactly
+    -- one named card, never a swept set, so the mover is the slot CR 400.7e's
+    -- rescue bound -- Pawl.Engine.Binding.became -- read live off the resolving
+    -- object. Only the second is a target (CR 115.10a); the first is a definition.
+    ExileHaunting SlotName.SlotName SlotName.SlotName
   | -- | CR 729.1/729.1b: play a Magic subgame, then bind its outcome (the derived
     -- loser) into this slot for a later effect to read. DEFINED here, like
     -- Create's minted-token slot, not a cast-time target -- the loser is known

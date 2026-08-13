@@ -432,6 +432,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Soulshift 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "soulshift 3 is not bushido 3"
+  -- CR 702.55a's haunt writes no payload at all -- the haunted object is board
+  -- state (GameState.haunting), not a field of the keyword.
+  Spec.it s "Haunt" $
+    Common.assertCodec
+      s
+      Keyword.codec
+      Keyword.Haunt
+      """ {"type":"Haunt"} """
   -- CR 702.77a writes BOTH an N and a cost, so the array carries two fields the
   -- way cycling's and morph's do, and both must survive the round trip.
   Spec.it s "Reinforce carries its N and its cost" $ do

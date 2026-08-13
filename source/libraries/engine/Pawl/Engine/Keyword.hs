@@ -159,6 +159,7 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.46b says each instance triggers separately, so a permanent with
   -- soulshift twice dies with two abilities and each chooses its own target.
   Keyword.Soulshift n -> List.genericReplicate count (soulshift n)
+  Keyword.Haunt -> List.genericReplicate count haunt
   Keyword.SplitSecond -> []
   -- Another: rule 702.63a states three abilities, and the first of
   -- them is a replacement effect rather than a trigger, so two land here.
@@ -299,6 +300,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -487,6 +489,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -746,6 +749,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -1137,6 +1141,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -1269,6 +1274,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -1363,6 +1369,7 @@ familyOf keyword = case keyword of
   Keyword.Vigilance -> Nothing
   Keyword.Banding -> Nothing
   Keyword.Flanking -> Nothing
+  Keyword.Haunt -> Nothing
   Keyword.Phasing -> Nothing
   Keyword.Shadow -> Nothing
   Keyword.Horsemanship -> Nothing
@@ -2636,6 +2643,48 @@ soulshift n =
 -- reads it for mentorTarget's reason.
 soulshiftTarget :: SlotName.SlotName
 soulshiftTarget = SlotName.MkSlotName (Text.pack "soulshifted")
+
+-- CR 702.55a: haunt. "When this permanent is put into a graveyard from the
+-- battlefield, exile it haunting target creature." Soulshift's shape -- the CR
+-- 700.4 dies event and one target slot -- with the clause mandatory, since rule
+-- 702.55a states no "may".
+--
+-- ONLY the permanent sentence. Rule 702.55a's other one, haunt on an instant or
+-- sorcery, is not minted (#1404).
+--
+-- THE CARD, NOT THE PERMANENT (CR 400.7): rule 702.55a's "exile IT" is the
+-- graveyard incarnation the death minted, which is Binding.became -- undying's
+-- and persist's split, and the reason this cannot name Binding.triggerSource.
+-- The ability's SOURCE is the permanent as it was on the battlefield, and that
+-- object no longer exists to exile.
+--
+-- A bare Creatures pool with no Filter is rule 702.55a's whole phrase: "target
+-- creature", nothing excluded. The bearer cannot be among the candidates anyway,
+-- since it is a card in a graveyard by the time the trigger is put on the stack.
+--
+-- Effect.ExileHaunting rather than a MoveToZone to Zone.Exile, because the move
+-- is only half of it: CR 702.55b's link from the exiled card to the object
+-- targeted is what the exile-zone half of the card reads, and only that opcode
+-- writes it.
+--
+-- Single mode, ChooseExactly 1: the target is all rule 702.55a leaves to choose.
+haunt :: TriggeredAbility Card
+haunt =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfDies,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget spec)))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    spec = TargetSpec.required Pool.Creatures Nothing
+    exile = Effect.ExileHaunting Binding.became hauntTarget
+
+-- The slot rule 702.55a's one target is chosen into, on soulshiftTarget's terms.
+hauntTarget :: SlotName.SlotName
+hauntTarget = SlotName.MkSlotName (Text.pack "haunted")
 
 -- CR 702.63a's SECOND and THIRD abilities. Rule 702.63a states three and the
 -- first is mintedReplacementsFor's, so vanishing is the first keyword here whose

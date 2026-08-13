@@ -458,6 +458,23 @@ data TriggerCondition
     -- CR 603.6c's SECOND trigger event, a phased-in permanent leaving the game
     -- with its owner, is not matched (#385).
     SelfLeavesTheBattlefield
+  | -- | CR 702.55b/702.55c: "when the creature this card haunts dies" -- the death
+    -- half of Blind Hunter's printed ability, borne by the haunting CARD IN
+    -- EXILE. CR 700.4's event again, so the match is PermanentDies' zone pair;
+    -- WHICH permanent is the one GameState.haunting files the bearer against, the
+    -- link Effect.ExileHaunting wrote as the card was exiled.
+    --
+    -- The only condition that cannot trigger from the battlefield for a reason
+    -- that is about the BEARER rather than about the event: a permanent on the
+    -- battlefield haunts nothing, so CR 113.6k sends this to the exile zone and
+    -- Pawl.Engine.Event.zonesTriggeredFrom answers Zone.Exile. Rule 702.55c says
+    -- as much in its own words.
+    --
+    -- NO payload and no Filter, unlike PermanentDies: rule 702.55b makes the
+    -- haunted object "the object targeted by the haunt ability, regardless of
+    -- whether or not that object is still a creature", so the link is the whole
+    -- match and no characteristic of the deceased is read.
+    HauntedCreatureDies
   | -- | CR 701.6a: "whenever a spell or ability you control counters a spell" --
     -- Baral, Chief of Compliance's. Matched against GameEvent.SpellCountered,
     -- whose Countering carries the controller of whatever DID the countering; the
@@ -694,7 +711,7 @@ data TriggerCondition
     -- in the zones it can trigger from, and this one cannot: CR 601.2a moves the
     -- object to the stack to cast it and leaves it there, so it is on the stack
     -- and not on the battlefield at the moment CR 601.2i fires this.
-    -- Pawl.Engine.Event.zoneTriggeredFrom answers that with a total case over
+    -- Pawl.Engine.Event.zonesTriggeredFrom answers that with a total case over
     -- this type; asking the same of a Filter's shape would be a partial analysis
     -- of an open language, silently answering "battlefield" for every shape it
     -- had not anticipated.

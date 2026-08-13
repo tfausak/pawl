@@ -116,6 +116,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Mentor _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
+  Effect.ExileHaunting {} -> Nothing
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing
   Effect.PlaySubgame _ -> Nothing
