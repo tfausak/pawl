@@ -338,9 +338,9 @@ spellAdjustments pid oid gs =
         else adjustments {CostAdjustments.increases = commanderTax : CostAdjustments.increases adjustments}
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes through
--- rule 601.2b-i like a spell's. Heartstone and Training Grounds are what reach it
--- (#90); no commander tax, since CR 903.8 taxes CASTING a commander and an
--- activation is not a cast.
+-- rule 601.2b-i like a spell's. Heartstone's floored reduction and Blossoming
+-- Tortoise's unfloored one are what reach it (#90); no commander tax, since CR
+-- 903.8 taxes CASTING a commander and an activation is not a cast.
 --
 -- Not reached by a MANA ability's cost, which pays through manaActivations rather
 -- than through Pawl.Engine.Activate -- and unobservably so, since every mana
