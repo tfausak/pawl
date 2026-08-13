@@ -354,6 +354,19 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
     -- own stated answer there.
     playersOf ref = case ref of
       PlayerRef.Candidate -> fmap pure (mView >>= Filter.playerIdentity)
+      -- The SECOND arm answered here rather than by Count.playersFor, and for a
+      -- neighbouring reason: that function holds no view, and who controls a
+      -- permanent is CR 613.1b's layer-2 question, which only a projection
+      -- answers. The view is the caller's, which is how CR 608.2h reaches this --
+      -- Spikeshell Harrier reads the speed of the player who controlled the
+      -- permanent its own earlier clause has already bounced, and a last-known
+      -- aware view is what still names them.
+      --
+      -- Nothing when the slot names no object or the view cannot describe it,
+      -- Candidate's posture: the quantity is unanswered rather than answered off
+      -- the resolving controller.
+      PlayerRef.ControllerOfBound slot ->
+        fmap pure (Map.lookup slot (Filter.slotObjects context) >>= viewOf >>= Filter.controller)
       PlayerRef.EachPlayer -> Count.playersFor context gs ref
       PlayerRef.Relative _ -> Count.playersFor context gs ref
       PlayerRef.InSlot _ -> Count.playersFor context gs ref
@@ -574,6 +587,10 @@ playerRefIsSlotless ref = case ref of
   -- The fold's candidate names no slot either: it is read off the view the fold
   -- hands the evaluation, never off a binding.
   PlayerRef.Candidate -> True
+  -- InSlot's answer, and for its reason: the slot is a TARGET slot, which
+  -- Resolve.slotsOf is the half that reports -- and cannot see one buried in a
+  -- quantity (#1079).
+  PlayerRef.ControllerOfBound _ -> False
 
 -- CR 611.2b: replace every PlayerRef.InSlot this quantity names with the baked
 -- PlayerRef.Specific arm, off the players the resolution's bindings name. What
@@ -637,6 +654,13 @@ bakePlayerRef players ref = case ref of
   -- it the same way. What baking fixes is a reference to the RESOLUTION's
   -- bindings, which this is not.
   PlayerRef.Candidate -> ref
+  -- LEFT STANDING, the posture Pawl.Engine.Filter.bakeBound takes for a slot its
+  -- map cannot answer: this map holds the PLAYERS a resolution's slots name (CR
+  -- 603.2), and this reference names a slot holding an OBJECT, whose controller
+  -- only a projection gives. A stored CR 611.2b duration reading it therefore
+  -- goes unanswered and ends, which is Pawl.Engine.Condition.holds' stated
+  -- collapse; no card in the pool stores one (#1441).
+  PlayerRef.ControllerOfBound _ -> ref
 
 -- A scope's reference, baked. Both scopes that name players take one; CR 608.2i's
 -- look-back names none.

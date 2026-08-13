@@ -135,6 +135,7 @@ import Pawl.Types.SlotArity (SlotArity)
 import qualified Pawl.Types.SlotArity as SlotArity
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -181,6 +182,10 @@ playerRefSlots ref = case ref of
   -- A fold's candidate is not a slot either: it comes from the member being
   -- read, and a card writes it (Malignus), so this arm is reachable and empty.
   PlayerRef.Candidate -> Map.empty
+  -- A TARGET slot like InSlot's, read at arity one: the reference asks who
+  -- controls the object the slot names, and a slot naming several objects names
+  -- no one controller. Spikeshell Harrier is what writes it.
+  PlayerRef.ControllerOfBound slot -> Map.singleton slot SlotArity.One
 
 -- The slots an AffectedPlayers reads. Only the Named arm does, and only ever one
 -- player: a card writes AffectedPlayers SlotName, whose Named payload is a slot
@@ -278,6 +283,8 @@ slotsOf effect = case effect of
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.RedistributeLifeTotals -> Map.empty
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  -- The floor beside them names no slot: it is a printed literal.
+  Effect.DecreaseSpeed d -> joinTwo (playerRefSlots (SpeedDecrease.player d)) (quantitySlots (SpeedDecrease.quantity d))
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
   Effect.Create quantity _ _ _ -> quantitySlots quantity
@@ -498,6 +505,7 @@ slotsAreExhaustive effect = case effect of
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.RedistributeLifeTotals -> True
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.DecreaseSpeed d -> Quantity.slotsAreExhaustive (SpeedDecrease.quantity d)
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
   Effect.Create quantity _ _ _ -> Quantity.slotsAreExhaustive quantity
@@ -625,6 +633,7 @@ readsX = any effectReadsX
       Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.RedistributeLifeTotals -> False
       Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
       Effect.Replace {} -> False
@@ -707,6 +716,7 @@ searchesLibrary effect = case effect of
   Effect.SetLifeTotal {} -> False
   Effect.RedistributeLifeTotals -> False
   Effect.IncreaseSpeed {} -> False
+  Effect.DecreaseSpeed {} -> False
   Effect.Create {} -> False
   Effect.CreateCopy {} -> False
   Effect.Replace {} -> False
@@ -848,6 +858,7 @@ boundSlots effect = case effect of
   Effect.SetLifeTotal {} -> Set.empty
   Effect.RedistributeLifeTotals -> Set.empty
   Effect.IncreaseSpeed {} -> Set.empty
+  Effect.DecreaseSpeed {} -> Set.empty
   Effect.Replace {} -> Set.empty
   Effect.SkipNextPhase {} -> Set.empty
   -- The shield itself binds nothing; CR 615.5's rider is an effect list like any
@@ -1091,7 +1102,7 @@ resolveSpellWith runSubgame oid = do
                     -- CR 701.46a's printed "if" first: it precedes the
                     -- instructions in written order (CR 608.2c), and a clause
                     -- that cannot happen is no question to ask.
-                    gated <- gateHolds effectController oid clause
+                    gated <- gateHolds effectController oid (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosen) clause
                     -- CR 603.5 / 608.2d: then the printed "may".
                     taken <- if gated then exercises oid effectController idx cIdx clause else pure False
                     -- CR 118.12a: and then this clause's "unless [a player]
@@ -1259,7 +1270,7 @@ resolveModes stackId srcId modes = do
                   -- reason. Read against `srcId`, the source permanent, not the
                   -- ability object -- CR 701.46a says "this permanent", which is
                   -- also why `paid` is given `srcId`.
-                  gated <- gateHolds effectController srcId clause
+                  gated <- gateHolds effectController srcId (instanceView chosen) clause
                   -- CR 603.5 / 608.2d: then the printed "may", answered as this
                   -- clause's instructions are applied.
                   taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
@@ -1290,14 +1301,27 @@ resolveModes stackId srcId modes = do
 -- `paid` takes `source` apart from `resolving` for its own reason. The two are
 -- the same object for a spell.
 --
--- The full view: the clause is resolving and the board is live, unlike CR
--- 603.4's intervening "if" on a leaves-the-battlefield trigger.
-gateHolds :: PlayerId -> ObjectId -> Clause.Clause Card.Type.Card -> Game Bool
-gateHolds controller source clause = case Clause.condition clause of
+-- CR 608.2h's view, not the live one, and the rule states the case outright:
+-- "if the effect has moved it from a public zone to a hidden zone, the effect
+-- uses the object's last known information". A clause gate is asked BETWEEN this
+-- resolution's clauses, so the object it reads may be one an earlier clause has
+-- already moved -- Spikeshell Harrier bounces the permanent whose controller the
+-- next sentence then asks about. Same view CR 603.4's intervening "if" is read
+-- with (Pawl.Engine.Condition's own account of the three answers), and it differs
+-- from the live one only for an id the board no longer holds.
+--
+-- The CHOSEN slots rather than CR 608.2b's surviving ones, which is the other
+-- half of the same rule. That check is made once, as the ability begins to
+-- resolve (targetsAllIllegal above), and a target THIS resolution moved is not a
+-- target that became illegal before it -- filtering it out here would answer
+-- "which player?" with nobody for the very sentence the rule above exists to
+-- answer.
+gateHolds :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
+gateHolds controller source chosen clause = case Clause.condition clause of
   Nothing -> pure True
   Just condition -> do
     gs <- State.get
-    pure (Condition.holds (Projection.fullView gs) (Filter.contextFor (Just controller) (Just source)) gs source condition)
+    pure (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (effectContext controller source chosen) gs source condition)
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made
@@ -1542,6 +1566,17 @@ playerRefPlayers legal controller gs ref = case ref of
   -- The reference is only ever answerable inside a Count (Pawl.Engine.Quantity's
   -- playersOf), so here it names an empty set and the opcode is a no-op.
   PlayerRef.Candidate -> []
+  -- CR 608.2h: the controller of the object the slot names, through last known
+  -- information -- the clause that names the player generally MOVED it first
+  -- (Spikeshell Harrier bounces it), and CR 108.4 leaves a card in a hand with no
+  -- controller at all, so the live reading alone would answer nobody. Nothing to
+  -- act on when the slot is unfilled, names several objects, names a player, or
+  -- nothing was filed for a gone one.
+  PlayerRef.ControllerOfBound slot -> case legalOne slot legal of
+    Just recipient -> case Recipient.objectOf recipient of
+      Just oid -> Maybe.maybeToList (Projection.controllerWithLastKnown oid gs)
+      Nothing -> []
+    Nothing -> []
   where
     everyone = Game.stillPlaying gs
 
@@ -3190,9 +3225,10 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- speed goes up by the value, and a player who has NONE, whose speed BECOMES
   -- the value -- are spelled separately here even though they coincide
   -- arithmetically against a stand-in zero. They are separate in the rule, and
-  -- the day a card decreases speed (#808) the stand-in zero would stop being
-  -- harmless. Only a card can reach the second reading at all: rule 702.179d's
-  -- ability exists only for a player who already has 1 or more speed.
+  -- the DecreaseSpeed arm below is what a stand-in zero here would have got
+  -- wrong: a decrease must leave a player with no speed still without one. Only a
+  -- card can reach the second reading at all -- rule 702.179d's ability exists
+  -- only for a player who already has 1 or more speed.
   --
   -- No cap is applied. Nothing in rule 702.179 bounds speed from above, and a cap
   -- here would be a rule pawl invented; what keeps rule 702.179d's own climb at 4
@@ -3212,6 +3248,43 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                 faster p = p {Player.speed = Just (maybe by (+ by) (Player.speed p))}
              in Monad.forM_ revving $ \pid ->
                   State.modify' (\g -> g {GameState.players = Map.adjust faster pid (GameState.players g)})
+      _ -> pure ()
+  -- CR 702.179 / Spikeshell Harrier: each named player's speed drops by this
+  -- much, never below the floor the CARD prints. The mirror of the arm above, and
+  -- deliberately NOT its negation:
+  --
+  --   * A player with NO SPEED (CR 702.179b) stays that way. CR 702.179c gives an
+  --     INCREASE the power to create a speed out of nothing ("their speed becomes
+  --     that value") and no rule says the same of a decrease, so the Maybe is
+  --     traversed rather than defaulted. CR 702.179f's stand-in 0 is a READING an
+  --     effect makes of such a player, not a value they have.
+  --   * The floor is the card's own sentence, so it comes off the payload. Rule
+  --     702.179 states no floor of its own, and a player at the floor already is
+  --     left exactly where they are rather than moved to it.
+  --
+  -- The REFERENCE is resolved against the CHOSEN slots where every sibling arm
+  -- reads the legal ones, and gateHolds carries the argument: this effect names
+  -- the controller of a permanent the preceding clause has already returned to a
+  -- hand, which CR 608.2b's filter drops, and CR 608.2h rather than CR 608.2b is
+  -- the rule about a target THIS resolution moved. The AMOUNT's context stays on
+  -- the legal slots, which is every other arm's posture and what CR 608.2b does
+  -- govern.
+  --
+  -- Not implemented: no OTHER opcode passes the chosen slots, so a card writing
+  -- PlayerRef.ControllerOfBound in one of their references would lose the player
+  -- once the object moved (#1441).
+  Effect.DecreaseSpeed d -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        slowing = playerRefPlayers chosen controller gs (SpeedDecrease.player d)
+        atLeast = toInteger (SpeedDecrease.floor d)
+    case Quantity.evaluateFor viewOf context gs resolving source (SpeedDecrease.quantity d) of
+      Just n
+        | n > 0 ->
+            let slower p = p {Player.speed = fmap (\was -> Integer.toNaturalSaturating (max atLeast (toInteger was - n))) (Player.speed p)}
+             in Monad.forM_ slowing $ \pid ->
+                  State.modify' (\g -> g {GameState.players = Map.adjust slower pid (GameState.players g)})
       _ -> pure ()
   -- CR 701.21a: the slot's target player sacrifices `quantity` permanents
   -- matching the filter, and THAT PLAYER chooses which -- the whole difference

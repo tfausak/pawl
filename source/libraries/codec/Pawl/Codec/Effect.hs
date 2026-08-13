@@ -36,6 +36,7 @@ import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Codec.SearchDestination as SearchDestination
 import qualified Pawl.Codec.SlotName as SlotName
+import qualified Pawl.Codec.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Codec.Uses as Uses
@@ -85,6 +86,7 @@ toJson codec e = case e of
   Effect.SetLifeTotal x -> Common.tagged "SetLifeTotal" . Just $ Codec.encode PlayerQuantity.codec x
   Effect.RedistributeLifeTotals -> Common.nullary "RedistributeLifeTotals"
   Effect.IncreaseSpeed x -> Common.tagged "IncreaseSpeed" . Just $ Codec.encode PlayerQuantity.codec x
+  Effect.DecreaseSpeed x -> Common.tagged "DecreaseSpeed" . Just $ Codec.encode SpeedDecrease.codec x
   -- Create's payload is positional, and the EntryRiders are ELIDED when they
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
   -- told apart on decode by JSON TYPE rather than by position: a slot name is a
@@ -217,6 +219,7 @@ fromJson decode value = do
     "SetLifeTotal" -> Common.withValue mv (fmap Effect.SetLifeTotal . Codec.decode PlayerQuantity.codec)
     "RedistributeLifeTotals" -> Right Effect.RedistributeLifeTotals
     "IncreaseSpeed" -> Common.withValue mv (fmap Effect.IncreaseSpeed . Codec.decode PlayerQuantity.codec)
+    "DecreaseSpeed" -> Common.withValue mv (fmap Effect.DecreaseSpeed . Codec.decode SpeedDecrease.codec)
     -- The three-element form is read by JSON type: an Object is the
     -- EntryRiders, anything else is the slot name, which is what lets the
     -- riders be elided without leaving a hole in the array.

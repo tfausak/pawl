@@ -45,6 +45,12 @@ spec s = Spec.describe s "Pawl.Codec.PlayerRef" $ do
       PlayerRef.codec
       PlayerRef.Candidate
       """ {"type":"Candidate"} """
+  Spec.it s "ControllerOfBound" $
+    Common.assertCodec
+      s
+      PlayerRef.codec
+      (PlayerRef.ControllerOfBound (SlotName.MkSlotName (Text.pack "permanent")))
+      """ {"type":"ControllerOfBound","value":"permanent"} """
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool
       s
