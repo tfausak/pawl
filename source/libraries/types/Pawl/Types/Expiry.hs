@@ -1,8 +1,8 @@
 module Pawl.Types.Expiry where
 
-import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.While as While
 
 -- | CR 611.2: how long a STORED effect lasts, as the game remembers it. The
 -- runtime counterpart of the printed Pawl.Types.Duration: card data says "until
@@ -28,7 +28,7 @@ data Expiry
     -- The CONDITION is baked at the same moment (Pawl.Engine.Condition.bakeBound):
     -- a PlayerRef naming one of the resolution's slots becomes PlayerRef.Specific,
     -- since the sweep that re-reads this has no resolution to read a slot off.
-    While PlayerId.PlayerId Condition.Condition
+    While While.While
   | -- | CR 611.2a: "until your next turn", as a concrete player. Ends as that
     -- player's turn begins.
     AtTurnOf PlayerId.PlayerId

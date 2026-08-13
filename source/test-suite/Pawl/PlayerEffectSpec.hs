@@ -122,6 +122,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.While as While
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -2013,7 +2014,7 @@ storedConditional piker =
       conditional =
         addPlayerEffectAt
           srcId
-          (Expiry.Type.While S.alice S.youControlSource)
+          (Expiry.Type.While (While.MkWhile S.alice S.youControlSource))
           (AffectedPlayers.Scoped PlayerScope.Opponents)
           PlayerEffect.Type.CantCastSpells
           S.alice
@@ -2690,7 +2691,7 @@ conditionalSilenceSpec s registry =
       let (hushId, _, _, _, before) = conditionalSilenceBoard True island swamp hush mountain piker
           resolved = conditionalSilenceAfter hushId before
       case fmap ActivePlayerEffect.expiry (GameState.playerEffects resolved) of
-        [Expiry.Type.While who _] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
+        [Expiry.Type.While (While.MkWhile who _)] -> Spec.assertEqWith s "the duration is keyed to its controller" who S.alice
         other -> Spec.assertFailure s ("expected one conditional player effect, got " <> show other)
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob anySpellId anySpell resolved) "bob is prohibited"
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.carol anySpellId anySpell resolved) "carol is prohibited too"

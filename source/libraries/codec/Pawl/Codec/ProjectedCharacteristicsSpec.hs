@@ -82,11 +82,10 @@ minimalCharacteristics =
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ProjectedCharacteristics" $ do
   Spec.it s "MkProjectedCharacteristics, every collection populated, loyalty and characteristicPT omitted at Nothing" $
-    Common.assertJsonCodec s PC.toJson PC.fromJson testCharacteristics testCharacteristicsJson
+    Common.assertCodec s PC.codec testCharacteristics testCharacteristicsJson
   Spec.it s "an all-default value omits every optional key" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PC.toJson
-      PC.fromJson
+      PC.codec
       minimalCharacteristics
       """ {"names":["Mountain"],"cardTypes":[{"type":"Land"}]} """

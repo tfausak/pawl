@@ -12,9 +12,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 spec :: (Monad m) => Spec.Spec m n -> n ()
 spec s =
   Spec.describe s "Pawl.Codec.ZoneChange" . Spec.it s "MkZoneChange" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ZoneChange.toJson
-      ZoneChange.fromJson
+      ZoneChange.codec
       (ZoneChange.MkZoneChange (ObjectId.MkObjectId 1) (ObjectId.MkObjectId 1) Zone.Battlefield Zone.Graveyard)
       """ {"departed":1,"object":1,"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}} """

@@ -69,6 +69,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.While as While
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -217,7 +218,7 @@ whileEffect src target you gs =
         ContinuousEffect.MkContinuousEffect
           { ContinuousEffect.source = src,
             ContinuousEffect.timestamp = ts,
-            ContinuousEffect.expiry = Expiry.Type.While you S.youControlSource,
+            ContinuousEffect.expiry = Expiry.Type.While (While.MkWhile you S.youControlSource),
             ContinuousEffect.modification = Modification.SetController you,
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
           }
@@ -244,7 +245,7 @@ whileReplacement src you gs =
             ActiveReplacement.source = src,
             ActiveReplacement.controller = you,
             ActiveReplacement.timestamp = ts,
-            ActiveReplacement.expiry = Expiry.Type.While you S.youControlSource,
+            ActiveReplacement.expiry = Expiry.Type.While (While.MkWhile you S.youControlSource),
             ActiveReplacement.uses = Uses.Unlimited,
             ActiveReplacement.origin = ReplacementOrigin.Other,
             ActiveReplacement.rider = Nothing
@@ -297,7 +298,7 @@ conditionalSpec s registry = Spec.describe s "Conditional" $ do
       s
       "starts"
       (Expiry.arm Map.empty S.alice srcId (Duration.ForAsLongAs S.youControlSource) gs)
-      (Just (Expiry.Type.While S.alice S.youControlSource))
+      (Just (Expiry.Type.While (While.MkWhile S.alice S.youControlSource)))
   Spec.it s "CR 611.2b the sweep DELETES the effect once the condition fails" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     warMammoth <- S.printingOf s registry "War Mammoth"
@@ -679,7 +680,7 @@ garlandSpec s registry = Spec.describe s "GarlandRoyalKidnapper" $ do
       s
       "CR 611.2b: the duration reads bob's crown, with no slot left to resolve"
       (fmap ContinuousEffect.expiry (filter (S.continuousEffectAffects bobs) (GameState.continuousEffects stolen)))
-      [Expiry.Type.While S.alice garlandCondition]
+      [Expiry.Type.While (While.MkWhile S.alice garlandCondition)]
   -- The other half of a duration: it must not end while its condition holds. A
   -- duration that never ends passes every assertion in the case above, so this
   -- and the two below are what separate the two.

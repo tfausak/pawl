@@ -3,6 +3,7 @@
 module Pawl.Codec.ExpirySpec where
 
 import qualified Pawl.Codec.Expiry as Expiry
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -14,39 +15,41 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.While as While
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
   -- CR 514.2.
   Spec.it s "AtCleanup" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Expiry.toJson
-      Expiry.fromJson
+      Expiry.codec
       Expiry.AtCleanup
       """ {"type":"AtCleanup"} """
   -- CR 611.2a: no sweep ends it.
   Spec.it s "Never" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Expiry.toJson
-      Expiry.fromJson
+      Expiry.codec
       Expiry.Never
       """ {"type":"Never"} """
   -- CR 611.2b, baked with the concrete PlayerId CR 109.5's "you" resolves to.
   Spec.it s "While carries its player and condition" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Expiry.toJson
-      Expiry.fromJson
-      (Expiry.While (PlayerId.MkPlayerId 0) (Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))))
-      """ {"type":"While","value":[0,{"type":"Compares","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}]} """
+      Expiry.codec
+      ( Expiry.While
+          While.MkWhile
+            { While.player = PlayerId.MkPlayerId 0,
+              While.condition = Condition.Compares (Compares.MkCompares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0))
+            }
+      )
+      """ {"type":"While","value":{"player":0,"condition":{"type":"Compares","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}}} """
   -- CR 611.2a, as a concrete player.
   Spec.it s "AtTurnOf carries its player" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Expiry.toJson
-      Expiry.fromJson
+      Expiry.codec
       (Expiry.AtTurnOf (PlayerId.MkPlayerId 1))
       """ {"type":"AtTurnOf","value":1} """
   -- CR 500.5, carrying the PhaseSelector window. Both grains -- a stepless
@@ -54,19 +57,17 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
   -- by EQUALITY, so a codec that collapsed them would let the end of a combat
   -- step end an effect stored against the whole combat phase.
   Spec.it s "AtEndOf carries its window" $ do
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Expiry.toJson
-      Expiry.fromJson
+      Expiry.codec
       (Expiry.AtEndOf PhaseSelector.CombatPhase)
       """ {"type":"AtEndOf","value":{"type":"CombatPhase"}} """
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Expiry.toJson
-      Expiry.fromJson
+      Expiry.codec
       (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat)))
       """ {"type":"AtEndOf","value":{"type":"Step","value":{"type":"Combat","value":{"type":"EndOfCombat"}}}} """
     Spec.assertBool
       s
-      (Expiry.toJson (Expiry.AtEndOf PhaseSelector.CombatPhase) /= Expiry.toJson (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat))))
+      (Codec.encode Expiry.codec (Expiry.AtEndOf PhaseSelector.CombatPhase) /= Codec.encode Expiry.codec (Expiry.AtEndOf (PhaseSelector.Step (Phase.Combat CombatStep.EndOfCombat))))
       "the phase and its own end-of-combat step encode differently"

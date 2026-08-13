@@ -1,52 +1,40 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.DamageEvent where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Recipient as Recipient
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.DamageEvent as DamageEvent
 
-toJson :: DamageEvent.DamageEvent -> Value.Value
-toJson ev =
-  Value.object
-    ( Common.requiredPair "source" (Codec.encode ObjectId.codec) (DamageEvent.source ev)
-        <> Common.requiredPair "target" (Codec.encode Recipient.codec) (DamageEvent.target ev)
-        <> Common.requiredPair "amount" Common.encodeNatural (DamageEvent.amount ev)
-        <> Common.optionalPair "dealtByDeathtouch" False Value.boolean (DamageEvent.dealtByDeathtouch ev)
-        <> Common.optionalPair "dealtByInfect" False Value.boolean (DamageEvent.dealtByInfect ev)
-        <> Common.optionalPair "dealtByWither" False Value.boolean (DamageEvent.dealtByWither ev)
-        <> Common.optionalPair "dealtByToxic" 0 Common.encodeNatural (DamageEvent.dealtByToxic ev)
-        -- CR 702.15b's answer is a player or nobody, so Nothing (no lifelink at
-        -- deal time) is what an absent key means.
-        <> Common.optionalPair "dealtByLifelink" Nothing (Common.encodeMaybe (Codec.encode PlayerId.codec)) (DamageEvent.dealtByLifelink ev)
-        <> Common.requiredPair "kind" (Codec.encode DamageKind.codec) (DamageEvent.kind ev)
-    )
-
-fromJson :: Value.Value -> Either Text.Text DamageEvent.DamageEvent
-fromJson value = do
-  ps <- Common.asObject value
-  s <- Common.field "source" ps >>= Codec.decode ObjectId.codec
-  t <- Common.field "target" ps >>= Codec.decode Recipient.codec
-  a <- Common.field "amount" ps >>= Common.decodeNatural
-  d <- Common.defaultedField "dealtByDeathtouch" False Common.asBoolean ps
-  i <- Common.defaultedField "dealtByInfect" False Common.asBoolean ps
-  w <- Common.defaultedField "dealtByWither" False Common.asBoolean ps
-  x <- Common.defaultedField "dealtByToxic" 0 Common.decodeNatural ps
-  l <- Common.defaultedField "dealtByLifelink" Nothing (Common.decodeMaybe (Codec.decode PlayerId.codec)) ps
-  k <- Common.field "kind" ps >>= Codec.decode DamageKind.codec
+-- | The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec DamageEvent.DamageEvent
+codec = Fields.object $ do
+  source <- Fields.required "source" ObjectId.codec DamageEvent.source
+  target <- Fields.required "target" Recipient.codec DamageEvent.target
+  amount <- Fields.required "amount" Common.natural DamageEvent.amount
+  dealtByDeathtouch <- Fields.defaulted "dealtByDeathtouch" False Common.boolean DamageEvent.dealtByDeathtouch
+  dealtByInfect <- Fields.defaulted "dealtByInfect" False Common.boolean DamageEvent.dealtByInfect
+  dealtByWither <- Fields.defaulted "dealtByWither" False Common.boolean DamageEvent.dealtByWither
+  dealtByToxic <- Fields.defaulted "dealtByToxic" 0 Common.natural DamageEvent.dealtByToxic
+  -- CR 702.15b's answer is a player or nobody, so Nothing (no lifelink at deal
+  -- time) is what an absent key means.
+  dealtByLifelink <- Fields.defaulted "dealtByLifelink" Nothing (Common.maybe PlayerId.codec) DamageEvent.dealtByLifelink
+  kind <- Fields.required "kind" DamageKind.codec DamageEvent.kind
   pure
     DamageEvent.MkDamageEvent
-      { DamageEvent.source = s,
-        DamageEvent.target = t,
-        DamageEvent.amount = a,
-        DamageEvent.dealtByDeathtouch = d,
-        DamageEvent.dealtByInfect = i,
-        DamageEvent.dealtByWither = w,
-        DamageEvent.dealtByToxic = x,
-        DamageEvent.dealtByLifelink = l,
-        DamageEvent.kind = k
+      { DamageEvent.source = source,
+        DamageEvent.target = target,
+        DamageEvent.amount = amount,
+        DamageEvent.dealtByDeathtouch = dealtByDeathtouch,
+        DamageEvent.dealtByInfect = dealtByInfect,
+        DamageEvent.dealtByWither = dealtByWither,
+        DamageEvent.dealtByToxic = dealtByToxic,
+        DamageEvent.dealtByLifelink = dealtByLifelink,
+        DamageEvent.kind = kind
       }

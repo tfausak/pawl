@@ -1,27 +1,29 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.ZoneChange where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Zone as Zone
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
-toJson :: ZoneChange.ZoneChange -> Value.Value
-toJson zc =
-  Value.object . concat $
-    [ Common.requiredPair "departed" (Codec.encode ObjectId.codec) (ZoneChange.departed zc),
-      Common.requiredPair "object" (Codec.encode ObjectId.codec) (ZoneChange.object zc),
-      Common.requiredPair "from" (Codec.encode Zone.codec) (ZoneChange.from zc),
-      Common.requiredPair "to" (Codec.encode Zone.codec) (ZoneChange.to zc)
-    ]
-
-fromJson :: Value.Value -> Either Text.Text ZoneChange.ZoneChange
-fromJson value = do
-  ps <- Common.asObject value
-  d <- Common.field "departed" ps >>= Codec.decode ObjectId.codec
-  o <- Common.field "object" ps >>= Codec.decode ObjectId.codec
-  f <- Common.field "from" ps >>= Codec.decode Zone.codec
-  t <- Common.field "to" ps >>= Codec.decode Zone.codec
-  pure (ZoneChange.MkZoneChange d o f t)
+-- | The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+--
+-- All four keys are named rather than positional, and two pairs of them share a
+-- type: CR 400.7's move has a departing id and an arriving one, and a zone it
+-- left and a zone it reached.
+codec :: Codec.Codec ZoneChange.ZoneChange
+codec = Fields.object $ do
+  departed <- Fields.required "departed" ObjectId.codec ZoneChange.departed
+  object <- Fields.required "object" ObjectId.codec ZoneChange.object
+  from <- Fields.required "from" Zone.codec ZoneChange.from
+  to <- Fields.required "to" Zone.codec ZoneChange.to
+  pure
+    ZoneChange.MkZoneChange
+      { ZoneChange.departed = departed,
+        ZoneChange.object = object,
+        ZoneChange.from = from,
+        ZoneChange.to = to
+      }
