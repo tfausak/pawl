@@ -80,9 +80,11 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
@@ -98,6 +100,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -575,7 +578,7 @@ effectCounts effect = case effect of
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
   Effect.Draw _ quantity -> quantityCounts quantity
-  Effect.Mill _ quantity _ -> quantityCounts quantity
+  Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
   Effect.Scry _ quantity -> quantityCounts quantity
   Effect.Surveil _ quantity -> quantityCounts quantity
   Effect.Fateseal _ quantity -> quantityCounts quantity
@@ -590,7 +593,7 @@ effectCounts effect = case effect of
   Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's.
-  Effect.CreateCopy quantity _ -> quantityCounts quantity
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> quantityCounts quantity
   -- The Condition is Galvanic Blast's "if you control three or more
   -- artifacts", and its Counts are as much card data as a Duration's.
   Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
@@ -2365,7 +2368,7 @@ effectFilters effect = case effect of
   Effect.PlayerSacrifices _ f quantity -> unframed (f : quantityFilters quantity)
   Effect.RestartGame -> []
   Effect.ControlPlayerNextTurn _ -> []
-  Effect.Destroy ref _ _ -> unframed (objectRefFilters ref)
+  Effect.Destroy (Destroy.MkDestroy ref _ _) -> unframed (objectRefFilters ref)
   Effect.Sacrifice _ -> []
   -- The riders reach a Filter one level further down than the ObjectRef: CR
   -- 122.6a's counters are keyed by CounterKind, and CR 122.1b's keyword counter
@@ -2376,7 +2379,7 @@ effectFilters effect = case effect of
   Effect.Draw _ quantity -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
-  Effect.Mill _ quantity mTally -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
+  Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
   Effect.Scry _ quantity -> unframed (quantityFilters quantity)
   Effect.Surveil _ quantity -> unframed (quantityFilters quantity)
   Effect.Fateseal _ quantity -> unframed (quantityFilters quantity)
@@ -2393,7 +2396,7 @@ effectFilters effect = case effect of
   Effect.Create quantity card riders _ -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's Filters are as much card text as Create's.
-  Effect.CreateCopy quantity ref -> unframed (quantityFilters quantity <> objectRefFilters ref)
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
@@ -2921,7 +2924,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches an effect that binds a reserved slot" $ do
     baneOfProgress <- S.printingOf s registry "Bane of Progress"
     let rebind slot effect = case effect of
-          Effect.Destroy ref regenerability (Just _) -> Effect.Destroy ref regenerability (Just slot)
+          Effect.Destroy (Destroy.MkDestroy ref regenerability (Just _)) -> Effect.Destroy (Destroy.MkDestroy ref regenerability (Just slot))
           other -> other
         overModal f modal =
           modal {Modal.modes = fmap (\m -> m {Mode.clauses = fmap (\c -> c {Clause.effects = fmap f (Clause.effects c)}) (Mode.clauses m)}) (Modal.modes modal)}
@@ -2969,7 +2972,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))))
+                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount))))))
                           (Map.singleton Binding.you (TargetSpec.required Pool.AnyTarget Nothing))
                       )
                   )
@@ -4262,7 +4265,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.spell = spellOf [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) buried SearchDestination.RevealThenHand] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
-              base {Face.spell = spellOf [Effect.Destroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing] Map.empty}
+              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing)] Map.empty}
             ),
             ( "CR 603.6a's trigger condition",
               base

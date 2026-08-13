@@ -34,8 +34,8 @@
                 "effects": [
                   {
                     "type": "Destroy",
-                    "value": [
-                      {
+                    "value": {
+                      "ref": {
                         "type": "EachMatching",
                         "value": {
                           "type": "HasCardType",
@@ -44,10 +44,10 @@
                           }
                         }
                       },
-                      {
+                      "regenerability": {
                         "type": "Regenerable"
                       }
-                    ]
+                    }
                   }
                 ]
               }

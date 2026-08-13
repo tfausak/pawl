@@ -7,9 +7,11 @@ import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
@@ -18,7 +20,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaProduction as ManaProduction
-import qualified Pawl.Types.MillTally as MillTally
+import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -28,7 +30,6 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
-import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -171,7 +172,7 @@ data Effect card
     -- the word to any other graveyard move, so the number comes out of
     -- Event.destroyReturning rather than off the swept list. A COUNT, not the set:
     -- a rider acting on each destroyed permanent is not implemented (#463).
-    Destroy ObjectRef.ObjectRef Regenerability.Regenerability (Maybe SlotName.SlotName)
+    Destroy Destroy.Destroy
   | -- | CR 701.21/701.21a: the slot's target permanent is sacrificed -- its
     -- CONTROLLER moves it to its OWNER's graveyard. NOT a destruction, which CR
     -- 701.21a says outright, so this consults neither indestructible (CR 702.12b)
@@ -298,7 +299,7 @@ data Effect card
     -- effect of the same resolution to read as Quantity.InSlot -- CR 728.1's
     -- "for each nonland card milled this way". Nothing for a mill nothing looks
     -- back at, which is every mill in the pool but rule 728.1's.
-    Mill PlayerRef.PlayerRef Quantity.Quantity (Maybe MillTally.MillTally)
+    Mill Mill.Mill
   | -- | CR 701.22a: the players the PlayerRef names each scry this many -- look at
     -- the top N of their own library, then put any number of them on the bottom
     -- in any order and the rest back on top in any order.
@@ -518,7 +519,7 @@ data Effect card
     -- printing behind it -- Kiki-Jiki's haste-and-sacrifice, Ochre Jelly's
     -- counters (#1255) -- and neither is in the pool, so each is owed to the
     -- first card that asks rather than to the opcode.
-    CreateCopy Quantity.Quantity ObjectRef.ObjectRef
+    CreateCopy CreateCopy.CreateCopy
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition. Fog and Drudge
     -- Skeletons' regeneration are both this opcode, differing only in the

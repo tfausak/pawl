@@ -98,16 +98,16 @@
                     "effects": [
                       {
                         "type": "Mill",
-                        "value": [
-                          {
+                        "value": {
+                          "player": {
                             "type": "InSlot",
                             "value": "target"
                           },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 2E+1
                           }
-                        ]
+                        }
                       }
                     ]
                   }
