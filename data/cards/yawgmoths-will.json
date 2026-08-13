@@ -46,18 +46,11 @@
                   },
                   {
                     "type": "Replace",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
-                        "type": "Unlimited"
-                      },
-                      {
-                        "type": "Other"
-                      },
-                      null,
-                      {
+                      "effect": {
                         "type": "ZoneChangeR",
                         "value": [
                           {
@@ -78,8 +71,14 @@
                             "type": "Exile"
                           }
                         ]
+                      },
+                      "origin": {
+                        "type": "Other"
+                      },
+                      "uses": {
+                        "type": "Unlimited"
                       }
-                    ]
+                    }
                   }
                 ]
               }

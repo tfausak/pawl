@@ -6,6 +6,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Json.Value as Value
@@ -15,9 +16,11 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastOffer as CastOffer.Type
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
@@ -56,6 +59,7 @@ import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -69,13 +73,17 @@ import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -168,8 +176,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2) (Filter.HasCardType CardType.Land) SearchDestination.BattlefieldTapped)
-      """ {"type":"Search","value":[{"type":"Relative","value":{"type":"You"}},{"type":"InSlot","value":"target"},{"type":"Literal","value":2},{"type":"HasCardType","value":{"type":"Land"}},{"type":"BattlefieldTapped"}]} """
+      ( Effect.Search
+          Search.MkSearch
+            { Search.searcher = PlayerRef.Relative PlayerRelation.You,
+              Search.owner = PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+              Search.quantity = Quantity.Literal 2,
+              Search.filter = Filter.HasCardType CardType.Land,
+              Search.destination = SearchDestination.BattlefieldTapped
+            }
+      )
+      """ {"type":"Search","value":{"searcher":{"type":"Relative","value":{"type":"You"}},"owner":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":2},"filter":{"type":"HasCardType","value":{"type":"Land"}},"destination":{"type":"BattlefieldTapped"}}} """
   Spec.it s "ExileAllGraveyards" $
     Common.assertJsonCodec
       s
@@ -541,8 +557,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Replace Duration.UntilEndOfTurn Uses.Once ReplacementOrigin.Other Nothing (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))
-      """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"Other"},null,{"type":"DestructionR","value":{"type":"Regenerate"}}]} """
+      ( Effect.Replace
+          Replace.MkReplace
+            { Replace.duration = Duration.UntilEndOfTurn,
+              Replace.uses = Uses.Once,
+              Replace.origin = ReplacementOrigin.Other,
+              Replace.condition = Nothing,
+              Replace.effect = ReplacementEffect.DestructionR DestructionRewrite.Regenerate
+            }
+      )
+      """ {"type":"Replace","value":{"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"Other"},"effect":{"type":"DestructionR","value":{"type":"Regenerate"}}}} """
   -- CR 614.15 / 616.1a: a self-replacement gated on a nonzero threshold.
   -- CR 702's ability words have no rules meaning, so "Metalcraft" itself
   -- encodes nothing.
@@ -552,13 +576,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       ( Effect.Replace
-          Duration.UntilEndOfTurn
-          Uses.Once
-          ReplacementOrigin.SelfReplacement
-          (Just (Condition.Compares (Compares.MkCompares (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3))))
-          (ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing) (DamageRewrite.SetAmount 4))
+          Replace.MkReplace
+            { Replace.duration = Duration.UntilEndOfTurn,
+              Replace.uses = Uses.Once,
+              Replace.origin = ReplacementOrigin.SelfReplacement,
+              Replace.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3))),
+              Replace.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing) (DamageRewrite.SetAmount 4)
+            }
       )
-      """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"SelfReplacement"},{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},{"type":"DamageR","value":[{"whatSource":{"type":"IsSource"}},{"type":"SetAmount","value":4}]}]} """
+      """ {"type":"Replace","value":{"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"SelfReplacement"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},"effect":{"type":"DamageR","value":[{"whatSource":{"type":"IsSource"}},{"type":"SetAmount","value":4}]}}} """
   -- CR 614.10a: a slot read, plus the whole-phase selector -- the arm a Phase
   -- alone cannot spell (CR 500.1).
   Spec.it s "SkipNextPhase" $ do
@@ -612,8 +638,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.RedirectDamage Duration.UntilEndOfTurn (Just DamageKind.Combat) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"RedirectDamage","value":[{"type":"UntilEndOfTurn"},{"type":"Combat"},{"type":"InSlot","value":"you"},{"type":"InSlot","value":"target"}]} """
+      ( Effect.RedirectDamage
+          RedirectDamage.MkRedirectDamage
+            { RedirectDamage.duration = Duration.UntilEndOfTurn,
+              RedirectDamage.kind = Just DamageKind.Combat,
+              RedirectDamage.from = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")),
+              RedirectDamage.to = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
+            }
+      )
+      """ {"type":"RedirectDamage","value":{"duration":{"type":"UntilEndOfTurn"},"kind":{"type":"Combat"},"from":{"type":"InSlot","value":"you"},"to":{"type":"InSlot","value":"target"}}} """
   -- CR 113.9: this opcode counters an ability as well as a spell, with the type
   -- unchanged, so the wire shape is too.
   Spec.it s "Counter" $
@@ -631,8 +664,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ShuffleIntoLibrary Nothing (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"ShuffleIntoLibrary","value":{"type":"InSlot","value":"target"}} """
+      ( Effect.ShuffleIntoLibrary
+          ShuffleIntoLibrary.MkShuffleIntoLibrary
+            { ShuffleIntoLibrary.library = Nothing,
+              ShuffleIntoLibrary.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
+            }
+      )
+      """ {"type":"ShuffleIntoLibrary","value":{"ref":{"type":"InSlot","value":"target"}}} """
   -- CR 701.24c's named library (Dwell on the Past's "their library"): the pair
   -- form, an ARRAY where a lone ObjectRef is a tagged object -- which is what
   -- tells the two apart.
@@ -642,10 +680,44 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       ( Effect.ShuffleIntoLibrary
-          (Just (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player"))))
-          (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "cards")))
+          ShuffleIntoLibrary.MkShuffleIntoLibrary
+            { ShuffleIntoLibrary.library = Just (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "player"))),
+              ShuffleIntoLibrary.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "cards"))
+            }
       )
-      """ {"type":"ShuffleIntoLibrary","value":[{"type":"InSlot","value":"player"},{"type":"InSlot","value":"cards"}]} """
+      """ {"type":"ShuffleIntoLibrary","value":{"library":{"type":"InSlot","value":"player"},"ref":{"type":"InSlot","value":"cards"}}} """
+  -- CR 608.2g. Written by no card -- rule 310.11b's battles and rule 702's
+  -- keywords mint this opcode in the engine (Pawl.Engine.Battle,
+  -- Pawl.Engine.Keyword) -- so this fixture is the whole of its wire coverage.
+  Spec.it s "OfferCast" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
+              OfferCast.offer = CastOffer.defaultValue
+            }
+      )
+      """ {"type":"OfferCast","value":{"slot":"exiled"}} """
+    -- CR 310.11b's two riders, which is what stops the offer being elided.
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.OfferCast
+          OfferCast.MkOfferCast
+            { OfferCast.slot = SlotName.MkSlotName (Text.pack "exiled"),
+              OfferCast.offer =
+                CastOffer.Type.MkCastOffer
+                  { CastOffer.Type.transformed = True,
+                    CastOffer.Type.withoutPayingManaCost = True,
+                    CastOffer.Type.payingInstead = Nothing
+                  }
+            }
+      )
+      """ {"type":"OfferCast","value":{"slot":"exiled","offer":{"transformed":true,"withoutPayingManaCost":true}}} """
   Spec.it s "PutCounters" $
     Common.assertJsonCodec
       s
@@ -807,26 +879,50 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ArmDelayedTrigger sacrificeIt Onset.Immediately Nothing)
-      """ {"type":"ArmDelayedTrigger","value":"sacrifice it"} """
+      ( Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = sacrificeIt,
+              ArmDelayedTrigger.onset = Onset.Immediately,
+              ArmDelayedTrigger.duration = Nothing
+            }
+      )
+      """ {"type":"ArmDelayedTrigger","value":{"name":"sacrifice it"}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ArmDelayedTrigger eachCombat Onset.Immediately (Just Duration.UntilEndOfTurn))
-      """ {"type":"ArmDelayedTrigger","value":["each combat",{"type":"UntilEndOfTurn"}]} """
+      ( Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = eachCombat,
+              ArmDelayedTrigger.onset = Onset.Immediately,
+              ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn
+            }
+      )
+      """ {"type":"ArmDelayedTrigger","value":{"name":"each combat","duration":{"type":"UntilEndOfTurn"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ArmDelayedTrigger returnIt Onset.FromYourNextTurn Nothing)
-      """ {"type":"ArmDelayedTrigger","value":["return it",{"type":"FromYourNextTurn"},null]} """
+      ( Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = returnIt,
+              ArmDelayedTrigger.onset = Onset.FromYourNextTurn,
+              ArmDelayedTrigger.duration = Nothing
+            }
+      )
+      """ {"type":"ArmDelayedTrigger","value":{"name":"return it","onset":{"type":"FromYourNextTurn"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.ArmDelayedTrigger returnIt Onset.FromYourNextTurn (Just Duration.UntilEndOfTurn))
-      """ {"type":"ArmDelayedTrigger","value":["return it",{"type":"FromYourNextTurn"},{"type":"UntilEndOfTurn"}]} """
+      ( Effect.ArmDelayedTrigger
+          ArmDelayedTrigger.MkArmDelayedTrigger
+            { ArmDelayedTrigger.name = returnIt,
+              ArmDelayedTrigger.onset = Onset.FromYourNextTurn,
+              ArmDelayedTrigger.duration = Just Duration.UntilEndOfTurn
+            }
+      )
+      """ {"type":"ArmDelayedTrigger","value":{"name":"return it","onset":{"type":"FromYourNextTurn"},"duration":{"type":"UntilEndOfTurn"}}} """
   Spec.it s "AffectPlayers" $
     Common.assertJsonCodec
       s

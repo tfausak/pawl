@@ -114,7 +114,9 @@
                 "effects": [
                   {
                     "type": "ArmDelayedTrigger",
-                    "value": "gain 2 life"
+                    "value": {
+                      "name": "gain 2 life"
+                    }
                   }
                 ]
               }

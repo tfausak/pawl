@@ -61,6 +61,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -119,6 +120,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -137,16 +139,20 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
@@ -595,7 +601,7 @@ effectCounts effect = case effect of
   Effect.AddMana _ -> []
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
   -- "up to two" -- so its Counts are reachable from here.
-  Effect.Search _ _ quantity _ _ -> quantityCounts quantity
+  Effect.Search (Search.MkSearch _ _ quantity _ _) -> quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.TemptWithTheRing -> []
@@ -630,14 +636,14 @@ effectCounts effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> quantityCounts quantity
   -- The Condition is Galvanic Blast's "if you control three or more
   -- artifacts", and its Counts are as much card data as a Duration's.
-  Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
+  Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationCounts duration <> foldMap conditionCounts condition
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider is an effect list a card authors, so its Counts are this
   -- card's Counts -- the same recursion Create takes into a minted token.
   Effect.PreventNextDamage duration _ quantity rider -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationCounts duration
-  Effect.RedirectDamage duration _ _ _ -> durationCounts duration
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationCounts duration
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
@@ -902,7 +908,7 @@ cardReplacementEffects card =
 -- the build breaks until it is.
 effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
 effectReplacements effect = case effect of
-  Effect.Replace _ _ _ _ replacement -> [replacement]
+  Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> [replacement]
   Effect.Create _ token _ _ -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
@@ -2448,7 +2454,7 @@ effectFilters effect = case effect of
     unframed (durationFilters duration <> modificationFilters modification <> objectRefFilters ref)
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
-  Effect.Search _ _ _ f _ -> unframed [f]
+  Effect.Search (Search.MkSearch _ _ _ f _) -> unframed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.TemptWithTheRing -> []
@@ -2489,7 +2495,7 @@ effectFilters effect = case effect of
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
-  Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
+  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
   -- landwalk's payload once, so a nested effect list is exactly what it must not
@@ -2498,7 +2504,7 @@ effectFilters effect = case effect of
     unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity) <> concatMap effectFilters rider
   Effect.PreventAllDamage (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
-  Effect.RedirectDamage duration _ srcRef destRef ->
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
     unframed (durationFilters duration <> objectRefFilters srcRef <> objectRefFilters destRef)
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
@@ -2515,7 +2521,7 @@ effectFilters effect = case effect of
   Effect.Transform ref -> unframed (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.GainControl (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
-  Effect.ArmDelayedTrigger _ _ mDuration -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
+  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ _ mDuration) -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers duration _ playerEffect) -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
   Effect.RequireBlock (RequireBlock.MkRequireBlock duration blocker attacker) -> unframed (durationFilters duration <> objectRefFilters blocker <> objectRefFilters attacker)
   -- CR 114.2's emblem is a whole card too.
@@ -2534,7 +2540,7 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.ChooseOpponent _ -> []
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> []
-  Effect.ShuffleIntoLibrary _ ref -> unframed (objectRefFilters ref)
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary _ ref) -> unframed (objectRefFilters ref)
   Effect.OfferCast {} -> []
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
@@ -3799,7 +3805,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           _ -> []
         readSingly effect = case effect of
-          Effect.OfferCast slot _ -> [slot]
+          Effect.OfferCast (OfferCast.MkOfferCast slot _) -> [slot]
           Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot slot) _ _ _ _ _) -> [slot]
           _ -> []
         clashes effects =
@@ -4374,7 +4380,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "a Search filter",
-              base {Face.spell = spellOf [Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) buried SearchDestination.RevealThenHand] Map.empty}
+              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
             ),
             ( "an ObjectRef.EachMatching set",
               base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing)] Map.empty}
@@ -4431,7 +4437,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Face.mulliganActions = [[Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.Literal 1) buried SearchDestination.RevealThenHand]]}
+              base {Face.mulliganActions = [[Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.destination = SearchDestination.RevealThenHand}]]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)

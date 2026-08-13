@@ -146,7 +146,9 @@
                       },
                       {
                         "type": "ArmDelayedTrigger",
-                        "value": "sacrifice it"
+                        "value": {
+                          "name": "sacrifice it"
+                        }
                       }
                     ]
                   }

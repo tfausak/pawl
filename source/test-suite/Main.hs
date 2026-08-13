@@ -16,6 +16,7 @@ import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AlternativeCostSpec
+import qualified Pawl.Codec.ArmDelayedTriggerSpec
 import qualified Pawl.Codec.AttachTargetSpec
 import qualified Pawl.Codec.AttackCostSpec
 import qualified Pawl.Codec.AttackRequirementSpec
@@ -105,6 +106,7 @@ import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
+import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
 import qualified Pawl.Codec.PhasePatternSpec
@@ -127,9 +129,11 @@ import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.PutCountersSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
+import qualified Pawl.Codec.RedirectDamageSpec
 import qualified Pawl.Codec.ReduceActivationCostSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.RemoveCountersSpec
+import qualified Pawl.Codec.ReplaceSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
 import qualified Pawl.Codec.RequireBlockSpec
@@ -140,6 +144,8 @@ import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
+import qualified Pawl.Codec.SearchSpec
+import qualified Pawl.Codec.ShuffleIntoLibrarySpec
 import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SpecialActionSpec
@@ -318,6 +324,7 @@ spec s registry = do
   Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s
+  Pawl.Codec.ArmDelayedTriggerSpec.spec s
   Pawl.Codec.AttachTargetSpec.spec s
   Pawl.Codec.AttackCostSpec.spec s
   Pawl.Codec.AttackRequirementSpec.spec s
@@ -345,11 +352,11 @@ spec s registry = do
   Pawl.Codec.CopyExceptionSpec.spec s
   Pawl.Codec.CostComponentSpec.spec s
   Pawl.Codec.CostSpec.spec s
+  Pawl.Codec.CountSpec.spec s
   Pawl.Codec.CounterKindSpec.spec s
   Pawl.Codec.CounterPatternSpec.spec s
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
-  Pawl.Codec.CountSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
   Pawl.Codec.DamageEventSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
@@ -357,10 +364,10 @@ spec s registry = do
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DaytimeSpec.spec s
   Pawl.Codec.DealDamageSpec.spec s
-  Pawl.Codec.DesignateSpec.spec s
-  Pawl.Codec.DesignationSpec.spec s
   Pawl.Codec.DefenseSpec.spec s
   Pawl.Codec.DelayedTriggerSpec.spec s
+  Pawl.Codec.DesignateSpec.spec s
+  Pawl.Codec.DesignationSpec.spec s
   Pawl.Codec.DestroySpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
@@ -407,6 +414,7 @@ spec s registry = do
   Pawl.Codec.MoveToZoneSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
   Pawl.Codec.ObjectRefSpec.spec s
+  Pawl.Codec.OfferCastSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
@@ -429,19 +437,23 @@ spec s registry = do
   Pawl.Codec.PutCountersSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
+  Pawl.Codec.RedirectDamageSpec.spec s
   Pawl.Codec.ReduceActivationCostSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
-  Pawl.Codec.RequireBlockSpec.spec s
-  Pawl.Codec.RoomIndexSpec.spec s
-  Pawl.Codec.RoundingSpec.spec s
+  Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s
+  Pawl.Codec.RequireBlockSpec.spec s
   Pawl.Codec.RevealCauseSpec.spec s
+  Pawl.Codec.RoomIndexSpec.spec s
+  Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
+  Pawl.Codec.SearchSpec.spec s
+  Pawl.Codec.ShuffleIntoLibrarySpec.spec s
   Pawl.Codec.SkipNextPhaseSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s

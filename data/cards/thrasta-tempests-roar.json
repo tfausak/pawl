@@ -15,7 +15,7 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1E+1
+          "value": 10.0
         },
         {
           "type": "OfType",

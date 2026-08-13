@@ -25,20 +25,11 @@
                 "effects": [
                   {
                     "type": "Search",
-                    "value": [
-                      {
-                        "type": "InSlot",
-                        "value": "player"
+                    "value": {
+                      "destination": {
+                        "type": "BattlefieldTapped"
                       },
-                      {
-                        "type": "InSlot",
-                        "value": "player"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
+                      "filter": {
                         "type": "And",
                         "value": [
                           {
@@ -55,10 +46,19 @@
                           }
                         ]
                       },
-                      {
-                        "type": "BattlefieldTapped"
+                      "owner": {
+                        "type": "InSlot",
+                        "value": "player"
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "searcher": {
+                        "type": "InSlot",
+                        "value": "player"
                       }
-                    ]
+                    }
                   }
                 ]
               },

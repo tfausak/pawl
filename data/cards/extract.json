@@ -21,29 +21,29 @@
                 "effects": [
                   {
                     "type": "Search",
-                    "value": [
-                      {
+                    "value": {
+                      "destination": {
+                        "type": "Exile"
+                      },
+                      "filter": {
+                        "type": "And",
+                        "value": []
+                      },
+                      "owner": {
+                        "type": "InSlot",
+                        "value": "player"
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "searcher": {
                         "type": "Relative",
                         "value": {
                           "type": "You"
                         }
-                      },
-                      {
-                        "type": "InSlot",
-                        "value": "player"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "type": "And",
-                        "value": []
-                      },
-                      {
-                        "type": "Exile"
                       }
-                    ]
+                    }
                   }
                 ]
               }

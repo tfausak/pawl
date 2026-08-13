@@ -21,16 +21,16 @@
                 "effects": [
                   {
                     "type": "ShuffleIntoLibrary",
-                    "value": [
-                      {
+                    "value": {
+                      "library": {
                         "type": "InSlot",
                         "value": "player"
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "cards"
                       }
-                    ]
+                    }
                   }
                 ]
               }

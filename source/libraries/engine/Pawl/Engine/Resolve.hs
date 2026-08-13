@@ -48,6 +48,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
@@ -112,6 +113,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.ObjectRef (ObjectRef)
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
@@ -137,14 +139,18 @@ import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
+import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.RevealCause as RevealCause
+import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import Pawl.Types.SlotArity (SlotArity)
@@ -276,7 +282,7 @@ slotsOf effect = case effect of
   Effect.AddMana _ -> Map.empty
   -- BOTH refs: Extract's library owner is the slot it targets, and a slot read
   -- only by that ref would otherwise look dangling to the dataflow lint.
-  Effect.Search searcher owner quantity _ _ ->
+  Effect.Search (Search.MkSearch searcher owner quantity _ _) ->
     joinSlots [playerRefSlots searcher, playerRefSlots owner, quantitySlots quantity]
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
@@ -323,7 +329,7 @@ slotsOf effect = case effect of
   -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
   -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
   -- one, but a dangling one would slip past the lint as ModifyTarget's would.
-  Effect.Replace duration _ _ condition _ -> joinTwo (durationSlots duration) (joinSlots (fmap conditionSlots (Maybe.maybeToList condition)))
+  Effect.Replace (Replace.MkReplace duration _ _ condition _) -> joinTwo (durationSlots duration) (joinSlots (fmap conditionSlots (Maybe.maybeToList condition)))
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase ref _) -> playerRefSlots ref
   -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
@@ -347,7 +353,7 @@ slotsOf effect = case effect of
   -- BOTH ObjectRefs. Turn the Tables reads its target slot through the
   -- DESTINATION ref, so naming only the source side would leave a declared
   -- target unread and pass the reads-equal-declares lint on a card that fizzles.
-  Effect.RedirectDamage duration _ srcRef destRef ->
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
     joinSlots [durationSlots duration, objectRefSlots srcRef, objectRefSlots destRef]
   Effect.Counter slot -> oneSlot slot
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
@@ -395,10 +401,10 @@ slotsOf effect = case effect of
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn ref _) -> playerRefSlots ref
   -- Both halves may name a slot: the ObjectRef names what is shuffled, and the
   -- PlayerRef whose library (Dwell on the Past's "target player").
-  Effect.ShuffleIntoLibrary named ref -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> joinTwo (maybe Map.empty playerRefSlots named) (objectRefSlots ref)
   -- OfferCast's slot is a READ: it names the object being offered, bound by an
   -- earlier effect of the same list (CR 400.7).
-  Effect.OfferCast slot _ -> oneSlot slot
+  Effect.OfferCast (OfferCast.MkOfferCast slot _) -> oneSlot slot
   -- Both a READ: the ObjectRef names the object being permitted, normally bound
   -- by a MoveToZone earlier in the same list (CR 400.7) exactly as OfferCast's
   -- slot is, and the Duration's Condition may read a slot as a Quantity.
@@ -508,7 +514,7 @@ slotsAreExhaustive effect = case effect of
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
   Effect.ChangeText {} -> True
   Effect.AddMana _ -> True
-  Effect.Search _ _ quantity _ _ -> Quantity.slotsAreExhaustive quantity
+  Effect.Search (Search.MkSearch _ _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
   Effect.TemptWithTheRing -> True
@@ -543,13 +549,13 @@ slotsAreExhaustive effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
   -- The ReplacementEffect holds no Quantity and no reference, so slotsOf's two
   -- unions are the whole of it once their quantities check out.
-  Effect.Replace duration _ _ condition _ ->
+  Effect.Replace (Replace.MkReplace duration _ _ condition _) ->
     durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
   Effect.PreventNextDamage duration _ quantity rider ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
   Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationSlotsAreExhaustive duration
-  Effect.RedirectDamage duration _ _ _ -> durationSlotsAreExhaustive duration
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationSlotsAreExhaustive duration
   Effect.Counter _ -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -597,8 +603,8 @@ slotsAreExhaustive effect = case effect of
   -- exhaustive.
   Effect.ChooseOpponent _ -> True
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
-  Effect.ShuffleIntoLibrary _ _ -> True
-  Effect.OfferCast _ _ -> True
+  Effect.ShuffleIntoLibrary {} -> True
+  Effect.OfferCast {} -> True
   Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration _) -> durationSlotsAreExhaustive duration
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
@@ -639,7 +645,7 @@ readsX = any effectReadsX
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
-      Effect.Search _ _ quantity _ _ -> Quantity.readsX quantity
+      Effect.Search (Search.MkSearch _ _ quantity _ _) -> Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
       Effect.TemptWithTheRing -> False
@@ -804,7 +810,7 @@ searchesLibrary effect = case effect of
 armedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
 armedAbilities effects =
   let named effect = case effect of
-        Effect.ArmDelayedTrigger name _ _ -> Just name
+        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) -> Just name
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 
@@ -817,8 +823,8 @@ armedAbilities effects =
 onsetGatedAbilities :: [Effect Card.Type.Card] -> Set AbilityName
 onsetGatedAbilities effects =
   let named effect = case effect of
-        Effect.ArmDelayedTrigger _ Onset.Immediately _ -> Nothing
-        Effect.ArmDelayedTrigger name _ _ -> Just name
+        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger _ Onset.Immediately _) -> Nothing
+        Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name _ _) -> Just name
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 
@@ -2276,7 +2282,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- Cost.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
-  Effect.Search searcherRef ownerRef quantity filter_ destination ->
+  Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ destination) ->
     -- CR 701.23a: match each library card through the PRINTED-card view -- a card
     -- in a library has no projection. Its power is CR 208.2a's exception, which
     -- is why the view is Projection.viewOfCardIn: Imperial Recruiter's "creature
@@ -2289,10 +2295,10 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           Just face -> Filter.matches searchContext (Projection.viewOfCardIn g oid face) filter_
      in do
           gs0 <- State.get
-          -- Whoever the first PlayerRef names searches -- the controller for
+          -- Whoever Search.searcher names searches -- the controller for
           -- Evolving Wilds' and Extract's `Relative You`, the targeted player for
-          -- Fertilid's Favor's `InSlot`. Whoever the second names owns the library
-          -- read: the same seat for the first two cards, the TARGET for Extract's
+          -- Fertilid's Favor's `InSlot`. Whoever Search.owner names owns the
+          -- library read: the same seat for the first two cards, the TARGET for Extract's
           -- "target player's library". The searcher is prompted and offered CR
           -- 601.3's cast; the owner's library is read and shuffled. Neither is
           -- `controller` except where a ref says so.
@@ -2943,7 +2949,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- unobservable, which is why the card's "its owner shuffles" needs nothing
   -- here: Prompt.Shuffle deliberately carries no Decider (randomness is not a
   -- choice), so there is no player for it to be asked of.
-  Effect.ShuffleIntoLibrary named ref -> do
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> do
     gs <- State.get
     let targets = objectRefObjects legal resolving controller source gs ref
         -- The owners are read from the PRE-MOVE objects, for rule 701.24c's
@@ -2957,7 +2963,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- calls a transcript can replay a fact about the rules rather than about
     -- PlayerId's Ord.
     Monad.forM_ (filter (`Set.member` owners) (Game.apnapOrder gs)) Mulligan.shuffleLibrary
-  Effect.OfferCast slot offer -> offerCast resolving controller slot offer
+  Effect.OfferCast (OfferCast.MkOfferCast slot offer) -> offerCast resolving controller slot offer
   -- CR 601.3: write the standing permission onto every object the ObjectRef
   -- names, as CR 109.5's "you" and the stated duration.
   --
@@ -3580,7 +3586,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                 -- enter simultaneously and none of them may copy a sibling.
                 Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) (Integer.toNaturalSaturating n) TapState.Untapped Map.empty)
       _ -> pure ()
-  Effect.ArmDelayedTrigger name onset duration -> do
+  Effect.ArmDelayedTrigger (ArmDelayedTrigger.MkArmDelayedTrigger name onset duration) -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and NOT belt and braces: the source can
     -- have left the battlefield an opcode earlier in this same list -- Meandering
@@ -3630,7 +3636,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                   DelayedTrigger.expiry = duration >>= \d -> Expiry.arm (Binding.playersIn legal) controller source d gs
                 }
          in State.put gs {GameState.delayedTriggers = GameState.delayedTriggers gs Seq.|> entry}
-  Effect.Replace duration uses origin condition re ->
+  Effect.Replace (Replace.MkReplace duration uses origin condition re) ->
     -- CR 614.3 / 615.3: install the floating replacement; Pawl.Engine.Replacement
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
@@ -3732,7 +3738,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     gs <- State.get
     let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
     State.modify' $ \g0 -> List.foldl' (installDamageRow (Binding.playersIn legal) controller source duration Nothing DamageRewrite.PreventAll Nothing) g0 recipients
-  Effect.RedirectDamage duration kind srcRef destRef -> do
+  Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration kind srcRef destRef) -> do
     -- CR 614.9: install a floating redirection effect -- Turn the Tables' "all
     -- combat damage that would be dealt to you this turn is dealt to target
     -- attacking creature instead". BOTH sides are baked here, because both are

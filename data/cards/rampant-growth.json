@@ -25,24 +25,11 @@
                 "effects": [
                   {
                     "type": "Search",
-                    "value": [
-                      {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
+                    "value": {
+                      "destination": {
+                        "type": "BattlefieldTapped"
                       },
-                      {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
+                      "filter": {
                         "type": "And",
                         "value": [
                           {
@@ -59,10 +46,23 @@
                           }
                         ]
                       },
-                      {
-                        "type": "BattlefieldTapped"
+                      "owner": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "searcher": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
                       }
-                    ]
+                    }
                   }
                 ]
               }
