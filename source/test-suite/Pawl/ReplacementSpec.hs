@@ -73,6 +73,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -2409,6 +2410,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   turnTheTablesSpec s registry
   gatherSpecimensSpec s registry
   shimatsuSpec s registry
+  entryBudgetSpec s registry
   riotSpec s registry
   unleashSpec s registry
   brineElementalSpec s registry
@@ -2974,6 +2976,175 @@ shimatsuSpec s registry =
         Just shimatsuId -> do
           Spec.assertEqWith s "six counters, one per OTHER permanent" (countersOn CounterKind.PlusOnePlusOne shimatsuId after) 6
           Spec.assertEqWith s "nothing else of alice's is left" (Set.toList (GameState.battlefield after)) [shimatsuId]
+
+-- CR 614.12b's board: alice controls nine untapped Islands, two untapped
+-- Forests and an untapped Bayou, a TAPPED Forest, a Mountain and a Wood
+-- Elemental, and holds a Rite of Replication. Returns the state, the Rite's
+-- hand id, the Wood Elemental, the three sacrificeable lands in the order they
+-- were added, the tapped Forest and the Mountain.
+--
+-- Wood Elemental {3}{G} Creature -- Elemental */*: "As this creature enters,
+-- sacrifice any number of untapped Forests. Wood Elemental's power and
+-- toughness are each equal to the number of Forests sacrificed as it entered."
+-- Kicked, the Rite mints FIVE token copies of it at one moment, and each token
+-- carries the copied face's own as-enters sacrifice -- so five entry costs
+-- compete for one supply of three Forests.
+--
+-- The Islands are added FIRST, so they are the lowest-id mana sources and
+-- Replay.defaultAnswer's head-of-list ChooseManaSource answer pays the whole
+-- kicked cost ({2}{U}{U} plus {5}) with them. A Forest tapped to pay for the
+-- spell would leave the assertions measuring the payment rather than the rule.
+--
+-- Three sacrificeable lands against five entering permanents is the scarcity
+-- the rule is about, and 3 and 5 are chosen so no two readings of it agree: a
+-- shared supply leaves ONE 3/3 token, a per-permanent supply leaves five, and
+-- one-each leaves three 1/1s.
+--
+-- Bayou (Land -- Swamp Forest) among the two Forests, and a tapped Forest and a
+-- Mountain beside them, so WHICH permanents went is observable rather than
+-- inferred from a count: the criterion is "untapped Forests", which the Bayou
+-- satisfies, and which the tapped Forest and the Mountain each fail on one
+-- half.
+--
+-- The Wood Elemental on the battlefield carries a +1/+1 counter, the trick
+-- Pawl.CopySpec's Clone board uses: its P/T is a sacrifice count it never made,
+-- so a 0/0 would die to CR 704.5f before the Rite could target it. Counters are
+-- not copiable (CR 707.2), so the tokens are minted off the printed */*.
+woodElementalBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId, ObjectId.ObjectId)
+woodElementalBoard island forest bayou mountain woodElemental rite =
+  let base = S.landsInPlay island 9
+      (firstForest, board1) = S.addCreature forest S.alice base
+      (secondForest, board2) = S.addCreature forest S.alice board1
+      (bayouId, board3) = S.addCreature bayou S.alice board2
+      (tappedForest, board4) = S.addCreature forest S.alice board3
+      (mountainId, board5) = S.addCreature mountain S.alice board4
+      (elementalId, board6) = S.addCreature woodElemental S.alice board5
+      (held, board7) = S.addHandCard rite S.alice (S.addCounter CounterKind.PlusOnePlusOne 1 elementalId (S.tapObject tappedForest board6))
+   in ( board7
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held,
+        elementalId,
+        [firstForest, secondForest, bayouId],
+        tappedForest,
+        mountainId
+      )
+
+-- Kick the Rite of Replication and aim it at `victim` -- PINNED to that id
+-- rather than searched for, so a mutation cannot be repaired by an answerer
+-- that finds another legal target -- answering every as-enters sacrifice with
+-- `sacrificeAnswer`.
+riteOn :: ObjectId.ObjectId -> (forall r. Prompt.Prompt r -> r) -> Prompt.Prompt a -> a
+riteOn victim sacrificeAnswer p = case p of
+  Prompt.ChooseKicker {} -> KickerDecision.Kicks
+  Prompt.ChooseTargets _ _ _ sets -> Map.map (const (Set.singleton (Recipient.ToCreature victim))) sets
+  _ -> sacrificeAnswer p
+
+-- Sacrifice the FIRST permanent of `order` that is still being offered, and
+-- nothing else. Pinned by id rather than by position in the offer: an engine
+-- that let a later entry choice see what an earlier one already spent would
+-- hand every token the same first id, where this answerer walks down the list
+-- exactly as the supply is consumed.
+sacrificesOneOf :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+sacrificesOneOf order p = case p of
+  Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates ->
+    Set.fromList (take 1 (filter (`elem` candidates) order))
+  _ -> S.identityAnswer p
+
+-- riteOn with sacrificesOneOf, as one rank-1 function: a `let` binding of the
+-- composition monomorphizes, and both S.runPure and answersFor want it
+-- polymorphic.
+riteSplitting :: ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+riteSplitting victim order = riteOn victim (sacrificesOneOf order)
+
+-- How many times a player was asked to make an as-enters sacrifice. One per
+-- entering permanent that had something to choose from -- the arm elides the
+-- prompt when nothing is offered, so this counts the entry costs that found a
+-- budget left rather than the permanents that entered.
+sacrificeAsks :: [Response.Response] -> Int
+sacrificeAsks responses =
+  let isSacrifice r = case r of
+        Response.ChoseSacrifices _ -> True
+        _ -> False
+   in length (filter isSacrifice responses)
+
+-- The names of the cards in a player's graveyard, sorted.
+graveyardNames :: PlayerId.PlayerId -> GameState.GameState -> [CardName.CardName]
+graveyardNames pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs))
+
+-- The tokens on the battlefield, newest first.
+tokensOnBattlefield :: GameState.GameState -> [ObjectId.ObjectId]
+tokensOnBattlefield gs = List.sortOn Ord.Down (filter (`Game.isToken` gs) (Set.toList (GameState.battlefield gs)))
+
+entryBudgetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+entryBudgetSpec s registry =
+  Spec.describe s "One budget for simultaneous entry costs (CR 614.12b)" $ do
+    -- THE PROVING BOARD for CR 614.12b and CR 614.13b, with a greedy answerer:
+    -- the first token to be asked takes every Forest there is, and the four
+    -- entering beside it are left with nothing to sacrifice and no prompt at
+    -- all. Five permanents, three Forests, one 3/3.
+    --
+    -- CR 614.13b ("the same object can't be chosen to change zones more than
+    -- once when applying replacement effects that modify how one or more
+    -- permanents enter the battlefield") is the sharper half of the citation,
+    -- and the P/T is what observes it: the arm counts what was CHOSEN, so an
+    -- engine that offered a spent Forest to the next token would stamp the same
+    -- three on all five and leave five 3/3s, even though the sacrifice funnel
+    -- would move nothing the second time.
+    Spec.it s "a greedy first choice leaves the four entering beside it nothing (CR 614.12b, CR 614.13b)" $ do
+      island <- S.printingOf s registry "Island"
+      forest <- S.printingOf s registry "Forest"
+      bayou <- S.printingOf s registry "Bayou"
+      mountain <- S.printingOf s registry "Mountain"
+      woodElemental <- S.printingOf s registry "Wood Elemental"
+      rite <- S.printingOf s registry "Rite of Replication"
+      let (gs, held, elementalId, sacrificeable, tappedForest, mountainId) = woodElementalBoard island forest bayou mountain woodElemental rite
+          play = S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority
+          after = S.runPure (riteOn elementalId sacrificesAll) gs play
+          asks = sacrificeAsks (answersFor (riteOn elementalId sacrificesAll) gs play)
+      Spec.assertEqWith s "one token survived, and it is the 3/3 that got all three" (fmap (\oid -> S.powerToughnessOf oid after) (tokensOnBattlefield after)) [Just (3, 3)]
+      Spec.assertEqWith s "only ONE of the five entry costs found anything to spend" asks 1
+      Spec.assertEqWith s "the two Forests and the Bayou all left the battlefield" (filter (\oid -> Set.member oid (GameState.battlefield after)) sacrificeable) []
+      -- BY NAME, not by id: CR 400.7's new object gets a fresh id on the way to
+      -- the graveyard, so the ids the fixture holds name only the battlefield
+      -- incarnations. Three cards and no more is the other half of the
+      -- assertion above -- nothing was sacrificed twice.
+      Spec.assertEqWith s "the two Forests and the Bayou are alice's whole graveyard, beside the spent Rite" (graveyardNames S.alice after) (fmap (CardName.MkCardName . Text.pack) ["Bayou", "Forest", "Forest", "Rite of Replication"])
+      Spec.assertBool s (Set.member tappedForest (GameState.battlefield after)) "the TAPPED Forest was never offered"
+      Spec.assertBool s (Set.member mountainId (GameState.battlefield after)) "nor was the Mountain"
+      Spec.assertEqWith s "the copied Wood Elemental is untouched" (S.powerToughnessOf elementalId after) (Just (1, 1))
+    -- The same board, the same five entering permanents and the same supply,
+    -- with the one answer changed: each entry cost spends ONE named Forest
+    -- rather than all of them. The budget NARROWS the later choices rather than
+    -- only emptying them -- three tokens are asked and each gets a different
+    -- land, the fourth and fifth are asked nothing.
+    --
+    -- The paired control for the case above: the two boards differ in exactly
+    -- the answer, and they disagree about how many tokens survive and at what
+    -- size, so neither can pass for the other's reason.
+    Spec.it s "each later choice sees only what the earlier ones left (CR 614.12b)" $ do
+      island <- S.printingOf s registry "Island"
+      forest <- S.printingOf s registry "Forest"
+      bayou <- S.printingOf s registry "Bayou"
+      mountain <- S.printingOf s registry "Mountain"
+      woodElemental <- S.printingOf s registry "Wood Elemental"
+      rite <- S.printingOf s registry "Rite of Replication"
+      let (gs, held, elementalId, sacrificeable, _, _) = woodElementalBoard island forest bayou mountain woodElemental rite
+          play = S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority
+          after = S.runPure (riteSplitting elementalId sacrificeable) gs play
+          asks = sacrificeAsks (answersFor (riteSplitting elementalId sacrificeable) gs play)
+      Spec.assertEqWith s "three tokens survived, each a 1/1 off one Forest" (fmap (\oid -> S.powerToughnessOf oid after) (tokensOnBattlefield after)) [Just (1, 1), Just (1, 1), Just (1, 1)]
+      Spec.assertEqWith s "three of the five entry costs found something to spend" asks 3
+      Spec.assertEqWith s "all three lands went, one apiece" (filter (\oid -> Set.member oid (GameState.battlefield after)) sacrificeable) []
 
 -- alice controls `mountains` untapped Mountains and `forests` untapped Forests
 -- in a precombat main phase with priority, holding one card per printing in
