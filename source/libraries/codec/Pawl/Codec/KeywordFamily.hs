@@ -35,7 +35,8 @@ codec =
       Arm.nullary "Fabricate" KeywordFamily.Fabricate,
       Arm.nullary "Afflict" KeywordFamily.Afflict,
       Arm.nullary "Afterlife" KeywordFamily.Afterlife,
-      Arm.nullary "Toxic" KeywordFamily.Toxic
+      Arm.nullary "Toxic" KeywordFamily.Toxic,
+      Arm.nullary "Plot" KeywordFamily.Plot
     ]
   where
     encode f = Common.nullary $ case f of
@@ -61,3 +62,4 @@ codec =
       KeywordFamily.Afflict -> "Afflict"
       KeywordFamily.Afterlife -> "Afterlife"
       KeywordFamily.Toxic -> "Toxic"
+      KeywordFamily.Plot -> "Plot"

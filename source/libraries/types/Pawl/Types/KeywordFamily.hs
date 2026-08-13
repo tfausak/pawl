@@ -87,4 +87,6 @@ data KeywordFamily
   | -- | CR 702.164a: toxic N. The family Flensing Raptor's "another target
     -- creature you control with toxic" names.
     Toxic
+  | -- | CR 702.170a: plot [cost].
+    Plot
   deriving (Eq, Ord, Show)

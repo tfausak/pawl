@@ -171,6 +171,7 @@ createCard pid printing = do
             Object.turnedOverAt = Nothing,
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
+            Object.plotted = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,

@@ -35,6 +35,7 @@ import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Rad as Rad
 import qualified Pawl.Engine.Replacement as Replacement
@@ -850,6 +851,7 @@ placeBorne srcId pending = do
             Object.turnedOverAt = Nothing,
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
+            Object.plotted = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -1336,6 +1338,15 @@ priorityLoop = do
                               -- TurnFaceUp arm's shape above applies unchanged --
                               -- the payment goes on nothing and no player gets a
                               -- window to respond to it.
+                              -- CR 116.2k / 702.170b: a special action too, so the
+                              -- TurnFaceUp arm's shape above applies unchanged --
+                              -- nothing goes on the stack and no player gets a
+                              -- window to respond to the payment or the exile.
+                              Action.Type.Plot oid -> do
+                                Plot.plot p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
                               Action.Type.Ignore oid -> do
                                 Ignore.ignore p oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})

@@ -234,6 +234,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Nightbound -> []
   Keyword.Decayed -> List.genericReplicate count decayed
   Keyword.Toxic _ -> []
+  Keyword.Plot _ -> []
   Keyword.StartYourEngines -> []
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
@@ -325,6 +326,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  Keyword.Plot _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -513,6 +515,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  Keyword.Plot _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -771,6 +774,14 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  -- CR 702.170a is a static ability functioning in a HAND, and what it grants
+  -- is CR 116.2k's special action rather than a cast: nothing here. CR
+  -- 702.170d's permission to cast the card from EXILE belongs to the PLOTTED
+  -- card and not to the keyword -- "a plotted card may be cast this way even if
+  -- it doesn't have the plot ability while in exile" -- so it is object state
+  -- (Object.plotted) that Pawl.Engine.Cast.permitsCastFromExile reads, the
+  -- shape CR 715.3d's Adventure permission already has.
+  Keyword.Plot _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -932,6 +943,26 @@ entwineCost :: Set Keyword -> Maybe (Cost Keyword)
 entwineCost keywords =
   let costOf keyword = case keyword of
         Keyword.Entwine cost -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- CR 702.170a: what CR 116.2k's special action costs -- "you may exile this card
+-- from your hand and PAY [COST]" -- or Nothing when the card has no plot. Read by
+-- Pawl.Engine.Plot, which is the only caller.
+--
+-- The cost of the ACTION and never of the cast, which is the mirror of
+-- flashbackCost above: rule 702.170d makes the later cast free, so nothing
+-- consults this from Pawl.Engine.Cost.
+--
+-- A wildcard rather than an exhaustive case, exactly as flashbackCost.
+--
+-- Nothing beyond the FIRST plot cost is reachable: a card printing two plot
+-- abilities is expressible and unrepresented, as for flashback and entwine, and
+-- no printing does it.
+plotCost :: Set Keyword -> Maybe (Cost Keyword)
+plotCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Plot cost -> Just cost
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
@@ -1130,6 +1161,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  Keyword.Plot _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1263,6 +1295,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Decayed -> [CombatRestriction.CantBlock (Affected.Matching Filter.IsSource) Nothing]
   Keyword.Training -> []
   Keyword.Toxic _ -> []
+  Keyword.Plot _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1311,6 +1344,7 @@ familyOf keyword = case keyword of
   Keyword.Rampage _ -> Just KeywordFamily.Rampage
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
+  Keyword.Plot _ -> Just KeywordFamily.Plot
   Keyword.Deathtouch -> Nothing
   Keyword.Defender -> Nothing
   Keyword.DoubleStrike -> Nothing
