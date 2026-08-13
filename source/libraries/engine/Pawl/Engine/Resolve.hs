@@ -58,12 +58,14 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import Pawl.Types.Effect (Effect)
@@ -84,6 +86,7 @@ import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
@@ -242,7 +245,7 @@ slotsOf effect = case effect of
   -- The third field is a DEFINITION (how many this sweep destroyed), not a read,
   -- so it belongs to boundSlots below and must not appear here -- Create's and
   -- PlaySubgame's slots take the same posture.
-  Effect.Destroy ref _ _ -> objectRefSlots ref
+  Effect.Destroy (Destroy.MkDestroy ref _ _) -> objectRefSlots ref
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown slot -> oneSlot slot
   Effect.RemoveFromCombat slot -> oneSlot slot
@@ -251,7 +254,7 @@ slotsOf effect = case effect of
   -- The tally's slot is a DEFINITION (how many of them counted), not a read, so
   -- it belongs to boundSlots below -- Destroy's third field takes the same
   -- posture, for the same reason.
-  Effect.Mill ref quantity _ -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Mill (Mill.MkMill ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Scry ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Surveil ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Fateseal ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -268,7 +271,7 @@ slotsOf effect = case effect of
   -- which is a target on Cackling Counterpart and the reserved self slot on
   -- Watchful Radstag. Both are reads; only the first is a target (CR 115.10a).
   -- Its Quantity is a read like Create's.
-  Effect.CreateCopy quantity ref -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> joinTwo (quantitySlots quantity) (objectRefSlots ref)
   -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
   -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
   -- one, but a dangling one would slip past the lint as ModifyTarget's would.
@@ -468,7 +471,7 @@ slotsAreExhaustive effect = case effect of
   Effect.RemoveFromCombat _ -> True
   Effect.MoveToZone {} -> True
   Effect.Draw _ quantity -> Quantity.slotsAreExhaustive quantity
-  Effect.Mill _ quantity _ -> Quantity.slotsAreExhaustive quantity
+  Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.Scry _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Surveil _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal _ quantity -> Quantity.slotsAreExhaustive quantity
@@ -482,7 +485,7 @@ slotsAreExhaustive effect = case effect of
   -- with its own empty bindings, so nothing in it sees this environment.
   Effect.Create quantity _ _ _ -> Quantity.slotsAreExhaustive quantity
   -- The ObjectRef is reported by slotsOf, so only the count can hide a slot.
-  Effect.CreateCopy quantity _ -> Quantity.slotsAreExhaustive quantity
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
   -- The ReplacementEffect holds no Quantity and no reference, so slotsOf's two
   -- unions are the whole of it once their quantities check out.
   Effect.Replace duration _ _ condition _ ->
@@ -591,7 +594,7 @@ readsX = any effectReadsX
       Effect.RemoveFromCombat _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw _ quantity -> Quantity.readsX quantity
-      Effect.Mill _ quantity _ -> Quantity.readsX quantity
+      Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
       Effect.Scry _ quantity -> Quantity.readsX quantity
       Effect.Surveil _ quantity -> Quantity.readsX quantity
       Effect.Fateseal _ quantity -> Quantity.readsX quantity
@@ -602,7 +605,7 @@ readsX = any effectReadsX
       Effect.ExchangeLifeTotals _ -> False
       Effect.IncreaseSpeed _ quantity -> Quantity.readsX quantity
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
-      Effect.CreateCopy quantity _ -> Quantity.readsX quantity
+      Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too, an X-cost shield's rider being
@@ -788,10 +791,10 @@ boundSlots effect = case effect of
   Effect.PlaySubgame slot -> Set.singleton slot
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
   -- each ... destroyed this way" to read as a Quantity.
-  Effect.Destroy _ _ mSlot -> foldMap Set.singleton mSlot
+  Effect.Destroy (Destroy.MkDestroy _ _ mSlot) -> foldMap Set.singleton mSlot
   -- How many of the cards this mill put in the graveyard matched the tally's
   -- filter, for CR 728.1's "for each nonland card milled this way" to read.
-  Effect.Mill _ _ mTally -> foldMap (Set.singleton . MillTally.slot) mTally
+  Effect.Mill (Mill.MkMill _ _ mTally) -> foldMap (Set.singleton . MillTally.slot) mTally
   Effect.Scry {} -> Set.empty
   Effect.Surveil {} -> Set.empty
   Effect.Fateseal {} -> Set.empty
@@ -2328,7 +2331,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           gs {GameState.pendingControl = Map.insert target (Decider.MkDecider controller) (GameState.pendingControl gs)}
         -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
         _ -> gs
-  Effect.Destroy ref regenerability mSlot -> do
+  Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot) -> do
     gs <- State.get
     -- CR 701.8: destroy them through the single funnel -- indestructible (CR
     -- 702.12b) and regeneration (CR 701.19a) are Event.destroy's to decide. The
@@ -2752,7 +2755,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             Monad.forM_ drawers $ \pid ->
               Monad.replicateM_ (Integer.toIntSaturating n) (Event.drawCard pid)
       _ -> pure ()
-  Effect.Mill ref quantity mTally -> do
+  Effect.Mill (Mill.MkMill ref quantity mTally) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -3130,7 +3133,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
                 State.modify' (bindSlot resolving slot named)
       _ -> pure ()
-  Effect.CreateCopy quantity ref -> do
+  Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> do
     gs <- State.get
     -- CR 707.2 / 111.3: this many tokens per named permanent, minted through the same
     -- CR 111.2 funnel a given-text token uses, carrying the copied permanent's
@@ -3161,8 +3164,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         | n > 0 ->
             Monad.forM_ sources $ \src ->
               Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
-                -- No riders: CR 707.2 copies no counters, and Effect.CreateCopy
-                -- carries nothing for an effect to add any with.
+                -- No riders: CR 707.2 copies no counters, and Effect.CreateCopy (CreateCopy.MkCreateCopy
+                -- carries) nothing for an effect to add any with.
                 --
                 -- Not implemented: a copy token an effect says enters with counters on it
                 -- (Ochre Jelly, Littjara Mirrorlake) arrives bare (#1255).

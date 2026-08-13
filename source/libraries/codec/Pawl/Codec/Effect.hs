@@ -8,9 +8,11 @@ import qualified Pawl.Codec.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
+import qualified Pawl.Codec.CreateCopy as CreateCopy
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Daytime as Daytime
 import qualified Pawl.Codec.Designation as Designation
+import qualified Pawl.Codec.Destroy as Destroy
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
@@ -19,7 +21,7 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Codec.ManaProduction as ManaProduction
-import qualified Pawl.Codec.MillTally as MillTally
+import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
 import qualified Pawl.Codec.ObjectRef as ObjectRef
@@ -29,7 +31,6 @@ import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Quantity as Quantity
-import qualified Pawl.Codec.Regenerability as Regenerability
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Codec.SearchDestination as SearchDestination
@@ -49,7 +50,6 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.Onset as Onset
-import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
 
@@ -70,11 +70,7 @@ toJson codec e = case e of
   Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Value.array [Codec.encode SlotName.codec slot, Codec.encode (Filter.codec Keyword.codec) f, Codec.encode Quantity.codec q]))
   Effect.RestartGame -> Common.nullary "RestartGame"
   Effect.ControlPlayerNextTurn s -> Common.tagged "ControlPlayerNextTurn" (Just (Codec.encode SlotName.codec s))
-  -- The bound-count slot is ELIDED when absent, so a card that says nothing
-  -- about counting its sweep keeps its two-element payload.
-  Effect.Destroy s r ms ->
-    Common.tagged "Destroy" . Just . Value.array $
-      [Codec.encode ObjectRef.codec s, Codec.encode Regenerability.codec r] <> fmap (Codec.encode SlotName.codec) (Maybe.maybeToList ms)
+  Effect.Destroy d -> Common.tagged "Destroy" . Just $ Codec.encode Destroy.codec d
   Effect.Sacrifice s -> Common.tagged "Sacrifice" (Just (Codec.encode SlotName.codec s))
   Effect.TurnFaceDown s -> Common.tagged "TurnFaceDown" (Just (Codec.encode SlotName.codec s))
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (Codec.encode SlotName.codec s))
@@ -105,11 +101,7 @@ toJson codec e = case e of
   Effect.Surveil r q -> Common.tagged "Surveil" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
   Effect.Fateseal r q -> Common.tagged "Fateseal" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
   Effect.Explore r -> Common.tagged "Explore" (Just (Codec.encode ObjectRef.codec r))
-  -- The tally is ELIDED when absent, as Destroy's bound-count slot is, so a mill
-  -- nothing looks back at keeps its two-element payload.
-  Effect.Mill r q mt ->
-    Common.tagged "Mill" . Just . Value.array $
-      [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q] <> fmap MillTally.toJson (Maybe.maybeToList mt)
+  Effect.Mill m -> Common.tagged "Mill" . Just $ Codec.encode Mill.codec m
   Effect.Discard s q -> Common.tagged "Discard" (Just (Value.array [Codec.encode SlotName.codec s, Codec.encode Quantity.codec q]))
   Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
   Effect.GainLife r q -> Common.tagged "GainLife" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
@@ -124,13 +116,7 @@ toJson codec e = case e of
       [Codec.encode Quantity.codec q, codec c]
         <> (if te == EntryRiders.defaultValue then [] else [EntryRiders.toJson te])
         <> fmap (Codec.encode SlotName.codec) (Maybe.maybeToList ms)
-  -- The count is ELIDED when it is one, which is Mill's tally posture and
-  -- Create's riders': every card that mints a single copy keeps the bare
-  -- ObjectRef it has always had, and only a card that mints several spells the
-  -- pair out.
-  Effect.CreateCopy q r
-    | q == Quantity.Literal 1 -> Common.tagged "CreateCopy" (Just (Codec.encode ObjectRef.codec r))
-    | otherwise -> Common.tagged "CreateCopy" (Just (Value.array [Codec.encode Quantity.codec q, Codec.encode ObjectRef.codec r]))
+  Effect.CreateCopy c -> Common.tagged "CreateCopy" . Just $ Codec.encode CreateCopy.codec c
   Effect.Replace d u o c re ->
     Common.tagged "Replace" . Just . Value.array $
       [Duration.toJson d, Codec.encode Uses.codec u, Codec.encode ReplacementOrigin.codec o, Common.encodeMaybe (Codec.encode Condition.codec) c, ReplacementEffect.toJson re]
@@ -276,10 +262,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "PlayerSacrifices expects [slot, filter, quantity]"
     "RestartGame" -> Right Effect.RestartGame
     "ControlPlayerNextTurn" -> Common.withValue mv (fmap Effect.ControlPlayerNextTurn . Codec.decode SlotName.codec)
-    "Destroy" -> case mv of
-      Just (Value.Array (Array.MkArray [sv, rv])) -> Effect.Destroy <$> Codec.decode ObjectRef.codec sv <*> Codec.decode Regenerability.codec rv <*> pure Nothing
-      Just (Value.Array (Array.MkArray [sv, rv, nv])) -> Effect.Destroy <$> Codec.decode ObjectRef.codec sv <*> Codec.decode Regenerability.codec rv <*> (Just <$> Codec.decode SlotName.codec nv)
-      _ -> Left . Text.pack $ "Destroy expects [objectRef, regenerability], optionally with a slot"
+    "Destroy" -> Common.withValue mv (fmap Effect.Destroy . Codec.decode Destroy.codec)
     "Sacrifice" -> Common.withValue mv (fmap Effect.Sacrifice . Codec.decode SlotName.codec)
     "TurnFaceDown" -> Common.withValue mv (fmap Effect.TurnFaceDown . Codec.decode SlotName.codec)
     "RemoveFromCombat" -> Common.withValue mv (fmap Effect.RemoveFromCombat . Codec.decode SlotName.codec)
@@ -305,10 +288,7 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Fateseal <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
       _ -> Left . Text.pack $ "Fateseal expects [playerRef, quantity]"
     "Explore" -> Common.withValue mv (fmap Effect.Explore . Codec.decode ObjectRef.codec)
-    "Mill" -> case mv of
-      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Mill <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q <*> pure Nothing
-      Just (Value.Array (Array.MkArray [r, q, tv])) -> Effect.Mill <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q <*> (Just <$> MillTally.fromJson tv)
-      _ -> Left . Text.pack $ "Mill expects [playerRef, quantity], optionally with a tally"
+    "Mill" -> Common.withValue mv (fmap Effect.Mill . Codec.decode Mill.codec)
     "Discard" -> case mv of
       Just (Value.Array (Array.MkArray [s, q])) -> Effect.Discard <$> Codec.decode SlotName.codec s <*> Codec.decode Quantity.codec q
       _ -> Left . Text.pack $ "Discard expects [slot, quantity]"
@@ -331,14 +311,7 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [q, c, s])) -> Effect.Create <$> Codec.decode Quantity.codec q <*> decode c <*> pure EntryRiders.defaultValue <*> (Just <$> Codec.decode SlotName.codec s)
       Just (Value.Array (Array.MkArray [q, c, e, s])) -> Effect.Create <$> Codec.decode Quantity.codec q <*> decode c <*> EntryRiders.fromJson e <*> (Just <$> Codec.decode SlotName.codec s)
       _ -> Left . Text.pack $ "Create expects [Quantity, Card], optionally with EntryRiders and/or a slot"
-    -- Told apart by LENGTH. Not implemented: a ref whose own encoding is a
-    -- two-element array is read as this pair and fails on the quantity, so
-    -- ObjectRef.TopOfLibrary has no bare spelling here (#1311). A three-element
-    -- one -- ObjectRef.EachCardInGraveyard -- falls through to the bare-ref
-    -- branch and is unaffected.
-    "CreateCopy" -> case mv of
-      Just (Value.Array (Array.MkArray [q, r])) -> Effect.CreateCopy <$> Codec.decode Quantity.codec q <*> Codec.decode ObjectRef.codec r
-      _ -> Common.withValue mv (fmap (Effect.CreateCopy (Quantity.Literal 1)) . Codec.decode ObjectRef.codec)
+    "CreateCopy" -> Common.withValue mv (fmap Effect.CreateCopy . Codec.decode CreateCopy.codec)
     -- The three shapes the encoder above can emit, told apart by LENGTH.
     "ArmDelayedTrigger" -> case mv of
       Just (Value.Array (Array.MkArray [n, o, d])) ->

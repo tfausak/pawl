@@ -66,6 +66,7 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -3005,7 +3006,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         -- illegal (it's no longer a legal CreatureTarget), while the
         -- reserved slot -- never targeted -- stays vacuously legal.
         gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-        mode = Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]))) specs
+        mode = Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Destroy (Destroy.MkDestroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing), Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]))) specs
         run = Resolve.resolveModes abilId source [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)]
         after = snd (Engine.runGamePure S.identityAnswer gone run)
     Spec.assertEqWith s "the targetless Draw did not run: the ability fizzled" (S.handSize S.alice after) handBefore

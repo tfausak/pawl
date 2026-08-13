@@ -16,10 +16,9 @@ spec s =
   Spec.describe s "Pawl.Codec.MillTally"
     -- CR 728.1's own tally: "for each NONLAND card milled this way".
     . Spec.it s "MkMillTally, a slot and a filter"
-    $ Common.assertJsonCodec
+    $ Common.assertCodec
       s
-      MillTally.toJson
-      MillTally.fromJson
+      MillTally.codec
       MillTally.MkMillTally
         { MillTally.slot = SlotName.MkSlotName (Text.pack "milled"),
           MillTally.filter = Filter.Not (Filter.HasCardType CardType.Land)
