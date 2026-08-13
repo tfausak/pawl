@@ -14,8 +14,10 @@ import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.WithCounters as WithCounters
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
@@ -74,8 +76,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       EntryRewrite.codec
-      (EntryRewrite.WithCounters CounterKind.Loyalty 3)
-      """ {"type":"WithCounters","value":[{"type":"Loyalty"},3]} """
+      (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty 3))
+      """ {"type":"WithCounters","value":{"kind":{"type":"Loyalty"},"amount":3}} """
   -- CR 702.136a: riot's rewrite, payload-free because rule 702.136a fixes both
   -- halves. Minted from a keyword rather than written by a card, and round-tripped
   -- anyway, because every arm of this type is.
@@ -128,8 +130,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       EntryRewrite.codec
-      (EntryRewrite.SacrificeAnyNumber (Filter.And []) (Just CounterKind.PlusOnePlusOne))
-      """ {"type":"SacrificeAnyNumber","value":[{"type":"And","value":[]},{"type":"PlusOnePlusOne"}]} """
+      (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.And []) (Just CounterKind.PlusOnePlusOne)))
+      """ {"type":"SacrificeAnyNumber","value":{"filter":{"type":"And","value":[]},"kind":{"type":"PlusOnePlusOne"}}} """
   -- The same rewrite buying no counters: Wood Elemental's count is read back by
   -- a characteristic-defining ability instead (CR 208.2a), so the second element
   -- is null. Its criterion is the narrowing one -- an untapped Forest (CR 110.5).
@@ -137,6 +139,6 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       EntryRewrite.codec
-      (EntryRewrite.SacrificeAnyNumber (Filter.And [Filter.HasSubtype Subtype.Forest, Filter.Not Filter.IsTapped]) Nothing)
-      """ {"type":"SacrificeAnyNumber","value":[{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Forest"}},{"type":"Not","value":{"type":"IsTapped"}}]},null]} """
+      (EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber (Filter.And [Filter.HasSubtype Subtype.Forest, Filter.Not Filter.IsTapped]) Nothing))
+      """ {"type":"SacrificeAnyNumber","value":{"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Forest"}},{"type":"Not","value":{"type":"IsTapped"}}]},"kind":null}} """
   Spec.it s "has a schema" $ Common.assertHasSchema s EntryRewrite.codec

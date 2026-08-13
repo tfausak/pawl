@@ -103,6 +103,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.WithCounters as WithCounters
 
 -- CR 613.1: the layer a modification applies in. A classification, never the
 -- modification's identity.
@@ -3701,7 +3702,7 @@ intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
 intrinsicReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
   -- is Filter.IsSource.
-  ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Loyalty n)
+  ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty n))
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
   ]
@@ -3709,7 +3710,7 @@ intrinsicReplacementsOf pc =
     -- counters on it equal to its printed defense number" -- CR 306.5b's clause
     -- one rule number over, keyed on the projected card type and reading the
     -- projected defense for the same three reasons.
-    <> [ ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Defense n)
+    <> [ ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Defense n))
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]

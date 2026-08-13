@@ -170,6 +170,7 @@ import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RevealedSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
+import qualified Pawl.Codec.SacrificeAnyNumberSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
@@ -207,6 +208,7 @@ import qualified Pawl.Codec.UntapRestrictionSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
 import qualified Pawl.Codec.WhileSpec
+import qualified Pawl.Codec.WithCountersSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
 import qualified Pawl.Codec.ZoneSpec
@@ -515,6 +517,7 @@ spec s registry = do
   Pawl.Codec.RevealedSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
+  Pawl.Codec.SacrificeAnyNumberSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
@@ -552,6 +555,7 @@ spec s registry = do
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.VentureMarkerEnteredSpec.spec s
   Pawl.Codec.WhileSpec.spec s
+  Pawl.Codec.WithCountersSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s
   Pawl.Codec.ZoneSpec.spec s

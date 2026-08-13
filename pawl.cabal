@@ -388,6 +388,8 @@ library codec
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
     Pawl.Codec.RoundingSpec
+    Pawl.Codec.SacrificeAnyNumber
+    Pawl.Codec.SacrificeAnyNumberSpec
     Pawl.Codec.SacrificeRestriction
     Pawl.Codec.SacrificeRestrictionSpec
     Pawl.Codec.Scaling
@@ -462,6 +464,8 @@ library codec
     Pawl.Codec.VentureMarkerEnteredSpec
     Pawl.Codec.While
     Pawl.Codec.WhileSpec
+    Pawl.Codec.WithCounters
+    Pawl.Codec.WithCountersSpec
     Pawl.Codec.Zone
     Pawl.Codec.ZoneChange
     Pawl.Codec.ZoneChangePattern
@@ -982,6 +986,7 @@ library types
     Pawl.Types.Revealed
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
+    Pawl.Types.SacrificeAnyNumber
     Pawl.Types.SacrificeRestriction
     Pawl.Types.Scaling
     Pawl.Types.Scope
@@ -1026,6 +1031,7 @@ library types
     Pawl.Types.Uses
     Pawl.Types.VentureMarkerEntered
     Pawl.Types.While
+    Pawl.Types.WithCounters
     Pawl.Types.Zone
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern

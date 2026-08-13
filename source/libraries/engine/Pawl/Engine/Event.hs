@@ -128,6 +128,7 @@ import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Revealed as Revealed
+import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -150,6 +151,7 @@ import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import Pawl.Types.TurnWindow (TurnWindow)
 import qualified Pawl.Types.TurnWindow as TurnWindow
 import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
+import qualified Pawl.Types.WithCounters as WithCounters
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
@@ -848,7 +850,7 @@ apply batch candidate event =
       -- counters are placed here rather than folded into the entry event's own
       -- payload. Consumed like every other arm, so CR 614.5 keeps the loop's next
       -- iteration from placing them twice.
-      EntryRewrite.WithCounters kind n -> do
+      EntryRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         Monad.void (putOwnCounters oid kind n)
         pure (Just event)
@@ -936,7 +938,7 @@ apply batch candidate event =
       -- choice and CAN be unpayable (Frankenstein's Monster's X) would need the
       -- forward check the rule literally describes; no EntryRewrite arm carries
       -- one (#1395).
-      EntryRewrite.SacrificeAnyNumber criterion kind -> do
+      EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber criterion kind) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         case Projection.controllerOf oid gs of
@@ -1307,7 +1309,7 @@ apply batch candidate event =
     -- accompanied by it, so Just is returned and FaceDown.turnFaceUp goes on to
     -- record CR 708.7's event.
     (ReplacementEffect.TurnUpR _ rewrite, ProposedEvent.WouldTurnFaceUp oid) -> case rewrite of
-      TurnUpRewrite.WithCounters kind n -> do
+      TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         Monad.void (putOwnCounters oid kind n)
         pure (Just event)

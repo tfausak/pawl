@@ -154,6 +154,7 @@ import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
@@ -2358,13 +2359,13 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []
-  EntryRewrite.WithCounters _ _ -> []
+  EntryRewrite.WithCounters {} -> []
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []
   EntryRewrite.Tapped -> []
   EntryRewrite.PayLifeOrTapped _ -> []
-  EntryRewrite.SacrificeAnyNumber f _ -> [f]
+  EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f _) -> [f]
 
 -- The Filter a TurnUpRewrite carries. CR 303.4k's destination text -- Gift of
 -- Doom's "you may attach it to a creature" -- and NOT framed, even though an
@@ -2374,7 +2375,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 -- text. That is why this list feeds `unframed` with every other position.
 turnUpRewriteFilters :: TurnUpRewrite.TurnUpRewrite -> [Filter.Type.Filter Keyword.Keyword]
 turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
-  TurnUpRewrite.WithCounters _ _ -> []
+  TurnUpRewrite.WithCounters {} -> []
   TurnUpRewrite.MayAttachTo f -> [f]
 
 -- CR 614.1c-e: four replacement patterns narrow by a Filter. CounterPattern.onWhat

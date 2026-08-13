@@ -1,9 +1,8 @@
 module Pawl.Types.TurnUpRewrite where
 
-import qualified Numeric.Natural as Natural
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.WithCounters as WithCounters
 
 -- | CR 614.1e: how an "As [this permanent] is turned face up . . ." replacement
 -- modifies the turning-over. EntryRewrite's twin one event class over, and a
@@ -21,7 +20,7 @@ data TurnUpRewrite
     -- constructor, as EntryRewrite.WithCounters' do, and the counters are placed
     -- through Pawl.Engine.Event.putCounters -- CR 122.6's funnel -- so CR 614.16
     -- applies and Doubling Season doubles a megamorph's counter.
-    WithCounters (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
+    WithCounters WithCounters.WithCounters
   | -- | CR 303.4k: "you may attach it to a creature" (Gift of Doom), the one
     -- printing of the "effect [that] allows an Aura that's being turned face up
     -- to become attached" that rule is conditional on.

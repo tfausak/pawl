@@ -28,6 +28,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -196,6 +197,6 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
     Common.assertCodec
       s
       ReplacementEffect.codec
-      (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters CounterKind.PlusOnePlusOne 1))
-      """ {"type":"TurnUpR","value":[{"type":"IsSource"},{"type":"WithCounters","value":[{"type":"PlusOnePlusOne"},1]}]} """
+      (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1)))
+      """ {"type":"TurnUpR","value":[{"type":"IsSource"},{"type":"WithCounters","value":{"kind":{"type":"PlusOnePlusOne"},"amount":1}}]} """
   Spec.it s "has a schema" $ Common.assertHasSchema s ReplacementEffect.codec
