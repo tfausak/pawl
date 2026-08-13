@@ -1619,8 +1619,8 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- Rise of the Dark Realms' "all creature cards from all graveyards": the same
   -- sweep as EachMatching with CR 109.2's battlefield default switched off by the
   -- card's own words (CR 109.2a), over the per-player zone CR 400.1 gives each
-  -- player instead of one shared one. Whose graveyards, which cards match, and in
-  -- what order are graveyardCards' below, shared with the chosen-card arm.
+  -- player instead of one shared one. Whose graveyards, which cards match and in
+  -- what order are all graveyardCards below, shared with the chosen-card arm.
   ObjectRef.EachCardInGraveyard scope filter_ -> graveyardCards controller source gs scope filter_
   -- Names players and so no objects at all. Empty rather than an error: every
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
@@ -2702,8 +2702,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
               pure (objectRefObjects legal resolving controller source gs ref)
             -- Port of Karfell's "return a creature card from your graveyard to
             -- the battlefield tapped": ONE card, and the only ref whose gather
-            -- asks a question rather than reading the board. THE reason this
-            -- opcode's gather runs in the Game monad at all, for this arm.
+            -- asks a question rather than reading the board -- which is why it is
+            -- answered here, in the Game monad, and nowhere else.
             --
             -- The candidates are read from the pre-move state exactly as the
             -- sweeps above are (CR 608.2c), so an earlier effect of this same
@@ -2711,8 +2711,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- cards in the graveyard and they are on offer, which is what "mill
             -- four cards, THEN return" says.
             --
-            -- The chooser is the resolving CONTROLLER (CR 608.2c, CR 608.2d),
-            -- whoever owns the graveyards the scope names.
+            -- The chooser is the resolving CONTROLLER (CR 608.2c, CR 608.2d), no
+            -- matter whose graveyards the scope draws the candidates from.
             --
             -- Elided at one candidate and skipped at none, which is
             -- Prompt.ChooseCardInGraveyard's documented rule: one matching card
