@@ -1519,6 +1519,10 @@ beginTurnOf pid gs =
             -- next to and for the same reason: this is the handoff, so a new turn
             -- starts with nobody's speed-increase ability spent.
             GameState.speedIncreasedThisTurn = Set.empty,
+            -- CR 121.1's per-turn draw tally, cleared here for the same reason and
+            -- for EVERY player: a player draws on turns that are not theirs, so
+            -- "each turn" is the whole map rather than the incoming seat's row.
+            GameState.drawsThisTurn = Map.empty,
             -- CR 502.2 / 731.2: the count the NEXT turn's untap step asks about
             -- "the previous turn's active player", taken here because the log it
             -- is folded from is cleared by this same record update and that check

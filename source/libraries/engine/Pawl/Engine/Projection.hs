@@ -1769,6 +1769,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfCycled -> condition
   TriggerCondition.SelfCast -> condition
   TriggerCondition.PlayerDiscards _ -> condition
+  TriggerCondition.PlayerDrawsNthCard _ _ -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
   -- CR 702.149a's Filter is a predicate over the OTHER attackers, so a subtype

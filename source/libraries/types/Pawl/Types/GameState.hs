@@ -302,6 +302,25 @@ data GameState = MkGameState
     -- Cleared PER PLAYER at that player's untap step (Engine.runTurnBasedActions),
     -- which is what makes it "this turn".
     landsPlayed :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- | CR 121.1: how many cards each player has already drawn this turn. A player
+    -- with no row here has drawn none. Written by Pawl.Engine.Event.drawCard, the
+    -- one funnel every draw goes through, and read only there -- to stamp the
+    -- ordinal onto the GameEvent.Drew it records, which is what a card asking
+    -- "your second card each turn" -- or CR 702.94a's "the first card you've drawn
+    -- this turn" -- actually matches against.
+    --
+    -- STORED rather than folded out of the turn-scoped event log, which would
+    -- otherwise be the Event.declarationsOf precedent: CR 103.3's opening hands
+    -- are drawn through the same funnel BEFORE the first turn begins, and that
+    -- log is not cleared between the two. A field can be -- and is, at the end of
+    -- Mulligan.openingHands -- while the log cannot without discarding the rest
+    -- of setup's history.
+    --
+    -- Cleared for EVERY player at the turn handoff (Engine.beginTurnOf), not per
+    -- player at their untap step as landsPlayed above is: a player draws on other
+    -- players' turns (Howling Mine, an instant), so the tally that resets is the
+    -- whole map.
+    drawsThisTurn :: Map.Map PlayerId.PlayerId Natural.Natural,
     -- | CR 702.179d: the players whose inherent speed-increase ability has
     -- already triggered this turn -- that rule's "this ability triggers only
     -- once each turn", which nothing else in the game state records.

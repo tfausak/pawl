@@ -665,6 +665,7 @@ castOf event = case event of
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew _ _ -> Nothing
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared {} -> Nothing
   GameEvent.BlockerDeclared _ _ -> Nothing
@@ -695,6 +696,9 @@ castOf event = case event of
 discardOf :: GameEvent -> Maybe PlayerId
 discardOf event = case event of
   GameEvent.Discarded pid _ _ -> Just pid
+  -- CR 701.9a's discard moves a card OUT of a hand; CR 121.1's draw moves one
+  -- in. Opposite directions, and neither event stands in for the other.
+  GameEvent.Drew _ _ -> Nothing
   GameEvent.SpellCast {} -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing

@@ -421,6 +421,10 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         afterTwo = S.runPure S.identityAnswer (atDrawStep (Setup.emptyGame S.bothPlayers)) S.drawStep
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty afterThree)) "CR 103.8c: alice draws on turn one at three seats"
     Spec.assertBool s (not (Set.member S.alice (GameState.drewFromEmpty afterTwo))) "CR 103.8a: alice still skips at two seats"
+    -- CR 121.4's attempt draws no card, so it is not one of CR 121.1's draws: the
+    -- per-turn tally that CR 702.94a's "the first card you've drawn this turn"
+    -- is read off stays empty even on the seat that tried.
+    Spec.assertEqWith s "an empty-library draw counts as no draw" (GameState.drawsThisTurn afterThree) Map.empty
 
   Spec.it s "CR 514.2 discard to hand size" $ do
     gs <- bobAfterCleanup s registry

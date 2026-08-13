@@ -32,6 +32,7 @@ toJson e = case e of
   GameEvent.BecameMonarch pid -> Common.tagged "BecameMonarch" . Just $ Codec.encode PlayerId.codec pid
   GameEvent.Discarded pid oid cause ->
     Common.tagged "Discarded" . Just . Value.array $ [Codec.encode PlayerId.codec pid, Codec.encode ObjectId.codec oid, Codec.encode DiscardCause.codec cause]
+  GameEvent.Drew pid nth -> Common.tagged "Drew" . Just . Value.array $ [Codec.encode PlayerId.codec pid, Common.encodeNatural nth]
   GameEvent.Revealed pid pc -> Common.tagged "Revealed" . Just . Value.array $ [Codec.encode PlayerId.codec pid, ProjectedCharacteristics.toJson pc]
   GameEvent.AttackerDeclared oid pid count -> Common.tagged "AttackerDeclared" . Just . Value.array $ [Codec.encode ObjectId.codec oid, Codec.encode PlayerId.codec pid, Common.encodeNatural count]
   GameEvent.BlockerDeclared blocker attacker -> Common.tagged "BlockerDeclared" . Just . Value.array $ [Codec.encode ObjectId.codec blocker, Codec.encode ObjectId.codec attacker]
@@ -70,6 +71,7 @@ fromJson value = do
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> Codec.decode PlayerId.codec v
     ("Discarded", Just (Value.Array (Array.MkArray [pid, oid, cause]))) ->
       GameEvent.Discarded <$> Codec.decode PlayerId.codec pid <*> Codec.decode ObjectId.codec oid <*> Codec.decode DiscardCause.codec cause
+    ("Drew", Just (Value.Array (Array.MkArray [pid, nth]))) -> GameEvent.Drew <$> Codec.decode PlayerId.codec pid <*> Common.decodeNatural nth
     ("Revealed", Just (Value.Array (Array.MkArray [pid, pc]))) -> GameEvent.Revealed <$> Codec.decode PlayerId.codec pid <*> ProjectedCharacteristics.fromJson pc
     ("AttackerDeclared", Just (Value.Array (Array.MkArray [oid, pid, count]))) -> GameEvent.AttackerDeclared <$> Codec.decode ObjectId.codec oid <*> Codec.decode PlayerId.codec pid <*> Common.decodeNatural count
     ("BlockerDeclared", Just (Value.Array (Array.MkArray [blocker, attacker]))) -> GameEvent.BlockerDeclared <$> Codec.decode ObjectId.codec blocker <*> Codec.decode ObjectId.codec attacker

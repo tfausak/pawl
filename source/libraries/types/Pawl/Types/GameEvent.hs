@@ -126,6 +126,32 @@ data GameEvent
     -- a hidden zone instead has still been discarded, so a reader matching the
     -- hand-to-graveyard zone pair would lose the case Rest in Peace creates.
     Discarded PlayerId.PlayerId ObjectId.ObjectId DiscardCause.DiscardCause
+  | -- | CR 121.1: a player DREW a card, and which of that player's draws this
+    -- turn it was -- 1 for the first, counting up. Emitted by
+    -- Pawl.Engine.Event.drawCard, the one funnel every draw goes through.
+    --
+    -- The ORDINAL is on the event rather than left to a reader to fold out of the
+    -- log, because CR 121.2 makes each draw its own event and CR 702.94a asks
+    -- which one it was ("the first card you've drawn this turn"). The count it
+    -- comes from is GameState.drawsThisTurn; recording it here is what keeps a
+    -- reader of past history (CR 608.2i) agreeing with the live tally after the
+    -- turn hands off and that tally is cleared.
+    --
+    -- Recorded only for a draw that COMPLETED. CR 121.4's attempt to draw from an
+    -- empty library draws nothing -- it sets GameState.drewFromEmpty and loses the
+    -- game at the next check -- so no card was drawn and nothing here says one
+    -- was.
+    --
+    -- Distinct from the Moved event the same draw records, for CR 701.9a's reason
+    -- one constructor up and CR 121.5's in as many words: a card an effect puts
+    -- into a hand from a library without saying "draw" has not been drawn, so a
+    -- reader matching the library-to-hand zone pair would answer for both.
+    --
+    -- The drawn CARD is deliberately not a field. No ability in the pool names it
+    -- ("whenever you draw your second card each turn, put a +1\/+1 counter on this
+    -- creature" points only at its own bearer), and the Moved event beside this
+    -- one carries the object for anything that folds the log.
+    Drew PlayerId.PlayerId Natural.Natural
   | -- | CR 508.2b: an attacker was DECLARED -- one entry per creature the active
     -- player chose in CR 508.1's turn-based action. What "whenever this creature
     -- attacks" matches (CR 508.3a).
