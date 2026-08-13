@@ -55,6 +55,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -350,7 +351,7 @@ awaitingAbility events gs oid =
       -- CR 310.11b's condition, matched exactly as Event.matchesTrigger matches it:
       -- an unscanned removal on this permanent that took its last defense counter.
       pending event = case event of
-        GameEvent.CountersRemoved target CounterKind.Defense _ after -> target == oid && after == 0
+        GameEvent.CountersRemoved (CounterChange.MkCounterChange target CounterKind.Defense _ after) -> target == oid && after == 0
         _ -> False
    in any onStack (GameState.stack gs) || any pending events
 

@@ -120,6 +120,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -5890,7 +5891,7 @@ exploreReveals :: GameState.GameState -> [String]
 exploreReveals gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
   where
     revealedName event = case event of
-      GameEvent.Revealed pid _ _ pc
+      GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
         | pid == S.alice ->
             fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
       _ -> Nothing

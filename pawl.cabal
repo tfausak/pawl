@@ -66,6 +66,8 @@ library codec
   exposed-modules:
     Pawl.Codec.AbilityName
     Pawl.Codec.AbilityNameSpec
+    Pawl.Codec.AbilityTriggered
+    Pawl.Codec.AbilityTriggeredSpec
     Pawl.Codec.ActivatedAbility
     Pawl.Codec.ActivatedAbilitySpec
     Pawl.Codec.ActivationRestriction
@@ -90,6 +92,8 @@ library codec
     Pawl.Codec.AttackCostSpec
     Pawl.Codec.AttackerBlocked
     Pawl.Codec.AttackerBlockedSpec
+    Pawl.Codec.AttackerDeclared
+    Pawl.Codec.AttackerDeclaredSpec
     Pawl.Codec.AttackRequirement
     Pawl.Codec.AttackRequirementSpec
     Pawl.Codec.BecameDesignated
@@ -142,6 +146,8 @@ library codec
     Pawl.Codec.ComparisonSpec
     Pawl.Codec.Condition
     Pawl.Codec.ConditionSpec
+    Pawl.Codec.ControlChanged
+    Pawl.Codec.ControlChangedSpec
     Pawl.Codec.ControllerRelation
     Pawl.Codec.ControllerRelationSpec
     Pawl.Codec.CopyException
@@ -153,6 +159,8 @@ library codec
     Pawl.Codec.Count
     Pawl.Codec.Counterability
     Pawl.Codec.CounterabilitySpec
+    Pawl.Codec.CounterChange
+    Pawl.Codec.CounterChangeSpec
     Pawl.Codec.Countering
     Pawl.Codec.CounteringSpec
     Pawl.Codec.CounterKind
@@ -193,6 +201,8 @@ library codec
     Pawl.Codec.Discard
     Pawl.Codec.DiscardCause
     Pawl.Codec.DiscardCauseSpec
+    Pawl.Codec.Discarded
+    Pawl.Codec.DiscardedSpec
     Pawl.Codec.DiscardSpec
     Pawl.Codec.Drew
     Pawl.Codec.DrewSpec
@@ -232,6 +242,8 @@ library codec
     Pawl.Codec.GameEventSpec
     Pawl.Codec.GraveyardScope
     Pawl.Codec.GraveyardScopeSpec
+    Pawl.Codec.HalfUnlocked
+    Pawl.Codec.HalfUnlockedSpec
     Pawl.Codec.Keyword
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
@@ -362,6 +374,8 @@ library codec
     Pawl.Codec.RequireBlockSpec
     Pawl.Codec.RevealCause
     Pawl.Codec.RevealCauseSpec
+    Pawl.Codec.Revealed
+    Pawl.Codec.RevealedSpec
     Pawl.Codec.RoomIndex
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
@@ -390,6 +404,8 @@ library codec
     Pawl.Codec.SpeedDecreaseSpec
     Pawl.Codec.SpellCast
     Pawl.Codec.SpellCastSpec
+    Pawl.Codec.SpellWasCast
+    Pawl.Codec.SpellWasCastSpec
     Pawl.Codec.StaticAbility
     Pawl.Codec.StaticAbilitySpec
     Pawl.Codec.StepBegan
@@ -434,6 +450,8 @@ library codec
     Pawl.Codec.UntapRestrictionSpec
     Pawl.Codec.Uses
     Pawl.Codec.UsesSpec
+    Pawl.Codec.VentureMarkerEntered
+    Pawl.Codec.VentureMarkerEnteredSpec
     Pawl.Codec.While
     Pawl.Codec.WhileSpec
     Pawl.Codec.Zone
@@ -733,6 +751,7 @@ library types
   -- cabal-gild: discover source/libraries/types
   exposed-modules:
     Pawl.Types.AbilityName
+    Pawl.Types.AbilityTriggered
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
     Pawl.Types.ActivationRestriction
@@ -751,6 +770,7 @@ library types
     Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
     Pawl.Types.AttackerBlocked
+    Pawl.Types.AttackerDeclared
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.BecameDesignated
@@ -784,6 +804,7 @@ library types
     Pawl.Types.Concession
     Pawl.Types.Condition
     Pawl.Types.ContinuousEffect
+    Pawl.Types.ControlChanged
     Pawl.Types.ControllerRelation
     Pawl.Types.CopyException
     Pawl.Types.Cost
@@ -792,6 +813,7 @@ library types
     Pawl.Types.Count
     Pawl.Types.Counterability
     Pawl.Types.CounterCause
+    Pawl.Types.CounterChange
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterPattern
@@ -818,6 +840,7 @@ library types
     Pawl.Types.Desync
     Pawl.Types.Discard
     Pawl.Types.DiscardCause
+    Pawl.Types.Discarded
     Pawl.Types.Drew
     Pawl.Types.DungeonRoom
     Pawl.Types.Duration
@@ -844,6 +867,7 @@ library types
     Pawl.Types.GameEvent
     Pawl.Types.GameState
     Pawl.Types.GraveyardScope
+    Pawl.Types.HalfUnlocked
     Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
     Pawl.Types.HybridPayment
@@ -943,6 +967,7 @@ library types
     Pawl.Types.RestartSignal
     Pawl.Types.Result
     Pawl.Types.RevealCause
+    Pawl.Types.Revealed
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
     Pawl.Types.SacrificeRestriction
@@ -960,6 +985,7 @@ library types
     Pawl.Types.SpecialAction
     Pawl.Types.SpeedDecrease
     Pawl.Types.SpellCast
+    Pawl.Types.SpellWasCast
     Pawl.Types.StaticAbility
     Pawl.Types.Status
     Pawl.Types.StepBegan
@@ -986,6 +1012,7 @@ library types
     Pawl.Types.UnlessPaid
     Pawl.Types.UntapRestriction
     Pawl.Types.Uses
+    Pawl.Types.VentureMarkerEntered
     Pawl.Types.While
     Pawl.Types.Zone
     Pawl.Types.ZoneChange

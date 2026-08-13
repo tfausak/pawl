@@ -52,12 +52,14 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Engine.UntapRestriction as UntapRestriction
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
@@ -372,7 +374,7 @@ sampleControl = do
             Just pid <- [Projection.controllerOfGiven grants Set.empty oid gs]
           ]
       changes =
-        [ GameEvent.ControlChanged oid before after
+        [ GameEvent.ControlChanged (ControlChanged.MkControlChanged oid before after)
         | (oid, after) <- Map.toList sampled,
           Just before <- [Map.lookup oid (GameState.controlSample gs)],
           before /= after
@@ -782,9 +784,11 @@ triggeredEvent pending = case PendingTrigger.source pending of
   TriggerSource.OfObject oid ->
     Just
       ( GameEvent.AbilityTriggered
-          oid
-          (PendingTrigger.controller pending)
-          (TriggeredAbility.condition (PendingTrigger.ability pending))
+          AbilityTriggered.MkAbilityTriggered
+            { AbilityTriggered.source = oid,
+              AbilityTriggered.controller = PendingTrigger.controller pending,
+              AbilityTriggered.condition = TriggeredAbility.condition (PendingTrigger.ability pending)
+            }
       )
 
 -- Put one triggered ability from the ordered batch on the stack. What it hangs

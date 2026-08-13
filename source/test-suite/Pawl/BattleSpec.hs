@@ -75,6 +75,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Departure as Departure.Type
@@ -616,7 +617,7 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
     -- hypothetical, and it is the whole reason the Siege above reaches exile.
     (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
     let drained = drain battle entered
-        removal = [GameEvent.CountersRemoved battle CounterKind.Defense 2 0]
+        removal = [GameEvent.CountersRemoved (CounterChange.MkCounterChange battle CounterKind.Defense 2 0)]
     Spec.assertBool s (Battle.awaitingAbility removal drained battle) "the ability has triggered"
     Spec.assertEqWith s "so nothing is buried" (Battle.defeated (Projection.projectAll drained) removal drained) []
 

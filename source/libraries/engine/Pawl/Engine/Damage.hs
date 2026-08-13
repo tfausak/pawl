@@ -24,6 +24,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CounterCause as CounterCause
+import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -945,7 +946,7 @@ applyDamage events = do
       removalOn before after oid =
         let was = Battle.defenseOn oid before
             now = Battle.defenseOn oid after
-         in [GameEvent.CountersRemoved oid CounterKind.Defense was now | was > now]
+         in [GameEvent.CountersRemoved (CounterChange.MkCounterChange oid CounterKind.Defense was now) | was > now]
       removalsBetween before after =
         concatMap (removalOn before after) (List.nub (Maybe.mapMaybe battleHit survivors))
       -- CR 120.3b / 702.90b, CR 120.3d / 702.90c / 702.80a and CR 120.3g /

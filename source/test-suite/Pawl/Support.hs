@@ -47,6 +47,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -1198,7 +1199,7 @@ attackerDeclarationsOf :: GameState.GameState -> [ObjectId.ObjectId]
 attackerDeclarationsOf gs = Maybe.mapMaybe declared (eventsOf gs)
   where
     declared event = case event of
-      GameEvent.AttackerDeclared oid _ _ -> Just oid
+      GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared oid _ _) -> Just oid
       _ -> Nothing
 
 -- The characteristics of nothing: Projection.project on an id with no card in

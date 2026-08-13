@@ -49,6 +49,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -630,7 +631,7 @@ circlingVultures s registry = Spec.describe s "CR 116.2e Circling Vultures" $ do
       s
       "CR 701.9a the discard was logged, and CR 702.29c's cycling cause is not what caused it"
       (filter isDiscarded (S.eventsOf after))
-      (fmap (\oid -> GameEvent.Discarded S.alice oid DiscardCause.Ordinary) graveyard)
+      (fmap (\oid -> GameEvent.Discarded (Discarded.MkDiscarded S.alice oid DiscardCause.Ordinary)) graveyard)
   -- CR 116.3: "if a player takes a special action, that player receives
   -- priority afterward." Both halves of the arm are pinned by the one sequence.
   -- Retaining priority puts alice's second prompt before bob's first; restarting

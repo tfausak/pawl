@@ -48,6 +48,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.Types.Zone as Zone
 
 -- | CR 309.1 \/ 205.2a: is this a dungeon card? Read off the PRINTED type line
@@ -124,7 +125,7 @@ roomPending :: [GameEvent.GameEvent] -> GameState.GameState -> [PendingTrigger.P
 roomPending events gs = Maybe.mapMaybe pendingFor events
   where
     pendingFor event = case event of
-      GameEvent.VentureMarkerEntered pid oid room -> do
+      GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid room) -> do
         entered <- roomAt room (roomsOf oid gs)
         Monad.guard (fmap Object.owner (Game.lookupObject oid gs) == Just pid)
         Just (PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) pid (roomAbility room entered) Map.empty)
@@ -149,7 +150,7 @@ finished gs = filter isFinished (Set.toList (GameState.command gs))
       _ -> False
     pending oid = any (aboutDungeon oid) (Event.unscannedEvents gs)
     aboutDungeon oid event = case event of
-      GameEvent.VentureMarkerEntered _ entered _ -> entered == oid
+      GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered _ entered _) -> entered == oid
       _ -> False
     isFinished oid = case Game.lookupObject oid gs of
       Nothing -> False
@@ -215,7 +216,7 @@ enter pid = do
               pid
               oid
               gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2)}
-      State.put (Event.recordEvent (GameEvent.VentureMarkerEntered pid oid RoomIndex.topmost) gs3)
+      State.put (Event.recordEvent (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid RoomIndex.topmost)) gs3)
 
 -- CR 309.5b \/ 701.49c: remove a finished dungeon card from the game. Also the
 -- CR 704.5t state-based action's action, which is why it takes an id rather than a
@@ -251,7 +252,7 @@ advance pid oid room = do
           pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
       State.modify' $ \g ->
         Event.recordEvent
-          (GameEvent.VentureMarkerEntered pid oid chosen)
+          (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered pid oid chosen))
           g {GameState.objects = Map.adjust (\o -> o {Object.ventureRoom = Just chosen}) oid (GameState.objects g)}
   where
     -- Ascending, so both the single-arrow shortcut and a transcript are
