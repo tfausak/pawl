@@ -17,10 +17,9 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
   -- anywhere. Both narrowing fields are at their defaults, so neither reaches
   -- the wire.
   Spec.it s "MkZoneChangePattern" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ZoneChangePattern.toJson
-      ZoneChangePattern.fromJson
+      ZoneChangePattern.codec
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [],
@@ -31,10 +30,9 @@ spec s = Spec.describe s "Pawl.Codec.ZoneChangePattern" $ do
   -- would die". The characteristic filter is what distinguishes this from the
   -- shape above, so it has to survive the wire.
   Spec.it s "MkZoneChangePattern (Anafenza, a nontoken creature)" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      ZoneChangePattern.toJson
-      ZoneChangePattern.fromJson
+      ZoneChangePattern.codec
       ZoneChangePattern.MkZoneChangePattern
         { ZoneChangePattern.whenDestination = Zone.Graveyard,
           ZoneChangePattern.whatObject = Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsToken],

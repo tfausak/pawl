@@ -276,6 +276,7 @@ library codec
     Pawl.Codec.QuantitySpec
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientSpec
+    Pawl.Codec.ReduceActivationCost
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.ReplacementEffect
@@ -796,6 +797,7 @@ library types
     Pawl.Types.ProposedEvent
     Pawl.Types.Quantity
     Pawl.Types.Recipient
+    Pawl.Types.ReduceActivationCost
     Pawl.Types.Regenerability
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate

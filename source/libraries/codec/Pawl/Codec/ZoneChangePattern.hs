@@ -1,13 +1,13 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.ZoneChangePattern where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.ControllerRelation as ControllerRelation
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Zone as Zone
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -25,23 +25,14 @@ defaultWhatObject = Filter.And []
 defaultWhoseObject :: ControllerRelation.ControllerRelation
 defaultWhoseObject = ControllerRelation.Anyones
 
-toJson :: ZoneChangePattern.ZoneChangePattern -> Value.Value
-toJson p =
-  Value.object
-    ( Common.requiredPair "whenDestination" (Codec.encode Zone.codec) (ZoneChangePattern.whenDestination p)
-        <> Common.optionalPair "whatObject" defaultWhatObject (Codec.encode (Filter.codec Keyword.codec)) (ZoneChangePattern.whatObject p)
-        <> Common.optionalPair "whoseObject" defaultWhoseObject (Codec.encode ControllerRelation.codec) (ZoneChangePattern.whoseObject p)
-    )
-
-fromJson :: Value.Value -> Either Text.Text ZoneChangePattern.ZoneChangePattern
-fromJson value = do
-  ps <- Common.asObject value
-  d <- Common.field "whenDestination" ps >>= Codec.decode Zone.codec
-  o <- Common.defaultedField "whatObject" defaultWhatObject (Codec.decode (Filter.codec Keyword.codec)) ps
-  w <- Common.defaultedField "whoseObject" defaultWhoseObject (Codec.decode ControllerRelation.codec) ps
+codec :: Codec.Codec ZoneChangePattern.ZoneChangePattern
+codec = Fields.object $ do
+  whenDestination <- Fields.required "whenDestination" Zone.codec ZoneChangePattern.whenDestination
+  whoseObject <- Fields.defaulted "whoseObject" defaultWhoseObject ControllerRelation.codec ZoneChangePattern.whoseObject
+  whatObject <- Fields.defaulted "whatObject" defaultWhatObject (Filter.codec Keyword.codec) ZoneChangePattern.whatObject
   pure
     ZoneChangePattern.MkZoneChangePattern
-      { ZoneChangePattern.whenDestination = d,
-        ZoneChangePattern.whatObject = o,
-        ZoneChangePattern.whoseObject = w
+      { ZoneChangePattern.whenDestination = whenDestination,
+        ZoneChangePattern.whoseObject = whoseObject,
+        ZoneChangePattern.whatObject = whatObject
       }

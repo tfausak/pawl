@@ -8,6 +8,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 
 -- | CR 611.1's third clause: a continuous effect affecting players or the rules
 -- of the game rather than the characteristics of an object. The player analogue
@@ -117,7 +118,7 @@ data PlayerEffect
     -- Not implemented: nothing INCREASES an activation cost (Suppression Field),
     -- which would be this arm's sibling and needs the "unless they're mana
     -- abilities" rider besides (#1242).
-    ReduceActivationCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost Natural.Natural
+    ReduceActivationCost ReduceActivationCost.ReduceActivationCost
   | -- | CR 613.11 / 601.2f / Brutal Suppression: the activated abilities of
     -- matching permanents cost these additional NON-MANA components to activate
     -- ("Activated abilities of nontoken Rebels cost an additional \"Sacrifice a

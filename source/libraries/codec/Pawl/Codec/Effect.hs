@@ -101,7 +101,7 @@ toJson codec e = case e of
   Effect.CreateCopy c -> Common.tagged "CreateCopy" . Just $ Codec.encode CreateCopy.codec c
   Effect.Replace d u o c re ->
     Common.tagged "Replace" . Just . Value.array $
-      [Codec.encode Duration.codec d, Codec.encode Uses.codec u, Codec.encode ReplacementOrigin.codec o, Common.encodeMaybe (Codec.encode Condition.codec) c, ReplacementEffect.toJson re]
+      [Codec.encode Duration.codec d, Codec.encode Uses.codec u, Codec.encode ReplacementOrigin.codec o, Common.encodeMaybe (Codec.encode Condition.codec) c, Codec.encode ReplacementEffect.codec re]
   Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode PhaseSelector.codec sel]))
   -- CR 615.5's additional effect is ELIDED when it is empty, which is Create's
   -- posture above and every other prevention in the corpus: a shield with no
@@ -131,7 +131,7 @@ toJson codec e = case e of
     (Onset.Immediately, Nothing) -> Codec.encode AbilityName.codec n
     (Onset.Immediately, Just d) -> Value.array [Codec.encode AbilityName.codec n, Codec.encode Duration.codec d]
     _ -> Value.array [Codec.encode AbilityName.codec n, Codec.encode Onset.codec o, Common.encodeMaybe (Codec.encode Duration.codec) md]
-  Effect.AffectPlayers d s pe -> Common.tagged "AffectPlayers" (Just (Value.array [Codec.encode Duration.codec d, Codec.encode AffectedPlayers.codec s, PlayerEffect.toJson pe]))
+  Effect.AffectPlayers d s pe -> Common.tagged "AffectPlayers" (Just (Value.array [Codec.encode Duration.codec d, Codec.encode AffectedPlayers.codec s, Codec.encode PlayerEffect.codec pe]))
   Effect.RequireBlock d b a -> Common.tagged "RequireBlock" (Just (Value.array [Codec.encode Duration.codec d, Codec.encode ObjectRef.codec b, Codec.encode ObjectRef.codec a]))
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (Codec.encode MonarchTarget.codec t))
@@ -240,7 +240,7 @@ fromJson decode value = do
         uses <- Codec.decode Uses.codec u
         origin <- Codec.decode ReplacementOrigin.codec o
         condition <- Common.decodeMaybe (Codec.decode Condition.codec) c
-        effect <- ReplacementEffect.fromJson re
+        effect <- Codec.decode ReplacementEffect.codec re
         pure (Effect.Replace duration uses origin condition effect)
       _ -> Left . Text.pack $ "Replace expects [Duration, Uses, ReplacementOrigin, Maybe Condition, ReplacementEffect]"
     "SkipNextPhase" -> case mv of
@@ -279,7 +279,7 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [d, r])) -> Effect.GainControl <$> Codec.decode Duration.codec d <*> Codec.decode ObjectRef.codec r
       _ -> Left . Text.pack $ "GainControl expects [duration, objectRef]"
     "AffectPlayers" -> case mv of
-      Just (Value.Array (Array.MkArray [d, s, pe])) -> Effect.AffectPlayers <$> Codec.decode Duration.codec d <*> Codec.decode AffectedPlayers.codec s <*> PlayerEffect.fromJson pe
+      Just (Value.Array (Array.MkArray [d, s, pe])) -> Effect.AffectPlayers <$> Codec.decode Duration.codec d <*> Codec.decode AffectedPlayers.codec s <*> Codec.decode PlayerEffect.codec pe
       _ -> Left . Text.pack $ "AffectPlayers expects [Duration, AffectedPlayers, PlayerEffect]"
     "RequireBlock" -> case mv of
       Just (Value.Array (Array.MkArray [d, b, a])) -> Effect.RequireBlock <$> Codec.decode Duration.codec d <*> Codec.decode ObjectRef.codec b <*> Codec.decode ObjectRef.codec a

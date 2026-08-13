@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.Destroy where
 
 import qualified Pawl.Codec.ObjectRef as ObjectRef
@@ -13,9 +15,13 @@ import qualified Pawl.Types.Destroy as Destroy
 -- previously a third array element recovered by JSON TYPE; as a named key it is
 -- just an absent key, and nothing has to be told apart (#1305).
 codec :: Codec.Codec Destroy.Destroy
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  ref <- Fields.required "ref" ObjectRef.codec Destroy.ref
+  regenerability <- Fields.required "regenerability" Regenerability.codec Destroy.regenerability
+  slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Destroy.slot
+  pure
     Destroy.MkDestroy
-      <$> Fields.required "ref" ObjectRef.codec Destroy.ref
-      <*> Fields.required "regenerability" Regenerability.codec Destroy.regenerability
-      <*> Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) Destroy.slot
+      { Destroy.ref = ref,
+        Destroy.regenerability = regenerability,
+        Destroy.slot = slot
+      }

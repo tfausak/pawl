@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.PlayerQuantity where
 
 import qualified Pawl.Codec.PlayerRef as PlayerRef
@@ -10,8 +12,11 @@ import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 -- written by whichever Pawl.Codec.Effect arm carries it, which is what keeps
 -- seven arms sharing one payload codec without sharing a tag.
 codec :: Codec.Codec PlayerQuantity.PlayerQuantity
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  player <- Fields.required "player" PlayerRef.codec PlayerQuantity.player
+  quantity <- Fields.required "quantity" Quantity.codec PlayerQuantity.quantity
+  pure
     PlayerQuantity.MkPlayerQuantity
-      <$> Fields.required "player" PlayerRef.codec PlayerQuantity.player
-      <*> Fields.required "quantity" Quantity.codec PlayerQuantity.quantity
+      { PlayerQuantity.player = player,
+        PlayerQuantity.quantity = quantity
+      }
