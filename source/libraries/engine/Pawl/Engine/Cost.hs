@@ -22,6 +22,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Claim as Claim
@@ -337,9 +338,9 @@ spellAdjustments pid oid gs =
         else adjustments {CostAdjustments.increases = commanderTax : CostAdjustments.increases adjustments}
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes through
--- rule 601.2b-i like a spell's. Heartstone and Training Grounds are what reach it
--- (#90); no commander tax, since CR 903.8 taxes CASTING a commander and an
--- activation is not a cast.
+-- rule 601.2b-i like a spell's. Heartstone's floored reduction and Blossoming
+-- Tortoise's unfloored one are what reach it (#90); no commander tax, since CR
+-- 903.8 taxes CASTING a commander and an activation is not a cast.
 --
 -- Not reached by a MANA ability's cost, which pays through manaActivations rather
 -- than through Pawl.Engine.Activate -- and unobservably so, since every mana
@@ -371,7 +372,7 @@ adjustmentResolutions adjustments =
         Nothing -> [symbol]
         Just [] -> [symbol]
         Just halves -> halves
-      resolveAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse resolveOne symbols)
+      resolveAll (ManaCost.MkManaCost symbols, floor_) = fmap (\xs -> (ManaCost.MkManaCost xs, floor_)) (traverse resolveOne symbols)
    in fmap
         (\reductions -> adjustments {CostAdjustments.reductions = reductions})
         (traverse resolveAll (CostAdjustments.reductions adjustments))
@@ -685,7 +686,7 @@ announceReductions pid oid gs adjustments =
           -- FILTERED, NOT TRUSTED, the Mana.announce posture: an answer that is
           -- not one of the offered halves falls back to the first.
           pure (if elem answer halves then answer else first)
-      chooseAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse chooseOne symbols)
+      chooseAll (ManaCost.MkManaCost symbols, floor_) = fmap (\xs -> (ManaCost.MkManaCost xs, floor_)) (traverse chooseOne symbols)
    in fmap
         (\reductions -> adjustments {CostAdjustments.reductions = reductions})
         (traverse chooseAll (CostAdjustments.reductions adjustments))
@@ -2147,46 +2148,50 @@ payComponent pid oid component = case component of
 --    component for CR 118.7b-c to move the stranded mana onto.
 -- 4. CR 601.2f's floor at {0} needs no special case: ManaCost is a list of
 --    symbols and the empty list IS {0}.
--- 5. A REDUCING EFFECT'S OWN FLOOR (CostAdjustments.minimumMana) is applied last,
---    as a clamp on the result: Heartstone's "This effect can't reduce the mana in
---    that cost to less than one mana" is card text CR 101.1 lets override the
---    rules, and it is a limit on what the reductions took rather than another
---    adjustment. The shortfall is made up in GENERIC mana, which is the only mana
---    a floored reduction in the pool can take (both printings reduce by generic
---    only, CR 118.7a).
+-- 5. A REDUCING EFFECT'S OWN FLOOR is applied as that reduction lands, never as a
+--    clamp on the pooled result: Heartstone's "This effect can't reduce the mana
+--    in that cost to less than one mana" is card text CR 101.1 lets override the
+--    rules, and it says THIS EFFECT. A floored reduction beside an unfloored one
+--    (Heartstone and Blossoming Tortoise on an animated Mutavault's {1}) is what
+--    tells the two readings apart: the floor stops Heartstone taking the last
+--    mana and has nothing to say about what the Tortoise then takes, so the cost
+--    is {0} and a pooled clamp would leave {1}. The shortfall a floor makes up is
+--    GENERIC mana, which is the only mana a floored reduction in the pool takes
+--    (every printing of the sentence reduces by generic only, CR 118.7a).
 --
 --    NEVER RAISES a cost that was already below the floor -- Heartstone's own
 --    ruling, "It will not add a {1} to abilities with no generic mana in their
---    activation cost" -- so the requirement is the floor or the UNREDUCED mana,
---    whichever is smaller.
+--    activation cost" -- so the requirement is the floor or the mana that
+--    reduction found, whichever is smaller.
 --
---    A CLAMP ON THE POOLED RESULT rather than per reduction, and exact rather than
---    an elision while every floor in the pool is one mana: two reductions floored
---    at one leave one mana between them whichever order they apply in, and a
---    surviving typed symbol is at least one mana whatever its type. What would
---    tell a clamp from a fold is a FLOORED reduction beside an UNFLOORED one, and
---    pawl has no unfloored activation-cost reducer to build that board with
---    (Hero of Iroas is the printed shape, and no card in the pool prints it)
---    (#1243).
+-- Reductions are FOLDED one at a time, in DESCENDING order of floor. CR 601.2f
+-- lets the player apply multiple reductions in any order, and once the floors
+-- differ the order is observable -- a floored reduction applied first takes its
+-- full amount and leaves the unfloored one to finish the cost off, where the same
+-- pair the other way round strands a mana. Descending floor is the CHEAPEST order
+-- (the more constrained reduction bites while there is still room for it), so
+-- pawl takes it and does not ask; the player's choice of a costlier order is the
+-- elision (#88). Reductions that state the SAME floor commute, and the sort is
+-- stable, so they keep the order they were gathered in.
 --
--- Reductions are POOLED rather than applied one at a time. CR 601.2f lets the
--- player apply multiple reductions in any order, which is a prompt in the rules
--- and an elision here (#88): the generic parts all route to the one generic
--- component, and a typed part only ever removes symbols of its own type -- and
--- one {W} in a cost is indistinguishable from another. Pooling is not merely
--- equivalent to some order, it is equivalent to EVERY order. That every reduction
--- applies at all, rather than one of them, is Edgewalker's own ruling.
+-- The sort itself is a FENCE and not a proved behaviour: no cost the pool can
+-- build observes it, since the one board with mixed floors (Pawl.ActivateSpec's
+-- UnflooredActivationCostReduction) has a printed {1} that either order empties,
+-- and reversing the sort leaves the suite green. What the suite does prove is that
+-- each floor binds its own reduction and no other.
 --
--- The result is CANONICAL: one leading Generic symbol carrying the whole generic
--- component (omitted entirely when it is zero), then the SURVIVING printed typed
--- symbols in their original order. Presentation, not semantics -- Mana.spend sums
--- every generic symbol and matches typed symbols first -- but it is what makes a
--- total cost comparable.
+-- That every reduction applies at all, rather than one of them, is Edgewalker's
+-- own ruling.
+--
+-- Every step's result is CANONICAL: one leading Generic symbol carrying the whole
+-- generic component (omitted entirely when it is zero), then the SURVIVING printed
+-- typed symbols in their original order. Presentation, not semantics -- Mana.spend
+-- sums every generic symbol and matches typed symbols first -- but it is what makes
+-- a total cost comparable, and it is what the next reduction in the fold reads.
 applyAdjustments :: CostAdjustments.CostAdjustments -> ManaCost.ManaCost -> ManaCost.ManaCost
 applyAdjustments adjustments cost =
   let increases = CostAdjustments.increases adjustments
       reductions = CostAdjustments.reductions adjustments
-      ManaCost.MkManaCost symbols = cost
       costGenericOf symbol = case symbol of
         ManaSymbol.Generic n -> n
         ManaSymbol.OfType _ -> 0
@@ -2339,20 +2344,29 @@ applyAdjustments adjustments cost =
         -- Unreachable for the reason costGenericOf's Variable arm gives; {X} is no
         -- amount of mana until CR 601.2b names one.
         ManaSymbol.Variable -> Nothing
-      reducingSymbols = concatMap (\(ManaCost.MkManaCost xs) -> xs) reductions
-      raised = sum (fmap costGenericOf symbols) + sum increases
-      taken = sum (fmap reducingGenericOf reducingSymbols)
-      -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
-      -- 601.2f floor is also what keeps this total.
-      lowered = if raised >= taken then raised - taken else 0
-      -- Point 5 above. `survivors` is the typed part the cancellation leaves, and
-      -- every typed symbol is at least one mana (CR 107.4e/107.4f/107.4h), so the
-      -- mana left in the cost is `lowered` plus how many of them there are.
-      survivors = cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) (filter isTyped symbols)
-      typedCount = Natural.length survivors
-      required = min (CostAdjustments.minimumMana adjustments) (raised + Natural.length (filter isTyped symbols))
-      floored = if lowered + typedCount >= required then lowered else required - typedCount
-      leading = if floored == 0 then [] else [ManaSymbol.Generic floored]
+      -- The canonical form point 5's header describes: the generic component as
+      -- one leading symbol, then the typed symbols left.
+      canonical generic typed = ManaCost.MkManaCost ((if generic == 0 then [] else [ManaSymbol.Generic generic]) <> typed)
+      -- Point 1: every increase, onto the generic component, before any reduction.
+      raise (ManaCost.MkManaCost symbols) =
+        canonical (sum (fmap costGenericOf symbols) + sum increases) (filter isTyped symbols)
+      -- ONE reduction, with the floor its own effect states.
+      reduce (ManaCost.MkManaCost symbols) (ManaCost.MkManaCost reducingSymbols, floor_) =
+        let generic = sum (fmap costGenericOf symbols)
+            typed = filter isTyped symbols
+            taken = sum (fmap reducingGenericOf reducingSymbols)
+            -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
+            -- 601.2f floor is also what keeps this total.
+            lowered = if generic >= taken then generic - taken else 0
+            -- Point 5 above. `survivors` is the typed part the cancellation
+            -- leaves, and every typed symbol is at least one mana (CR
+            -- 107.4e/107.4f/107.4h), so the mana left in the cost is `lowered`
+            -- plus how many of them there are.
+            survivors = cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) typed
+            typedCount = Natural.length survivors
+            required = min floor_ (generic + Natural.length typed)
+            floored = if lowered + typedCount >= required then lowered else required - typedCount
+         in canonical floored survivors
       -- Each reducing symbol cancels ONE matching symbol in the cost. Walks the
       -- printed symbols in their printed order, so the survivors keep it;
       -- `unspent` is the bag of reducing types that have not found a match yet,
@@ -2363,4 +2377,4 @@ applyAdjustments adjustments cost =
         symbol : rest -> case costManaTypeOf symbol of
           Just manaType | elem manaType unspent -> cancel (List.delete manaType unspent) rest
           _ -> symbol : cancel unspent rest
-   in ManaCost.MkManaCost (leading <> survivors)
+   in List.foldl' reduce (raise cost) (List.sortOn (Ord.Down . snd) reductions)
