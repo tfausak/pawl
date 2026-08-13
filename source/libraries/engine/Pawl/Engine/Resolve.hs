@@ -1080,11 +1080,10 @@ targetsAllIllegal oid gs = case Game.lookupObject oid gs of
           not (Map.null targeted) && all Set.null (Map.elems targeted)
 
 -- CR 608.2b then CR 608.2: re-validate every filled slot against what it
--- declares; if the
--- spell has slots and ALL are now illegal it fizzles, moving to the graveyard with
--- no effect applied. Otherwise the effects run in order (CR 608.2c), each skipping
--- a slot whose target is illegal, and the spell goes to its owner's graveyard as
--- the final part of resolution (CR 608.2n).
+-- declares; if the spell has slots and ALL are now illegal it fizzles, moving to
+-- the graveyard with no effect applied. Otherwise the effects run in order (CR
+-- 608.2c), each skipping a slot whose target is illegal, and the spell goes to
+-- its owner's graveyard as the final part of resolution (CR 608.2n).
 --
 -- Extended for CR 729.1b: the resolving object's bindings are re-read before EACH
 -- effect, so a slot DEFINED mid-resolution is visible to a later one. Target-slot
@@ -1260,9 +1259,9 @@ resolveModes stackId srcId modes = do
       -- CR 608.2b re-judges the slot against the SAME declaration CR 603.3d
       -- offered, so the "that player controls" atoms are baked here too, off the
       -- bindings the placement stamped on this very object
-      -- (Pawl.Engine.Target.bakeSlots). An
-      -- ability whose environment binds no player leaves them standing, which
-      -- admits nothing -- see Pawl.Engine.Filter.bakeBound.
+      -- (Pawl.Engine.Target.bakeSlots). An ability whose environment binds no
+      -- player leaves them standing, which admits nothing -- see
+      -- Pawl.Engine.Filter.bakeBound.
       let slots = Target.bakeSlots (Binding.playerSlots (Object.bindings obj)) (Map.unions (fmap (\(mi, mode) -> Map.mapKeys (Modal.instanceSlot mi) (Mode.targetSlots mode)) modes))
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipients = case Map.lookup slot slots of
@@ -1912,7 +1911,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
 -- It is ruled out by a lint instead. A card can only reach it by declaring a
 -- delayed ability's target slot under a name its own Create defines, which is
 -- the card saying two different things with one word, and the Pawl.CardSpec lint
--- "no delayed ability declares a target slot under a slot its card defines"
+-- "no delayed ability declares a target slot under a name its card defines"
 -- rejects it. So this arm never actually chooses, and the ordering is which way
 -- to fail if that lint were ever removed.
 slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
@@ -2770,7 +2769,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- answer is what keeps the two apart: a slot cannot be both, and a
             -- target never loses its re-validation to a binding that happens to
             -- share its name. No card observes the difference -- the CardSpec lint
-            -- "no delayed ability declares a target slot under a slot its card
+            -- "no delayed ability declares a target slot under a name its card
             -- defines" is what rules the collision out -- so the membership test
             -- buys the ordering rather than a passing test.
             ObjectRef.InSlot slot -> do

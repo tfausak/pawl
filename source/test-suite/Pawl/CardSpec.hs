@@ -1118,7 +1118,7 @@ slotNamesCollide sets = Set.size (Set.unions sets) /= sum (fmap Set.size sets)
 cardSlotNamesCollide :: Face.Face Card.Type.Card -> Bool
 cardSlotNamesCollide card =
   let modeSlots modal = fmap (Map.keysSet . Mode.targetSlots) (Foldable.toList (Modal.modes modal))
-   in slotNamesCollide (Map.keysSet (Card.enchantSlots card) : modeSlots (Face.spell card))
+   in slotNamesCollide (Map.keysSet (Card.enchantSlotMap card) : modeSlots (Face.spell card))
         || any (slotNamesCollide . modeSlots . ActivatedAbility.modal) (Face.activatedAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Face.triggeredAbilities card)
         || any (slotNamesCollide . modeSlots . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
@@ -3652,7 +3652,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let card = S.combinedFace piker
     Spec.assertEqWith s "no enchant slot" (Face.enchant card) []
     Spec.assertBool s (not (Card.isAura card)) "not an Aura"
-    Spec.assertEqWith s "no enchant slot" (Card.enchantSlots card) Map.empty
+    Spec.assertEqWith s "no enchant slot" (Card.enchantSlotMap card) Map.empty
   -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
   -- target and could never be cast; a non-Aura with enchant declares a restriction
   -- nothing reads. The D4 lint cannot see either, because it walks

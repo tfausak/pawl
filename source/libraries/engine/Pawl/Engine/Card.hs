@@ -895,7 +895,7 @@ allEffects face = Modal.allEffects (Face.spell face)
 -- Union is left-biased, and the CardSpec lint holds that no mode declares this
 -- slot name, so the bias is never exercised.
 allTargetSlots :: Face.Face Card.Card -> Map SlotName TargetSlot
-allTargetSlots face = Map.union (enchantSlots face) (Modal.allTargetSlots (Face.spell face))
+allTargetSlots face = Map.union (enchantSlotMap face) (Modal.allTargetSlots (Face.spell face))
 
 -- The target slots of one mode by index (CR 700.2c: only the chosen mode's
 -- slots). Nothing if the index is out of range (total). The enchant slot is
@@ -916,7 +916,7 @@ chosenModes chosen face = Modal.chosenModes chosen (Face.spell face)
 -- the card's enchant slot (CR 303.4a) if it has one. Only these slots are
 -- prompted at cast and re-validated at CR 608.2b.
 modesTargetSlots :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSlot
-modesTargetSlots chosen face = Map.union (enchantSlots face) (Modal.modesTargetSlots chosen (Face.spell face))
+modesTargetSlots chosen face = Map.union (enchantSlotMap face) (Modal.modesTargetSlots chosen (Face.spell face))
 
 isLand :: Face.Face Card.Card -> Bool
 isLand f = Set.member CardType.Land (TypeLine.types (Face.typeLine f))
@@ -1003,8 +1003,8 @@ enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
 -- makes the instances narrow it together (enchantTargetSlot below). Merged into
 -- the two functions above, and passed to Target.fillableModes by Pawl.Engine.Cast
 -- so castability accounts for it.
-enchantSlots :: Face.Face Card.Card -> Map SlotName TargetSlot
-enchantSlots face = case enchantTargetSlot face of
+enchantSlotMap :: Face.Face Card.Card -> Map SlotName TargetSlot
+enchantSlotMap face = case enchantTargetSlot face of
   Nothing -> Map.empty
   Just slot -> Map.singleton enchantSlot slot
 

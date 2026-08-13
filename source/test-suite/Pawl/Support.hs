@@ -507,9 +507,10 @@ withEffect oid m gs =
 performer :: HandActionPerformer.HandActionPerformer
 performer = Resolve.performHandAction
 
--- The source stand-in for a targeting call whose target slot is source-blind (every
--- slot but OpponentCreatureTarget). Object id 999 names nothing, the same
--- posture withEffectAt's 998 takes.
+-- The source stand-in for a targeting call whose target slot is source-blind
+-- (every slot but the opponent's-creatures one, Pawl.ResolveSpec's CR 115.1a
+-- cases). Object id 999 names nothing, the same posture withEffectAt's 998
+-- takes.
 --
 -- SOURCE-BLIND is now a claim about the BOARD as well as about the slot: CR
 -- 702.11d's "hexproof from [quality]" makes Target.legalRecipients read the
@@ -787,10 +788,10 @@ addHandCard printing pid gs =
 withHumility :: Printing.Printing -> GameState.GameState -> GameState.GameState
 withHumility humility gs = snd (addCreature humility bob gs)
 
--- The "target" slot's TargetSlot, read straight out of a JSON-loaded printing's
--- spell (Modal.allTargetSlots, keyed by SlotName) -- so a gate test exercises
--- the codec's parse of the committed card data, never a hand-built TargetSlot
--- (P9 Task 5: Terror, Reprisal).
+-- The TargetSlot declared under the "target" slot name, read straight out of a
+-- JSON-loaded printing's spell (Modal.allTargetSlots, keyed by SlotName) -- so a
+-- gate test exercises the codec's parse of the committed card data, never a
+-- hand-built TargetSlot (P9 Task 5: Terror, Reprisal).
 spellTargetSlot :: Printing.Printing -> Maybe TargetSlot.TargetSlot
 spellTargetSlot printing =
   Map.lookup

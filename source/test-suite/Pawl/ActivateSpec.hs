@@ -115,7 +115,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   youOnActivatedAbilitySpec s registry
   textChangedAbilitySpec s registry
   textChangedCostSpec s registry
-  textChangedTargetSlot s registry
+  textChangedTargetSpec s registry
   graveyardEffectZoneSpec s registry
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
@@ -1931,8 +1931,8 @@ textChangedCostSpec s registry =
 --
 -- Both lands start TAPPED, so "the ability never resolved" and "it untapped the
 -- other land" are distinguishable board states.
-textChangedTargetSlot :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-textChangedTargetSlot s registry =
+textChangedTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedTargetSpec s registry =
   let untapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
       -- The legal recipients of the projected ability's one mode, as CR 601.2c
       -- would offer them. A candidate-set assertion alone can pass off a list
@@ -1952,7 +1952,7 @@ textChangedTargetSlot s registry =
             board = withForestHackedToIsland hacked elfId hackId g0
         after <- activateSole s elfId board
         pure (elfId, forestId, islandId, board, after)
-   in Spec.describe s "TextChangedTargetSlot" $ do
+   in Spec.describe s "TextChangedTargetSpec" $ do
         -- The control: unhacked, "target Forest" admits the Forest alone, and the
         -- Forest is what wakes up.
         Spec.it s "CR 601.2c whole card: an unhacked Arbor Elf may untap only the Forest" $ do

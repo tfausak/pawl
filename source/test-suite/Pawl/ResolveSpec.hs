@@ -8845,8 +8845,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry
-  upToOneTargetSlot s registry
-  multiTargetSlot s registry
+  upToOneTargetSpec s registry
+  multiTargetSpec s registry
   supportSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
@@ -8884,8 +8884,8 @@ plusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne .
 -- two target creatures." The same count on a TRIGGERED ability, where
 -- Resolve.resolveModes rather than Resolve.targetsAllIllegal asks CR 608.2b's
 -- question.
-multiTargetSlot :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-multiTargetSlot s registry = Spec.describe s "MultiTarget" $ do
+multiTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+multiTargetSpec s registry = Spec.describe s "MultiTarget" $ do
   -- Three creatures with three different power/toughness boxes, so which two were
   -- pumped is legible; two targets out of three is what makes the count a choice
   -- rather than a sweep.
@@ -9153,8 +9153,8 @@ announcingOnly slot p = case p of
 -- Explosive Entry {1}{R} Sorcery (data/cards/explosive-entry.json): "Destroy up
 -- to one target artifact. Put a +1/+1 counter on up to one target creature." Two
 -- independently optional slots, so one can be taken while the other is declined.
-upToOneTargetSlot :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-upToOneTargetSlot s registry = Spec.describe s "UpToOneTarget" $ do
+upToOneTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
   Spec.it s "CR 115.6 Rat Out aimed at a creature shrinks it and still makes the Rat" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"

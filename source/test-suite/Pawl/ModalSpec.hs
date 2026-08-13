@@ -141,7 +141,7 @@ falsifierSpec s registry = Spec.describe s "Falsifier" $ do
     Spec.assertEqWith
       s
       "the Wall mode (0) is absent from the fillable set"
-      (Target.fillableModes Nothing oid (Card.enchantSlots (S.combinedFace chaosCharm)) (Face.spell (S.combinedFace chaosCharm)) gs1)
+      (Target.fillableModes Nothing oid (Card.enchantSlotMap (S.combinedFace chaosCharm)) (Face.spell (S.combinedFace chaosCharm)) gs1)
       (Set.fromList [ModeIndex.MkModeIndex 1, ModeIndex.MkModeIndex 2])
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
@@ -205,8 +205,8 @@ forcedSpec s registry = Spec.describe s "ForcedNoPrompt" $ do
 -- Pool.Permanents narrowed by Not (HasCardType Land), with CR 601.2c's "another"
 -- as the Not IsSource conjunct (#163). This proves the target slot and the exclusion in
 -- isolation; the wiring to a consumer is a later M4h task.
-nonlandPermanentTargetSlot :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-nonlandPermanentTargetSlot s registry = Spec.describe s "M4h NonlandPermanentTarget" $ do
+nonlandPermanentTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nonlandPermanentTargetSpec s registry = Spec.describe s "M4h NonlandPermanentTarget" $ do
   Spec.it s "NonlandPermanentTarget excludes lands (CR 109.2/110.4)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mindslaver <- S.printingOf s registry "Mindslaver"
@@ -485,7 +485,7 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     Spec.assertEqWith
       s
       "with a spell on the stack and permanents in play, all four modes are fillable"
-      (Target.fillableModes (Just S.alice) spellId (Card.enchantSlots (S.combinedFace crypticCommand)) modal gs)
+      (Target.fillableModes (Just S.alice) spellId (Card.enchantSlotMap (S.combinedFace crypticCommand)) modal gs)
       crypticModes
     -- The forced case's own boundary, and why casting does not reach it: modes 2
     -- and 3 take no targets, so they are fillable even on an empty board --
@@ -1124,7 +1124,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   onlyChosenModeSpec s registry
   fizzleSpec s registry
   forcedSpec s registry
-  nonlandPermanentTargetSlot s registry
+  nonlandPermanentTargetSpec s registry
   modalReaderSpec s
   activationModalSpec s registry
   triggerModalSpec s registry
