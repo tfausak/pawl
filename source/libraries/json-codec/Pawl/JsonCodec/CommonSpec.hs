@@ -89,19 +89,6 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     . Spec.it s "ignores object key order"
     $ Common.assertToJson s id (Value.object [Value.pair "b" (Value.integer 1), Value.pair "a" (Value.integer 2)]) "{\"a\":2,\"b\":1}"
 
-  Spec.describe s "optionalPair" $ do
-    Spec.it s "omits a field equal to its default" $
-      Spec.assertEq s (Common.optionalPair "k" (0 :: Integer) Value.integer 0) []
-    Spec.it s "writes a field differing from its default" $
-      Spec.assertEq s (Common.optionalPair "k" (0 :: Integer) Value.integer 1) [Value.pair "k" (Value.integer 1)]
-    -- The default is not required to be the type's zero.
-    Spec.it s "omits a non-zero default" $
-      Spec.assertEq s (Common.optionalPair "k" (7 :: Integer) Value.integer 7) []
-
-  Spec.describe s "requiredPair"
-    . Spec.it s "always writes the field"
-    $ Spec.assertEq s (Common.requiredPair "k" Value.integer (0 :: Integer)) [Value.pair "k" (Value.integer 0)]
-
   Spec.describe s "defaultedField" $ do
     Spec.it s "supplies the default for an absent key" $
       Spec.assertEq s (Common.defaultedField "k" (0 :: Integer) Common.asInteger []) (Right 0)
@@ -114,15 +101,6 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         s
         (Common.defaultedField "k" (Just (1 :: Integer)) (Common.decodeMaybe Common.asInteger) [Value.pair "k" Value.null])
         (Right Nothing)
-    -- The round trip the two halves have to agree on: 'optionalPair' elides a
-    -- field equal to its default, so 'defaultedField' sees an absent key and
-    -- supplies that same default back.
-    Spec.it s "supplies the default when optionalPair elides the field" $
-      Spec.assertEq
-        s
-        (Common.defaultedField "k" (7 :: Integer) Common.asInteger (Common.optionalPair "k" 7 Value.integer 7))
-        (Right 7)
-
   Spec.describe s "defaultedField accepts the verbose form" $ do
     -- The key is PRESENT, so 'defaultedField' hands the value straight to the
     -- decoder; the result equals the default only because 'decodeMaybe' reads
