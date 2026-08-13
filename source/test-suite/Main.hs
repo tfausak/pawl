@@ -114,6 +114,7 @@ import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.QuantitySpec
 import qualified Pawl.Codec.RecipientSpec
+import qualified Pawl.Codec.ReduceActivationCostSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
@@ -397,6 +398,7 @@ spec s registry = do
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.QuantitySpec.spec s
   Pawl.Codec.RecipientSpec.spec s
+  Pawl.Codec.ReduceActivationCostSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s

@@ -127,6 +127,7 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RoomIndex as RoomIndex
@@ -2122,7 +2123,7 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.ReduceSpellCost f _ -> [f]
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way.
-  PlayerEffect.ReduceActivationCost f _ _ -> [f]
+  PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _) -> [f]
   -- CR 601.2f's addition carries a Filter in two places: its own criterion
   -- ("nontoken Rebels"), and one inside each component it adds ("sacrifice a
   -- land"). Both are authored by the card, so both are linted, and the inner

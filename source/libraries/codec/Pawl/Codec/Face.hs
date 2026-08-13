@@ -76,7 +76,7 @@ toJson encodeCard f =
       Common.optionalPair "spell" Face.defaultSpell (Modal.toJson encodeCard) (Face.spell f),
       Common.optionalPair "staticAbilities" [] (Common.encodeList StaticAbility.toJson) (Face.staticAbilities f),
       Common.optionalPair "activatedAbilities" [] (Common.encodeList (ActivatedAbility.toJson encodeCard)) (Face.activatedAbilities f),
-      Common.optionalPair "replacementEffects" [] (Common.encodeList ReplacementEffect.toJson) (Face.replacementEffects f),
+      Common.optionalPair "replacementEffects" [] (Common.encodeList (Codec.encode ReplacementEffect.codec)) (Face.replacementEffects f),
       Common.optionalPair "triggeredAbilities" [] (Common.encodeList (TriggeredAbility.toJson encodeCard)) (Face.triggeredAbilities f),
       Common.optionalPair "delayedAbilities" Map.empty (TriggeredAbility.toJsonDelayed encodeCard) (Face.delayedAbilities f),
       -- CR 309.4: the rooms of a dungeon card, topmost first.
@@ -126,7 +126,7 @@ fromJson decodeCard value = do
   statics <- Common.defaultedField "staticAbilities" [] (Common.decodeList StaticAbility.fromJson) ps
   spell <- Common.defaultedField "spell" Face.defaultSpell (Modal.fromJson decodeCard) ps
   activated <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (ActivatedAbility.fromJson decodeCard)) ps
-  replacements <- Common.defaultedField "replacementEffects" [] (Common.decodeList ReplacementEffect.fromJson) ps
+  replacements <- Common.defaultedField "replacementEffects" [] (Common.decodeList (Codec.decode ReplacementEffect.codec)) ps
   triggered <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (TriggeredAbility.fromJson decodeCard)) ps
   permissions <- Common.defaultedField "castingPermissions" [] (Common.decodeList (Codec.decode CastingPermission.codec)) ps
   restrictions <- Common.defaultedField "castingRestrictions" [] (Common.decodeList (Codec.decode CastingRestriction.codec)) ps

@@ -27,7 +27,7 @@ toJson :: GameEvent.GameEvent -> Value.Value
 toJson e = case e of
   GameEvent.Moved zc pc -> Common.tagged "Moved" . Just . Value.array $ [ZoneChange.toJson zc, ProjectedCharacteristics.toJson pc]
   GameEvent.DamageDealt ev -> Common.tagged "DamageDealt" . Just $ DamageEvent.toJson ev
-  GameEvent.DamagePrevented r n -> Common.tagged "DamagePrevented" . Just . Value.array $ [Recipient.toJson r, Common.encodeNatural n]
+  GameEvent.DamagePrevented r n -> Common.tagged "DamagePrevented" . Just . Value.array $ [Codec.encode Recipient.codec r, Common.encodeNatural n]
   GameEvent.StepBegan p pid -> Common.tagged "StepBegan" . Just . Value.array $ [Codec.encode Phase.codec p, Codec.encode PlayerId.codec pid]
   GameEvent.SpellCast pid oid pc -> Common.tagged "SpellCast" . Just . Value.array $ [Codec.encode PlayerId.codec pid, Codec.encode ObjectId.codec oid, ProjectedCharacteristics.toJson pc]
   GameEvent.BecameMonarch pid -> Common.tagged "BecameMonarch" . Just $ Codec.encode PlayerId.codec pid
@@ -67,7 +67,7 @@ fromJson value = do
   case (t, mv) of
     ("Moved", Just (Value.Array (Array.MkArray [zc, pc]))) -> GameEvent.Moved <$> ZoneChange.fromJson zc <*> ProjectedCharacteristics.fromJson pc
     ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> DamageEvent.fromJson v
-    ("DamagePrevented", Just (Value.Array (Array.MkArray [r, n]))) -> GameEvent.DamagePrevented <$> Recipient.fromJson r <*> Common.decodeNatural n
+    ("DamagePrevented", Just (Value.Array (Array.MkArray [r, n]))) -> GameEvent.DamagePrevented <$> Codec.decode Recipient.codec r <*> Common.decodeNatural n
     ("StepBegan", Just (Value.Array (Array.MkArray [p, pid]))) -> GameEvent.StepBegan <$> Codec.decode Phase.codec p <*> Codec.decode PlayerId.codec pid
     ("SpellCast", Just (Value.Array (Array.MkArray [pid, oid, pc]))) -> GameEvent.SpellCast <$> Codec.decode PlayerId.codec pid <*> Codec.decode ObjectId.codec oid <*> ProjectedCharacteristics.fromJson pc
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> Codec.decode PlayerId.codec v

@@ -37,7 +37,7 @@ toJson pc =
       Common.requiredPair "cardTypes" (Common.encodeSet (Codec.encode CardType.codec)) (PC.cardTypes pc),
       Common.optionalPair "subtypes" Set.empty (Common.encodeSet (Codec.encode Subtype.codec)) (PC.subtypes pc),
       Common.optionalPair "activatedAbilities" [] (Common.encodeList (ActivatedAbility.toJson Card.toJson)) (PC.activatedAbilities pc),
-      Common.optionalPair "replacementEffects" [] (Common.encodeList ReplacementEffect.toJson) (PC.replacementEffects pc),
+      Common.optionalPair "replacementEffects" [] (Common.encodeList (Codec.encode ReplacementEffect.codec)) (PC.replacementEffects pc),
       Common.optionalPair "triggeredAbilities" [] (Common.encodeList (TriggeredAbility.toJson Card.toJson)) (PC.triggeredAbilities pc)
     ]
 
@@ -57,7 +57,7 @@ fromJson value = do
   cts <- Common.field "cardTypes" ps >>= Common.decodeSet (Codec.decode CardType.codec)
   subs <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet (Codec.decode Subtype.codec)) ps
   acts <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (ActivatedAbility.fromJson Card.fromJson)) ps
-  reps <- Common.defaultedField "replacementEffects" [] (Common.decodeList ReplacementEffect.fromJson) ps
+  reps <- Common.defaultedField "replacementEffects" [] (Common.decodeList (Codec.decode ReplacementEffect.codec)) ps
   trigs <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (TriggeredAbility.fromJson Card.fromJson)) ps
   pure
     PC.MkProjectedCharacteristics
