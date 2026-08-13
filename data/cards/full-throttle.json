@@ -84,12 +84,12 @@
                   },
                   {
                     "type": "ArmDelayedTrigger",
-                    "value": [
-                      "each combat",
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
-                      }
-                    ]
+                      },
+                      "name": "each combat"
+                    }
                   }
                 ]
               }

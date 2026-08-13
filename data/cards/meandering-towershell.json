@@ -122,13 +122,12 @@
                       },
                       {
                         "type": "ArmDelayedTrigger",
-                        "value": [
-                          "return it",
-                          {
+                        "value": {
+                          "name": "return it",
+                          "onset": {
                             "type": "FromYourNextTurn"
-                          },
-                          null
-                        ]
+                          }
+                        }
                       }
                     ]
                   }

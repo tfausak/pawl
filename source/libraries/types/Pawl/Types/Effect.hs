@@ -1,14 +1,11 @@
 module Pawl.Types.Effect where
 
 import qualified Data.Sequence as Seq
-import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
-import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.ChangeText as ChangeText
-import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CreateCopy as CreateCopy
-import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
@@ -20,31 +17,28 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
-import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
-import qualified Pawl.Types.Onset as Onset
+import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
-import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
-import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
-import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
+import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.RequireBlock as RequireBlock
-import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.Search as Search
+import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
-import qualified Pawl.Types.Uses as Uses
 
 -- | The ISA (design.md section 1): first-order, non-recursive in CONTROL FLOW --
 -- no loops, branches, or recursive calls -- and with no functions in any field.
@@ -103,9 +97,9 @@ data Effect card
     -- list as one activation's yield. Executed by Cost.tapForMana at payment (CR
     -- 605.3b: a mana ability never uses the stack), never by Resolve.applyEffect.
     AddMana ManaProduction.ManaProduction
-  | -- | CR 701.23: the players the FIRST PlayerRef names each search the library
-    -- of each player the SECOND names, for Quantity cards matching the
-    -- Filter, put them where the SearchDestination says, then that library's
+  | -- | CR 701.23: the players Search.searcher names each search the library of
+    -- each player Search.owner names, for Search.quantity cards matching
+    -- Search.filter, put them where Search.destination says, then that library's
     -- owner shuffles. The Filter is evaluated over the PRINTED-card view
     -- (Projection.viewOfCardIn) -- a card in a library has no projection, only CR
     -- 208.2a's characteristic-defining power. Evolving Wilds' "basic land card"
@@ -114,7 +108,8 @@ data Effect card
     -- destination.
     --
     -- TWO refs, because CR 701.23a's looking and CR 400.1's ownership are
-    -- genuinely independent and no card's text derives one from the other:
+    -- genuinely independent and no card's text derives one from the other, which
+    -- is also why the payload names them:
     -- Evolving Wilds says `You`/`You`, Fertilid's Favor's "target player searches
     -- their library" says the same `InSlot` twice, and Extract's "search target
     -- player's library" says `You`/`InSlot` -- the controller looks, the target
@@ -138,7 +133,7 @@ data Effect card
     -- Not implemented: a search of any zone but a library (#1318). Nor "up to N
     -- cards" with no quality stated, which CR 701.23d does not force and this
     -- pair of fields cannot tell from a bare "N cards" (#1379).
-    Search PlayerRef.PlayerRef PlayerRef.PlayerRef Quantity.Quantity (Filter.Filter Keyword.Keyword) SearchDestination.SearchDestination
+    Search Search.Search
   | -- | CR 701.13 / Rest in Peace: exile every card in every graveyard. Targetless
     -- and bulk; a general exile-from-zone is future.
     ExileAllGraveyards
@@ -611,7 +606,7 @@ data Effect card
     -- NOT Pawl.Types.Clause.condition: that one gates whether a clause's
     -- instructions run at all, while this one gates only whether this opcode
     -- installs its row.
-    Replace Duration.Duration Uses.Uses ReplacementOrigin.ReplacementOrigin (Maybe Condition.Condition) ReplacementEffect.ReplacementEffect
+    Replace Replace.Replace
   | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue names a step; Stonehorn Dignitary names a whole
     -- phase (CR 500.1).
@@ -691,8 +686,8 @@ data Effect card
     PreventAllDamage DurationRef.DurationRef
   | -- | CR 614.9: install a floating REDIRECTION effect -- Turn the Tables' "all
     -- combat damage that would be dealt to you this turn is dealt to target
-    -- attacking creature instead". The first ObjectRef is the damage's original
-    -- recipient, the second where it goes instead.
+    -- attacking creature instead". RedirectDamage.from is the damage's original
+    -- recipient, RedirectDamage.to where it goes instead.
     --
     -- NOT a Replace carrying a DamageR, for PreventNextDamage's reason doubled:
     -- BOTH sides are known only at resolution, and card data can name neither an
@@ -705,7 +700,7 @@ data Effect card
     -- controller's noncombat damage away too -- weaker than printed, in the
     -- controller's favour. Nothing means any kind, for a redirect that names
     -- none.
-    RedirectDamage Duration.Duration (Maybe DamageKind.DamageKind) ObjectRef.ObjectRef ObjectRef.ObjectRef
+    RedirectDamage RedirectDamage.RedirectDamage
   | -- | CR 701.6/701.6a: counter the slot's target via the Event.counter funnel.
     -- ONE opcode for both of that rule's subjects -- Cancel's slot is a
     -- Pool.Spells one and Stifle's a Pool.Abilities one -- because which ending
@@ -891,7 +886,7 @@ data Effect card
     -- Immediately for everything but Meandering Towershell's "on your next turn";
     -- see Pawl.Types.Onset for why a total field rather than a second Maybe, and
     -- why the gate cannot live in the ability's own trigger condition.
-    ArmDelayedTrigger AbilityName.AbilityName Onset.Onset (Maybe Duration.Duration)
+    ArmDelayedTrigger ArmDelayedTrigger.ArmDelayedTrigger
   | -- | CR 611.1 / 613.11: install a stored PLAYER or RULES-modifying continuous
     -- effect on some players for a duration. Silence is
     -- `AffectPlayers UntilEndOfTurn (Scoped Opponents) CantCastSpells`, and
@@ -1205,8 +1200,8 @@ data Effect card
     -- countered" is: CR 701.24e and CR 701.24f are both about abilities that
     -- trigger when a library is shuffled, which a library move alone does not fire.
     --
-    -- The Maybe PlayerRef NAMES the library, and is what CR 701.24c's first
-    -- half needs: "that library is shuffled even if none of those objects are in
+    -- ShuffleIntoLibrary.library NAMES the library, and is what CR 701.24c's
+    -- first half needs: "that library is shuffled even if none of those objects are in
     -- the zone they're expected to be in". An owner read off the objects
     -- disappears with them, so a card whose shuffle-in resolves with every named
     -- object gone -- Dwell on the Past's and Gaea's Blessing's "target player
@@ -1235,7 +1230,7 @@ data Effect card
     -- still shuffled once. The same arm reaches CR 701.24d's set ("shuffled even
     -- if there are no objects in that set") through EachCardInGraveyard, which
     -- is Gaea's Blessing's "shuffle your graveyard into your library".
-    ShuffleIntoLibrary (Maybe PlayerRef.PlayerRef) ObjectRef.ObjectRef
+    ShuffleIntoLibrary ShuffleIntoLibrary.ShuffleIntoLibrary
   | -- | CR 608.2g: offer this effect's controller the cast of the object the slot
     -- names -- "if an effect specifically instructs or allows a player to cast a
     -- spell during resolution, they do so by following the steps in rules
@@ -1258,7 +1253,7 @@ data Effect card
     -- "for as long as that card remains exiled" and is Object.playableFromExile;
     -- this one is a single opportunity taken during a resolution, and a Siege
     -- whose controller declines it stays in exile uncastable.
-    OfferCast SlotName.SlotName CastOffer.CastOffer
+    OfferCast OfferCast.OfferCast
   | -- | CR 601.3: "a player can begin to cast a spell only if a rule or effect
     -- allows that player to cast it" -- grant that permission over the objects
     -- the ObjectRef names, for a duration. Victor Mancha, Runaway's "exile target

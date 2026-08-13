@@ -70,6 +70,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -291,8 +292,10 @@ siegeDefeat =
     -- learns that rule 310.11b is what wrote them.
     offer =
       Effect.OfferCast
-        Binding.became
-        CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing}
+        OfferCast.MkOfferCast
+          { OfferCast.slot = Binding.became,
+            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True, CastOffer.payingInstead = Nothing}
+          }
 
 -- The intrinsic triggered abilities rule 310 gives a permanent, read off the
 -- finished projection. Pawl.Engine.Keyword.triggeredAbilitiesOf's sibling, and

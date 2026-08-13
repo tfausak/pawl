@@ -80,6 +80,8 @@ library codec
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AlternativeCost
     Pawl.Codec.AlternativeCostSpec
+    Pawl.Codec.ArmDelayedTrigger
+    Pawl.Codec.ArmDelayedTriggerSpec
     Pawl.Codec.AttachTarget
     Pawl.Codec.AttachTargetSpec
     Pawl.Codec.AttackCost
@@ -258,6 +260,8 @@ library codec
     Pawl.Codec.ObjectIdSpec
     Pawl.Codec.ObjectRef
     Pawl.Codec.ObjectRefSpec
+    Pawl.Codec.OfferCast
+    Pawl.Codec.OfferCastSpec
     Pawl.Codec.Onset
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
@@ -302,16 +306,20 @@ library codec
     Pawl.Codec.QuantitySpec
     Pawl.Codec.Recipient
     Pawl.Codec.RecipientSpec
+    Pawl.Codec.RedirectDamage
+    Pawl.Codec.RedirectDamageSpec
     Pawl.Codec.ReduceActivationCost
     Pawl.Codec.ReduceActivationCostSpec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.RemoveCounters
     Pawl.Codec.RemoveCountersSpec
+    Pawl.Codec.Replace
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.ReplacementOrigin
     Pawl.Codec.ReplacementOriginSpec
+    Pawl.Codec.ReplaceSpec
     Pawl.Codec.RequireBlock
     Pawl.Codec.RequireBlockSpec
     Pawl.Codec.RevealCause
@@ -326,8 +334,12 @@ library codec
     Pawl.Codec.ScalingSpec
     Pawl.Codec.Scope
     Pawl.Codec.ScopeSpec
+    Pawl.Codec.Search
     Pawl.Codec.SearchDestination
     Pawl.Codec.SearchDestinationSpec
+    Pawl.Codec.SearchSpec
+    Pawl.Codec.ShuffleIntoLibrary
+    Pawl.Codec.ShuffleIntoLibrarySpec
     Pawl.Codec.SkipNextPhase
     Pawl.Codec.SkipNextPhaseSpec
     Pawl.Codec.SlotName
@@ -685,6 +697,7 @@ library types
     Pawl.Types.AffectPlayers
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost
+    Pawl.Types.ArmDelayedTrigger
     Pawl.Types.Asked
     Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
@@ -812,6 +825,7 @@ library types
     Pawl.Types.Object
     Pawl.Types.ObjectId
     Pawl.Types.ObjectRef
+    Pawl.Types.OfferCast
     Pawl.Types.Onset
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
@@ -847,9 +861,11 @@ library types
     Pawl.Types.PutCounters
     Pawl.Types.Quantity
     Pawl.Types.Recipient
+    Pawl.Types.RedirectDamage
     Pawl.Types.ReduceActivationCost
     Pawl.Types.Regenerability
     Pawl.Types.RemoveCounters
+    Pawl.Types.Replace
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate
     Pawl.Types.ReplacementEffect
@@ -865,7 +881,9 @@ library types
     Pawl.Types.SacrificeRestriction
     Pawl.Types.Scaling
     Pawl.Types.Scope
+    Pawl.Types.Search
     Pawl.Types.SearchDestination
+    Pawl.Types.ShuffleIntoLibrary
     Pawl.Types.Sickness
     Pawl.Types.SkipNextPhase
     Pawl.Types.SlotArity

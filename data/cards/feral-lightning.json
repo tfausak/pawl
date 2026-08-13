@@ -132,7 +132,9 @@
                   },
                   {
                     "type": "ArmDelayedTrigger",
-                    "value": "exile them"
+                    "value": {
+                      "name": "exile them"
+                    }
                   }
                 ]
               }

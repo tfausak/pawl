@@ -34,22 +34,22 @@
                 "effects": [
                   {
                     "type": "RedirectDamage",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
-                        "type": "Combat"
-                      },
-                      {
+                      "from": {
                         "type": "InSlot",
                         "value": "you"
                       },
-                      {
+                      "kind": {
+                        "type": "Combat"
+                      },
+                      "to": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   }
                 ]
               }

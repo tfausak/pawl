@@ -24,24 +24,23 @@
                     "effects": [
                       {
                         "type": "Replace",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
-                            "type": "Once"
-                          },
-                          {
-                            "type": "Other"
-                          },
-                          null,
-                          {
+                          "effect": {
                             "type": "DestructionR",
                             "value": {
                               "type": "Regenerate"
                             }
+                          },
+                          "origin": {
+                            "type": "Other"
+                          },
+                          "uses": {
+                            "type": "Once"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

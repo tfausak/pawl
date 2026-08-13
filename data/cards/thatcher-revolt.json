@@ -106,7 +106,9 @@
                   },
                   {
                     "type": "ArmDelayedTrigger",
-                    "value": "sacrifice those tokens"
+                    "value": {
+                      "name": "sacrifice those tokens"
+                    }
                   }
                 ]
               }

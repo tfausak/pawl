@@ -17,6 +17,7 @@ import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card
@@ -63,6 +64,7 @@ import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
@@ -81,6 +83,7 @@ import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -403,7 +406,15 @@ cycling cost searchFor =
       Nothing -> Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
       -- CR 702.29e's "search your library for a [quality] card", so one card is
       -- the whole instruction's count.
-      Just filter_ -> Effect.Search (PlayerRef.Relative PlayerRelation.You) (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1) filter_ SearchDestination.RevealThenHand
+      Just filter_ ->
+        Effect.Search
+          Search.MkSearch
+            { Search.searcher = PlayerRef.Relative PlayerRelation.You,
+              Search.owner = PlayerRef.Relative PlayerRelation.You,
+              Search.quantity = Quantity.Literal 1,
+              Search.filter = filter_,
+              Search.destination = SearchDestination.RevealThenHand
+            }
 
 -- CR 702.77a: "reinforce N-[cost]" means "[cost], Discard this card: Put N +1/+1
 -- counters on target creature." Cycling's ability one clause over, and the first
@@ -2145,7 +2156,13 @@ decayed =
       TriggeredAbility.intervening = Nothing
     }
   where
-    effect = Effect.ArmDelayedTrigger decayedSacrificeName Onset.Immediately Nothing
+    effect =
+      Effect.ArmDelayedTrigger
+        ArmDelayedTrigger.MkArmDelayedTrigger
+          { ArmDelayedTrigger.name = decayedSacrificeName,
+            ArmDelayedTrigger.onset = Onset.Immediately,
+            ArmDelayedTrigger.duration = Nothing
+          }
 
 -- CR 603.7: the delayed triggered abilities RULE 702 declares, keyed by the name
 -- its own arming opcode names. Pawl.Engine.Resolve falls back to this map when a
@@ -2781,8 +2798,10 @@ miracle cost =
   where
     offer =
       Effect.OfferCast
-        Binding.triggerSource
-        CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost}
+        OfferCast.MkOfferCast
+          { OfferCast.slot = Binding.triggerSource,
+            OfferCast.offer = CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost}
+          }
 
 -- CR 702.94a's STATIC half, read as the one thing its reader needs: what this
 -- card would cost if its controller took the reveal. Nothing when the card has no

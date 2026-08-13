@@ -89,7 +89,9 @@
                   },
                   {
                     "type": "ArmDelayedTrigger",
-                    "value": "tap it"
+                    "value": {
+                      "name": "tap it"
+                    }
                   }
                 ]
               }

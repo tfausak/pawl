@@ -21,18 +21,11 @@
                 "effects": [
                   {
                     "type": "Replace",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
-                        "type": "Unlimited"
-                      },
-                      {
-                        "type": "Other"
-                      },
-                      null,
-                      {
+                      "effect": {
                         "type": "DamageR",
                         "value": [
                           {
@@ -44,8 +37,14 @@
                             "type": "PreventAll"
                           }
                         ]
+                      },
+                      "origin": {
+                        "type": "Other"
+                      },
+                      "uses": {
+                        "type": "Unlimited"
                       }
-                    ]
+                    }
                   }
                 ]
               }

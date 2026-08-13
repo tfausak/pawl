@@ -27,24 +27,11 @@
                     "effects": [
                       {
                         "type": "Search",
-                        "value": [
-                          {
-                            "type": "Relative",
-                            "value": {
-                              "type": "You"
-                            }
+                        "value": {
+                          "destination": {
+                            "type": "RevealThenHand"
                           },
-                          {
-                            "type": "Relative",
-                            "value": {
-                              "type": "You"
-                            }
-                          },
-                          {
-                            "type": "Literal",
-                            "value": 1
-                          },
-                          {
+                          "filter": {
                             "type": "And",
                             "value": [
                               {
@@ -61,10 +48,23 @@
                               }
                             ]
                           },
-                          {
-                            "type": "RevealThenHand"
+                          "owner": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "searcher": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
                           }
-                        ]
+                        }
                       }
                     ]
                   }

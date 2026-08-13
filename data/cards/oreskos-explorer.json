@@ -38,20 +38,23 @@
                     "effects": [
                       {
                         "type": "Search",
-                        "value": [
-                          {
+                        "value": {
+                          "destination": {
+                            "type": "RevealThenHand"
+                          },
+                          "filter": {
+                            "type": "HasSubtype",
+                            "value": {
+                              "type": "Plains"
+                            }
+                          },
+                          "owner": {
                             "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          {
-                            "type": "Relative",
-                            "value": {
-                              "type": "You"
-                            }
-                          },
-                          {
+                          "quantity": {
                             "type": "Count",
                             "value": {
                               "aggregation": {
@@ -74,16 +77,13 @@
                               }
                             }
                           },
-                          {
-                            "type": "HasSubtype",
+                          "searcher": {
+                            "type": "Relative",
                             "value": {
-                              "type": "Plains"
+                              "type": "You"
                             }
-                          },
-                          {
-                            "type": "RevealThenHand"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

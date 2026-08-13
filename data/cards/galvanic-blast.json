@@ -21,17 +21,8 @@
                 "effects": [
                   {
                     "type": "Replace",
-                    "value": [
-                      {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "Once"
-                      },
-                      {
-                        "type": "SelfReplacement"
-                      },
-                      {
+                    "value": {
+                      "condition": {
                         "type": "Compares",
                         "value": {
                           "comparison": {
@@ -79,7 +70,10 @@
                           }
                         }
                       },
-                      {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "effect": {
                         "type": "DamageR",
                         "value": [
                           {
@@ -92,8 +86,14 @@
                             "value": 4
                           }
                         ]
+                      },
+                      "origin": {
+                        "type": "SelfReplacement"
+                      },
+                      "uses": {
+                        "type": "Once"
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "DealDamage",

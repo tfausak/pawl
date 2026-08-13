@@ -51,7 +51,7 @@
       ],
       "toughness": {
         "type": "Literal",
-        "value": 3E+1
+        "value": 30.0
       },
       "typeLine": {
         "subtypes": [

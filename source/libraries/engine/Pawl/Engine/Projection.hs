@@ -83,6 +83,8 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
+import qualified Pawl.Types.Search as Search
+import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -1520,7 +1522,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ChangeText (ChangeText.MkChangeText family forbidden slot) ->
     Effect.ChangeText (ChangeText.MkChangeText family (Set.map (swapWordIn family pairs) forbidden) slot)
   Effect.AddMana _ -> effect
-  Effect.Search searcher owner quantity filter_ destination -> Effect.Search searcher owner quantity (Filter.rewrite pairs filter_) destination
+  Effect.Search (Search.MkSearch searcher owner quantity filter_ destination) -> Effect.Search (Search.MkSearch searcher owner quantity (Filter.rewrite pairs filter_) destination)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
   Effect.TemptWithTheRing -> effect
@@ -1615,7 +1617,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   Effect.ChooseOpponent _ -> effect
   Effect.TakeExtraTurn {} -> effect
-  Effect.ShuffleIntoLibrary named ref -> Effect.ShuffleIntoLibrary named (rewriteObjectRef pairs ref)
+  Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named ref) -> Effect.ShuffleIntoLibrary (ShuffleIntoLibrary.MkShuffleIntoLibrary named (rewriteObjectRef pairs ref))
   Effect.OfferCast {} -> effect
   -- The ObjectRef alone, exactly as GainControl above: the Duration is left
   -- untouched, so a ForAsLongAs Condition's Filters are not rewritten. That
