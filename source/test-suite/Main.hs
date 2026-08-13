@@ -259,16 +259,17 @@ testTree registry =
     "pawl"
     ( [Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry]
         -- These two subtrees are wired separately because their timeouts are
-        -- tasty options and Pawl.Spec cannot express one. They are also the
-        -- only timeouts the suite has under CI, which passes no --timeout: the
-        -- `nix build` check phase runs a bare `Setup test`, so tasty defaults
-        -- to NoTimeout and deleting either would turn a non-terminating
-        -- regression into a job that runs to the platform's limit. Each budget
-        -- is at least 100x its group's slowest case measured 2026-08-09,
-        -- rounded up to a round number: headroom for a loaded shared runner,
-        -- not a speed assertion. The option is deliberately NOT hoisted onto the whole
-        -- "pawl" group, because localOption beats the command line and would
-        -- silently make an agent's --timeout 2s ineffective suite-wide.
+        -- tasty options and Pawl.Spec cannot express one. Every case now has
+        -- SOME budget under CI: flake.nix's testFlags pass --timeout 5s to the
+        -- `nix build` check phase, which used to run a bare `Setup test` and
+        -- leave tasty at NoTimeout. These two keep their own budgets anyway,
+        -- because localOption beats the command line -- so they hold whatever
+        -- an agent passes, and neither is tighter than the CI floor. Each is
+        -- at least 100x its group's slowest case measured 2026-08-09, rounded
+        -- up to a round number: headroom for a loaded shared runner, not a
+        -- speed assertion. The option is deliberately NOT hoisted onto the
+        -- whole "pawl" group, because that same precedence would silently make
+        -- an agent's --timeout ineffective suite-wide.
         --
         -- Pawl.ReplacementSpec guards CR 616.1's termination, where a
         -- regression hangs rather than fails; the fuller rationale is at that
