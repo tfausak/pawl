@@ -1301,7 +1301,17 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- The COMPONENTS are asked exactly as `canPay` asks them, and no completion
 -- touches them: `completions` rewrites mana symbols only.
 canPaySomeCompletion :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletion pid oid total_ cost gs = canPaySomeCompletionGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid oid total_ cost gs
+canPaySomeCompletion pid oid total_ cost gs =
+  let pcs = Projection.projectAll gs
+   in canPaySomeCompletionGiven (activationManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ cost gs
+
+-- The mana sources an ACTIVATION payment is judged against, which is what every
+-- gate below hands Mana.payableResolutionsGiven. ONE function pairing
+-- `manaActivations` with the sweep taken under it, so a hoisted list cannot be
+-- built under a capacity the gate does not read -- the invariant
+-- Mana.payableResolutionsGiven states and its type cannot.
+activationManaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
+activationManaSourcesGiven = Mana.manaSourcesGiven manaActivations
 
 -- The same question given a board the CALLER has already walked. The wrapper
 -- above reaches Mana.canPayCommitting, which takes one control-grant walk and
@@ -1310,19 +1320,24 @@ canPaySomeCompletion pid oid total_ cost gs = canPaySomeCompletionGiven (Project
 -- Handing the board in changes no answer -- see Mana.payableResolutionsGiven and
 -- the snapshot argument at Projection.projectGiven.
 --
+-- `sources` rather than the control grants, because the grants were only ever
+-- forwarded to Mana.manaSourcesGiven and that sweep is the same for every
+-- permanent in one enumeration (#1073). Build it with
+-- activationManaSourcesGiven above and nothing else.
+--
 -- ONLY the mana half gets the pre-walked board. The COMPONENTS are still
 -- asked through canPayComponent, whose Sacrifice and TapForTotalPower arms make
--- per-object walks of their own (#1073); no activation cost in the pool carries
+-- per-object walks of their own (#1448); no activation cost in the pool carries
 -- one. Their CLAIMS do reach the mana side, for `canPay`'s reason (#1134).
-canPaySomeCompletionGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cost of
+canPaySomeCompletionGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletionGiven sources pcs pid oid total_ cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy (Cost.components cost)
         claimed = claimsOf pid oid (Cost.components cost) gs
         payable (completed, life) =
           any
-            (\totalled -> Mana.canPayCommittingGiven manaActivations grants pcs pid (outside + life) claimed totalled gs)
+            (\totalled -> Mana.canPayCommittingGiven manaActivations sources pcs pid (outside + life) claimed totalled gs)
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)

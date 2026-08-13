@@ -851,12 +851,14 @@ canPay capacity pid = canPayCommitting capacity pid 0 []
 -- one creature under CR 118.3, exactly as two sources' are (#1134). Zero and
 -- empty everywhere else, which is what `canPay` is.
 canPayCommitting :: Capacity -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
-canPayCommitting capacity pid committed claimed cost gs = canPayCommittingGiven capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid committed claimed cost gs
+canPayCommitting capacity pid committed claimed cost gs =
+  let pcs = Projection.projectAll gs
+   in canPayCommittingGiven capacity (manaSourcesGiven capacity (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same question given a board already walked -- see payableResolutionsGiven
--- for what `grants` and `pcs` are and why handing them in changes no answer.
-canPayCommittingGiven :: Capacity -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
-canPayCommittingGiven capacity grants pcs pid committed claimed cost gs = not (null (payableResolutionsGiven capacity grants pcs pid committed claimed cost gs))
+-- for what `sources` and `pcs` are and why handing them in changes no answer.
+canPayCommittingGiven :: Capacity -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommittingGiven capacity sources pcs pid committed claimed cost gs = not (null (payableResolutionsGiven capacity sources pcs pid committed claimed cost gs))
 
 -- One source's contribution to the supply side, as the OPTIONS it offers: one
 -- option per group of yields (see the collapse below), and each option is that
@@ -1013,13 +1015,26 @@ sourceOptions supplies =
 -- enumeration: its life way is a resolution with one fewer demand, so neither
 -- has to learn about a symbol that consumes no supply at all.
 payableResolutions :: Capacity -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutions capacity pid committed claimed cost gs = payableResolutionsGiven capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid committed claimed cost gs
+payableResolutions capacity pid committed claimed cost gs =
+  let pcs = Projection.projectAll gs
+   in payableResolutionsGiven capacity (manaSourcesGiven capacity (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same list given a board the CALLER has already walked, which is the half
 -- Action.legalActions' enumeration wants: the wrapper above takes one
 -- control-grant walk and one whole-board projection per CALL, and the caller
 -- there is a loop over the battlefield, so an activation cost measured through
 -- the wrapper costs a whole-board sweep per permanent (#716).
+--
+-- `sources` is manaSourcesGiven's answer for this player, handed in rather than
+-- taken, because that sweep is itself a walk of everything the player controls
+-- asking manaRoutesOfGiven of each -- identical for every ability of every
+-- permanent in one enumeration, and so one more per-permanent O(N) walk when it
+-- is taken here (#1073). It is the SAME list Action.legalActions offers CR
+-- 605.3a's mana activations from, so the offer and this gate cannot disagree.
+--
+-- IT MUST BE `capacity`'s OWN LIST. Nothing in the type says so: every caller
+-- builds it with the same capacity it passes here, and the two plain wrappers
+-- above are what a caller with no list of its own uses.
 --
 -- The SAME board manaSources is judged against serves the per-source yields
 -- too, rather than a fresh projection per source on top of the sweep (#200);
@@ -1040,11 +1055,11 @@ payableResolutions capacity pid committed claimed cost gs = payableResolutionsGi
 -- case -- the creature buys the {B} or pays the additional cost, not both
 -- (#1134). It is the whole cost's claims and not the remainder's, which is
 -- exact: `Cost.canPay` asks this before any part of the cost is paid.
-payableResolutionsGiven :: Capacity -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutionsGiven capacity grants pcs pid committed claimed cost gs =
+payableResolutionsGiven :: Capacity -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutionsGiven capacity sources pcs pid committed claimed cost gs =
   let Mana.MkMana units = Game.poolOf pid gs
       pooled = fmap supplyOf units
-      options = fmap (\oid -> sourceOptions (manaSuppliesGiven capacity pcs pid oid gs)) (manaSourcesGiven capacity grants pcs pid gs)
+      options = fmap (\oid -> sourceOptions (manaSuppliesGiven capacity pcs pid oid gs)) sources
       -- One option taken from each source, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all. Each board
