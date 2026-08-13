@@ -44,6 +44,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SelfCountersReached as SelfCountersReached
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -89,7 +90,7 @@ chapterOf = chapterOfCondition . TriggeredAbility.condition
 -- get the same answer `chapterOf` gives the SBA above.
 chapterOfCondition :: TriggerCondition.TriggerCondition -> Maybe Natural
 chapterOfCondition condition = case condition of
-  TriggerCondition.SelfCountersReached CounterKind.Lore n -> Just n
+  TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore n) -> Just n
   _ -> Nothing
 
 -- | CR 714.2a: the chapter numbers a permanent's abilities print, read off the

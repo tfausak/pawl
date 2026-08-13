@@ -276,6 +276,8 @@ library codec
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
     Pawl.Codec.OptionalitySpec
+    Pawl.Codec.PermanentBecomesDesignated
+    Pawl.Codec.PermanentBecomesDesignatedSpec
     Pawl.Codec.Phase
     Pawl.Codec.PhasePattern
     Pawl.Codec.PhasePatternSpec
@@ -286,6 +288,8 @@ library codec
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerCounters
     Pawl.Codec.PlayerCountersSpec
+    Pawl.Codec.PlayerDrawsNthCard
+    Pawl.Codec.PlayerDrawsNthCardSpec
     Pawl.Codec.PlayerEffect
     Pawl.Codec.PlayerEffectSpec
     Pawl.Codec.PlayerId
@@ -348,6 +352,8 @@ library codec
     Pawl.Codec.SearchDestination
     Pawl.Codec.SearchDestinationSpec
     Pawl.Codec.SearchSpec
+    Pawl.Codec.SelfCountersReached
+    Pawl.Codec.SelfCountersReachedSpec
     Pawl.Codec.ShuffleIntoLibrary
     Pawl.Codec.ShuffleIntoLibrarySpec
     Pawl.Codec.SkipNextPhase
@@ -358,8 +364,12 @@ library codec
     Pawl.Codec.SpecialActionSpec
     Pawl.Codec.SpeedDecrease
     Pawl.Codec.SpeedDecreaseSpec
+    Pawl.Codec.SpellCast
+    Pawl.Codec.SpellCastSpec
     Pawl.Codec.StaticAbility
     Pawl.Codec.StaticAbilitySpec
+    Pawl.Codec.StepBegins
+    Pawl.Codec.StepBeginsSpec
     Pawl.Codec.Subtype
     Pawl.Codec.SubtypeFamily
     Pawl.Codec.SubtypeFamilySpec
@@ -847,6 +857,7 @@ library types
     Pawl.Types.Payment
     Pawl.Types.PaymentDecision
     Pawl.Types.PendingTrigger
+    Pawl.Types.PermanentBecomesDesignated
     Pawl.Types.Phase
     Pawl.Types.PhasedOut
     Pawl.Types.PhasePattern
@@ -855,6 +866,7 @@ library types
     Pawl.Types.Player
     Pawl.Types.PlayerCounterKind
     Pawl.Types.PlayerCounters
+    Pawl.Types.PlayerDrawsNthCard
     Pawl.Types.PlayerEffect
     Pawl.Types.PlayerId
     Pawl.Types.PlayerQuantity
@@ -898,6 +910,7 @@ library types
     Pawl.Types.Scope
     Pawl.Types.Search
     Pawl.Types.SearchDestination
+    Pawl.Types.SelfCountersReached
     Pawl.Types.ShuffleIntoLibrary
     Pawl.Types.Sickness
     Pawl.Types.SkipNextPhase
@@ -906,8 +919,10 @@ library types
     Pawl.Types.Source
     Pawl.Types.SpecialAction
     Pawl.Types.SpeedDecrease
+    Pawl.Types.SpellCast
     Pawl.Types.StaticAbility
     Pawl.Types.Status
+    Pawl.Types.StepBegins
     Pawl.Types.Subtype
     Pawl.Types.SubtypeFamily
     Pawl.Types.Supertype

@@ -5,17 +5,17 @@
         "gain 2 life": {
           "condition": {
             "type": "StepBegins",
-            "value": [
-              {
+            "value": {
+              "phase": {
                 "type": "Ending",
                 "value": {
                   "type": "EndStep"
                 }
               },
-              {
+              "scope": {
                 "type": "EachTurn"
               }
-            ]
+            }
           },
           "intervening": {
             "type": "Compares",

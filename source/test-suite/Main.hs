@@ -114,11 +114,13 @@ import qualified Pawl.Codec.ObjectRefSpec
 import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
+import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
 import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
 import qualified Pawl.Codec.PlayerCountersSpec
+import qualified Pawl.Codec.PlayerDrawsNthCardSpec
 import qualified Pawl.Codec.PlayerEffectSpec
 import qualified Pawl.Codec.PlayerIdSpec
 import qualified Pawl.Codec.PlayerQuantitySpec
@@ -150,12 +152,15 @@ import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SearchSpec
+import qualified Pawl.Codec.SelfCountersReachedSpec
 import qualified Pawl.Codec.ShuffleIntoLibrarySpec
 import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.SpeedDecreaseSpec
+import qualified Pawl.Codec.SpellCastSpec
 import qualified Pawl.Codec.StaticAbilitySpec
+import qualified Pawl.Codec.StepBeginsSpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
@@ -427,11 +432,13 @@ spec s registry = do
   Pawl.Codec.OfferCastSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
+  Pawl.Codec.PermanentBecomesDesignatedSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
   Pawl.Codec.PhaseSelectorSpec.spec s
   Pawl.Codec.PhaseSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
   Pawl.Codec.PlayerCountersSpec.spec s
+  Pawl.Codec.PlayerDrawsNthCardSpec.spec s
   Pawl.Codec.PlayerEffectSpec.spec s
   Pawl.Codec.PlayerIdSpec.spec s
   Pawl.Codec.PlayerQuantitySpec.spec s
@@ -463,12 +470,15 @@ spec s registry = do
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SearchSpec.spec s
+  Pawl.Codec.SelfCountersReachedSpec.spec s
   Pawl.Codec.ShuffleIntoLibrarySpec.spec s
   Pawl.Codec.SkipNextPhaseSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
   Pawl.Codec.SpecialActionSpec.spec s
   Pawl.Codec.SpeedDecreaseSpec.spec s
+  Pawl.Codec.SpellCastSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
+  Pawl.Codec.StepBeginsSpec.spec s
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s

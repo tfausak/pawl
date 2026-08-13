@@ -14,7 +14,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 toJson :: (Eq card) => (card -> Value.Value) -> TriggeredAbility.TriggeredAbility card -> Value.Value
 toJson codec ta =
   Value.object . concat $
-    [ Common.requiredPair "condition" TriggerCondition.toJson (TriggeredAbility.condition ta),
+    [ Common.requiredPair "condition" (Codec.encode TriggerCondition.codec) (TriggeredAbility.condition ta),
       Common.requiredPair "modal" (Modal.toJson codec) (TriggeredAbility.modal ta),
       Common.optionalPair "intervening" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (TriggeredAbility.intervening ta)
     ]
@@ -22,7 +22,7 @@ toJson codec ta =
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (TriggeredAbility.TriggeredAbility card)
 fromJson decode value = do
   ps <- Common.asObject value
-  c <- Common.field "condition" ps >>= TriggerCondition.fromJson
+  c <- Common.field "condition" ps >>= Codec.decode TriggerCondition.codec
   m <- Common.field "modal" ps >>= Modal.fromJson decode
   i <- Common.defaultedField "intervening" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   pure

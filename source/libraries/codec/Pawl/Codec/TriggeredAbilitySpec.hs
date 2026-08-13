@@ -33,6 +33,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -81,7 +82,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
       toJson
       fromJson
       ( TriggeredAbility.MkTriggeredAbility
-          { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn,
+          { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
             TriggeredAbility.modal =
               Modal.MkModal
                 (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Quantity.Literal 1)))))) Map.empty))
@@ -97,7 +98,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 )
           }
       )
-      """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":{"ref":{"type":"InSlot","value":"you"},"quantity":{"type":"Literal","value":1}}}]}]}]},"intervening":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
+      """ {"condition":{"type":"StepBegins","value":{"phase":{"type":"Beginning","value":{"type":"Upkeep"}},"scope":{"type":"ControllersTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":{"ref":{"type":"InSlot","value":"you"},"quantity":{"type":"Literal","value":1}}}]}]}]},"intervening":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
   -- CR 603.7: Face.delayedAbilities is a name-keyed map, rendered as a JSON
   -- OBJECT keyed by the name in ascending order. The two entries are inserted in
   -- DESCENDING name order, so a trip that emitted the map's incidental traversal
@@ -110,7 +111,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
       ( Map.fromList
           [ ( AbilityName.MkAbilityName (Text.pack "sacrifice it"),
               TriggeredAbility.MkTriggeredAbility
-                { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn,
+                { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn),
                   TriggeredAbility.modal =
                     Modal.MkModal
                       (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "token")))))) Map.empty))
@@ -120,7 +121,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             ),
             ( AbilityName.MkAbilityName (Text.pack "each combat"),
               TriggeredAbility.MkTriggeredAbility
-                { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Combat CombatStep.BeginningOfCombat) TurnScope.EachTurn,
+                { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.BeginningOfCombat) TurnScope.EachTurn),
                   TriggeredAbility.modal =
                     Modal.MkModal
                       (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Untap (ObjectRef.EachMatching Filter.AttackedThisTurn))))) Map.empty))
@@ -130,7 +131,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             )
           ]
       )
-      """ {"each combat":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Untap","value":{"type":"EachMatching","value":{"type":"AttackedThisTurn"}}}]}]}]}},"sacrifice it":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}]}}} """
+      """ {"each combat":{"condition":{"type":"StepBegins","value":{"phase":{"type":"Combat","value":{"type":"BeginningOfCombat"}},"scope":{"type":"EachTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Untap","value":{"type":"EachMatching","value":{"type":"AttackedThisTurn"}}}]}]}]}},"sacrifice it":{"condition":{"type":"StepBegins","value":{"phase":{"type":"Ending","value":{"type":"EndStep"}},"scope":{"type":"EachTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}]}}} """
   -- CR 603.4: an ability stating no intervening "if" leaves only the two
   -- required keys.
   Spec.it s "an all-default value omits every optional key" $

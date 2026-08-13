@@ -5,17 +5,17 @@
         "sacrifice it": {
           "condition": {
             "type": "StepBegins",
-            "value": [
-              {
+            "value": {
+              "phase": {
                 "type": "Ending",
                 "value": {
                   "type": "EndStep"
                 }
               },
-              {
+              "scope": {
                 "type": "ControllersTurn"
               }
-            ]
+            }
           },
           "modal": {
             "modes": [
@@ -63,17 +63,17 @@
         {
           "condition": {
             "type": "StepBegins",
-            "value": [
-              {
+            "value": {
+              "phase": {
                 "type": "Combat",
                 "value": {
                   "type": "BeginningOfCombat"
                 }
               },
-              {
+              "scope": {
                 "type": "ControllersTurn"
               }
-            ]
+            }
           },
           "modal": {
             "modes": [

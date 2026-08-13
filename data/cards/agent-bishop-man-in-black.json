@@ -29,17 +29,17 @@
         {
           "condition": {
             "type": "StepBegins",
-            "value": [
-              {
+            "value": {
+              "phase": {
                 "type": "Combat",
                 "value": {
                   "type": "BeginningOfCombat"
                 }
               },
-              {
+              "scope": {
                 "type": "ControllersTurn"
               }
-            ]
+            }
           },
           "modal": {
             "modes": [

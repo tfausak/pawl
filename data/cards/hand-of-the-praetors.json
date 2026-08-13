@@ -85,8 +85,8 @@
         {
           "condition": {
             "type": "SpellCast",
-            "value": [
-              {
+            "value": {
+              "filter": {
                 "type": "And",
                 "value": [
                   {
@@ -109,10 +109,10 @@
                   }
                 ]
               },
-              {
+              "scope": {
                 "type": "EachTurn"
               }
-            ]
+            }
           },
           "modal": {
             "modes": [

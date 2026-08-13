@@ -10,23 +10,20 @@ import qualified Pawl.Types.Designation as Designation
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Designation" $ do
   Spec.it s "Renowned" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Designation.toJson
-      Designation.fromJson
+      Designation.codec
       Designation.Renowned
       """ {"type":"Renowned"} """
   Spec.it s "Monstrous" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Designation.toJson
-      Designation.fromJson
+      Designation.codec
       Designation.Monstrous
       """ {"type":"Monstrous"} """
   Spec.it s "Suspected" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      Designation.toJson
-      Designation.fromJson
+      Designation.codec
       Designation.Suspected
       """ {"type":"Suspected"} """

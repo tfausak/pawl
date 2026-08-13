@@ -5,17 +5,17 @@
         "return it": {
           "condition": {
             "type": "StepBegins",
-            "value": [
-              {
+            "value": {
+              "phase": {
                 "type": "Combat",
                 "value": {
                   "type": "DeclareAttackers"
                 }
               },
-              {
+              "scope": {
                 "type": "ControllersTurn"
               }
-            ]
+            }
           },
           "modal": {
             "modes": [

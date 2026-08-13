@@ -125,6 +125,7 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -161,7 +162,9 @@ import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
+import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
@@ -524,7 +527,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- PermanentEnters' reason.
   TriggerCondition.PermanentTurnedFaceUp _ -> []
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
-  TriggerCondition.PermanentBecomesDesignated _ _ -> []
+  TriggerCondition.PermanentBecomesDesignated {} -> []
   TriggerCondition.SelfEvolves -> []
   -- CR 702.134c's is nullary too, so it holds no Quantity.
   TriggerCondition.AttachedCreatureMentors -> []
@@ -536,7 +539,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
   TriggerCondition.PermanentDies _ -> []
-  TriggerCondition.StepBegins _ _ -> []
+  TriggerCondition.StepBegins {} -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count.
@@ -565,7 +568,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfRevealedForMiracle -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
-  TriggerCondition.PlayerDrawsNthCard _ _ -> []
+  TriggerCondition.PlayerDrawsNthCard {} -> []
   -- CR 725.1's crowning condition is a PlayerRelation too.
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
@@ -584,12 +587,12 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
-  TriggerCondition.SelfCountersReached _ _ -> []
+  TriggerCondition.SelfCountersReached {} -> []
   -- CR 310.11b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- CR 601.2i's Filter is a predicate over the spell that was cast, and a Filter
   -- holds no Count, exactly as CR 603.6a's does above.
-  TriggerCondition.SpellCast _ _ -> []
+  TriggerCondition.SpellCast {} -> []
   -- The same rule read off the spell itself carries nothing at all.
   TriggerCondition.SelfCast -> []
 
@@ -2065,7 +2068,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
   TriggerCondition.PermanentTurnedFaceUp f -> [f]
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
-  TriggerCondition.PermanentBecomesDesignated _ f -> [f]
+  TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated _ f) -> [f]
   TriggerCondition.SelfEvolves -> []
   -- CR 702.134c's carries none either: "equipped creature" is CR 301.5f's one
   -- permanent rather than a class of them, and "a creature" narrows by nothing.
@@ -2079,7 +2082,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentDies f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition
   TriggerCondition.SelfEnters -> []
-  TriggerCondition.StepBegins _ _ -> []
+  TriggerCondition.StepBegins {} -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   -- Its watcher-scoped sibling carries one -- Tovolar's "a Wolf or Werewolf you
   -- control", which the card lint must sweep.
@@ -2114,7 +2117,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
   TriggerCondition.PlayerDiscards _ -> []
-  TriggerCondition.PlayerDrawsNthCard _ _ -> []
+  TriggerCondition.PlayerDrawsNthCard {} -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.
   TriggerCondition.PlayerBecomesMonarch _ -> []
   -- CR 603.7's slot-named condition holds a SlotName, which is no Filter -- what
@@ -2131,12 +2134,12 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerGainsLife _ -> []
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
-  TriggerCondition.SelfCountersReached _ _ -> []
+  TriggerCondition.SelfCountersReached {} -> []
   -- CR 310.11b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
-  TriggerCondition.SpellCast f _ -> [f]
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _) -> [f]
   -- "This spell" names the bearer and needs no Filter to say so.
   TriggerCondition.SelfCast -> []
 
@@ -3345,7 +3348,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         eachTurn ability =
           ability
             { TriggeredAbility.condition =
-                TriggerCondition.StepBegins (Phase.Combat CombatStep.DeclareAttackers) TurnScope.EachTurn
+                TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Combat CombatStep.DeclareAttackers) TurnScope.EachTurn)
             }
         widened = face {Face.delayedAbilities = fmap eachTurn (Face.delayedAbilities face)}
         -- The other way a card can reach this: an onset naming an ability the

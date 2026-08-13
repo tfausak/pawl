@@ -34,17 +34,17 @@
         {
           "condition": {
             "type": "SpellCast",
-            "value": [
-              {
+            "value": {
+              "filter": {
                 "type": "ControlledBy",
                 "value": {
                   "type": "You"
                 }
               },
-              {
+              "scope": {
                 "type": "OpponentsTurn"
               }
-            ]
+            }
           },
           "modal": {
             "modes": [
