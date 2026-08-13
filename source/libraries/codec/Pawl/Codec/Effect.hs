@@ -28,10 +28,13 @@ import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Onset as Onset
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Codec.PlayerCounters as PlayerCounters
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Codec.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Codec.PlayerRef as PlayerRef
+import qualified Pawl.Codec.PutCounters as PutCounters
 import qualified Pawl.Codec.Quantity as Quantity
+import qualified Pawl.Codec.RemoveCounters as RemoveCounters
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Codec.SearchDestination as SearchDestination
@@ -112,10 +115,10 @@ toJson codec e = case e of
         <> [Common.encodeSeq (toJson codec) rider | not (Seq.null rider)]
   Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Value.array [Codec.encode Duration.codec d, Codec.encode ObjectRef.codec r]))
   Effect.RedirectDamage d k f t -> Common.tagged "RedirectDamage" (Just (Value.array [Codec.encode Duration.codec d, Common.encodeMaybe (Codec.encode DamageKind.codec) k, Codec.encode ObjectRef.codec f, Codec.encode ObjectRef.codec t]))
-  Effect.PutCounters k q r -> Common.tagged "PutCounters" (Just (Value.array [Codec.encode (CounterKind.codec Keyword.codec) k, Codec.encode Quantity.codec q, Codec.encode ObjectRef.codec r]))
-  Effect.RemoveCounters k q s -> Common.tagged "RemoveCounters" (Just (Value.array [Codec.encode (CounterKind.codec Keyword.codec) k, Codec.encode Quantity.codec q, Codec.encode SlotName.codec s]))
-  Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode PlayerCounterKind.codec k, Codec.encode Quantity.codec q]))
-  Effect.RemovePlayerCounters r k q -> Common.tagged "RemovePlayerCounters" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode PlayerCounterKind.codec k, Codec.encode Quantity.codec q]))
+  Effect.PutCounters x -> Common.tagged "PutCounters" . Just $ Codec.encode PutCounters.codec x
+  Effect.RemoveCounters x -> Common.tagged "RemoveCounters" . Just $ Codec.encode RemoveCounters.codec x
+  Effect.GainPlayerCounters x -> Common.tagged "GainPlayerCounters" . Just $ Codec.encode PlayerCounters.codec x
+  Effect.RemovePlayerCounters x -> Common.tagged "RemovePlayerCounters" . Just $ Codec.encode PlayerCounters.codec x
   Effect.Tap r -> Common.tagged "Tap" (Just (Codec.encode ObjectRef.codec r))
   Effect.Untap r -> Common.tagged "Untap" (Just (Codec.encode ObjectRef.codec r))
   Effect.Transform r -> Common.tagged "Transform" (Just (Codec.encode ObjectRef.codec r))
@@ -257,18 +260,10 @@ fromJson decode value = do
     "RedirectDamage" -> case mv of
       Just (Value.Array (Array.MkArray [d, k, from, to])) -> Effect.RedirectDamage <$> Codec.decode Duration.codec d <*> Common.decodeMaybe (Codec.decode DamageKind.codec) k <*> Codec.decode ObjectRef.codec from <*> Codec.decode ObjectRef.codec to
       _ -> Left . Text.pack $ "RedirectDamage expects [Duration, Maybe DamageKind, ObjectRef, ObjectRef]"
-    "PutCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [k, q, r])) -> Effect.PutCounters <$> Codec.decode (CounterKind.codec Keyword.codec) k <*> Codec.decode Quantity.codec q <*> Codec.decode ObjectRef.codec r
-      _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, objectRef]"
-    "RemoveCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.RemoveCounters <$> Codec.decode (CounterKind.codec Keyword.codec) k <*> Codec.decode Quantity.codec q <*> Codec.decode SlotName.codec s
-      _ -> Left . Text.pack $ "RemoveCounters expects [counterKind, quantity, slot]"
-    "GainPlayerCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> Codec.decode PlayerRef.codec r <*> Codec.decode PlayerCounterKind.codec k <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]"
-    "RemovePlayerCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.RemovePlayerCounters <$> Codec.decode PlayerRef.codec r <*> Codec.decode PlayerCounterKind.codec k <*> Codec.decode Quantity.codec q
-      _ -> Left . Text.pack $ "RemovePlayerCounters expects [playerRef, playerCounterKind, quantity]"
+    "PutCounters" -> Common.withValue mv (fmap Effect.PutCounters . Codec.decode PutCounters.codec)
+    "RemoveCounters" -> Common.withValue mv (fmap Effect.RemoveCounters . Codec.decode RemoveCounters.codec)
+    "GainPlayerCounters" -> Common.withValue mv (fmap Effect.GainPlayerCounters . Codec.decode PlayerCounters.codec)
+    "RemovePlayerCounters" -> Common.withValue mv (fmap Effect.RemovePlayerCounters . Codec.decode PlayerCounters.codec)
     "Tap" -> Common.withValue mv (fmap Effect.Tap . Codec.decode ObjectRef.codec)
     "Untap" -> Common.withValue mv (fmap Effect.Untap . Codec.decode ObjectRef.codec)
     "Transform" -> Common.withValue mv (fmap Effect.Transform . Codec.decode ObjectRef.codec)

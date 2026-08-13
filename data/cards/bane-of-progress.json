@@ -76,19 +76,19 @@
                       },
                       {
                         "type": "PutCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
                             "type": "PlusOnePlusOne"
                           },
-                          {
+                          "quantity": {
                             "type": "InSlot",
                             "value": "destroyed"
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

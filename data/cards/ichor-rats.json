@@ -52,18 +52,18 @@
                     "effects": [
                       {
                         "type": "GainPlayerCounters",
-                        "value": [
-                          {
-                            "type": "EachPlayer"
-                          },
-                          {
+                        "value": {
+                          "kind": {
                             "type": "Poison"
                           },
-                          {
+                          "player": {
+                            "type": "EachPlayer"
+                          },
+                          "quantity": {
                             "type": "Literal",
                             "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }

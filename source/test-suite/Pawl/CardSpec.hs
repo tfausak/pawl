@@ -115,6 +115,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasePattern as PhasePattern
+import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
@@ -125,10 +126,12 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
@@ -624,10 +627,10 @@ effectCounts effect = case effect of
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
-  Effect.PutCounters _ quantity _ -> quantityCounts quantity
-  Effect.RemoveCounters _ quantity _ -> quantityCounts quantity
-  Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
-  Effect.RemovePlayerCounters _ _ quantity -> quantityCounts quantity
+  Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Transform _ -> []
@@ -2482,10 +2485,10 @@ effectFilters effect = case effect of
   -- BOTH positions: the ObjectRef carries Renegade Krasis' "each other creature
   -- you control with a +1/+1 counter on it", and a Filter there would otherwise
   -- escape the lint.
-  Effect.PutCounters _ quantity ref -> unframed (quantityFilters quantity <> objectRefFilters ref)
-  Effect.RemoveCounters _ quantity _ -> unframed (quantityFilters quantity)
-  Effect.GainPlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
-  Effect.RemovePlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
+  Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
+  Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> unframed (quantityFilters quantity)
+  Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
+  Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.Tap ref -> unframed (objectRefFilters ref)
   Effect.Untap ref -> unframed (objectRefFilters ref)
   Effect.Transform ref -> unframed (objectRefFilters ref)

@@ -6,7 +6,6 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Condition as Condition
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
@@ -26,11 +25,13 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -714,7 +715,7 @@ data Effect card
     -- Each named permanent gets its OWN call to Event.putCounters, because CR
     -- 614.16 replaces one placement at a time: a Hardened Scales seeing three
     -- creatures gets three opportunities, not one.
-    PutCounters (CounterKind.CounterKind Keyword.Keyword) Quantity.Quantity ObjectRef.ObjectRef
+    PutCounters PutCounters.PutCounters
   | -- | CR 122: remove this many counters of this kind from the slot's target
     -- permanent. PutCounters' mirror, and a SEPARATE constructor rather than one
     -- signed amount for the reason RemovePlayerCounters is separate from
@@ -734,7 +735,7 @@ data Effect card
     -- Still a bare SLOT where PutCounters now takes an ObjectRef: no printing in
     -- the pool takes counters off a swept set, so the widening was owed on one
     -- side only.
-    RemoveCounters (CounterKind.CounterKind Keyword.Keyword) Quantity.Quantity SlotName.SlotName
+    RemoveCounters RemoveCounters.RemoveCounters
   | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of a
     -- player-counter kind. Subsumes any self-scoped player counter (energy,
     -- experience, rad) as `Relative You` -- Longtusk Cub's "you get {E}{E}".
@@ -748,7 +749,7 @@ data Effect card
     -- TARGETING (CR 601.2c), which is how The Master, Transcendent's "target
     -- player gets two rad counters" is written -- but nothing here demands it,
     -- and no card in the pool aims POISON counters that way (#120).
-    GainPlayerCounters PlayerRef.PlayerRef PlayerCounterKind.PlayerCounterKind Quantity.Quantity
+    GainPlayerCounters PlayerCounters.PlayerCounters
   | -- | CR 122: the players the PlayerRef names each LOSE N counters of a
     -- player-counter kind -- CR 728.1's "removes one rad counter from
     -- themselves", and what Survivor's Med Kit's "target player loses all rad
@@ -762,7 +763,7 @@ data Effect card
     -- Removing more than the player has removes what they have and no more --
     -- the count is a Natural and CR 122 knows no negative counter -- rather than
     -- being an error or a no-op.
-    RemovePlayerCounters PlayerRef.PlayerRef PlayerCounterKind.PlayerCounterKind Quantity.Quantity
+    RemovePlayerCounters PlayerCounters.PlayerCounters
   | -- | CR 701.26a: tap the permanents the ObjectRef names -- Untap's exact mirror,
     -- down to the ObjectRef. A permanent that is ALREADY tapped is left alone
     -- rather than being an error, which is that rule's own second sentence and

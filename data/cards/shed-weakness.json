@@ -50,16 +50,16 @@
                 "effects": [
                   {
                     "type": "RemoveCounters",
-                    "value": [
-                      {
+                    "value": {
+                      "kind": {
                         "type": "MinusOneMinusOne"
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 1
                       },
-                      "target"
-                    ]
+                      "slot": "target"
+                    }
                   }
                 ],
                 "optionality": {

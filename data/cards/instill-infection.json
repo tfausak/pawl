@@ -25,19 +25,19 @@
                 "effects": [
                   {
                     "type": "PutCounters",
-                    "value": [
-                      {
+                    "value": {
+                      "kind": {
                         "type": "MinusOneMinusOne"
                       },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 1
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "Draw",

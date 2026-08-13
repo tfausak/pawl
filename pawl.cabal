@@ -252,6 +252,7 @@ library codec
     Pawl.Codec.PhaseSpec
     Pawl.Codec.PlayerCounterKind
     Pawl.Codec.PlayerCounterKindSpec
+    Pawl.Codec.PlayerCounters
     Pawl.Codec.PlayerEffect
     Pawl.Codec.PlayerEffectSpec
     Pawl.Codec.PlayerId
@@ -274,6 +275,7 @@ library codec
     Pawl.Codec.PrintingSpec
     Pawl.Codec.ProjectedCharacteristics
     Pawl.Codec.ProjectedCharacteristicsSpec
+    Pawl.Codec.PutCounters
     Pawl.Codec.Quantity
     Pawl.Codec.QuantitySpec
     Pawl.Codec.Recipient
@@ -282,6 +284,7 @@ library codec
     Pawl.Codec.ReduceActivationCostSpec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
+    Pawl.Codec.RemoveCounters
     Pawl.Codec.ReplacementEffect
     Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.ReplacementOrigin
@@ -782,6 +785,7 @@ library types
     Pawl.Types.PhyrexianPayment
     Pawl.Types.Player
     Pawl.Types.PlayerCounterKind
+    Pawl.Types.PlayerCounters
     Pawl.Types.PlayerEffect
     Pawl.Types.PlayerId
     Pawl.Types.PlayerQuantity
@@ -799,10 +803,12 @@ library types
     Pawl.Types.ProjectedCharacteristics
     Pawl.Types.Prompt
     Pawl.Types.ProposedEvent
+    Pawl.Types.PutCounters
     Pawl.Types.Quantity
     Pawl.Types.Recipient
     Pawl.Types.ReduceActivationCost
     Pawl.Types.Regenerability
+    Pawl.Types.RemoveCounters
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate
     Pawl.Types.ReplacementEffect

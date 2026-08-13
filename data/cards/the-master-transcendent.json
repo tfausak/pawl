@@ -56,19 +56,19 @@
                     "effects": [
                       {
                         "type": "GainPlayerCounters",
-                        "value": [
-                          {
+                        "value": {
+                          "kind": {
+                            "type": "Rad"
+                          },
+                          "player": {
                             "type": "InSlot",
                             "value": "target"
                           },
-                          {
-                            "type": "Rad"
-                          },
-                          {
+                          "quantity": {
                             "type": "Literal",
                             "value": 2
                           }
-                        ]
+                        }
                       }
                     ]
                   }
