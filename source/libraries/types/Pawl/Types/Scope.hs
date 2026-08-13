@@ -1,8 +1,8 @@
 module Pawl.Types.Scope where
 
 import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.Zone as Zone
 
 -- | What a Pawl.Types.Count folds over: a zone's current residents, the event
 -- log, or the players themselves. Three domains rather than one because the
@@ -15,7 +15,7 @@ import qualified Pawl.Types.Zone as Zone
 -- Aggregation have nothing to say about a mana unit. Pawl.Types.ManaCount is the
 -- parallel axis, and its haddock carries the argument in full.
 data Scope
-  = InZone Zone.Zone PlayerRef.PlayerRef
+  = InZone InZone.InZone
   | -- | CR 608.2i: effects that look back in time.
     InHistory EventShape.EventShape
   | -- | CR 102.1: the PLAYERS the reference names -- Tyranid Invasion's "the

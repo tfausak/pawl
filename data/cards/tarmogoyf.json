@@ -13,14 +13,14 @@
           },
           "scope": {
             "type": "InZone",
-            "value": [
-              {
-                "type": "Graveyard"
-              },
-              {
+            "value": {
+              "player": {
                 "type": "EachPlayer"
+              },
+              "zone": {
+                "type": "Graveyard"
               }
-            ]
+            }
           }
         }
       },

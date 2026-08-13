@@ -248,6 +248,8 @@ library codec
     Pawl.Codec.HalfUnlockedSpec
     Pawl.Codec.Hybrid
     Pawl.Codec.HybridSpec
+    Pawl.Codec.InZone
+    Pawl.Codec.InZoneSpec
     Pawl.Codec.Keyword
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
@@ -880,6 +882,7 @@ library types
     Pawl.Types.Hybrid
     Pawl.Types.HybridPayment
     Pawl.Types.IgnoredAbility
+    Pawl.Types.InZone
     Pawl.Types.Keyword
     Pawl.Types.KeywordFamily
     Pawl.Types.KickerDecision

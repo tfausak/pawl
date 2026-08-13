@@ -105,6 +105,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
@@ -823,7 +824,7 @@ isSharedZone zone = case zone of
 -- type, not by the rules (#161).
 scopeOffends :: Scope.Scope -> Bool
 scopeOffends scope = case scope of
-  Scope.InZone zone ref -> isSharedZone zone && ref /= PlayerRef.EachPlayer
+  Scope.InZone (InZone.MkInZone zone ref) -> isSharedZone zone && ref /= PlayerRef.EachPlayer
   Scope.InHistory _ -> False
   -- No zone at all, shared or otherwise: this scope folds the players a
   -- PlayerRef names rather than a copy of a zone each of them owns, so the
@@ -4382,7 +4383,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.staticAbilities =
                     [ boostedBy
                         ( Quantity.Type.Count
-                            (Count.Type.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) buried Aggregation.Members)
+                            (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
                         )
                     ]
                 }

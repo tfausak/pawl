@@ -100,6 +100,7 @@ import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GraveyardScopeSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
 import qualified Pawl.Codec.HybridSpec
+import qualified Pawl.Codec.InZoneSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LayoutSpec
@@ -444,6 +445,7 @@ spec s registry = do
   Pawl.Codec.GraveyardScopeSpec.spec s
   Pawl.Codec.HalfUnlockedSpec.spec s
   Pawl.Codec.HybridSpec.spec s
+  Pawl.Codec.InZoneSpec.spec s
   Pawl.Codec.KeywordFamilySpec.spec s
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LayoutSpec.spec s

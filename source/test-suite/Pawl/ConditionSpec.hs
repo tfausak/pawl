@@ -25,6 +25,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -43,7 +44,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 everyPermanent :: Count.Type.Count Quantity.Type.Quantity
 everyPermanent =
   Count.Type.MkCount
-    (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+    (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
     (Filter.Type.And [])
     Aggregation.Members
 
@@ -169,7 +170,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
       let (viewOf, gs) = boardOf swamp 0
           count =
             Count.Type.MkCount
-              (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
+              (Scope.InZone (InZone.MkInZone Zone.Hand (PlayerRef.Relative PlayerRelation.You)))
               (Filter.Type.And [])
               Aggregation.Members
       Spec.assertBool

@@ -45,6 +45,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -86,7 +87,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
         count =
           Quantity.Type.Count
             ( Count.Type.MkCount
-                (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
+                (Scope.InZone (InZone.MkInZone Zone.Graveyard PlayerRef.EachPlayer))
                 (Filter.Type.And [])
                 Aggregation.DistinctCardTypes
             )

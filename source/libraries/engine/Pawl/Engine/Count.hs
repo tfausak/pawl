@@ -26,6 +26,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Moved as Moved
@@ -65,7 +66,7 @@ type QuantityOf quantity = Maybe ObjectId -> Filter.View -> quantity -> Maybe In
 -- Pawl.Engine.Quantity.determine.
 evaluate :: ViewOf -> QuantityOf quantity -> Filter.Context -> GameState -> Count.Type.Count quantity -> Maybe Integer
 evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
-  Scope.InZone zone ref -> do
+  Scope.InZone (InZone.MkInZone zone ref) -> do
     pids <- playersFor context gs ref
     let ids = concatMap (\pid -> Game.zoneMembers zone pid gs) pids
         kept = Maybe.mapMaybe (\oid -> fmap ((,) (Just oid)) (keep predicate context (viewOf oid))) ids

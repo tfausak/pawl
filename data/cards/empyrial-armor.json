@@ -54,17 +54,17 @@
                     },
                     "scope": {
                       "type": "InZone",
-                      "value": [
-                        {
-                          "type": "Hand"
-                        },
-                        {
+                      "value": {
+                        "player": {
                           "type": "Relative",
                           "value": {
                             "type": "You"
                           }
+                        },
+                        "zone": {
+                          "type": "Hand"
                         }
-                      ]
+                      }
                     }
                   }
                 },
@@ -80,17 +80,17 @@
                     },
                     "scope": {
                       "type": "InZone",
-                      "value": [
-                        {
-                          "type": "Hand"
-                        },
-                        {
+                      "value": {
+                        "player": {
                           "type": "Relative",
                           "value": {
                             "type": "You"
                           }
+                        },
+                        "zone": {
+                          "type": "Hand"
                         }
-                      ]
+                      }
                     }
                   }
                 }

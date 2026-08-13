@@ -18,6 +18,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaCount as ManaCount.Type
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -666,7 +667,7 @@ bakePlayerRef players ref = case ref of
 -- look-back names none.
 bakeScope :: Map.Map SlotName PlayerId.PlayerId -> Scope.Scope -> Scope.Scope
 bakeScope players scope = case scope of
-  Scope.InZone zone ref -> Scope.InZone zone (bakePlayerRef players ref)
+  Scope.InZone (InZone.MkInZone zone ref) -> Scope.InZone (InZone.MkInZone zone (bakePlayerRef players ref))
   Scope.OverPlayers ref -> Scope.OverPlayers (bakePlayerRef players ref)
   Scope.InHistory _ -> scope
 
@@ -675,7 +676,7 @@ bakeScope players scope = case scope of
 -- reference either way, so the same question.
 scopeIsSlotless :: Scope.Scope -> Bool
 scopeIsSlotless scope = case scope of
-  Scope.InZone _ ref -> playerRefIsSlotless ref
+  Scope.InZone (InZone.MkInZone _ ref) -> playerRefIsSlotless ref
   Scope.InHistory _ -> True
   Scope.OverPlayers ref -> playerRefIsSlotless ref
 

@@ -37,6 +37,7 @@ import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Object as Object
@@ -55,7 +56,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 swampsYouControl :: Count.Type.Count Quantity.Type.Quantity
 swampsYouControl =
   Count.Type.MkCount
-    (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+    (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
     (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
     Aggregation.Members
 
@@ -96,7 +97,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             ]
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
+            (Scope.InZone (InZone.MkInZone Zone.Graveyard PlayerRef.EachPlayer))
             (Filter.Type.And [])
             Aggregation.DistinctCardTypes
     Spec.assertEqWith s "two types" (S.countOf viewOf (Filter.contextFor Nothing Nothing) gs count) $ Just 2
@@ -113,7 +114,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         viewOf = S.stubView [(a1, land, swamp, Just S.alice), (b1, land, swamp, Just S.bob)]
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent)))
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Members
     Spec.assertEqWith s "Alice's one" (S.countOf viewOf (Filter.contextFor (Just S.bob) Nothing) gs count) $ Just 1
@@ -142,7 +143,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             ]
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent)))
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Members
     Spec.assertEqWith s "bob's one plus carol's two, and none of alice's" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) $ Just 3
@@ -192,7 +193,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     let gs = Setup.emptyGame S.bothPlayers
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
+            (Scope.InZone (InZone.MkInZone Zone.Hand (PlayerRef.Relative PlayerRelation.You)))
             (Filter.Type.And [])
             Aggregation.Members
     Spec.assertEq s (S.countOf (S.stubView []) (Filter.contextFor Nothing Nothing) gs count) Nothing
@@ -230,7 +231,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             ]
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Members
     Spec.assertEqWith s "three" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) $ Just 3
@@ -267,7 +268,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         viewOf = S.stubView [(h1, Set.singleton CardType.Instant, Set.empty, Just S.bob)]
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Hand (PlayerRef.InSlot slot))
+            (Scope.InZone (InZone.MkInZone Zone.Hand (PlayerRef.InSlot slot)))
             (Filter.Type.And [])
             Aggregation.Members
     Spec.assertEqWith s "one card" (S.countOf viewOf (Filter.contextFor Nothing (Just srcId)) gs count) $ Just 1
@@ -294,7 +295,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         viewOf = S.stubView [(b1, land, Set.singleton Subtype.Swamp, Just S.bob)]
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
             (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
             (Aggregation.Greatest Quantity.Type.ManaValue)
     -- Alice keeps none of Bob's one Swamp, so the fold has no members. The
@@ -321,7 +322,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         pumped = S.addCounter CounterKind.PlusOnePlusOne 2 pikerId printed
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
             (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You])
             (Aggregation.Greatest Quantity.Type.Power)
         greatestPower g =
@@ -340,7 +341,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         (a1, gs) = S.addCreature swampPrinting S.alice gs0
         count =
           Count.Type.MkCount
-            (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+            (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
             (Filter.Type.ControlledBy PlayerRelation.You)
             (Aggregation.Greatest Quantity.Type.Power)
         viewOf = S.stubView [(a1, Set.singleton CardType.Land, Set.singleton Subtype.Swamp, Just S.alice)]

@@ -13,6 +13,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -60,7 +61,7 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
           ( Just
               ( Quantity.Count
                   Count.MkCount
-                    { Count.scope = Scope.InZone Zone.Battlefield PlayerRef.EachPlayer,
+                    { Count.scope = Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer),
                       Count.filter = Filter.And [Filter.HasSubtype Subtype.Equipment, Filter.IsAttachedToSource],
                       Count.aggregation = Aggregation.Members
                     }
@@ -68,5 +69,5 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
           )
           Nothing
       )
-      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Count","value":{"aggregation":{"type":"Members"},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Equipment"}},{"type":"IsAttachedToSource"}]},"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]}}}} """
+      """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":{"type":"Count","value":{"aggregation":{"type":"Members"},"filter":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Equipment"}},{"type":"IsAttachedToSource"}]},"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}}}}} """
   Spec.it s "has a schema" $ Common.assertHasSchema s BlockPermission.codec

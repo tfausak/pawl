@@ -16,6 +16,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -86,7 +87,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       (CombatRestriction.CantAttack (AffectedUnless.MkAffectedUnless Affected.Attached (Just anotherGiant)))
       ( "{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"},\"unless\":"
           <> "{\"type\":\"Compares\",\"value\":"
-          <> "{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":[{\"type\":\"Battlefield\"},{\"type\":\"EachPlayer\"}]},"
+          <> "{\"measured\":{\"type\":\"Count\",\"value\":{\"scope\":{\"type\":\"InZone\",\"value\":{\"zone\":{\"type\":\"Battlefield\"},\"player\":{\"type\":\"EachPlayer\"}}},"
           <> "\"filter\":{\"type\":\"And\",\"value\":[{\"type\":\"HasSubtype\",\"value\":{\"type\":\"Giant\"}},{\"type\":\"ControlledBy\",\"value\":{\"type\":\"You\"}}]},"
           <> "\"aggregation\":{\"type\":\"Members\"}}},"
           <> "\"comparison\":{\"type\":\"AtLeast\"},\"threshold\":{\"type\":\"Literal\",\"value\":1}}}}}"
@@ -111,7 +112,7 @@ anotherGiant =
     ( Compares.MkCompares
         ( Quantity.Count
             ( Count.MkCount
-                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
                 (Filter.And [Filter.HasSubtype Subtype.Giant, Filter.ControlledBy PlayerRelation.You])
                 Aggregation.Members
             )

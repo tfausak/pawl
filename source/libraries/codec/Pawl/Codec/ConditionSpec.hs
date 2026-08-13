@@ -14,6 +14,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -78,6 +79,6 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
 zeroSwamps :: Count.Count Quantity.Quantity
 zeroSwamps =
   Count.MkCount
-    (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
+    (Scope.InZone (InZone.MkInZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent)))
     (Filter.HasSubtype Subtype.Swamp)
     Aggregation.Members

@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Scope as Scope
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -18,8 +19,8 @@ spec s = Spec.describe s "Pawl.Codec.Scope" $ do
     Common.assertCodec
       s
       Scope.codec
-      (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
-      """ {"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]} """
+      (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
+      """ {"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}} """
   -- CR 608.2i's look-back-in-time domain.
   Spec.it s "InHistory" $
     Common.assertCodec
