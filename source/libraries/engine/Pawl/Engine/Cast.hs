@@ -382,9 +382,12 @@ castableZones pid oid face gs =
         _ -> False
    in filter permitted castZones
 
--- CR 601.3: may this player cast this half of this exiled card? Two conjuncts,
--- from two rules, and CR 715.3d's are why the Adventure half of an exiled
--- adventurer card is not offered while the same card in a hand offers both:
+-- CR 601.3: may this player cast this half of this exiled card? TWO INDEPENDENT
+-- PERMISSIONS, either of which suffices, because the rules state two. The first
+-- is Object.playableFromExile's, whose two conjuncts are below and whose second
+-- is why the Adventure half of an exiled adventurer card is not offered while the
+-- same card in a hand offers both; the second is CR 702.170d's plotted card,
+-- which permitsCastPlotted answers.
 --
 --   * Object.playableFromExile names a player -- which is what keeps a
 --     permission from being an offer to the table. Written either by CR 715.3d's
@@ -402,8 +405,33 @@ castableZones pid oid face gs =
 -- offers fewer casts than the rules allow, never more.
 permitsCastFromExile :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromExile pid oid face gs =
-  fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid
-    && not (Card.isAdventure face)
+  (fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid && not (Card.isAdventure face))
+    || permitsCastPlotted pid oid gs
+
+-- CR 702.170d: may this player cast this PLOTTED card? Three conjuncts, and the
+-- rule states each of them:
+--
+--   * the card is plotted, which is the Object.plotted stamp Pawl.Engine.Plot
+--     wrote;
+--   * this player is its OWNER -- "a plotted card's OWNER may cast it from
+--     exile" -- where CR 715.3d's permission names a player instead, which is why
+--     the two are separate disjuncts above rather than one test;
+--   * the turn is a LATER one than the stamp, "during any turn after the turn in
+--     which it became plotted". A strict comparison on GameState.turnNumber,
+--     which counts every turn the game takes -- extra turns (CR 500.7) included
+--     -- so the clause needs no other bookkeeping.
+--
+-- The rule's own "during their main phase while the stack is empty" is NOT a
+-- conjunct here, and it is exact all the same for every card in the pool: CR
+-- 307.5's window is what a creature card is cast in anyway, and the one printing
+-- pawl models is a creature. A plotted INSTANT would need it, and the seam is
+-- this function rather than Cast.timingOk -- that one is a disjunction, so it can
+-- only widen a window and never narrow one (#1392).
+permitsCastPlotted :: PlayerId -> ObjectId -> GameState -> Bool
+permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
+  obj <- Game.lookupObject oid gs
+  turn <- Object.plotted obj
+  pure (Object.owner obj == pid && GameState.turnNumber gs > turn)
 
 -- The objects in a castable zone that this player might cast, BEFORE any
 -- permission is consulted -- the membership half of the two questions
@@ -414,7 +442,10 @@ permitsCastFromExile pid oid face gs =
 -- OWNER. CR 601.3's permission names a PLAYER, and both writers of one --
 -- CR 715.3d's Adventure exile and Effect.GrantPlayFromExile -- name the
 -- controller of whatever granted it, so a player permitted to play a card
--- somebody else owns has to be able to reach it (#668).
+-- somebody else owns has to be able to reach it (#668). CR 702.170d's plotted
+-- card is the third permission this zone carries and needs the width for no
+-- reason of its own: that one names the card's OWNER, whom zoneMembers would
+-- have found.
 -- Pawl.Engine.Cast.permitsCastFromExile is what keeps that from widening into an
 -- offer to the table: it answers False for every player the permission does not
 -- name, this one included.

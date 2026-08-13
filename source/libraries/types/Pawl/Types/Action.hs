@@ -6,11 +6,11 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ObjectId as ObjectId
 
--- | What a player with priority may do. CR 116.2 lists twelve SPECIAL actions
--- and five of them are here -- CR 116.2a's land play, CR 116.2b's turning a
--- face-down permanent face up, CR 116.2d's ignoring a static ability's effect,
--- CR 116.2e's Circling Vultures discard and CR 116.2m's unlock cost; the tracker
--- for the other seven is #875. Grows.
+-- | What a player with priority may do. The SPECIAL actions CR 116.2 lists that
+-- are here are CR 116.2a's land play, CR 116.2b's turning a face-down permanent
+-- face up, CR 116.2d's ignoring a static ability's effect, CR 116.2e's Circling
+-- Vultures discard, CR 116.2k's plot and CR 116.2m's unlock cost; the tracker for
+-- the rest of rule 116.2 is #875. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The
@@ -123,4 +123,20 @@ data Action
     -- is offered to them at all is CR 116.2d's own question, answered by
     -- Pawl.Engine.Ignore.canIgnore.
     Ignore ObjectId.ObjectId
+  | -- | CR 116.2k / 702.170a: pay a card's plot cost and exile it from your hand,
+    -- making it a plotted card. "Any time you have priority during your main
+    -- phase while the stack is empty", and it does not use the stack (CR
+    -- 702.170b) -- so it is an Action rather than anything that goes through
+    -- Pawl.Engine.Stack, exactly as CR 116.2a's land play is.
+    --
+    -- Carries only the card, Unlock's argument in reverse: CR 702.170a leaves
+    -- nothing to choose. What it costs is the keyword's own payload, which
+    -- Pawl.Engine.Plot reads off the card, and the destination is fixed at exile.
+    --
+    -- WHICH HALF is not carried either, where Cast and Play both carry a name. CR
+    -- 702.170a exiles "this card" rather than a half, and the keyword is a
+    -- characteristic of a face rather than of the card -- so a split card with
+    -- plot on one half would plot the whole card all the same. No printing has
+    -- plot on a multi-faced card.
+    Plot ObjectId.ObjectId
   deriving (Eq, Ord, Show)

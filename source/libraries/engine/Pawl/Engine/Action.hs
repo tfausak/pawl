@@ -11,6 +11,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Plot as Plot
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Turn as Turn
@@ -162,6 +163,12 @@ legalActions pid gs =
       -- one of several -- Damping Engine's two abilities come from one sentence,
       -- and its "this effect" is that sentence (#1267).
       ignores = fmap Action.Ignore (Ignore.ignorable pid gs)
+      -- CR 116.2k / 702.170a: the sixth special action, and the second whose
+      -- window is CR 116.2a's rather than CR 116.2b's -- "any time you have
+      -- priority during your main phase while the stack is empty". That gate is
+      -- Turn.sorcerySpeedWindow, asked inside Plot.canPlot beside the cost, so
+      -- the clauses of one rule stay together.
+      plots = fmap Action.Plot (Plot.plottable pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
@@ -217,4 +224,4 @@ legalActions pid gs =
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
       manaAbilityActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.manaActivations grants pcs pid gs)
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> activations <> manaAbilityActivations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> plots <> activations <> manaAbilityActivations

@@ -264,6 +264,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (flashback 1)
       """ {"type":"Flashback","value":{"mana":[{"type":"Generic","value":1}]}} """
     Spec.assertBool s (Codec.encode Keyword.codec (flashback 1) /= Codec.encode Keyword.codec (flashback 4)) "the cost is part of the encoding"
+  -- CR 702.170a's payload is a whole Cost too, and it must not share Flashback's
+  -- tag: the two name different costs on the same card -- flashback's is the
+  -- cast's and plot's is the special action's.
+  Spec.it s "Plot carries its cost, and is not Flashback" $ do
+    let plot n = Keyword.Plot (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (plot 3)
+      """ {"type":"Plot","value":{"mana":[{"type":"Generic","value":3}]}} """
+    Spec.assertBool s (Codec.encode Keyword.codec (plot 3) /= Codec.encode Keyword.codec (flashbackOf 3)) "the same cost under two keywords encodes differently"
   -- CR 702.107a's payload is a Cost too, Flashback's shape rather than Crew's
   -- Natural.
   Spec.it s "Outlast carries its cost" $ do

@@ -1,0 +1,147 @@
+-- Rule 702.170 in the one voice the rest of the engine cannot supply for itself:
+-- CR 116.2k's special action that pays a card's plot cost to exile it from a
+-- hand, and the stamp that makes the exiled card a PLOTTED one.
+--
+-- The rule's other half lives where every other casting question does. CR
+-- 702.170d's permission -- "a plotted card's owner may cast it from exile without
+-- paying its mana cost ... during any turn after the turn in which it became
+-- plotted" -- is read by Pawl.Engine.Cast.permitsCastFromExile and priced by
+-- Pawl.Engine.Cost.costsFor, off the Object.plotted stamp this module writes.
+-- What is left is an action a player takes, and an action needs a place to be
+-- offered from and performed in. Pawl.Engine.Room is the same module for rule
+-- 709.5, and this one is written to its shape.
+--
+-- THE INVARIANT: rule 702 is part of the rulebook, so reading Keyword.Plot here
+-- is the same closed-half act as reading a Phase. This module never asks which
+-- CARD is being plotted.
+module Pawl.Engine.Plot where
+
+import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Turn as Turn
+import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Face as Face
+import Pawl.Types.Game (Game)
+import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
+import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Payment as Payment
+import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Zone as Zone
+
+-- CR 702.170a: what this object's plot ability costs, or Nothing when it has
+-- none.
+--
+-- Read off the CARD (Card.combined) and never a projection, the reading
+-- Pawl.Engine.Action.discardableCards gives for CR 116.2e one rule over: the
+-- ability functions in the hand, which pawl's projection does not reach (#160). A
+-- hand member with no card behind it -- a token, an ability -- has no plot cost.
+plotCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
+plotCostOf oid gs = do
+  obj <- Game.lookupObject oid gs
+  card <- case Object.source obj of
+    Source.OfCard printing -> Just (Printing.card printing)
+    Source.OfToken card -> Just card
+    Source.OfAbility _ _ -> Nothing
+    Source.OfTrigger _ _ -> Nothing
+    Source.OfEmblem _ -> Nothing
+    Source.OfInherentTrigger _ _ -> Nothing
+  Keyword.plotCost (Face.keywords (Card.combined card))
+
+-- CR 702.170a / 116.2k: may this player plot this card right now? Three
+-- conjuncts, each a clause of the rule:
+--
+--   * the card is in THIS PLAYER'S HAND with a plot cost to pay ("you may exile
+--     this card FROM YOUR HAND"), which plotCostOf and the zone test settle
+--     together;
+--   * the window is a main phase of their own turn with the stack empty ("any
+--     time you have priority during your main phase while the stack is empty"),
+--     which is CR 307.5's sorcery-speed window conjunct for conjunct -- so it is
+--     asked through Turn.sorcerySpeedWindow rather than a near-copy that can
+--     drift. CR 116.2k's own wording drops "main phase" and rule 702.170a keeps
+--     it; the keyword is what a card grants, so the narrower one governs.
+--   * the plot cost is payable. An action the player cannot take is not offered,
+--     which is Pawl.Engine.Action.legalActions' posture throughout.
+--
+-- The payability check is Cost.canPay and NOT Cost.total's CR 601.2f adjustments,
+-- for the reason Room.canUnlock gives: that rule totals the cost of a spell being
+-- cast or an ability being activated, and a special action is neither (#90).
+--
+-- The PRIORITY clause has no conjunct, for the reason CR 116.2a's land play has
+-- none: legalActions is asked only of the priority holder.
+canPlot :: PlayerId -> ObjectId -> GameState -> Bool
+canPlot pid oid gs = case plotCostOf oid gs of
+  Nothing -> False
+  Just cost ->
+    elem oid (Game.zoneMembers Zone.Hand pid gs)
+      && Turn.sorcerySpeedWindow pid gs
+      && Cost.canPay pid oid cost gs
+
+-- Every card this player may plot right now -- what Action.Plot is built from,
+-- and the shape Room.unlockable and FaceDown.turnableFaceUp have.
+plottable :: PlayerId -> GameState -> [ObjectId]
+plottable pid gs = filter (\oid -> canPlot pid oid gs) (Game.zoneMembers Zone.Hand pid gs)
+
+-- CR 702.170a, in the rule's own order: exile the card from hand and pay the
+-- cost, leaving it a plotted card.
+--
+-- REJECT-NOT-REPAIR, the posture Room.unlock, FaceDown.turnFaceUp and
+-- Cast.castSpell all take: a payment that fails restores the state from before it
+-- was attempted and the card stays in hand. The payment runs FIRST for that
+-- reason -- a failed one has moved nothing to put back -- where rule 702.170a's
+-- own sentence names the exile first ("exile this card from your hand and pay
+-- [cost]"). Nothing in the pool observes the order: no player has priority inside
+-- a special action (CR 116.1), every printed plot cost is mana, and the two
+-- halves either both happen or neither does.
+--
+-- The stamp is written onto the id the move RETURNS and never onto `oid`, the
+-- reading Resolve.finishSpell gives CR 715.3d's permission: CR 400.7 mints a
+-- fresh incarnation in exile and deletes the one that was in hand, so the plotted
+-- designation belongs to the new object. Nothing comes back when the move was
+-- cancelled, and then there is no exiled card to be plotted.
+--
+-- FACE UP, which is the whole difference from CR 702.143a's foretell: rule
+-- 702.170a says only "exile this card", so the default facing stands and every
+-- player can see what was plotted.
+--
+-- Not implemented: an event saying a card became plotted, which CR 702.170e's
+-- "when this card becomes plotted" would trigger on -- only the move's own zone
+-- change is logged (#1391).
+plot :: PlayerId -> ObjectId -> Game ()
+plot pid oid = do
+  before <- State.get
+  if not (canPlot pid oid before)
+    then pure ()
+    else do
+      payment <- Cost.pay pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
+      case payment of
+        Payment.Unpaid -> State.put before
+        Payment.Paid -> do
+          exiled <- Event.changeZoneReturning oid Zone.Exile
+          case exiled of
+            Nothing -> pure ()
+            Just newId -> State.modify' (stamp newId)
+
+-- CR 702.170a's "it becomes a plotted card", stamped with the turn the action was
+-- taken on -- which is what CR 702.170d's "any turn after the turn in which it
+-- became plotted" is compared against.
+--
+-- Read AFTER the move rather than from `before`: nothing in a zone change ends a
+-- turn, so the two numbers agree, and reading the board the stamp is written to
+-- is what keeps them from drifting apart if one ever could.
+stamp :: ObjectId -> GameState -> GameState
+stamp newId gs =
+  gs
+    { GameState.objects =
+        Map.adjust (\o -> o {Object.plotted = Just (GameState.turnNumber gs)}) newId (GameState.objects gs)
+    }

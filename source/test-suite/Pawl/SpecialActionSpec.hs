@@ -30,8 +30,11 @@
 -- would hold whether or not the arm restarted the count.
 module Pawl.SpecialActionSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Engine as Engine
@@ -49,6 +52,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -90,6 +94,7 @@ isPlay action = case action of
   Action.Type.TurnFaceUp _ -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
   Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -182,6 +187,7 @@ playing wanted action = case action of
   Action.Type.TurnFaceUp _ -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
   Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -195,6 +201,7 @@ casting wanted action = case action of
   Action.Type.TurnFaceUp _ -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
   Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -267,11 +274,156 @@ bobLeading forest gs =
   let add g = snd (S.addCreature forest S.bob g)
    in add (add (add gs))
 
+-- Djinn of Fool's Fall (OTJ 43) on alice's own precombat main with the stack
+-- empty -- CR 702.170a's window -- holding four Islands, the Djinn and a Doomed
+-- Traveler.
+--
+-- FOUR Islands and not more: the plot cost is {3}{U}, so the board pays it to the
+-- last mana. That is what makes the later cast's assertions discriminating, since
+-- every land is tapped by the time the plotted card is offered and a cast that
+-- charged anything at all could not be paid for.
+--
+-- The Traveler is the negative control -- a hand card with no plot ability, so an
+-- implementation that offered the action for every hand card fails.
+plotBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+plotBoard island djinn traveler =
+  let (djinnId, gs1) = S.addHandCard djinn S.alice (S.landsInPlay island 4)
+      (travelerId, gs2) = S.addHandCard traveler S.alice gs1
+   in ( djinnId,
+        travelerId,
+        gs2
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The one exiled card on the board, and the assertion that there is exactly one:
+-- CR 400.7 mints a new object as the card leaves the hand, so no test can name
+-- the exiled incarnation by the id it plotted.
+soleExile :: GameState.GameState -> Maybe ObjectId.ObjectId
+soleExile gs = case Set.toList (GameState.exile gs) of
+  [oid] -> Just oid
+  _ -> Nothing
+
+plotting :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
+  -- CR 702.170a's window is CR 116.2a's rather than CR 116.2b's: "any time you
+  -- have priority DURING YOUR MAIN PHASE WHILE THE STACK IS EMPTY". Each of the
+  -- two paired boards moves exactly one of those conjuncts and nothing else.
+  Spec.it s "the action is offered only for a card with plot, and only at sorcery speed" $ do
+    island <- S.printingOf s registry "Island"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (djinnId, travelerId, gs) = plotBoard island djinn traveler
+        actions = Action.legalActions S.alice gs
+        opponentsTurn = gs {GameState.activePlayer = S.bob}
+        stackBusy = snd (S.spellOnStack bolt S.alice gs)
+    Spec.assertBool s (List.elem (Action.Type.Plot djinnId) actions) "the Djinn may be plotted"
+    Spec.assertBool s (List.notElem (Action.Type.Plot travelerId) actions) "the Doomed Traveler may not"
+    Spec.assertBool s (List.notElem (Action.Type.Plot djinnId) (Action.legalActions S.alice opponentsTurn)) "not on an opponent's turn"
+    Spec.assertBool s (List.notElem (Action.Type.Plot djinnId) (Action.legalActions S.alice stackBusy)) "and not with a spell on the stack"
+  -- CR 702.170a's "and pay [cost]": an action whose cost cannot be paid is not
+  -- offered. The pair differs in the mana available and in nothing else -- three
+  -- Islands against the four {3}{U} needs.
+  Spec.it s "the action is not offered when the plot cost cannot be paid" $ do
+    island <- S.printingOf s registry "Island"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (djinnId, _, gs) = plotBoard island djinn traveler
+        (poorId, poor) = case S.addHandCard djinn S.alice (S.landsInPlay island 3) of
+          (oid, g) -> (oid, g {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+    Spec.assertBool s (List.elem (Action.Type.Plot djinnId) (Action.legalActions S.alice gs)) "four Islands pay {3}{U}"
+    Spec.assertBool s (List.notElem (Action.Type.Plot poorId) (Action.legalActions S.alice poor)) "three do not"
+  -- CR 702.170b: the action does not use the stack. The prompt log is what proves
+  -- it -- alice acts and is asked AGAIN before bob is asked anything, so no player
+  -- got a window to respond and nothing was put on the stack to respond to. CR
+  -- 116.3's retained priority is the same sequence read the other way, and is
+  -- asserted once for the whole family in the Vultures group above.
+  Spec.it s "CR 702.170b taking it exiles the card without using the stack" $ do
+    island <- S.printingOf s registry "Island"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (djinnId, _, gs) = plotBoard island djinn traveler
+        (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId)) gs Engine.priorityLoop) [] of
+          ((_, g), log') -> (log', g)
+    Spec.assertEqWith
+      s
+      "alice acts, alice is asked again, and only then is bob asked"
+      asked
+      [S.alice, S.alice, S.bob]
+    Spec.assertEqWith
+      s
+      "the Djinn is in exile"
+      (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (soleExile after))
+      (Just (Just (S.printingName djinn)))
+    Spec.assertEqWith s "the Traveler is still in hand" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "nothing but the four Islands is on the battlefield" (length (GameState.battlefield after)) 4
+    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+    -- CR 702.170a's "it becomes a plotted card", which is the whole point of the
+    -- action: an arm that exiled the card and stamped nothing would pass every
+    -- assertion above.
+    Spec.assertEqWith
+      s
+      "the exiled card is plotted, stamped with this turn"
+      (soleExile after >>= \oid -> fmap Object.plotted (Game.lookupObject oid after))
+      (Just (Just (GameState.turnNumber after)))
+  -- CR 702.170d: "a plotted card's owner may cast it from exile without paying
+  -- its mana cost ... during ANY TURN AFTER the turn in which it became plotted."
+  -- Every board below is the state the plot left behind, with one thing moved:
+  -- the turn number, the caster, or the stamp.
+  Spec.it s "CR 702.170d the plotted card is castable only by its owner, and only later" $ do
+    island <- S.printingOf s registry "Island"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (djinnId, _, gs) = plotBoard island djinn traveler
+        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId)) gs Engine.priorityLoop) [])
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+        unplotted = later {GameState.objects = Map.map (\o -> o {Object.plotted = Nothing}) (GameState.objects later)}
+        -- CR 307.5's window belongs to whoever's turn it is, so bob's case has to
+        -- be asked on bob's turn or it fails for the timing rather than for the
+        -- ownership. `bobOwns` is that same board with the exiled card's owner
+        -- moved and nothing else, which is what makes the refusal above CR
+        -- 702.170d's rather than a coincidence.
+        bobsTurn = later {GameState.activePlayer = S.bob}
+        bobOwns oid = bobsTurn {GameState.objects = Map.adjust (\o -> o {Object.owner = S.bob}) oid (GameState.objects bobsTurn)}
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the cases below are about a card in exile"
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      Spec.assertBool s (not (S.castable S.alice exiledId after)) "not on the turn it became plotted"
+      Spec.assertBool s (S.castable S.alice exiledId later) "on the next turn it is castable -- with every Island still tapped, so the cast is free"
+      Spec.assertBool s (not (S.castable S.bob exiledId bobsTurn)) "and not by a player who does not own it"
+      Spec.assertBool s (S.castable S.bob exiledId (bobOwns exiledId)) "the control: bob's own turn and bob's own plotted card is castable, so the refusal above was the ownership"
+      Spec.assertBool s (not (S.castable S.alice exiledId unplotted)) "the control: the same card in the same exile, unplotted, is castable by nobody"
+  -- The offer taken rather than merely asked about: the Djinn reaches the
+  -- battlefield off a board with no untapped land on it, which is CR 702.170d's
+  -- "without paying its mana cost" observed rather than inferred.
+  Spec.it s "CR 702.170d casting it costs nothing" $ do
+    island <- S.printingOf s registry "Island"
+    djinn <- S.printingOf s registry "Djinn of Fool's Fall"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (djinnId, _, gs) = plotBoard island djinn traveler
+        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Plot djinnId)) gs Engine.priorityLoop) [])
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      let resolved = S.runPure S.castAnswer later (S.cast S.alice exiledId >> Stack.resolveTop)
+      Spec.assertEqWith
+        s
+        "the Djinn is on the battlefield"
+        (S.countOnBattlefieldByName (S.printingName djinn) S.alice resolved)
+        1
+      Spec.assertEqWith s "and exile is empty" (length (GameState.exile resolved)) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
   dampingEngine s registry
   leoninArbiter s registry
+  plotting s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
 -- offered to (its own scope is EachPlayer, so every seat is offered it) and what
