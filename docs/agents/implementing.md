@@ -21,12 +21,18 @@ silently ran unpedantic until CI caught it.
 
 ## Running the suite
 
-    cabal test --test-options '--timeout 2s --hide-successes'
+    cabal test --test-options '--timeout 5s --hide-successes'
 
 The timeout catches infinite loops. It is not an assertion about speed, so a
-case that sits near the budget is not a regression to chase. Two subtrees carry
-their own, looser budgets via `Tasty.localOption` in `Main.hs`, which beats the
-command line; that is what keeps the small global figure safe.
+case that sits near the budget is not a regression to chase --- and 2s, the
+figure this used to name, was near the budget: seven cases run 1.0-1.7s
+unloaded and one of them timed out twice on nothing but concurrent build load.
+The machine is shared --- the owner's own build and test run alongside agents'
+worktrees, all contending on one GHC job semaphore --- so a TIMEOUT on one of
+those seven is background noise. Re-run it unloaded before investigating; a
+real hang fails at any budget. Two subtrees carry their own budgets via
+`Tasty.localOption` in `Main.hs`, which beats the command line. CI sets 5s
+suite-wide through `flake.nix`'s `testFlags`.
 
 Never pipe `cabal test` or `cabal build` output --- it stalls a ~30s suite for
 minutes. One build at a time. No `cabal clean`; the incremental build under

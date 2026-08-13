@@ -47,6 +47,26 @@
               postInstall = (old.postInstall or "") + ''
                 install -D -m 755 dist/build/pawl-benchmark/pawl-benchmark "$out/bin/pawl-benchmark"
               '';
+
+              # This check phase is the only place CI runs the suite, and
+              # without these flags tasty defaults to NoTimeout: a
+              # non-terminating regression would run to the platform's job
+              # limit instead of failing. Each entry reaches the test binary as
+              # `--test-option`, so tasty sees `--timeout 5s`.
+              #
+              # The figure is a floor against a hang, not an assertion about
+              # speed: a real hang never terminates at any budget, so raising
+              # or lowering this cannot mask one -- it only sets how long CI
+              # waits before naming the case. Measured 2026-08-13 on an
+              # unloaded aarch64-darwin: the whole suite runs in 26s and its
+              # slowest case not already carrying a `Tasty.localOption` budget
+              # in `source/test-suite/Main.hs` takes 1.7s. If a loaded runner
+              # ever trips this, bump the number -- that is not a performance
+              # regression to chase.
+              testFlags = (old.testFlags or [ ]) ++ [
+                "--timeout"
+                "5s"
+              ];
             }))
           ];
         in
