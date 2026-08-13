@@ -15,6 +15,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -29,13 +30,18 @@ import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
+import qualified Pawl.Types.DealDamage as DealDamage
+import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Discard as Discard
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
+import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -70,9 +76,11 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
+import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -100,20 +108,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3))
-      """ {"type":"DealDamage","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":3}]} """
+      (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)))
+      """ {"type":"DealDamage","value":{"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.DealDamage (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) (Quantity.Literal 1))
-      """ {"type":"DealDamage","value":[{"type":"EachMatching","value":{"type":"HasKeyword","value":{"type":"Flying"}}},{"type":"Literal","value":1}]} """
+      (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) (Quantity.Literal 1)))
+      """ {"type":"DealDamage","value":{"ref":{"type":"EachMatching","value":{"type":"HasKeyword","value":{"type":"Flying"}}},"quantity":{"type":"Literal","value":1}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.DealDamage ObjectRef.EachPlayer (Quantity.Literal 2))
-      """ {"type":"DealDamage","value":[{"type":"EachPlayer"},{"type":"Literal","value":2}]} """
+      (Effect.DealDamage (DealDamage.MkDealDamage ObjectRef.EachPlayer (Quantity.Literal 2)))
+      """ {"type":"DealDamage","value":{"ref":{"type":"EachPlayer"},"quantity":{"type":"Literal","value":2}}} """
   -- Both ObjectRef arms have to survive the trip through the payload.
   Spec.it s "ModifyTarget round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
@@ -237,8 +245,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature))
-      """ {"type":"AttachTarget","value":["target",{"type":"HasCardType","value":{"type":"Creature"}}]} """
+      (Effect.AttachTarget (AttachTarget.MkAttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature)))
+      """ {"type":"AttachTarget","value":{"slot":"target","filter":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   -- MoveToZone's payload is the ObjectRef and the destination zone, then four
   -- independently elided extras -- the EntryRiders, the bound slot, CR 113.6m's
   -- origin zone and CR 401.2's library position -- so it is told apart by JSON
@@ -425,8 +433,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Discard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1))
-      """ {"type":"Discard","value":["target",{"type":"Literal","value":1}]} """
+      (Effect.Discard (Discard.MkDiscard (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 1)))
+      """ {"type":"Discard","value":{"slot":"target","quantity":{"type":"Literal","value":1}}} """
   Spec.it s "LoseLife" $
     Common.assertJsonCodec
       s
@@ -558,14 +566,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep)))
-      """ {"type":"SkipNextPhase","value":[{"type":"InSlot","value":"target"},{"type":"Step","value":{"type":"Beginning","value":{"type":"DrawStep"}}}]} """
+      (Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep))))
+      """ {"type":"SkipNextPhase","value":{"player":{"type":"InSlot","value":"target"},"selector":{"type":"Step","value":{"type":"Beginning","value":{"type":"DrawStep"}}}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase)
-      """ {"type":"SkipNextPhase","value":[{"type":"InSlot","value":"target"},{"type":"CombatPhase"}]} """
+      (Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase))
+      """ {"type":"SkipNextPhase","value":{"player":{"type":"InSlot","value":"target"},"selector":{"type":"CombatPhase"}}} """
   -- CR 615.7.
   Spec.it s "PreventNextDamage" $
     Common.assertJsonCodec
@@ -595,8 +603,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventAllDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))))
-      """ {"type":"PreventAllDamage","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"you"}]} """
+      (Effect.PreventAllDamage (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you")))))
+      """ {"type":"PreventAllDamage","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"you"}}} """
   -- CR 614.9: Turn the Tables, whose kind field is PRINTED ("all combat
   -- damage") and whose two refs are the source side then the destination.
   Spec.it s "RedirectDamage" $
@@ -766,27 +774,27 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
-      """ {"type":"GainControl","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"target"}]} """
+      (Effect.GainControl (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+      """ {"type":"GainControl","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"target"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment)))
-      """ {"type":"GainControl","value":[{"type":"Indefinite"},{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Enchantment"}}}]} """
+      (Effect.GainControl (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment))))
+      """ {"type":"GainControl","value":{"duration":{"type":"Indefinite"},"ref":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Enchantment"}}}}} """
   Spec.it s "GrantPlayFromExile round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
-      """ {"type":"GrantPlayFromExile","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"exiled"}]} """
+      (Effect.GrantPlayFromExile (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")))))
+      """ {"type":"GrantPlayFromExile","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"exiled"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GrantPlayFromExile Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
-      """ {"type":"GrantPlayFromExile","value":[{"type":"Indefinite"},{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}]} """
+      (Effect.GrantPlayFromExile (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))))
+      """ {"type":"GrantPlayFromExile","value":{"duration":{"type":"Indefinite"},"ref":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}}} """
   -- The shapes the encoder can emit, told apart by LENGTH: a bare ability name
   -- (CR 603.7a/b's defaults), a two-element form (a stated duration, onset
   -- still the default), and a three-element form (a stated onset, whose last
@@ -869,22 +877,22 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Designate Designation.Renowned (SlotName.MkSlotName (Text.pack "self")))
-      """ {"type":"Designate","value":[{"type":"Renowned"},"self"]} """
+      (Effect.Designate (Designate.MkDesignate Designation.Renowned (SlotName.MkSlotName (Text.pack "self"))))
+      """ {"type":"Designate","value":{"designation":{"type":"Renowned"},"slot":"self"}} """
   Spec.it s "Designate Monstrous" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Designate Designation.Monstrous (SlotName.MkSlotName (Text.pack "self")))
-      """ {"type":"Designate","value":[{"type":"Monstrous"},"self"]} """
+      (Effect.Designate (Designate.MkDesignate Designation.Monstrous (SlotName.MkSlotName (Text.pack "self"))))
+      """ {"type":"Designate","value":{"designation":{"type":"Monstrous"},"slot":"self"}} """
   Spec.it s "Designate Suspected" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Designate Designation.Suspected (SlotName.MkSlotName (Text.pack "self")))
-      """ {"type":"Designate","value":[{"type":"Suspected"},"self"]} """
+      (Effect.Designate (Designate.MkDesignate Designation.Suspected (SlotName.MkSlotName (Text.pack "self"))))
+      """ {"type":"Designate","value":{"designation":{"type":"Suspected"},"slot":"self"}} """
   -- CR 701.60a's ending, with an ObjectRef on the wire where Designate above
   -- writes a slot name directly: Eliminate the Impossible names a set rather
   -- than one permanent.
@@ -932,8 +940,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ExileHaunting (SlotName.MkSlotName (Text.pack "became")) (SlotName.MkSlotName (Text.pack "haunted")))
-      """ {"type":"ExileHaunting","value":["became","haunted"]} """
+      (Effect.ExileHaunting (ExileHaunting.MkExileHaunting (SlotName.MkSlotName (Text.pack "became")) (SlotName.MkSlotName (Text.pack "haunted"))))
+      """ {"type":"ExileHaunting","value":{"card":"became","host":"haunted"}} """
   Spec.it s "PlaySubgame" $
     Common.assertJsonCodec
       s
@@ -994,20 +1002,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Set.empty)
-      """ {"type":"TakeExtraTurn","value":[{"type":"InSlot","value":"target"},[]]} """
+      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) Set.empty))
+      """ {"type":"TakeExtraTurn","value":{"player":{"type":"InSlot","value":"target"},"skips":[]}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn (PlayerRef.Relative PlayerRelation.You) (Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap))))
-      """ {"type":"TakeExtraTurn","value":[{"type":"Relative","value":{"type":"You"}},[{"type":"Step","value":{"type":"Beginning","value":{"type":"Untap"}}}]]} """
+      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn (PlayerRef.Relative PlayerRelation.You) (Set.singleton (PhaseSelector.Step (Phase.Beginning BeginningStep.Untap)))))
+      """ {"type":"TakeExtraTurn","value":{"player":{"type":"Relative","value":{"type":"You"}},"skips":[{"type":"Step","value":{"type":"Beginning","value":{"type":"Untap"}}}]}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.TakeExtraTurn PlayerRef.EachPlayer (Set.fromList [PhaseSelector.Step (Phase.Beginning BeginningStep.Untap), PhaseSelector.CombatPhase]))
-      """ {"type":"TakeExtraTurn","value":[{"type":"EachPlayer"},[{"type":"Step","value":{"type":"Beginning","value":{"type":"Untap"}}},{"type":"CombatPhase"}]]} """
+      (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn PlayerRef.EachPlayer (Set.fromList [PhaseSelector.Step (Phase.Beginning BeginningStep.Untap), PhaseSelector.CombatPhase])))
+      """ {"type":"TakeExtraTurn","value":{"player":{"type":"EachPlayer"},"skips":[{"type":"Step","value":{"type":"Beginning","value":{"type":"Untap"}}},{"type":"CombatPhase"}]}} """
 
 -- The stand-in a parametricity test hands over in place of a real card codec:
 -- any Value at all, so long as both instantiations are given the same one.

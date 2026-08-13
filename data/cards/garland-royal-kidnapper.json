@@ -168,8 +168,8 @@
                     "effects": [
                       {
                         "type": "GainControl",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "ForAsLongAs",
                             "value": {
                               "type": "Compares",
@@ -191,11 +191,11 @@
                               }
                             }
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

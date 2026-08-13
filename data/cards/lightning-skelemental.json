@@ -60,13 +60,13 @@
                     "effects": [
                       {
                         "type": "Discard",
-                        "value": [
-                          "thatPlayer",
-                          {
+                        "value": {
+                          "quantity": {
                             "type": "Literal",
                             "value": 2
-                          }
-                        ]
+                          },
+                          "slot": "thatPlayer"
+                        }
                       }
                     ]
                   }

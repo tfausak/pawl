@@ -52,6 +52,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 
 turnSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -976,7 +977,7 @@ extraTurnSpec s registry = Spec.describe s "ExtraTurn" $ do
           S.runPure
             S.identityAnswer
             gs
-            (Resolve.applyEffect source source S.bob Map.empty Map.empty (Effect.TakeExtraTurn PlayerRef.EachPlayer Set.empty))
+            (Resolve.applyEffect source source S.bob Map.empty Map.empty (Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn PlayerRef.EachPlayer Set.empty)))
     Spec.assertEqWith s "added in APNAP order, so taken in reverse" (takersOf after) [S.alice, S.bob]
 
 -- alice in her precombat main phase with priority, eight untapped Islands

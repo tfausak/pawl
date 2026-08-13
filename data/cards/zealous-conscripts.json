@@ -43,15 +43,15 @@
                     "effects": [
                       {
                         "type": "GainControl",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "target"
                           }
-                        ]
+                        }
                       },
                       {
                         "type": "Untap",

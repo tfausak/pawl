@@ -25,24 +25,24 @@
                 "effects": [
                   {
                     "type": "GainControl",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "Indefinite"
                       },
-                      {
+                      "ref": {
                         "type": "InSlot",
                         "value": "target"
                       }
-                    ]
+                    }
                   },
                   {
                     "type": "AttachTarget",
-                    "value": [
-                      "target",
-                      {
+                    "value": {
+                      "filter": {
                         "type": "CanHostSubject"
-                      }
-                    ]
+                      },
+                      "slot": "target"
+                    }
                   }
                 ]
               }

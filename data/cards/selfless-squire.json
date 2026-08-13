@@ -43,15 +43,15 @@
                     "effects": [
                       {
                         "type": "PreventAllDamage",
-                        "value": [
-                          {
+                        "value": {
+                          "duration": {
                             "type": "UntilEndOfTurn"
                           },
-                          {
+                          "ref": {
                             "type": "InSlot",
                             "value": "you"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

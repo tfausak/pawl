@@ -33,16 +33,16 @@
                     "effects": [
                       {
                         "type": "DealDamage",
-                        "value": [
-                          {
-                            "type": "InSlot",
-                            "value": "thatPlayer"
-                          },
-                          {
+                        "value": {
+                          "quantity": {
                             "type": "Literal",
                             "value": 2
+                          },
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "thatPlayer"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

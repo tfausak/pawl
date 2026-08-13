@@ -34,13 +34,13 @@
                 "effects": [
                   {
                     "type": "TakeExtraTurn",
-                    "value": [
-                      {
+                    "value": {
+                      "player": {
                         "type": "InSlot",
                         "value": "target"
                       },
-                      []
-                    ]
+                      "skips": []
+                    }
                   }
                 ]
               }

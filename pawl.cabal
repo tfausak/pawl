@@ -80,6 +80,8 @@ library codec
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AlternativeCost
     Pawl.Codec.AlternativeCostSpec
+    Pawl.Codec.AttachTarget
+    Pawl.Codec.AttachTargetSpec
     Pawl.Codec.AttackCost
     Pawl.Codec.AttackCostSpec
     Pawl.Codec.AttackRequirement
@@ -154,21 +156,29 @@ library codec
     Pawl.Codec.DamageRewriteSpec
     Pawl.Codec.Daytime
     Pawl.Codec.DaytimeSpec
+    Pawl.Codec.DealDamage
+    Pawl.Codec.DealDamageSpec
     Pawl.Codec.Defense
     Pawl.Codec.DefenseSpec
     Pawl.Codec.DelayedTrigger
     Pawl.Codec.DelayedTriggerSpec
+    Pawl.Codec.Designate
+    Pawl.Codec.DesignateSpec
     Pawl.Codec.Designation
     Pawl.Codec.DesignationSpec
     Pawl.Codec.Destroy
     Pawl.Codec.DestroySpec
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DestructionRewriteSpec
+    Pawl.Codec.Discard
     Pawl.Codec.DiscardCause
     Pawl.Codec.DiscardCauseSpec
+    Pawl.Codec.DiscardSpec
     Pawl.Codec.DungeonRoom
     Pawl.Codec.DungeonRoomSpec
     Pawl.Codec.Duration
+    Pawl.Codec.DurationRef
+    Pawl.Codec.DurationRefSpec
     Pawl.Codec.DurationSpec
     Pawl.Codec.Effect
     Pawl.Codec.EffectSpec
@@ -184,6 +194,8 @@ library codec
     Pawl.Codec.EventShapeSpec
     Pawl.Codec.ExchangeSides
     Pawl.Codec.ExchangeSidesSpec
+    Pawl.Codec.ExileHaunting
+    Pawl.Codec.ExileHauntingSpec
     Pawl.Codec.Expiry
     Pawl.Codec.ExpirySpec
     Pawl.Codec.ExtraPhase
@@ -316,6 +328,8 @@ library codec
     Pawl.Codec.ScopeSpec
     Pawl.Codec.SearchDestination
     Pawl.Codec.SearchDestinationSpec
+    Pawl.Codec.SkipNextPhase
+    Pawl.Codec.SkipNextPhaseSpec
     Pawl.Codec.SlotName
     Pawl.Codec.SlotNameSpec
     Pawl.Codec.SpecialAction
@@ -330,6 +344,8 @@ library codec
     Pawl.Codec.SubtypeSpec
     Pawl.Codec.Supertype
     Pawl.Codec.SupertypeSpec
+    Pawl.Codec.TakeExtraTurn
+    Pawl.Codec.TakeExtraTurnSpec
     Pawl.Codec.TapState
     Pawl.Codec.TapStateSpec
     Pawl.Codec.TargetCount
@@ -670,6 +686,7 @@ library types
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost
     Pawl.Types.Asked
+    Pawl.Types.AttachTarget
     Pawl.Types.AttackCost
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
@@ -716,20 +733,24 @@ library types
     Pawl.Types.DamagePattern
     Pawl.Types.DamageRewrite
     Pawl.Types.Daytime
+    Pawl.Types.DealDamage
     Pawl.Types.Decider
     Pawl.Types.DecisionLog
     Pawl.Types.Deck
     Pawl.Types.Defense
     Pawl.Types.DelayedTrigger
     Pawl.Types.Departure
+    Pawl.Types.Designate
     Pawl.Types.Designation
     Pawl.Types.Destroy
     Pawl.Types.DestructionCause
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
+    Pawl.Types.Discard
     Pawl.Types.DiscardCause
     Pawl.Types.DungeonRoom
     Pawl.Types.Duration
+    Pawl.Types.DurationRef
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption
@@ -739,6 +760,7 @@ library types
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
     Pawl.Types.ExchangeSides
+    Pawl.Types.ExileHaunting
     Pawl.Types.ExilePlayPermission
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase
@@ -845,6 +867,7 @@ library types
     Pawl.Types.Scope
     Pawl.Types.SearchDestination
     Pawl.Types.Sickness
+    Pawl.Types.SkipNextPhase
     Pawl.Types.SlotArity
     Pawl.Types.SlotName
     Pawl.Types.Source
@@ -855,6 +878,7 @@ library types
     Pawl.Types.Subtype
     Pawl.Types.SubtypeFamily
     Pawl.Types.Supertype
+    Pawl.Types.TakeExtraTurn
     Pawl.Types.TapState
     Pawl.Types.TargetCount
     Pawl.Types.TargetSpec

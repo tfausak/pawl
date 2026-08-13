@@ -22,6 +22,9 @@ import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.DealDamage as DealDamage
+import qualified Pawl.Types.Designate as Designate
+import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import Pawl.Types.ManaProduction (ManaProduction)
@@ -59,7 +62,7 @@ isManaAbility ab =
 manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
   Effect.AddMana production -> Just production
-  Effect.DealDamage _ _ -> Nothing
+  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
   Effect.Search {} -> Nothing
@@ -110,13 +113,13 @@ manaProduced effect = case effect of
   Effect.Untap _ -> Nothing
   Effect.Transform _ -> Nothing
   Effect.AddPhases _ -> Nothing
-  Effect.GainControl _ _ -> Nothing
+  Effect.GainControl (DurationRef.MkDurationRef _ _) -> Nothing
   Effect.ArmDelayedTrigger {} -> Nothing
   Effect.AffectPlayers {} -> Nothing
   Effect.RequireBlock {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
-  Effect.Designate _ _ -> Nothing
+  Effect.Designate (Designate.MkDesignate _ _) -> Nothing
   Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing

@@ -142,12 +142,12 @@
                     "effects": [
                       {
                         "type": "Designate",
-                        "value": [
-                          {
+                        "value": {
+                          "designation": {
                             "type": "Suspected"
                           },
-                          "target"
-                        ]
+                          "slot": "target"
+                        }
                       }
                     ]
                   }
