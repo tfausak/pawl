@@ -176,7 +176,7 @@ instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 -- The one object whose stack membership the move does change is the spell itself,
 -- and CR 115.5 takes that one back out of every stack pool
 -- (Target.legalRecipients). What the CHOSEN HALF changes is no longer part of
--- that argument: the specs come from `proposedFace`, and `castable` hands this a
+-- that argument: the slots come from `proposedFace`, and `castable` hands this a
 -- state with that same half stamped onto the OBJECT (asProposed), so a filter
 -- that reads the spell's own characteristics reads the half being cast too.
 targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
@@ -184,7 +184,7 @@ targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
     let modal = Face.spell face
-     in Modal.selectionPossible (Target.fillableModes (Just pid) oid (Card.enchantSpecs face) modal gs) (Modal.Type.selection modal)
+     in Modal.selectionPossible (Target.fillableModes (Just pid) oid (Card.enchantSlots face) modal gs) (Modal.Type.selection modal)
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -300,7 +300,7 @@ entwineOffer pid oid candidates gs = case Game.faceOf oid gs of
   Just face -> do
     cost <- Keyword.entwineCost (Face.keywords face)
     let modal = Face.spell face
-        legal = Target.fillableModes (Just pid) oid (Card.enchantSpecs face) modal gs
+        legal = Target.fillableModes (Just pid) oid (Card.enchantSlots face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
     Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
@@ -592,7 +592,7 @@ asProposed oid name facing gs =
 -- necessity -- once stamped, the two resolve the same face -- and each carries a
 -- job the other cannot: as an ARGUMENT, which is how the ones that read the CARD
 -- -- the timing window, the printed restrictions, the candidate costs, the target
--- specs -- resolve their face, and where the name is used AS A NAME (CR 601.3a's
+-- slots -- resolve their face, and where the name is used AS A NAME (CR 601.3a's
 -- prohibitions, Null Chamber; Cost.costsFor); and as `asProposed`'s STAMP, which
 -- is how the ones that go on to read the
 -- OBJECT resolve theirs: CR 601.2f's adjustments through Cost.total, and any
@@ -990,7 +990,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
   gs <- State.get
   let decider = Decide.deciderFor pid gs
       modal = Face.spell face
-      legal = Target.fillableModes (Just pid) sid (Card.enchantSpecs face) modal gs
+      legal = Target.fillableModes (Just pid) sid (Card.enchantSlots face) modal gs
       -- CR 601.2e: an illegal proposal returns the game to the moment before the
       -- casting was proposed, which is the state before CR 601.2a's move. CR
       -- 601.6 says the same for a permission lost after the proposal completes.
@@ -1106,8 +1106,8 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
           if notElem chosenCost payable
             then reject
             else do
-              let specs = Card.modesTargetSpecs chosenModes face
-                  sets = Target.legalSets (Just pid) sid specs gs
+              let slots = Card.modesTargetSlots chosenModes face
+                  sets = Target.legalSets (Just pid) sid slots gs
               -- CR 601.2b's announcement is free -- any Natural -- but the player
               -- making it is told what the board can pay. The bound rides the
               -- CHOSEN cost, and nothing filters the answer against it: an
@@ -1157,8 +1157,8 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in
                   -- it, and CR 115.5 taking it back out.
-                  chosen <- Target.chooseTargets decider pid sid specs sets
-                  if not (Target.selectionLegal (Just pid) sid specs sets chosen gs)
+                  chosen <- Target.chooseTargets decider pid sid slots sets
+                  if not (Target.selectionLegal (Just pid) sid slots sets chosen gs)
                     then reject
                     else do
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian

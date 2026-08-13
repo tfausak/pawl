@@ -44,7 +44,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
@@ -187,12 +187,13 @@ data Face card = MkFace
     -- can target and what an Aura can enchant. Empty for every card that is not an
     -- Aura; the CardSpec lint family holds the biconditional both ways.
     --
-    -- TargetSpecs, not Filters, because CR 702.5d's enchant-player Auras need the
-    -- Pool axis and TargetSpec already is {pool, filter}. A LIST, because CR 702.5c
+    -- TargetSlots, not Filters, because CR 702.5d's enchant-player Auras need the
+    -- Pool axis and TargetSlot already is {pool, filter}. A LIST, because CR 702.5c
     -- makes multiple instances of enchant all apply -- printed order, the order the
-    -- other ability lists on this record keep. Pawl.Engine.Card.enchantSpec is the
-    -- conjunction every reader goes through, and the one place that rule is applied.
-    enchant :: [TargetSpec.TargetSpec],
+    -- other ability lists on this record keep. Pawl.Engine.Card.enchantTargetSlot
+    -- is the conjunction every reader goes through, and the one place that rule is
+    -- applied.
+    enchant :: [TargetSlot.TargetSlot],
     -- | CR 113.6g: a can't-be-countered ability functions on the stack (Rending
     -- Volley). Read straight off the card by Event.counter rather than through the
     -- projection -- the castingPermissions precedent: a spell on the stack gets no

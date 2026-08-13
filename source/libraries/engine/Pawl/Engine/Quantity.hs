@@ -122,7 +122,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- The source is asked first so the existing reading is untouched, and the two
   -- cannot collide over one name: a mid-resolution bind names a slot the CARD
   -- authored, and an event-supplied one names a reserved slot no card may name
-  -- at all -- neither as a target spec (Pawl.CardSpec's reservedDeclarations)
+  -- at all -- neither as a target slot (Pawl.CardSpec's reservedDeclarations)
   -- nor as an effect's bound SlotName (its reservedBindings). Both halves of
   -- that sweep are load-bearing HERE: the bind side is the one that could put a
   -- card's own write on the source, where this arm looks first (see
@@ -598,7 +598,7 @@ playerRefIsSlotless ref = case ref of
 -- its resolution: Pawl.Engine.Expiry.arm bakes as the duration begins, so the
 -- stored condition names a seat rather than a slot on an object whose bindings
 -- the sweep cannot reach. Pawl.Engine.Filter.bakeBound is the same move for a
--- target spec's atoms, and carries the argument for baking over threading.
+-- target slot's atoms, and carries the argument for baking over threading.
 --
 -- The atom is LEFT STANDING when the environment names no player for the slot,
 -- which is bakeBound's posture there too: Count.playersFor then answers Nothing

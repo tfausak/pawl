@@ -34,7 +34,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "wall": {
                 "filter": {
                   "type": "HasSubtype",
@@ -68,7 +68,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "damaged": {
                 "pool": {
                   "type": "Creatures"
@@ -101,7 +101,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "hasted": {
                 "pool": {
                   "type": "Creatures"

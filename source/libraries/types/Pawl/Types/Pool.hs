@@ -5,8 +5,9 @@ import qualified Pawl.Types.GraveyardScope as GraveyardScope
 -- | CR 115: the closed set of recipient kinds a target slot may draw from, fixing
 -- both WHICH objects are candidates and HOW they are referenced
 -- (Recipient.ToCreature / ToPlaneswalker / ToBattle / ToPlayer / ToObject).
--- Closed-half vocabulary, like the old TargetSpec enum -- it grows only when the
--- rules define a new kind of targetable object, never per card.
+-- Closed-half vocabulary, like the hand-carved target enum TargetSlot retired
+-- (#40) -- it grows only when the rules define a new kind of targetable object,
+-- never per card.
 data Pool
   = Creatures -- CR 115.1a: creatures on the battlefield (ToCreature).
   | Players -- CR 115: players still in the game (ToPlayer).

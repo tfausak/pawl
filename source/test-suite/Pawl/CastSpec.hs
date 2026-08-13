@@ -1293,12 +1293,12 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
 -- mode and a Face.enchant of "target creature" (CardSpec's auraCardSpec).
--- Task 6 merges Card.enchantSpecs into allTargetSpecs/modesTargetSpecs and
+-- Task 6 merges Card.enchantSlots into allTargetSlots/modesTargetSlots and
 -- teaches Target.fillableModes the extra slots a card declares outside its
 -- modes, so castability sees the enchant slot too -- without either function
 -- learning what an Aura is.
-auraTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
+auraTargetSlot :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+auraTargetSlot s registry = Spec.describe s "AuraTarget" $ do
   Spec.it s "CR 303.4a: an Aura spell targets, so it prompts for the creature it enchants" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1306,15 +1306,15 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
-        specs = Card.modesTargetSpecs (Seq.singleton (ModeIndex.MkModeIndex 0)) (S.combinedFace unholyStrength)
-    Spec.assertEqWith s "one slot, the enchant slot" (Set.singleton Card.enchantSlot) (Map.keysSet specs)
+        slots = Card.modesTargetSlots (Seq.singleton (ModeIndex.MkModeIndex 0)) (S.combinedFace unholyStrength)
+    Spec.assertEqWith s "one slot, the enchant slot" (Set.singleton Card.enchantSlot) (Map.keysSet slots)
     Spec.assertEqWith
       s
       "its legal set is the one creature"
-      (Target.legalSets Nothing spellId specs gs)
+      (Target.legalSets Nothing spellId slots gs)
       (Map.singleton Card.enchantSlot (Set.singleton (Recipient.ToCreature creature)))
   -- CR 601.2c: a spell whose required target has no legal choice cannot be
-  -- cast at all. Reading only Mode.targetSpecs would call this castable and
+  -- cast at all. Reading only Mode.targetSlots would call this castable and
   -- let it be countered on resolution instead.
   Spec.it s "CR 601.2c: an Aura with no creature on the battlefield is not castable" $ do
     swamp <- S.printingOf s registry "Swamp"
@@ -2564,7 +2564,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   modalCastSpec s registry
   entwineSpec s registry
   kickerSpec s registry
-  auraTargetSpec s registry
+  auraTargetSlot s registry
   fireboltSpec s registry
   flashbackCardTypeSpec s registry
   grantedFlashbackSpec s registry
@@ -2574,7 +2574,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   flashSpec s registry
   victorManchaSpec s registry
   direFleetDaredevilSpec s registry
-  upToOneTargetSpec s registry
+  upToOneTargetSlot s registry
   multiTargetCastSpec s registry
 
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
@@ -2583,8 +2583,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
 -- creature gets -5/-5 until end of turn", the same clause with the slot
 -- REQUIRED. One creatureless board tells the two apart, and the same board with
 -- a creature on it is what proves the mana was never the reason.
-upToOneTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-upToOneTargetSpec s registry = Spec.describe s "UpToOneTargetCast" $ do
+upToOneTargetSlot :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+upToOneTargetSlot s registry = Spec.describe s "UpToOneTargetCast" $ do
   Spec.it s "CR 115.6 a slot that may be left empty does not gate castability" $ do
     swamp <- S.printingOf s registry "Swamp"
     piker <- S.printingOf s registry "Goblin Piker"

@@ -100,7 +100,7 @@ import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -507,11 +507,11 @@ withEffect oid m gs =
 performer :: HandActionPerformer.HandActionPerformer
 performer = Resolve.performHandAction
 
--- The source stand-in for a targeting call whose spec is source-blind (every
--- spec but OpponentCreatureTarget). Object id 999 names nothing, the same
+-- The source stand-in for a targeting call whose target slot is source-blind (every
+-- slot but OpponentCreatureTarget). Object id 999 names nothing, the same
 -- posture withEffectAt's 998 takes.
 --
--- SOURCE-BLIND is now a claim about the BOARD as well as about the spec: CR
+-- SOURCE-BLIND is now a claim about the BOARD as well as about the slot: CR
 -- 702.11d's "hexproof from [quality]" makes Target.legalRecipients read the
 -- source's characteristics, and this id has none to read, so every quality is
 -- vacuously unmatched. A case that puts such a candidate on the board must pass a
@@ -787,15 +787,15 @@ addHandCard printing pid gs =
 withHumility :: Printing.Printing -> GameState.GameState -> GameState.GameState
 withHumility humility gs = snd (addCreature humility bob gs)
 
--- The "target" slot's TargetSpec, read straight out of a JSON-loaded printing's
--- spell (Modal.allTargetSpecs, keyed by SlotName) -- so a gate test exercises
--- the codec's parse of the committed card data, never a hand-built TargetSpec
+-- The "target" slot's TargetSlot, read straight out of a JSON-loaded printing's
+-- spell (Modal.allTargetSlots, keyed by SlotName) -- so a gate test exercises
+-- the codec's parse of the committed card data, never a hand-built TargetSlot
 -- (P9 Task 5: Terror, Reprisal).
-spellTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
-spellTargetSpec printing =
+spellTargetSlot :: Printing.Printing -> Maybe TargetSlot.TargetSlot
+spellTargetSlot printing =
   Map.lookup
     (SlotName.MkSlotName (Text.pack "target"))
-    (Modal.allTargetSpecs (Face.spell (Card.combined (Printing.card printing))))
+    (Modal.allTargetSlots (Face.spell (Card.combined (Printing.card printing))))
 
 -- alice controls n untapped basic lands of one printing, nothing else. The
 -- two-seat board; landsFor below is the same lands on a board a caller supplies,
@@ -1312,12 +1312,12 @@ addCounter kind n oid gs =
 -- reset is a property of the field, so the CR 400.7 test does not need an Aura.
 --
 -- Tagged ToCreature, which is the tag the real attach paths store for a
--- CREATURE-enchanting Aura: those have a Pool.Creatures enchant spec, and
+-- CREATURE-enchanting Aura: those have a Pool.Creatures enchant slot, and
 -- Target's candidates for that pool are ToCreature -- so an SBA that re-checks
--- the attachment against the spec (Pawl.Engine.Sba.stillLegalEnchant) sees what
+-- the attachment against the enchant slot (Pawl.Engine.Sba.stillLegalEnchant) sees what
 -- casting would have left.
 --
--- WRONG for Convincing Mirage, whose "Enchant land" is a Pool.Permanents spec
+-- WRONG for Convincing Mirage, whose "Enchant land" is a Pool.Permanents slot
 -- narrowed by a Land filter, and whose candidates are therefore ToObject. That
 -- costs nothing for a rule that reads only WHICH object is named -- CR 704.5n,
 -- CR 704.5p, CR 400.7, and Affected.Attached, which goes through

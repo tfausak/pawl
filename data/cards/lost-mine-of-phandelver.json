@@ -203,7 +203,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "pool": {
                       "type": "Creatures"
@@ -301,7 +301,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "pool": {
                       "type": "Creatures"

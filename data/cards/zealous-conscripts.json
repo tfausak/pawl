@@ -81,7 +81,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "pool": {
                       "type": "Permanents"

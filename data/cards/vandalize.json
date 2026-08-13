@@ -38,7 +38,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "artifact": {
                 "filter": {
                   "type": "HasCardType",
@@ -71,7 +71,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "land": {
                 "filter": {
                   "type": "HasCardType",

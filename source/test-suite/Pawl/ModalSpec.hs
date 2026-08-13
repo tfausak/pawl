@@ -57,7 +57,7 @@ import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -141,7 +141,7 @@ falsifierSpec s registry = Spec.describe s "Falsifier" $ do
     Spec.assertEqWith
       s
       "the Wall mode (0) is absent from the fillable set"
-      (Target.fillableModes Nothing oid (Card.enchantSpecs (S.combinedFace chaosCharm)) (Face.spell (S.combinedFace chaosCharm)) gs1)
+      (Target.fillableModes Nothing oid (Card.enchantSlots (S.combinedFace chaosCharm)) (Face.spell (S.combinedFace chaosCharm)) gs1)
       (Set.fromList [ModeIndex.MkModeIndex 1, ModeIndex.MkModeIndex 2])
 
 -- CR 601.2c/700.2c: only the CHOSEN mode's slots are ever prompted or stamped
@@ -203,16 +203,16 @@ forcedSpec s registry = Spec.describe s "ForcedNoPrompt" $ do
 
 -- M4h task 1: Aether Channeler's "another nonland permanent" slot as data --
 -- Pool.Permanents narrowed by Not (HasCardType Land), with CR 601.2c's "another"
--- as the Not IsSource conjunct (#163). This proves the spec and the exclusion in
+-- as the Not IsSource conjunct (#163). This proves the target slot and the exclusion in
 -- isolation; the wiring to a consumer is a later M4h task.
-nonlandPermanentTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-nonlandPermanentTargetSpec s registry = Spec.describe s "M4h NonlandPermanentTarget" $ do
+nonlandPermanentTargetSlot :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nonlandPermanentTargetSlot s registry = Spec.describe s "M4h NonlandPermanentTarget" $ do
   Spec.it s "NonlandPermanentTarget excludes lands (CR 109.2/110.4)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mindslaver <- S.printingOf s registry "Mindslaver"
     mountain <- S.printingOf s registry "Mountain"
     let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
-        got = Target.legalRecipients Nothing S.noSource (TargetSpec.required Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land)))) gs
+        got = Target.legalRecipients Nothing S.noSource (TargetSlot.required Pool.Permanents (Just (Filter.Type.Not (Filter.Type.HasCardType CardType.Land)))) gs
     Spec.assertEqWith
       s
       "two nonland permanents, no land"
@@ -225,8 +225,8 @@ nonlandPermanentTargetSpec s registry = Spec.describe s "M4h NonlandPermanentTar
     mountain <- S.printingOf s registry "Mountain"
     let gs = S.boardWithCreatureArtifactLand piker mindslaver mountain
         nonlandOther = Filter.Type.And [Filter.Type.Not (Filter.Type.HasCardType CardType.Land), Filter.Type.Not Filter.Type.IsSource]
-        specs = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.required Pool.Permanents (Just nonlandOther))
-        got = Target.legalSets Nothing (S.creatureId gs) specs gs
+        slots = Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.Permanents (Just nonlandOther))
+        got = Target.legalSets Nothing (S.creatureId gs) slots gs
     Spec.assertEqWith
       s
       "source excluded from its own set"
@@ -485,7 +485,7 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     Spec.assertEqWith
       s
       "with a spell on the stack and permanents in play, all four modes are fillable"
-      (Target.fillableModes (Just S.alice) spellId (Card.enchantSpecs (S.combinedFace crypticCommand)) modal gs)
+      (Target.fillableModes (Just S.alice) spellId (Card.enchantSlots (S.combinedFace crypticCommand)) modal gs)
       crypticModes
     -- The forced case's own boundary, and why casting does not reach it: modes 2
     -- and 3 take no targets, so they are fillable even on an empty board --
@@ -865,12 +865,12 @@ repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
     Spec.assertEqWith
       s
       "choosing the bounce mode twice declares two target slots"
-      (Map.size (Modal.modesTargetSpecs twiceBounced modal))
+      (Map.size (Modal.modesTargetSlots twiceBounced modal))
       2
     Spec.assertEqWith
       s
       "choosing it once declares one"
-      (Map.size (Modal.modesTargetSpecs (Seq.fromList [bounceMode, drawMode, drawMode]) modal))
+      (Map.size (Modal.modesTargetSlots (Seq.fromList [bounceMode, drawMode, drawMode]) modal))
       1
     let answer :: Prompt.Prompt r -> r
         answer p = case p of
@@ -1124,7 +1124,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   onlyChosenModeSpec s registry
   fizzleSpec s registry
   forcedSpec s registry
-  nonlandPermanentTargetSpec s registry
+  nonlandPermanentTargetSlot s registry
   modalReaderSpec s
   activationModalSpec s registry
   triggerModalSpec s registry

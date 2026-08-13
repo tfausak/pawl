@@ -23,33 +23,33 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 
 -- CR 601.2b: the reserved slot under which a spell's single chosen X is stored.
--- No card's targetSpecs may name it (lint-enforced): X is not a target, so it
+-- No card's targetSlots may name it (lint-enforced): X is not a target, so it
 -- needs a key the target namespace cannot collide with.
 variableX :: SlotName
 variableX = SlotName.MkSlotName (Text.pack "X")
 
 -- CR 700.2: the reserved slot under which a modal spell's chosen modes are
--- stored. No card's targetSpecs may name it (lint-enforced): a mode is not a
+-- stored. No card's targetSlots may name it (lint-enforced): a mode is not a
 -- target. Distinct from variableX.
 chosenModes :: SlotName
 chosenModes = SlotName.MkSlotName (Text.pack "modes")
 
 -- CR 707.5: the reserved slot under which an object's copy snapshot is stored.
--- No card's targetSpecs may name it: a copy source is not a target.
+-- No card's targetSlots may name it: a copy source is not a target.
 copySource :: SlotName
 copySource = SlotName.MkSlotName (Text.pack "copySource")
 
 -- CR 113.7: the reserved slot under which a triggered ability's SOURCE object
 -- (the object whose ability triggered) is bound as the ability is placed, so
 -- "this creature" / "this enchantment" is a slot read rather than a
--- self-referential opcode. No card's targetSpecs may name it (lint-enforced): a
+-- self-referential opcode. No card's targetSlots may name it (lint-enforced): a
 -- source is not a target.
 --
 -- Hazard this comment used to only predict, and which #1043 then resolved.
 -- CardSpec.hs's "declared slots == read slots" equality lint now walks a card's
 -- ABILITY modes as well as its spell's, and it would indeed be unsatisfiable
 -- stated naively -- Resolve.slotsOf returns this slot for an effect that reads
--- it, while the rule above forbids the matching targetSpecs entry. What makes it
+-- it, while the rule above forbids the matching targetSlots entry. What makes it
 -- statable is the discipline this comment named: CardSpec.modalSlotsOffend
 -- SUBTRACTS the reserved names its carrier binds (this one, variableX,
 -- chosenModes, copySource, you, thatPlayer, became, thatSpell) from the READ side
@@ -83,8 +83,8 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 -- damage, whose recipient is an ObjectRef whose only player-reaching arm is a
 -- bound one -- Char's "and 2 damage to you" (Pawl.CastSpec's Char case).
 --
--- "No card's targetSpecs may name it" is lint-enforced as for the names above,
--- and reaches spells and abilities alike: a card declaring a "you" target spec
+-- "No card's targetSlots may name it" is lint-enforced as for the names above,
+-- and reaches spells and abilities alike: a card declaring a "you" target slot
 -- would be prompted for a target and have the answer clobbered by setYou.
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
@@ -99,8 +99,8 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- opponent is not derivable from the controller at all.
 --
 -- Not a target (nothing was chosen), so CR 608.2b has nothing to re-validate --
--- Resolve's legalSlot answers True for any slot with no target spec, which is
--- how this stays readable at resolution. `you`'s "no card's targetSpecs may
+-- Resolve's legalSlot answers True for any slot that declares no target, which
+-- is how this stays readable at resolution. `you`'s "no card's targetSlots may
 -- name it" rule applies here too, under the same sweep. That an effect reading
 -- this slot sits under a condition that binds it is enforced by
 -- Pawl.Engine.Event.eventBindingSlots: only the combat-damage-to-a-player, the
@@ -147,7 +147,7 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 --
 -- Stamped by Pawl.Engine.Event.eventBindings alongside `triggerPlayer`, and not
 -- a target -- same CR 608.2b posture as that slot, including the "no card's
--- targetSpecs may name it" sweep and the eventBindingSlots check on reads. A
+-- targetSlots may name it" sweep and the eventBindingSlots check on reads. A
 -- condition that binds it only SOMETIMES is rejected by that same lint: CR
 -- 400.7e withholds this slot when the destination is hidden (CR 400.2), so the
 -- wider leaves-the-battlefield condition binds it for a death and not for a
@@ -185,7 +185,7 @@ became = SlotName.MkSlotName (Text.pack "became")
 -- does.
 --
 -- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
--- "no card's targetSpecs may name it" sweep as `you`, `thatPlayer` and `became`.
+-- "no card's targetSlots may name it" sweep as `you`, `thatPlayer` and `became`.
 -- Swept on the BINDING side too, which matters here more than for any of those
 -- three: a card naming this one in an effect's bound SlotName -- Destroy's
 -- count, MoveToZone's incarnation -- would write it to the source, which
@@ -214,7 +214,7 @@ eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 -- coincides.
 --
 -- Not a target, so the same CR 608.2b posture and the same "no card's
--- targetSpecs may name it" sweep as eventAmount.
+-- targetSlots may name it" sweep as eventAmount.
 sacrificedCount :: SlotName
 sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 
@@ -244,8 +244,8 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 --
 -- Not a target -- nothing was chosen -- so the same CR 608.2b posture as
 -- `triggerPlayer` and `became`: Resolve's legalSlot answers True for a slot with
--- no target spec, which is how CR 701.6a's countering reaches it at resolution.
--- The "no card's targetSpecs may name it" rule applies here too, under the same
+-- no target slot, which is how CR 701.6a's countering reaches it at resolution.
+-- The "no card's targetSlots may name it" rule applies here too, under the same
 -- Pawl.CardSpec sweep, and the binding side of that sweep matters just as much:
 -- a card writing this name into an effect's bound SlotName would shadow the
 -- event's spell with its own object.
@@ -274,7 +274,7 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 -- nothing here holds a set.
 --
 -- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
--- "no card's targetSpecs may name it" sweep as `triggerPlayer` and `became`. A
+-- "no card's targetSlots may name it" sweep as `triggerPlayer` and `became`. A
 -- dead id is possible and is the payload's problem, as it is for those: the
 -- blocker can leave the battlefield before the trigger resolves.
 blockingCreature :: SlotName
@@ -317,7 +317,7 @@ blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 -- One object, never a group: the slot is stamped per declaration event, and the
 -- only condition that reads it is one that fires when the declaration named
 -- exactly one creature. Not a target (nothing was chosen), so the same CR 608.2b
--- posture and the same "no card's targetSpecs may name it" sweep as
+-- posture and the same "no card's targetSlots may name it" sweep as
 -- `blockingCreature`; a dead id by resolution is the payload's problem, as it is
 -- there.
 attackingCreature :: SlotName
@@ -342,7 +342,7 @@ attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 -- one object.
 --
 -- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
--- "no card's targetSpecs may name it" sweep as `blockingCreature`. A dead id is
+-- "no card's targetSlots may name it" sweep as `blockingCreature`. A dead id is
 -- possible and is the payload's problem: a trampler can die to its blocker in the
 -- same CR 510.2 event.
 combatDamager :: SlotName
@@ -366,7 +366,7 @@ combatDamager = SlotName.MkSlotName (Text.pack "thatDamager")
 -- One object, never a group: rule 702.134a's ability has one target, so each
 -- resolution mentors exactly one creature and two mentors are two events. Not a
 -- target (nothing was chosen), so the same CR 608.2b posture and the same "no
--- card's targetSpecs may name it" sweep as `blockingCreature`; a dead id by
+-- card's targetSlots may name it" sweep as `blockingCreature`; a dead id by
 -- resolution is the payload's problem, as it is there.
 mentoredCreature :: SlotName
 mentoredCreature = SlotName.MkSlotName (Text.pack "thatMentoredCreature")

@@ -50,7 +50,7 @@
                 }
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "spell": {
                 "pool": {
                   "type": "Spells"
@@ -77,7 +77,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "creature": {
                 "pool": {
                   "type": "Creatures"

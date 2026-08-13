@@ -68,7 +68,7 @@
                     }
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "filter": {
                       "type": "And",

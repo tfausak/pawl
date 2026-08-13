@@ -445,8 +445,8 @@ damageSpec s registry = Spec.describe s "Damage" $ do
   Spec.it s "CR 115.4 an any-target spell offers the battle, and only what rule 115.4 names" $ do
     (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt"]
     bolt <- S.printingOf s registry "Lightning Bolt"
-    case (spells, S.spellTargetSpec bolt) of
-      ([boltId], Just theSpec) ->
+    case (spells, S.spellTargetSlot bolt) of
+      ([boltId], Just theSlot) ->
         -- EXACT rather than a membership test, and that is what makes this read CR
         -- 115.4 rather than "battles are permanents": alice's Plains and Mountain
         -- are on the same battlefield, and rule 115.4's last sentence keeps them
@@ -454,7 +454,7 @@ damageSpec s registry = Spec.describe s "Damage" $ do
         Spec.assertEqWith
           s
           "the Siege and the three players"
-          (Target.legalRecipients (Just S.alice) boltId theSpec gs)
+          (Target.legalRecipients (Just S.alice) boltId theSlot gs)
           ( Set.fromList
               [ Recipient.ToBattle battle,
                 Recipient.ToPlayer S.alice,
@@ -462,7 +462,7 @@ damageSpec s registry = Spec.describe s "Damage" $ do
                 Recipient.ToPlayer S.carol
               ]
           )
-      _ -> Spec.assertFailure s "fixture should have a Bolt with a target spec"
+      _ -> Spec.assertFailure s "fixture should have a Bolt with a target slot"
   Spec.it s "CR 310.6 Lightning Bolt takes three defense counters off it" $ do
     (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt"]
     case spells of

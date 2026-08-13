@@ -58,7 +58,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "artifact": {
                 "count": {
                   "least": 0,

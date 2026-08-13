@@ -54,7 +54,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "card": {
                     "count": {
                       "least": 0,

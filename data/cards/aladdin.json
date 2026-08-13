@@ -100,7 +100,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "filter": {
                       "type": "HasCardType",

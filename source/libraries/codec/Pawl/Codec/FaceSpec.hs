@@ -54,7 +54,7 @@ import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -226,7 +226,7 @@ populatedFace =
       Face.mulliganActions = [[Effect.ExileHandThenDraw]],
       Face.openingHandActions = [[Effect.ExileHandThenDraw]],
       Face.specialActions = [SpecialAction.DiscardThisAnyTime],
-      Face.enchant = [TargetSpec.required Pool.Creatures Nothing],
+      Face.enchant = [TargetSlot.required Pool.Creatures Nothing],
       Face.castingRestrictions = [CastingRestriction.AttackedThisStep]
     }
 
@@ -494,7 +494,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.enchant = [TargetSpec.required Pool.Creatures Nothing]}
+        baseFace {Face.enchant = [TargetSlot.required Pool.Creatures Nothing]}
         (init baseFaceJson <> ",\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}]}")
     Spec.it s "castingRestrictions" $
       Common.assertJsonCodec
@@ -513,5 +513,5 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Common.assertFromJson
       s
       decodeFace
-      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"clauses":[],"targetSpecs":{}}],"selection":{"type":"ChooseExactly","value":1}}} """
+      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"clauses":[],"targetSlots":{}}],"selection":{"type":"ChooseExactly","value":1}}} """
       mountainFace

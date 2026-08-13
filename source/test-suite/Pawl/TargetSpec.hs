@@ -7,7 +7,7 @@
 -- together: the two rules differ in exactly one thing, whether the restriction
 -- reads WHO is targeting. One case covers the other side of the
 -- restriction/admission split -- Pawl.Engine.Sba's CR 303.4c re-check, which
--- asks what an enchant spec ADMITS and must not ask a targeting question --
+-- asks what an enchant slot ADMITS and must not ask a targeting question --
 -- a group of them covers rule 702.11's "hexproof from [quality]" variant (CR
 -- 702.11d and 702.11e), the only restriction here that reads what the SOURCE is
 -- rather than who controls it, ending on Knight of Grace's printing -- and the
@@ -36,7 +36,7 @@
 -- long as you're the monarch" clause, so the same Doom Blade answers both ways
 -- across CR 725.5's no-monarch window.
 --
--- Gameplay-level: every spec under test is read out of a committed card rather
+-- Gameplay-level: every target slot under test is read out of a committed card rather
 -- than hand-built, and the cases that turn on an effect cast and resolve through
 -- the stack.
 module Pawl.TargetSpec where
@@ -75,24 +75,24 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
--- The one target spec a single-slot card or ability declares, read out of the
--- committed printing (S.spellTargetSpec's rationale) but keyed by COUNT rather
+-- The one target slot a single-slot card or ability declares, read out of the
+-- committed printing (S.spellTargetSlot's rationale) but keyed by COUNT rather
 -- than by slot name: Cancel calls its slot "spell", not "target".
-soleTargetSpec :: Modal.Modal Card.Type.Card -> Maybe TargetSpec.TargetSpec
-soleTargetSpec modal = case Map.elems (Modal.allTargetSpecs modal) of
+soleTargetSlot :: Modal.Modal Card.Type.Card -> Maybe TargetSlot.TargetSlot
+soleTargetSlot modal = case Map.elems (Modal.allTargetSlots modal) of
   [only] -> Just only
   _ -> Nothing
 
--- soleTargetSpec, off the one TRIGGERED ability a printing declares rather than
--- off its spell. Same rationale: the spec is read out of the committed card, so
--- the case exercises the codec's parse and never a hand-built TargetSpec.
-triggerTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
-triggerTargetSpec printing = case Face.triggeredAbilities (S.combinedFace printing) of
-  [ability] -> soleTargetSpec (TriggeredAbility.modal ability)
+-- soleTargetSlot, off the one TRIGGERED ability a printing declares rather than
+-- off its spell. Same rationale: the slot is read out of the committed card, so
+-- the case exercises the codec's parse and never a hand-built TargetSlot.
+triggerTargetSlot :: Printing.Printing -> Maybe TargetSlot.TargetSlot
+triggerTargetSlot printing = case Face.triggeredAbilities (S.combinedFace printing) of
+  [ability] -> soleTargetSlot (TriggeredAbility.modal ability)
   _ -> Nothing
 
 -- `pid` controls the restricted creature -- a Blurred Mongoose or a Slippery
@@ -169,10 +169,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let (mongooseId, pikerId, gs) = restrictionBoard mongoose piker S.bob
-    case S.spellTargetSpec doomBlade of
+    case S.spellTargetSlot doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
-      Just theSpec -> do
-        let legal = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+      Just theSlot -> do
+        let legal = Target.legalRecipients (Just S.alice) S.noSource theSlot gs
         Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) legal) "the Piker beside it is a legal target"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature mongooseId) legal)) "the Mongoose is not"
 
@@ -186,10 +186,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let (mongooseId, pikerId, gs) = restrictionBoard mongoose piker S.alice
-    case S.spellTargetSpec doomBlade of
+    case S.spellTargetSlot doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
-      Just theSpec -> do
-        let legal = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+      Just theSlot -> do
+        let legal = Target.legalRecipients (Just S.alice) S.noSource theSlot gs
         Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) legal) "alice may target her own Piker"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature mongooseId) legal)) "but not her own Mongoose"
 
@@ -207,10 +207,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     bolt <- S.printingOf s registry "Lightning Bolt"
     let bare = Setup.emptyGame S.bothPlayers
         (_, masked) = S.addCreature ivoryMask S.bob bare
-    case S.spellTargetSpec bolt of
+    case S.spellTargetSlot bolt of
       Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
-      Just theSpec -> do
-        let legalFor who = Target.legalRecipients (Just who) S.noSource theSpec
+      Just theSlot -> do
+        let legalFor who = Target.legalRecipients (Just who) S.noSource theSlot
         -- The control twin first: without the Mask on the board, bob is an
         -- ordinary CR 115.4 candidate, so the Mask is what removes him.
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice bare)) "without the Mask, alice may bolt bob"
@@ -233,10 +233,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     leyline <- S.printingOf s registry "Leyline of Sanctity"
     bolt <- S.printingOf s registry "Lightning Bolt"
     let (_, warded) = S.addCreature leyline S.bob (Setup.emptyGame S.bothPlayers)
-    case S.spellTargetSpec bolt of
+    case S.spellTargetSlot bolt of
       Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
-      Just theSpec -> do
-        let legalFor who = Target.legalRecipients (Just who) S.noSource theSpec warded
+      Just theSlot -> do
+        let legalFor who = Target.legalRecipients (Just who) S.noSource theSlot warded
         Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.bob) (legalFor S.alice))) "alice, his opponent, may not bolt bob"
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) (legalFor S.bob)) "but bob may bolt himself -- hexproof names only opponents"
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob)) "and alice is targetable as ever"
@@ -312,9 +312,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (mongooseId, pikerId, gs) = restrictionBoard mongoose piker S.alice
-    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
-      [theSpec] -> do
-        let legal = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+    case Maybe.mapMaybe (soleTargetSlot . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
+      [theSlot] -> do
+        let legal = Target.legalRecipients (Just S.alice) S.noSource theSlot gs
         Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) legal) "the Piker is a legal any-target"
         Spec.assertBool s (Set.member (Recipient.ToPlayer S.bob) legal) "so is a player (CR 115.4)"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature mongooseId) legal)) "the Mongoose is not"
@@ -333,16 +333,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     doomBlade <- S.printingOf s registry "Doom Blade"
     let (mongooseId, _, board) = restrictionBoard mongoose piker S.bob
         humbled = S.withHumility humility board
-    case S.spellTargetSpec doomBlade of
+    case S.spellTargetSlot doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
-      Just theSpec -> do
+      Just theSlot -> do
         Spec.assertBool
           s
-          (not (Set.member (Recipient.ToCreature mongooseId) (Target.legalRecipients (Just S.alice) S.noSource theSpec board)))
+          (not (Set.member (Recipient.ToCreature mongooseId) (Target.legalRecipients (Just S.alice) S.noSource theSlot board)))
           "before Humility the Mongoose is untargetable"
         Spec.assertBool
           s
-          (Set.member (Recipient.ToCreature mongooseId) (Target.legalRecipients (Just S.alice) S.noSource theSpec humbled))
+          (Set.member (Recipient.ToCreature mongooseId) (Target.legalRecipients (Just S.alice) S.noSource theSlot humbled))
           "under Humility it is a legal target"
 
   -- CR 115.10a: "Just because an object or player is being affected by a spell
@@ -384,12 +384,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (gs, cancelId) = S.handOne cancel onStack
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice cancelId))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-    case soleTargetSpec (Face.spell (S.combinedFace cancel)) of
+    case soleTargetSlot (Face.spell (S.combinedFace cancel)) of
       Nothing -> Spec.assertFailure s "Cancel should declare one target slot"
-      Just theSpec ->
+      Just theSlot ->
         Spec.assertBool
           s
-          (Set.member (Recipient.ToObject spellId) (Target.legalRecipients (Just S.alice) S.noSource theSpec gs))
+          (Set.member (Recipient.ToObject spellId) (Target.legalRecipients (Just S.alice) S.noSource theSlot gs))
           "the Mongoose spell is a legal target on the stack"
     Spec.assertBool s (elem spellId (GameState.stack resolved)) "and is still on the stack, uncountered"
     Spec.assertEqWith s "Cancel resolved into alice's graveyard regardless" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
@@ -408,10 +408,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     let base = S.landsInPlay island 3
         (victimId, withVictim) = S.spellOnStack mongoose S.bob base
         (cancelId, gs) = S.spellOnStack cancel S.alice withVictim
-    case soleTargetSpec (Face.spell (S.combinedFace cancel)) of
+    case soleTargetSlot (Face.spell (S.combinedFace cancel)) of
       Nothing -> Spec.assertFailure s "Cancel should declare one target slot"
-      Just theSpec -> do
-        let legal = Target.legalRecipients (Just S.alice) cancelId theSpec gs
+      Just theSlot -> do
+        let legal = Target.legalRecipients (Just S.alice) cancelId theSlot gs
         Spec.assertBool
           s
           (not (Set.member (Recipient.ToObject cancelId) legal))
@@ -431,11 +431,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   Spec.it s "CR 115.5 does not stop Prodigal Sorcerer's ability targeting its own source" $ do
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (sorcererId, gs) = S.addCreature sorcerer S.alice (Setup.emptyGame S.bothPlayers)
-    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
-      [theSpec] ->
+    case Maybe.mapMaybe (soleTargetSlot . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
+      [theSlot] ->
         Spec.assertBool
           s
-          (Set.member (Recipient.ToCreature sorcererId) (Target.legalRecipients (Just S.alice) sorcererId theSpec gs))
+          (Set.member (Recipient.ToCreature sorcererId) (Target.legalRecipients (Just S.alice) sorcererId theSlot gs))
           "the Sorcerer is a legal target of its own ability"
       _ -> Spec.assertFailure s "Prodigal Sorcerer should print one ability with one target slot"
 
@@ -491,7 +491,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- entire printed rules text is the keyword, so a case that uses this printing
   -- is asking about 702.11b and nothing else.
   --
-  -- BOTH HALVES ON ONE BOARD, with one spec and one Doom Blade, because the
+  -- BOTH HALVES ON ONE BOARD, with one target slot and one Doom Blade, because the
   -- controller axis IS the rule: an implementation that reused shroud's gate
   -- passes the opponent half and fails the controller half, and one that
   -- inverted the comparison does the reverse. Neither can pass this case.
@@ -505,11 +505,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
     let (bogleId, pikerId, gs) = restrictionBoard bogle piker S.alice
-    case S.spellTargetSpec doomBlade of
+    case S.spellTargetSlot doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
-      Just theSpec -> do
-        let mine = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
-            theirs = Target.legalRecipients (Just S.bob) S.noSource theSpec gs
+      Just theSlot -> do
+        let mine = Target.legalRecipients (Just S.alice) S.noSource theSlot gs
+            theirs = Target.legalRecipients (Just S.bob) S.noSource theSlot gs
         Spec.assertBool s (Set.member (Recipient.ToCreature bogleId) mine) "alice may target her own Bogle"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature bogleId) theirs)) "bob may not, and that is the whole of CR 702.11b"
         Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) mine) "the Piker beside it is a legal target for alice"
@@ -525,10 +525,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (bogleId, pikerId, gs) = restrictionBoard bogle piker S.alice
-    case Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
-      [theSpec] -> do
-        let mine = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
-            theirs = Target.legalRecipients (Just S.bob) S.noSource theSpec gs
+    case Maybe.mapMaybe (soleTargetSlot . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace sorcerer)) of
+      [theSlot] -> do
+        let mine = Target.legalRecipients (Just S.alice) S.noSource theSlot gs
+            theirs = Target.legalRecipients (Just S.bob) S.noSource theSlot gs
         Spec.assertBool s (Set.member (Recipient.ToCreature bogleId) mine) "alice's own ability may point at her Bogle"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature bogleId) theirs)) "bob's may not"
         Spec.assertBool s (Set.member (Recipient.ToCreature pikerId) theirs) "though bob's may point at the Piker"
@@ -591,16 +591,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     doomBlade <- S.printingOf s registry "Doom Blade"
     let (bogleId, _, board) = restrictionBoard bogle piker S.bob
         humbled = S.withHumility humility board
-    case S.spellTargetSpec doomBlade of
+    case S.spellTargetSlot doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
-      Just theSpec -> do
+      Just theSlot -> do
         Spec.assertBool
           s
-          (not (Set.member (Recipient.ToCreature bogleId) (Target.legalRecipients (Just S.alice) S.noSource theSpec board)))
+          (not (Set.member (Recipient.ToCreature bogleId) (Target.legalRecipients (Just S.alice) S.noSource theSlot board)))
           "before Humility alice cannot target bob's Bogle"
         Spec.assertBool
           s
-          (Set.member (Recipient.ToCreature bogleId) (Target.legalRecipients (Just S.alice) S.noSource theSpec humbled))
+          (Set.member (Recipient.ToCreature bogleId) (Target.legalRecipients (Just S.alice) S.noSource theSlot humbled))
           "under Humility it is a legal target"
 
   -- CR 702.11d: "'Hexproof from [quality]' on a permanent means 'This permanent
@@ -639,15 +639,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     angelicEdict <- S.printingOf s registry "Angelic Edict"
     let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         withHexproof quality = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof quality)) board
-    case (S.spellTargetSpec doomBlade, S.spellTargetSpec angelicEdict) of
-      (Just blackSpec, Just whiteSpec) -> do
+    case (S.spellTargetSlot doomBlade, S.spellTargetSlot angelicEdict) of
+      (Just blackSlot, Just whiteSlot) -> do
         -- Doom Blade's pool is Creatures and Angelic Edict's is Permanents, so
         -- the same Piker is tagged differently in the two sets (CR 115).
-        let reaches printing theSpec tag gs =
+        let reaches printing theSlot tag gs =
               let (spellId, onStack) = S.spellOnStack printing S.alice gs
-               in Set.member (tag pikerId) (Target.legalRecipients (Just S.alice) spellId theSpec onStack)
-            blackReaches = reaches doomBlade blackSpec Recipient.ToCreature
-            whiteReaches = reaches angelicEdict whiteSpec Recipient.ToObject
+               in Set.member (tag pikerId) (Target.legalRecipients (Just S.alice) spellId theSlot onStack)
+            blackReaches = reaches doomBlade blackSlot Recipient.ToCreature
+            whiteReaches = reaches angelicEdict whiteSlot Recipient.ToObject
             fromBlack = withHexproof (Just (Filter.Type.HasColor Color.Black))
             fromWhite = withHexproof (Just (Filter.Type.HasColor Color.White))
         Spec.assertBool s (blackReaches board) "with no hexproof at all, alice's Doom Blade reaches bob's Piker"
@@ -681,11 +681,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     doomBlade <- S.printingOf s registry "Doom Blade"
     let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         guarded = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof (Just (Filter.Type.HasColor Color.Black)))) board
-    case S.spellTargetSpec doomBlade of
+    case S.spellTargetSlot doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
-      Just theSpec -> do
+      Just theSlot -> do
         let (spellId, onStack) = S.spellOnStack doomBlade S.bob guarded
-            reaches caster = Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients (Just caster) spellId theSpec onStack)
+            reaches caster = Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients (Just caster) spellId theSlot onStack)
         Spec.assertBool s (reaches S.bob) "bob may aim his own Doom Blade at his own Piker (CR 702.11d, 'your opponents control')"
         Spec.assertBool s (not (reaches S.alice)) "alice may not aim the same spell at it"
 
@@ -710,12 +710,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
         guarded = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof (Just (Filter.Type.HasColor Color.Black)))) board
         humbled = S.withHumility humility guarded
-    case S.spellTargetSpec doomBlade of
+    case S.spellTargetSlot doomBlade of
       Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
-      Just theSpec -> do
+      Just theSlot -> do
         let reaches gs =
               let (spellId, onStack) = S.spellOnStack doomBlade S.alice gs
-               in Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients (Just S.alice) spellId theSpec onStack)
+               in Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients (Just S.alice) spellId theSlot onStack)
         Spec.assertBool s (not (reaches guarded)) "before Humility alice's Doom Blade cannot reach the Piker"
         Spec.assertBool s (reaches humbled) "under Humility it can, the variant having gone with the rest"
 
@@ -775,25 +775,25 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     knight <- S.printingOf s registry "Knight of Grace"
     doomBlade <- S.printingOf s registry "Doom Blade"
     angelicEdict <- S.printingOf s registry "Angelic Edict"
-    case (S.spellTargetSpec doomBlade, S.spellTargetSpec angelicEdict) of
-      (Just blackSpec, Just whiteSpec) -> do
+    case (S.spellTargetSlot doomBlade, S.spellTargetSlot angelicEdict) of
+      (Just blackSlot, Just whiteSlot) -> do
         let (knightId, board) = S.addCreature knight S.bob (Setup.emptyGame S.bothPlayers)
             -- Doom Blade's pool is Creatures and Angelic Edict's is Permanents,
             -- so the same Knight is tagged differently in the two sets (CR 115).
-            reaches printing theSpec tag caster =
+            reaches printing theSlot tag caster =
               let (spellId, onStack) = S.spellOnStack printing caster board
-               in Set.member (tag knightId) (Target.legalRecipients (Just caster) spellId theSpec onStack)
+               in Set.member (tag knightId) (Target.legalRecipients (Just caster) spellId theSlot onStack)
         Spec.assertBool
           s
-          (not (reaches doomBlade blackSpec Recipient.ToCreature S.alice))
+          (not (reaches doomBlade blackSlot Recipient.ToCreature S.alice))
           "alice's black Doom Blade cannot target bob's Knight of Grace (CR 702.11d)"
         Spec.assertBool
           s
-          (reaches angelicEdict whiteSpec Recipient.ToObject S.alice)
+          (reaches angelicEdict whiteSlot Recipient.ToObject S.alice)
           "her white Angelic Edict can -- the half a plain-hexproof reading loses"
         Spec.assertBool
           s
-          (reaches doomBlade blackSpec Recipient.ToCreature S.bob)
+          (reaches doomBlade blackSlot Recipient.ToCreature S.bob)
           "and bob's own black Doom Blade can, CR 702.11d stopping only what his opponents control"
       _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
 
@@ -835,7 +835,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- can pass by the pool simply being empty. Cancel ("counter target spell",
   -- Pool.Spells) and Stifle ("counter target activated or triggered ability",
   -- Pool.Abilities) are read off their committed printings, so this is the
-  -- printed text and not a hand-built spec.
+  -- printed text and not a hand-built target slot.
   --
   -- CR 115.2 is what admits either at all: "only permanents are legal targets
   -- ... unless a spell or ability ... (b) targets an object that can't exist on
@@ -854,9 +854,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
             (spellId, onStack) = S.spellOnStack piker S.alice settled
             gs = S.runPure S.identityAnswer (onStack {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
             abilIds = filter (/= spellId) (GameState.stack gs)
-            -- soleTargetSpec, not S.spellTargetSpec: neither card calls its slot
+            -- soleTargetSlot, not S.spellTargetSlot: neither card calls its slot
             -- "target" -- Cancel's is "spell" and Stifle's is "ability".
-            legalFor printing = fmap (\theSpec -> Target.legalRecipients (Just S.bob) S.noSource theSpec gs) (soleTargetSpec (Face.spell (S.combinedFace printing)))
+            legalFor printing = fmap (\theSlot -> Target.legalRecipients (Just S.bob) S.noSource theSlot gs) (soleTargetSlot (Face.spell (S.combinedFace printing)))
         case (abilIds, legalFor cancel, legalFor stifle) of
           ([abilId], Just cancelLegal, Just stifleLegal) -> do
             Spec.assertEqWith s "Cancel sees the spell and only the spell" cancelLegal (Set.singleton (Recipient.ToObject spellId))
@@ -891,10 +891,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (mineId, g2) = S.addGraveyardCard piker S.alice g1
         (myBoltId, g3) = S.addGraveyardCard bolt S.alice g2
         (theirsId, gs) = S.addGraveyardCard piker S.bob g3
-    case S.spellTargetSpec raiseDead of
+    case S.spellTargetSlot raiseDead of
       Nothing -> Spec.assertFailure s "Raise Dead should declare a target slot"
-      Just theSpec -> do
-        let legal = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+      Just theSlot -> do
+        let legal = Target.legalRecipients (Just S.alice) S.noSource theSlot gs
         Spec.assertBool s (Set.member (Recipient.ToObject mineId) legal) "the creature card in alice's own graveyard is legal"
         Spec.assertBool s (not (Set.member (Recipient.ToObject theirsId) legal)) "the identical card in bob's graveyard is not (CR 400.1)"
         Spec.assertBool s (not (Set.member (Recipient.ToObject myBoltId) legal)) "nor is the instant card beside it (the Filter narrows)"
@@ -976,23 +976,23 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (mineId, g2) = S.addGraveyardCard piker S.alice g1
         (myBoltId, g3) = S.addGraveyardCard bolt S.alice g2
         (theirsId, gs) = S.addGraveyardCard piker S.bob g3
-        wretchSpecs = Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace wretch))
-    case (wretchSpecs, S.spellTargetSpec raiseDead) of
-      ([wretchSpec], Just raiseDeadSpec) -> do
-        let legal theSpec = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+        wretchSlots = Maybe.mapMaybe (soleTargetSlot . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace wretch))
+    case (wretchSlots, S.spellTargetSlot raiseDead) of
+      ([wretchSlot], Just raiseDeadSlot) -> do
+        let legal theSlot = Target.legalRecipients (Just S.alice) S.noSource theSlot gs
         Spec.assertEqWith
           s
           "the Wretch offers every card in every graveyard, of every card type, and nothing else"
-          (legal wretchSpec)
+          (legal wretchSlot)
           (Set.fromList (fmap Recipient.ToObject [mineId, myBoltId, theirsId]))
         Spec.assertBool
           s
-          (not (Set.member (Recipient.ToCreature inPlayId) (legal wretchSpec)))
+          (not (Set.member (Recipient.ToCreature inPlayId) (legal wretchSlot)))
           "and not the Piker on the battlefield under ToCreature either (disjoint from Pool.Creatures)"
         Spec.assertEqWith
           s
           "while Raise Dead, on those same graveyards, still reaches only alice's creature card"
-          (legal raiseDeadSpec)
+          (legal raiseDeadSlot)
           (Set.singleton (Recipient.ToObject mineId))
       _ -> Spec.assertFailure s "Withered Wretch should print one ability with one target slot, and Raise Dead one slot"
 
@@ -1088,24 +1088,24 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (buriedId, g2) = S.addGraveyardCard piker S.alice g1
         (hersId, g3) = S.addExiledCard piker S.alice g2
         (hisId, gs) = S.addExiledCard bolt S.bob g3
-        riftSpecs = Maybe.mapMaybe (soleTargetSpec . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace riftsweeper))
-        wretchSpecs = Maybe.mapMaybe (soleTargetSpec . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace wretch))
-    case (riftSpecs, wretchSpecs) of
-      ([riftSpec], [wretchSpec]) -> do
-        let legal theSpec = Target.legalRecipients (Just S.alice) S.noSource theSpec gs
+        riftSlots = Maybe.mapMaybe (soleTargetSlot . TriggeredAbility.modal) (Face.triggeredAbilities (S.combinedFace riftsweeper))
+        wretchSlots = Maybe.mapMaybe (soleTargetSlot . ActivatedAbility.modal) (Face.activatedAbilities (S.combinedFace wretch))
+    case (riftSlots, wretchSlots) of
+      ([riftSlot], [wretchSlot]) -> do
+        let legal theSlot = Target.legalRecipients (Just S.alice) S.noSource theSlot gs
         Spec.assertEqWith
           s
           "both exiled cards, hers and his, of both card types, and nothing else"
-          (legal riftSpec)
+          (legal riftSlot)
           (Set.fromList (fmap Recipient.ToObject [hersId, hisId]))
         Spec.assertBool
           s
-          (not (Set.member (Recipient.ToCreature inPlayId) (legal riftSpec)))
+          (not (Set.member (Recipient.ToCreature inPlayId) (legal riftSlot)))
           "not the Piker on the battlefield under ToCreature either (disjoint from Pool.Creatures)"
         Spec.assertEqWith
           s
           "while Withered Wretch, on that same board, still reaches only the graveyard card"
-          (legal wretchSpec)
+          (legal wretchSlot)
           (Set.singleton (Recipient.ToObject buriedId))
       _ -> Spec.assertFailure s "Riftsweeper should print one triggered ability with one target slot, and Withered Wretch one activated ability with one"
 
@@ -1255,8 +1255,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (hisOtherId, g3) = S.addGraveyardCard bolt S.bob g2
         (hersId, g4) = S.addGraveyardCard bolt S.carol g3
         (board, dwellId) = S.handOne dwell g4
-        specs = Modal.allTargetSpecs (Face.spell (S.combinedFace dwell))
-        offered = Target.legalSets (Just S.alice) S.noSource specs board
+        slots = Modal.allTargetSlots (Face.spell (S.combinedFace dwell))
+        offered = Target.legalSets (Just S.alice) S.noSource slots board
         slotNamed name = Map.findWithDefault Set.empty (SlotName.MkSlotName (Text.pack name)) offered
         run oids =
           let cast = S.runPure (aimingDwell oids) board (S.cast S.alice dwellId)
@@ -1305,10 +1305,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         (pikerId, gs3) = S.addCreature piker S.alice gs2
         (hisStalkerId, gs4) = S.addCreature stalker S.bob gs3
         (enteringId, board) = S.entersWithTrigger raptor S.alice gs4
-    case triggerTargetSpec raptor of
+    case triggerTargetSlot raptor of
       Nothing -> Spec.assertFailure s "Flensing Raptor's trigger should declare one target slot"
-      Just theSpec -> do
-        let legal = Target.legalRecipients (Just S.alice) enteringId theSpec board
+      Just theSlot -> do
+        let legal = Target.legalRecipients (Just S.alice) enteringId theSlot board
         Spec.assertBool s (Set.member (Recipient.ToCreature otherRaptorId) legal) "the Raptor beside it has toxic 1, and is legal"
         Spec.assertBool s (Set.member (Recipient.ToCreature stalkerId) legal) "Branchblight Stalker has toxic 2, and is legal too"
         Spec.assertBool s (not (Set.member (Recipient.ToCreature pikerId) legal)) "Goblin Piker has no toxic at all"
@@ -1441,11 +1441,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         window = S.runPure S.identityAnswer entered Engine.settleForPriority
         -- The same board one resolution later, with alice crowned.
         crowned = S.runPure S.identityAnswer window Stack.resolveTop
-    case (S.spellTargetSpec doomBlade, regentOn window) of
+    case (S.spellTargetSlot doomBlade, regentOn window) of
       (Nothing, _) -> Spec.assertFailure s "Doom Blade should declare a target slot"
       (_, Nothing) -> Spec.assertFailure s "the Regent should be on the battlefield in the window"
-      (Just theSpec, Just regentId) -> do
-        let legalFor pid = Target.legalRecipients (Just pid) S.noSource theSpec
+      (Just theSlot, Just regentId) -> do
+        let legalFor pid = Target.legalRecipients (Just pid) S.noSource theSlot
             aimAtRegent :: Prompt.Prompt r -> r
             aimAtRegent p = case p of
               Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature regentId))) sets

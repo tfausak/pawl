@@ -107,8 +107,8 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
 
   -- Engine.placeOne joins a delayed ability's placement-time choices with the
   -- environment captured when it was armed, and the two can now carry DIFFERENT
-  -- fields of one slot -- a target spec named for the slot a Create bound its
-  -- tokens to. A whole-Binding left-biased union would drop the loser entirely;
+  -- fields of one slot -- a target slot sharing the name a Create bound its
+  -- tokens under. A whole-Binding left-biased union would drop the loser entirely;
   -- merging per field keeps both, which is what that join relies on.
   Spec.it s "mergeBinding keeps disjoint fields from both sides" $ do
     let merged =

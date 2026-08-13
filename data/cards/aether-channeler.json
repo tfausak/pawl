@@ -100,7 +100,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "permanent": {
                     "filter": {
                       "type": "And",

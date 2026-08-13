@@ -57,7 +57,7 @@ data Binding = MkBinding
     -- No slot carries BOTH this and a target. mergeBinding would keep both, and
     -- Pawl.Engine.Engine.placeOne's per-field join is where they could meet, so
     -- the guarantee is a lint rather than a type: a card reaching it would have
-    -- to declare a delayed ability's target spec under a name its own Create or
+    -- to declare a delayed ability's target slot under a name its own Create or
     -- MoveToZone defines, which Pawl.CardSpec rejects.
     -- Pawl.Engine.Resolve.slotGroup records which way it would fail anyway.
     --

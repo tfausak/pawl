@@ -42,7 +42,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "tapped": {
                 "pool": {
                   "type": "Permanents"
@@ -64,7 +64,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "untapped": {
                 "pool": {
                   "type": "Permanents"

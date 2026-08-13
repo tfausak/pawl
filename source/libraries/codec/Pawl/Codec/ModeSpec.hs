@@ -17,7 +17,7 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout.
 -- 'Mode.toJson'/'Mode.fromJson' reach it only through the supplied Effect
@@ -46,10 +46,10 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
       fromJson
       ( Mode.MkMode
           (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
-          (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.required Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
+          (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSlot.required Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
       )
-      """ {"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}} """
-  -- A mode with no clauses or targetSpecs is what a card that says nothing
+      """ {"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSlots":{"target":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}} """
+  -- A mode with no clauses or targetSlots is what a card that says nothing
   -- extra means, and it round-trips through the empty object.
   Spec.it s "omits every default field" $
     Common.assertJsonCodec

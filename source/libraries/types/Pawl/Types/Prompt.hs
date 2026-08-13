@@ -211,7 +211,7 @@ data Prompt r where
   -- counter; the answer is the subset of each that gets one more of every kind it
   -- already has.
   --
-  -- CHOOSE, not target: proliferate declares no target spec, so a candidate is
+  -- CHOOSE, not target: proliferate declares no target slot, so a candidate is
   -- offered whoever's it is, and nothing is re-checked at resolution (CR 608.2b).
   --
   -- Asked whenever either list is non-empty, elided only when both are empty.
@@ -237,7 +237,7 @@ data Prompt r where
   -- Pawl.Engine.Resolve's job, since #222 has answers validated rather than
   -- trusted.
   --
-  -- CHOOSE, not target: the card declares no target spec, so nothing is
+  -- CHOOSE, not target: the card declares no target slot, so nothing is
   -- re-checked at resolution (CR 608.2b).
   --
   -- Elided only below two candidates, where the identity is the only assignment
@@ -253,7 +253,7 @@ data Prompt r where
   -- that takes the designation.
   --
   -- CHOOSE, not target: rule 701.54a says "choose a creature you control", so no
-  -- target spec is declared and nothing is re-checked at resolution (CR 608.2b).
+  -- target slot is declared and nothing is re-checked at resolution (CR 608.2b).
   --
   -- Raised only for TWO OR MORE candidates, ChooseLegend's shape. One creature is
   -- not a choice: the action is mandatory and has exactly one legal answer, so
@@ -856,7 +856,7 @@ data Prompt r where
   -- engine pre-filters, in ascending order); the Natural is how many. The answer
   -- is a Set because one permanent cannot be sacrificed twice for one payment.
   --
-  -- Deliberately NOT Prompt.ChooseTargets or the TargetSpec machinery: CR 115.1
+  -- Deliberately NOT Prompt.ChooseTargets or the TargetSlot machinery: CR 115.1
   -- makes a target only what the word "target" names, and conflating the two
   -- would let shroud, hexproof and "becomes the target" triggers observe a
   -- sacrifice choice. Its shape mirrors ChooseDiscard (candidates plus a count).

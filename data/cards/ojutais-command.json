@@ -47,7 +47,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "creature": {
                 "filter": {
                   "type": "And",
@@ -110,7 +110,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "spell": {
                 "filter": {
                   "type": "HasCardType",

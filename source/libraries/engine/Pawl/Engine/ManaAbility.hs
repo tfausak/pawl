@@ -50,7 +50,7 @@ import Pawl.Types.ManaProduction (ManaProduction)
 isManaAbility :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Bool
 isManaAbility ab =
   not (null (Maybe.mapMaybe manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
-    && Map.null (Modal.allTargetSpecs (ActivatedAbility.modal ab))
+    && Map.null (Modal.allTargetSlots (ActivatedAbility.modal ab))
 
 -- CR 605: does this effect add mana, and how is its type decided? Read by
 -- Mana.isManaAbility to keep mana abilities off the stack, and by

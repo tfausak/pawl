@@ -2475,7 +2475,7 @@ blossomingCalmAfter calmId before =
 
 -- bob casts his Bolt with an answerer that aims at alice whenever the engine
 -- offers her, so "alice was never offered" is the only way the damage can land
--- anywhere else -- TargetSpec's prefersBob, pointed the other way.
+-- anywhere else -- Pawl.TargetSpec's prefersBob, pointed the other way.
 --
 -- The phase and priority are restated rather than inherited, so a board that has
 -- been handed off two seats is cast on under exactly the conditions the
@@ -2551,10 +2551,10 @@ blossomingCalmSpec s registry =
       bolt <- S.printingOf s registry "Lightning Bolt"
       let (calmId, _, before) = blossomingCalmBoard plains calm mountain bolt
           resolved = blossomingCalmAfter calmId before
-      case S.spellTargetSpec bolt of
+      case S.spellTargetSlot bolt of
         Nothing -> Spec.assertFailure s "Lightning Bolt should declare a target slot"
-        Just theSpec -> do
-          let legalFor who = Target.legalRecipients (Just who) S.noSource theSpec
+        Just theSlot -> do
+          let legalFor who = Target.legalRecipients (Just who) S.noSource theSlot
           Spec.assertBool s (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob before)) "before the Calm, bob may bolt alice"
           Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.alice) (legalFor S.bob resolved))) "after it, he may not"
           Spec.assertBool s (not (Set.member (Recipient.ToPlayer S.alice) (legalFor S.carol resolved))) "and neither may carol -- both opponents, not just the next seat"

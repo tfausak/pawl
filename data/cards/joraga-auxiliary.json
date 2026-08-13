@@ -54,7 +54,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "creatures": {
                     "count": {
                       "least": 0,

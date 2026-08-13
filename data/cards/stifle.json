@@ -26,7 +26,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "ability": {
                 "pool": {
                   "type": "Abilities"

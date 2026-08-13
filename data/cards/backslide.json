@@ -51,7 +51,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "target": {
                 "filter": {
                   "type": "HasKeywordFamily",

@@ -23,7 +23,7 @@ import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
-import Pawl.Types.TargetSpec (TargetSpec)
+import Pawl.Types.TargetSlot (TargetSlot)
 
 -- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
 -- inner list per mode, kept apart. The shape a caller wants when the MODE is
@@ -89,12 +89,12 @@ combinationsWithRepeats n xs
       -- remains available to the smaller selection.
       h : t -> fmap (h :) (combinationsWithRepeats (n - 1) (h : t)) <> combinationsWithRepeats n t
 
--- The union of every mode's target specs. Slot names are unique across a card's
+-- The union of every mode's target slots. Slot names are unique across a card's
 -- modes, and that is CHECKED rather than merely intended: a CardSpec lint
 -- rejects the card whose two modes declare one name, which this union would
 -- otherwise collapse into a single entry.
-allTargetSpecs :: Modal.Modal card -> Map SlotName TargetSpec
-allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.modes m)))
+allTargetSlots :: Modal.Modal card -> Map SlotName TargetSlot
+allTargetSlots m = Map.unions (fmap Mode.targetSlots (Foldable.toList (Modal.modes m)))
 
 -- CR 700.2d: the slot a given INSTANCE of a chosen mode fills. "If that mode
 -- requires a target, the same player or object may be chosen as the target for
@@ -134,7 +134,7 @@ chosenModes chosen m =
    in Maybe.mapMaybe modeAt (instancesOf chosen)
 
 -- The chosen indices numbered by occurrence, sorted (CR 608.2c). Split out
--- because the specs and the modes must agree instance for instance, and both
+-- because the slots and the modes must agree instance for instance, and both
 -- read it.
 instancesOf :: Seq.Seq ModeIndex.ModeIndex -> [ModeInstance.ModeInstance]
 instancesOf chosen =
@@ -156,21 +156,21 @@ modeAtIndex (ModeIndex.MkModeIndex n) m = Seq.lookup (Natural.toIntSaturating n)
 modesEffects :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
 modesEffects chosen m = concatMap (Foldable.toList . Mode.allEffects . snd) (chosenModes chosen m)
 
--- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union), each instance's
+-- CR 601.2c/700.2c: only the CHOSEN modes' target slots (union), each instance's
 -- slots under instanceSlot's name. Two modes may be chosen at once (CR 702.42a's
 -- entwine), which is what makes this union's collapse an observable wrong answer
 -- rather than a latent one -- so the CardSpec lint keeps a card whose modes share
 -- a slot name out of the pool, and instanceSlot keeps one mode's repeats from
 -- colliding with themselves.
-modesTargetSpecs :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName TargetSpec
-modesTargetSpecs chosen m = Map.unions (fmap (\mi -> instanceTargetSpecs mi m) (instancesOf chosen))
+modesTargetSlots :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName TargetSlot
+modesTargetSlots chosen m = Map.unions (fmap (\mi -> instanceTargetSlots mi m) (instancesOf chosen))
 
--- One chosen instance's target specs, renamed to that instance's slots. The
--- inverse of the projection instanceView applies before running the instance's
--- effects, which still read the printed names.
-instanceTargetSpecs :: ModeInstance.ModeInstance -> Modal.Modal card -> Map SlotName TargetSpec
-instanceTargetSpecs mi m =
-  Map.mapKeys (instanceSlot mi) (maybe Map.empty Mode.targetSpecs (modeAtIndex (ModeInstance.index mi) m))
+-- One chosen instance's target slots, renamed under that instance's slot names.
+-- The inverse of the projection instanceView applies before running the
+-- instance's effects, which still read the printed names.
+instanceTargetSlots :: ModeInstance.ModeInstance -> Modal.Modal card -> Map SlotName TargetSlot
+instanceTargetSlots mi m =
+  Map.mapKeys (instanceSlot mi) (maybe Map.empty Mode.targetSlots (modeAtIndex (ModeInstance.index mi) m))
 
 -- CR 700.2d: the binding-shaped environment ONE chosen instance's effects read.
 -- Three parts, and each is a rule rather than a convenience:
@@ -196,22 +196,22 @@ instanceTargetSpecs mi m =
 -- one function, which is what keeps them from disagreeing about which slot
 -- belongs to which instance.
 --
--- `allSpecs` is every chosen instance's specs (modesTargetSpecs, already
--- instance-named); `printed` is this instance's own mode's specs, under the names
+-- `allSlots` is every chosen instance's slots (modesTargetSlots, already
+-- instance-named); `printed` is this instance's own mode's slots, under the names
 -- the card prints. Taken as arguments rather than derived from the payload
--- because the two resolution paths hold different things: a spell's `allSpecs`
+-- because the two resolution paths hold different things: a spell's `allSlots`
 -- also carries CR 303.4a's enchant slot, which is the card's and not any mode's,
 -- and so must survive the projection.
-instanceView :: Map SlotName TargetSpec -> ModeInstance.ModeInstance -> Map SlotName TargetSpec -> Map SlotName v -> Map SlotName v
-instanceView allSpecs mi printed env =
+instanceView :: Map SlotName TargetSlot -> ModeInstance.ModeInstance -> Map SlotName TargetSlot -> Map SlotName v -> Map SlotName v
+instanceView allSlots mi printed env =
   let renamed = Maybe.mapMaybe (\slot -> fmap ((,) slot) (Map.lookup (instanceSlot mi slot) env)) (Map.keys printed)
-   in Map.union (Map.fromList renamed) (Map.withoutKeys env (Map.keysSet allSpecs))
+   in Map.union (Map.fromList renamed) (Map.withoutKeys env (Map.keysSet allSlots))
 
--- The target specs of one mode by index (CR 700.2c: only the chosen mode's
+-- The target slots of one mode by index (CR 700.2c: only the chosen mode's
 -- slots). Nothing if the index is out of range (total).
-modeTargetSpecs :: ModeIndex.ModeIndex -> Modal.Modal card -> Maybe (Map SlotName TargetSpec)
-modeTargetSpecs (ModeIndex.MkModeIndex n) m =
-  fmap Mode.targetSpecs (Seq.lookup (Natural.toIntSaturating n) (Modal.modes m))
+modeTargetSlots :: ModeIndex.ModeIndex -> Modal.Modal card -> Maybe (Map SlotName TargetSlot)
+modeTargetSlots (ModeIndex.MkModeIndex n) m =
+  fmap Mode.targetSlots (Seq.lookup (Natural.toIntSaturating n) (Modal.modes m))
 
 -- CR 700.2: the FEWEST modes a selection satisfying this instruction may name.
 -- Equal to mostOf for an exact instruction, whichever half of CR 700.2d it is;

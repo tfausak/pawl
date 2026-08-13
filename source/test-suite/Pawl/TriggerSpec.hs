@@ -73,7 +73,7 @@
 -- of the declaration for a bigger companion, with Apprentice Sharpshooter --
 -- `trainingSpec`. CR 702.39 provoke, the first whose payload
 -- creates a CR 509.1c blocking requirement, with Goblin Grappler --
--- `provokeSpec`. CR 603.2's "that player" narrowing a TARGET SPEC rather than an
+-- `provokeSpec`. CR 603.2's "that player" narrowing a TARGET SLOT rather than an
 -- effect's operand -- Filter.ControlledByBound, baked to the player the event
 -- named -- with Trygon Predator at three seats -- `trygonPredatorSpec`. CR
 -- 702.112 renown, the first minted
@@ -293,7 +293,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -1228,7 +1228,7 @@ delayedSpec s registry =
         -- direction (`Map.union captured placementTime`) the captured {7} would
         -- win instead, and this assertion would fail.
         Spec.it s "CR 603.7c placement-time's own chosen mode wins a collision with the captured environment" $ do
-          let onlyMode = Mode.MkMode {Mode.clauses = Seq.empty, Mode.targetSpecs = Map.empty}
+          let onlyMode = Mode.MkMode {Mode.clauses = Seq.empty, Mode.targetSlots = Map.empty}
               ability =
                 TriggeredAbility.MkTriggeredAbility
                   { TriggeredAbility.condition = TriggerCondition.SelfEnters,
@@ -4080,7 +4080,7 @@ exaltedSpec s registry =
 
 -- CR 702.134a's mentor, which rule 702 states as a triggered ability
 -- and the FIRST whose ability TARGETS -- so this is the group that runs a
--- keyword-minted TargetSpec through CR 601.2c's choosing, and with it
+-- keyword-minted TargetSlot through CR 601.2c's choosing, and with it
 -- Filter.PowerLessThanSource, the one atom whose bound is the source's own power
 -- rather than a literal.
 --
@@ -4208,22 +4208,22 @@ mentorSpec s registry =
             _ -> Spec.assertFailure s "fixture should give alice two Instructors and a Piker"
         -- The same multiplicity asserted of the MINT, as exalted's and flanking's
         -- instance cases are, and with it the slot the gameplay cases above can
-        -- only see through its effects: CR 508.3a's condition, and a spec whose
+        -- only see through its effects: CR 508.3a's condition, and a target slot whose
         -- filter is the rule's two printed narrowings.
         Spec.it s "CR 702.134b two instances mint two targeting abilities" $ do
           let abilities = Keyword.abilitiesFor Keyword.Type.Mentor 2
-              expectedSpec =
-                TargetSpec.required
+              expectedSlot =
+                TargetSlot.required
                   Pool.Creatures
                   (Just (Filter.Type.And [Filter.Type.IsAttacking, Filter.Type.PowerLessThanSource]))
-              specsOf ability = concatMap (Map.elems . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
+              slotsOf ability = concatMap (Map.elems . Mode.targetSlots) (Modal.modes (TriggeredAbility.modal ability))
           Spec.assertEqWith s "two abilities" (length abilities) 2
           Spec.assertEqWith
             s
             "each watching CR 508.3a's declaration"
             (fmap TriggeredAbility.condition abilities)
             [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
-          Spec.assertEqWith s "each with rule 702.134a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
+          Spec.assertEqWith s "each with rule 702.134a's one slot" (concatMap slotsOf abilities) [expectedSlot, expectedSlot]
 
 -- CR 702.134c, the OTHER half of rule 702.134: not mentor's own attack trigger but
 -- an ability that watches a mentor ability RESOLVE. "An ability that triggers
@@ -4569,7 +4569,7 @@ decayedSpec s registry =
               Spec.assertBool s (S.onBattlefield zombie after) "and the token is still there"
             other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
 
--- CR 603.2's "that player" reaching a TARGET SPEC rather than an effect's
+-- CR 603.2's "that player" reaching a TARGET SLOT rather than an effect's
 -- operand: Trygon Predator's "whenever this creature deals combat damage to a
 -- player, you may destroy target artifact or enchantment THAT PLAYER controls".
 -- The slot is narrowed by Filter.ControlledByBound, baked to the damaged player
@@ -4751,7 +4751,7 @@ provokeSpec s registry =
           grappler <- S.printingOf s registry "Goblin Grappler"
           piker <- S.printingOf s registry "Goblin Piker"
           let (gs0, mine, theirs, others) = S.threePlayerCombat [grappler] [piker] [piker]
-              minted = concatMap (concatMap (Map.elems . Mode.targetSpecs) . Modal.modes . TriggeredAbility.modal) (Keyword.abilitiesFor Keyword.Type.Provoke 1)
+              minted = concatMap (concatMap (Map.elems . Mode.targetSlots) . Modal.modes . TriggeredAbility.modal) (Keyword.abilitiesFor Keyword.Type.Provoke 1)
           case (mine, theirs, others, minted) of
             ([attacker], [bobs], [carols], [slot]) -> do
               let after = atBlockers (S.attackTo S.carol) gs0
@@ -4785,15 +4785,15 @@ provokeSpec s registry =
         -- 508.3a's condition, and rule 702.39a's one printed narrowing.
         Spec.it s "CR 702.39b two instances mint two targeting abilities" $ do
           let abilities = Keyword.abilitiesFor Keyword.Type.Provoke 2
-              expectedSpec = TargetSpec.required Pool.Creatures (Just Filter.Type.ControlledByDefendingPlayer)
-              specsOf ability = concatMap (Map.elems . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
+              expectedSlot = TargetSlot.required Pool.Creatures (Just Filter.Type.ControlledByDefendingPlayer)
+              slotsOf ability = concatMap (Map.elems . Mode.targetSlots) (Modal.modes (TriggeredAbility.modal ability))
           Spec.assertEqWith s "two abilities" (length abilities) 2
           Spec.assertEqWith
             s
             "each on CR 508.3a's condition"
             (fmap TriggeredAbility.condition abilities)
             [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
-          Spec.assertEqWith s "each with rule 702.39a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
+          Spec.assertEqWith s "each with rule 702.39a's one slot" (concatMap slotsOf abilities) [expectedSlot, expectedSlot]
 
 -- CR 702.112a's renown, which rule 702 states as a triggered
 -- ability -- and the first minted one carrying an intervening "if" (CR 603.4),
@@ -5213,7 +5213,7 @@ renownSpec s registry =
 -- with flying an opponent controls."
 --
 -- bob holds Bird Maiden 1/2 flying and Goblin Piker 2/1: the Piker is the
--- falsifier for a target spec that dropped "with flying", and both are his, so no
+-- falsifier for a target slot that dropped "with flying", and both are his, so no
 -- assertion here turns on the seat.
 --
 -- TWELVE Forests, not six: the second-monstrosity case has to be able to PAY for
@@ -6543,7 +6543,7 @@ gaeasBlessingSpec s registry =
   let namesIn zone pid gs =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
       -- CR 701.24a leaves a shuffle observable only through the order it
-      -- produces, so the interpreter REVERSES it (TargetSpec's Riftsweeper cases,
+      -- produces, so the interpreter REVERSES it (Pawl.TargetSpec's Riftsweeper cases,
       -- for the same reason). What order a shuffle leaves is not asserted
       -- anywhere -- a real one has none.
       reversing :: Prompt.Prompt r -> r
@@ -9411,13 +9411,13 @@ kindredSpec s registry =
          in (oid, onStack, resolveAll onStack)
       slot = SlotName.MkSlotName (Text.pack "target")
       -- "Target Faerie ...", drawn from a pool: the same Pool + Filter machinery
-      -- every printed target spec goes through (Pawl.ResolveSpec's "target
+      -- every printed target slot goes through (Pawl.ResolveSpec's "target
       -- Wall" is the same shape over a creature type that behaves ordinarily).
       faeriesIn pool gs =
         Map.findWithDefault
           Set.empty
           slot
-          (Target.legalSets (Just S.alice) S.noSource (Map.singleton slot (TargetSpec.required pool (Just (Filter.Type.HasSubtype Subtype.Faerie)))) gs)
+          (Target.legalSets (Just S.alice) S.noSource (Map.singleton slot (TargetSlot.required pool (Just (Filter.Type.HasSubtype Subtype.Faerie)))) gs)
    in Spec.describe s "Kindred" $ do
         -- The proving test for CR 308. CR 308.2 makes the kindred subtypes
         -- "the same as the set of creature subtypes", so the ENCHANTMENT

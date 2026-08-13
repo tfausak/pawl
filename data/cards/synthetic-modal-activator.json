@@ -33,7 +33,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "damaged": {
                     "pool": {
                       "type": "Creatures"
@@ -64,7 +64,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "strengthened": {
                     "pool": {
                       "type": "Creatures"

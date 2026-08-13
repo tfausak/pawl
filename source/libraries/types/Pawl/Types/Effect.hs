@@ -168,7 +168,7 @@ data Effect card
     -- destroyed into the effect source's live bindings, for a later effect of the
     -- same resolution to read back as Quantity.InSlot -- Bane of Progress' two
     -- sentences are two ordinary opcodes joined by the slot. A DEFINITION, not a
-    -- read: never a target, never in targetSpecs. ACTUALLY destroyed is not
+    -- read: never a target, never in targetSlots. ACTUALLY destroyed is not
     -- "matched by the ObjectRef", since CR 702.12b's indestructible permanent and
     -- CR 701.19a's regenerated one are swept at and survive and CR 701.8b denies
     -- the word to any other graveyard move, so the number comes out of
@@ -200,7 +200,7 @@ data Effect card
     -- this targets the thing that moves and does not target the destination at all
     -- (Crown of the Ages' Gatherer ruling is explicit). So the destination is a
     -- CHOICE on resolution, outside CR 608.2b's illegal-target check, and hence a
-    -- bare Filter rather than a TargetSpec.
+    -- bare Filter rather than a TargetSlot.
     --
     -- The Filter is the destination's card text; Aura Graft's "another permanent
     -- IT CAN ENCHANT" is `Filter.CanHostSubject`, the one atom that asks about the
@@ -243,7 +243,7 @@ data Effect card
     -- Towershell's two "it"s are the singular producer; Act on Impulse's "those
     -- cards" is the plural one, and Resolve binds a group for it exactly as
     -- Create does for "those tokens". A DEFINITION, not a read: never a target,
-    -- never in targetSpecs.
+    -- never in targetSlots.
     --
     -- The trailing Maybe Zone is the zone the effect's own words say the object
     -- is moved OUT of -- Reassembling Skeleton's "return this card FROM YOUR
@@ -471,7 +471,7 @@ data Effect card
     -- the necessary amount, exactly as SetLifeTotal's CR 119.5 makes it.
     --
     -- CHOOSE, not target, Proliferate's posture and why this carries no SlotName:
-    -- the card declares no target spec, the whole assignment is picked on
+    -- the card declares no target slot, the whole assignment is picked on
     -- RESOLUTION via Prompt.ChooseRedistribution, and nothing is subject to CR
     -- 608.2b's illegal-target check.
     --
@@ -539,7 +539,7 @@ data Effect card
     -- The Maybe SlotName BINDS what this Create minted into the resolving
     -- object's LIVE bindings, so a delayed ability armed by this same resolution
     -- can name it. A DEFINITION, not a read: never a target, never in
-    -- targetSpecs.
+    -- targetSlots.
     --
     -- WHAT it binds is decided by the PRINTED Quantity, which is the only thing
     -- that can tell CR 603.7c's singular "it" from a card's plural "those
@@ -1063,7 +1063,7 @@ data Effect card
     -- Offering says the same words twice.
     --
     -- CHOOSE, not target, Proliferate's posture and the reason this is an effect
-    -- rather than a target spec: CR 115.10a makes a player a target only where
+    -- rather than a target slot: CR 115.10a makes a player a target only where
     -- the text identifies them with the word "target", and neither producer does.
     -- So the pick happens while applying the effect (CR 608.2d) rather than on
     -- announcement (CR 601.2c), and CR 608.2b has nothing to re-validate -- an
@@ -1099,7 +1099,7 @@ data Effect card
   | -- | CR 701.34a: choose any number of permanents and/or players that have a
     -- counter, then give each one additional counter of each kind it already has.
     --
-    -- CHOOSE, not target (the rule's own word): no target spec, the set is picked
+    -- CHOOSE, not target (the rule's own word): no target slot, the set is picked
     -- on RESOLUTION via Prompt.ChooseProliferate, and nothing is subject to CR
     -- 608.2b's illegal-target check -- which is why this carries no SlotName.
     --
@@ -1113,7 +1113,7 @@ data Effect card
     -- named The Ring if they have none (CR 701.54c), then choose a creature they
     -- control to become their Ring-bearer.
     --
-    -- CHOOSE, not target, the word rule 701.54a itself uses: no target spec, the
+    -- CHOOSE, not target, the word rule 701.54a itself uses: no target slot, the
     -- creature is picked on RESOLUTION via Prompt.ChooseRingBearer, and nothing is
     -- subject to CR 608.2b's illegal-target check -- Proliferate's posture, and
     -- why this carries no SlotName either.

@@ -27,7 +27,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "filter": {
                       "type": "HasSubtype",

@@ -44,11 +44,11 @@ import qualified Pawl.Types.Subtype as Subtype
 --
 -- Equipment is CR 301.5's creature test. Aura is CR 303.4's enchant ability, asked
 -- through Target.admittedRecipients rather than a hand-rolled creature test, which
--- honours an enchant spec that narrows further for free. Admission and not target
+-- honours an enchant slot that narrows further for free. Admission and not target
 -- legality: CR 702.5a gives the enchant ability both jobs and this is the second,
 -- so rule 702's targeting restrictions do not reach here. CR 109.5's "you" on that
--- spec is the AURA's controller, not the moving effect's. An Aura with no enchant
--- ability cannot arise -- the CardSpec lint holds the biconditional.
+-- enchant slot is the AURA's controller, not the moving effect's. An Aura with
+-- no enchant ability cannot arise -- the CardSpec lint holds the biconditional.
 --
 -- Read through Game.faceOf, so CR 708.2a's substitution applies: a permanent that
 -- is still face down has no enchant ability and no Aura subtype, and this answers
@@ -69,7 +69,7 @@ import qualified Pawl.Types.Subtype as Subtype
 -- attachment is to an object or player and Object.attachedTo records which -- and
 -- the tag must be the one the moving permanent's OWN rules reference the
 -- destination by, not the one the moving effect targeted it with. Taking the
--- answer from the spec's candidate list is what keeps Sba's CR 303.4c re-check
+-- answer from the slot's candidate list is what keeps Sba's CR 303.4c re-check
 -- able to compare against that same list later, so `destination` is matched by
 -- which object or player it names rather than by how the caller tagged it.
 attachmentFor :: ObjectId -> Recipient -> GameState -> Maybe Recipient
@@ -84,12 +84,12 @@ attachmentFor src destination gs
   | Set.member Subtype.Aura subtypes =
       if Projection.isCreatureOf src gs
         then Nothing
-        else case Game.faceOf src gs >>= Card.enchantSpec of
+        else case Game.faceOf src gs >>= Card.enchantTargetSlot of
           Nothing -> Nothing
-          Just spec ->
+          Just slot ->
             List.find
               (names destination)
-              (Set.toList (Target.admittedRecipients (Projection.controllerOf src gs) src spec gs))
+              (Set.toList (Target.admittedRecipients (Projection.controllerOf src gs) src slot gs))
   | otherwise = Nothing
   where
     subtypes = Projection.subtypesOf src gs

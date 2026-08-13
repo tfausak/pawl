@@ -77,7 +77,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "opponent": {
                     "filter": {
                       "type": "IsPlayer",

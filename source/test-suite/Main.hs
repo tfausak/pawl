@@ -157,7 +157,7 @@ import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TakeExtraTurnSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetCountSpec
-import qualified Pawl.Codec.TargetSpecSpec
+import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.ToughnessSpec
 import qualified Pawl.Codec.TriggerConditionSpec
@@ -465,7 +465,7 @@ spec s registry = do
   Pawl.Codec.TakeExtraTurnSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TargetCountSpec.spec s
-  Pawl.Codec.TargetSpecSpec.spec s
+  Pawl.Codec.TargetSlotSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.ToughnessSpec.spec s
   Pawl.Codec.TriggerConditionSpec.spec s

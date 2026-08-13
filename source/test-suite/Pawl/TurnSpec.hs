@@ -842,7 +842,7 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
       (fmap Object.tapped (Game.lookupObject attacker (castAndResolve spell fought)))
       (Just TapState.Untapped)
 
--- Aim every target slot at one player. Time Warp's spec is Pool.Players, so a
+-- Aim every target slot at one player. Time Warp's slot is Pool.Players, so a
 -- recipient tagged for any other pool is not in its legal set at all.
 aimPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimPlayer pid p = case p of

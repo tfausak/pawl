@@ -42,7 +42,7 @@ import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Codec.SpecialAction as SpecialAction
 import qualified Pawl.Codec.StaticAbility as StaticAbility
-import qualified Pawl.Codec.TargetSpec as TargetSpec
+import qualified Pawl.Codec.TargetSlot as TargetSlot
 import qualified Pawl.Codec.Toughness as Toughness
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TypeLine as TypeLine
@@ -70,7 +70,7 @@ toJson encodeCard f =
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe (Codec.encode Loyalty.codec)) (Face.loyalty f),
       Common.optionalPair "defense" Nothing (Common.encodeMaybe (Codec.encode Defense.codec)) (Face.defense f),
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (Codec.encode Quantity.codec)) (Face.characteristicPT f),
-      Common.optionalPair "enchant" [] (Common.encodeList (Codec.encode TargetSpec.codec)) (Face.enchant f),
+      Common.optionalPair "enchant" [] (Common.encodeList (Codec.encode TargetSlot.codec)) (Face.enchant f),
       Common.optionalPair "keywords" Set.empty (Common.encodeSet (Codec.encode Keyword.codec)) (Face.keywords f),
       Common.optionalPair "colorIndicator" Set.empty (Common.encodeSet (Codec.encode Color.codec)) (Face.colorIndicator f),
       Common.optionalPair "spell" Face.defaultSpell (Modal.toJson encodeCard) (Face.spell f),
@@ -147,7 +147,7 @@ fromJson decodeCard value = do
   mulliganActions <- Common.defaultedField "mulliganActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
   openingHandActions <- Common.defaultedField "openingHandActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
   specialActions <- Common.defaultedField "specialActions" [] (Common.decodeList (Codec.decode SpecialAction.codec)) ps
-  enchant <- Common.defaultedField "enchant" [] (Common.decodeList (Codec.decode TargetSpec.codec)) ps
+  enchant <- Common.defaultedField "enchant" [] (Common.decodeList (Codec.decode TargetSlot.codec)) ps
   counterability <- Common.defaultedField "counterability" Counterability.Counterable (Codec.decode Counterability.codec) ps
   pure
     Face.MkFace

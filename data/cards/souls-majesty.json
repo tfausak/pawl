@@ -46,7 +46,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "creature": {
                 "filter": {
                   "type": "ControlledBy",

@@ -190,7 +190,7 @@ data Filter keyword
     -- (Pawl.Engine.Filter.bakeBound): the two moments that judge a target slot --
     -- CR 603.3d's choosing (Pawl.Engine.Engine.placeBorne) and CR 608.2b's
     -- re-check (Pawl.Engine.Resolve.resolveModes) -- each hold the bindings and
-    -- hand Pawl.Engine.Target a spec with this atom already replaced. Vacuously
+    -- hand Pawl.Engine.Target a slot with this atom already replaced. Vacuously
     -- False if it survives to a match, which is a slot that named no one player.
     ControlledByBound SlotName.SlotName
   | -- | The atom above with its player resolved: the candidate's controller IS this

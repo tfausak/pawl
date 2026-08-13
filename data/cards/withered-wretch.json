@@ -32,7 +32,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "pool": {
                       "type": "CardsInGraveyard",

@@ -876,9 +876,9 @@ placeBorne srcId pending = do
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
       -- is placed. A mode with no target slots (Create, or a Draw that names its
       -- drawer without targeting) asks nothing.
-      let specs = Modal.modesTargetSpecs chosenModes modal
-          sets = Target.legalSets (Just controller) srcId specs gs
-      chosen <- Target.chooseTargets decider controller abilId specs sets
+      let slots = Modal.modesTargetSlots chosenModes modal
+          sets = Target.legalSets (Just controller) srcId slots gs
+      chosen <- Target.chooseTargets decider controller abilId slots sets
       -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
       -- placed, so "this creature" resolves as an ordinary slot read even after
       -- the source has left the battlefield.
@@ -898,7 +898,7 @@ placeBorne srcId pending = do
       -- unionWith mergeBinding rather than a left-biased Map.union, which would
       -- drop the WHOLE captured entry on a name collision: the two sides can now
       -- carry disjoint FIELDS of one slot -- a delayed ability declaring a target
-      -- spec under the name a Create bound its minted tokens to would keep only
+      -- slot under the name a Create bound its minted tokens to would keep only
       -- the target and lose the group. Per-field, both survive.
       State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
 
@@ -964,7 +964,7 @@ interchangeable entries = case entries of
 --   * one mode and a ChooseExactly 1 selection, so CR 603.3c / 700.2b's mode
 --     announcement -- made as the ability is put on the stack, in the order
 --     chosen -- has nothing to announce;
---   * no target specs, since CR 603.3d imports CR 601.2c and targets are chosen
+--   * no target slots, since CR 603.3d imports CR 601.2c and targets are chosen
 --     as each ability is placed, in the order chosen;
 --   * the mode reads NO slot at all (Resolve.modeSlots);
 --   * and that answer is complete (Resolve.slotsAreExhaustive), which is where
@@ -986,7 +986,7 @@ orderInert ability =
         && Modal.Type.selection modal == ModeSelection.ChooseExactly 1
         && case Foldable.toList (Modal.Type.modes modal) of
           [mode] ->
-            Map.null (Mode.targetSpecs mode)
+            Map.null (Mode.targetSlots mode)
               && Map.null (Resolve.modeSlots mode)
               && all Resolve.slotsAreExhaustive (Mode.allEffects mode)
           _ -> False

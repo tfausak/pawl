@@ -64,7 +64,7 @@
                     ]
                   }
                 ],
-                "targetSpecs": {
+                "targetSlots": {
                   "target": {
                     "filter": {
                       "type": "IsAttacking"

@@ -83,7 +83,7 @@
                 ]
               }
             ],
-            "targetSpecs": {
+            "targetSlots": {
               "permanent": {
                 "count": {
                   "least": 0,

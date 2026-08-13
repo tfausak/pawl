@@ -327,7 +327,7 @@ stepSkipSpec s registry = Spec.describe s "Skip" $ do
     Spec.assertEqWith s "having consumed exactly that one step" (GameState.remaining after) Seq.empty
 
 -- Aim every target slot at one player. The player-side twin of `aimObject`
--- above; Fatigue's spec is Pool.Players, so a recipient tagged for any other
+-- above; Fatigue's slot is Pool.Players, so a recipient tagged for any other
 -- pool is not in its legal set at all.
 aimPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimPlayer pid p = case p of
@@ -1490,7 +1490,7 @@ tablesBoard plains lands mine spells =
 -- attack with everything.
 --
 -- Order matters in the Kill Shot case, and one answerer cannot express it: both
--- spells declare the same Pool.Creatures/IsAttacking spec, and casting both in
+-- spells declare the same Pool.Creatures/IsAttacking slot, and casting both in
 -- one priority round puts Kill Shot on TOP of the stack, so it resolves first
 -- and Turn the Tables fizzles under CR 608.2b with no row installed. That case
 -- therefore runs one step per spell, naming one card each time.
@@ -1645,7 +1645,7 @@ turnTheTablesSpec s registry = Spec.describe s "Turn the Tables (CR 614.9)" $ do
 settleDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> [DamageEvent.DamageEvent] -> GameState.GameState
 settleDamage answer gs batch = S.runPure answer gs (Damage.applyDamage batch)
 
--- Aim every target slot at one creature. Mending Hands' spec is Pool.AnyTarget
+-- Aim every target slot at one creature. Mending Hands' slot is Pool.AnyTarget
 -- (CR 115.4), whose creature members are tagged ToCreature.
 aimCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimCreature oid p = case p of
