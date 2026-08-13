@@ -6,6 +6,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Clause as Clause
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Clause as Clause
@@ -25,17 +26,17 @@ import qualified Pawl.Types.UnlessPaid as UnlessPaid
 -- | The `card` parameter is instantiated at 'Text.Text' throughout, for
 -- 'Pawl.Codec.ModeSpec''s reason: the codec reaches it only through the supplied
 -- Effect codec, so any type proves the shape.
-cardToJson :: Text.Text -> Value.Value
-cardToJson = Value.text
+cardCodec :: Codec.Codec Text.Text
+cardCodec = Common.text
 
-cardFromJson :: Value.Value -> Either Text.Text Text.Text
-cardFromJson = Common.asText
+codec :: Codec.Codec (Clause.Clause Text.Text)
+codec = Clause.codec cardCodec
 
 toJson :: Clause.Clause Text.Text -> Value.Value
-toJson = Clause.toJson cardToJson
+toJson = Codec.encode codec
 
 fromJson :: Value.Value -> Either Text.Text (Clause.Clause Text.Text)
-fromJson = Clause.fromJson cardFromJson
+fromJson = Codec.decode codec
 
 -- One constructor, so five cases: a populated clause, CR 603.5's `optionality`
 -- flag when present, CR 118.12a's `unlessPaid` clause when present, CR 701.46a's

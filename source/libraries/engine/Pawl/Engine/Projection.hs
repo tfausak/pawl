@@ -36,6 +36,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -77,6 +78,7 @@ import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesign
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -1569,7 +1571,7 @@ rewriteEffect pairs effect = case effect of
   -- Not implemented: the riders go through unchanged, so a CR 122.1b keyword
   -- counter named among them keeps its printed keyword (#1190) -- the MoveToZone
   -- arm above and this one now both read that field.
-  Effect.Create quantity card riders slot -> Effect.Create quantity (rewriteCard pairs card) riders slot
+  Effect.Create (Create.MkCreate quantity card riders slot) -> Effect.Create (Create.MkCreate quantity (rewriteCard pairs card) riders slot)
   -- The ObjectRef alone, exactly as Tap above: an EachMatching's Filter is a
   -- word a CR 612.1 swap reaches. What the token BECOMES is not text on this
   -- card at all -- it is the copied permanent's copiable values, and CR 707.2
@@ -1580,8 +1582,8 @@ rewriteEffect pairs effect = case effect of
   -- CR 612.1: a rider's text is as changeable as any other, so the recursion
   -- reaches it. The shield's own three fields hold nothing a text change
   -- touches, which is why the arm was a no-op before.
-  Effect.PreventNextDamage duration ref quantity rider ->
-    Effect.PreventNextDamage duration ref quantity (fmap (rewriteEffect pairs) rider)
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration ref quantity rider) ->
+    Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration ref quantity (fmap (rewriteEffect pairs) rider))
   Effect.PreventAllDamage {} -> effect
   Effect.RedirectDamage {} -> effect
   Effect.Counter _ -> effect

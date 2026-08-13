@@ -59,12 +59,8 @@
                 "effects": [
                   {
                     "type": "Create",
-                    "value": [
-                      {
-                        "type": "Literal",
-                        "value": 3
-                      },
-                      {
+                    "value": {
+                      "card": {
                         "faces": [
                           {
                             "colorIndicator": [
@@ -101,8 +97,12 @@
                           }
                         ]
                       },
-                      "tokens"
-                    ]
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 3
+                      },
+                      "slot": "tokens"
+                    }
                   },
                   {
                     "type": "ArmDelayedTrigger",

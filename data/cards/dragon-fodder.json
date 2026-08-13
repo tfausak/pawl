@@ -25,12 +25,8 @@
                 "effects": [
                   {
                     "type": "Create",
-                    "value": [
-                      {
-                        "type": "Literal",
-                        "value": 2
-                      },
-                      {
+                    "value": {
+                      "card": {
                         "faces": [
                           {
                             "colorIndicator": [
@@ -61,8 +57,12 @@
                             }
                           }
                         ]
+                      },
+                      "quantity": {
+                        "type": "Literal",
+                        "value": 2
                       }
-                    ]
+                    }
                   }
                 ]
               }

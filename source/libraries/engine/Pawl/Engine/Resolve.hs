@@ -64,6 +64,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -131,6 +132,7 @@ import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -320,7 +322,7 @@ slotsOf effect = case effect of
   Effect.DecreaseSpeed d -> joinTwo (playerRefSlots (SpeedDecrease.player d)) (quantitySlots (SpeedDecrease.quantity d))
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
-  Effect.Create quantity _ _ _ -> quantitySlots quantity
+  Effect.Create (Create.MkCreate quantity _ _ _) -> quantitySlots quantity
   -- A READ, unlike Create's slot: the ref names the permanent being copied,
   -- which is a target on Cackling Counterpart and the reserved self slot on
   -- Watchful Radstag. Both are reads; only the first is a target (CR 115.10a).
@@ -341,7 +343,7 @@ slotsOf effect = case effect of
   -- Subtracted here rather than added to `boundSlots` below, because the
   -- Pawl.CardSpec sweep that forbids a CARD binding a reserved name reads that
   -- one.
-  Effect.PreventNextDamage duration ref quantity rider ->
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration ref quantity rider) ->
     joinSlots
       [ durationSlots duration,
         objectRefSlots ref,
@@ -544,7 +546,7 @@ slotsAreExhaustive effect = case effect of
   Effect.DecreaseSpeed d -> Quantity.slotsAreExhaustive (SpeedDecrease.quantity d)
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
-  Effect.Create quantity _ _ _ -> Quantity.slotsAreExhaustive quantity
+  Effect.Create (Create.MkCreate quantity _ _ _) -> Quantity.slotsAreExhaustive quantity
   -- The ObjectRef is reported by slotsOf, so only the count can hide a slot.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.slotsAreExhaustive quantity
   -- The ReplacementEffect holds no Quantity and no reference, so slotsOf's two
@@ -552,7 +554,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Replace (Replace.MkReplace duration _ _ condition _) ->
     durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> True
-  Effect.PreventNextDamage duration _ quantity rider ->
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ quantity rider) ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
   Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationSlotsAreExhaustive duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationSlotsAreExhaustive duration
@@ -673,14 +675,14 @@ readsX = any effectReadsX
       Effect.RedistributeLifeTotals -> False
       Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.DecreaseSpeed d -> Quantity.readsX (SpeedDecrease.quantity d)
-      Effect.Create quantity _ _ _ -> Quantity.readsX quantity
+      Effect.Create (Create.MkCreate quantity _ _ _) -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too, an X-cost shield's rider being
       -- free to name the same X. No card in the pool does, but this half of the
       -- contract is a lint the rider must not slip past.
-      Effect.PreventNextDamage _ _ quantity rider -> Quantity.readsX quantity || readsX (Foldable.toList rider)
+      Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
       Effect.PreventAllDamage {} -> False
       Effect.RedirectDamage {} -> False
       Effect.Counter _ -> False
@@ -860,7 +862,7 @@ boundSlots effect = case effect of
   -- The token or tokens this Create minted, named so a later effect can refer
   -- back to them -- CR 603.7c's delayed trigger "that refers to a particular
   -- object" is the case that needs the name to survive the resolution.
-  Effect.Create _ _ _ mSlot -> foldMap Set.singleton mSlot
+  Effect.Create (Create.MkCreate _ _ _ mSlot) -> foldMap Set.singleton mSlot
   -- Binds nothing: no card in the pool names the token copy it minted.
   Effect.CreateCopy {} -> Set.empty
   -- CR 729.1b: the subgame's loser, derived rather than chosen.
@@ -908,7 +910,7 @@ boundSlots effect = case effect of
   -- The shield itself binds nothing; CR 615.5's rider is an effect list like any
   -- other, so a name IT authors is a name this card authors -- which is what
   -- keeps Pawl.CardSpec's reserved-name sweep over the rider.
-  Effect.PreventNextDamage _ _ _ rider -> foldMap boundSlots rider
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ rider) -> foldMap boundSlots rider
   Effect.PreventAllDamage {} -> Set.empty
   Effect.RedirectDamage {} -> Set.empty
   Effect.Counter _ -> Set.empty
@@ -3479,7 +3481,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           _ -> pure ()
       -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
       _ -> pure ()
-  Effect.Create quantity card entry mSlot -> do
+  Effect.Create (Create.MkCreate quantity card entry mSlot) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -3682,7 +3684,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                         ActiveReplacement.rider = Nothing
                       }
                in gs1 {GameState.replacements = active : GameState.replacements gs1}
-  Effect.PreventNextDamage duration ref quantity riderEffects -> do
+  Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration ref quantity riderEffects) -> do
     -- CR 615.3 / 615.7: install one floating prevention shield per recipient the
     -- ref names -- "Prevent the next 4 damage that would be dealt to any target
     -- this turn" (Mending Hands). Pawl.Engine.Replacement consults it at the damage

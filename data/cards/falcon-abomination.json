@@ -43,12 +43,8 @@
                     "effects": [
                       {
                         "type": "Create",
-                        "value": [
-                          {
-                            "type": "Literal",
-                            "value": 1
-                          },
-                          {
+                        "value": {
+                          "card": {
                             "faces": [
                               {
                                 "colorIndicator": [
@@ -84,8 +80,12 @@
                                 }
                               }
                             ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }

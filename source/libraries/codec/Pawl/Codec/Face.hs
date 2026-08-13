@@ -1,11 +1,11 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 -- | @Face@ is the entry point to the rest of @Pawl.Codec@: the transitive
--- closure of @Face@'s fields is one module per type, each exposing free
--- @toJson@\/@fromJson@ functions rather than a type class, and this module is
--- where they are instantiated at @Face@.
+-- closure of @Face@'s fields is one module per type, each exposing a 'Codec.Codec'
+-- bundle, and this module is where they are instantiated at @Face@.
 --
 -- Parametric in the card codec the way 'Pawl.Types.Face.Face' is parametric in
--- @card@: @Pawl.Codec.Card@ passes its own pair in, which is where the knot is
--- tied.
+-- @card@: @Pawl.Codec.Card@ passes its own in, which is where the knot is tied.
 --
 -- Every @Pawl.Types.*@ module stays JSON-free. Casing on an effect's identity
 -- anywhere under @Pawl.Codec@ is open-half machinery, not the rules core.
@@ -14,7 +14,7 @@ module Pawl.Codec.Face where
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
-import qualified Data.Text as Text
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.AlternativeCost as AlternativeCost
 import qualified Pawl.Codec.AttackCost as AttackCost
@@ -47,129 +47,89 @@ import qualified Pawl.Codec.Toughness as Toughness
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TypeLine as TypeLine
 import qualified Pawl.Codec.UntapRestriction as UntapRestriction
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
-import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.JsonCodec.Fields as Fields
+import qualified Pawl.Types.Counterability as Counterability.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.TypeLine as TypeLine
 
--- `Eq card` because six of the fields below carry card-shaped payloads and
--- 'Common.optionalPair' omits a key by comparing its value to the default.
-toJson :: (Eq card) => (card -> Value.Value) -> Face.Face card -> Value.Value
-toJson encodeCard f =
-  Value.object . concat $
-    [ Common.requiredPair "name" (Codec.encode CardName.codec) (Face.name f),
-      -- CR 205.1 puts a type line on every card and CR 114.3 gives an emblem no
-      -- types at all, so the key is optional and its absence means the latter --
-      -- see fromJson.
-      Common.optionalPair "typeLine" TypeLine.empty (Codec.encode TypeLine.codec) (Face.typeLine f),
-      Common.optionalPair "manaCost" Nothing (Common.encodeMaybe (Codec.encode ManaCost.codec)) (Face.manaCost f),
-      Common.optionalPair "power" Nothing (Common.encodeMaybe (Codec.encode Power.codec)) (Face.power f),
-      Common.optionalPair "toughness" Nothing (Common.encodeMaybe (Codec.encode Toughness.codec)) (Face.toughness f),
-      Common.optionalPair "loyalty" Nothing (Common.encodeMaybe (Codec.encode Loyalty.codec)) (Face.loyalty f),
-      Common.optionalPair "defense" Nothing (Common.encodeMaybe (Codec.encode Defense.codec)) (Face.defense f),
-      Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (Codec.encode Quantity.codec)) (Face.characteristicPT f),
-      Common.optionalPair "enchant" [] (Common.encodeList (Codec.encode TargetSlot.codec)) (Face.enchant f),
-      Common.optionalPair "keywords" Set.empty (Common.encodeSet (Codec.encode Keyword.codec)) (Face.keywords f),
-      Common.optionalPair "colorIndicator" Set.empty (Common.encodeSet (Codec.encode Color.codec)) (Face.colorIndicator f),
-      Common.optionalPair "spell" Face.defaultSpell (Modal.toJson encodeCard) (Face.spell f),
-      Common.optionalPair "staticAbilities" [] (Common.encodeList (Codec.encode StaticAbility.codec)) (Face.staticAbilities f),
-      Common.optionalPair "activatedAbilities" [] (Common.encodeList (ActivatedAbility.toJson encodeCard)) (Face.activatedAbilities f),
-      Common.optionalPair "replacementEffects" [] (Common.encodeList (Codec.encode ReplacementEffect.codec)) (Face.replacementEffects f),
-      Common.optionalPair "triggeredAbilities" [] (Common.encodeList (TriggeredAbility.toJson encodeCard)) (Face.triggeredAbilities f),
-      Common.optionalPair "delayedAbilities" Map.empty (TriggeredAbility.toJsonDelayed encodeCard) (Face.delayedAbilities f),
-      -- CR 309.4: the rooms of a dungeon card, topmost first.
-      Common.optionalPair "rooms" Seq.empty (Common.encodeSeq (DungeonRoom.toJson encodeCard)) (Face.rooms f),
-      Common.optionalPair "castingPermissions" [] (Common.encodeList (Codec.encode CastingPermission.codec)) (Face.castingPermissions f),
-      Common.optionalPair "castingRestrictions" [] (Common.encodeList (Codec.encode CastingRestriction.codec)) (Face.castingRestrictions f),
-      Common.optionalPair "playerAbilities" [] (Common.encodeList (Codec.encode PlayerStaticAbility.codec)) (Face.playerAbilities f),
-      Common.optionalPair "blockRequirements" [] (Common.encodeList (Codec.encode BlockRequirement.codec)) (Face.blockRequirements f),
-      Common.optionalPair "blockPermissions" [] (Common.encodeList (Codec.encode BlockPermission.codec)) (Face.blockPermissions f),
-      Common.optionalPair "attackRequirements" [] (Common.encodeList (Codec.encode AttackRequirement.codec)) (Face.attackRequirements f),
-      Common.optionalPair "combatRestrictions" [] (Common.encodeList (Codec.encode CombatRestriction.codec)) (Face.combatRestrictions f),
-      Common.optionalPair "sacrificeRestrictions" [] (Common.encodeList (Codec.encode SacrificeRestriction.codec)) (Face.sacrificeRestrictions f),
-      Common.optionalPair "untapRestrictions" [] (Common.encodeList (Codec.encode UntapRestriction.codec)) (Face.untapRestrictions f),
-      Common.optionalPair "attackCosts" [] (Common.encodeList (Codec.encode AttackCost.codec)) (Face.attackCosts f),
-      Common.optionalPair "additionalCosts" [] (Common.encodeList (Codec.encode (CostComponent.codec Keyword.codec))) (Face.additionalCosts f),
-      Common.optionalPair "alternativeCosts" [] (Common.encodeList (Codec.encode AlternativeCost.codec)) (Face.alternativeCosts f),
-      -- CR 103.5b / CR 103.6: an array of ACTIONS, each an array of effects, so a
-      -- face granting two of them is writable (Pawl.Types.Face).
-      Common.optionalPair "mulliganActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.mulliganActions f),
-      Common.optionalPair "openingHandActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.openingHandActions f),
-      -- CR 116.2: the special actions this face grants (Pawl.Types.Face).
-      Common.optionalPair "specialActions" [] (Common.encodeList (Codec.encode SpecialAction.codec)) (Face.specialActions f),
-      -- CR 113.6g: Counterable is the absence of a card stating it can't be
-      -- countered.
-      Common.optionalPair "counterability" Counterability.Counterable (Codec.encode Counterability.codec) (Face.counterability f)
-    ]
-
-fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Face.Face card)
-fromJson decodeCard value = do
-  ps <- Common.asObject value
-  name <- Common.field "name" ps >>= Codec.decode CardName.codec
-  -- CR 114.3: an emblem "has no characteristics other than the abilities defined
-  -- by the effect that created it. In particular, an emblem has no types" -- and
-  -- an emblem's face is authored as the payload of Effect.CreateEmblem, decoded
-  -- through this same codec. So an ABSENT key is CR 114.3's answer, while a key
-  -- that is present must still name a card type, which is Pawl.Codec.TypeLine's
-  -- own reading of CR 205.1. Which faces may leave it out is a question
-  -- about the corpus rather than about the wire, and Pawl.CardSpec's lint --
-  -- "only an emblem's face has no card type" -- is what asks it.
-  typeLine <- Common.defaultedField "typeLine" TypeLine.empty (Codec.decode TypeLine.codec) ps
-  manaCost <- Common.defaultedField "manaCost" Nothing (Common.decodeMaybe (Codec.decode ManaCost.codec)) ps
-  power <- Common.defaultedField "power" Nothing (Common.decodeMaybe (Codec.decode Power.codec)) ps
-  toughness <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe (Codec.decode Toughness.codec)) ps
-  loyalty <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe (Codec.decode Loyalty.codec)) ps
-  defense <- Common.defaultedField "defense" Nothing (Common.decodeMaybe (Codec.decode Defense.codec)) ps
-  keywords <- Common.defaultedField "keywords" Set.empty (Common.decodeSet (Codec.decode Keyword.codec)) ps
-  statics <- Common.defaultedField "staticAbilities" [] (Common.decodeList (Codec.decode StaticAbility.codec)) ps
-  spell <- Common.defaultedField "spell" Face.defaultSpell (Modal.fromJson decodeCard) ps
-  activated <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (ActivatedAbility.fromJson decodeCard)) ps
-  replacements <- Common.defaultedField "replacementEffects" [] (Common.decodeList (Codec.decode ReplacementEffect.codec)) ps
-  triggered <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (TriggeredAbility.fromJson decodeCard)) ps
-  permissions <- Common.defaultedField "castingPermissions" [] (Common.decodeList (Codec.decode CastingPermission.codec)) ps
-  restrictions <- Common.defaultedField "castingRestrictions" [] (Common.decodeList (Codec.decode CastingRestriction.codec)) ps
-  colorIndicator <- Common.defaultedField "colorIndicator" Set.empty (Common.decodeSet (Codec.decode Color.codec)) ps
-  characteristicPT <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe (Codec.decode Quantity.codec)) ps
-  delayed <- Common.defaultedField "delayedAbilities" Map.empty (TriggeredAbility.fromJsonDelayed decodeCard) ps
-  rooms <- Common.defaultedField "rooms" Seq.empty (Common.decodeSeq (DungeonRoom.fromJson decodeCard)) ps
-  playerAbilities <- Common.defaultedField "playerAbilities" [] (Common.decodeList (Codec.decode PlayerStaticAbility.codec)) ps
-  blockRequirements <- Common.defaultedField "blockRequirements" [] (Common.decodeList (Codec.decode BlockRequirement.codec)) ps
-  blockPermissions <- Common.defaultedField "blockPermissions" [] (Common.decodeList (Codec.decode BlockPermission.codec)) ps
-  attackRequirements <- Common.defaultedField "attackRequirements" [] (Common.decodeList (Codec.decode AttackRequirement.codec)) ps
-  combatRestrictions <- Common.defaultedField "combatRestrictions" [] (Common.decodeList (Codec.decode CombatRestriction.codec)) ps
-  sacrificeRestrictions <- Common.defaultedField "sacrificeRestrictions" [] (Common.decodeList (Codec.decode SacrificeRestriction.codec)) ps
-  untapRestrictions <- Common.defaultedField "untapRestrictions" [] (Common.decodeList (Codec.decode UntapRestriction.codec)) ps
-  attackCosts <- Common.defaultedField "attackCosts" [] (Common.decodeList (Codec.decode AttackCost.codec)) ps
-  additionalCosts <- Common.defaultedField "additionalCosts" [] (Common.decodeList (Codec.decode (CostComponent.codec Keyword.codec))) ps
-  alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList (Codec.decode AlternativeCost.codec)) ps
-  mulliganActions <- Common.defaultedField "mulliganActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
-  openingHandActions <- Common.defaultedField "openingHandActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
-  specialActions <- Common.defaultedField "specialActions" [] (Common.decodeList (Codec.decode SpecialAction.codec)) ps
-  enchant <- Common.defaultedField "enchant" [] (Common.decodeList (Codec.decode TargetSlot.codec)) ps
-  counterability <- Common.defaultedField "counterability" Counterability.Counterable (Codec.decode Counterability.codec) ps
+-- | @Eq card@ because several fields below carry card-shaped payloads and
+-- 'Fields.defaulted' omits a key by comparing its value to the default.
+--
+-- The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Face.Face card)
+codec cardCodec = Fields.object $ do
+  name <- Fields.required "name" CardName.codec Face.name
+  -- CR 205.1 puts a type line on every card and CR 114.3 gives an emblem no
+  -- types at all, so the key is optional and its absence means the latter: an
+  -- emblem's face is authored as the payload of Effect.CreateEmblem and decoded
+  -- through this same codec. A key that IS present must still name a card type,
+  -- which is Pawl.Codec.TypeLine's own reading of CR 205.1. Which faces may
+  -- leave it out is a question about the corpus rather than about the wire, and
+  -- Pawl.CardSpec's lint -- "only an emblem's face has no card type" -- asks it.
+  typeLine <- Fields.defaulted "typeLine" TypeLine.empty TypeLine.codec Face.typeLine
+  manaCost <- Fields.defaulted "manaCost" Nothing (Common.maybe ManaCost.codec) Face.manaCost
+  power <- Fields.defaulted "power" Nothing (Common.maybe Power.codec) Face.power
+  toughness <- Fields.defaulted "toughness" Nothing (Common.maybe Toughness.codec) Face.toughness
+  loyalty <- Fields.defaulted "loyalty" Nothing (Common.maybe Loyalty.codec) Face.loyalty
+  defense <- Fields.defaulted "defense" Nothing (Common.maybe Defense.codec) Face.defense
+  characteristicPT <- Fields.defaulted "characteristicPT" Nothing (Common.maybe Quantity.codec) Face.characteristicPT
+  enchant <- Fields.defaulted "enchant" [] (Common.list TargetSlot.codec) Face.enchant
+  keywords <- Fields.defaulted "keywords" Set.empty (Common.set Keyword.codec) Face.keywords
+  colorIndicator <- Fields.defaulted "colorIndicator" Set.empty (Common.set Color.codec) Face.colorIndicator
+  spell <- Fields.defaulted "spell" Face.defaultSpell (Modal.codec cardCodec) Face.spell
+  staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list StaticAbility.codec) Face.staticAbilities
+  activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec cardCodec)) Face.activatedAbilities
+  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list ReplacementEffect.codec) Face.replacementEffects
+  triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec cardCodec)) Face.triggeredAbilities
+  delayedAbilities <- Fields.defaulted "delayedAbilities" Map.empty (TriggeredAbility.codecDelayed cardCodec) Face.delayedAbilities
+  -- CR 309.4: the rooms of a dungeon card, topmost first.
+  rooms <- Fields.defaulted "rooms" Seq.empty (Common.seq (DungeonRoom.codec cardCodec)) Face.rooms
+  castingPermissions <- Fields.defaulted "castingPermissions" [] (Common.list CastingPermission.codec) Face.castingPermissions
+  castingRestrictions <- Fields.defaulted "castingRestrictions" [] (Common.list CastingRestriction.codec) Face.castingRestrictions
+  playerAbilities <- Fields.defaulted "playerAbilities" [] (Common.list PlayerStaticAbility.codec) Face.playerAbilities
+  blockRequirements <- Fields.defaulted "blockRequirements" [] (Common.list BlockRequirement.codec) Face.blockRequirements
+  blockPermissions <- Fields.defaulted "blockPermissions" [] (Common.list BlockPermission.codec) Face.blockPermissions
+  attackRequirements <- Fields.defaulted "attackRequirements" [] (Common.list AttackRequirement.codec) Face.attackRequirements
+  combatRestrictions <- Fields.defaulted "combatRestrictions" [] (Common.list CombatRestriction.codec) Face.combatRestrictions
+  sacrificeRestrictions <- Fields.defaulted "sacrificeRestrictions" [] (Common.list SacrificeRestriction.codec) Face.sacrificeRestrictions
+  untapRestrictions <- Fields.defaulted "untapRestrictions" [] (Common.list UntapRestriction.codec) Face.untapRestrictions
+  attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
+  additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
+  alternativeCosts <- Fields.defaulted "alternativeCosts" [] (Common.list AlternativeCost.codec) Face.alternativeCosts
+  -- CR 103.5b / CR 103.6: an array of ACTIONS, each an array of effects, so a
+  -- face granting two of them is writable (Pawl.Types.Face).
+  mulliganActions <- Fields.defaulted "mulliganActions" [] (Common.list (Common.list (Effect.codec cardCodec))) Face.mulliganActions
+  openingHandActions <- Fields.defaulted "openingHandActions" [] (Common.list (Common.list (Effect.codec cardCodec))) Face.openingHandActions
+  -- CR 116.2: the special actions this face grants (Pawl.Types.Face).
+  specialActions <- Fields.defaulted "specialActions" [] (Common.list SpecialAction.codec) Face.specialActions
+  -- CR 113.6g: Counterable is the absence of a card stating it can't be
+  -- countered.
+  counterability <- Fields.defaulted "counterability" Counterability.Type.Counterable Counterability.codec Face.counterability
   pure
     Face.MkFace
       { Face.name = name,
-        Face.manaCost = manaCost,
         Face.typeLine = typeLine,
+        Face.manaCost = manaCost,
         Face.power = power,
         Face.toughness = toughness,
         Face.loyalty = loyalty,
         Face.defense = defense,
-        Face.keywords = keywords,
-        Face.staticAbilities = statics,
-        Face.spell = spell,
-        Face.activatedAbilities = activated,
-        Face.replacementEffects = replacements,
-        Face.triggeredAbilities = triggered,
-        Face.castingPermissions = permissions,
-        Face.castingRestrictions = restrictions,
-        Face.colorIndicator = colorIndicator,
         Face.characteristicPT = characteristicPT,
-        Face.delayedAbilities = delayed,
+        Face.enchant = enchant,
+        Face.keywords = keywords,
+        Face.colorIndicator = colorIndicator,
+        Face.spell = spell,
+        Face.staticAbilities = staticAbilities,
+        Face.activatedAbilities = activatedAbilities,
+        Face.replacementEffects = replacementEffects,
+        Face.triggeredAbilities = triggeredAbilities,
+        Face.delayedAbilities = delayedAbilities,
         Face.rooms = rooms,
+        Face.castingPermissions = castingPermissions,
+        Face.castingRestrictions = castingRestrictions,
         Face.playerAbilities = playerAbilities,
         Face.blockRequirements = blockRequirements,
         Face.blockPermissions = blockPermissions,
@@ -183,6 +143,5 @@ fromJson decodeCard value = do
         Face.mulliganActions = mulliganActions,
         Face.openingHandActions = openingHandActions,
         Face.specialActions = specialActions,
-        Face.enchant = enchant,
         Face.counterability = counterability
       }

@@ -24,19 +24,19 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSlot as TargetSlot
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout.
--- 'Modal.toJson'/'Modal.fromJson' reach it only through the supplied Mode
+-- 'Modal.codec' reach it only through the supplied Mode
 -- codec, so any type proves the shape.
-cardToJson :: Text.Text -> Value.Value
-cardToJson = Value.text
+cardCodec :: Codec.Codec Text.Text
+cardCodec = Common.text
 
-cardFromJson :: Value.Value -> Either Text.Text Text.Text
-cardFromJson = Common.asText
+codec :: Codec.Codec (Modal.Modal Text.Text)
+codec = Modal.codec cardCodec
 
 toJson :: Modal.Modal Text.Text -> Value.Value
-toJson = Modal.toJson cardToJson
+toJson = Codec.encode codec
 
 fromJson :: Value.Value -> Either Text.Text (Modal.Modal Text.Text)
-fromJson = Modal.fromJson cardFromJson
+fromJson = Codec.decode codec
 
 -- One constructor, so three cases: a populated payload in CR 700.2's non-modal
 -- shape, the `selection` field defaulted (the only omissible one -- `modes` is

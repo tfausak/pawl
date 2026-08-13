@@ -25,19 +25,19 @@
                 "effects": [
                   {
                     "type": "PreventNextDamage",
-                    "value": [
-                      {
+                    "value": {
+                      "duration": {
                         "type": "UntilEndOfTurn"
                       },
-                      {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
+                      "quantity": {
                         "type": "Literal",
                         "value": 3
                       },
-                      [
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      "riders": [
                         {
                           "type": "PutCounters",
                           "value": {
@@ -55,7 +55,7 @@
                           }
                         }
                       ]
-                    ]
+                    }
                   }
                 ]
               }

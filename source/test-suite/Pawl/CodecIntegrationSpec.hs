@@ -104,13 +104,13 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   -- coverage, including the empty-modes decode failure, lives in
   -- Pawl.Codec.ModalSpec.
   Spec.describe s "honesty round-trip over allPrintings" $ do
-    Spec.it s "P1: Printing.Codec.fromJson . Printing.Codec.toJson == Right" $ do
+    Spec.it s "P1: Codec.decode Printing.Codec.codec . Codec.encode Printing.Codec.codec == Right" $ do
       ps <- S.allPrintings s
-      mapM_ (\p -> Spec.assertEqWith s (show (Face.name (S.combinedFace p))) (Printing.Codec.fromJson (Printing.Codec.toJson p)) (Right p)) ps
+      mapM_ (\p -> Spec.assertEqWith s (show (Face.name (S.combinedFace p))) (Codec.decode Printing.Codec.codec (Codec.encode Printing.Codec.codec p)) (Right p)) ps
     Spec.it s "P2: through text" $ do
       ps <- S.allPrintings s
       mapM_
-        (\p -> Spec.assertEqWith s (show (Face.name (S.combinedFace p))) (Common.parse (Common.render (Printing.Codec.toJson p)) >>= Printing.Codec.fromJson) (Right p))
+        (\p -> Spec.assertEqWith s (show (Face.name (S.combinedFace p))) (Common.parse (Common.render (Codec.encode Printing.Codec.codec p)) >>= Codec.decode Printing.Codec.codec) (Right p))
         ps
     Spec.it s "M4e Cancel loads as a single Counter effect targeting a spell" $ do
       cancel <- S.printingOf s registry "Cancel"

@@ -7,6 +7,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Mode as Mode
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Clause as Clause
@@ -20,19 +21,19 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSlot as TargetSlot
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout.
--- 'Mode.toJson'/'Mode.fromJson' reach it only through the supplied Effect
+-- 'Mode.codec' reach it only through the supplied Effect
 -- codec, so any type proves the shape.
-cardToJson :: Text.Text -> Value.Value
-cardToJson = Value.text
+cardCodec :: Codec.Codec Text.Text
+cardCodec = Common.text
 
-cardFromJson :: Value.Value -> Either Text.Text Text.Text
-cardFromJson = Common.asText
+codec :: Codec.Codec (Mode.Mode Text.Text)
+codec = Mode.codec cardCodec
 
 toJson :: Mode.Mode Text.Text -> Value.Value
-toJson = Mode.toJson cardToJson
+toJson = Codec.encode codec
 
 fromJson :: Value.Value -> Either Text.Text (Mode.Mode Text.Text)
-fromJson = Mode.fromJson cardFromJson
+fromJson = Codec.decode codec
 
 -- One constructor and two fields, so two cases: a populated mode, and the empty
 -- one whose every key is omitted. The resolution-time riders belong to

@@ -36,9 +36,9 @@ toJson pc =
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (\(p, t) -> Value.array [Codec.encode Quantity.codec p, Codec.encode Quantity.codec t])) (PC.characteristicPT pc),
       Common.requiredPair "cardTypes" (Common.encodeSet (Codec.encode CardType.codec)) (PC.cardTypes pc),
       Common.optionalPair "subtypes" Set.empty (Common.encodeSet (Codec.encode Subtype.codec)) (PC.subtypes pc),
-      Common.optionalPair "activatedAbilities" [] (Common.encodeList (ActivatedAbility.toJson Card.toJson)) (PC.activatedAbilities pc),
+      Common.optionalPair "activatedAbilities" [] (Common.encodeList (Codec.encode (ActivatedAbility.codec Card.codec))) (PC.activatedAbilities pc),
       Common.optionalPair "replacementEffects" [] (Common.encodeList (Codec.encode ReplacementEffect.codec)) (PC.replacementEffects pc),
-      Common.optionalPair "triggeredAbilities" [] (Common.encodeList (TriggeredAbility.toJson Card.toJson)) (PC.triggeredAbilities pc)
+      Common.optionalPair "triggeredAbilities" [] (Common.encodeList (Codec.encode (TriggeredAbility.codec Card.codec))) (PC.triggeredAbilities pc)
     ]
 
 fromJson :: Value.Value -> Either Text.Text PC.ProjectedCharacteristics
@@ -56,9 +56,9 @@ fromJson value = do
   cda <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe (Codec.decode Quantity.pairCodec)) ps
   cts <- Common.field "cardTypes" ps >>= Common.decodeSet (Codec.decode CardType.codec)
   subs <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet (Codec.decode Subtype.codec)) ps
-  acts <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (ActivatedAbility.fromJson Card.fromJson)) ps
+  acts <- Common.defaultedField "activatedAbilities" [] (Common.decodeList (Codec.decode (ActivatedAbility.codec Card.codec))) ps
   reps <- Common.defaultedField "replacementEffects" [] (Common.decodeList (Codec.decode ReplacementEffect.codec)) ps
-  trigs <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (TriggeredAbility.fromJson Card.fromJson)) ps
+  trigs <- Common.defaultedField "triggeredAbilities" [] (Common.decodeList (Codec.decode (TriggeredAbility.codec Card.codec))) ps
   pure
     PC.MkProjectedCharacteristics
       { PC.names = nms,

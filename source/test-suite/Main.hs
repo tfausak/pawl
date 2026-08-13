@@ -53,6 +53,7 @@ import qualified Pawl.Codec.CounterPatternSpec
 import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.CreateCopySpec
+import qualified Pawl.Codec.CreateSpec
 import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
@@ -131,6 +132,7 @@ import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PlayerStaticAbilitySpec
 import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.PowerSpec
+import qualified Pawl.Codec.PreventNextDamageSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.PutCountersSpec
@@ -371,6 +373,7 @@ spec s registry = do
   Pawl.Codec.CounterabilitySpec.spec s
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
+  Pawl.Codec.CreateSpec.spec s
   Pawl.Codec.DamageEventSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
@@ -449,6 +452,7 @@ spec s registry = do
   Pawl.Codec.PlayerStaticAbilitySpec.spec s
   Pawl.Codec.PoolSpec.spec s
   Pawl.Codec.PowerSpec.spec s
+  Pawl.Codec.PreventNextDamageSpec.spec s
   Pawl.Codec.PrintingSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s

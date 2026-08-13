@@ -10,6 +10,7 @@ import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
@@ -28,6 +29,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
@@ -71,6 +73,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
@@ -94,19 +97,32 @@ import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout (and at
--- 'Int' in the parametricity case). 'Effect.toJson'/'Effect.fromJson' reach it
--- only through the supplied codec, so any type proves the shape.
-cardToJson :: Text.Text -> Value.Value
-cardToJson = Value.text
+-- 'Int' in the parametricity case). 'Effect.codec' reaches it only through the
+-- supplied codec, so any type proves the shape.
+cardCodec :: Codec.Codec Text.Text
+cardCodec = Common.text
 
-cardFromJson :: Value.Value -> Either Text.Text Text.Text
-cardFromJson = Common.asText
+codec :: Codec.Codec (Effect.Effect Text.Text)
+codec = Effect.codec cardCodec
 
 toJson :: Effect.Effect Text.Text -> Value.Value
-toJson = Effect.toJson cardToJson
+toJson = Codec.encode codec
 
 fromJson :: Value.Value -> Either Text.Text (Effect.Effect Text.Text)
-fromJson = Effect.fromJson cardFromJson
+fromJson = Codec.decode codec
+
+-- | A card codec that ignores its argument, at whatever type the use site
+-- demands. Only its encoder is exercised: the parametricity case below asks
+-- whether the payload comes from THIS codec rather than from the constructor.
+constCodec :: Value.Value -> Codec.Codec a
+constCodec v =
+  Codec.MkCodec
+    { Codec.encode = const v,
+      Codec.decode = const (Left (Text.pack "constCodec does not decode")),
+      -- Borrowed rather than built: naming a Schema here would make this spec
+      -- depend on pawl:json-schema, which nothing else under Pawl.Codec does.
+      Codec.schema = Codec.schema Common.text
+    }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Effect" $ do
@@ -507,26 +523,26 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Create (Quantity.Literal 2) card plain Nothing)
-      """ {"type":"Create","value":[{"type":"Literal","value":2},"Goblin Piker"]} """
+      (Effect.Create (Create.MkCreate (Quantity.Literal 2) card plain Nothing))
+      """ {"type":"Create","value":{"quantity":{"type":"Literal","value":2},"card":"Goblin Piker"}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Create (Quantity.Literal 1) card plain (Just slot))
-      """ {"type":"Create","value":[{"type":"Literal","value":1},"Goblin Piker","token"]} """
+      (Effect.Create (Create.MkCreate (Quantity.Literal 1) card plain (Just slot)))
+      """ {"type":"Create","value":{"quantity":{"type":"Literal","value":1},"card":"Goblin Piker","slot":"token"}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Create (Quantity.Literal 2) card attacking Nothing)
-      """ {"type":"Create","value":[{"type":"Literal","value":2},"Goblin Piker",{"tapped":{"type":"Tapped"},"attacking":true}]} """
+      (Effect.Create (Create.MkCreate (Quantity.Literal 2) card attacking Nothing))
+      """ {"type":"Create","value":{"quantity":{"type":"Literal","value":2},"card":"Goblin Piker","riders":{"tapped":{"type":"Tapped"},"attacking":true}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.Create (Quantity.Literal 1) card attacking (Just slot))
-      """ {"type":"Create","value":[{"type":"Literal","value":1},"Goblin Piker",{"tapped":{"type":"Tapped"},"attacking":true},"token"]} """
+      (Effect.Create (Create.MkCreate (Quantity.Literal 1) card attacking (Just slot)))
+      """ {"type":"Create","value":{"quantity":{"type":"Literal","value":1},"card":"Goblin Piker","riders":{"tapped":{"type":"Tapped"},"attacking":true},"slot":"token"}} """
   -- Both ObjectRef arms have to survive. A count of one is elided, so both of
   -- these write the ref alone.
   Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do
@@ -606,8 +622,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4) Seq.empty)
-      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"target"},{"type":"Literal","value":4}]} """
+      (Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4) Seq.empty))
+      """ {"type":"PreventNextDamage","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":4}}} """
   -- CR 615.5's additional effect, the fourth element (Test of Faith). Elided
   -- above, where it is empty; nested here, so the recursion into an effect
   -- inside an effect is round-tripped.
@@ -617,12 +633,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       toJson
       fromJson
       ( Effect.PreventNextDamage
-          Duration.UntilEndOfTurn
-          (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
-          (Quantity.Literal 3)
-          (Seq.singleton (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))))
+          PreventNextDamage.MkPreventNextDamage
+            { PreventNextDamage.duration = Duration.UntilEndOfTurn,
+              PreventNextDamage.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")),
+              PreventNextDamage.quantity = Quantity.Literal 3,
+              PreventNextDamage.riders =
+                Seq.singleton (Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
+            }
       )
-      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},{"type":"InSlot","value":"target"},{"type":"Literal","value":3},[{"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"InSlot","value":"thatMuch"},"ref":{"type":"InSlot","value":"target"}}}]]} """
+      """ {"type":"PreventNextDamage","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3},"riders":[{"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"InSlot","value":"thatMuch"},"ref":{"type":"InSlot","value":"target"}}}]}} """
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
   Spec.it s "PreventAllDamage" $
     Common.assertJsonCodec
@@ -959,8 +978,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     Spec.assertEqWith
       s
       "the emblem payload comes from the argument, not the card"
-      (Effect.toJson (const sentinel) (Effect.CreateEmblem (Text.pack "a wholly different card type")))
-      (Effect.toJson (const sentinel) (Effect.CreateEmblem (0 :: Int)))
+      (Codec.encode (Effect.codec (constCodec sentinel)) (Effect.CreateEmblem (Text.pack "a wholly different card type")))
+      (Codec.encode (Effect.codec (constCodec sentinel)) (Effect.CreateEmblem (0 :: Int)))
   Spec.it s "BecomeMonarch" $
     Common.assertJsonCodec
       s

@@ -52,8 +52,40 @@
                     "effects": [
                       {
                         "type": "Create",
-                        "value": [
-                          {
+                        "value": {
+                          "card": {
+                            "faces": [
+                              {
+                                "colorIndicator": [
+                                  {
+                                    "type": "Black"
+                                  }
+                                ],
+                                "name": "Zombie Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Zombie"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "quantity": {
                             "type": "Count",
                             "value": {
                               "aggregation": {
@@ -97,40 +129,8 @@
                                 }
                               }
                             }
-                          },
-                          {
-                            "faces": [
-                              {
-                                "colorIndicator": [
-                                  {
-                                    "type": "Black"
-                                  }
-                                ],
-                                "name": "Zombie Token",
-                                "power": {
-                                  "type": "Literal",
-                                  "value": 2
-                                },
-                                "toughness": {
-                                  "type": "Literal",
-                                  "value": 2
-                                },
-                                "typeLine": {
-                                  "subtypes": [
-                                    {
-                                      "type": "Zombie"
-                                    }
-                                  ],
-                                  "types": [
-                                    {
-                                      "type": "Creature"
-                                    }
-                                  ]
-                                }
-                              }
-                            ]
                           }
-                        ]
+                        }
                       }
                     ]
                   }

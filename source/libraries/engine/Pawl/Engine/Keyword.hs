@@ -40,6 +40,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Duration as Duration
@@ -2491,16 +2492,19 @@ afterlife n =
   where
     spawn =
       Effect.Create
-        (Quantity.Literal (toInteger n))
-        spiritToken
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = False,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.empty,
-            EntryRiders.underOwner = False
+        Create.MkCreate
+          { Create.quantity = Quantity.Literal (toInteger n),
+            Create.card = spiritToken,
+            Create.riders =
+              EntryRiders.MkEntryRiders
+                { EntryRiders.tapped = TapState.Untapped,
+                  EntryRiders.attacking = False,
+                  EntryRiders.transformed = False,
+                  EntryRiders.counters = Map.empty,
+                  EntryRiders.underOwner = False
+                },
+            Create.slot = Nothing
           }
-        Nothing
 
 -- | CR 702.135a's token: 1/1 white and black Spirit creature with flying. Rule
 -- 702.135a names no name, so CR 111.4 supplies one -- "its subtype(s) plus the
@@ -2605,16 +2609,19 @@ fabricate n =
         }
     spawn =
       Effect.Create
-        (Quantity.Literal (toInteger n))
-        servoToken
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = False,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.empty,
-            EntryRiders.underOwner = False
+        Create.MkCreate
+          { Create.quantity = Quantity.Literal (toInteger n),
+            Create.card = servoToken,
+            Create.riders =
+              EntryRiders.MkEntryRiders
+                { EntryRiders.tapped = TapState.Untapped,
+                  EntryRiders.attacking = False,
+                  EntryRiders.transformed = False,
+                  EntryRiders.counters = Map.empty,
+                  EntryRiders.underOwner = False
+                },
+            Create.slot = Nothing
           }
-        Nothing
 
 -- | CR 702.123a's token: 1/1 colorless Servo artifact creature. Colorless is the
 -- ABSENCE of a colorIndicator (CR 105.2, CR 202.2e) rather than a colour, which

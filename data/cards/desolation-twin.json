@@ -29,12 +29,8 @@
                     "effects": [
                       {
                         "type": "Create",
-                        "value": [
-                          {
-                            "type": "Literal",
-                            "value": 1
-                          },
-                          {
+                        "value": {
+                          "card": {
                             "faces": [
                               {
                                 "name": "Eldrazi Token",
@@ -60,8 +56,12 @@
                                 }
                               }
                             ]
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
                           }
-                        ]
+                        }
                       }
                     ]
                   }

@@ -25,29 +25,8 @@
                 "effects": [
                   {
                     "type": "Create",
-                    "value": [
-                      {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Members"
-                          },
-                          "filter": {
-                            "type": "And",
-                            "value": []
-                          },
-                          "scope": {
-                            "type": "OverPlayers",
-                            "value": {
-                              "type": "Relative",
-                              "value": {
-                                "type": "Opponent"
-                              }
-                            }
-                          }
-                        }
-                      },
-                      {
+                    "value": {
+                      "card": {
                         "faces": [
                           {
                             "colorIndicator": [
@@ -86,8 +65,29 @@
                             }
                           }
                         ]
+                      },
+                      "quantity": {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Members"
+                          },
+                          "filter": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "scope": {
+                            "type": "OverPlayers",
+                            "value": {
+                              "type": "Relative",
+                              "value": {
+                                "type": "Opponent"
+                              }
+                            }
+                          }
+                        }
                       }
-                    ]
+                    }
                   }
                 ]
               }

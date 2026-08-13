@@ -5,6 +5,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Codec.Printing as Printing
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -42,4 +43,4 @@ checkFile s root p = do
           -- pretty-printed (`jq -S .`) while Common.render emits compact output, so
           -- this can never quietly regress into a byte comparison: every file would
           -- fail at once.
-          Spec.assertEqWith s path (Common.sortKeys (Printing.toJson p)) (Common.sortKeys value)
+          Spec.assertEqWith s path (Common.sortKeys (Codec.encode Printing.codec p)) (Common.sortKeys value)
