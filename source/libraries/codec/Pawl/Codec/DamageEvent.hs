@@ -14,7 +14,7 @@ toJson :: DamageEvent.DamageEvent -> Value.Value
 toJson ev =
   Value.object
     ( Common.requiredPair "source" (Codec.encode ObjectId.codec) (DamageEvent.source ev)
-        <> Common.requiredPair "target" Recipient.toJson (DamageEvent.target ev)
+        <> Common.requiredPair "target" (Codec.encode Recipient.codec) (DamageEvent.target ev)
         <> Common.requiredPair "amount" Common.encodeNatural (DamageEvent.amount ev)
         <> Common.optionalPair "dealtByDeathtouch" False Value.boolean (DamageEvent.dealtByDeathtouch ev)
         <> Common.optionalPair "dealtByInfect" False Value.boolean (DamageEvent.dealtByInfect ev)
@@ -30,7 +30,7 @@ fromJson :: Value.Value -> Either Text.Text DamageEvent.DamageEvent
 fromJson value = do
   ps <- Common.asObject value
   s <- Common.field "source" ps >>= Codec.decode ObjectId.codec
-  t <- Common.field "target" ps >>= Recipient.fromJson
+  t <- Common.field "target" ps >>= Codec.decode Recipient.codec
   a <- Common.field "amount" ps >>= Common.decodeNatural
   d <- Common.defaultedField "dealtByDeathtouch" False Common.asBoolean ps
   i <- Common.defaultedField "dealtByInfect" False Common.asBoolean ps

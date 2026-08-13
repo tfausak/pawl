@@ -1,13 +1,14 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.CounterPattern where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.ControllerRelation as ControllerRelation
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterPattern as CounterPattern
 
@@ -16,29 +17,18 @@ import qualified Pawl.Types.CounterPattern as CounterPattern
 defaultWhose :: ControllerRelation.ControllerRelation
 defaultWhose = ControllerRelation.Anyones
 
-toJson :: CounterPattern.CounterPattern -> Value.Value
-toJson p =
-  Value.object
-    ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (Codec.encode (CounterKind.codec Keyword.codec))) (CounterPattern.whichKind p)
-        <> Common.optionalPair "byWhom" Nothing (Common.encodeMaybe (Codec.encode ControllerRelation.codec)) (CounterPattern.byWhom p)
-        <> Common.optionalPair "whose" defaultWhose (Codec.encode ControllerRelation.codec) (CounterPattern.whose p)
-        <> Common.requiredPair "onWhat" (Codec.encode (Filter.codec Keyword.codec)) (CounterPattern.onWhat p)
-        <> Common.optionalPair "onWho" Nothing (Common.encodeMaybe (Codec.encode ControllerRelation.codec)) (CounterPattern.onWho p)
-    )
-
-fromJson :: Value.Value -> Either Text.Text CounterPattern.CounterPattern
-fromJson value = do
-  ps <- Common.asObject value
-  k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe (Codec.decode (CounterKind.codec Keyword.codec))) ps
-  b <- Common.defaultedField "byWhom" Nothing (Common.decodeMaybe (Codec.decode ControllerRelation.codec)) ps
-  w <- Common.defaultedField "whose" defaultWhose (Codec.decode ControllerRelation.codec) ps
-  o <- Common.field "onWhat" ps >>= Codec.decode (Filter.codec Keyword.codec)
-  p <- Common.defaultedField "onWho" Nothing (Common.decodeMaybe (Codec.decode ControllerRelation.codec)) ps
+codec :: Codec.Codec CounterPattern.CounterPattern
+codec = Fields.object $ do
+  whichKind <- Fields.defaulted "whichKind" Nothing (Common.maybe (CounterKind.codec Keyword.codec)) CounterPattern.whichKind
+  byWhom <- Fields.defaulted "byWhom" Nothing (Common.maybe ControllerRelation.codec) CounterPattern.byWhom
+  whose <- Fields.defaulted "whose" defaultWhose ControllerRelation.codec CounterPattern.whose
+  onWhat <- Fields.required "onWhat" (Filter.codec Keyword.codec) CounterPattern.onWhat
+  onWho <- Fields.defaulted "onWho" Nothing (Common.maybe ControllerRelation.codec) CounterPattern.onWho
   pure
     CounterPattern.MkCounterPattern
-      { CounterPattern.whichKind = k,
-        CounterPattern.byWhom = b,
-        CounterPattern.whose = w,
-        CounterPattern.onWhat = o,
-        CounterPattern.onWho = p
+      { CounterPattern.whichKind = whichKind,
+        CounterPattern.byWhom = byWhom,
+        CounterPattern.whose = whose,
+        CounterPattern.onWhat = onWhat,
+        CounterPattern.onWho = onWho
       }

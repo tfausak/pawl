@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.MoveToZone where
 
 import qualified Pawl.Codec.EntryRiders as EntryRiders
@@ -22,12 +24,19 @@ import qualified Pawl.Types.MoveToZone as MoveToZone
 -- need none of it: absence is absence, and two objects that are both objects no
 -- longer have to be told apart.
 codec :: Codec.Codec MoveToZone.MoveToZone
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  ref <- Fields.required "ref" ObjectRef.codec MoveToZone.ref
+  zone <- Fields.required "zone" Zone.codec MoveToZone.zone
+  riders <- Fields.defaulted "riders" EntryRiders.defaultValue EntryRiders.codec MoveToZone.riders
+  slot <- Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) MoveToZone.slot
+  origin <- Fields.defaulted "origin" Nothing (Common.maybe Zone.codec) MoveToZone.origin
+  placement <- Fields.defaulted "placement" LibraryPlacement.defaultValue LibraryPlacement.codec MoveToZone.placement
+  pure
     MoveToZone.MkMoveToZone
-      <$> Fields.required "ref" ObjectRef.codec MoveToZone.ref
-      <*> Fields.required "zone" Zone.codec MoveToZone.zone
-      <*> Fields.defaulted "riders" EntryRiders.defaultValue EntryRiders.codec MoveToZone.riders
-      <*> Fields.defaulted "slot" Nothing (Common.maybe SlotName.codec) MoveToZone.slot
-      <*> Fields.defaulted "origin" Nothing (Common.maybe Zone.codec) MoveToZone.origin
-      <*> Fields.defaulted "placement" LibraryPlacement.defaultValue LibraryPlacement.codec MoveToZone.placement
+      { MoveToZone.ref = ref,
+        MoveToZone.zone = zone,
+        MoveToZone.riders = riders,
+        MoveToZone.slot = slot,
+        MoveToZone.origin = origin,
+        MoveToZone.placement = placement
+      }

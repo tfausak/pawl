@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.MillTally where
 
 import qualified Pawl.Codec.Filter as Filter
@@ -11,8 +13,11 @@ import qualified Pawl.Types.MillTally as MillTally
 -- single-constructor record in this codec writes. Pawl.Codec.Mill is the only
 -- caller, and it is what says the value is a mill's tally.
 codec :: Codec.Codec MillTally.MillTally
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  slot <- Fields.required "slot" SlotName.codec MillTally.slot
+  filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) MillTally.filter
+  pure
     MillTally.MkMillTally
-      <$> Fields.required "slot" SlotName.codec MillTally.slot
-      <*> Fields.required "filter" (Filter.codec Keyword.codec) MillTally.filter
+      { MillTally.slot = slot,
+        MillTally.filter = filter_
+      }

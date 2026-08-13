@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.TargetSpec where
 
 import qualified Data.Map.Strict as Map
@@ -20,12 +22,16 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- "target creature" renders as it always did and only CR 601.2c's variable
 -- counts spend a key.
 codec :: Codec.Codec TargetSpec.TargetSpec
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  pool <- Fields.required "pool" Pool.codec TargetSpec.pool
+  filter_ <- Fields.defaulted "filter" Nothing (Common.maybe (Filter.codec Keyword.codec)) TargetSpec.filter
+  count <- Fields.defaulted "count" TargetCount.one TargetCount.codec TargetSpec.count
+  pure
     TargetSpec.MkTargetSpec
-      <$> Fields.required "pool" Pool.codec TargetSpec.pool
-      <*> Fields.defaulted "filter" Nothing (Common.maybe (Filter.codec Keyword.codec)) TargetSpec.filter
-      <*> Fields.defaulted "count" TargetCount.one TargetCount.codec TargetSpec.count
+      { TargetSpec.pool = pool,
+        TargetSpec.filter = filter_,
+        TargetSpec.count = count
+      }
 
 -- | A slot-keyed map as a JSON object keyed by the slot name (#1303).
 codecMap :: Codec.Codec (Map.Map SlotName.SlotName TargetSpec.TargetSpec)

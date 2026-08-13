@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.Count where
 
 import qualified Data.Typeable as Typeable
@@ -16,9 +18,13 @@ import qualified Pawl.Types.Count as Count
 --
 -- Parametric for 'Pawl.Codec.Aggregation''s reason, and converts with it.
 codec :: (Typeable.Typeable q) => Codec.Codec q -> Codec.Codec (Count.Count q)
-codec quantityCodec =
-  Fields.object $
+codec quantityCodec = Fields.object $ do
+  scope <- Fields.required "scope" Scope.codec Count.scope
+  filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) Count.filter
+  aggregation <- Fields.required "aggregation" (Aggregation.codec quantityCodec) Count.aggregation
+  pure
     Count.MkCount
-      <$> Fields.required "scope" Scope.codec Count.scope
-      <*> Fields.required "filter" (Filter.codec Keyword.codec) Count.filter
-      <*> Fields.required "aggregation" (Aggregation.codec quantityCodec) Count.aggregation
+      { Count.scope = scope,
+        Count.filter = filter_,
+        Count.aggregation = aggregation
+      }

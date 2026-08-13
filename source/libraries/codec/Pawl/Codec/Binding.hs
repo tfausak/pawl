@@ -17,7 +17,7 @@ import qualified Pawl.Types.SlotName as SlotName
 toJson :: Binding.Binding -> Value.Value
 toJson b =
   Value.object . concat $
-    [ Common.optionalPair "targets" Nothing (Common.encodeMaybe (Common.encodeSet Recipient.toJson)) (Binding.targets b),
+    [ Common.optionalPair "targets" Nothing (Common.encodeMaybe (Common.encodeSet (Codec.encode Recipient.codec))) (Binding.targets b),
       Common.optionalPair "amount" Nothing (Common.encodeMaybe Common.encodeNatural) (Binding.amount b),
       Common.optionalPair "modes" Nothing (Common.encodeMaybe (Common.encodeSeq (Codec.encode ModeIndex.codec))) (Binding.modes b),
       Common.optionalPair "copy" Nothing (Common.encodeMaybe ProjectedCharacteristics.toJson) (Binding.copy b),
@@ -27,7 +27,7 @@ toJson b =
 fromJson :: Value.Value -> Either Text.Text Binding.Binding
 fromJson value = do
   ps <- Common.asObject value
-  t <- Common.defaultedField "targets" Nothing (Common.decodeMaybe (Common.decodeSet Recipient.fromJson)) ps
+  t <- Common.defaultedField "targets" Nothing (Common.decodeMaybe (Common.decodeSet (Codec.decode Recipient.codec))) ps
   a <- Common.defaultedField "amount" Nothing (Common.decodeMaybe Common.decodeNatural) ps
   m <- Common.defaultedField "modes" Nothing (Common.decodeMaybe (Common.decodeSeq (Codec.decode ModeIndex.codec))) ps
   c <- Common.defaultedField "copy" Nothing (Common.decodeMaybe ProjectedCharacteristics.fromJson) ps

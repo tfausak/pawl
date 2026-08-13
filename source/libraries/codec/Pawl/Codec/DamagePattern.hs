@@ -1,13 +1,14 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.DamagePattern where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Recipient as Recipient
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -24,23 +25,14 @@ defaultWhatSource = Filter.And []
 -- this codec is structural over the record and so accepts one from card JSON.
 -- A corpus lint keeps the pool honest instead, as for PhasePattern's
 -- `whosePhase`.
-toJson :: DamagePattern.DamagePattern -> Value.Value
-toJson p =
-  Value.object
-    ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (Codec.encode DamageKind.codec)) (DamagePattern.whichKind p)
-        <> Common.optionalPair "whatSource" defaultWhatSource (Codec.encode (Filter.codec Keyword.codec)) (DamagePattern.whatSource p)
-        <> Common.optionalPair "whichRecipient" Nothing (Common.encodeMaybe Recipient.toJson) (DamagePattern.whichRecipient p)
-    )
-
-fromJson :: Value.Value -> Either Text.Text DamagePattern.DamagePattern
-fromJson value = do
-  ps <- Common.asObject value
-  k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe (Codec.decode DamageKind.codec)) ps
-  src <- Common.defaultedField "whatSource" defaultWhatSource (Codec.decode (Filter.codec Keyword.codec)) ps
-  r <- Common.defaultedField "whichRecipient" Nothing (Common.decodeMaybe Recipient.fromJson) ps
+codec :: Codec.Codec DamagePattern.DamagePattern
+codec = Fields.object $ do
+  whichKind <- Fields.defaulted "whichKind" Nothing (Common.maybe DamageKind.codec) DamagePattern.whichKind
+  whatSource <- Fields.defaulted "whatSource" defaultWhatSource (Filter.codec Keyword.codec) DamagePattern.whatSource
+  whichRecipient <- Fields.defaulted "whichRecipient" Nothing (Common.maybe Recipient.codec) DamagePattern.whichRecipient
   pure
     DamagePattern.MkDamagePattern
-      { DamagePattern.whichKind = k,
-        DamagePattern.whatSource = src,
-        DamagePattern.whichRecipient = r
+      { DamagePattern.whichKind = whichKind,
+        DamagePattern.whatSource = whatSource,
+        DamagePattern.whichRecipient = whichRecipient
       }

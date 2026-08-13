@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.ManaCount where
 
 import qualified Pawl.Codec.ManaFilter as ManaFilter
@@ -10,8 +12,11 @@ import qualified Pawl.Types.ManaCount as ManaCount
 -- single-constructor record in this codec writes. The tag that picks it is
 -- written by Pawl.Codec.Quantity's ManaCount arm, this codec's only caller.
 codec :: Codec.Codec ManaCount.ManaCount
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  player <- Fields.required "player" PlayerRef.codec ManaCount.player
+  filter_ <- Fields.required "filter" ManaFilter.codec ManaCount.filter
+  pure
     ManaCount.MkManaCount
-      <$> Fields.required "player" PlayerRef.codec ManaCount.player
-      <*> Fields.required "filter" ManaFilter.codec ManaCount.filter
+      { ManaCount.player = player,
+        ManaCount.filter = filter_
+      }

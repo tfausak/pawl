@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.EntryRiders where
 
 import qualified Data.Map.Strict as Map
@@ -18,17 +20,20 @@ defaultTapped = TapState.Untapped
 -- | Every field is defaulted, so riders equal to 'defaultValue' write the empty
 -- object -- and their own key is then elided by whichever effect carries them.
 codec :: Codec.Codec EntryRiders.EntryRiders
-codec =
-  Fields.object $
+codec = Fields.object $ do
+  tapped <- Fields.defaulted "tapped" defaultTapped TapState.codec EntryRiders.tapped
+  attacking <- Fields.defaulted "attacking" False Common.boolean EntryRiders.attacking
+  transformed <- Fields.defaulted "transformed" False Common.boolean EntryRiders.transformed
+  counters <- Fields.defaulted "counters" Map.empty (Common.multiset (CounterKind.codec Keyword.codec)) EntryRiders.counters
+  underOwner <- Fields.defaulted "underOwner" False Common.boolean EntryRiders.underOwner
+  pure
     EntryRiders.MkEntryRiders
-      <$> Fields.defaulted "tapped" defaultTapped TapState.codec EntryRiders.tapped
-      <*> Fields.defaulted "attacking" False Common.boolean EntryRiders.attacking
-      <*> Fields.defaulted "transformed" False Common.boolean EntryRiders.transformed
-      -- A MULTISET, the shape ProjectedCharacteristics' keywords take: a kind
-      -- repeated as many times as there are counters, ascending, so the
-      -- encoding is canonical.
-      <*> Fields.defaulted "counters" Map.empty (Common.multiset (CounterKind.codec Keyword.codec)) EntryRiders.counters
-      <*> Fields.defaulted "underOwner" False Common.boolean EntryRiders.underOwner
+      { EntryRiders.tapped = tapped,
+        EntryRiders.attacking = attacking,
+        EntryRiders.transformed = transformed,
+        EntryRiders.counters = counters,
+        EntryRiders.underOwner = underOwner
+      }
 
 -- | The value every carrier elides: a card file carries riders only when the
 -- effect really does say otherwise (CR 110.5b for tapped, CR 508.4 for a

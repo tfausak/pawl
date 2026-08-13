@@ -1,10 +1,10 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.TokenPattern where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.ControllerRelation as ControllerRelation
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.TokenPattern as TokenPattern
 
@@ -13,12 +13,10 @@ import qualified Pawl.Types.TokenPattern as TokenPattern
 defaultWhose :: ControllerRelation.ControllerRelation
 defaultWhose = ControllerRelation.Anyones
 
-toJson :: TokenPattern.TokenPattern -> Value.Value
-toJson p =
-  Value.object (Common.optionalPair "whose" defaultWhose (Codec.encode ControllerRelation.codec) (TokenPattern.whose p))
-
-fromJson :: Value.Value -> Either Text.Text TokenPattern.TokenPattern
-fromJson value = do
-  ps <- Common.asObject value
-  w <- Common.defaultedField "whose" defaultWhose (Codec.decode ControllerRelation.codec) ps
-  pure TokenPattern.MkTokenPattern {TokenPattern.whose = w}
+codec :: Codec.Codec TokenPattern.TokenPattern
+codec = Fields.object $ do
+  whose <- Fields.defaulted "whose" defaultWhose ControllerRelation.codec TokenPattern.whose
+  pure
+    TokenPattern.MkTokenPattern
+      { TokenPattern.whose = whose
+      }
