@@ -269,6 +269,7 @@ slotsOf effect = case effect of
   Effect.LoseLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.GainLife ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
+  Effect.SetLifeTotal ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.IncreaseSpeed ref quantity -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
@@ -487,6 +488,7 @@ slotsAreExhaustive effect = case effect of
   Effect.LoseLife _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
+  Effect.SetLifeTotal _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.IncreaseSpeed _ quantity -> Quantity.slotsAreExhaustive quantity
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
@@ -612,6 +614,7 @@ readsX = any effectReadsX
       Effect.LoseLife _ quantity -> Quantity.readsX quantity
       Effect.GainLife _ quantity -> Quantity.readsX quantity
       Effect.ExchangeLifeTotals _ -> False
+      Effect.SetLifeTotal _ quantity -> Quantity.readsX quantity
       Effect.IncreaseSpeed _ quantity -> Quantity.readsX quantity
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
@@ -692,6 +695,7 @@ searchesLibrary effect = case effect of
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals _ -> False
+  Effect.SetLifeTotal {} -> False
   Effect.IncreaseSpeed {} -> False
   Effect.Create {} -> False
   Effect.CreateCopy {} -> False
@@ -831,6 +835,7 @@ boundSlots effect = case effect of
   Effect.LoseLife {} -> Set.empty
   Effect.GainLife {} -> Set.empty
   Effect.ExchangeLifeTotals _ -> Set.empty
+  Effect.SetLifeTotal {} -> Set.empty
   Effect.IncreaseSpeed {} -> Set.empty
   Effect.Replace {} -> Set.empty
   Effect.SkipNextPhase {} -> Set.empty
@@ -3006,6 +3011,51 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- left with anything but its two sides: no-op, and CR 701.12a agrees --
       -- if the entire exchange can't be completed, no part of it occurs.
       Nothing -> pure ()
+  -- CR 119.5: each named player "gains or loses the necessary amount of life to
+  -- end up with the new total". So this is a DELTA per player, computed against
+  -- that player's own current total -- one seat may gain while another loses on
+  -- the same resolution, which is why nothing here is a GainLife or a LoseLife.
+  --
+  -- Written through changeLife exactly as ExchangeLifeTotals is, and for CR
+  -- 119.5's sake rather than for tidiness: a raw write to Player.life would leave
+  -- the log silent, and "whenever you gain life" is supposed to see this. The
+  -- rule spends its whole sentence saying so.
+  --
+  -- The target total is evaluated ONCE, before any life moves, and every delta is
+  -- read off that same pre-effect state -- ExchangeLifeTotals' posture. A
+  -- REGRESSION FENCE rather than proven behaviour: re-reading the board per
+  -- recipient leaves the suite green, since setting everyone to the maximum leaves
+  -- the maximum where it was and no other producer has several recipients. A card
+  -- folding a MINIMUM over the same players would tell the two apart, and reading
+  -- a total this effect had already overwritten is the bug that gives.
+  --
+  -- changeLife's zero case is CR 119.9's, and here it is the load-bearing one:
+  -- Arbiter's own highest-life seat is already at the new total, so it gains
+  -- nothing and no life-gain trigger may fire for it.
+  --
+  -- CR 104.3b's state-based action follows a total driven to 0 or less, and it is
+  -- the existing one in Pawl.Engine.Sba -- reached through changeLife's ordinary
+  -- subtraction, with nothing here to arrange.
+  --
+  -- Not implemented: a total that differs PER RECIPIENT -- Biorhythm's "each
+  -- player's life total becomes the number of creatures they control" -- which
+  -- would need both a reference an effect's recipient answers and an evaluation
+  -- per player rather than the one below (#1424).
+  Effect.SetLifeTotal ref quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        recipients = playerRefPlayers legal controller gs ref
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      -- An undeterminable total is no instruction at all, LoseLife's and
+      -- GainLife's posture for the same reason: there is no number to reach.
+      Nothing -> pure ()
+      Just total -> Monad.forM_ recipients $ \pid ->
+        -- A player with no row is nobody to move, which is the same no-op an
+        -- unfilled slot already gave; the lookup is what makes the delta a
+        -- delta, so there is nothing to fall back to.
+        Monad.forM_ (Map.lookup pid (GameState.players gs)) $ \player ->
+          changeLife pid (total - Player.life player)
   -- CR 702.179c: each named player's speed increases by this much. Pawl.Engine.
   -- Speed's inherent triggered ability (CR 702.179d) is one producer and card data
   -- is the other, so the PlayerRef is genuinely read rather than known --
