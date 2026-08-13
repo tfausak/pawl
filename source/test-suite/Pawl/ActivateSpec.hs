@@ -2432,7 +2432,7 @@ activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition"
   -- THE FALSIFIER for the criterion, both halves of it, on ONE board carrying a
   -- positive: Brutal Suppression names "nontoken REBELS", so a nonRebel's
   -- ability and a Rebel TOKEN's ability are both untaxed while the Recluse's is
-  -- taxed. Prodigal Sorcerer is the nonRebel (Human Wizard, "{T}: deals 1 damage
+  -- taxed. Prodigal Sorcerer is the nonRebel ("{T}: This creature deals 1 damage
   -- to any target"), and the token is a copy of the Recluse's own card -- so the
   -- two differ from the taxed permanent in exactly one atom each.
   Spec.it s "CR 601.2f Brutal Suppression's criterion spares a nonRebel and a token Rebel" $ do
