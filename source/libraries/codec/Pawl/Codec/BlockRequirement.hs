@@ -1,18 +1,15 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.BlockRequirement where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 
-toJson :: BlockRequirement.BlockRequirement -> Value.Value
-toJson br =
-  Value.object (Common.requiredPair "attacker" (Codec.encode Affected.codec) (BlockRequirement.attacker br))
-
-fromJson :: Value.Value -> Either Text.Text BlockRequirement.BlockRequirement
-fromJson value = do
-  ps <- Common.asObject value
-  a <- Common.field "attacker" ps >>= Codec.decode Affected.codec
-  pure (BlockRequirement.MkBlockRequirement a)
+-- | The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec BlockRequirement.BlockRequirement
+codec = Fields.object $ do
+  attacker <- Fields.required "attacker" Affected.codec BlockRequirement.attacker
+  pure BlockRequirement.MkBlockRequirement {BlockRequirement.attacker = attacker}

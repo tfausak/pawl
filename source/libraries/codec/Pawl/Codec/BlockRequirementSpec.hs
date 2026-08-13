@@ -8,14 +8,14 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 
-spec :: (Monad m) => Spec.Spec m n -> n ()
-spec s =
+spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Codec.BlockRequirement" $ do
   -- Lure's shape (CR 303.4m): the enchanted creature IS the attacker every
   -- creature able to block must block.
-  Spec.describe s "Pawl.Codec.BlockRequirement" . Spec.it s "MkBlockRequirement" $
-    Common.assertJsonCodec
+  Spec.it s "MkBlockRequirement" $
+    Common.assertCodec
       s
-      BlockRequirement.toJson
-      BlockRequirement.fromJson
+      BlockRequirement.codec
       (BlockRequirement.MkBlockRequirement Affected.Attached)
       """ {"attacker":{"type":"Attached"}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s BlockRequirement.codec

@@ -1,13 +1,14 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Pawl.Codec.StaticAbility where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Modification as Modification
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonCodec.Fields as Fields
 import qualified Pawl.Types.StaticAbility as StaticAbility
 
 -- | CR 613.6: the parts of one ability's effect travel together, so the wire
@@ -19,23 +20,19 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 -- 604.2 override beside it -- "if this leaves the battlefield, this effect
 -- continues until end of turn" -- is optional for the same reason, and absent
 -- means the effect ends with its permanent.
-toJson :: StaticAbility.StaticAbility -> Value.Value
-toJson sa =
-  Value.object
-    ( Common.requiredPair "affected" (Codec.encode Affected.codec) (StaticAbility.affected sa)
-        <> Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (StaticAbility.condition sa)
-        <> Common.optionalPair "lingers" Nothing (Common.encodeMaybe (Codec.encode Duration.codec)) (StaticAbility.lingers sa)
-        <> Common.requiredPair
-          "modifications"
-          (Common.encodeNonEmpty (Codec.encode Modification.codec))
-          (StaticAbility.modifications sa)
-    )
-
-fromJson :: Value.Value -> Either Text.Text StaticAbility.StaticAbility
-fromJson value = do
-  ps <- Common.asObject value
-  a <- Common.field "affected" ps >>= Codec.decode Affected.codec
-  c <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
-  l <- Common.defaultedField "lingers" Nothing (Common.decodeMaybe (Codec.decode Duration.codec)) ps
-  ms <- Common.field "modifications" ps >>= Common.decodeNonEmpty (Codec.decode Modification.codec)
-  pure (StaticAbility.MkStaticAbility a c l ms)
+--
+-- The wire format is unchanged by the conversion to a bundle; what it adds is
+-- the schema.
+codec :: Codec.Codec StaticAbility.StaticAbility
+codec = Fields.object $ do
+  affected <- Fields.required "affected" Affected.codec StaticAbility.affected
+  condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) StaticAbility.condition
+  lingers <- Fields.defaulted "lingers" Nothing (Common.maybe Duration.codec) StaticAbility.lingers
+  modifications <- Fields.required "modifications" (Common.nonEmpty Modification.codec) StaticAbility.modifications
+  pure
+    StaticAbility.MkStaticAbility
+      { StaticAbility.affected = affected,
+        StaticAbility.condition = condition,
+        StaticAbility.lingers = lingers,
+        StaticAbility.modifications = modifications
+      }

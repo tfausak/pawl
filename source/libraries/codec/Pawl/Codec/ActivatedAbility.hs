@@ -18,7 +18,7 @@ toJson codec aa =
         <> Common.requiredPair "modal" (Modal.toJson codec) (ActivatedAbility.modal aa)
         -- CR 602.5: emitted only for a restricted ability, so the absence of the
         -- key is CR 602.2's default -- no "activate only ..." rider at all.
-        <> Common.optionalPair "restrictions" [] (Common.encodeList ActivationRestriction.toJson) (ActivatedAbility.restrictions aa)
+        <> Common.optionalPair "restrictions" [] (Common.encodeList (Codec.encode ActivationRestriction.codec)) (ActivatedAbility.restrictions aa)
         -- CR 702.178a: emitted only for a GRANTED ability, so the absence of the
         -- key means the object simply has this ability.
         <> Common.optionalPair "condition" Nothing (Common.encodeMaybe (Codec.encode Condition.codec)) (ActivatedAbility.condition aa)
@@ -29,6 +29,6 @@ fromJson decode value = do
   ps <- Common.asObject value
   c <- Common.field "cost" ps >>= Codec.decode (Cost.codec Keyword.codec)
   m <- Common.field "modal" ps >>= Modal.fromJson decode
-  t <- Common.defaultedField "restrictions" [] (Common.decodeList ActivationRestriction.fromJson) ps
+  t <- Common.defaultedField "restrictions" [] (Common.decodeList (Codec.decode ActivationRestriction.codec)) ps
   g <- Common.defaultedField "condition" Nothing (Common.decodeMaybe (Codec.decode Condition.codec)) ps
   pure (ActivatedAbility.MkActivatedAbility c m t g)

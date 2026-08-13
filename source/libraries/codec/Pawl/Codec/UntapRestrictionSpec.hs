@@ -10,16 +10,15 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
 
-spec :: (Monad m) => Spec.Spec m n -> n ()
-spec s =
+spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+spec s = Spec.describe s "Pawl.Codec.UntapRestriction" $ do
   -- Tsabo's Web's second sentence (CR 502.3 / CR 101.2), which is also the pool's
   -- one writer of Filter.HasNonManaActivatedAbility -- so this round-trips that
   -- atom in the position a card actually writes it.
-  Spec.describe s "Pawl.Codec.UntapRestriction" . Spec.it s "MkUntapRestriction" $
-    Common.assertJsonCodec
+  Spec.it s "MkUntapRestriction" $
+    Common.assertCodec
       s
-      UntapRestriction.toJson
-      UntapRestriction.fromJson
+      UntapRestriction.codec
       ( UntapRestriction.MkUntapRestriction
           ( Affected.Matching
               ( Filter.And
@@ -30,3 +29,4 @@ spec s =
           )
       )
       """ {"affected":{"type":"Matching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Land"}},{"type":"HasNonManaActivatedAbility"}]}}} """
+  Spec.it s "has a schema" $ Common.assertHasSchema s UntapRestriction.codec

@@ -5,6 +5,7 @@ module Pawl.Codec.StaticAbilitySpec where
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
@@ -28,18 +29,16 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
   -- A single-part static ability, e.g. a keyword granter.
   Spec.it s "one part" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      StaticAbility.toJson
-      StaticAbility.fromJson
+      StaticAbility.codec
       (StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
       """ {"affected":{"type":"Attached"},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- Humility's shape: several parts under one affected set (CR 613.6).
   Spec.it s "several parts" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      StaticAbility.toJson
-      StaticAbility.fromJson
+      StaticAbility.codec
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           Nothing
@@ -52,10 +51,9 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
   -- above pin the absent half -- an encoder that always emitted the key would
   -- rewrite every card already committed.
   Spec.it s "an as-long-as condition" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      StaticAbility.toJson
-      StaticAbility.fromJson
+      StaticAbility.codec
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           ( Just
@@ -75,10 +73,9 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
   -- for the condition's reason -- absent means the effect ends with its
   -- permanent, which is every other ability in the pool.
   Spec.it s "a leaves-the-battlefield duration" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      StaticAbility.toJson
-      StaticAbility.fromJson
+      StaticAbility.codec
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           Nothing
@@ -96,8 +93,10 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       ( either
           (const True)
           (const False)
-          ( StaticAbility.fromJson
+          ( Codec.decode
+              StaticAbility.codec
               (Value.object [Value.pair "affected" (Common.tagged "Attached" Nothing), Value.pair "modifications" (Value.array [])])
           )
       )
       "an empty array does not decode"
+  Spec.it s "has a schema" $ Common.assertHasSchema s StaticAbility.codec

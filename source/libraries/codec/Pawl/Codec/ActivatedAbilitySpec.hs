@@ -15,6 +15,7 @@ import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.DuringPhase as DuringPhase
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -82,12 +83,12 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [CostComponent.TapThis])
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
-          [ ActivationRestriction.DuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers)) TurnScope.EachTurn,
+          [ ActivationRestriction.DuringPhase (DuringPhase.MkDuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers)) TurnScope.EachTurn),
             ActivationRestriction.AttackedThisStep
           ]
           Nothing
       )
-      """ {"cost":{"mana":null,"components":[{"type":"TapThis"}]},"modal":{"modes":[{}]},"restrictions":[{"type":"DuringPhase","value":[{"type":"Step","value":{"type":"Combat","value":{"type":"DeclareAttackers"}}},{"type":"EachTurn"}]},{"type":"AttackedThisStep"}]} """
+      """ {"cost":{"mana":null,"components":[{"type":"TapThis"}]},"modal":{"modes":[{}]},"restrictions":[{"type":"DuringPhase","value":{"window":{"type":"Step","value":{"type":"Combat","value":{"type":"DeclareAttackers"}}},"scope":{"type":"EachTurn"}}},{"type":"AttackedThisStep"}]} """
   -- CR 602.2: no rider is the default for nearly every ability, so the key stays
   -- out of the JSON.
   Spec.it s "an unrestricted ability omits the restrictions key, and an absent key decodes to none" $

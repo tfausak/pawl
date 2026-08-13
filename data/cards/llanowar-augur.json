@@ -76,8 +76,11 @@
           "restrictions": [
             {
               "type": "DuringPhase",
-              "value": [
-                {
+              "value": {
+                "scope": {
+                  "type": "ControllersTurn"
+                },
+                "window": {
                   "type": "Step",
                   "value": {
                     "type": "Beginning",
@@ -85,11 +88,8 @@
                       "type": "Upkeep"
                     }
                   }
-                },
-                {
-                  "type": "ControllersTurn"
                 }
-              ]
+              }
             }
           ]
         }

@@ -1,7 +1,6 @@
 module Pawl.Types.ActivationRestriction where
 
-import qualified Pawl.Types.PhaseSelector as PhaseSelector
-import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.DuringPhase as DuringPhase
 
 -- | CR 602.5: ONE clause of the "activate only ..." rider an activated ability
 -- prints about itself -- CR 602.5b's "a restriction on its use".
@@ -65,7 +64,7 @@ data ActivationRestriction
     -- "An opponent's turn" (Trade Caravan, Nettling Imp) is now sayable --
     -- TurnScope.OpponentsTurn -- but a turn named with no phase at all (Lavinia,
     -- Foil to Conspiracy) still is not: this arm requires a window (#520).
-    DuringPhase PhaseSelector.PhaseSelector TurnScope.TurnScope
+    DuringPhase DuringPhase.DuringPhase
   | -- | "Activate only if you've been attacked this step", asked of the player
     -- activating the ability. Kongming's Contraptions prints it alongside
     -- DuringPhase, which is what made this type a list.
