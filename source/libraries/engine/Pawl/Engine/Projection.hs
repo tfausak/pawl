@@ -531,11 +531,16 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. A candidate in a
--- library, hand, graveyard or exile has no projection at all, since gather does
--- not walk those zones, so it falls back to the printed card and is matched
--- against its PRINTED characteristics (#160). Its POWER is the one axis a rule
--- reaches into there: CR 208.2a makes a characteristic-defining one function everywhere,
--- which is why the fallback is viewOfCardIn rather than viewOfCard.
+-- library, hand, graveyard or exile falls back to the printed card and is
+-- matched against its PRINTED characteristics (#160). A GRAVEYARD card is the
+-- one of the four gather now reaches -- CR 113.6f, fromGraveyardCard -- so this
+-- fallback is a bound rather than an absence there: the effects exist and a
+-- clause read INSIDE the fold still does not see them. Unobservable, since no
+-- clause in the pool reads a graveyard card's characteristics.
+--
+-- POWER is the one axis a rule reaches into there: CR 208.2a makes a
+-- characteristic-defining one function everywhere, which is why the fallback is
+-- viewOfCardIn rather than viewOfCard.
 --
 -- The STACK is projected, not fallen back on, and gatherGiven's CR 113.6 walk is
 -- what makes that worth doing: a spell can carry a static ability of its own, so
