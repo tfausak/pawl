@@ -38,4 +38,22 @@ data PlayerRef
     -- codec cannot enforce (it is total both ways, since an Expiry serialises
     -- through Pawl.Codec.Condition) and Pawl.CardSpec's pool sweep does.
     Specific PlayerId.PlayerId
+  | -- | The player a Pawl.Types.Scope.OverPlayers fold is currently looking at --
+    -- Malignus' "the highest life total among your opponents", where the life
+    -- read is each candidate's rather than any one player's.
+    --
+    -- Pawl.Types.Quantity.Power's position, one type over: the object-reading
+    -- arms name no object and read whichever one the evaluation is aimed at,
+    -- and this names no player and reads whichever one it is aimed at. So it is
+    -- resolved where the candidate is known -- Pawl.Engine.Quantity, off
+    -- Pawl.Engine.Filter.playerView's identity -- rather than at
+    -- Pawl.Engine.Count.playersFor, which holds no candidate and answers Nothing
+    -- for it.
+    --
+    -- Undeterminable ANYWHERE ELSE, deliberately: an evaluation aimed at an
+    -- object or at nothing has no candidate player, so a card writing this
+    -- outside a Scope.OverPlayers fold's per-member quantity reads Nothing and
+    -- its effect does nothing. That is the honest answer rather than a silent
+    -- substitution of "you".
+    Candidate
   deriving (Eq, Ord, Show)

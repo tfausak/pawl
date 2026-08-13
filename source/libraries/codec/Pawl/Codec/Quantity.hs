@@ -7,6 +7,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaCount as ManaCount
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerRef as PlayerRef
+import qualified Pawl.Codec.Rounding as Rounding
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -39,6 +40,9 @@ codec =
       Arm.payload "InSlot" SlotName.codec Quantity.InSlot,
       Arm.nullary "Star" Quantity.Star,
       Arm.payload "Plus" pairCodec (uncurry Quantity.Plus),
+      -- CR 107.1a's rounding first, then what is halved: the direction is the
+      -- card's word and the payload is the value it applies to.
+      Arm.payload "Halved" (Common.tuple Rounding.codec codec) (uncurry Quantity.Halved),
       -- CR 107.1b's negative game value: one whole Quantity on the wire, since a
       -- minus sign carries nothing of its own.
       Arm.payload "Negate" codec Quantity.Negate,
@@ -83,6 +87,9 @@ codec =
       Quantity.InSlot s -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec s
       Quantity.Star -> Common.nullary "Star"
       Quantity.Plus a b -> Common.tagged "Plus" . Just . Value.array $ [encode a, encode b]
+      Quantity.Halved rounding q_ ->
+        Common.tagged "Halved" . Just . Value.array $
+          [Codec.encode Rounding.codec rounding, encode q_]
       Quantity.Negate a -> Common.tagged "Negate" . Just $ encode a
       Quantity.Count c -> Common.tagged "Count" . Just $ Codec.encode (Count.codec codec) c
       Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ Codec.encode ManaCount.codec c

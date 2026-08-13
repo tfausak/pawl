@@ -1,0 +1,102 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Halved",
+        "value": [
+          {
+            "type": "Up"
+          },
+          {
+            "type": "Count",
+            "value": {
+              "aggregation": {
+                "type": "Greatest",
+                "value": {
+                  "type": "LifeTotal",
+                  "value": {
+                    "type": "Candidate"
+                  }
+                }
+              },
+              "filter": {
+                "type": "And",
+                "value": []
+              },
+              "scope": {
+                "type": "OverPlayers",
+                "value": {
+                  "type": "Relative",
+                  "value": {
+                    "type": "Opponent"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Malignus",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "DamageCantBePrevented",
+            "value": {
+              "whatSource": {
+                "type": "IsSource"
+              }
+            }
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
+        }
+      ],
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elemental"
+          },
+          {
+            "type": "Spirit"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

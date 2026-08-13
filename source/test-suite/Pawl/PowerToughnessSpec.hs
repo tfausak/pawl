@@ -13,7 +13,9 @@
 -- with no value for its power or toughness (Ashaya, Soul of the Wild under
 -- Blood Moon), plus CR 109.5's static-ability perspective on a player-scoped
 -- count (Empyrial Armor on an opponent's creature) and CR 613.4c's NEGATIVE
--- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b).
+-- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b),
+-- and CR 107.1a's rounding -- both directions in one modification (Aspect of
+-- Wolf), and a CDA halving a maximum folded over the PLAYERS (Malignus).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -45,6 +47,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
@@ -52,6 +56,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -558,6 +563,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   handOfThePraetorsSpec s registry
   ashayaBloodMoonSpec s registry
   empyrialArmorSpec s registry
+  aspectOfWolfSpec s registry
+  malignusSpec s registry
   toxicDelugeSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
@@ -1242,6 +1249,138 @@ ridersOn host gs =
   filter
     (\oid -> (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf) == Just host)
     (Set.toList (GameState.battlefield gs))
+
+-- Aspect of Wolf ({1}{G} Enchantment -- Aura), whole text: "Enchant creature.
+-- Enchanted creature gets +X/+Y, where X is half the number of Forests you
+-- control, rounded down, and Y is half the number of Forests you control,
+-- rounded up." Oracle text verified against api.scryfall.com; nothing is
+-- omitted from the transcription.
+--
+-- CR 107.1a's TWO DIRECTIONS IN ONE SENTENCE, which is the whole case for
+-- keeping the direction in the payload (Pawl.Types.Rounding) rather than fixing
+-- it in the engine: over an ODD count the same number gives a different X and Y,
+-- so no single engine-chosen direction reproduces the printed line.
+--
+-- Layer 7c (CR 613.4c) rather than a CDA: CR 604.3a(3) excludes an ability that
+-- affects another object, which this one does. So "you control" is CR 109.5's
+-- static-ability perspective -- the AURA's controller -- and the Aura goes on
+-- BOB's Hill Giant while bob holds Forests of his own, so a count read against
+-- the enchanted creature's controller would find two rather than the five alice
+-- has. Empyrial Armor's group above is where that reading is argued in full.
+aspectOfWolfSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aspectOfWolfSpec s registry = Spec.describe s "Aspect of Wolf" $ do
+  -- FIVE Forests: 2 and 3, which is the case an even board cannot state. A
+  -- Hill Giant is printed 3/3, so the whole answer is 5/6 -- and the two
+  -- directions swapped would be 6/5, a board this one tells apart.
+  Spec.it s "CR 107.1a five Forests give +2/+3, the two directions apart" $ do
+    forest <- S.printingOf s registry "Forest"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    aspect <- S.printingOf s registry "Aspect of Wolf"
+    let (before, after, giantId) = wolfOn forest hillGiant aspect 5
+    Spec.assertEqWith s "before the Aura, the Hill Giant is its printed 3/3" (S.powerToughnessOf giantId before) (Just (3, 3))
+    Spec.assertEqWith s "the Aura really attached, so the count genuinely runs (CR 303.4m)" (length (ridersOn giantId after)) 1
+    Spec.assertEqWith s "half of five: down for the power, up for the toughness" (S.powerToughnessOf giantId after) (Just (5, 6))
+  -- A second odd board, so neither half can be a constant: every number moves.
+  Spec.it s "CR 107.1a three Forests give +1/+2" $ do
+    forest <- S.printingOf s registry "Forest"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    aspect <- S.printingOf s registry "Aspect of Wolf"
+    let (_, after, giantId) = wolfOn forest hillGiant aspect 3
+    Spec.assertEqWith s "half of three, each way" (S.powerToughnessOf giantId after) (Just (4, 5))
+  -- The control: on an EVEN count the directions agree, which is exactly why the
+  -- two cases above are odd.
+  Spec.it s "CR 107.1 four Forests give +2/+2, the directions agreeing" $ do
+    forest <- S.printingOf s registry "Forest"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    aspect <- S.printingOf s registry "Aspect of Wolf"
+    let (_, after, giantId) = wolfOn forest hillGiant aspect 4
+    Spec.assertEqWith s "no fraction to round" (S.powerToughnessOf giantId after) (Just (5, 5))
+
+-- alice with `n` Forests and Aspect of Wolf in hand, bob with a Hill Giant and
+-- TWO Forests of his own; alice casts the Aura on the Giant and it resolves.
+-- Returns the board before the cast, the board after, and the Giant.
+--
+-- Two Forests for bob rather than none: they are what makes "Forests you
+-- control" observable, and two halves to a whole 1 under either direction, so a
+-- perspective slip shows up in both numbers at once.
+wolfOn :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+wolfOn forest hillGiant aspect n =
+  let base0 = S.landsInPlay forest n
+      (giantId, base1) = S.addCreature hillGiant S.bob base0
+      base2 = S.landsFor forest S.bob 2 base1
+      (before, auraId) = S.handOne aspect base2
+      cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature giantId)) before (S.cast S.alice auraId))
+      after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+   in (before, after, giantId)
+
+-- Malignus ({3}{R}{R} Creature -- Elemental Spirit, printed */*), first line:
+-- "Malignus's power and toughness are each equal to half the highest life total
+-- among your opponents, rounded up." Oracle text verified against
+-- api.scryfall.com.
+--
+-- Its second line -- "Damage that would be dealt by this creature can't be
+-- prevented" (CR 615.12) -- is on the card verbatim, written with the same
+-- PlayerEffect.DamageCantBePrevented carrier Excruciator prints and covered by
+-- that card's own group; nothing is omitted from the transcription.
+--
+-- Two capabilities in one CDA (CR 604.3, layer 7a): CR 107.1a's rounding, and an
+-- Aggregation.Greatest folding a per-PLAYER quantity over Scope.OverPlayers --
+-- the maximum reads each candidate's own life through
+-- Pawl.Types.PlayerRef.Candidate, which no other card in the pool writes.
+--
+-- Three seats with DISTINCT life totals, alice's highest of all: 39 for alice,
+-- 13 for bob and 21 for carol. Every wrong reading lands on a different number
+-- -- all players rather than the opponents gives 20, the least rather than the
+-- greatest gives 7, a sum gives 17, and rounding down gives 10 where the card
+-- gives 11.
+malignusSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+malignusSpec s registry = Spec.describe s "Malignus" $ do
+  -- CR 707.2a, the Tarmogoyf and Serra Avatar seed tests' reason: what the seed
+  -- holds is the unevaluated quantity, so a copy acquires the ability rather
+  -- than a frozen number.
+  Spec.it s "CR 604.3 the seed carries the halved fold as a QUANTITY, with the printed star substituted" $ do
+    malignus <- S.printingOf s registry "Malignus"
+    let (malignusId, gs) = malignusBoard malignus
+        halfTheHighest =
+          Quantity.Type.Halved
+            Rounding.Up
+            ( Quantity.Type.Count
+                ( Count.Type.MkCount
+                    (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
+                    (Filter.Type.And [])
+                    (Aggregation.Greatest (Quantity.Type.LifeTotal PlayerRef.Candidate))
+                )
+            )
+    Spec.assertEqWith s "both boxes are the same quantity" (PC.characteristicPT (Projection.baseCharacteristics malignusId gs)) (Just (halfTheHighest, halfTheHighest))
+  Spec.it s "CR 107.1a half of the opponents' highest life total, rounded UP" $ do
+    malignus <- S.printingOf s registry "Malignus"
+    let (malignusId, gs) = malignusBoard malignus
+    Spec.assertEqWith s "alice highest of all, and the two opponents apart" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 39, Just 13, Just 21]
+    Spec.assertEqWith s "carol's 21 halved upward, not alice's 39 and not bob's 13" (S.powerToughnessOf malignusId gs) (Just (11, 11))
+  -- THE LIVENESS FALSIFIER, and the tie case in one: bob overtakes carol at 25,
+  -- so the maximum moves seats, and carol joining him there does not change it.
+  -- Nothing touches Malignus between the reads -- only the next projection's
+  -- fold.
+  Spec.it s "CR 119.3 the fold re-reads: bob at 25 makes it a 13/13, and a tie at 25 keeps it there" $ do
+    malignus <- S.printingOf s registry "Malignus"
+    let (malignusId, gs) = malignusBoard malignus
+        bobAhead = atLife S.bob 25 gs
+        tied = atLife S.carol 25 bobAhead
+    Spec.assertEqWith s "11/11 before" (S.powerToughnessOf malignusId gs) (Just (11, 11))
+    Spec.assertEqWith s "bob's 25 halved upward" (S.powerToughnessOf malignusId bobAhead) (Just (13, 13))
+    Spec.assertEqWith s "a second seat at 25 is still one maximum" (S.powerToughnessOf malignusId tied) (Just (13, 13))
+
+-- alice's Malignus on a three-seat board held at 39 / 13 / 21.
+malignusBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+malignusBoard malignus =
+  let (malignusId, gs) = S.addCreature malignus S.alice S.threePlayerGame
+   in (malignusId, atLife S.alice 39 (atLife S.bob 13 (atLife S.carol 21 gs)))
+
+-- One seat's life total, set outright. CR 119.3 changes a life total whenever an
+-- effect says so, and what these cases are about is what the next projection
+-- READS, so no spell has to be cast to move one.
+atLife :: PlayerId.PlayerId -> Integer -> GameState.GameState -> GameState.GameState
+atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
 
 -- Answers Prompt.ChooseTargets with one fixed recipient -- CR 601.2c's choice,
 -- which S.identityAnswer declines.

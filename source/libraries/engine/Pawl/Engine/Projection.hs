@@ -1884,6 +1884,9 @@ rewriteQuantity pairs quantity = case quantity of
           Count.Type.aggregation = rewriteAggregation pairs (Count.Type.aggregation c)
         }
   Quantity.Type.Plus x y -> Quantity.Type.Plus (rewriteQuantity pairs x) (rewriteQuantity pairs y)
+  -- Plus' descent: the rounding is no word CR 612.1 could swap, and the payload
+  -- may hide a Count whose Filter names one.
+  Quantity.Type.Halved rounding inner -> Quantity.Type.Halved rounding (rewriteQuantity pairs inner)
   -- Plus's descent through one child rather than two: a minus sign hides no
   -- subtype word of its own, but its payload may.
   Quantity.Type.Negate x -> Quantity.Type.Negate (rewriteQuantity pairs x)
@@ -2845,6 +2848,8 @@ quantityReads q = case q of
   Quantity.Type.Power -> Set.singleton PowerA
   Quantity.Type.Toughness -> Set.singleton PowerA
   Quantity.Type.Plus a b -> quantityReads a <> quantityReads b
+  -- Composition, as Plus is: halving reads nothing of its own.
+  Quantity.Type.Halved _ a -> quantityReads a
   Quantity.Type.Negate a -> quantityReads a
   Quantity.Type.AgainstSlot _ a -> quantityReads a
   Quantity.Type.Literal _ -> Set.empty

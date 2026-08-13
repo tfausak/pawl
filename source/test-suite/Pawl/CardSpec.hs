@@ -366,6 +366,9 @@ quantityCounts quantity = case quantity of
   Quantity.Type.InSlot _ -> []
   Quantity.Type.Star -> []
   Quantity.Type.Plus a b -> quantityCounts a <> quantityCounts b
+  -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it
+  -- halves may be one -- Malignus halves a fold over players.
+  Quantity.Type.Halved _ inner -> quantityCounts inner
   -- Not a leaf: a minus sign hides nothing, so the lints reach through it --
   -- Toxic Deluge's -X, and any negated count a card comes to print.
   Quantity.Type.Negate a -> quantityCounts a
@@ -3733,6 +3736,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               -- One seat, so one library -- InSlot's answer. Unreachable from
               -- card data, which the sweep below is what enforces.
               PlayerRef.Specific _ -> True
+              -- NO library at all: an ObjectRef is read by a resolution, where
+              -- no fold supplies a candidate, so this names nobody and moves
+              -- nothing -- which is at most one.
+              PlayerRef.Candidate -> True
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           _ -> []
