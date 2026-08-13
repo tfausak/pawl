@@ -41,6 +41,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -204,7 +205,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     Spec.it s "GameEvent.Revealed round-trips with its snapshot" $ do
       typhoidRats <- S.printingOf s registry "Typhoid Rats"
       let (ratId, gs) = S.addLibraryCard typhoidRats S.alice (Setup.emptyGame S.bothPlayers)
-      roundTrip s "revealed" GameEvent.Codec.toJson GameEvent.Codec.fromJson (GameEvent.Revealed S.alice (Projection.project ratId gs))
+      roundTrip s "revealed" GameEvent.Codec.toJson GameEvent.Codec.fromJson (GameEvent.Revealed S.alice ratId RevealCause.ForMiracle (Projection.project ratId gs))
     -- TriggerCondition's own per-constructor coverage lives in
     -- Pawl.Codec.TriggerConditionSpec now.
     Spec.it s "Barbarian Outcast / Sarcomancy shaped Conditions round-trip" $

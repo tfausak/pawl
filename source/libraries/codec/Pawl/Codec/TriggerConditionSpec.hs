@@ -105,6 +105,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfCycled
       """ {"type":"SelfCycled"} """
+  -- CR 702.94a's linked half.
+  Spec.it s "SelfRevealedForMiracle" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfRevealedForMiracle
+      """ {"type":"SelfRevealedForMiracle"} """
   -- CR 701.9a's discard. Both relations, since the PlayerRelation is the whole
   -- content of the "whenever an opponent discards" phrasing.
   Spec.it s "PlayerDiscards round-trips both relations" $ do
@@ -120,6 +128,16 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PlayerDiscards PlayerRelation.You)
       """ {"type":"PlayerDiscards","value":{"type":"You"}} """
+  -- CR 121.1's Nth draw of a turn. The relation and the ordinal are both content,
+  -- and the ordinal is not 1, so a codec dropping it would fail rather than
+  -- round-trip the default.
+  Spec.it s "PlayerDrawsNthCard" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerDrawsNthCard PlayerRelation.You 2)
+      """ {"type":"PlayerDrawsNthCard","value":[{"type":"You"},2]} """
   -- CR 508.3a. Both frequencies, since "for the first time each turn" is a
   -- payload on this condition rather than a sibling one.
   Spec.it s "SelfAttacks round-trips both frequencies" $ do

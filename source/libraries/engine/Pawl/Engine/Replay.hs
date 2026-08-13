@@ -58,6 +58,7 @@ encode p answer = case p of
   Prompt.ChooseExtraManaSource {} -> Response.ChoseExtraManaSource answer
   Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
+  Prompt.ChooseRedistribution {} -> Response.ChoseRedistribution answer
   Prompt.ChooseRingBearer {} -> Response.ChoseRingBearer answer
   Prompt.ChooseRoom {} -> Response.ChoseRoom answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
@@ -106,6 +107,7 @@ encode p answer = case p of
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
   Prompt.OfferedCast {} -> Response.ChoseOfferedCast answer
+  Prompt.OfferedMiracleReveal {} -> Response.ChoseMiracleReveal answer
   Prompt.ChooseToPay {} -> Response.ChoseToPay answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
   Prompt.AnnounceHybridPayment {} -> Response.AnnouncedHybridPayment answer
@@ -163,6 +165,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseProliferate {} -> case response of
     Response.ChoseProliferation chosen -> Just chosen
+    _ -> Nothing
+  Prompt.ChooseRedistribution {} -> case response of
+    Response.ChoseRedistribution assignment -> Just assignment
     _ -> Nothing
   Prompt.ChooseRingBearer {} -> case response of
     Response.ChoseRingBearer oid -> Just oid
@@ -293,6 +298,9 @@ decode p response = case p of
   Prompt.OfferedCast {} -> case response of
     Response.ChoseOfferedCast decision -> Just decision
     _ -> Nothing
+  Prompt.OfferedMiracleReveal {} -> case response of
+    Response.ChoseMiracleReveal decision -> Just decision
+    _ -> Nothing
   Prompt.ChooseToPay {} -> case response of
     Response.ChoseToPay decision -> Just decision
     _ -> Nothing
@@ -376,6 +384,11 @@ defaultAnswer p = case p of
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   -- CR 701.34a: any number includes none, so declining is always legal.
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  -- Redistributing among nobody: "any number of players" includes none, and the
+  -- empty permutation is the answer that moves no life total. The identity over
+  -- every candidate would be equally legal and equally quiet, but the empty map
+  -- needs no candidates to build.
+  Prompt.ChooseRedistribution {} -> Map.empty
   -- CR 701.54a: the prompt is only raised with two or more creatures the player
   -- controls, and every one of them is a legal Ring-bearer.
   Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
@@ -537,6 +550,9 @@ defaultAnswer p = case p of
   -- CR 608.2g: declining an offered cast is always legal, and it leaves the card
   -- exactly where the resolving effect put it.
   Prompt.OfferedCast {} -> OptionalDecision.Declines
+  -- CR 702.94a: declining the reveal is always legal, and it leaves the drawn
+  -- card an ordinary card in hand.
+  Prompt.OfferedMiracleReveal {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is always legal, and it
   -- spends nothing -- which keeps a short transcript from tapping a payer's board.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines

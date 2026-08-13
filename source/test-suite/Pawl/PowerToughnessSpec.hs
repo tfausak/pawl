@@ -12,7 +12,10 @@
 -- objects have (Hand of the Praetors), and CR 208.5's 0 for a creature left
 -- with no value for its power or toughness (Ashaya, Soul of the Wild under
 -- Blood Moon), plus CR 109.5's static-ability perspective on a player-scoped
--- count (Empyrial Armor on an opponent's creature).
+-- count (Empyrial Armor on an opponent's creature) and CR 613.4c's NEGATIVE
+-- layer-7c modification of an announced value (Toxic Deluge's -X/-X, CR 107.1b),
+-- and CR 107.1a's rounding -- both directions in one modification (Aspect of
+-- Wolf), and a CDA halving a maximum folded over the PLAYERS (Malignus).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -23,6 +26,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -43,6 +47,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
@@ -50,6 +56,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
@@ -556,6 +563,9 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   handOfThePraetorsSpec s registry
   ashayaBloodMoonSpec s registry
   empyrialArmorSpec s registry
+  aspectOfWolfSpec s registry
+  malignusSpec s registry
+  toxicDelugeSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -1240,9 +1250,250 @@ ridersOn host gs =
     (\oid -> (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf) == Just host)
     (Set.toList (GameState.battlefield gs))
 
+-- Aspect of Wolf ({1}{G} Enchantment -- Aura), whole text: "Enchant creature.
+-- Enchanted creature gets +X/+Y, where X is half the number of Forests you
+-- control, rounded down, and Y is half the number of Forests you control,
+-- rounded up." Oracle text verified against api.scryfall.com; nothing is
+-- omitted from the transcription.
+--
+-- CR 107.1a's TWO DIRECTIONS IN ONE SENTENCE, which is the whole case for
+-- keeping the direction in the payload (Pawl.Types.Rounding) rather than fixing
+-- it in the engine: over an ODD count the same number gives a different X and Y,
+-- so no single engine-chosen direction reproduces the printed line.
+--
+-- Layer 7c (CR 613.4c) rather than a CDA: CR 604.3a(3) excludes an ability that
+-- affects another object, which this one does. So "you control" is CR 109.5's
+-- static-ability perspective -- the AURA's controller -- and the Aura goes on
+-- BOB's Hill Giant while bob holds Forests of his own, so a count read against
+-- the enchanted creature's controller would find two rather than the five alice
+-- has. Empyrial Armor's group above is where that reading is argued in full.
+aspectOfWolfSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aspectOfWolfSpec s registry = Spec.describe s "Aspect of Wolf" $ do
+  -- FIVE Forests: 2 and 3, which is the case an even board cannot state. A
+  -- Hill Giant is printed 3/3, so the whole answer is 5/6 -- and the two
+  -- directions swapped would be 6/5, a board this one tells apart.
+  Spec.it s "CR 107.1a five Forests give +2/+3, the two directions apart" $ do
+    forest <- S.printingOf s registry "Forest"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    aspect <- S.printingOf s registry "Aspect of Wolf"
+    let (before, after, giantId) = wolfOn forest hillGiant aspect 5
+    Spec.assertEqWith s "before the Aura, the Hill Giant is its printed 3/3" (S.powerToughnessOf giantId before) (Just (3, 3))
+    Spec.assertEqWith s "the Aura really attached, so the count genuinely runs (CR 303.4m)" (length (ridersOn giantId after)) 1
+    Spec.assertEqWith s "half of five: down for the power, up for the toughness" (S.powerToughnessOf giantId after) (Just (5, 6))
+  -- A second odd board, so neither half can be a constant: every number moves.
+  Spec.it s "CR 107.1a three Forests give +1/+2" $ do
+    forest <- S.printingOf s registry "Forest"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    aspect <- S.printingOf s registry "Aspect of Wolf"
+    let (_, after, giantId) = wolfOn forest hillGiant aspect 3
+    Spec.assertEqWith s "half of three, each way" (S.powerToughnessOf giantId after) (Just (4, 5))
+  -- The control: on an EVEN count the directions agree, which is exactly why the
+  -- two cases above are odd.
+  Spec.it s "CR 107.1 four Forests give +2/+2, the directions agreeing" $ do
+    forest <- S.printingOf s registry "Forest"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    aspect <- S.printingOf s registry "Aspect of Wolf"
+    let (_, after, giantId) = wolfOn forest hillGiant aspect 4
+    Spec.assertEqWith s "no fraction to round" (S.powerToughnessOf giantId after) (Just (5, 5))
+
+-- alice with `n` Forests and Aspect of Wolf in hand, bob with a Hill Giant and
+-- TWO Forests of his own; alice casts the Aura on the Giant and it resolves.
+-- Returns the board before the cast, the board after, and the Giant.
+--
+-- Two Forests for bob rather than none: they are what makes "Forests you
+-- control" observable, and two halves to a whole 1 under either direction, so a
+-- perspective slip shows up in both numbers at once.
+wolfOn :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+wolfOn forest hillGiant aspect n =
+  let base0 = S.landsInPlay forest n
+      (giantId, base1) = S.addCreature hillGiant S.bob base0
+      base2 = S.landsFor forest S.bob 2 base1
+      (before, auraId) = S.handOne aspect base2
+      cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature giantId)) before (S.cast S.alice auraId))
+      after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+   in (before, after, giantId)
+
+-- Malignus ({3}{R}{R} Creature -- Elemental Spirit, printed */*), first line:
+-- "Malignus's power and toughness are each equal to half the highest life total
+-- among your opponents, rounded up." Oracle text verified against
+-- api.scryfall.com.
+--
+-- Its second line -- "Damage that would be dealt by this creature can't be
+-- prevented" (CR 615.12) -- is on the card verbatim, written with the same
+-- PlayerEffect.DamageCantBePrevented carrier Excruciator prints and covered by
+-- that card's own group; nothing is omitted from the transcription.
+--
+-- Two capabilities in one CDA (CR 604.3, layer 7a): CR 107.1a's rounding, and an
+-- Aggregation.Greatest folding a per-PLAYER quantity over Scope.OverPlayers --
+-- the maximum reads each candidate's own life through
+-- Pawl.Types.PlayerRef.Candidate, which no other card in the pool writes.
+--
+-- Three seats with DISTINCT life totals, alice's highest of all: 39 for alice,
+-- 13 for bob and 21 for carol. Every wrong reading lands on a different number
+-- -- all players rather than the opponents gives 20, the least rather than the
+-- greatest gives 7, a sum gives 17, and rounding down gives 10 where the card
+-- gives 11.
+malignusSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+malignusSpec s registry = Spec.describe s "Malignus" $ do
+  -- CR 707.2a, the Tarmogoyf and Serra Avatar seed tests' reason: what the seed
+  -- holds is the unevaluated quantity, so a copy acquires the ability rather
+  -- than a frozen number.
+  Spec.it s "CR 604.3 the seed carries the halved fold as a QUANTITY, with the printed star substituted" $ do
+    malignus <- S.printingOf s registry "Malignus"
+    let (malignusId, gs) = malignusBoard malignus
+        halfTheHighest =
+          Quantity.Type.Halved
+            Rounding.Up
+            ( Quantity.Type.Count
+                ( Count.Type.MkCount
+                    (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
+                    (Filter.Type.And [])
+                    (Aggregation.Greatest (Quantity.Type.LifeTotal PlayerRef.Candidate))
+                )
+            )
+    Spec.assertEqWith s "both boxes are the same quantity" (PC.characteristicPT (Projection.baseCharacteristics malignusId gs)) (Just (halfTheHighest, halfTheHighest))
+  Spec.it s "CR 107.1a half of the opponents' highest life total, rounded UP" $ do
+    malignus <- S.printingOf s registry "Malignus"
+    let (malignusId, gs) = malignusBoard malignus
+    Spec.assertEqWith s "alice highest of all, and the two opponents apart" (fmap (\pid -> S.lifeOf pid gs) [S.alice, S.bob, S.carol]) [Just 39, Just 13, Just 21]
+    Spec.assertEqWith s "carol's 21 halved upward, not alice's 39 and not bob's 13" (S.powerToughnessOf malignusId gs) (Just (11, 11))
+  -- THE LIVENESS FALSIFIER, and the tie case in one: bob overtakes carol at 25,
+  -- so the maximum moves seats, and carol joining him there does not change it.
+  -- Nothing touches Malignus between the reads -- only the next projection's
+  -- fold.
+  Spec.it s "CR 119.3 the fold re-reads: bob at 25 makes it a 13/13, and a tie at 25 keeps it there" $ do
+    malignus <- S.printingOf s registry "Malignus"
+    let (malignusId, gs) = malignusBoard malignus
+        bobAhead = atLife S.bob 25 gs
+        tied = atLife S.carol 25 bobAhead
+    Spec.assertEqWith s "11/11 before" (S.powerToughnessOf malignusId gs) (Just (11, 11))
+    Spec.assertEqWith s "bob's 25 halved upward" (S.powerToughnessOf malignusId bobAhead) (Just (13, 13))
+    Spec.assertEqWith s "a second seat at 25 is still one maximum" (S.powerToughnessOf malignusId tied) (Just (13, 13))
+
+-- alice's Malignus on a three-seat board held at 39 / 13 / 21.
+malignusBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+malignusBoard malignus =
+  let (malignusId, gs) = S.addCreature malignus S.alice S.threePlayerGame
+   in (malignusId, atLife S.alice 39 (atLife S.bob 13 (atLife S.carol 21 gs)))
+
+-- One seat's life total, set outright. CR 119.3 changes a life total whenever an
+-- effect says so, and what these cases are about is what the next projection
+-- READS, so no spell has to be cast to move one.
+atLife :: PlayerId.PlayerId -> Integer -> GameState.GameState -> GameState.GameState
+atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
+
 -- Answers Prompt.ChooseTargets with one fixed recipient -- CR 601.2c's choice,
 -- which S.identityAnswer declines.
 aimRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
 aimRecipient recipient p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton recipient)) sets
   _ -> S.identityAnswer p
+
+-- Chooses this value of X. Toxic Deluge names no target, so every other prompt
+-- takes the identity fallback -- Pawl.CostSpec's answerHatredXOf pattern.
+answerDelugeXOf :: Natural.Natural -> Prompt.Prompt r -> r
+answerDelugeXOf n p = case p of
+  Prompt.ChooseX {} -> n
+  _ -> S.identityAnswer p
+
+-- alice controls three untapped Swamps -- exactly {2}{B} -- a Goblin Piker (2/1)
+-- and Jedit Ojanen (5/5); bob controls Russet Wolves (3/3); Toxic Deluge is in
+-- alice's hand, in her own precombat main phase.
+--
+-- THE TOUGHNESSES STRADDLE the X every case below announces: 1 is below it, 3 is
+-- exactly it, 5 is above it. So which creatures died is an observation and not a
+-- coincidence, and the powers are distinct too (2, 3, 5) so a survivor's numbers
+-- name one reading only. The 3/3 is BOB's: "all creatures" is neither "creatures
+-- you control" nor "creatures an opponent controls", and a board where every
+-- creature shared a controller could not tell those apart.
+delugeBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+delugeBoard swamp piker wolves jedit deluge =
+  let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay swamp 3)
+      (wolvesId, withWolves) = S.addCreature wolves S.bob withPiker
+      (jeditId, withJedit) = S.addCreature jedit S.alice withWolves
+      (gs, delugeId) = S.handOne deluge withJedit
+   in (pikerId, wolvesId, jeditId, delugeId, gs)
+
+-- Cast Toxic Deluge announcing this X, resolve it, and let CR 704 run.
+castDeluge :: Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castDeluge x delugeId gs =
+  S.runPure (answerDelugeXOf x) gs (S.cast S.alice delugeId >> Stack.resolveTop >> Engine.settleForPriority)
+
+-- Toxic Deluge ({2}{B} Sorcery, Oracle text verified against Scryfall): "As an
+-- additional cost to cast this spell, pay X life. All creatures get -X/-X until
+-- end of turn."
+--
+-- The card CR 613.4c's NEGATIVE half was waiting for on a value the card does
+-- not print. Dismember's -5/-5 is a printed literal, which Quantity.Literal's
+-- signed Integer already says; this one's minus sign sits in front of CR 107.3a's
+-- announced X, and Quantity.Plus has no inverse -- so it needs Quantity.Negate or
+-- it cannot be written at all. Writing it as +X/+X instead would be weaker in the
+-- controller's favour, which is why the card waited (#1419).
+--
+-- The layer is 7c (CR 613.4c, "effects and counters that modify power and/or
+-- toughness"), the same one Trumpet Blast's +2/+0 lands in, over the same
+-- filter-selected set CR 611.2c freezes at resolution. What is new is the sign.
+--
+-- CR 107.1b is what makes the result legal: a creature's power may be less than
+-- zero, and CR 704.5f is what a toughness of 0 or less then means.
+toxicDelugeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+toxicDelugeSpec s registry = Spec.describe s "Toxic Deluge" $ do
+  -- THE PROVING CASE. Falsifiers, in order: +X/+X leaves all three alive with the
+  -- Jedit an 8/8; an X read as 0 leaves all three alive at 20 life; an X read but
+  -- not paid leaves the same board at 20 life; an X paid but not read leaves
+  -- three live creatures at 17.
+  Spec.it s "CR 613.4c/107.3a whole card: X=3 buries the 2/1 and the 3/3, leaves the 5/5 a 2/2, and costs 3 life" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    deluge <- S.printingOf s registry "Toxic Deluge"
+    let (pikerId, wolvesId, jeditId, delugeId, gs) = delugeBoard swamp piker wolves jedit deluge
+        after = castDeluge 3 delugeId gs
+    Spec.assertEqWith s "the printed boxes before the spell" (fmap (`S.powerToughnessOf` gs) [pikerId, wolvesId, jeditId]) [Just (2, 1), Just (3, 3), Just (5, 5)]
+    Spec.assertEqWith s "the spell resolved" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "CR 119.4 subtracted the announced 3" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "bob paid nothing: the cost is the caster's" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertBool s (not (Set.member pikerId (GameState.battlefield after))) "CR 704.5f buried the 2/1, whose toughness went to -2"
+    Spec.assertBool s (not (Set.member wolvesId (GameState.battlefield after))) "and bob's 3/3, whose toughness went to exactly 0"
+    Spec.assertBool s (Set.member jeditId (GameState.battlefield after)) "the 5/5 survived"
+    Spec.assertEqWith s "as a 2/2: BOTH halves moved, and downwards" (S.powerToughnessOf jeditId after) (Just (2, 2))
+    Spec.assertEqWith s "three Swamps paid {2}{B}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "Toxic Deluge resolved out of hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+  -- CR 107.3i: the cost's X and the effect's X are ONE value, so both move
+  -- together. The same board with one thing changed, and at X=5 the survivor of
+  -- the case above dies too -- 5/5 modified to 0/0, which is CR 704.5f's own
+  -- boundary read from the other side.
+  Spec.it s "CR 107.3i at X=5 the 5/5 goes to 0/0 and dies too, for 5 life" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    deluge <- S.printingOf s registry "Toxic Deluge"
+    let (_, _, jeditId, delugeId, gs) = delugeBoard swamp piker wolves jedit deluge
+        after = castDeluge 5 delugeId gs
+    Spec.assertEqWith s "5 life paid" (S.lifeOf S.alice after) (Just 15)
+    Spec.assertBool s (not (Set.member jeditId (GameState.battlefield after))) "nothing is left on the battlefield to be a creature"
+    Spec.assertEqWith s "no creature survived, either player's" (S.creaturesInPlay S.alice after + S.creaturesInPlay S.bob after) 0
+  -- CR 119.4b: 0 life is always payable, so X=0 is a legal announcement -- and
+  -- CR 613.4c still applies a modification, of -0/-0. Every creature survives
+  -- with its printed box, which is also the board a sign error CANNOT produce at
+  -- any other X.
+  Spec.it s "CR 119.4b X=0 casts, pays nothing and kills nothing" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    deluge <- S.printingOf s registry "Toxic Deluge"
+    let (pikerId, wolvesId, jeditId, delugeId, gs) = delugeBoard swamp piker wolves jedit deluge
+        after = castDeluge 0 delugeId gs
+    Spec.assertEqWith s "life untouched" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "every printed box is intact" (fmap (`S.powerToughnessOf` after) [pikerId, wolvesId, jeditId]) [Just (2, 1), Just (3, 3), Just (5, 5)]
+    Spec.assertEqWith s "three Swamps still paid {2}{B}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "Toxic Deluge resolved out of hand" (length (Game.zoneMembers Zone.Hand S.alice after)) 0

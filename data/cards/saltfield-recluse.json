@@ -1,0 +1,104 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          {
+                            "type": "ModifyPowerToughness",
+                            "value": [
+                              {
+                                "type": "Literal",
+                                "value": -2
+                              },
+                              {
+                                "type": "Literal",
+                                "value": 0
+                              }
+                            ]
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": {
+                  "target": {
+                    "pool": {
+                      "type": "Creatures"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Saltfield Recluse",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Cleric"
+          },
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Rebel"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

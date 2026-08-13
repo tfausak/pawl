@@ -13,6 +13,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.RoomIndex as RoomIndex
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -126,6 +127,32 @@ data GameEvent
     -- a hidden zone instead has still been discarded, so a reader matching the
     -- hand-to-graveyard zone pair would lose the case Rest in Peace creates.
     Discarded PlayerId.PlayerId ObjectId.ObjectId DiscardCause.DiscardCause
+  | -- | CR 121.1: a player DREW a card, and which of that player's draws this
+    -- turn it was -- 1 for the first, counting up. Emitted by
+    -- Pawl.Engine.Event.drawCard, the one funnel every draw goes through.
+    --
+    -- The ORDINAL is on the event rather than left to a reader to fold out of the
+    -- log, because CR 121.2 makes each draw its own event and CR 702.94a asks
+    -- which one it was ("the first card you've drawn this turn"). The count it
+    -- comes from is GameState.drawsThisTurn; recording it here is what keeps a
+    -- reader of past history (CR 608.2i) agreeing with the live tally after the
+    -- turn hands off and that tally is cleared.
+    --
+    -- Recorded only for a draw that COMPLETED. CR 121.4's attempt to draw from an
+    -- empty library draws nothing -- it sets GameState.drewFromEmpty and loses the
+    -- game at the next check -- so no card was drawn and nothing here says one
+    -- was.
+    --
+    -- Distinct from the Moved event the same draw records, for CR 701.9a's reason
+    -- one constructor up and CR 121.5's in as many words: a card an effect puts
+    -- into a hand from a library without saying "draw" has not been drawn, so a
+    -- reader matching the library-to-hand zone pair would answer for both.
+    --
+    -- The drawn CARD is deliberately not a field. No ability in the pool names it
+    -- ("whenever you draw your second card each turn, put a +1\/+1 counter on this
+    -- creature" points only at its own bearer), and the Moved event beside this
+    -- one carries the object for anything that folds the log.
+    Drew PlayerId.PlayerId Natural.Natural
   | -- | CR 508.2b: an attacker was DECLARED -- one entry per creature the active
     -- player chose in CR 508.1's turn-based action. What "whenever this creature
     -- attacks" matches (CR 508.3a).
@@ -246,12 +273,19 @@ data GameEvent
     -- the card, so an engine that did not record the reveal would be
     -- bit-for-bit identical to one that never performed it.
     --
-    -- Carries the CARD's characteristics rather than an ObjectId, because what a
-    -- reveal discloses is a card and not an identity -- and because the id is
-    -- routinely dead by the time anything reads the event: every reveal in the
-    -- pool today is a search's "reveal it, and put it into your hand", where
-    -- CR 400.7 mints a new object one step later. An id joins this payload when
-    -- a card needs to refer back to "that card" it revealed.
+    -- Carries the CARD's characteristics because what a reveal discloses is a
+    -- card rather than an identity, and the ID BESIDE THEM because CR 702.94a
+    -- needs to refer back to "this card": miracle's linked triggered ability
+    -- (CR 603.11) is borne by the very card the reveal showed, still sitting in
+    -- its owner's hand, so the snapshot alone could not say which object fired.
+    -- The id is routinely dead by the time anything reads the event -- a search's
+    -- "reveal it, and put it into your hand" moves the card one step later and
+    -- CR 400.7 mints a new object -- so a reader that needs a live object must
+    -- check, exactly as Discarded's does.
+    --
+    -- The RevealCause is CR 702.94a's "this way", and DiscardCause's shape one
+    -- rule over: one showing of one card, described once, answering both "was a
+    -- card revealed?" and "was it revealed as it was drawn?".
     --
     -- Strict (!) for GameEvent.Moved's reason.
     --
@@ -259,7 +293,7 @@ data GameEvent
     -- revealed to pay a cost, and one that stays revealed while a triggered
     -- ability it caused is on the stack -- need a per-object flag that no card
     -- in the pool asks for (#185, #282).
-    Revealed PlayerId.PlayerId !ProjectedCharacteristics.ProjectedCharacteristics
+    Revealed PlayerId.PlayerId !ObjectId.ObjectId !RevealCause.RevealCause !ProjectedCharacteristics.ProjectedCharacteristics
   | -- | CR 701.6a: a spell was COUNTERED. Emitted by Pawl.Engine.Event.counter,
     -- the one funnel every countering in the engine goes through, alongside the
     -- Moved event that same removal records.

@@ -84,6 +84,8 @@ data KeywordFamily
     Afflict
   | -- | CR 702.135a: afterlife N.
     Afterlife
+  | -- | CR 702.94a: miracle [cost].
+    Miracle
   | -- | CR 702.164a: toxic N. The family Flensing Raptor's "another target
     -- creature you control with toxic" names.
     Toxic

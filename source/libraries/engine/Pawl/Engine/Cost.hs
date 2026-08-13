@@ -22,6 +22,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Claim as Claim
@@ -248,12 +249,24 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             -- graveyard under such an effect: both costs are available and CR
             -- 601.2b picks one.
             Zone.Graveyard ->
-              fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
-                <> [printed | Keyword.hasAftermath (Face.keywords face)]
-                <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
-                   | Keyword.hasJumpStart (Face.keywords face)
-                   ]
-                <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
+              let -- CR 613.1: the keywords the card HAS in the graveyard, not
+                  -- the ones it prints. Rule 702.34a's cost is stated by the
+                  -- ability, and an ability granted to a card in a graveyard
+                  -- (Viral Spawning's own, CR 113.6f) states it as much as a
+                  -- printed one does -- so a projected read is what makes the
+                  -- granted cost reachable at all (#1385).
+                  --
+                  -- Off the OBJECT rather than the face, so the caller's CR
+                  -- 709.3a half is the one measured: every caller stamps the
+                  -- proposal through Pawl.Engine.Cast.asProposed first, and the
+                  -- projection resolves that same stamp.
+                  keywords = Map.keysSet (Projection.keywordsOf oid gs)
+               in fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost keywords))
+                    <> [printed | Keyword.hasAftermath keywords]
+                    <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
+                       | Keyword.hasJumpStart keywords
+                       ]
+                    <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
             -- CR 702.170d: a PLOTTED card is cast "without paying its mana
             -- cost", which is CR 118.9's alternative cost and so
             -- withoutPayingManaCost above -- the card's own additional costs
@@ -325,9 +338,9 @@ spellAdjustments pid oid gs =
         else adjustments {CostAdjustments.increases = commanderTax : CostAdjustments.increases adjustments}
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes through
--- rule 601.2b-i like a spell's. Heartstone and Training Grounds are what reach it
--- (#90); no commander tax, since CR 903.8 taxes CASTING a commander and an
--- activation is not a cast.
+-- rule 601.2b-i like a spell's. Heartstone's floored reduction and Blossoming
+-- Tortoise's unfloored one are what reach it (#90); no commander tax, since CR
+-- 903.8 taxes CASTING a commander and an activation is not a cast.
 --
 -- Not reached by a MANA ability's cost, which pays through manaActivations rather
 -- than through Pawl.Engine.Activate -- and unobservably so, since every mana
@@ -359,7 +372,7 @@ adjustmentResolutions adjustments =
         Nothing -> [symbol]
         Just [] -> [symbol]
         Just halves -> halves
-      resolveAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse resolveOne symbols)
+      resolveAll (ManaCost.MkManaCost symbols, floor_) = fmap (\xs -> (ManaCost.MkManaCost xs, floor_)) (traverse resolveOne symbols)
    in fmap
         (\reductions -> adjustments {CostAdjustments.reductions = reductions})
         (traverse resolveAll (CostAdjustments.reductions adjustments))
@@ -372,6 +385,35 @@ adjustmentResolutions adjustments =
 -- caller in the engine asks for; `totalManas` below is it over every resolution.
 totalWith :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustments) (Cost.mana cost)}
+
+-- CR 601.2f's "plus all additional costs", the half that is not mana: the
+-- components an effect ADDS to a cost, appended to the ones the cost prints
+-- (Brutal Suppression's "Sacrifice a land" onto a Rebel's activation cost, by CR
+-- 602.2b).
+--
+-- SEPARATE from `totalWith` above rather than folded into it, and the separation
+-- is what keeps the components from being added twice: the gate measures a cost
+-- before CR 601.2b's completion (`canPaySomeCompletion` takes the mana totalling
+-- as a FUNCTION and never a whole cost), while `totalWith` runs on the announced
+-- cost afterwards. Both moments need the components, so this is applied at the
+-- earlier one and `totalWith` leaves them alone -- see Pawl.Engine.Activate,
+-- which is the only caller of either that has adjustments carrying any.
+--
+-- APPENDED, so a printed component is paid before an added one absent a payer's
+-- reordering -- and CR 601.2h makes the order the payer's anyway
+-- (`payComponents` prompts for it whenever it is observable).
+--
+-- A no-op for every SPELL cost, whose adjustments carry no components at all
+-- (Pawl.Engine.PlayerEffect.spellCostAdjustments).
+--
+-- Applied AFTER `substituteX`, which is why an ADDED component may not carry CR
+-- 601.2b's X: a CostComponent.PayLifeX arriving this way would never be
+-- substituted, and `canPayComponent` would refuse the whole cost. No effect in
+-- the pool adds one -- CR 601.2b announces the variables of the cost as printed,
+-- and an increase that named an unannounced X would be an amount nobody chose --
+-- so this is a bound on the open half rather than an elision.
+plusComponents :: CostAdjustments.CostAdjustments -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+plusComponents adjustments cost = cost {Cost.components = Cost.components cost <> CostAdjustments.components adjustments}
 
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
 -- of one mana cost. `total` above is this fmapped over a whole Cost's mana part;
@@ -417,18 +459,80 @@ plus base extra =
           Cost.components = Cost.components base <> Cost.components extra
         }
 
--- CR 601.2b: substitute the chosen value of X into the mana part. Identity on a
--- Variable-free cost, and on an unpayable one.
+-- CR 601.2b: substitute the chosen value of X everywhere in this cost -- the mana
+-- part's ManaSymbol.Variable, and the components' CostComponent.PayLifeX.
+-- Identity on a cost that declares no X, and on an unpayable one.
+--
+-- BOTH halves, because CR 107.3a gives one announced value to "a mana cost,
+-- alternative cost, additional cost, and/or activation cost with an {X}, [-X], or
+-- X in it" -- Hatred's X is the same X whichever half of the cost it sits in, and
+-- CR 107.3i keeps the two equal.
 substituteX :: Natural -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
-substituteX x cost = cost {Cost.mana = fmap (Mana.substituteX x) (Cost.mana cost)}
+substituteX x cost =
+  cost
+    { Cost.mana = fmap (Mana.substituteX x) (Cost.mana cost),
+      Cost.components = fmap (substituteXInComponent x) (Cost.components cost)
+    }
 
--- Does this cost's mana part contain an {X} (CR 107.3)? What decides whether the
--- caster is asked for a value at CR 601.2b -- a spell with no {X} is not asked,
--- and CR 602.2b sends an activation cost through the same question.
+-- EXHAUSTIVE with no wildcard, this module's posture for every CostComponent
+-- match: a new component that could carry CR 601.2b's X owes an answer here, and
+-- -Werror is what makes it.
+substituteXInComponent :: Natural -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
+substituteXInComponent x component = case component of
+  CostComponent.PayLifeX -> CostComponent.PayLife x
+  CostComponent.PayLife _ -> component
+  CostComponent.TapThis -> component
+  CostComponent.UntapThis -> component
+  CostComponent.SacrificeThis -> component
+  CostComponent.Sacrifice _ _ -> component
+  CostComponent.TapForTotalPower _ _ -> component
+  CostComponent.DiscardCards _ -> component
+  CostComponent.DiscardThis -> component
+  CostComponent.PayEnergy _ -> component
+  CostComponent.AddLoyaltyToThis _ -> component
+  CostComponent.RemoveLoyaltyFromThis _ -> component
+  CostComponent.PutPlusOneCountersOnThis _ -> component
+  CostComponent.ExileThisFromGraveyard -> component
+  CostComponent.ExileCardsFromGraveyard _ _ -> component
+  CostComponent.ExileTopFromGraveyard _ -> component
+
+-- Does this cost contain an X (CR 107.3)? What decides whether the caster is
+-- asked for a value at CR 601.2b -- a spell with no X is not asked, and CR 602.2b
+-- sends an activation cost through the same question.
+--
+-- BOTH HALVES, mana part and components. CR 601.2b's "a variable cost that will
+-- be paid as it's being cast (such as an {X} in its mana cost)" names the mana
+-- cost as an EXAMPLE rather than as the rule, and CR 107.3a lists the additional
+-- cost beside the mana cost -- so Hatred, whose only X is in "pay X life", is
+-- asked exactly as Blaze is.
 hasVariable :: Cost Keyword.Type.Keyword -> Bool
-hasVariable cost = case Cost.mana cost of
-  Nothing -> False
-  Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
+hasVariable cost = manaHasVariable || any componentHasVariable (Cost.components cost)
+  where
+    manaHasVariable = case Cost.mana cost of
+      Nothing -> False
+      Just (ManaCost.MkManaCost symbols) -> elem ManaSymbol.Variable symbols
+
+-- substituteXInComponent's predicate half, and exhaustive for its reason: the
+-- two must agree, since a component this answers False for is one no announcement
+-- will ever substitute.
+componentHasVariable :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
+componentHasVariable component = case component of
+  CostComponent.PayLifeX -> True
+  CostComponent.PayLife _ -> False
+  CostComponent.TapThis -> False
+  CostComponent.UntapThis -> False
+  CostComponent.SacrificeThis -> False
+  CostComponent.Sacrifice _ _ -> False
+  CostComponent.TapForTotalPower _ _ -> False
+  CostComponent.DiscardCards _ -> False
+  CostComponent.DiscardThis -> False
+  CostComponent.PayEnergy _ -> False
+  CostComponent.AddLoyaltyToThis _ -> False
+  CostComponent.RemoveLoyaltyFromThis _ -> False
+  CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileCardsFromGraveyard _ _ -> False
+  CostComponent.ExileTopFromGraveyard _ -> False
 
 -- CR 601.2b: the greatest value of X this player could actually pay for -- what
 -- Prompt.ChooseX carries -- found by ASCENDING SEARCH from 0 over the caller's
@@ -449,7 +553,14 @@ hasVariable cost = case Cost.mana cost of
 -- Activate.affordableX's cost is the same one with CR 601.2f's totalling taken
 -- out, which can only shorten it.
 --
--- Answers 0 for a cost with no {X} in it, a totality guard rather than a rule:
+-- `substituteX` is what makes the demand grow, on BOTH halves of the cost: the
+-- generic mana Mana.substituteX writes, and the CostComponent.PayLife this
+-- module's substituteXInComponent writes for a CostComponent.PayLifeX. A half
+-- that took the value and charged nothing for it would leave the climb without a
+-- bound -- Pawl.CostSpec's "Hatred is asked for X, bounded by the life its cost
+-- can pay" is the case that stops running at all if the life half ever does.
+--
+-- Answers 0 for a cost with no X in it, a totality guard rather than a rule:
 -- the climb would never end and there is no variable to report a greatest value
 -- of. Neither caller asks -- both gate the prompt on the same `hasVariable`. Also
 -- 0 for a cost unpayable even at X=0, the least misleading number to report.
@@ -575,7 +686,7 @@ announceReductions pid oid gs adjustments =
           -- FILTERED, NOT TRUSTED, the Mana.announce posture: an answer that is
           -- not one of the offered halves falls back to the first.
           pure (if elem answer halves then answer else first)
-      chooseAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse chooseOne symbols)
+      chooseAll (ManaCost.MkManaCost symbols, floor_) = fmap (\xs -> (ManaCost.MkManaCost xs, floor_)) (traverse chooseOne symbols)
    in fmap
         (\reductions -> adjustments {CostAdjustments.reductions = reductions})
         (traverse chooseAll (CostAdjustments.reductions adjustments))
@@ -665,6 +776,7 @@ isLoyaltyComponent component = case component of
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
   CostComponent.PayLife _ -> False
+  CostComponent.PayLifeX -> False
   CostComponent.Sacrifice _ _ -> False
   CostComponent.TapForTotalPower _ _ -> False
   CostComponent.DiscardCards _ -> False
@@ -710,6 +822,7 @@ zoneOfComponent component = case component of
   CostComponent.UntapThis -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.PayLife _ -> Nothing
+  CostComponent.PayLifeX -> Nothing
   CostComponent.Sacrifice _ _ -> Nothing
   -- CR 702.122a taps permanents on the battlefield and moves nothing out of any
   -- zone, so CR 113.6m says nothing and CR 113.6's default stands.
@@ -907,6 +1020,7 @@ removalClaim pid oid component gs = case component of
   CostComponent.UntapThis -> Nothing
   CostComponent.TapForTotalPower _ _ -> Nothing
   CostComponent.PayLife _ -> Nothing
+  CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
@@ -1121,6 +1235,11 @@ uncountedCeiling component = case component of
   CostComponent.ExileThisFromGraveyard -> Nothing
   -- Counted by `lifeCeiling`, CR 119.4.
   CostComponent.PayLife _ -> Nothing
+  -- Zero, and not the 1 the uncounted components take: an unannounced X cannot be
+  -- paid even once (`canPayComponent`). Unreachable in fact -- `manaActivations`
+  -- asks canPayComponent of every component before it reaches `repeatsOf` -- so
+  -- this is the answer that stays true if that guard ever moves.
+  CostComponent.PayLifeX -> Just 0
   CostComponent.TapThis -> Just 1
   CostComponent.UntapThis -> Just 1
   CostComponent.TapForTotalPower _ _ -> Just 1
@@ -1163,9 +1282,12 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 -- `lifeOwedBy` rides on every completion.
 --
 -- `total` is CR 601.2f's totalling of a mana cost, the CALLER's to supply for the
--- reason Pawl.Engine.Cost.announce's is: Pawl.Engine.Cast passes `totalManas` and
--- Pawl.Engine.Activate passes `pure`, since an activation cost is deliberately not
--- routed through `total` at all (#90).
+-- reason Pawl.Engine.Cost.announce's is: Pawl.Engine.Cast passes `totalManas`
+-- over the SPELL adjustments and Pawl.Engine.Activate passes it over the
+-- ACTIVATION ones (#90). CR 601.2f's non-mana additions are not in this
+-- parameter at all -- they are on the `cost` that arrives
+-- (Pawl.Engine.Cost.plusComponents), since a component is not a mana cost to
+-- rewrite.
 --
 -- It answers MANY totals, one per CR 118.7e resolution of the reductions
 -- (`totalManas`), and this asks `any` of them: the choice of half belongs to the
@@ -1211,15 +1333,21 @@ canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cos
 -- component owes 0, which is what leaves every such cost's answer exactly as it
 -- was.
 --
--- The only component that spends life: this module is the one place that matches
--- a CostComponent constructor, and the match is total so a new life-spending
--- component cannot be added without answering here.
+-- PayLife is the only component that spends a KNOWN amount of life, and
+-- PayLifeX the only one that will spend an announced amount -- which is why the
+-- latter owes 0 here rather than a guess. This module is the one place that
+-- matches a CostComponent constructor, and the match is total so a new
+-- life-spending component cannot be added without answering here.
 lifeOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
 lifeOwedBy = sum . fmap lifeOwedByComponent
 
 lifeOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
 lifeOwedByComponent component = case component of
   CostComponent.PayLife n -> n
+  -- 0, because an unannounced X names no amount to owe. Not a claim that this
+  -- component is free: `canPayComponent` refuses it outright, so no cost carrying
+  -- one is payable for this sum to understate.
+  CostComponent.PayLifeX -> 0
   CostComponent.TapThis -> 0
   CostComponent.UntapThis -> 0
   CostComponent.SacrificeThis -> 0
@@ -1271,6 +1399,16 @@ canPayComponent pid oid component gs = case component of
   -- is asked about on its own terms here, and it can only ever be the weaker of
   -- the two.
   CostComponent.PayLife n -> Event.canPayLife pid n gs
+  -- CR 601.2b: the value of X is announced as the spell is cast, and this is the
+  -- component BEFORE that announcement. There is no amount to measure against CR
+  -- 119.4, so the answer is no -- CR 601.2 reverses a casting a player cannot
+  -- comply with rather than choosing a value on their behalf.
+  --
+  -- Unreachable from either cast path: `hasVariable` reads the components, so a
+  -- cost carrying this is announced, and both paths substitute (`substituteX`)
+  -- before they measure or pay. What it is is the fence under that reasoning --
+  -- Pawl.CostSpec's "an unannounced X is unpayable" case is the test.
+  CostComponent.PayLifeX -> False
   -- CR 701.21a: this player must control at least `n` matching permanents.
   --
   -- This component ALONE, which is not the whole of CR 118.3's question, exactly
@@ -1480,7 +1618,7 @@ orderObservable components = case filter orderSensitive components of
 -- changes the counters on one -- a criterion reads tap state and counters (a
 -- Filter), and TapForTotalPower totals the power counters change.
 --
--- False for the two per-player scalars, for `orderObservable`'s stated reason.
+-- False for the per-player scalars, for `orderObservable`'s stated reason.
 --
 -- EXHAUSTIVE with no wildcard, `removalClaim`'s posture and for its reason: a new
 -- component has to answer here, and -Werror is what makes it. A component that
@@ -1502,6 +1640,7 @@ orderSensitive component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
   CostComponent.PayLife _ -> False
+  CostComponent.PayLifeX -> False
   CostComponent.PayEnergy _ -> False
 
 -- CR 601.2g: if the total cost includes a mana payment, the player then has a
@@ -1768,6 +1907,10 @@ payComponent pid oid component = case component of
   CostComponent.PayLife n -> do
     State.modify' (Event.payLife pid n)
     pure Payment.Paid
+  -- Unpayable, `canPayComponent`'s answer and for its reason: CR 601.2b's value
+  -- has not been announced, so there is nothing to subtract. Unpaid rather than a
+  -- guessed 0, which CR 601.2h turns into the reversal of the whole casting.
+  CostComponent.PayLifeX -> pure Payment.Unpaid
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a
   -- prompt. Elided only when forced -- exactly as many candidates as the count.
   -- Three payable Mountains and a count of two IS asked: they differ in tap
@@ -2005,46 +2148,50 @@ payComponent pid oid component = case component of
 --    component for CR 118.7b-c to move the stranded mana onto.
 -- 4. CR 601.2f's floor at {0} needs no special case: ManaCost is a list of
 --    symbols and the empty list IS {0}.
--- 5. A REDUCING EFFECT'S OWN FLOOR (CostAdjustments.minimumMana) is applied last,
---    as a clamp on the result: Heartstone's "This effect can't reduce the mana in
---    that cost to less than one mana" is card text CR 101.1 lets override the
---    rules, and it is a limit on what the reductions took rather than another
---    adjustment. The shortfall is made up in GENERIC mana, which is the only mana
---    a floored reduction in the pool can take (both printings reduce by generic
---    only, CR 118.7a).
+-- 5. A REDUCING EFFECT'S OWN FLOOR is applied as that reduction lands, never as a
+--    clamp on the pooled result: Heartstone's "This effect can't reduce the mana
+--    in that cost to less than one mana" is card text CR 101.1 lets override the
+--    rules, and it says THIS EFFECT. A floored reduction beside an unfloored one
+--    (Heartstone and Blossoming Tortoise on an animated Mutavault's {1}) is what
+--    tells the two readings apart: the floor stops Heartstone taking the last
+--    mana and has nothing to say about what the Tortoise then takes, so the cost
+--    is {0} and a pooled clamp would leave {1}. The shortfall a floor makes up is
+--    GENERIC mana, which is the only mana a floored reduction in the pool takes
+--    (every printing of the sentence reduces by generic only, CR 118.7a).
 --
 --    NEVER RAISES a cost that was already below the floor -- Heartstone's own
 --    ruling, "It will not add a {1} to abilities with no generic mana in their
---    activation cost" -- so the requirement is the floor or the UNREDUCED mana,
---    whichever is smaller.
+--    activation cost" -- so the requirement is the floor or the mana that
+--    reduction found, whichever is smaller.
 --
---    A CLAMP ON THE POOLED RESULT rather than per reduction, and exact rather than
---    an elision while every floor in the pool is one mana: two reductions floored
---    at one leave one mana between them whichever order they apply in, and a
---    surviving typed symbol is at least one mana whatever its type. What would
---    tell a clamp from a fold is a FLOORED reduction beside an UNFLOORED one, and
---    pawl has no unfloored activation-cost reducer to build that board with
---    (Hero of Iroas is the printed shape, and no card in the pool prints it)
---    (#1243).
+-- Reductions are FOLDED one at a time, in DESCENDING order of floor. CR 601.2f
+-- lets the player apply multiple reductions in any order, and once the floors
+-- differ the order is observable -- a floored reduction applied first takes its
+-- full amount and leaves the unfloored one to finish the cost off, where the same
+-- pair the other way round strands a mana. Descending floor is the CHEAPEST order
+-- (the more constrained reduction bites while there is still room for it), so
+-- pawl takes it and does not ask; the player's choice of a costlier order is the
+-- elision (#88). Reductions that state the SAME floor commute, and the sort is
+-- stable, so they keep the order they were gathered in.
 --
--- Reductions are POOLED rather than applied one at a time. CR 601.2f lets the
--- player apply multiple reductions in any order, which is a prompt in the rules
--- and an elision here (#88): the generic parts all route to the one generic
--- component, and a typed part only ever removes symbols of its own type -- and
--- one {W} in a cost is indistinguishable from another. Pooling is not merely
--- equivalent to some order, it is equivalent to EVERY order. That every reduction
--- applies at all, rather than one of them, is Edgewalker's own ruling.
+-- The sort itself is a FENCE and not a proved behaviour: no cost the pool can
+-- build observes it, since the one board with mixed floors (Pawl.ActivateSpec's
+-- UnflooredActivationCostReduction) has a printed {1} that either order empties,
+-- and reversing the sort leaves the suite green. What the suite does prove is that
+-- each floor binds its own reduction and no other.
 --
--- The result is CANONICAL: one leading Generic symbol carrying the whole generic
--- component (omitted entirely when it is zero), then the SURVIVING printed typed
--- symbols in their original order. Presentation, not semantics -- Mana.spend sums
--- every generic symbol and matches typed symbols first -- but it is what makes a
--- total cost comparable.
+-- That every reduction applies at all, rather than one of them, is Edgewalker's
+-- own ruling.
+--
+-- Every step's result is CANONICAL: one leading Generic symbol carrying the whole
+-- generic component (omitted entirely when it is zero), then the SURVIVING printed
+-- typed symbols in their original order. Presentation, not semantics -- Mana.spend
+-- sums every generic symbol and matches typed symbols first -- but it is what makes
+-- a total cost comparable, and it is what the next reduction in the fold reads.
 applyAdjustments :: CostAdjustments.CostAdjustments -> ManaCost.ManaCost -> ManaCost.ManaCost
 applyAdjustments adjustments cost =
   let increases = CostAdjustments.increases adjustments
       reductions = CostAdjustments.reductions adjustments
-      ManaCost.MkManaCost symbols = cost
       costGenericOf symbol = case symbol of
         ManaSymbol.Generic n -> n
         ManaSymbol.OfType _ -> 0
@@ -2197,20 +2344,29 @@ applyAdjustments adjustments cost =
         -- Unreachable for the reason costGenericOf's Variable arm gives; {X} is no
         -- amount of mana until CR 601.2b names one.
         ManaSymbol.Variable -> Nothing
-      reducingSymbols = concatMap (\(ManaCost.MkManaCost xs) -> xs) reductions
-      raised = sum (fmap costGenericOf symbols) + sum increases
-      taken = sum (fmap reducingGenericOf reducingSymbols)
-      -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
-      -- 601.2f floor is also what keeps this total.
-      lowered = if raised >= taken then raised - taken else 0
-      -- Point 5 above. `survivors` is the typed part the cancellation leaves, and
-      -- every typed symbol is at least one mana (CR 107.4e/107.4f/107.4h), so the
-      -- mana left in the cost is `lowered` plus how many of them there are.
-      survivors = cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) (filter isTyped symbols)
-      typedCount = Natural.length survivors
-      required = min (CostAdjustments.minimumMana adjustments) (raised + Natural.length (filter isTyped symbols))
-      floored = if lowered + typedCount >= required then lowered else required - typedCount
-      leading = if floored == 0 then [] else [ManaSymbol.Generic floored]
+      -- The canonical form point 5's header describes: the generic component as
+      -- one leading symbol, then the typed symbols left.
+      canonical generic typed = ManaCost.MkManaCost ((if generic == 0 then [] else [ManaSymbol.Generic generic]) <> typed)
+      -- Point 1: every increase, onto the generic component, before any reduction.
+      raise (ManaCost.MkManaCost symbols) =
+        canonical (sum (fmap costGenericOf symbols) + sum increases) (filter isTyped symbols)
+      -- ONE reduction, with the floor its own effect states.
+      reduce (ManaCost.MkManaCost symbols) (ManaCost.MkManaCost reducingSymbols, floor_) =
+        let generic = sum (fmap costGenericOf symbols)
+            typed = filter isTyped symbols
+            taken = sum (fmap reducingGenericOf reducingSymbols)
+            -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
+            -- 601.2f floor is also what keeps this total.
+            lowered = if generic >= taken then generic - taken else 0
+            -- Point 5 above. `survivors` is the typed part the cancellation
+            -- leaves, and every typed symbol is at least one mana (CR
+            -- 107.4e/107.4f/107.4h), so the mana left in the cost is `lowered`
+            -- plus how many of them there are.
+            survivors = cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) typed
+            typedCount = Natural.length survivors
+            required = min floor_ (generic + Natural.length typed)
+            floored = if lowered + typedCount >= required then lowered else required - typedCount
+         in canonical floored survivors
       -- Each reducing symbol cancels ONE matching symbol in the cost. Walks the
       -- printed symbols in their printed order, so the survivors keep it;
       -- `unspent` is the bag of reducing types that have not found a match yet,
@@ -2221,4 +2377,4 @@ applyAdjustments adjustments cost =
         symbol : rest -> case costManaTypeOf symbol of
           Just manaType | elem manaType unspent -> cancel (List.delete manaType unspent) rest
           _ -> symbol : cancel unspent rest
-   in ManaCost.MkManaCost (leading <> survivors)
+   in List.foldl' reduce (raise cost) (List.sortOn (Ord.Down . snd) reductions)

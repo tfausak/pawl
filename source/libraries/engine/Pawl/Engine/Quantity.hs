@@ -28,6 +28,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
 import Pawl.Types.SlotName (SlotName)
 
@@ -165,6 +166,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.Plus a b -> case (recur a, recur b) of
     (Just x, Just y) -> Just (x + y)
     _ -> Nothing
+  -- CR 107.1 / 107.1a: halve, then round the way the card printed. Nothing
+  -- propagates from the payload, Plus' posture: half of a number nobody could
+  -- determine is not a number either.
+  Quantity.Halved rounding inner -> fmap (halve rounding) (recur inner)
+  -- CR 107.1b: the negated value, with no floor here -- a creature's power may be
+  -- less than zero, and the readers that need a nonnegative count apply that
+  -- rule's "zero is used instead" themselves. Unanswerable stays unanswerable:
+  -- the negation of a value nothing could determine is not 0.
+  Quantity.Negate a -> fmap negate (recur a)
   -- CR 208.2a / 608.2h: delegate to the general Count fold (Pawl.Engine.Count),
   -- which reads the CR 613 projection through the injected ViewOf. The second
   -- injection is this function itself, aimed at whichever CANDIDATE the fold is
@@ -186,18 +196,21 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- and no priority pass owed in between, so a stored or sampled copy would go
   -- stale mid-resolution.
   --
-  -- The PlayerRef is resolved by the same Count.playersFor the two arms above
-  -- use, which is what keeps one reference from meaning different players in
-  -- different arms. Nothing for anything but EXACTLY ONE player: a life total is
-  -- one player's scalar, so a reference naming several answers "whose?" rather
-  -- than answering with a sum. Summing or maximising over several is a different
-  -- shape -- an aggregation, as Pawl.Types.Aggregation is for objects -- and no
-  -- card in the pool asks for one (#681).
-  Quantity.LifeTotal ref -> case Count.playersFor context gs ref of
+  -- The PlayerRef is resolved by playersOf below -- Count.playersFor for every
+  -- reference but the fold's own candidate -- which is what keeps one reference
+  -- from meaning different players in different arms. Nothing for anything but
+  -- EXACTLY ONE player: a life total is one player's scalar, so a reference
+  -- naming several answers "whose?" rather than answering with a sum.
+  --
+  -- Maximising over several is a different shape and has its own spelling:
+  -- Aggregation.Greatest over Scope.OverPlayers, with THIS arm reading each
+  -- candidate through PlayerRef.Candidate. Malignus is that card, and it is why
+  -- nothing here folds.
+  Quantity.LifeTotal ref -> case playersOf ref of
     Just [pid] -> fmap Player.life (Map.lookup pid (GameState.players gs))
     _ -> Nothing
   -- CR 702.179e / 702.179f: a player's speed. LifeTotal's arm in every respect
-  -- above -- read live, resolved through the same Count.playersFor, and Nothing
+  -- above -- read live, resolved through the same playersOf, and Nothing
   -- for a reference naming anything but exactly one player.
   --
   -- CR 702.179f is applied HERE and only here: "if that player has no speed,
@@ -206,7 +219,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- 702.179b) answers Just 0. The outer Nothing means "which player?" went
   -- unanswered, which is a different claim -- a player the map does not hold at
   -- all is not a player with no speed.
-  Quantity.Speed ref -> case Count.playersFor context gs ref of
+  Quantity.Speed ref -> case playersOf ref of
     Just [pid] -> fmap (maybe 0 toInteger . Player.speed) (Map.lookup pid (GameState.players gs))
     _ -> Nothing
   -- CR 725.1: is that player the monarch? LifeTotal's and Speed's arm in what it
@@ -227,18 +240,18 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- prescribes. Nothing would instead collapse to False through
   -- Condition.holds' undeterminable path, which reaches the same answer for
   -- this comparison by accident and would be the wrong claim about the rule.
-  Quantity.IsMonarch ref -> case Count.playersFor context gs ref of
+  Quantity.IsMonarch ref -> case playersOf ref of
     Nothing -> Nothing
     Just pids -> Just (if any (\pid -> GameState.monarch gs == Just pid) pids then 1 else 0)
   -- CR 122.1: how many counters of a kind that player has. The third arm on
   -- LifeTotal's and Speed's terms -- live, one player only, through the same
-  -- Count.playersFor.
+  -- playersOf.
   --
   -- A kind the player's map does not hold answers 0 rather than Nothing, which
   -- is Player.counters' own convention and not this arm's invention: an absent
   -- key means the player has none of that counter, and "none" is a number. The
   -- outer Nothing is reserved for the reference, exactly as above.
-  Quantity.PlayerCounters ref kind -> case Count.playersFor context gs ref of
+  Quantity.PlayerCounters ref kind -> case playersOf ref of
     Just [pid] -> fmap (toInteger . Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
     _ -> Nothing
   -- CR 122.1's OBJECT reading, through the injected view exactly as the Power
@@ -271,7 +284,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.WasKicked -> fmap (\view -> if Filter.kicked view then 1 else 0) mView
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
-  -- through the same Count.playersFor, and Nothing for a reference naming
+  -- through the same playersOf, and Nothing for a reference naming
   -- anything but exactly one player, since "whose opponents?" has no sum.
   --
   -- Read off Combat.declaredAttacked and NOT Combat.attacked, which is that
@@ -288,12 +301,12 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- An EMPTY record answers 0 rather than Nothing: no attack declared is an
   -- answered question, and outside a combat phase the cleared record (CR 511.3)
   -- says the same thing. What is unanswered is only the reference.
-  Quantity.OpponentsAttacked ref -> case Count.playersFor context gs ref of
+  Quantity.OpponentsAttacked ref -> case playersOf ref of
     Just [pid] -> Just (toInteger (length (filter (attackedOpponent pid) (Set.toList (Combat.declaredAttacked (GameState.combat gs))))))
     _ -> Nothing
   -- CR 701.9a / 608.2i: how many cards that player has discarded this turn.
   -- OpponentsAttacked's arm in shape -- live, one player only, resolved through the
-  -- same Count.playersFor, and Nothing for a reference naming anything but exactly
+  -- same playersOf, and Nothing for a reference naming anything but exactly
   -- one player, since "whose discards?" has no sum.
   --
   -- A fold over GameState.events, which is cleared at turn handoff
@@ -307,7 +320,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- An EMPTY log answers 0 rather than Nothing, as OpponentsAttacked's empty
   -- record does: nobody having discarded is an answered question. What is
   -- unanswered is only the reference.
-  Quantity.CardsDiscardedThisTurn ref -> case Count.playersFor context gs ref of
+  Quantity.CardsDiscardedThisTurn ref -> case playersOf ref of
     Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . snd) (Foldable.toList (GameState.events gs)))))
     _ -> Nothing
   -- CR 509.1h's declaration, counted beyond the first: how many creatures are
@@ -329,6 +342,22 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       mOid
   where
     recur = evaluateAgainst viewOf context gs announcedOn mOid mView
+    -- CR 102.1's reference, resolved by Count.playersFor for every arm but the
+    -- fold's own candidate. That one is answered HERE because this is where the
+    -- candidate is: Count.evaluate's Scope.OverPlayers arm hands each candidate
+    -- to this reader as a Pawl.Engine.Filter.playerView, whose identity IS the
+    -- player, and Count.playersFor holds no view to read it from.
+    --
+    -- Nothing wherever the evaluation is not aimed at a player -- an object
+    -- candidate's view carries no identity, and an evaluation outside a fold
+    -- carries no candidate at all -- which is Pawl.Types.PlayerRef.Candidate's
+    -- own stated answer there.
+    playersOf ref = case ref of
+      PlayerRef.Candidate -> fmap pure (mView >>= Filter.playerIdentity)
+      PlayerRef.EachPlayer -> Count.playersFor context gs ref
+      PlayerRef.Relative _ -> Count.playersFor context gs ref
+      PlayerRef.InSlot _ -> Count.playersFor context gs ref
+      PlayerRef.Specific _ -> Count.playersFor context gs ref
 
 -- Is this declared attack an attack on one of that player's OPPONENTS? CR 506.3
 -- gives three things a creature can attack and rule 702.121a counts only the
@@ -344,13 +373,27 @@ attackedOpponent pid target = case target of
   AttackTarget.OfPlaneswalker _ -> False
   AttackTarget.OfBattle _ -> False
 
+-- CR 107.1 / 107.1a: half of a number, as an integer, rounded the way the card
+-- says. `div` floors and `negate . div (negate x)` is its ceiling, so both
+-- directions mean the neighbouring integer rather than "away from zero" -- see
+-- Pawl.Types.Rounding, which is where that reading is argued.
+halve :: Rounding.Rounding -> Integer -> Integer
+halve rounding n = case rounding of
+  Rounding.Down -> div n 2
+  Rounding.Up -> negate (div (negate n) 2)
+
 -- CR 208.2a, last sentence: an undeterminable number is 0, including inside a
 -- calculation. TOTAL where evaluate is partial -- an Integer, never a Maybe.
 --
 -- The recursion through Plus is what "inside a calculation" buys, and it is not
 -- the same answer as substituting at the top: Tarmogoyf's printed 1+* is 1 when
 -- its count cannot be determined, because it is the COUNT that becomes 0 and
--- not the sum. Plus is the only calculation Pawl.Types.Quantity has.
+-- not the sum. Plus, Halved and Negate are the calculations Pawl.Types.Quantity
+-- has, and all three descend for that one reason -- but only Plus's descent
+-- changes an answer. Half of CR 208.2a's substituted 0 is 0 whichever way it
+-- rounds, so Malignus, whose whole CDA is a Halved, reads 0 with no opponents
+-- either way; and no printed characteristic-defining P/T contains a Negate at
+-- all. Both of those arms are consistency rather than a card's behaviour.
 --
 -- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is: the callers
 -- are Projection.applyCharacteristicPT on the battlefield and
@@ -365,6 +408,8 @@ attackedOpponent pid target = case target of
 determine :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Quantity -> Integer
 determine viewOf context gs oid quantity = case quantity of
   Quantity.Plus a b -> determine viewOf context gs oid a + determine viewOf context gs oid b
+  Quantity.Halved rounding inner -> halve rounding (determine viewOf context gs oid inner)
+  Quantity.Negate a -> negate (determine viewOf context gs oid a)
   _ -> Maybe.fromMaybe 0 (evaluate viewOf context gs oid quantity)
 
 -- CR 208.2: resolve a printed star to the quantity a characteristic-defining
@@ -373,6 +418,13 @@ substituteStar :: Quantity -> Quantity -> Quantity
 substituteStar star quantity = case quantity of
   Quantity.Star -> star
   Quantity.Plus a b -> Quantity.Plus (substituteStar star a) (substituteStar star b)
+  -- The same descent Plus takes, for CR 208.2's reason: a printed star inside a
+  -- halving is still the value the CDA supplies. No card prints one there --
+  -- Malignus' star is the whole P/T box and its CDA carries the halving.
+  Quantity.Halved rounding inner -> Quantity.Halved rounding (substituteStar star inner)
+  -- Plus's descent, for Plus's reason: a star under a minus sign is still the
+  -- star the characteristic-defining ability defines.
+  Quantity.Negate a -> Quantity.Negate (substituteStar star a)
   Quantity.Literal _ -> quantity
   Quantity.ManaValue -> quantity
   Quantity.Power -> quantity
@@ -414,6 +466,16 @@ slots quantity = case quantity of
   Quantity.InSlot slot -> Set.singleton slot
   Quantity.Star -> Set.empty
   Quantity.Plus a b -> Set.union (slots a) (slots b)
+  -- Composition, as Plus is: the rounding names no slot and the payload may name
+  -- any.
+  Quantity.Halved _ inner -> slots inner
+  -- Whatever the payload reads, since a minus sign changes no slot: Toxic
+  -- Deluge's -X is a Negate over the InSlot that names X. A REGRESSION FENCE
+  -- rather than proven behaviour -- emptying this arm leaves the suite green,
+  -- because the consumer that could tell (CR 603.3b's orderInert, through
+  -- Resolve.modeSlots) is reached only by a TRIGGERED ability, and no card in
+  -- the pool negates a slot read inside one.
+  Quantity.Negate a -> slots a
   -- Terminating for the reason evaluate's Count arm is: a Greatest's payload is
   -- a strictly smaller subterm.
   Quantity.Count c -> Count.slots slots c
@@ -474,6 +536,10 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.InSlot _ -> True
   Quantity.Star -> True
   Quantity.Plus a b -> slotsAreExhaustive a && slotsAreExhaustive b
+  -- Plus' answer: the rounding hides no reference, so what the payload hides is
+  -- the whole question.
+  Quantity.Halved _ inner -> slotsAreExhaustive inner
+  Quantity.Negate a -> slotsAreExhaustive a
   -- Both halves `slots` skips: the Scope's PlayerRef, and the per-member
   -- quantity of a Greatest, which may hide one of its own.
   Quantity.Count c ->
@@ -505,6 +571,9 @@ playerRefIsSlotless ref = case ref of
   -- cannot write one (Pawl.CardSpec's sweep), so this arm is only ever reached
   -- through a stored Expiry.While.
   PlayerRef.Specific _ -> True
+  -- The fold's candidate names no slot either: it is read off the view the fold
+  -- hands the evaluation, never off a binding.
+  PlayerRef.Candidate -> True
 
 -- CR 611.2b: replace every PlayerRef.InSlot this quantity names with the baked
 -- PlayerRef.Specific arm, off the players the resolution's bindings name. What
@@ -538,6 +607,8 @@ bakeBound players quantity = case quantity of
     let baked = Count.mapQuantity (bakeBound players) c
      in Quantity.Count baked {Count.Type.scope = bakeScope players (Count.Type.scope c)}
   Quantity.Plus a b -> Quantity.Plus (bakeBound players a) (bakeBound players b)
+  Quantity.Halved rounding inner -> Quantity.Halved rounding (bakeBound players inner)
+  Quantity.Negate a -> Quantity.Negate (bakeBound players a)
   Quantity.AgainstSlot slot inner -> Quantity.AgainstSlot slot (bakeBound players inner)
   -- Every arm below holds no PlayerRef and no Quantity. InSlot names an AMOUNT
   -- slot rather than a player one, so nothing here substitutes it -- an amount an
@@ -561,6 +632,11 @@ bakePlayerRef players ref = case ref of
   PlayerRef.EachPlayer -> ref
   PlayerRef.Relative _ -> ref
   PlayerRef.Specific _ -> ref
+  -- Nothing to bake: the candidate is supplied by whichever fold is running when
+  -- the quantity is evaluated, so a stored condition carrying one still resolves
+  -- it the same way. What baking fixes is a reference to the RESOLUTION's
+  -- bindings, which this is not.
+  PlayerRef.Candidate -> ref
 
 -- A scope's reference, baked. Both scopes that name players take one; CR 608.2i's
 -- look-back names none.
@@ -599,6 +675,15 @@ readsX quantity = case quantity of
   -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
   -- Plus X (Literal 3), which reads X without being equal to it.
   Quantity.Plus a b -> readsX a || readsX b
+  -- The same recursion: "half X, rounded down" would be a Halved over an X that
+  -- is not equal to one. A REGRESSION FENCE rather than proven behaviour --
+  -- neither producer halves an announced value, so answering False here leaves
+  -- the suite green.
+  Quantity.Halved _ inner -> readsX inner
+  -- Toxic Deluge's "-X" is Negate X, which reads X the same way. Without this
+  -- arm the CR 107.3 lint would call the card an unannounced-X reader on one
+  -- side and an unread announcement on the other.
+  Quantity.Negate a -> readsX a
   -- Terminating for the reason slots' Count arm is: a Greatest's payload is a
   -- strictly smaller subterm.
   Quantity.Count c -> Count.anyQuantity readsX c

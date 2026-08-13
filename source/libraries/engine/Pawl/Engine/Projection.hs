@@ -531,11 +531,16 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. A candidate in a
--- library, hand, graveyard or exile has no projection at all, since gather does
--- not walk those zones, so it falls back to the printed card and is matched
--- against its PRINTED characteristics (#160). Its POWER is the one axis a rule
--- reaches into there: CR 208.2a makes a characteristic-defining one function everywhere,
--- which is why the fallback is viewOfCardIn rather than viewOfCard.
+-- library, hand, graveyard or exile falls back to the printed card and is
+-- matched against its PRINTED characteristics (#160). A GRAVEYARD card is the
+-- one of the four gather now reaches -- CR 113.6f, fromGraveyardCard -- so this
+-- fallback is a bound rather than an absence there: the effects exist and a
+-- clause read INSIDE the fold still does not see them. Unobservable, since no
+-- clause in the pool reads a graveyard card's characteristics.
+--
+-- POWER is the one axis a rule reaches into there: CR 208.2a makes a
+-- characteristic-defining one function everywhere, which is why the fallback is
+-- viewOfCardIn rather than viewOfCard.
 --
 -- The STACK is projected, not fallen back on, and gatherGiven's CR 113.6 walk is
 -- what makes that worth doing: a spell can carry a static ability of its own, so
@@ -1539,6 +1544,8 @@ rewriteEffect pairs effect = case effect of
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect
   Effect.ExchangeLifeTotals _ -> effect
+  Effect.SetLifeTotal {} -> effect
+  Effect.RedistributeLifeTotals -> effect
   Effect.IncreaseSpeed {} -> effect
   -- CR 612.2a: a token-creating spell defines the token's creature types and its
   -- name with the same words, so a text change reaches both. Those words live in
@@ -1767,8 +1774,10 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> condition
   TriggerCondition.OpponentLostLifeDuringYourTurn -> condition
   TriggerCondition.SelfCycled -> condition
+  TriggerCondition.SelfRevealedForMiracle -> condition
   TriggerCondition.SelfCast -> condition
   TriggerCondition.PlayerDiscards _ -> condition
+  TriggerCondition.PlayerDrawsNthCard _ _ -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
   -- CR 702.149a's Filter is a predicate over the OTHER attackers, so a subtype
@@ -1877,6 +1886,12 @@ rewriteQuantity pairs quantity = case quantity of
           Count.Type.aggregation = rewriteAggregation pairs (Count.Type.aggregation c)
         }
   Quantity.Type.Plus x y -> Quantity.Type.Plus (rewriteQuantity pairs x) (rewriteQuantity pairs y)
+  -- Plus' descent: the rounding is no word CR 612.1 could swap, and the payload
+  -- may hide a Count whose Filter names one.
+  Quantity.Type.Halved rounding inner -> Quantity.Type.Halved rounding (rewriteQuantity pairs inner)
+  -- Plus's descent through one child rather than two: a minus sign hides no
+  -- subtype word of its own, but its payload may.
+  Quantity.Type.Negate x -> Quantity.Type.Negate (rewriteQuantity pairs x)
   Quantity.Type.Literal _ -> quantity
   Quantity.Type.ManaValue -> quantity
   Quantity.Type.Power -> quantity
@@ -1985,6 +2000,16 @@ anyConditional gs =
    in any conditional (Set.toList (GameState.battlefield gs))
         || any conditional (Set.toList (GameState.command gs))
         || any conditional (GameState.stack gs)
+        -- The GRAVEYARD, for the reason the stack is here: gatherGiven gathers a
+        -- CR 113.6f ability from there, and Viral Spawning's "as long as an
+        -- opponent has three or more poison counters" is a CR 604.2 clause on
+        -- one. Wired open, a Viral Spawning in a graveyard would carry flashback
+        -- against an unpoisoned board.
+        --
+        -- Every card in the graveyard rather than only the ones whose ability
+        -- gatherGiven will keep: a superset costs a second walk, where a subset
+        -- ungates a clause.
+        || any conditional (graveyardCards gs)
 
 -- CR 604.2: is this static ability's "as long as" clause true right now?
 --
@@ -2068,9 +2093,61 @@ gatherGiven stripped functioning gs =
               then []
               else concat (zipWith (gatherStatic (functioning spellId) spellId (Object.timestamp spellObj) [] False) [0 ..] (Face.staticAbilities face))
       spells = concatMap fromSpell (GameState.stack gs)
+      fromGraveyardCard cardId = case Game.lookupObject cardId gs of
+        Nothing -> []
+        Just cardObj -> case Game.faceOf cardId gs of
+          Nothing -> []
+          Just face ->
+            -- CR 113.6f: "an object's ability that restricts or modifies what
+            -- zones that particular object can be played or cast from functions
+            -- everywhere". Viral Spawning's "as long as ... this card is in your
+            -- graveyard, it has flashback {2}{G}" is one -- the granted keyword
+            -- is rule 702.34a's, which is a permission to cast the card from a
+            -- graveyard -- so the ability functions where the card lies.
+            --
+            -- WHICH abilities qualify is asked of rule 702 rather than of the
+            -- card: an ability qualifies when a keyword it grants is one rule
+            -- 702 turns into a casting permission, which is
+            -- Keyword.permissionsFor, the same mapping Pawl.Engine.Cast reads
+            -- for a printed keyword. A classification, not an identity.
+            --
+            -- The PRINTED type line answers rule 702.34a's instant-or-sorcery
+            -- clause here, where Pawl.Engine.Cast asks it of the face being
+            -- cast: this is the gate on whether to gather at all, so reading it
+            -- from a projection this walk is building would be circular.
+            -- Nothing in the pool changes a graveyard card's type line, and the
+            -- permission is re-derived from the projected keywords downstream
+            -- anyway.
+            --
+            -- CR 613.7a again: the effect shares the card's own timestamp. No
+            -- text-change pass and never stripped, for the emblem and spell
+            -- branches' reason -- the pool's CR 613.1f removers reach creatures
+            -- on the battlefield, and a card in a graveyard is not one.
+            --
+            -- Not implemented: the ability's own zone clause, so an ability
+            -- gathered here is also gathered from the stack by `fromSpell`
+            -- above when its card is an instant or a sorcery (#1413).
+            let qualifies sa = any (grantsKeywordWhere (castZoneKeyword face)) (StaticAbility.modifications sa)
+                indexed = zip [0 :: Natural ..] (Face.staticAbilities face)
+             in concat [gatherStatic (functioning cardId) cardId (Object.timestamp cardObj) [] False n sa | (n, sa) <- indexed, qualifies sa]
+      graveyards = concatMap fromGraveyardCard (graveyardCards gs)
       counters = counterGathered gs
       designations = designationGathered gs
-   in stored <> static <> emblems <> spells <> counters <> designations
+   in stored <> static <> emblems <> spells <> graveyards <> counters <> designations
+
+-- Every card in every graveyard, which is the zone gatherGiven's CR 113.6f walk
+-- and anyConditional's precondition both range over.
+graveyardCards :: GameState -> [ObjectId]
+graveyardCards = foldMap (foldr (:) []) . Map.elems . GameState.graveyard
+
+-- CR 113.6f's classification, one keyword at a time: does rule 702 turn this
+-- keyword into a permission to cast the object it is on from somewhere? Rule
+-- 702.34a's flashback does, and so do aftermath and jump-start.
+--
+-- The face supplies rule 702.34a's card types, which is what makes flashback on
+-- a creature card grant nothing -- the same argument Pawl.Engine.Cast passes.
+castZoneKeyword :: Face.Face card -> Keyword -> Bool
+castZoneKeyword face keyword = not (null (Keyword.permissionsFor (TypeLine.types (Face.typeLine face)) keyword))
 
 -- CR 113.6's first sentence: the card types whose object has its abilities
 -- function on the stack rather than on the battlefield. Its own binding rather
@@ -2595,6 +2672,11 @@ filterReads f = case f of
   -- CR 603.2's atom is written into a target slot.
   Filter.Type.ControlledByBound _ -> Set.singleton Controller
   Filter.Type.ControlledByPlayer _ -> Set.singleton Controller
+  -- The same aspect for the same reason: the atom compares the CANDIDATE's
+  -- controller against a player the surrounding effect supplies. Not in an
+  -- affected set in the pool either -- CR 119.5's atom is written into an effect's
+  -- quantity.
+  Filter.Type.ControlledByRecipient -> Set.singleton Controller
   -- Reads NOTHING, where its sibling above reads Controller, and the contrast is
   -- CR 108.3's: no Modification writes Object.owner, because no rule changes an
   -- owner at all -- CR 613.1b's layer 2 moves control and rule 108.3 has no
@@ -2754,7 +2836,8 @@ modificationReads m = case m of
 -- Three ways to read one. A Count folds a population its Filter keeps, so it
 -- reads whatever that filter reads (plus whatever its aggregation reads); Power
 -- and Toughness read CR 613.4's own layer off the object the evaluation is aimed
--- at; and Plus and AgainstSlot are composition, reading what they contain.
+-- at; and Plus, Negate and AgainstSlot are composition, reading what they
+-- contain.
 --
 -- Everything else reads nothing a Modification writes, each for the reason its
 -- sibling filter atom gives: ManaValue is computed from the printed mana cost
@@ -2772,6 +2855,9 @@ quantityReads q = case q of
   Quantity.Type.Power -> Set.singleton PowerA
   Quantity.Type.Toughness -> Set.singleton PowerA
   Quantity.Type.Plus a b -> quantityReads a <> quantityReads b
+  -- Composition, as Plus is: halving reads nothing of its own.
+  Quantity.Type.Halved _ a -> quantityReads a
+  Quantity.Type.Negate a -> quantityReads a
   Quantity.Type.AgainstSlot _ a -> quantityReads a
   Quantity.Type.Literal _ -> Set.empty
   Quantity.Type.ManaValue -> Set.empty

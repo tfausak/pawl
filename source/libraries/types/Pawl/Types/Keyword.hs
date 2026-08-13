@@ -565,6 +565,27 @@ data Keyword
     --
     -- Nullary and count-read, for persist's reasons.
     Undying
+  | -- | 702.94a: miracle [cost]. A STATIC ability linked (CR 603.11) to a
+    -- TRIGGERED one -- "You may reveal this card from your hand as you draw it if
+    -- it's the first card you've drawn this turn. When you reveal this card this
+    -- way, you may cast it by paying [cost] rather than its mana cost."
+    --
+    -- Both halves live in the HAND (CR 113.6b), so both are read off a card's
+    -- PRINTED keywords, the way flashback's three readers are: pawl's projection
+    -- reaches the battlefield only (#160). The static half is
+    -- Pawl.Engine.Keyword.miracleCost, consulted by Pawl.Engine.Event's draw
+    -- funnel -- the one place CR 121.9's window exists; the triggered half is
+    -- minted by Pawl.Engine.Keyword.miracle, and CR 113.6k is what confines it to
+    -- the hand rather than a zone check anywhere in its reader.
+    --
+    -- A Cost and not a ManaCost, for Cycling's and Flashback's reason: rule
+    -- 702.94a writes "[cost]", and CR 118.9d's alternative cost is a cost like any
+    -- other. Every printing states mana alone.
+    --
+    -- The LINK is what the trigger condition carries rather than anything here:
+    -- CR 702.94a's "this way" is a fact about the reveal that happened, so it
+    -- rides Pawl.Types.RevealCause on the event and never the keyword.
+    Miracle (Cost.Cost Keyword)
   | -- | 702.98a: unleash. TWO static abilities, as rule 702.98a bundles them:
     -- "You may have this permanent enter with an additional +1/+1 counter on it"
     -- and "This permanent can't block as long as it has a +1/+1 counter on it."

@@ -318,15 +318,16 @@ phyrexianGreen :: ManaSymbol.ManaSymbol
 phyrexianGreen = ManaSymbol.Phyrexian Color.Green
 
 -- CR 601.2f's adjustments as this suite's assertions state them: the increases,
--- the reductions, and no floor -- Pawl.Types.CostAdjustments.minimumMana is
--- Heartstone's sentence, and no spell-cost reducer states it (the activation side
--- is proved against the card in Pawl.ActivateSpec).
+-- the reductions each floored at zero, and no added components -- the floor is
+-- Heartstone's sentence and Pawl.Types.CostAdjustments.components is Brutal
+-- Suppression's, and no spell-cost effect states either (the activation side of
+-- both is proved against the card in Pawl.ActivateSpec).
 adjustments :: [Natural] -> [ManaCost.ManaCost] -> CostAdjustments.CostAdjustments
 adjustments increases reductions =
   CostAdjustments.MkCostAdjustments
     { CostAdjustments.increases = increases,
-      CostAdjustments.reductions = reductions,
-      CostAdjustments.minimumMana = 0
+      CostAdjustments.reductions = fmap (\reduction -> (reduction, 0)) reductions,
+      CostAdjustments.components = []
     }
 
 -- A reduction by an amount of GENERIC mana (CR 118.7a) -- the Medallion's shape,

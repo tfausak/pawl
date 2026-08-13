@@ -1,6 +1,7 @@
 module Pawl.Codec.PlayerEffect where
 
 import qualified Data.Text as Text
+import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -22,6 +23,7 @@ toJson e = case e of
   PlayerEffect.IncreaseSpellCost c n -> Common.tagged "IncreaseSpellCost" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) c, Common.encodeNatural n]
   PlayerEffect.ReduceSpellCost c m -> Common.tagged "ReduceSpellCost" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) c, Codec.encode ManaCost.codec m]
   PlayerEffect.ReduceActivationCost c m n -> Common.tagged "ReduceActivationCost" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) c, Codec.encode ManaCost.codec m, Common.encodeNatural n]
+  PlayerEffect.AddActivationCost c cs -> Common.tagged "AddActivationCost" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) c, Codec.encode (Common.list (CostComponent.codec Keyword.codec)) cs]
   PlayerEffect.PlayAdditionalLands n -> Common.tagged "PlayAdditionalLands" . Just $ Common.encodeNatural n
   PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
   PlayerEffect.SetMaximumHandSize n -> Common.tagged "SetMaximumHandSize" . Just $ Common.encodeNatural n
@@ -47,6 +49,7 @@ fromJson value = do
     ("IncreaseSpellCost", Just (Value.Array (Array.MkArray [c, n]))) -> PlayerEffect.IncreaseSpellCost <$> Codec.decode (Filter.codec Keyword.codec) c <*> Common.decodeNatural n
     ("ReduceSpellCost", Just (Value.Array (Array.MkArray [c, m]))) -> PlayerEffect.ReduceSpellCost <$> Codec.decode (Filter.codec Keyword.codec) c <*> Codec.decode ManaCost.codec m
     ("ReduceActivationCost", Just (Value.Array (Array.MkArray [c, m, n]))) -> PlayerEffect.ReduceActivationCost <$> Codec.decode (Filter.codec Keyword.codec) c <*> Codec.decode ManaCost.codec m <*> Common.decodeNatural n
+    ("AddActivationCost", Just (Value.Array (Array.MkArray [c, cs]))) -> PlayerEffect.AddActivationCost <$> Codec.decode (Filter.codec Keyword.codec) c <*> Codec.decode (Common.list (CostComponent.codec Keyword.codec)) cs
     ("PlayAdditionalLands", Just v) -> PlayerEffect.PlayAdditionalLands <$> Common.decodeNatural v
     ("NoMaximumHandSize", _) -> Right PlayerEffect.NoMaximumHandSize
     ("SetMaximumHandSize", Just v) -> PlayerEffect.SetMaximumHandSize <$> Common.decodeNatural v

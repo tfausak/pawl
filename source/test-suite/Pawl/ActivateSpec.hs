@@ -120,6 +120,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   twoSacrificeComponentSpec s registry
   outlastSpec s registry
   activationCostReductionSpec s registry
+  unflooredActivationCostReductionSpec s registry
+  activationCostAdditionSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -642,7 +644,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
   -- What the assertion is FOR: a tutored card is otherwise private -- it
   -- goes from one hidden zone to another -- so the log entry is the only
   -- record that a Forest in Alice's hand is a fact Bob gets to play around.
-  -- The log, not a per-player view: pawl has no such view yet (#322), and
+  -- The log, not a per-player view: pawl has no such view yet (#1412), and
   -- this is the record one would read.
   Spec.it s "CR 701.20a basic landcycling reveals the Forest it fetches" $ do
     barrens <- S.printingOf s registry "Ash Barrens"
@@ -2339,3 +2341,196 @@ activationCostReductionSpec s registry = Spec.describe s "ActivationCostReductio
     Spec.assertBool s (Activate.activatable S.bob srcId ability board) "bob's creature is reduced too"
     Spec.assertEqWith s "two of bob's three Mountains paid it" (S.tappedCount S.bob after) 2
     Spec.assertEqWith s "and alice tapped nothing" (S.tappedCount S.alice after) 0
+
+-- Mutavault's SECOND printed ability, the {1} animation. `theAbility` takes the
+-- first, which here is the mana ability CR 605.3b keeps off the stack -- and one
+-- with no mana in its cost, so nothing could be measured on it.
+animationAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+animationAbility p = case drop 1 (Face.activatedAbilities (S.combinedFace p)) of
+  ab : _ -> ab
+  [] -> theAbility p
+
+-- alice's board: Mutavault, `lands` Mountains and Heartstone, plus Blossoming
+-- Tortoise when one is passed. The positive and the negative differ in that Maybe
+-- and in nothing else -- same seats, same lands, same permanents, same priority --
+-- which is what makes a tapped count attributable to the second reduction.
+mutavaultBoard ::
+  Printing.Printing ->
+  Int ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+mutavaultBoard mountain lands mutavault heartstone mTortoise =
+  let base = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. lands]
+      (srcId, g1) = S.addCreature mutavault S.alice base
+      g2 = snd (S.addCreature heartstone S.alice g1)
+      g3 = maybe g2 (\tortoise -> snd (S.addCreature tortoise S.alice g2)) mTortoise
+   in (srcId, g3 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
+
+-- CR 601.2f's floor read PER REDUCING EFFECT rather than as a clamp on the pooled
+-- result (#1243). The two readings agree on every board with one reduction, and on
+-- every board whose reductions all state the same floor, so what tells them apart
+-- is a FLOORED reduction beside an UNFLOORED one on one cost.
+--
+-- Heartstone {3} Artifact -- "Activated abilities of creatures cost {1} less to
+-- activate. This effect can't reduce the mana in that cost to less than one mana"
+-- -- is the floored half. Blossoming Tortoise {2}{G}{G} Creature -- Turtle 3/3 --
+-- "Activated abilities of lands you control cost {1} less to activate" is the
+-- unfloored half; it states no such sentence, so nothing forbids it taking the
+-- mana Heartstone's floor left behind. Mutavault's "{1}: This land becomes a 2/2
+-- creature with all creature types until end of turn. It's still a land" is the
+-- cost both reduce, and the animation is what puts one permanent inside both
+-- criteria at once. All three Oracle texts checked against api.scryfall.com.
+--
+-- The NUMBERS are why the board is honest: the printed {1} is at most what either
+-- reduction takes, so the two orders CR 601.2f leaves the player agree -- the
+-- Tortoise alone empties the cost, and Heartstone applied to an empty cost adds
+-- nothing back (its own ruling) -- and the assertion is not reading pawl's choice
+-- of order. A pooled clamp answers {1} on the same board, which is a different
+-- number of lands.
+unflooredActivationCostReductionSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+unflooredActivationCostReductionSpec s registry = Spec.describe s "UnflooredActivationCostReduction" $ do
+  Spec.it s "CR 601.2f an unfloored reduction takes the mana a floored one may not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    mutavault <- S.printingOf s registry "Mutavault"
+    heartstone <- S.printingOf s registry "Heartstone"
+    tortoise <- S.printingOf s registry "Blossoming Tortoise"
+    let animate = animationAbility mutavault
+        (withId, withBoard) = mutavaultBoard mountain 2 mutavault heartstone (Just tortoise)
+        (withoutId, withoutBoard) = mutavaultBoard mountain 2 mutavault heartstone Nothing
+        activate srcId gs = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId animate)
+        animated srcId gs = S.runPure S.identityAnswer (activate srcId gs) Stack.resolveTop
+        withAnimated = animated withId withBoard
+        withoutAnimated = animated withoutId withoutBoard
+    Spec.assertEqWith s "Mutavault prints two abilities, and the animation is the second" (length (Face.activatedAbilities (S.combinedFace mutavault))) 2
+    -- The first activation, made while Mutavault is still no creature: only the
+    -- Tortoise's criterion names it, so the board WITHOUT her pays the printed
+    -- {1}. That is also what proves the two boards are the same board otherwise.
+    Spec.assertEqWith s "the Tortoise alone pays the first activation" (S.tappedCount S.alice withAnimated) 0
+    Spec.assertEqWith s "where the printed {1} costs a land" (S.tappedCount S.alice withoutAnimated) 1
+    -- The animation resolved, so Mutavault is now a land AND a creature -- inside
+    -- both criteria at once. The Tortoise's third sentence is what tells the two
+    -- apart: "Land creatures you control get +1/+1".
+    Spec.assertEqWith s "an animated Mutavault under the Tortoise" (S.powerToughnessOf withId withAnimated) (Just (3, 3))
+    Spec.assertEqWith s "and 2/2 without her" (S.powerToughnessOf withoutId withoutAnimated) (Just (2, 2))
+    let withSecond = activate withId withAnimated
+        withoutSecond = activate withoutId withoutAnimated
+    -- THE ASSERTION. Heartstone may not take the last mana; the Tortoise may, and
+    -- does. A clamp on the pooled reduction leaves {1} here and taps a Mountain.
+    Spec.assertEqWith s "the second activation costs nothing at all" (S.tappedCount S.alice withSecond) 0
+    Spec.assertEqWith s "and is on the stack, so it was not merely refused" (length (GameState.stack withSecond)) 1
+    -- The floor, on the same pair: Heartstone alone leaves the {1} it may not
+    -- reduce, and one more land pays it. Not a refusal -- the ability reaches the
+    -- stack on this board too, so the difference is the mana and nothing else.
+    Spec.assertEqWith s "Heartstone's own floor leaves a mana to pay" (S.tappedCount S.alice withoutSecond) 2
+    Spec.assertEqWith s "which is paid, not refused" (length (GameState.stack withoutSecond)) 1
+
+-- alice's board: Saltfield Recluse, `lands` Plains, and a Goblin Piker under bob
+-- to aim the Recluse's ability at -- plus Brutal Suppression under BOB when one
+-- is passed. The positive and the negative differ in that Maybe and in nothing
+-- else: same seats, same permanents, same priority, and the same mana on both
+-- boards because the Recluse's activation cost has NO mana part at all, so no
+-- reading of the negative can be "she could not afford it".
+--
+-- Brutal Suppression sits with bob however the activation goes, because its
+-- sentence is symmetric ("activated abilities of nontoken Rebels", no
+-- possessive, PlayerScope.EachPlayer) -- the board that proves that is the one
+-- where the activating player does not control it.
+suppressionBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  Maybe Printing.Printing ->
+  (ObjectId.ObjectId, GameState.GameState)
+suppressionBoard recluse plains piker lands mSuppression =
+  let base = List.foldl' (\g _ -> snd (S.addCreature plains S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. lands]
+      (srcId, g1) = S.addCreature recluse S.alice base
+      g2 = snd (S.addCreature piker S.bob g1)
+      g3 = maybe g2 (\suppression -> snd (S.addCreature suppression S.bob g2)) mSuppression
+   in (srcId, g3 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice})
+
+-- CR 601.2f's "plus all additional costs" reaching an ACTIVATION cost by CR
+-- 602.2b (#1321), which nothing could do before: an adjustment carried mana
+-- only, so no effect could add a tap, a sacrifice or a discard to an ability.
+--
+-- Brutal Suppression {R} Enchantment -- "Activated abilities of nontoken Rebels
+-- cost an additional \"Sacrifice a land\" to activate" (Oracle text checked
+-- against Scryfall) -- is the printing. Saltfield Recluse {2}{W} Creature --
+-- Human Rebel Cleric 1/2, "{T}: Target creature gets -2/-0 until end of turn",
+-- is the ability it taxes, and its cost is why the pair is honest: {T} and
+-- nothing else, so the ONLY thing a land can be needed for on these boards is
+-- the added component.
+--
+-- Asserted at GAMEPLAY level -- what Action.legalActions offers, and what
+-- Activate.activateAbility actually does to the board -- rather than through
+-- Activate.activatable, so a refusal is one a player would meet.
+activationCostAdditionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition" $ do
+  -- The gate, on a pair of boards differing only in the Suppression: with no
+  -- land to sacrifice the added component cannot be paid, so the ability is not
+  -- offered and an activation attempted anyway is the no-op CR 602.2 requires --
+  -- nothing on the stack and the Recluse still UNTAPPED, which is the printed
+  -- half of the cost proving it was rolled back rather than half-paid.
+  Spec.it s "CR 601.2f Brutal Suppression's added cost stops an activation with no land" $ do
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    suppression <- S.printingOf s registry "Brutal Suppression"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let ability = theAbility recluse
+        (withId, withSuppression) = suppressionBoard recluse plains piker 0 (Just suppression)
+        (withoutId, withoutSuppression) = suppressionBoard recluse plains piker 0 Nothing
+        activated srcId gs = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId ability)
+        after = activated withId withSuppression
+        control = activated withoutId withoutSuppression
+    Spec.assertEqWith s "not offered under the Suppression" (activationsOf withId (Action.legalActions S.alice withSuppression)) []
+    Spec.assertBool s (not (null (activationsOf withoutId (Action.legalActions S.alice withoutSuppression)))) "and offered without it"
+    Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "and the Recluse was not tapped either" (fmap Object.tapped (Game.lookupObject withId after)) (Just TapState.Untapped)
+    Spec.assertEqWith s "where the same activation without the Suppression is on the stack" (length (GameState.stack control)) 1
+    Spec.assertEqWith s "having tapped the Recluse" (fmap Object.tapped (Game.lookupObject withoutId control)) (Just TapState.Tapped)
+
+  -- The added component being PAID rather than merely measured, on a pair
+  -- differing only in the Suppression again: one Plains under the Suppression is
+  -- gone after the activation, and the same Plains without it is untouched. An
+  -- ability that activated without paying is what this catches.
+  Spec.it s "CR 601.2h the added \"Sacrifice a land\" is actually paid" $ do
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    suppression <- S.printingOf s registry "Brutal Suppression"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let ability = theAbility recluse
+        plainsName = S.nameOf (Printing.card plains)
+        (withId, withSuppression) = suppressionBoard recluse plains piker 1 (Just suppression)
+        (withoutId, withoutSuppression) = suppressionBoard recluse plains piker 1 Nothing
+        activated srcId gs = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice srcId ability)
+        after = activated withId withSuppression
+        control = activated withoutId withoutSuppression
+    Spec.assertBool s (not (null (activationsOf withId (Action.legalActions S.alice withSuppression)))) "one Plains pays the added cost"
+    Spec.assertEqWith s "the ability is on the stack" (length (GameState.stack after)) 1
+    Spec.assertEqWith s "and the Plains was sacrificed" (S.countOnBattlefieldByName plainsName S.alice after) 0
+    Spec.assertEqWith s "into her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "where the same activation without the Suppression keeps it" (S.countOnBattlefieldByName plainsName S.alice control) 1
+    Spec.assertEqWith s "and sacrifices nothing" (length (Game.zoneMembers Zone.Graveyard S.alice control)) 0
+
+  -- THE FALSIFIER for the criterion, both halves of it, on ONE board carrying a
+  -- positive: Brutal Suppression names "nontoken REBELS", so a nonRebel's
+  -- ability and a Rebel TOKEN's ability are both untaxed while the Recluse's is
+  -- taxed. Prodigal Sorcerer is the nonRebel ("{T}: This creature deals 1 damage
+  -- to any target"), and the token is a copy of the Recluse's own card -- so the
+  -- two differ from the taxed permanent in exactly one atom each.
+  Spec.it s "CR 601.2f Brutal Suppression's criterion spares a nonRebel and a token Rebel" $ do
+    recluse <- S.printingOf s registry "Saltfield Recluse"
+    recluseCard <- S.cardOf s registry "Saltfield Recluse"
+    suppression <- S.printingOf s registry "Brutal Suppression"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (reclusId, board) = suppressionBoard recluse plains piker 0 (Just suppression)
+        (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice board
+        (tokenId, withToken) = S.addToken recluseCard S.alice withSorcerer
+        actions = Action.legalActions S.alice withToken
+    Spec.assertEqWith s "the nontoken Rebel is taxed and cannot pay" (activationsOf reclusId actions) []
+    Spec.assertBool s (not (null (activationsOf sorcererId actions))) "the nonRebel is untaxed"
+    Spec.assertBool s (not (null (activationsOf tokenId actions))) "and so is the token Rebel"

@@ -1484,6 +1484,7 @@ oneMountainState mountain ph =
           GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
+          GameState.drawsThisTurn = mempty,
           GameState.speedIncreasedThisTurn = mempty,
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,

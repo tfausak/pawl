@@ -3974,6 +3974,421 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
         Spec.assertEqWith s "no loss" (lifeLosses after) []
       other -> Spec.assertFailure s ("expected exactly one activated ability on the Conduit, got " <> show (length other))
 
+-- CR 119.5: "If an effect sets a player's life total to a specific number, the
+-- player gains or loses the necessary amount of life to end up with the new
+-- total." So a set is NOT a third kind of life event: it is a gain or a loss,
+-- whichever the arithmetic makes it, and everything that watches gaining or
+-- losing life sees it. The whole group exists to hold that reading in place.
+--
+-- Two cards prove it, and it takes two because neither reaches both directions:
+--
+--   * Magister Sphinx, {4}{W}{U}{B} Artifact Creature -- Sphinx 5/5 with flying,
+--     "When this creature enters, target player's life total becomes 10." The
+--     literal, so the SAME card is a gain at one seat and a loss at another --
+--     and the first two cases below are one board differing in nothing but which
+--     seat the trigger names.
+--   * Arbiter of Knollridge, {6}{W} Creature -- Giant Wizard 5/5 with vigilance,
+--     "When this creature enters, each player's life total becomes the highest
+--     life total among all players." The fold, and the several-recipients shape a
+--     targeted card cannot reach.
+--
+-- Three seats at 4, 27 and 13 -- distinct, and one above 10 and two below, so the
+-- Sphinx cases tell a gain from a loss. 27 is not the sum (44), the count (3) or
+-- the least (4), so Arbiter's one number falsifies every other fold. Only the
+-- CR 119.9 case changes a starting total, moving carol to 10 so that the seat the
+-- trigger names is already there.
+--
+-- The watchers are what make the claim about EVENTS rather than about totals.
+-- Ajani's Pridemate ("whenever you gain life, put a +1/+1 counter on this
+-- creature") is on the board for the gain side and Mindcrank ("whenever an
+-- opponent loses life, that player mills that many cards") for the loss side, so
+-- every case asserts which of the two fired -- and a set that wrote Player.life
+-- directly would leave both silent while every life total still came out right.
+setLifeTotalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+setLifeTotalSpec s registry =
+  let -- Cast, then settle-and-resolve until the stack runs dry: the spell, then
+      -- CR 603.6a's entry trigger, then whatever the life change itself
+      -- triggered. Deliberately NOT Engine.priorityLoop, which advances the turn
+      -- and clears GameState.events out from under lifeGains and lifeLosses. Six
+      -- passes is more than the deepest case needs, and settling or resolving an
+      -- empty stack is a no-op.
+      castAndTrigger :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      castAndTrigger answer spellId gs =
+        let step board = S.runPure answer (S.runPure answer board Engine.settleForPriority) Stack.resolveTop
+         in List.foldl' (\board _ -> step board) (S.runPure answer gs (S.cast S.alice spellId)) [1 .. 6 :: Int]
+      -- Pinned, not searched: the trigger's target slot takes `who` and nothing
+      -- else, so a mutation cannot be repaired by an answerer that goes looking
+      -- for a legal option. Three players and a count of one, so there is a real
+      -- choice to pin.
+      aimedAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      aimedAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer who) sets
+        _ -> S.identityAnswer p
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      graveyardSize pid gs = Seq.length (Map.findWithDefault Seq.empty pid (GameState.graveyard gs))
+      -- The three seats, alice holding the mana and both watchers, and every
+      -- library stocked so Mindcrank has something to mill and CR 104.3c never
+      -- fires. `lands` is the mana base the spell needs; everything else is
+      -- shared by all four cases.
+      setBoard lands pridemate mindcrank filler spell aliceLife bobLife carolLife =
+        let withLands = List.foldl' (\board (printing, n) -> S.landsFor printing S.alice n board) S.threePlayerGame lands
+            (aliceMate, withAliceMate) = S.addCreature pridemate S.alice withLands
+            (bobMate, withBobMate) = S.addCreature pridemate S.bob withAliceMate
+            (_, withCrank) = S.addCreature mindcrank S.alice withBobMate
+            stocked = List.foldl' (\board pid -> stockLibrary filler pid 30 board) withCrank [S.alice, S.bob, S.carol]
+            at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+            lifed = stocked {GameState.players = at S.alice aliceLife (at S.bob bobLife (at S.carol carolLife (GameState.players stocked)))}
+            (gs, spellId) = S.handOne spell lifed
+         in (aliceMate, bobMate, spellId, gs)
+      addPikers piker pid n gs = List.foldl' (\board _ -> snd (S.addCreature piker pid board)) gs [1 .. n :: Int]
+      -- Biorhythm's board, where what differs between the seats is their CREATURE
+      -- COUNT rather than their life total. setBoard leaves alice a Pridemate and
+      -- a Mindcrank -- an ARTIFACT, so not one of her creatures -- and bob a
+      -- Pridemate, so the Pikers below take alice to 4 creatures and bob to 3.
+      -- `carolPikers` is the one knob the pair of cases turns.
+      --
+      -- Life totals 2, 3 and 9 against counts 4, 3 and 0: every seat's answer is
+      -- distinct, no seat's answer is any other seat's, and only bob's happens to
+      -- equal his own starting total -- which is what the CR 119.9 half of the
+      -- pair needs. bob's count and bob's life coinciding is why the other two
+      -- seats are there: alice's 2 against 4 and carol's 9 against 0 tell "counts
+      -- creatures" from "reads a life total".
+      biorhythmBoard carolPikers = do
+        forest <- S.printingOf s registry "Forest"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        mindcrank <- S.printingOf s registry "Mindcrank"
+        piker <- S.printingOf s registry "Goblin Piker"
+        biorhythm <- S.printingOf s registry "Biorhythm"
+        let (aliceMate, bobMate, spellId, gs) = setBoard [(forest, 8)] pridemate mindcrank piker biorhythm 2 3 9
+        pure (aliceMate, bobMate, spellId, addPikers piker S.carol carolPikers (addPikers piker S.bob 2 (addPikers piker S.alice 3 gs)))
+      sphinxBoard aliceLife bobLife carolLife = do
+        plains <- S.printingOf s registry "Plains"
+        island <- S.printingOf s registry "Island"
+        swamp <- S.printingOf s registry "Swamp"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        mindcrank <- S.printingOf s registry "Mindcrank"
+        piker <- S.printingOf s registry "Goblin Piker"
+        sphinx <- S.printingOf s registry "Magister Sphinx"
+        pure (setBoard [(plains, 5), (island, 1), (swamp, 1)] pridemate mindcrank piker sphinx aliceLife bobLife carolLife)
+   in Spec.describe s "SetLifeTotal" $ do
+        -- The gain direction. alice is BELOW 10, so reaching it is a gain of 6 --
+        -- and her Pridemate sees it, which is the whole CR 119.5 claim.
+        Spec.it s "CR 119.5 Magister Sphinx sets a total UPWARD, and that is a life gain" $ do
+          (aliceMate, bobMate, spellId, gs) <- sphinxBoard 4 27 13
+          let after = castAndTrigger (aimedAt S.alice) spellId gs
+          Spec.assertEqWith s "alice reached 10" (S.lifeOf S.alice after) (Just 10)
+          Spec.assertEqWith s "bob, untargeted, keeps his 27" (S.lifeOf S.bob after) (Just 27)
+          Spec.assertEqWith s "carol, untargeted, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "logged as a gain of exactly 6" (lifeGains after) [(S.alice, 6)]
+          Spec.assertEqWith s "and as no loss at all" (lifeLosses after) []
+          Spec.assertEqWith s "alice's Pridemate saw the gain" (countersOn aliceMate after) (Just 1)
+          Spec.assertEqWith s "bob's did not: it was not his life" (countersOn bobMate after) (Just 0)
+          Spec.assertEqWith s "and Mindcrank stayed silent: nobody lost life" (graveyardSize S.bob after) 0
+        -- The control twin, differing in ONE thing: the seat the trigger names.
+        -- bob is ABOVE 10, so the identical card is a LOSS of 17 -- Mindcrank
+        -- fires and the Pridemate does not, which is the pair that tells a set
+        -- from a gain.
+        Spec.it s "CR 119.5 the control: the same card set DOWNWARD is a life loss" $ do
+          (aliceMate, bobMate, spellId, gs) <- sphinxBoard 4 27 13
+          let after = castAndTrigger (aimedAt S.bob) spellId gs
+          Spec.assertEqWith s "bob came down to 10" (S.lifeOf S.bob after) (Just 10)
+          Spec.assertEqWith s "alice, untargeted, keeps her 4" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "carol, untargeted, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "logged as a loss of exactly 17" (lifeLosses after) [(S.bob, 17)]
+          Spec.assertEqWith s "and as no gain at all" (lifeGains after) []
+          Spec.assertEqWith s "Mindcrank milled bob for exactly 17" (graveyardSize S.bob after) 17
+          Spec.assertEqWith s "alice's Pridemate stayed silent" (countersOn aliceMate after) (Just 0)
+          Spec.assertEqWith s "and so did bob's: losing life is not gaining it" (countersOn bobMate after) (Just 0)
+        -- CR 119.9's own last sentence, on the set: carol is ALREADY at 10, so
+        -- the necessary amount is 0, no life event occurs, and neither watcher
+        -- may fire. The Sphinx really entered, so a spell that did nothing cannot
+        -- pass this by leaving the board alone.
+        Spec.it s "CR 119.9 setting a total to the number it already holds is neither a gain nor a loss" $ do
+          (aliceMate, bobMate, spellId, gs) <- sphinxBoard 4 27 10
+          let after = castAndTrigger (aimedAt S.carol) spellId gs
+          Spec.assertEqWith s "carol is still at 10" (S.lifeOf S.carol after) (Just 10)
+          Spec.assertEqWith s "no gain" (lifeGains after) []
+          Spec.assertEqWith s "no loss" (lifeLosses after) []
+          Spec.assertEqWith s "no Pridemate counter anywhere" (fmap (\oid -> countersOn oid after) [aliceMate, bobMate]) [Just 0, Just 0]
+          Spec.assertEqWith s "and Mindcrank milled nobody" (graveyardSize S.carol after) 0
+          Spec.assertEqWith s "and the Sphinx really entered, so a spell that never resolved cannot pass this" (Set.size (GameState.battlefield after)) (Set.size (GameState.battlefield gs) + 1)
+        -- Arbiter of Knollridge: SEVERAL recipients from one instruction, and a
+        -- folded number rather than a literal. 27 is the highest, and it is not
+        -- the sum (44), the count (3), the least (4) or any seat's own total, so
+        -- one set of three assertions falsifies every other reading.
+        --
+        -- bob is the seat that is ALREADY highest, and his own Pridemate is the
+        -- point of the case: he ends on the number he started on, so CR 119.9
+        -- says no life gain event happened to him even though the effect named
+        -- him. That is the assertion a raw "write the total to every player"
+        -- implementation fails.
+        Spec.it s "CR 119.5 Arbiter of Knollridge raises every seat to the HIGHEST total, gaining only where the total moves" $ do
+          plains <- S.printingOf s registry "Plains"
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          mindcrank <- S.printingOf s registry "Mindcrank"
+          piker <- S.printingOf s registry "Goblin Piker"
+          arbiter <- S.printingOf s registry "Arbiter of Knollridge"
+          let (aliceMate, bobMate, spellId, gs) = setBoard [(plains, 7)] pridemate mindcrank piker arbiter 4 27 13
+              after = castAndTrigger S.identityAnswer spellId gs
+          Spec.assertEqWith s "alice rose from 4 to 27" (S.lifeOf S.alice after) (Just 27)
+          Spec.assertEqWith s "bob, already highest, stayed at 27" (S.lifeOf S.bob after) (Just 27)
+          Spec.assertEqWith s "carol rose from 13 to 27" (S.lifeOf S.carol after) (Just 27)
+          Spec.assertEqWith s "exactly the two seats that moved gained, by exactly their deltas" (lifeGains after) [(S.alice, 23), (S.carol, 14)]
+          Spec.assertEqWith s "nobody lost life" (lifeLosses after) []
+          Spec.assertEqWith s "alice's Pridemate saw her gain" (countersOn aliceMate after) (Just 1)
+          Spec.assertEqWith s "bob's did not: a total set to itself is no gain (CR 119.9)" (countersOn bobMate after) (Just 0)
+          Spec.assertEqWith s "and Mindcrank milled nobody" (graveyardSize S.carol after) 0
+        -- Biorhythm, {6}{G}{G} Sorcery: "Each player's life total becomes the
+        -- number of creatures they control." The number is EACH RECIPIENT'S OWN,
+        -- which neither producer above can tell from a single evaluation: the
+        -- Sphinx names one seat and Arbiter names one number for the whole table.
+        --
+        -- Three seats, three different counts -- alice 4, bob 3, carol 0 -- so no
+        -- seat's answer can stand in for another's, and a reading that evaluated
+        -- once from the CONTROLLER's perspective would hand bob and carol alice's
+        -- 4. Each seat carries one half of the rule besides:
+        --
+        --   * alice gains (2 -> 4), and her Pridemate sees it;
+        --   * bob's count is his current total, so CR 119.9 leaves him with no
+        --     life event at all and his Pridemate silent;
+        --   * carol controls nothing, so her total becomes 0 and CR 104.3b takes
+        --     her out of the game.
+        Spec.it s "CR 119.5 Biorhythm sets EACH seat to its OWN creature count" $ do
+          (aliceMate, bobMate, spellId, gs) <- biorhythmBoard 0
+          let after = castAndTrigger S.identityAnswer spellId gs
+          Spec.assertEqWith s "alice, controlling 4 creatures, rose from 2 to 4" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "bob, controlling 3, is at 3 -- not alice's 4" (S.lifeOf S.bob after) (Just 3)
+          Spec.assertEqWith s "carol, controlling none, fell from 9 to 0" (S.lifeOf S.carol after) (Just 0)
+          Spec.assertEqWith s "only alice gained, and by her own delta" (lifeGains after) [(S.alice, 2)]
+          Spec.assertEqWith s "only carol lost, and by hers" (lifeLosses after) [(S.carol, 9)]
+          Spec.assertEqWith s "alice's Pridemate saw her gain" (countersOn aliceMate after) (Just 1)
+          Spec.assertEqWith s "bob's did not: his total was already his count (CR 119.9)" (countersOn bobMate after) (Just 0)
+          Spec.assertBool s (notElem S.carol (Game.stillPlaying after)) "CR 104.3b took carol, at 0 life, out of the game"
+          Spec.assertEqWith s "and left the other two in it" (filter (`elem` Game.stillPlaying after) [S.alice, S.bob]) [S.alice, S.bob]
+        -- The control twin, differing in ONE thing: carol controls a single Piker.
+        -- Her answer moves 0 -> 1 while alice's and bob's do not move at all,
+        -- which is the pair that shows the count is read per seat; and a total of
+        -- 1 is a total CR 104.3b has no quarrel with, so the state-based action
+        -- above fired on carol's number rather than on her being named.
+        Spec.it s "CR 104.3b the control: one creature is one life, and carol stays in the game" $ do
+          (aliceMate, bobMate, spellId, gs) <- biorhythmBoard 1
+          let after = castAndTrigger S.identityAnswer spellId gs
+          Spec.assertEqWith s "alice is unmoved at 4" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "bob is unmoved at 3" (S.lifeOf S.bob after) (Just 3)
+          Spec.assertEqWith s "carol, controlling one creature, fell from 9 to 1" (S.lifeOf S.carol after) (Just 1)
+          Spec.assertEqWith s "alice still gained 2" (lifeGains after) [(S.alice, 2)]
+          Spec.assertEqWith s "carol lost 8 rather than 9" (lifeLosses after) [(S.carol, 8)]
+          Spec.assertBool s (elem S.carol (Game.stillPlaying after)) "and stayed in the game"
+          Spec.assertEqWith s "Mindcrank milled carol for exactly her loss" (graveyardSize S.carol after) 8
+          Spec.assertEqWith s "alice's Pridemate saw her gain" (countersOn aliceMate after) (Just 1)
+          Spec.assertEqWith s "bob's stayed silent" (countersOn bobMate after) (Just 0)
+
+-- Reverse the Sands, {6}{W}{W} Sorcery: "Redistribute any number of players'
+-- life totals. (Each of those players gets one life total back.)" CR 119.7 and
+-- CR 119.8 name the action; every seat's new total is CR 119.5's gain or loss,
+-- which setLifeTotalSpec above holds in place for one recipient and this group
+-- holds for a whole permutation.
+--
+-- The choice is the resolving controller's (CR 608.2c-d, and the card's own
+-- ruling "you choose which player gets which life total when the spell
+-- resolves"), so the engine may never pick it. Three seats at 27, 4 and 13 --
+-- distinct, so no two assignments produce the same board -- and the two positive
+-- cases are ONE board answered two ways, differing in nothing but the
+-- permutation. They disagree at every seat, which is what no fixed permutation
+-- the engine could have chosen for itself can do.
+--
+-- Neither permutation is the identity and neither is a rotation: both are
+-- transpositions, so each has a seat that is chosen and mapped to ITSELF. That
+-- seat is the one that tells "kept its own total" from "was never chosen" --
+-- both leave the total alone, and only the watchers agree with CR 119.9 that
+-- neither is a life event.
+--
+-- The watchers are what make the claim about EVENTS rather than totals. A
+-- Pridemate under each seat is the gain side ("whenever you gain life") and
+-- bob's Mindcrank is the loss side ("whenever an opponent loses life, that
+-- player mills that many cards"), so each case pins which of the two fired at
+-- which seat. A redistribution written as three raw Player.life writes would
+-- leave all four silent while every total still came out right.
+redistributeLifeTotalsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+redistributeLifeTotalsSpec s registry =
+  let -- setLifeTotalSpec's driver: cast, then settle-and-resolve until the stack
+      -- runs dry, so the spell and everything its life changes triggered all
+      -- resolve. Deliberately NOT Engine.priorityLoop, which advances the turn
+      -- and clears GameState.events out from under lifeGains and lifeLosses.
+      castAndTrigger :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      castAndTrigger answer spellId gs =
+        let step board = S.runPure answer (S.runPure answer board Engine.settleForPriority) Stack.resolveTop
+         in List.foldl' (\board _ -> step board) (S.runPure answer gs (S.cast S.alice spellId)) [1 .. 6 :: Int]
+      -- PINNED, not searched: the answer is exactly these pairs whatever the
+      -- prompt offers, so a mutation to the engine's own handling cannot be
+      -- repaired by an answerer that goes hunting for a legal permutation.
+      assigning :: [(PlayerId.PlayerId, PlayerId.PlayerId)] -> Prompt.Prompt r -> r
+      assigning pairs p = case p of
+        Prompt.ChooseRedistribution {} -> Map.fromList pairs
+        _ -> S.identityAnswer p
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      graveyardSize pid gs = Seq.length (Map.findWithDefault Seq.empty pid (GameState.graveyard gs))
+      -- alice holds the mana and casts; every seat has a Pridemate, bob has the
+      -- Mindcrank, and every library is stocked deep enough that a 23-card mill
+      -- never reaches CR 104.3c.
+      sandsBoard = do
+        plains <- S.printingOf s registry "Plains"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        mindcrank <- S.printingOf s registry "Mindcrank"
+        piker <- S.printingOf s registry "Goblin Piker"
+        sands <- S.printingOf s registry "Reverse the Sands"
+        let withLands = S.landsFor plains S.alice 8 S.threePlayerGame
+            (aliceMate, g1) = S.addCreature pridemate S.alice withLands
+            (bobMate, g2) = S.addCreature pridemate S.bob g1
+            (carolMate, g3) = S.addCreature pridemate S.carol g2
+            (_, g4) = S.addCreature mindcrank S.bob g3
+            stocked = List.foldl' (\board pid -> stockLibrary piker pid 40 board) g4 [S.alice, S.bob, S.carol]
+            at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+            lifed = stocked {GameState.players = at S.alice 27 (at S.bob 4 (at S.carol 13 (GameState.players stocked)))}
+            (gs, spellId) = S.handOne sands lifed
+        pure (aliceMate, bobMate, carolMate, spellId, gs)
+      -- The board every refused answer is checked against: nothing moved, and
+      -- nothing was logged. Shared so the three #222 cases differ in exactly one
+      -- thing -- the answer.
+      assertUntouched after = do
+        Spec.assertEqWith s "alice keeps her 27" (S.lifeOf S.alice after) (Just 27)
+        Spec.assertEqWith s "bob keeps his 4" (S.lifeOf S.bob after) (Just 4)
+        Spec.assertEqWith s "carol keeps her 13" (S.lifeOf S.carol after) (Just 13)
+        Spec.assertEqWith s "no gain" (lifeGains after) []
+        Spec.assertEqWith s "no loss" (lifeLosses after) []
+        -- Load-bearing: the spent sorcery and nothing else is in alice's
+        -- graveyard, so the spell really RESOLVED and no Mindcrank mill followed.
+        -- Without it every case below would pass just as well on a spell that
+        -- fizzled.
+        Spec.assertEqWith s "the spell resolved, and milled nobody doing it" (graveyardSize S.alice after) 1
+   in Spec.describe s "RedistributeLifeTotals" $ do
+        -- alice hands her 27 to carol and takes carol's 13; bob is CHOSEN and
+        -- mapped to himself. One seat gains, one loses, one is chosen and stays
+        -- put -- and 13, 4 and 27 are three different numbers, so this one set of
+        -- assertions falsifies every other permutation of the three.
+        Spec.it s "Reverse the Sands whole card: the controller's permutation is what happens, seat by seat" $ do
+          (aliceMate, bobMate, carolMate, spellId, gs) <- sandsBoard
+          let after = castAndTrigger (assigning [(S.alice, S.carol), (S.bob, S.bob), (S.carol, S.alice)]) spellId gs
+          Spec.assertEqWith s "alice took carol's 13" (S.lifeOf S.alice after) (Just 13)
+          Spec.assertEqWith s "bob, mapped to himself, is still on 4" (S.lifeOf S.bob after) (Just 4)
+          Spec.assertEqWith s "carol took alice's 27" (S.lifeOf S.carol after) (Just 27)
+          -- CR 119.5, per seat: the necessary amount, and its own sign.
+          Spec.assertEqWith s "carol gained exactly the difference" (lifeGains after) [(S.carol, 14)]
+          Spec.assertEqWith s "alice lost exactly the difference" (lifeLosses after) [(S.alice, 14)]
+          Spec.assertEqWith s "carol's Pridemate saw her gain" (countersOn carolMate after) (Just 1)
+          Spec.assertEqWith s "alice's did not: losing life is not gaining it" (countersOn aliceMate after) (Just 0)
+          -- CR 119.9 on the fixed point: bob was chosen, so a redistribution
+          -- that handed out totals blindly would still have "given" him one.
+          -- Taking his own is a delta of 0 and therefore no life event at all.
+          Spec.assertEqWith s "bob's Pridemate stayed silent: his own total back is no gain" (countersOn bobMate after) (Just 0)
+          -- 14 milled, plus the spent sorcery itself (CR 608.2m), which is alice's
+          -- card and lands in her graveyard -- so this also witnesses that the
+          -- spell really resolved rather than fizzling quietly.
+          Spec.assertEqWith s "bob's Mindcrank milled alice for exactly what she lost" (graveyardSize S.alice after) 15
+          Spec.assertEqWith s "and milled carol for nothing: she gained" (graveyardSize S.carol after) 0
+        -- The control twin: the SAME board, differing in nothing but the
+        -- permutation the controller names. Every seat lands somewhere else than
+        -- it did above, so no permutation the engine picked for itself can
+        -- satisfy both cases -- which is the whole second-invariant claim.
+        Spec.it s "the same board answered differently redistributes differently at every seat" $ do
+          (aliceMate, bobMate, carolMate, spellId, gs) <- sandsBoard
+          let after = castAndTrigger (assigning [(S.alice, S.bob), (S.bob, S.alice), (S.carol, S.carol)]) spellId gs
+          Spec.assertEqWith s "alice took bob's 4" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "bob took alice's 27" (S.lifeOf S.bob after) (Just 27)
+          Spec.assertEqWith s "carol, mapped to herself, is still on 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "bob gained exactly the difference" (lifeGains after) [(S.bob, 23)]
+          Spec.assertEqWith s "alice lost exactly the difference" (lifeLosses after) [(S.alice, 23)]
+          Spec.assertEqWith s "bob's Pridemate saw his gain" (countersOn bobMate after) (Just 1)
+          Spec.assertEqWith s "alice's stayed silent" (countersOn aliceMate after) (Just 0)
+          Spec.assertEqWith s "carol's stayed silent: her own total back is no gain" (countersOn carolMate after) (Just 0)
+          -- 23 milled plus the spent sorcery, as in the case above.
+          Spec.assertEqWith s "bob's Mindcrank milled alice for exactly what she lost" (graveyardSize S.alice after) 24
+        -- A ROTATION, and the reason the two transpositions above are not enough
+        -- on their own: a transposition is its own inverse, so reading the answer
+        -- backwards -- giving each named player's total AWAY instead of handing it
+        -- TO them -- lands on the very same board. This assignment's inverse is
+        -- the other rotation, which lands on a different total at all three
+        -- seats, so this is the case that pins the direction of the map.
+        Spec.it s "a rotation moves every seat, and in the direction the answer names" $ do
+          (aliceMate, bobMate, carolMate, spellId, gs) <- sandsBoard
+          let after = castAndTrigger (assigning [(S.alice, S.bob), (S.bob, S.carol), (S.carol, S.alice)]) spellId gs
+          Spec.assertEqWith s "alice took bob's 4, not carol's 13" (S.lifeOf S.alice after) (Just 4)
+          Spec.assertEqWith s "bob took carol's 13, not alice's 27" (S.lifeOf S.bob after) (Just 13)
+          Spec.assertEqWith s "carol took alice's 27, not bob's 4" (S.lifeOf S.carol after) (Just 27)
+          Spec.assertEqWith s "the two seats that rose gained their own differences" (lifeGains after) [(S.bob, 9), (S.carol, 14)]
+          Spec.assertEqWith s "and the one that fell lost hers" (lifeLosses after) [(S.alice, 23)]
+          Spec.assertEqWith s "bob's Pridemate saw his gain" (countersOn bobMate after) (Just 1)
+          Spec.assertEqWith s "carol's saw hers" (countersOn carolMate after) (Just 1)
+          Spec.assertEqWith s "alice's stayed silent" (countersOn aliceMate after) (Just 0)
+          -- The rotation is also what proves the totals are read from ONE
+          -- snapshot: an implementation that set each seat in turn against the
+          -- live board would hand bob the 4 alice had just taken.
+          Spec.assertEqWith s "23 milled plus the spent sorcery" (graveyardSize S.alice after) 24
+        -- The ruling's option (a), "leave the life totals as they are": "any
+        -- number of players" includes none, so the empty answer is legal and
+        -- quiet rather than refused.
+        Spec.it s "redistributing among nobody is a legal answer and moves nothing" $ do
+          (_, _, _, spellId, gs) <- sandsBoard
+          assertUntouched (castAndTrigger (assigning []) spellId gs)
+        -- #222, splitting: alice takes carol's 13 while carol keeps it, so one
+        -- life total would end up on two seats -- exactly what "you can't split
+        -- up a life total when you redistribute it" forbids. Refused ENTIRE,
+        -- because there is no honest partial permutation to keep.
+        Spec.it s "#222 an answer that hands out a total its owner keeps is refused" $ do
+          (_, _, _, spellId, gs) <- sandsBoard
+          assertUntouched (castAndTrigger (assigning [(S.alice, S.carol)]) spellId gs)
+        -- #222, duplication: alice and bob both take carol's 13. The keys are all
+        -- three seats but the totals handed out are only two, so it is not a
+        -- bijection and alice's 27 would simply vanish.
+        Spec.it s "#222 an answer giving two players the same life total is refused" $ do
+          (_, _, _, spellId, gs) <- sandsBoard
+          assertUntouched (castAndTrigger (assigning [(S.alice, S.carol), (S.bob, S.carol), (S.carol, S.alice)]) spellId gs)
+        -- #222, an outsider: dave is not in this game. This answer IS a
+        -- permutation -- its keys and its values are the same two seats -- so
+        -- only the candidate check refuses it, which is what makes this case
+        -- discriminating rather than a second copy of the one above.
+        Spec.it s "#222 an answer naming a player who is not in the game is refused" $ do
+          (_, _, _, spellId, gs) <- sandsBoard
+          assertUntouched (castAndTrigger (assigning [(S.alice, S.dave), (S.dave, S.alice)]) spellId gs)
+        -- CR 102.1: the offer is the players IN the game, not the keys of
+        -- GameState.players, which keep a departed seat's row. Driven through
+        -- Resolve.applyEffect rather than a cast, the narrowest path that raises
+        -- the prompt at all.
+        Spec.it s "CR 102.1 every player in the game is offered, beside the total they hold, and a departed seat is not" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (src, g0) = S.addCreature piker S.alice S.threePlayerGame
+              at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+              gs = g0 {GameState.players = at S.alice 27 (at S.bob 4 (at S.carol 13 (GameState.players g0)))}
+              recording :: Prompt.Prompt r -> State.State [(PlayerId.PlayerId, Integer)] r
+              recording p = case p of
+                Prompt.ChooseRedistribution _ _ offered -> do
+                  State.put offered
+                  pure (S.identityAnswer p)
+                _ -> pure (S.identityAnswer p)
+              offerOf g = List.sort (State.execState (Engine.runGame recording g (Resolve.applyEffect src src S.alice Map.empty Map.empty Effect.RedistributeLifeTotals)) [])
+              gone = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.carol)
+          Spec.assertEqWith s "all three seats, each beside its own total" (offerOf gs) [(S.alice, 27), (S.bob, 4), (S.carol, 13)]
+          Spec.assertEqWith s "carol conceded, so she is no longer a candidate" (offerOf gone) [(S.alice, 27), (S.bob, 4)]
+        -- Where the rules leave nothing to ask, do not ask. One candidate admits
+        -- only the identity and no candidate not even that, so both are the same
+        -- assignment however they are answered; two candidates is a real choice.
+        Spec.it s "one remaining player leaves only the identity, so no prompt is raised" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (src, gs) = S.addCreature piker S.alice S.threePlayerGame
+              countingAnswer :: Prompt.Prompt r -> State.State Int r
+              countingAnswer p = case p of
+                Prompt.ChooseRedistribution {} -> do
+                  State.modify (+ 1)
+                  pure (S.identityAnswer p)
+                _ -> pure (S.identityAnswer p)
+              asks g = State.execState (Engine.runGame countingAnswer g (Resolve.applyEffect src src S.alice Map.empty Map.empty Effect.RedistributeLifeTotals)) 0
+              leaves pid g = S.runPure S.identityAnswer g (Departure.leaveGame Departure.Type.Conceded pid)
+              two = leaves S.carol gs
+              one = leaves S.bob two
+          Spec.assertEqWith s "three seats: a real decision" (asks gs) 1
+          Spec.assertEqWith s "two seats: still a real decision, the swap being legal" (asks two) 1
+          Spec.assertEqWith s "one seat: only the identity, so nothing to ask" (asks one) 0
+
 -- One with the Machine, the card that proves Aggregation.Greatest (#254):
 -- "Draw cards equal to the greatest mana value among artifacts you control."
 -- Nothing but the fold is new -- the effect is the existing Draw, the scope and
@@ -5465,7 +5880,7 @@ exploreReveals :: GameState.GameState -> [String]
 exploreReveals gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
   where
     revealedName event = case event of
-      GameEvent.Revealed pid pc
+      GameEvent.Revealed pid _ _ pc
         | pid == S.alice ->
             fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
       _ -> Nothing
@@ -7561,6 +7976,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   drawCardSpec s registry
   loseLifeSpec s registry
   exchangeLifeTotalsSpec s registry
+  setLifeTotalSpec s registry
+  redistributeLifeTotalsSpec s registry
   greatestSpec s registry
   soulsMajestySpec s registry
   counterSpec s registry

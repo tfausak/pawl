@@ -179,6 +179,11 @@ admittedGiven pcs grants perspective bindings source spec gs =
             -- attacking creature, and `source` is the object CR 113.7 says the
             -- ability came from.
             Filter.defendingPlayer = Defender.playerOfAttacker source gs,
+            -- Nothing: a target slot is judged before the effect names anyone, so
+            -- there is no recipient it could have reached yet. CR 119.5's atom
+            -- lives in an effect's QUANTITY, which is evaluated later and
+            -- elsewhere.
+            Filter.recipient = Nothing,
             -- Empty: no Filter atom reads it, and a slot's own filter is matched
             -- while the slots are still being CHOSEN (CR 601.2c), so there is no
             -- resolution's slot map to hand over yet.

@@ -82,6 +82,8 @@ toJson codec e = case e of
   Effect.LoseLife x -> Common.tagged "LoseLife" . Just $ Codec.encode PlayerQuantity.codec x
   Effect.GainLife x -> Common.tagged "GainLife" . Just $ Codec.encode PlayerQuantity.codec x
   Effect.ExchangeLifeTotals sides -> Common.tagged "ExchangeLifeTotals" (Just (ExchangeSides.toJson sides))
+  Effect.SetLifeTotal x -> Common.tagged "SetLifeTotal" . Just $ Codec.encode PlayerQuantity.codec x
+  Effect.RedistributeLifeTotals -> Common.nullary "RedistributeLifeTotals"
   Effect.IncreaseSpeed x -> Common.tagged "IncreaseSpeed" . Just $ Codec.encode PlayerQuantity.codec x
   -- Create's payload is positional, and the EntryRiders are ELIDED when they
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
@@ -212,6 +214,8 @@ fromJson decode value = do
     "LoseLife" -> Common.withValue mv (fmap Effect.LoseLife . Codec.decode PlayerQuantity.codec)
     "GainLife" -> Common.withValue mv (fmap Effect.GainLife . Codec.decode PlayerQuantity.codec)
     "ExchangeLifeTotals" -> Common.withValue mv (fmap Effect.ExchangeLifeTotals . ExchangeSides.fromJson)
+    "SetLifeTotal" -> Common.withValue mv (fmap Effect.SetLifeTotal . Codec.decode PlayerQuantity.codec)
+    "RedistributeLifeTotals" -> Right Effect.RedistributeLifeTotals
     "IncreaseSpeed" -> Common.withValue mv (fmap Effect.IncreaseSpeed . Codec.decode PlayerQuantity.codec)
     -- The three-element form is read by JSON type: an Object is the
     -- EntryRiders, anything else is the slot name, which is what lets the

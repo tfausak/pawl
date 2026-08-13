@@ -25,6 +25,7 @@ codec keywordCodec =
       Arm.nullary "UntapThis" CostComponent.UntapThis,
       Arm.nullary "SacrificeThis" CostComponent.SacrificeThis,
       Arm.payload "PayLife" Common.natural CostComponent.PayLife,
+      Arm.nullary "PayLifeX" CostComponent.PayLifeX,
       Arm.payload "Sacrifice" (Common.tuple Common.natural (Filter.codec keywordCodec)) (uncurry CostComponent.Sacrifice),
       Arm.payload "TapForTotalPower" (Common.tuple Common.natural (Filter.codec keywordCodec)) (uncurry CostComponent.TapForTotalPower),
       Arm.payload "DiscardCards" Common.natural CostComponent.DiscardCards,
@@ -43,6 +44,7 @@ codec keywordCodec =
       CostComponent.UntapThis -> Common.nullary "UntapThis"
       CostComponent.SacrificeThis -> Common.nullary "SacrificeThis"
       CostComponent.PayLife n -> Common.tagged "PayLife" . Just $ Common.encodeNatural n
+      CostComponent.PayLifeX -> Common.nullary "PayLifeX"
       CostComponent.Sacrifice n c_ -> Common.tagged "Sacrifice" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Filter.codec keywordCodec) c_]
       CostComponent.TapForTotalPower n c_ -> Common.tagged "TapForTotalPower" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Filter.codec keywordCodec) c_]
       CostComponent.DiscardCards n -> Common.tagged "DiscardCards" . Just $ Common.encodeNatural n

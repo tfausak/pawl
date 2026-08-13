@@ -62,10 +62,12 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -1481,6 +1483,81 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
 -- the two directions below differ in the type line and in nothing else, and the
 -- from-hand case rules out mana, timing and the card itself as the reason the
 -- graveyard cast is missing.
+-- CR 702.34a's flashback GRANTED rather than printed, which is the whole of what
+-- separates this group from Firebolt's above: the permission and the cost are
+-- both read through the CR 613 projection of the card as it lies in the
+-- graveyard, so a keyword nothing printed reaches them (#1385).
+--
+-- Viral Spawning {2}{G} Sorcery is the producer: "Create a 3/3 green Phyrexian
+-- Beast creature token with toxic 1." plus "Corrupted -- As long as an opponent
+-- has three or more poison counters and this card is in your graveyard, it has
+-- flashback {2}{G}." Its static ability functions in the graveyard by CR 113.6f,
+-- since the keyword it grants is one that says which zone the card may be cast
+-- from.
+--
+-- The pair of boards differs in ONE number, the opponent's poison count, so the
+-- branch cannot flip on mana, timing, the stack or the card. Three poison
+-- counters is the rule's own threshold and two is one short.
+--
+-- What Viral Spawning cannot prove is WHICH cost was paid -- its flashback cost
+-- and its mana cost are both {2}{G} -- so the second half of the group grants a
+-- flashback that differs from the printed cost and pays that instead.
+grantedFlashbackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
+  Spec.it s "CR 702.34a/113.6f a granted flashback is castable from the graveyard, and exiles the card" $ do
+    forest <- S.printingOf s registry "Forest"
+    spawning <- S.printingOf s registry "Viral Spawning"
+    let (inGraveyard, board) = inGraveyardWith forest spawning 3
+        poisoned n = S.addPlayerCounter PlayerCounterKind.Poison n S.bob board
+        corrupted = poisoned 3
+        uncorrupted = poisoned 2
+    Spec.assertBool s (not (S.castable S.alice inGraveyard uncorrupted)) "two poison counters: no flashback, so not castable"
+    Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice uncorrupted))) "and not offered"
+    Spec.assertBool s (S.castable S.alice inGraveyard corrupted) "three poison counters: castable"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice corrupted)) "and offered"
+    let cast = S.runPure S.identityAnswer corrupted (S.cast S.alice inGraveyard)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "the spell resolved and made its token" (length (filter (\o -> Projection.subtypesOf o resolved == Set.fromList [Subtype.Beast, Subtype.Phyrexian]) (Game.zoneMembers Zone.Battlefield S.alice resolved))) 1
+    -- CR 702.34a's SECOND static ability, and the assertion that tells a real
+    -- flashback cast from a bare permission: the card must not come back.
+    Spec.assertEqWith s "it did NOT go back to the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
+    Spec.assertEqWith s "it was exiled instead" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
+  -- CR 601.2b: the GRANTED cost is the one offered, and the printed mana cost is
+  -- not. Lightning Bolt {R} carries no flashback of its own, so every candidate
+  -- below came from the grant; the two costs share no symbol, so no board can
+  -- pay one by paying the other.
+  Spec.it s "CR 702.34a the granted cost, not the printed one, is what a graveyard cast pays" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let granted = Modification.GainKeyword (Keyword.Flashback (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Blue)])) []))
+        withGrant oid = S.withEffect oid granted
+        (onIslands, islandBoard) = inGraveyardWith island bolt 3
+        (onMountains, mountainBoard) = inGraveyardWith mountain bolt 3
+        blueBoard = withGrant onIslands islandBoard
+        redBoard = withGrant onMountains mountainBoard
+        manaOf oid gs = fmap Cost.Type.mana (Cost.costsFor (S.printingName bolt) oid gs)
+    Spec.assertEqWith
+      s
+      "the flashback {2}{U} is the only candidate offered"
+      (manaOf onIslands blueBoard)
+      [Just (ManaCost.MkManaCost [ManaSymbol.Generic 2, ManaSymbol.OfType (ManaType.Colored Color.Blue)])]
+    Spec.assertEqWith s "and with no grant there is no candidate at all" (manaOf onIslands islandBoard) []
+    Spec.assertBool s (S.castable S.alice onIslands blueBoard) "three Islands pay the granted {2}{U}"
+    -- Three Mountains pay the PRINTED {R} and cannot pay {2}{U}. The cast is
+    -- permitted on this board -- the grant is the same one -- so only the cost
+    -- can be refusing it.
+    Spec.assertBool s (not (S.castable S.alice onMountains redBoard)) "three Mountains do not"
+    Spec.assertBool s (uncurry (S.castable S.alice) (inHandWith mountain bolt 3)) "though they pay the printed {R} from hand"
+    -- CR 702.34a's second static ability off a grant that CANNOT survive the
+    -- move: this one is stored against the graveyard object's id, and CR 601.2a
+    -- mints a new one, so the replacement has to be armed from the keywords the
+    -- card held where it lay.
+    let cast = S.runPure S.identityAnswer blueBoard (S.cast S.alice onIslands)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "the flashed-back Bolt did not return to the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
+    Spec.assertEqWith s "it was exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
+
 flashbackCardTypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
   Spec.it s "CR 702.34a a creature card with flashback is not castable from the graveyard" $ do
@@ -2490,6 +2567,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   auraTargetSpec s registry
   fireboltSpec s registry
   flashbackCardTypeSpec s registry
+  grantedFlashbackSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry

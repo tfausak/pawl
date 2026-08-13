@@ -56,6 +56,7 @@ import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CreateCopy as CreateCopy
@@ -125,6 +126,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.RevealCause as RevealCause
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotArity (SlotArity)
@@ -163,9 +165,9 @@ insertOne slot = joinTwo (oneSlot slot)
 quantitySlots :: Quantity.Type.Quantity -> Map.Map SlotName SlotArity
 quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
 
--- The slots a PlayerRef reads. Only InSlot names one; the other three are
--- answered from the evaluation context alone. Factored out of slotsOf below
--- so the recursion into PlayerRef is stated once.
+-- The slots a PlayerRef reads. Only InSlot names one; the others are answered
+-- from the evaluation context alone. Factored out of slotsOf below so the
+-- recursion into PlayerRef is stated once.
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
@@ -174,6 +176,9 @@ playerRefSlots ref = case ref of
   -- InSlot's baked half names a seat, not a slot. Unreachable from card data,
   -- which this lint's whole input is (Pawl.CardSpec sweeps the pool for one).
   PlayerRef.Specific _ -> Map.empty
+  -- A fold's candidate is not a slot either: it comes from the member being
+  -- read, and a card writes it (Malignus), so this arm is reachable and empty.
+  PlayerRef.Candidate -> Map.empty
 
 -- The slots an AffectedPlayers reads. Only the Named arm does, and only ever one
 -- player: a card writes AffectedPlayers SlotName, whose Named payload is a slot
@@ -265,6 +270,8 @@ slotsOf effect = case effect of
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.ExchangeLifeTotals sides -> exchangeSidesSlots sides
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.RedistributeLifeTotals -> Map.empty
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
@@ -483,6 +490,8 @@ slotsAreExhaustive effect = case effect of
   Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.ExchangeLifeTotals _ -> True
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.RedistributeLifeTotals -> True
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
@@ -562,8 +571,9 @@ conditionSlotsAreExhaustive condition = case condition of
     Quantity.slotsAreExhaustive (Compares.measured c) && Quantity.slotsAreExhaustive (Compares.threshold c)
   Condition.Type.Any conditions -> all conditionSlotsAreExhaustive conditions
 
--- Does any of these effects read X? A card that reads X must declare {X} in its
--- cost (CR 107.3, CR 107.3a, CR 118.4) -- the same reads-equal-declares contract
+-- Does any of these effects read X? A card that reads X must declare it in its
+-- cost -- in the mana cost as an {X}, or in an additional cost as Hatred's "pay X
+-- life" (CR 107.3, CR 107.3a, CR 118.4) -- the same reads-equal-declares contract
 -- slotsOf draws for target slots. Quantity.readsX does the looking, so a nested
 -- X -- Vitalizing Cascade's "X plus 3", or an X inside a Count -- is seen here
 -- exactly as slotsOf sees a nested slot through Quantity.slots.
@@ -607,6 +617,8 @@ readsX = any effectReadsX
       Effect.LoseLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.GainLife (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.ExchangeLifeTotals _ -> False
+      Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
+      Effect.RedistributeLifeTotals -> False
       Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
       Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> Quantity.readsX quantity
@@ -687,6 +699,8 @@ searchesLibrary effect = case effect of
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
   Effect.ExchangeLifeTotals _ -> False
+  Effect.SetLifeTotal {} -> False
+  Effect.RedistributeLifeTotals -> False
   Effect.IncreaseSpeed {} -> False
   Effect.Create {} -> False
   Effect.CreateCopy {} -> False
@@ -826,6 +840,8 @@ boundSlots effect = case effect of
   Effect.LoseLife {} -> Set.empty
   Effect.GainLife {} -> Set.empty
   Effect.ExchangeLifeTotals _ -> Set.empty
+  Effect.SetLifeTotal {} -> Set.empty
+  Effect.RedistributeLifeTotals -> Set.empty
   Effect.IncreaseSpeed {} -> Set.empty
   Effect.Replace {} -> Set.empty
   Effect.SkipNextPhase {} -> Set.empty
@@ -1516,6 +1532,11 @@ playerRefPlayers legal controller gs ref = case ref of
   -- reason InSlot is not: it names one specific player who arrived from
   -- elsewhere.
   PlayerRef.Specific pid -> [pid]
+  -- NOBODY, and not a hole: an effect names the players it acts on, and there is
+  -- no fold running over a resolution's opcodes for a candidate to come from.
+  -- The reference is only ever answerable inside a Count (Pawl.Engine.Quantity's
+  -- playersOf), so here it names an empty set and the opcode is a no-op.
+  PlayerRef.Candidate -> []
   where
     everyone = Game.stillPlaying gs
 
@@ -1803,8 +1824,9 @@ slotOne slot resolving gs = do
 --      CR 712.8c gives the resulting spell that face's characteristics; without
 --      the rider it is CR 712.11's default, the card's front face.
 --   3. WHAT IT COSTS (CR 118.9). `withoutPayingManaCost` applies the alternative
---      cost the rule names by that very phrase; without the rider the candidates
---      are CR 601.2b's own.
+--      cost the rule names by that very phrase, and `payingInstead` applies a
+--      STATED one (CR 702.94a); without either rider the candidates are CR
+--      601.2b's own.
 --   4. MAY IT BE CAST AT ALL, which is Cast.castableWhenOffered -- the prohibit
 --      half of CR 601.3, an affordable cost, and a fillable target set. Asked
 --      BEFORE the prompt, so the player is never offered a cast the announcement
@@ -1835,7 +1857,20 @@ offerCast resolving controller slot offer = do
         let name = Face.name face
             -- CR 118.9a: at most ONE alternative cost, so the applied one
             -- replaces the candidates rather than joining them.
-            applied = if CastOffer.withoutPayingManaCost offer then Just (Cost.withoutPayingManaCost face) else Nothing
+            --
+            -- Two riders can state one, and rule 118.9a is why they are asked in
+            -- order rather than combined: `withoutPayingManaCost` is CR 118.9's
+            -- "without paying its mana cost" and `payingInstead` is its "rather
+            -- than pay this spell's mana cost" (CR 702.94a's miracle). No producer
+            -- sets both, and if one did the free cast would be the one applied.
+            --
+            -- CR 118.9d in both cases: an alternative replaces only the MANA
+            -- cost, so the face's own additional costs ride along -- which is what
+            -- Cost.withoutPayingManaCost does for the free branch and what this
+            -- one does explicitly for the stated branch.
+            applied
+              | CastOffer.withoutPayingManaCost offer = Just (Cost.withoutPayingManaCost face)
+              | otherwise = fmap (\c -> c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face}) (CastOffer.payingInstead offer)
             -- Face up: CR 708.4's face-down cast is a permission a MORPH
             -- ability gives (CR 702.37d), and an OfferCast opcode carries no
             -- such rider -- CR 310.11b's offer names a face and a cost and
@@ -2982,6 +3017,111 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- left with anything but its two sides: no-op, and CR 701.12a agrees --
       -- if the entire exchange can't be completed, no part of it occurs.
       Nothing -> pure ()
+  -- CR 119.5: each named player "gains or loses the necessary amount of life to
+  -- end up with the new total". So this is a DELTA per player, computed against
+  -- that player's own current total -- one seat may gain while another loses on
+  -- the same resolution, which is why a card cannot spell this with a GainLife or
+  -- a LoseLife of its own: neither can name an amount it has to subtract a live
+  -- life total to find.
+  --
+  -- Written through changeLife exactly as ExchangeLifeTotals is, and for CR
+  -- 119.5's sake rather than for tidiness: a raw write to Player.life would leave
+  -- the log silent, and "whenever you gain life" is supposed to see this. The
+  -- rule spends its whole sentence saying so.
+  --
+  -- The total is evaluated ONCE PER RECIPIENT, because a card may name a number
+  -- that is each recipient's own: Biorhythm's "each player's life total becomes
+  -- the number of creatures THEY control" gives three seats three answers, where
+  -- Magister Sphinx's literal and Arbiter of Knollridge's fold give one number to
+  -- the whole table. Which recipient the evaluation has reached rides in
+  -- Filter.Context's `recipient`, and Filter.ControlledByRecipient is the one atom
+  -- that reads it; a quantity naming no such atom cannot tell the loop from a
+  -- single evaluation.
+  --
+  -- Every evaluation and every delta is read off `gs`, the state BEFORE any life
+  -- moves (CR 608.2f) -- ExchangeLifeTotals' posture -- so the deltas cannot see
+  -- each other and a fold over life totals answers the same for every seat. Still
+  -- a REGRESSION FENCE rather than proven behaviour, as it was before the loop
+  -- went per-recipient: Biorhythm counts creatures, which this effect does not
+  -- move, and Arbiter's maximum is where it was after the first seat reaches it.
+  -- A card folding a MINIMUM over the same players is what would tell them apart.
+  --
+  -- changeLife's zero case is CR 119.9's, and here it is the load-bearing one:
+  -- Arbiter's own highest-life seat is already at the new total, so it gains
+  -- nothing and no life-gain trigger may fire for it.
+  --
+  -- CR 104.3b's state-based action follows a total driven to 0 or less, and it is
+  -- the existing one in Pawl.Engine.Sba -- reached through changeLife's ordinary
+  -- subtraction, with nothing here to arrange. Biorhythm's seat controlling no
+  -- creature is the producer that gets there.
+  Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        recipients = playerRefPlayers legal controller gs ref
+    Monad.forM_ recipients $ \pid ->
+      -- A player with no row is nobody to move, which is the same no-op an
+      -- unfilled slot already gave; the lookup is what makes the delta a delta, so
+      -- there is nothing to fall back to.
+      Monad.forM_ (Map.lookup pid (GameState.players gs)) $ \player ->
+        -- An undeterminable total is no instruction at all, LoseLife's and
+        -- GainLife's posture for the same reason: there is no number to reach.
+        -- Asked per recipient rather than for the effect as a whole, which is what
+        -- a per-recipient number means -- one seat's unanswerable count leaves
+        -- that seat alone and says nothing about the others.
+        Monad.forM_ (Quantity.evaluateFor viewOf (context {Filter.recipient = Just pid}) gs resolving source quantity) $ \total ->
+          changeLife pid (total - Player.life player)
+  -- Reverse the Sands: "Redistribute any number of players' life totals. (Each of
+  -- those players gets one life total back.)" CR 119.7 and CR 119.8 name the
+  -- action, and every seat's new total is CR 119.5's gain or loss of the
+  -- necessary amount -- SetLifeTotal's arm above, once per recipient, through the
+  -- same changeLife.
+  --
+  -- The roster is CR 102.1's players IN the game (Game.stillPlaying), not the keys
+  -- of GameState.players, which keep a departed seat's row -- Proliferate's arm
+  -- makes the same distinction. Offering a seat that left would hand a live
+  -- player a dead one's total.
+  --
+  -- Every total is read ONCE, before the prompt and before any life moves (CR
+  -- 608.2h), and every delta is computed against that snapshot. Reading a total
+  -- this effect had already overwritten is the bug a permutation makes
+  -- unmissable: a rotation would otherwise leave two seats on one number.
+  --
+  -- FILTERED, NOT TRUSTED (#222), but all-or-nothing rather than per entry: only
+  -- a whole permutation is a legal answer, so there is no honest way to keep part
+  -- of a bad one. An answer that names a non-candidate, drops a player it hands a
+  -- total to, or gives two players the same total is refused entire, and the
+  -- fallback is the answer that is always legal -- redistribute among nobody.
+  -- Refusing whole is what makes "you can't split up a life total" hold:
+  -- honouring {alice -> carol} alone would leave carol's total on two seats.
+  --
+  -- Not implemented: CR 119.7-8's own restrictions, under which a player who
+  -- can't gain life may not be given a higher total (and the mirror for losing).
+  -- Vacuous rather than elided, ExchangeLifeTotals' position for the same reason:
+  -- nothing in the pool stops a player gaining or losing life, Pawl.Types.
+  -- PlayerEffect having no such arm to consult.
+  --
+  -- CR 810.9f's "not more than one member of each team" is not expressed either,
+  -- pawl having no teams (#175).
+  Effect.RedistributeLifeTotals -> do
+    gs <- State.get
+    let candidates = Game.stillPlaying gs
+        lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
+        offered = fmap (\pid -> (pid, lifeOf pid)) candidates
+    -- One candidate leaves only the identity, and no candidates leave not even
+    -- that: either way every assignment is the same assignment, so there is
+    -- nothing to ask.
+    Monad.when (length candidates > 1) $ do
+      assignment <- Game.choose (Prompt.ChooseRedistribution (Decide.deciderFor controller gs) controller offered)
+      let takers = Map.keysSet assignment
+          givers = Set.fromList (Map.elems assignment)
+          -- A permutation of the chosen subset: the keys are candidates, and the
+          -- totals handed out are exactly the takers' own. Set equality also
+          -- settles injectivity, a Map's keys being distinct -- a repeated giver
+          -- would make `givers` smaller than `takers` and fail here.
+          isPermutation = Set.isSubsetOf takers (Set.fromList candidates) && takers == givers
+      Monad.when isPermutation . Monad.forM_ (Map.toList assignment) $ \(taker, giver) ->
+        changeLife taker (lifeOf giver - lifeOf taker)
   -- CR 702.179c: each named player's speed increases by this much. Pawl.Engine.
   -- Speed's inherent triggered ability (CR 702.179d) is one producer and card data
   -- is the other, so the PlayerRef is genuinely read rather than known --
@@ -4298,7 +4438,7 @@ putFound searcher destination cardId = case destination of
   -- with the same characteristics today, and would still be the wrong act --
   -- what was shown was the card in the library, not the card in the hand.
   SearchDestination.RevealThenHand -> do
-    Event.reveal searcher cardId
+    Event.reveal RevealCause.Ordinary searcher cardId
     Event.changeZone cardId Zone.Hand
   -- Hoarding Dragon's "exile it": the move alone, with NO Event.reveal ahead of
   -- it. CR 701.23e is what makes that right rather than an omission -- the card
@@ -4491,7 +4631,7 @@ exploreOne oid = do
     Just pid -> case Game.zoneMembers Zone.Library pid gs of
       [] -> grow pid
       top : _ -> do
-        Event.reveal pid top
+        Event.reveal RevealCause.Ordinary pid top
         after <- State.get
         let isLand = case Game.faceOf top after of
               Nothing -> False

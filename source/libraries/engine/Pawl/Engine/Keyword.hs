@@ -22,6 +22,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastOffer as CastOffer
 import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Clause as Clause
@@ -239,6 +240,13 @@ abilitiesFor keyword count = case keyword of
   Keyword.Decayed -> List.genericReplicate count decayed
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  -- CR 702.94a's linked triggered half, one per instance for CR 603.2's general
+  -- reason -- rule 702.94 states no "each instance" sentence, and no printing
+  -- carries miracle twice. Minted HERE rather than in a hand-only roster because
+  -- WHERE it functions is CR 113.6k's question, answered once in
+  -- Pawl.Engine.Event.zonesTriggeredFrom: the battlefield scan filters it out and
+  -- the hand source picks it up, neither of them learning it is miracle.
+  Keyword.Miracle cost -> List.genericReplicate count (miracle cost)
   Keyword.StartYourEngines -> []
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
@@ -332,6 +340,9 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  -- CR 702.94a's hand ability is TRIGGERED rather than activated, so it is
+  -- minted by `abilitiesFor` above and reached from a hand by CR 113.6k.
+  Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -522,6 +533,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -652,13 +664,14 @@ outlast cost =
 -- A card's own printed permissions (Face.castingPermissions) are a separate,
 -- additive list; Pawl.Engine.Cast reads both.
 --
--- Taken over the card's PRINTED keywords rather than a projection's post-layer
--- ones: this permission functions in the GRAVEYARD (CR 113.6), which pawl's
--- projection does not reach (#160).
+-- WHICH keyword set is the caller's to choose, and the two callers choose
+-- differently: a card in a GRAVEYARD is read through the projection, so a
+-- granted flashback grants its permission too, while a card in a LIBRARY is read
+-- as printed, that being a zone pawl's projection does not reach (#160).
 --
 -- The card types come along because rule 702.34a's permission is CONDITIONAL on
 -- them. They are the types of the one FACE being proposed, which is the caller's
--- doing -- see Pawl.Engine.Cast.permissionsOf for why that is the right face.
+-- doing -- see Pawl.Engine.Cast.permissionsWith for why that is the right face.
 castingPermissionsOf :: Set CardType.CardType -> Set Keyword -> [CastingPermission]
 castingPermissionsOf cardTypes = concatMap (permissionsFor cardTypes) . Set.toAscList
 
@@ -789,6 +802,11 @@ permissionsFor cardTypes keyword = case keyword of
   -- (Object.plotted) that Pawl.Engine.Cast.permitsCastFromExile reads, the
   -- shape CR 715.3d's Adventure permission already has.
   Keyword.Plot _ -> []
+  -- CR 702.94a's cast is one CR 608.2g offers during the linked ability's
+  -- resolution, so it is not a standing CR 601.3 permission the way flashback's
+  -- graveyard cast is: nothing may be cast from a hand by miracle at a player's
+  -- own timing.
+  Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -824,15 +842,17 @@ permissionsFor cardTypes keyword = case keyword of
 --   * TheseObjects is the one that could in principle reach elsewhere -- it is
 --     CR 611.2c's frozen set, and Magical Hack's ChangeText already stores one
 --     naming a spell on the STACK. What stops it here is the pool: no
---     Pawl.Types.Pool arm names a card in a hand at all, and every
---     Modification.GainKeyword producer in the pool is aimed at creatures on the
---     battlefield.
+--     Pawl.Types.Pool arm names a card in a hand at all.
 --
 -- So a card in a hand projects exactly its printed keywords, and nothing can
--- grant or remove flash there (#160). The first effect that changes a
--- non-battlefield card's characteristics is what parts the two, and this becomes
--- a projected read then. The same posture castingPermissionsOf and
--- handAbilitiesOf above take (#567).
+-- grant or remove flash there (#160). The same posture handAbilitiesOf above
+-- takes (#567).
+--
+-- A GRAVEYARD is no longer covered by that argument: MatchingAnywhere reaches
+-- one, and Viral Spawning grants a keyword to a card lying there. Still exact,
+-- and now for a narrower reason -- no effect in the pool grants FLASH off the
+-- battlefield, so the two reads agree on every board (#160). castingPermissionsOf
+-- above is the read that has already parted, and this is the next.
 --
 -- A membership test rather than an exhaustive case: this asks about ONE named
 -- constructor rather than classifying every keyword, so a new arm has nothing to
@@ -876,9 +896,11 @@ hasJumpStart = Set.member Keyword.JumpStart
 -- constructor rather than classifying every keyword, so a new arm has nothing to
 -- say here.
 --
--- Nothing beyond the FIRST flashback cost is reachable. A card printing two
--- flashback abilities is expressible and unrepresented in what this returns; no
--- printing does it (#294).
+-- Nothing beyond the FIRST flashback cost is reachable, and rule 702.34a states
+-- no limit on how many a card may have. The set this is asked of is the
+-- PROJECTED one in a graveyard, so a card with a printed flashback and a granted
+-- one has two costs and CR 601.2b a choice between them; only the lesser (Set
+-- order) is offered (#294).
 flashbackCost :: Set Keyword -> Maybe (Cost Keyword)
 flashbackCost keywords =
   let costOf keyword = case keyword of
@@ -1170,6 +1192,10 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  -- CR 702.94a's static half is a PERMISSION to reveal, not a replacement: CR
+  -- 121.9's window changes nothing about the draw, so there is no event to
+  -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCost directly.
+  Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1305,6 +1331,8 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  -- CR 702.94a states no combat restriction.
+  Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
@@ -1354,6 +1382,8 @@ familyOf keyword = case keyword of
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Plot _ -> Just KeywordFamily.Plot
+  -- CR 702.94a's parameterized keyword: "a card with miracle" drops the cost.
+  Keyword.Miracle _ -> Just KeywordFamily.Miracle
   Keyword.Deathtouch -> Nothing
   Keyword.Defender -> Nothing
   Keyword.DoubleStrike -> Nothing
@@ -2688,6 +2718,69 @@ haunt =
 -- The slot rule 702.55a's one target is chosen into, on soulshiftTarget's terms.
 hauntTarget :: SlotName.SlotName
 hauntTarget = SlotName.MkSlotName (Text.pack "haunted")
+
+-- CR 702.94a's linked triggered ability: "When you reveal this card this way, you
+-- may cast it by paying [cost] rather than its mana cost."
+--
+-- One mode, one MANDATORY clause: the "you may" governs the CASTING alone, and
+-- that is Prompt.OfferedCast's own question -- Pawl.Engine.Battle.siegeDefeat
+-- makes the same call for the same reason, and for the same rule (CR 608.2g).
+-- Marking the clause optional would raise a second prompt for one printed "may".
+--
+-- ONE effect and no move ahead of it, which is where this parts from siegeDefeat:
+-- CR 701.20b says revealing does not move the card, so what may be cast is the
+-- very object the ability triggered from -- Binding.triggerSource (CR 113.7a),
+-- not Binding.became. The card is in its owner's hand throughout.
+--
+-- The cost rides the OFFER (CastOffer.payingInstead) rather than the card,
+-- because CR 118.9 makes it an alternative cost applied to the spell "from
+-- another effect": Thunderous Wrath in a hand nobody drew this turn costs
+-- {4}{R}{R}, and nothing about the card changes when it does not.
+miracle :: Cost Keyword -> TriggeredAbility Card
+miracle cost =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfRevealedForMiracle,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton offer))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    offer =
+      Effect.OfferCast
+        Binding.triggerSource
+        CastOffer.MkCastOffer {CastOffer.transformed = False, CastOffer.withoutPayingManaCost = False, CastOffer.payingInstead = Just cost}
+
+-- CR 702.94a's STATIC half, read as the one thing its reader needs: what this
+-- card would cost if its controller took the reveal. Nothing when the card has no
+-- miracle ability at all, which is also "no window to open".
+--
+-- flashbackCost's shape exactly, including the wildcard -- this asks about ONE
+-- constructor rather than classifying every keyword -- and asked of the card's
+-- PRINTED keywords for that function's reason: rule 702.94a's abilities function
+-- in the hand (CR 113.6b), which pawl's projection does not reach (#160).
+--
+-- Nothing beyond the FIRST miracle cost is reachable, also for flashbackCost's
+-- reason. No printing carries miracle twice.
+miracleCost :: Set Keyword -> Maybe (Cost Keyword)
+miracleCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Miracle cost -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- The triggered abilities rule 702 mints for a card read OUTSIDE the battlefield,
+-- off its printed keywords. `triggeredAbilitiesOf`'s sibling, and the same roster:
+-- a printed keyword set holds one instance of each, which is what the count of 1
+-- says.
+--
+-- Rule 702.94a's miracle is the only one any of them reaches today, and CR 113.6k
+-- is what decides that -- Pawl.Engine.Event filters this list by
+-- `functionsIn`, so a drawn Doomed Traveler's dies trigger is offered from no
+-- hand.
+printedTriggeredAbilitiesOf :: Set Keyword -> [TriggeredAbility Card]
+printedTriggeredAbilitiesOf = triggeredAbilitiesOf . Map.fromSet (const 1)
 
 -- CR 702.63a's SECOND and THIRD abilities. Rule 702.63a states three and the
 -- first is mintedReplacementsFor's, so vanishing is the first keyword here whose

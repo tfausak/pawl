@@ -1,0 +1,152 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Viral Spawning",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "Green"
+                              }
+                            ],
+                            "keywords": [
+                              {
+                                "type": "Toxic",
+                                "value": 1
+                              }
+                            ],
+                            "name": "Phyrexian Beast Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 3
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 3
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Beast"
+                                },
+                                {
+                                  "type": "Phyrexian"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "MatchingAnywhere",
+            "value": {
+              "type": "IsSource"
+            }
+          },
+          "condition": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "PlayerCounters",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "Opponent"
+                    }
+                  },
+                  {
+                    "type": "Poison"
+                  }
+                ]
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 3
+              }
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Flashback",
+                "value": {
+                  "mana": [
+                    {
+                      "type": "Generic",
+                      "value": 2
+                    },
+                    {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Green"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

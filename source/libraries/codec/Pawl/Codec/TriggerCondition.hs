@@ -41,7 +41,9 @@ toJson c = case c of
   TriggerCondition.SelfBecomesBlockedBy f -> Common.tagged "SelfBecomesBlockedBy" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> Common.tagged "SelfBecomesBlockedByOneOrMore" . Just $ Codec.encode (Filter.codec Keyword.codec) f
   TriggerCondition.SelfCycled -> Common.nullary "SelfCycled"
+  TriggerCondition.SelfRevealedForMiracle -> Common.nullary "SelfRevealedForMiracle"
   TriggerCondition.PlayerDiscards r -> Common.tagged "PlayerDiscards" . Just $ Codec.encode PlayerRelation.codec r
+  TriggerCondition.PlayerDrawsNthCard r n -> Common.tagged "PlayerDrawsNthCard" . Just . Value.array $ [Codec.encode PlayerRelation.codec r, Common.encodeNatural n]
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Common.nullary "SelfPutIntoGraveyardFromLibrary"
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Common.nullary "SelfPutIntoGraveyardFromAnywhere"
   TriggerCondition.SelfDies -> Common.nullary "SelfDies"
@@ -96,7 +98,9 @@ fromJson value = do
     ("SelfBecomesBlockedBy", Just v) -> TriggerCondition.SelfBecomesBlockedBy <$> Codec.decode (Filter.codec Keyword.codec) v
     ("SelfBecomesBlockedByOneOrMore", Just v) -> TriggerCondition.SelfBecomesBlockedByOneOrMore <$> Codec.decode (Filter.codec Keyword.codec) v
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
+    ("SelfRevealedForMiracle", _) -> Right TriggerCondition.SelfRevealedForMiracle
     ("PlayerDiscards", Just v) -> TriggerCondition.PlayerDiscards <$> Codec.decode PlayerRelation.codec v
+    ("PlayerDrawsNthCard", Just (Value.Array (Array.MkArray [r, n]))) -> TriggerCondition.PlayerDrawsNthCard <$> Codec.decode PlayerRelation.codec r <*> Common.decodeNatural n
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary
     ("SelfPutIntoGraveyardFromAnywhere", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromAnywhere
     ("SelfDies", _) -> Right TriggerCondition.SelfDies

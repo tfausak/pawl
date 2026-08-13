@@ -57,6 +57,12 @@ openingHands perform owners = do
   mulliganRounds perform Map.empty owners
   -- CR 103.6: the opening-hand window, after the WHOLE CR 103.5 process.
   openingHandActions perform owners
+  -- CR 103.8: the starting player takes their first turn only after all of this,
+  -- so none of the draws above -- CR 103.5's opening hands, and every mulligan's
+  -- redraw -- was made during a turn. GameState.drawsThisTurn counts CR 121.1's
+  -- draws PER TURN, and the handoff that would otherwise clear it does not run
+  -- before turn one.
+  State.modify' (\gs -> gs {GameState.drawsThisTurn = Map.empty})
 
 -- CR 103.5b / CR 103.6: every action the cards in this player's hand grant from
 -- the window `field` names, keyed by the granting card AND which of that card's

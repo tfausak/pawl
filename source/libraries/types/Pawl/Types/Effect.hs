@@ -444,6 +444,45 @@ data Effect card
     -- has exactly two sides, where a PlayerRef may name every player at once.
     -- Pawl.Types.ExchangeSides has the rest of that argument.
     ExchangeLifeTotals ExchangeSides.ExchangeSides
+  | -- | CR 119.5: the players the PlayerRef names each end up with this life total
+    -- -- Magister Sphinx' "target player's life total becomes 10" is `InSlot` over
+    -- a Literal, Arbiter of Knollridge's "each player's life total becomes the
+    -- highest life total among all players" is `EachPlayer` over a fold.
+    --
+    -- NOT expressible as a GainLife or a LoseLife, which is why it is an opcode
+    -- rather than sugar: the amount is the DIFFERENCE between a total nobody wrote
+    -- down and the new one, and its sign varies per player -- one seat gains while
+    -- another loses on the same resolution.
+    --
+    -- Also not a raw write. CR 119.5 spends its whole sentence saying the player
+    -- "gains or loses the necessary amount of life to end up with the new total",
+    -- so this resolves into the same CR 608.2i gain and loss events LoseLife and
+    -- GainLife append, and a "whenever you gain life" trigger reads them.
+    -- ExchangeLifeTotals took that posture first, under CR 701.12c's parallel
+    -- wording.
+    SetLifeTotal PlayerQuantity.PlayerQuantity
+  | -- | Reverse the Sands' "redistribute any number of players' life totals": the
+    -- resolving controller chooses any number of the players in the game and then
+    -- hands each of them one of THOSE players' previous totals, using each total
+    -- exactly once. CR 119.7 and CR 119.8 name the action ("if an effect
+    -- redistributes life totals"); every seat's new total is a gain or a loss of
+    -- the necessary amount, exactly as SetLifeTotal's CR 119.5 makes it.
+    --
+    -- CHOOSE, not target, Proliferate's posture and why this carries no SlotName:
+    -- the card declares no target spec, the whole assignment is picked on
+    -- RESOLUTION via Prompt.ChooseRedistribution, and nothing is subject to CR
+    -- 608.2b's illegal-target check.
+    --
+    -- Nullary for Proliferate's reason as well: the printed words leave nothing
+    -- for an author to vary. The roster is CR 102.1's players in the game, the
+    -- subset and the assignment are the controller's at resolution, and the
+    -- totals handed out are the ones those players already had -- there is no
+    -- quantity, scope or filter anywhere in the sentence.
+    --
+    -- NOT a composition of SetLifeTotals: each one would read a total an earlier
+    -- one had already overwritten, and no card data could name the permutation a
+    -- player picks while the spell resolves.
+    RedistributeLifeTotals
   | -- | CR 702.179c: the players the PlayerRef names each have their speed
     -- increased by this much -- "if a player has no speed and they are instructed
     -- to increase their speed by a certain value, their speed becomes that value",

@@ -218,6 +218,36 @@ data Prompt r where
   -- Deliberately not elided for a single candidate, ChooseManaSource's posture:
   -- "any number" includes none, so even one candidate is a real yes or no.
   ChooseProliferate :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [PlayerId.PlayerId] -> Prompt (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)
+  -- | Reverse the Sands' redistribution (CR 119.7-8 name the action): which
+  -- players the resolving controller redistributes life totals among, and who
+  -- ends up with whose. The [(PlayerId, Integer)] is every player in the game
+  -- beside the total they hold, read once before anything moves (CR 608.2h).
+  --
+  -- The answer maps each CHOSEN player to the player whose previous total they
+  -- take. A permutation of the chosen subset, and it has to be one: the ruling
+  -- "you can't split up a life total when you redistribute it" and the printed
+  -- reminder "each of those players gets one life total back" together say each
+  -- total is handed out exactly once. Mapping a player to themselves is legal and
+  -- is how a chosen seat keeps what it had.
+  --
+  -- A player -> PLAYER map rather than a player -> total map, so that inventing a
+  -- number is not expressible at all: a total can only be named by whose it was.
+  -- What is left to check is that the answer is a permutation -- keys drawn from
+  -- the candidates, and the values exactly the keys again -- which is
+  -- Pawl.Engine.Resolve's job, since #222 has answers validated rather than
+  -- trusted.
+  --
+  -- CHOOSE, not target: the card declares no target spec, so nothing is
+  -- re-checked at resolution (CR 608.2b).
+  --
+  -- Elided only below two candidates, where the identity is the only assignment
+  -- there is and every subset of it does nothing. Deliberately still asked when
+  -- the candidates all hold the SAME total, ChooseProliferate's posture: "any
+  -- number" makes even a doomed-to-be-quiet choice the player's to make.
+  --
+  -- CR 810.9f's "not more than one member of each team" is not expressed, pawl
+  -- having no teams (#175).
+  ChooseRedistribution :: Decider.Decider -> PlayerId.PlayerId -> [(PlayerId.PlayerId, Integer)] -> Prompt (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   -- | CR 701.54a: which creature a tempted player controls becomes their
   -- Ring-bearer. The NonEmpty is the creatures they control; the answer is the ONE
   -- that takes the designation.
@@ -455,10 +485,14 @@ data Prompt r where
   --
   -- A bare Natural rather than a Maybe: the prompt is issued only for a cost that
   -- already passed the X=0 floor, so a greatest payable X always exists and 0 is a
-  -- real answer. There is no unbounded case -- a player's mana is finite.
+  -- real answer. There is no unbounded case -- a player's mana and life are both
+  -- finite.
   --
   -- Prompted before targets (CR 601.2b precedes 601.2c), and only when the cost
-  -- contains a Variable symbol.
+  -- declares an X -- a ManaSymbol.Variable in its mana part, or a
+  -- CostComponent.PayLifeX among its components (Hatred). CR 601.2b's "such as an
+  -- {X} in its mana cost" is an example rather than the rule; CR 107.3a is the
+  -- general statement.
   ChooseX :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt Natural.Natural
   -- | Rule 702.42a: whether this player uses the entwine ability of the modal spell
   -- they are casting. The ObjectId is the spell; the Cost is the additional cost
@@ -1053,6 +1087,28 @@ data Prompt r where
   -- nothing to ask -- the card is no longer where the effect left it (CR 608.2h),
   -- or the cast is one Cast.castableWhenOffered says cannot legally happen.
   OfferedCast :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 702.94a / CR 121.9: whether this player reveals the card they are
+  -- drawing, from their hand, as they draw it -- miracle's static half. The
+  -- ObjectId is the card just drawn and the CardName is its face, for
+  -- OfferedCast's reason: a bare id would leave what is being revealed invisible
+  -- to the answerer.
+  --
+  -- CR 121.9 is satisfied by the prompt itself: "that player may look at that
+  -- card as they draw it before choosing whether to reveal it", and the card is
+  -- named in the question. pawl has no hidden-information filter at all
+  -- (docs/design.md's PlayerView), so there is nothing here that could have shown
+  -- less.
+  --
+  -- Distinct from OfferedCast, which is the LINKED ability's own "may" one step
+  -- later. Two prompts for one keyword is what rule 702.94a says: the reveal is
+  -- the static ability's, and the cast belongs to the triggered ability that the
+  -- reveal put on the stack. A player who reveals may still decline the cast.
+  --
+  -- NEVER elided: revealing and not revealing reach plainly different boards --
+  -- one puts a triggered ability on the stack. Not asked at all when the rules
+  -- leave nothing to ask: no miracle on the card, or the draw was not the turn's
+  -- first (CR 702.94a's own gate).
+  OfferedMiracleReveal :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
   -- | CR 118.12 / 118.12a: whether this player pays a cost a RESOLVING spell or
   -- ability offers them -- Mana Leak's "unless its controller pays {3}", which CR
   -- 118.12a rewrites as "its controller may pay {3}. If they don't, counter it."
@@ -1178,8 +1234,8 @@ data Prompt r where
   --
   -- One prompt per symbol, in the order the reductions are read. Two identical
   -- reductions ask two identical questions, which is sound because the answers
-  -- are interchangeable: the pooled bag applyAdjustments cancels against does not
-  -- record which prompt contributed which symbol.
+  -- are interchangeable: applyAdjustments folds the reductions one at a time, and
+  -- two that carry the same amount and the same floor commute.
   --
   -- NOT filtered by payability, unlike the two announcements above. CR 118.7e
   -- puts no such condition on the choice -- a player may take the half that

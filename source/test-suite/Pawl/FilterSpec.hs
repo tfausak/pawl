@@ -302,6 +302,33 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches (defended 0) noController Filter.Type.ControlledByDefendingPlayer)) "no candidate controller"
       Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ControlledByDefendingPlayer)) "no defending player"
 
+  -- CR 119.5's "they control", whose player comes from the Context as
+  -- ControlledByDefendingPlayer's does -- Biorhythm asks it once per recipient.
+  -- blackCreature is controlled by player 0 and OWNED by player 1, so a reading
+  -- off the wrong field agrees with neither arm below.
+  Spec.describe s "ControlledByRecipient" $ do
+    let reached n = self {Filter.recipient = Just (PlayerId.MkPlayerId n)}
+    Spec.it s "holds only for the reached recipient's creature" $ do
+      Spec.assertBool s (Filter.matches (reached 0) blackCreature Filter.Type.ControlledByRecipient) "controller is the recipient"
+      Spec.assertBool s (not (Filter.matches (reached 1) blackCreature Filter.Type.ControlledByRecipient)) "owner is not the controller"
+
+    -- Perspective-free, which is why the atom exists: `noPerspective` names no
+    -- "you" at all and the answer is unchanged, where ControlledBy You is
+    -- vacuously False there. That is the difference between "they control" and
+    -- "you control" on one board.
+    Spec.it s "is not ControlledBy You, and needs no perspective" $ do
+      Spec.assertBool s (Filter.matches (noPerspective {Filter.recipient = Just (PlayerId.MkPlayerId 0)}) blackCreature Filter.Type.ControlledByRecipient) "no perspective needed"
+      Spec.assertBool s (not (Filter.matches noPerspective blackCreature (Filter.Type.ControlledBy PlayerRelation.You))) "where ControlledBy You cannot answer"
+      Spec.assertBool s (Filter.matches (reached 1) blackCreature (Filter.Type.ControlledBy PlayerRelation.You)) "and disagrees with it on the very same view: the perspective still controls this creature where the recipient does not"
+
+    -- ControlledBy's vacuity posture on both sides. No recipient at all is every
+    -- position but a per-recipient effect's quantity.
+    Spec.it s "is False when either player is absent" $ do
+      let noController = blackCreature {Filter.controller = Nothing}
+      Spec.assertBool s (not (Filter.matches (reached 0) noController Filter.Type.ControlledByRecipient)) "no candidate controller"
+      Spec.assertBool s (not (Filter.matches (reached 0) aPlayer Filter.Type.ControlledByRecipient)) "a player controls nothing"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ControlledByRecipient)) "no recipient"
+
   -- CR 603.2's "that player controls", the pair a trigger's binding is baked
   -- through. blackCreature is controlled by player 0 and owned by player 1, so a
   -- reading off the wrong field disagrees with both arms below.

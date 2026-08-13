@@ -155,6 +155,13 @@ setupSpec s registry = Spec.describe s "Setup" $ do
     gs <- setupState s registry
     Spec.assertEqWith s "hand" (length (Game.zoneMembers Zone.Hand S.bob gs)) 7
 
+  -- CR 103.5's fourteen draws happen before CR 103.8's first turn, so none of
+  -- them is a draw made "this turn" -- the tally CR 121.1's per-turn count is
+  -- read off starts the first turn empty, though the hands above are full.
+  Spec.it s "CR 103.8 the opening hands are not draws made this turn" $ do
+    gs <- setupState s registry
+    Spec.assertEqWith s "no draws counted" (GameState.drawsThisTurn gs) Map.empty
+
   Spec.it s "active player is first in turn order" $ do
     gs <- setupState s registry
     Spec.assertEqWith s "active" (GameState.activePlayer gs) S.alice
