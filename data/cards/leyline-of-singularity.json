@@ -30,15 +30,15 @@
         [
           {
             "type": "MoveToZone",
-            "value": [
-              {
+            "value": {
+              "ref": {
                 "type": "InSlot",
                 "value": "self"
               },
-              {
+              "zone": {
                 "type": "Battlefield"
               }
-            ]
+            }
           }
         ]
       ],

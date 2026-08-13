@@ -19,11 +19,11 @@ import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Codec.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
+import qualified Pawl.Codec.MoveToZone as MoveToZone
 import qualified Pawl.Codec.ObjectRef as ObjectRef
 import qualified Pawl.Codec.Onset as Onset
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
@@ -38,7 +38,6 @@ import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Codec.Uses as Uses
-import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -46,12 +45,8 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Effect as Effect
 -- These type modules share an alias with their codec module, the posture Onset
 -- already took here: the names never collide, since a codec module exports
--- functions and a type module exports the type moveTail's signature needs.
-import qualified Pawl.Types.EntryRiders as EntryRiders
-import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+-- functions and a type module exports the type a signature here names.
 import qualified Pawl.Types.Onset as Onset
-import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.Zone as Zone
 
 toJson :: (card -> Value.Value) -> Effect.Effect card -> Value.Value
 toJson codec e = case e of
@@ -75,27 +70,7 @@ toJson codec e = case e of
   Effect.TurnFaceDown s -> Common.tagged "TurnFaceDown" (Just (Codec.encode SlotName.codec s))
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (Codec.encode SlotName.codec s))
   Effect.Counter s -> Common.tagged "Counter" (Just (Codec.encode SlotName.codec s))
-  -- MoveToZone's payload is the ObjectRef and the destination zone, then four
-  -- independently elided extras where Create has two: the EntryRiders are
-  -- dropped when they are the CR 110.5b default, the bound slot when there is
-  -- none, CR 113.6m's origin zone when the effect states none, and the library
-  -- placement when it is the default end, stated. Everything after the
-  -- destination is therefore optional, and told apart on decode by JSON TYPE
-  -- rather than by position -- a slot name is a string, a zone and a library
-  -- placement are tagged objects with disjoint tags, and the riders are an
-  -- object that is neither. `moveTail` is the decoding half.
-  --
-  -- The two POSITIONAL elements are exempt from that, and since #1304 the
-  -- ObjectRef among them is a tagged object like any other sum -- which is what
-  -- keeps it out of the tail's reckoning entirely rather than merely distinct
-  -- from it.
-  Effect.MoveToZone r z riders ms mo p ->
-    Common.tagged "MoveToZone" . Just . Value.array $
-      [Codec.encode ObjectRef.codec r, Codec.encode Zone.codec z]
-        <> (if riders == EntryRiders.defaultValue then [] else [EntryRiders.toJson riders])
-        <> fmap (Codec.encode SlotName.codec) (Maybe.maybeToList ms)
-        <> fmap (Codec.encode Zone.codec) (Maybe.maybeToList mo)
-        <> (if p == LibraryPlacement.defaultValue then [] else [Codec.encode LibraryPlacement.codec p])
+  Effect.MoveToZone m -> Common.tagged "MoveToZone" . Just $ Codec.encode MoveToZone.codec m
   Effect.Draw r q -> Common.tagged "Draw" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
   Effect.Scry r q -> Common.tagged "Scry" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
   Effect.Surveil r q -> Common.tagged "Surveil" (Just (Value.array [Codec.encode PlayerRef.codec r, Codec.encode Quantity.codec q]))
@@ -111,10 +86,14 @@ toJson codec e = case e of
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
   -- told apart on decode by JSON TYPE rather than by position: a slot name is a
   -- string and riders are an object, so the two can never be confused.
+  --
+  -- The LAST arm still shaped this way. Its record waits on this module becoming
+  -- a bundle, since Create is parametric in the card and a record codec needs a
+  -- whole Codec for it (#1305, and #1306's constraint one level up).
   Effect.Create q c te ms ->
     Common.tagged "Create" . Just . Value.array $
       [Codec.encode Quantity.codec q, codec c]
-        <> (if te == EntryRiders.defaultValue then [] else [EntryRiders.toJson te])
+        <> (if te == EntryRiders.defaultValue then [] else [Codec.encode EntryRiders.codec te])
         <> fmap (Codec.encode SlotName.codec) (Maybe.maybeToList ms)
   Effect.CreateCopy c -> Common.tagged "CreateCopy" . Just $ Codec.encode CreateCopy.codec c
   Effect.Replace d u o c re ->
@@ -186,55 +165,6 @@ toJson codec e = case e of
         else Value.array [Codec.encode SlotName.codec s, Codec.encode CastOffer.codec offer]
   Effect.GrantPlayFromExile d r -> Common.tagged "GrantPlayFromExile" (Just (Value.array [Duration.toJson d, Codec.encode ObjectRef.codec r]))
 
--- Everything a MoveToZone payload may carry after its ObjectRef and its
--- destination zone: the EntryRiders (CR 110.5b), the slot binding the destination
--- incarnation (CR 400.7), the origin zone the effect names (CR 113.6m), and how a
--- library destination's end is settled (CR 401.2). Each is optional, so they are
--- read by JSON TYPE rather than by position -- a string is the slot, and an
--- object is the origin zone or the library placement if it decodes as one and the
--- riders otherwise.
---
--- ZONE AND PLACEMENT FIRST is what makes that order-independent rather than
--- merely ordered: EntryRiders.fromJson defaults every field it does not find, so
--- it would accept either tagged object and silently return the default riders,
--- while the zone codec and the placement codec accept nothing but their own
--- tagged shapes. Those two shapes cannot be confused with each other either --
--- no zone is named Stated or OwnerChooses.
---
--- A REPEATED element is an error rather than last-one-wins. Two origin zones is
--- a card file saying something CR 113.6m's "a particular zone" cannot mean, and
--- two of anything else is as likely a typo.
-moveTail :: [Value.Value] -> Either Text.Text (EntryRiders.EntryRiders, Maybe SlotName.SlotName, Maybe Zone.Zone, LibraryPlacement.LibraryPlacement)
-moveTail = go Nothing Nothing Nothing Nothing
-  where
-    go mRiders mSlot mOrigin mPlacement values = case values of
-      [] ->
-        Right
-          ( Maybe.fromMaybe EntryRiders.defaultValue mRiders,
-            mSlot,
-            mOrigin,
-            Maybe.fromMaybe LibraryPlacement.defaultValue mPlacement
-          )
-      v : rest -> case v of
-        Value.String _ -> case mSlot of
-          Just _ -> Left . Text.pack $ "MoveToZone names two bound slots"
-          Nothing -> do
-            slot <- Codec.decode SlotName.codec v
-            go mRiders (Just slot) mOrigin mPlacement rest
-        _ -> case Codec.decode Zone.codec v of
-          Right zone -> case mOrigin of
-            Just _ -> Left . Text.pack $ "MoveToZone names two origin zones"
-            Nothing -> go mRiders mSlot (Just zone) mPlacement rest
-          Left _ -> case Codec.decode LibraryPlacement.codec v of
-            Right placement -> case mPlacement of
-              Just _ -> Left . Text.pack $ "MoveToZone names two library placements"
-              Nothing -> go mRiders mSlot mOrigin (Just placement) rest
-            Left _ -> case mRiders of
-              Just _ -> Left . Text.pack $ "MoveToZone names two sets of entry riders"
-              Nothing -> do
-                riders <- EntryRiders.fromJson v
-                go (Just riders) mSlot mOrigin mPlacement rest
-
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Effect.Effect card)
 fromJson decode value = do
   (t, mv) <- Common.asTagged value
@@ -268,14 +198,7 @@ fromJson decode value = do
     "TurnFaceDown" -> Common.withValue mv (fmap Effect.TurnFaceDown . Codec.decode SlotName.codec)
     "RemoveFromCombat" -> Common.withValue mv (fmap Effect.RemoveFromCombat . Codec.decode SlotName.codec)
     "Counter" -> Common.withValue mv (fmap Effect.Counter . Codec.decode SlotName.codec)
-    -- Read by JSON TYPE and not by position, which is `moveTail`'s whole job:
-    -- Create's third-position rule would not survive CR 113.6m's origin zone,
-    -- since that zone and the EntryRiders are both objects.
-    "MoveToZone" -> case mv of
-      Just (Value.Array (Array.MkArray (r : z : rest))) -> do
-        (riders, mSlot, mOrigin, placement) <- moveTail rest
-        Effect.MoveToZone <$> Codec.decode ObjectRef.codec r <*> Codec.decode Zone.codec z <*> pure riders <*> pure mSlot <*> pure mOrigin <*> pure placement
-      _ -> Left . Text.pack $ "MoveToZone expects [objectRef, zone], optionally with EntryRiders, a slot, an origin zone and/or a library placement"
+    "MoveToZone" -> Common.withValue mv (fmap Effect.MoveToZone . Codec.decode MoveToZone.codec)
     "Draw" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Draw <$> Codec.decode PlayerRef.codec r <*> Codec.decode Quantity.codec q
       _ -> Left . Text.pack $ "Draw expects [playerRef, quantity]"
@@ -308,9 +231,9 @@ fromJson decode value = do
     -- riders be elided without leaving a hole in the array.
     "Create" -> case mv of
       Just (Value.Array (Array.MkArray [q, c])) -> Effect.Create <$> Codec.decode Quantity.codec q <*> decode c <*> pure EntryRiders.defaultValue <*> pure Nothing
-      Just (Value.Array (Array.MkArray [q, c, e@(Value.Object _)])) -> Effect.Create <$> Codec.decode Quantity.codec q <*> decode c <*> EntryRiders.fromJson e <*> pure Nothing
+      Just (Value.Array (Array.MkArray [q, c, e@(Value.Object _)])) -> Effect.Create <$> Codec.decode Quantity.codec q <*> decode c <*> Codec.decode EntryRiders.codec e <*> pure Nothing
       Just (Value.Array (Array.MkArray [q, c, s])) -> Effect.Create <$> Codec.decode Quantity.codec q <*> decode c <*> pure EntryRiders.defaultValue <*> (Just <$> Codec.decode SlotName.codec s)
-      Just (Value.Array (Array.MkArray [q, c, e, s])) -> Effect.Create <$> Codec.decode Quantity.codec q <*> decode c <*> EntryRiders.fromJson e <*> (Just <$> Codec.decode SlotName.codec s)
+      Just (Value.Array (Array.MkArray [q, c, e, s])) -> Effect.Create <$> Codec.decode Quantity.codec q <*> decode c <*> Codec.decode EntryRiders.codec e <*> (Just <$> Codec.decode SlotName.codec s)
       _ -> Left . Text.pack $ "Create expects [Quantity, Card], optionally with EntryRiders and/or a slot"
     "CreateCopy" -> Common.withValue mv (fmap Effect.CreateCopy . Codec.decode CreateCopy.codec)
     -- The three shapes the encoder above can emit, told apart by LENGTH.

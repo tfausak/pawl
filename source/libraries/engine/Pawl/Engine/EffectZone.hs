@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Types.Card as Card.Type
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import Pawl.Types.Zone (Zone)
 
@@ -31,7 +32,7 @@ import Pawl.Types.Zone (Zone)
 --
 -- TWO conditions, and both are the rule's own words. The effect has to name the
 -- zone it moves the object out of, which is the origin Effect.MoveToZone
--- carries; and the object moved has to be "THE OBJECT IT'S ON", which is the
+-- carries; and the object moved) has to be "THE OBJECT) IT'S ON", which is the
 -- reserved slot CR 113.7's source is bound under. An effect that moves some
 -- other object out of a graveyard -- Raise Dead's target -- says nothing about
 -- where its own ability functions, and answering Just for it would strand every
@@ -49,7 +50,7 @@ zoneFunctionedFrom effect = case effect of
   -- so it cannot be one either. All of them answer Nothing however the card file
   -- states the origin -- the same inert card-data error the note above describes
   -- for a move of somebody else's permanent.
-  Effect.MoveToZone ref _ _ _ origin _ -> case ref of
+  Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ origin _) -> case ref of
     ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
     ObjectRef.EachMatching _ -> Nothing
     ObjectRef.EachCardInGraveyard _ _ -> Nothing

@@ -13,8 +13,10 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 -- on the JSON type of what it was handed cannot be stated as @oneOf@ over
 -- branches a reader can tell apart (#1304).
 --
--- The two tags stay disjoint from every zone's, which is what
--- 'Pawl.Codec.Effect'\'s @moveTail@ needs to tell a placement from a zone.
+-- The two tags were also what told a placement from a zone in
+-- 'Pawl.Codec.Effect'\'s @moveTail@. That function is gone (#1305): a placement
+-- is now a NAMED KEY on 'Pawl.Types.MoveToZone', so nothing has to tell the two
+-- apart by shape.
 codec :: Codec.Codec LibraryPlacement.LibraryPlacement
 codec =
   Arm.tagged

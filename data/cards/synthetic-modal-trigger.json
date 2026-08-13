@@ -29,15 +29,15 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "bounced"
                           },
-                          {
+                          "zone": {
                             "type": "Hand"
                           }
-                        ]
+                        }
                       }
                     ]
                   }
@@ -76,15 +76,15 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "exiled"
                           },
-                          {
+                          "zone": {
                             "type": "Exile"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

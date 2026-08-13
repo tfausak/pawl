@@ -25,15 +25,15 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "tokens"
                           },
-                          {
+                          "zone": {
                             "type": "Exile"
                           }
-                        ]
+                        }
                       }
                     ]
                   }

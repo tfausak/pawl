@@ -1891,7 +1891,7 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid req
 --
 -- One caller, Pawl.Engine.Cast, which is the only route a CARD takes onto the
 -- stack. changeZoneEntering carries a player too, so an Effect.MoveToZone naming
--- the stack would stamp one as well -- no card in the pool does, and CR 800.4b's
+-- the stack would stamp) one as well -- no) card in the pool does, and CR 800.4b's
 -- "put onto the stack under the control of" says such a move would have a
 -- controller to name if one did.
 --

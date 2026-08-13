@@ -34,8 +34,11 @@
                 "effects": [
                   {
                     "type": "MoveToZone",
-                    "value": [
-                      {
+                    "value": {
+                      "placement": {
+                        "type": "OwnerChooses"
+                      },
+                      "ref": {
                         "type": "EachMatching",
                         "value": {
                           "type": "And",
@@ -52,13 +55,10 @@
                           ]
                         }
                       },
-                      {
+                      "zone": {
                         "type": "Library"
-                      },
-                      {
-                        "type": "OwnerChooses"
                       }
-                    ]
+                    }
                   }
                 ]
               }

@@ -57,6 +57,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MorphVariant as MorphVariant
+import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
@@ -1477,18 +1478,20 @@ ingest =
   where
     effect =
       Effect.MoveToZone
-        (ObjectRef.TopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) 1)
-        Zone.Exile
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = False,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.empty,
-            EntryRiders.underOwner = False
-          }
-        Nothing
-        Nothing
-        LibraryPlacement.defaultValue
+        ( MoveToZone.MkMoveToZone
+            (ObjectRef.TopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) 1)
+            Zone.Exile
+            EntryRiders.MkEntryRiders
+              { EntryRiders.tapped = TapState.Untapped,
+                EntryRiders.attacking = False,
+                EntryRiders.transformed = False,
+                EntryRiders.counters = Map.empty,
+                EntryRiders.underOwner = False
+              }
+            Nothing
+            Nothing
+            LibraryPlacement.defaultValue
+        )
 
 -- CR 702.86a: whenever this creature attacks, defending player sacrifices N
 -- permanents. Rule 702 states it as a triggered ability, minted exactly as rule
@@ -2341,18 +2344,20 @@ returns kind =
   where
     back =
       Effect.MoveToZone
-        (ObjectRef.InSlot Binding.became)
-        Zone.Battlefield
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = False,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.singleton kind 1,
-            EntryRiders.underOwner = True
-          }
-        Nothing
-        Nothing
-        LibraryPlacement.defaultValue
+        ( MoveToZone.MkMoveToZone
+            (ObjectRef.InSlot Binding.became)
+            Zone.Battlefield
+            EntryRiders.MkEntryRiders
+              { EntryRiders.tapped = TapState.Untapped,
+                EntryRiders.attacking = False,
+                EntryRiders.transformed = False,
+                EntryRiders.counters = Map.singleton kind 1,
+                EntryRiders.underOwner = True
+              }
+            Nothing
+            Nothing
+            LibraryPlacement.defaultValue
+        )
 
 -- CR 702.135a: afterlife N. "When this permanent is put into a graveyard from
 -- the battlefield, create N 1/1 white and black Spirit creature tokens with
@@ -2619,18 +2624,20 @@ soulshift n =
         (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.ManaValueAtMost (toInteger n)]))
     back =
       Effect.MoveToZone
-        (ObjectRef.InSlot soulshiftTarget)
-        Zone.Hand
-        EntryRiders.MkEntryRiders
-          { EntryRiders.tapped = TapState.Untapped,
-            EntryRiders.attacking = False,
-            EntryRiders.transformed = False,
-            EntryRiders.counters = Map.empty,
-            EntryRiders.underOwner = False
-          }
-        Nothing
-        Nothing
-        LibraryPlacement.defaultValue
+        ( MoveToZone.MkMoveToZone
+            (ObjectRef.InSlot soulshiftTarget)
+            Zone.Hand
+            EntryRiders.MkEntryRiders
+              { EntryRiders.tapped = TapState.Untapped,
+                EntryRiders.attacking = False,
+                EntryRiders.transformed = False,
+                EntryRiders.counters = Map.empty,
+                EntryRiders.underOwner = False
+              }
+            Nothing
+            Nothing
+            LibraryPlacement.defaultValue
+        )
 
 -- The slot rule 702.46a's one target is chosen into, declared by the ability that
 -- reads it for mentorTarget's reason.

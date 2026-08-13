@@ -25,8 +25,8 @@
                 "effects": [
                   {
                     "type": "MoveToZone",
-                    "value": [
-                      {
+                    "value": {
+                      "ref": {
                         "type": "TopOfLibrary",
                         "value": [
                           {
@@ -38,11 +38,11 @@
                           3
                         ]
                       },
-                      {
+                      "slot": "exiled",
+                      "zone": {
                         "type": "Exile"
-                      },
-                      "exiled"
-                    ]
+                      }
+                    }
                   },
                   {
                     "type": "GrantPlayFromExile",

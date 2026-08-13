@@ -34,8 +34,8 @@
                 "effects": [
                   {
                     "type": "MoveToZone",
-                    "value": [
-                      {
+                    "value": {
+                      "ref": {
                         "type": "EachCardInGraveyard",
                         "value": [
                           {
@@ -49,10 +49,10 @@
                           }
                         ]
                       },
-                      {
+                      "zone": {
                         "type": "Battlefield"
                       }
-                    ]
+                    }
                   }
                 ]
               }

@@ -25,21 +25,21 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "exiled"
                           },
-                          {
-                            "type": "Battlefield"
-                          },
-                          {
+                          "riders": {
                             "attacking": true,
                             "tapped": {
                               "type": "Tapped"
                             }
+                          },
+                          "zone": {
+                            "type": "Battlefield"
                           }
-                        ]
+                        }
                       }
                     ]
                   }
@@ -109,16 +109,16 @@
                     "effects": [
                       {
                         "type": "MoveToZone",
-                        "value": [
-                          {
+                        "value": {
+                          "ref": {
                             "type": "InSlot",
                             "value": "self"
                           },
-                          {
+                          "slot": "exiled",
+                          "zone": {
                             "type": "Exile"
-                          },
-                          "exiled"
-                        ]
+                          }
+                        }
                       },
                       {
                         "type": "ArmDelayedTrigger",
