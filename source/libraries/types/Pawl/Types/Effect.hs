@@ -35,6 +35,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Uses as Uses
@@ -498,14 +499,30 @@ data Effect card
     -- "has no speed" reading at all, existing as it does only for a player who
     -- already has speed. Only a card gets to any of that.
     --
-    -- NOT a "set speed to" or a "decrease" opcode. CR 702.179b does name a set --
-    -- "until a rule or effect sets their speed to a specific value" -- and CR
-    -- 704.5z is one, but that clause is the rules core's own (Pawl.Engine.Speed's
-    -- startEngines) rather than something a card asks for; no printing sets a
-    -- speed. A decrease one does want, and that is #808's. Either would also have
-    -- to say what happens to a player with no speed, which is exactly the question
-    -- CR 702.179c answers for this one.
+    -- NOT a "set speed to" opcode. CR 702.179b does name a set -- "until a rule
+    -- or effect sets their speed to a specific value" -- and CR 704.5z is one, but
+    -- that clause is the rules core's own (Pawl.Engine.Speed's startEngines)
+    -- rather than something a card asks for; no printing sets a speed. The
+    -- decrease below is the arm a card did ask for.
     IncreaseSpeed PlayerQuantity.PlayerQuantity
+  | -- | The other direction: the players the reference names each have their
+    -- speed reduced by this much, never below the floor beside it -- Spikeshell
+    -- Harrier's "reduce that opponent's speed by 1. This effect can't reduce their
+    -- speed below 1", the pool's only printing that lowers a speed at all.
+    --
+    -- NOT IncreaseSpeed with a negated Quantity, and rule 702.179 is why rather
+    -- than the arithmetic. CR 702.179c makes an increase CREATE a speed for a
+    -- player who has none ("their speed becomes that value"), and no rule says the
+    -- same of a decrease -- so a player with no speed (CR 702.179b) must come out
+    -- of this arm with none, where sharing the opcode would give them one. The
+    -- floor is the second reason: it is the card's own sentence, so it rides this
+    -- payload rather than the rules core, and IncreaseSpeed has nowhere to put it.
+    --
+    -- NO CAP and NO FLOOR of the rules' own, in IncreaseSpeed's sense: rule
+    -- 702.179 bounds speed in neither direction, so the only bound applied is the
+    -- one the card prints. Whether an effect may push speed past 4 is still
+    -- unsettled (#809) and is that arm's question, not this one's.
+    DecreaseSpeed SpeedDecrease.SpeedDecrease
   | -- | CR 111: create this many tokens with the given effect-defined
     -- characteristics (CR 111.3). The `card` is the token's text, embedded
     -- literally (tied to Card by Card's own instantiation); Create (Literal 2)

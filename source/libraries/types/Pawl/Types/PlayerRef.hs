@@ -56,4 +56,31 @@ data PlayerRef
     -- its effect does nothing. That is the honest answer rather than a silent
     -- substitution of "you".
     Candidate
+  | -- | CR 108.4 / 110.2: the CONTROLLER of the object a slot names --
+    -- Spikeshell Harrier's "return target creature or Vehicle an opponent
+    -- controls to its owner's hand. If THAT OPPONENT's speed ...", where the
+    -- player is identified by the permanent the ability targeted.
+    --
+    -- InSlot's twin one indirection out. That arm reads a slot whose recipient IS
+    -- a player (CR 115.1); this one reads a slot whose recipient is an OBJECT and
+    -- asks who controls it, which is the only spelling a card has for a player it
+    -- never targeted. Neither is derivable from the other: a slot holds one kind
+    -- of recipient or the other.
+    --
+    -- CR 608.2h is load-bearing rather than incidental. The sentence that names
+    -- the player generally MOVES the object first -- Spikeshell Harrier's does,
+    -- from the battlefield to a hand -- and CR 108.4 gives a card in a hand no
+    -- controller at all, so the live reading is empty by the time the next clause
+    -- asks. That rule's "or if the effect has moved it from a public zone to a
+    -- hidden zone, the effect uses the object's last known information" is the
+    -- clause this arm rests on, and every reader answers it through a last-known
+    -- aware view: Pawl.Engine.Resolve.playerRefPlayers through
+    -- Pawl.Engine.Projection.controllerWithLastKnown, Pawl.Engine.Quantity
+    -- through the view its caller supplies.
+    --
+    -- Undeterminable where no view can answer, which is Candidate's posture and
+    -- for a neighbouring reason: Pawl.Engine.Count.playersFor holds no projection,
+    -- so a Scope or a ManaCount naming this reference reads Nothing and its count
+    -- is unanswered (#1441).
+    ControllerOfBound SlotName.SlotName
   deriving (Eq, Ord, Show)

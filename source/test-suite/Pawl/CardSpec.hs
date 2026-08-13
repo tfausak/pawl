@@ -138,6 +138,7 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpecialAction as SpecialAction
+import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -607,6 +608,8 @@ effectCounts effect = case effect of
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
+  -- The floor beside it is a printed literal and holds no Count.
+  Effect.DecreaseSpeed d -> quantityCounts (SpeedDecrease.quantity d)
   Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
   -- No embedded card -- the copied permanent supplies the text -- but the count
   -- is card data like Create's.
@@ -916,6 +919,7 @@ effectReplacements effect = case effect of
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.DecreaseSpeed _ -> []
   Effect.SkipNextPhase _ _ -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
   Effect.PreventNextDamage _ _ _ rider -> concatMap effectReplacements rider
@@ -1441,6 +1445,7 @@ effectMintedFaces effect = case effect of
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ _) -> []
+  Effect.DecreaseSpeed _ -> []
   Effect.SkipNextPhase _ _ -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
   Effect.PreventNextDamage _ _ _ rider -> concatMap effectMintedFaces rider
@@ -1683,6 +1688,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.OwnedBy _ -> 0
   Filter.Type.IsSource -> 0
   Filter.Type.IsPlayer _ -> 0
+  Filter.Type.IsControllerOfBound _ -> 0
   Filter.Type.IsAttacking -> 0
   Filter.Type.IsBlocking -> 0
   Filter.Type.AttackedThisTurn -> 0
@@ -2459,6 +2465,7 @@ effectFilters effect = case effect of
   Effect.SetLifeTotal (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.RedistributeLifeTotals -> []
   Effect.IncreaseSpeed (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
+  Effect.DecreaseSpeed d -> unframed (quantityFilters (SpeedDecrease.quantity d))
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
   Effect.Create quantity card riders _ -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
@@ -3758,6 +3765,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               -- no fold supplies a candidate, so this names nobody and moves
               -- nothing -- which is at most one.
               PlayerRef.Candidate -> True
+              -- One seat, so one library -- InSlot's answer, one indirection out.
+              PlayerRef.ControllerOfBound _ -> True
           -- One card per CHOOSER: the resolving controller chooses once however
           -- many graveyards the scope draws candidates from, where Exhume's
           -- "each player" is one choice each and so several cards on any board

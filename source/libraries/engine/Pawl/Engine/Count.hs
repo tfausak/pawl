@@ -159,6 +159,18 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
     let theirs = controlledMatching viewOf context gs inner candidate
         yours = fmap (controlledMatching viewOf context gs inner) (Filter.perspective context)
      in truth (maybe False (theirs >) yours)
+  -- CR 108.4 / 608.2h: is this candidate the player who controls the object the
+  -- slot names? Baked here for ControlsMoreThanYou's reason -- projecting a
+  -- controller is a question about the board -- and off the same view the fold
+  -- reads everything else through, which is what carries CR 608.2h in: the caller
+  -- that has already moved the object supplies a last-known-aware view, and
+  -- Pawl.Engine.Filter.View.controller then answers for a permanent that is gone.
+  --
+  -- False when the slot names no object or the view cannot describe it, the
+  -- vacuous posture above: an unanswerable atom admits no candidate rather than
+  -- admitting every one.
+  Filter.Type.IsControllerOfBound slot ->
+    truth (Just candidate == (Map.lookup slot (Filter.slotObjects context) >>= viewOf >>= Filter.controller))
   Filter.Type.And fs -> Filter.Type.And (fmap recur fs)
   Filter.Type.Or fs -> Filter.Type.Or (fmap recur fs)
   Filter.Type.Not f -> Filter.Type.Not (recur f)
@@ -312,6 +324,14 @@ playersFor context gs ref =
         -- candidate at all -- a Scope naming it, or a ManaCount -- and Nothing is
         -- the honest answer for those.
         PlayerRef.Candidate -> Nothing
+        -- The controller of a bound OBJECT, which this function cannot answer
+        -- either: CR 613.1b's layer 2 decides who controls a permanent, and
+        -- projecting that needs a view this function is handed none of.
+        -- Pawl.Engine.Quantity answers it where the view is, exactly as it
+        -- answers the candidate above; what reaches here is the reference in a
+        -- position that holds no view at all -- a Scope naming it, or a ManaCount
+        -- -- and those go unanswered (#1441).
+        PlayerRef.ControllerOfBound _ -> Nothing
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event
 -- recorded rather than from any object that may no longer exist.
