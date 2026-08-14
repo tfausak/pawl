@@ -146,20 +146,20 @@
                         "value": {
                           "ref": {
                             "type": "ChosenCardInGraveyard",
-                            "value": [
-                              {
+                            "value": {
+                              "chooser": {
                                 "type": "TheController"
                               },
-                              {
-                                "type": "You"
-                              },
-                              {
+                              "filter": {
                                 "type": "HasCardType",
                                 "value": {
                                   "type": "Land"
                                 }
+                              },
+                              "players": {
+                                "type": "You"
                               }
-                            ]
+                            }
                           },
                           "riders": {
                             "tapped": {

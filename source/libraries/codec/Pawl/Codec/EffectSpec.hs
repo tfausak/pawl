@@ -49,6 +49,7 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -600,7 +601,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               Replace.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing) (DamageRewrite.SetAmount 4)
             }
       )
-      """ {"type":"Replace","value":{"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"SelfReplacement"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},"effect":{"type":"DamageR","value":[{"whatSource":{"type":"IsSource"}},{"type":"SetAmount","value":4}]}}} """
+      """ {"type":"Replace","value":{"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"SelfReplacement"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},"effect":{"type":"DamageR","value":[{"whatSource":{"type":"IsSource"}},{"type":"SetAmount","value":4}]}}} """
   -- CR 614.10a: a slot read, plus the whole-phase selector -- the arm a Phase
   -- alone cannot spell (CR 500.1).
   Spec.it s "SkipNextPhase" $ do
@@ -1142,6 +1143,6 @@ sentinel = Value.text (Text.pack "SENTINEL")
 threeArtifacts :: Count.Count Quantity.Quantity
 threeArtifacts =
   Count.MkCount
-    (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+    (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
     (Filter.And [Filter.HasCardType CardType.Artifact, Filter.ControlledBy PlayerRelation.You])
     Aggregation.Members

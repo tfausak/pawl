@@ -9,20 +9,20 @@
       "manaCost": [
         {
           "type": "Hybrid",
-          "value": [
-            {
+          "value": {
+            "left": {
               "type": "Colored",
               "value": {
                 "type": "Green"
               }
             },
-            {
+            "right": {
               "type": "Colored",
               "value": {
                 "type": "Blue"
               }
             }
-          ]
+          }
         }
       ],
       "name": "Slippery Bogle",

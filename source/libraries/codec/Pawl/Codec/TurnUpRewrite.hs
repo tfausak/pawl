@@ -4,6 +4,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.WithCounters as WithCounters
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -20,11 +21,11 @@ codec :: Codec.Codec TurnUpRewrite.TurnUpRewrite
 codec =
   Arm.tagged
     encode
-    [ Arm.payload "WithCounters" counters (uncurry TurnUpRewrite.WithCounters),
+    [ Arm.payload "WithCounters" WithCounters.codec TurnUpRewrite.WithCounters,
       Arm.payload "MayAttachTo" filterCodec TurnUpRewrite.MayAttachTo
     ]
   where
     filterCodec = Filter.codec Keyword.codec
     encode r = case r of
-      TurnUpRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just $ Codec.encode counters (kind, n)
+      TurnUpRewrite.WithCounters x -> Common.tagged "WithCounters" . Just $ Codec.encode WithCounters.codec x
       TurnUpRewrite.MayAttachTo f -> Common.tagged "MayAttachTo" . Just $ Codec.encode filterCodec f

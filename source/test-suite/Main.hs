@@ -42,6 +42,7 @@ import qualified Pawl.Codec.ChangeTextSpec
 import qualified Pawl.Codec.CharacteristicPTSpec
 import qualified Pawl.Codec.ChooseBetweenSpec
 import qualified Pawl.Codec.ChooserSpec
+import qualified Pawl.Codec.ChosenCardInGraveyardSpec
 import qualified Pawl.Codec.ClauseIndexSpec
 import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.ColorSpec
@@ -84,6 +85,7 @@ import qualified Pawl.Codec.DungeonRoomSpec
 import qualified Pawl.Codec.DurationRefSpec
 import qualified Pawl.Codec.DurationSpec
 import qualified Pawl.Codec.DuringPhaseSpec
+import qualified Pawl.Codec.EachCardInGraveyardSpec
 import qualified Pawl.Codec.EffectSpec
 import qualified Pawl.Codec.EndingStepSpec
 import qualified Pawl.Codec.EntryOptionSpec
@@ -99,6 +101,8 @@ import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GraveyardScopeSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
+import qualified Pawl.Codec.HybridSpec
+import qualified Pawl.Codec.InZoneSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LayoutSpec
@@ -125,6 +129,7 @@ import qualified Pawl.Codec.ModifyTargetSpec
 import qualified Pawl.Codec.MonarchTargetSpec
 import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveToZoneSpec
+import qualified Pawl.Codec.MovedBetweenSpec
 import qualified Pawl.Codec.MovedSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
@@ -167,12 +172,14 @@ import qualified Pawl.Codec.RevealCauseSpec
 import qualified Pawl.Codec.RevealedSpec
 import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
+import qualified Pawl.Codec.SacrificeAnyNumberSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SearchSpec
 import qualified Pawl.Codec.SelfCountersReachedSpec
+import qualified Pawl.Codec.SetPowerToughnessSpec
 import qualified Pawl.Codec.ShuffleIntoLibrarySpec
 import qualified Pawl.Codec.SkipNextPhaseSpec
 import qualified Pawl.Codec.SlotNameSpec
@@ -191,6 +198,7 @@ import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
 import qualified Pawl.Codec.TokenPatternSpec
+import qualified Pawl.Codec.TopOfLibrarySpec
 import qualified Pawl.Codec.ToughnessSpec
 import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
@@ -204,6 +212,7 @@ import qualified Pawl.Codec.UntapRestrictionSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
 import qualified Pawl.Codec.WhileSpec
+import qualified Pawl.Codec.WithCountersSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
 import qualified Pawl.Codec.ZoneSpec
@@ -384,6 +393,7 @@ spec s registry = do
   Pawl.Codec.CharacteristicPTSpec.spec s
   Pawl.Codec.ChooseBetweenSpec.spec s
   Pawl.Codec.ChooserSpec.spec s
+  Pawl.Codec.ChosenCardInGraveyardSpec.spec s
   Pawl.Codec.ClauseIndexSpec.spec s
   Pawl.Codec.ClauseSpec.spec s
   Pawl.Codec.ColorSpec.spec s
@@ -426,6 +436,7 @@ spec s registry = do
   Pawl.Codec.DurationRefSpec.spec s
   Pawl.Codec.DurationSpec.spec s
   Pawl.Codec.DuringPhaseSpec.spec s
+  Pawl.Codec.EachCardInGraveyardSpec.spec s
   Pawl.Codec.EffectSpec.spec s
   Pawl.Codec.EndingStepSpec.spec s
   Pawl.Codec.EntryOptionSpec.spec s
@@ -441,6 +452,8 @@ spec s registry = do
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GraveyardScopeSpec.spec s
   Pawl.Codec.HalfUnlockedSpec.spec s
+  Pawl.Codec.HybridSpec.spec s
+  Pawl.Codec.InZoneSpec.spec s
   Pawl.Codec.KeywordFamilySpec.spec s
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LayoutSpec.spec s
@@ -467,6 +480,7 @@ spec s registry = do
   Pawl.Codec.MonarchTargetSpec.spec s
   Pawl.Codec.MorphVariantSpec.spec s
   Pawl.Codec.MoveToZoneSpec.spec s
+  Pawl.Codec.MovedBetweenSpec.spec s
   Pawl.Codec.MovedSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
   Pawl.Codec.ObjectRefSpec.spec s
@@ -509,12 +523,14 @@ spec s registry = do
   Pawl.Codec.RevealedSpec.spec s
   Pawl.Codec.RoomIndexSpec.spec s
   Pawl.Codec.RoundingSpec.spec s
+  Pawl.Codec.SacrificeAnyNumberSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SearchSpec.spec s
   Pawl.Codec.SelfCountersReachedSpec.spec s
+  Pawl.Codec.SetPowerToughnessSpec.spec s
   Pawl.Codec.ShuffleIntoLibrarySpec.spec s
   Pawl.Codec.SkipNextPhaseSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
@@ -533,6 +549,7 @@ spec s registry = do
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
+  Pawl.Codec.TopOfLibrarySpec.spec s
   Pawl.Codec.ToughnessSpec.spec s
   Pawl.Codec.TriggerConditionSpec.spec s
   Pawl.Codec.TriggerFrequencySpec.spec s
@@ -546,6 +563,7 @@ spec s registry = do
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.VentureMarkerEnteredSpec.spec s
   Pawl.Codec.WhileSpec.spec s
+  Pawl.Codec.WithCountersSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s
   Pawl.Codec.ZoneSpec.spec s

@@ -93,6 +93,7 @@ import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -102,6 +103,7 @@ import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UnlessPaid as UnlessPaid
+import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -1126,11 +1128,11 @@ mintedReplacementsFor keyword count = case keyword of
   -- ONE ROW PER INSTANCE for riot's reason, and CR 702.63c makes the counters
   -- add up: two instances of vanishing 2 enter the permanent with four time
   -- counters, since each rewrite places its own N.
-  Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters CounterKind.Time n))
+  Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time n)))
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind:
   -- "this permanent enters with N +1/+1 counters on it". One row per instance
   -- for the same reason, and CR 702.43b makes them add up.
-  Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters CounterKind.PlusOnePlusOne n))
+  Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne n)))
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
@@ -1182,7 +1184,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- ordinal, not the effect value, is what separates two equal rows. Unexercised
   -- here: no card grants megamorph to a creature that already has it.
   Keyword.Morph _ MorphVariant.Mega ->
-    List.genericReplicate count (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters CounterKind.PlusOnePlusOne 1))
+    List.genericReplicate count (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1)))
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Cycling _ _ -> []
@@ -1541,7 +1543,7 @@ ingest =
     effect =
       Effect.MoveToZone
         ( MoveToZone.MkMoveToZone
-            (ObjectRef.TopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) 1)
+            (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.InSlot Binding.triggerPlayer) 1))
             Zone.Exile
             EntryRiders.MkEntryRiders
               { EntryRiders.tapped = TapState.Untapped,

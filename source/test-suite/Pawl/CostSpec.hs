@@ -53,6 +53,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -875,7 +876,7 @@ asmorSpec s registry =
       let (asmor, vulturesId, gs) = asmorBoard swamp asmorPrinting vultures
           discarded = S.runPure S.identityAnswer gs (Event.discard DiscardCause.Ordinary S.alice vulturesId)
           manaOf state = fmap Cost.Type.mana (Cost.costsFor (S.printingName asmorPrinting) asmor state)
-          blackRed = ManaSymbol.Hybrid (ManaType.Colored Color.Black) (ManaType.Colored Color.Red)
+          blackRed = ManaSymbol.Hybrid (Hybrid.MkHybrid (ManaType.Colored Color.Black) (ManaType.Colored Color.Red))
       Spec.assertEqWith s "undiscarded: the printed cost alone, unpayable" (manaOf gs) [Nothing]
       Spec.assertEqWith s "discarded: the printed cost first, then the {B/R}" (manaOf discarded) [Nothing, Just (ManaCost.MkManaCost [blackRed])]
     -- The cast itself, at gameplay level: the spell reaches the stack and the

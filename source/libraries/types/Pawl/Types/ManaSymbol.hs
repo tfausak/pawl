@@ -2,6 +2,7 @@ module Pawl.Types.ManaSymbol where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.ManaType as ManaType
 
 -- | CR 107.4. Grows: hybrid Phyrexian (#364).
@@ -19,7 +20,7 @@ data ManaSymbol
     -- two are ALTERNATIVES, so order carries no meaning beyond presentation, and
     -- `Hybrid t t` is degenerate rather than illegal -- it simply means `OfType
     -- t`, and no card prints one.
-    Hybrid ManaType.ManaType ManaType.ManaType
+    Hybrid Hybrid.Hybrid
   | -- | CR 107.4e: {2/B}, payable with either one mana of the stated type or two
     -- mana of any type.
     --

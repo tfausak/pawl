@@ -12,6 +12,7 @@ import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -102,12 +103,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       ( Quantity.Count
           ( Count.MkCount
-              (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
+              (Scope.InZone (InZone.MkInZone Zone.Graveyard PlayerRef.EachPlayer))
               (Filter.And [])
               Aggregation.DistinctCardTypes
           )
       )
-      """ {"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Graveyard"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"DistinctCardTypes"}}} """
+      """ {"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Graveyard"},"player":{"type":"EachPlayer"}}},"filter":{"type":"And","value":[]},"aggregation":{"type":"DistinctCardTypes"}}} """
   -- Greatest's payload is a whole Quantity rather than a nullary tag, so a
   -- per-member quantity that is itself a Count has to round-trip.
   Spec.it s "Greatest round-trips a nested Count payload" $
@@ -116,12 +117,12 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       ( Quantity.Count
           ( Count.MkCount
-              (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+              (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
               (Filter.And [])
               ( Aggregation.Greatest
                   ( Quantity.Count
                       ( Count.MkCount
-                          (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
+                          (Scope.InZone (InZone.MkInZone Zone.Graveyard PlayerRef.EachPlayer))
                           (Filter.And [])
                           Aggregation.DistinctCardTypes
                       )
@@ -129,7 +130,7 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
               )
           )
       )
-      """ {"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"Greatest","value":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Graveyard"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"DistinctCardTypes"}}}}}} """
+      """ {"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"And","value":[]},"aggregation":{"type":"Greatest","value":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Graveyard"},"player":{"type":"EachPlayer"}}},"filter":{"type":"And","value":[]},"aggregation":{"type":"DistinctCardTypes"}}}}}} """
   -- CR 119.1, with the PlayerRef on the wire saying whose. Serra Avatar's "your"
   -- is the Relative arm; the InSlot arm below is the one a recursive decoder
   -- could lose a payload through, so both are round-tripped.

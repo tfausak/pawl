@@ -1,5 +1,7 @@
 module Pawl.Types.CopyException where
 
+import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
+
 -- | CR 707.9: one exception to the copying process, the "except ..." clause of a
 -- copy effect. Quicksilver Gargantuan's "except it's 7/7" is the one producer
 -- today, and it is CR 707.9d's own worked example.
@@ -20,7 +22,7 @@ module Pawl.Types.CopyException where
 -- characteristic, CR 707.9d's "in addition to its other types" carve-out, and
 -- CR 707.9e's exception that is an additional effect rather than a
 -- characteristic (#1292).
-data CopyException
+newtype CopyException
   = -- | CR 707.9b: the copy's power and toughness are these numbers instead of
     -- the copied object's ("except it's 7/7").
     --
@@ -34,5 +36,5 @@ data CopyException
     -- a certain characteristic" does not copy the CDA defining it. Without that
     -- half the CDA would win at layer 7a and a Gargantuan copying a Tarmogoyf
     -- would recompute rather than stay 7/7.
-    SetPowerToughness Integer Integer
+    SetPowerToughness SetPowerToughness.SetPowerToughness
   deriving (Eq, Ord, Show)

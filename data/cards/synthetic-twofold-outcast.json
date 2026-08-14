@@ -60,14 +60,14 @@
                     },
                     "scope": {
                       "type": "InZone",
-                      "value": [
-                        {
-                          "type": "Battlefield"
-                        },
-                        {
+                      "value": {
+                        "player": {
                           "type": "EachPlayer"
+                        },
+                        "zone": {
+                          "type": "Battlefield"
                         }
-                      ]
+                      }
                     }
                   }
                 },
@@ -144,14 +144,14 @@
                     },
                     "scope": {
                       "type": "InZone",
-                      "value": [
-                        {
-                          "type": "Battlefield"
-                        },
-                        {
+                      "value": {
+                        "player": {
                           "type": "EachPlayer"
+                        },
+                        "zone": {
+                          "type": "Battlefield"
                         }
-                      ]
+                      }
                     }
                   }
                 },

@@ -1,12 +1,11 @@
 module Pawl.Codec.ObjectRef where
 
-import qualified Pawl.Codec.Chooser as Chooser
+import qualified Pawl.Codec.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Codec.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Codec.PlayerRef as PlayerRef
-import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.SlotName as SlotName
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.Codec.TopOfLibrary as TopOfLibrary
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -34,10 +33,10 @@ codec =
     encode
     [ Arm.payload "InSlot" SlotName.codec ObjectRef.InSlot,
       Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching,
-      Arm.payload "EachCardInGraveyard" (Common.tuple PlayerScope.codec filterCodec) (uncurry ObjectRef.EachCardInGraveyard),
+      Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard,
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
-      Arm.payload "TopOfLibrary" (Common.tuple PlayerRef.codec Common.natural) (uncurry ObjectRef.TopOfLibrary),
-      Arm.payload "ChosenCardInGraveyard" (Common.tuple3 Chooser.codec PlayerScope.codec filterCodec) (\(c, s, f) -> ObjectRef.ChosenCardInGraveyard c s f)
+      Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary,
+      Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard
     ]
   where
     -- Written once so the encoder, the decoder and the schema cannot disagree
@@ -46,13 +45,7 @@ codec =
     encode r = case r of
       ObjectRef.InSlot n -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec n
       ObjectRef.EachMatching f -> Common.tagged "EachMatching" . Just $ Codec.encode filterCodec f
-      ObjectRef.EachCardInGraveyard s f ->
-        Common.tagged "EachCardInGraveyard" . Just . Value.array $
-          [Codec.encode PlayerScope.codec s, Codec.encode filterCodec f]
+      ObjectRef.EachCardInGraveyard x -> Common.tagged "EachCardInGraveyard" . Just $ Codec.encode EachCardInGraveyard.codec x
       ObjectRef.EachPlayer -> Common.nullary "EachPlayer"
-      ObjectRef.TopOfLibrary p n ->
-        Common.tagged "TopOfLibrary" . Just . Value.array $
-          [Codec.encode PlayerRef.codec p, Common.encodeNatural n]
-      ObjectRef.ChosenCardInGraveyard c s f ->
-        Common.tagged "ChosenCardInGraveyard" . Just . Value.array $
-          [Codec.encode Chooser.codec c, Codec.encode PlayerScope.codec s, Codec.encode filterCodec f]
+      ObjectRef.TopOfLibrary x -> Common.tagged "TopOfLibrary" . Just $ Codec.encode TopOfLibrary.codec x
+      ObjectRef.ChosenCardInGraveyard x -> Common.tagged "ChosenCardInGraveyard" . Just $ Codec.encode ChosenCardInGraveyard.codec x

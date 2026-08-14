@@ -25,6 +25,7 @@ import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -93,14 +94,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
               Just
                 ( Condition.Compares
                     ( Compares.MkCompares
-                        (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Zombie) Aggregation.Members))
+                        (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) (Filter.HasSubtype Subtype.Zombie) Aggregation.Members))
                         Comparison.Exactly
                         (Quantity.Literal 0)
                     )
                 )
           }
       )
-      """ {"condition":{"type":"StepBegins","value":{"phase":{"type":"Beginning","value":{"type":"Upkeep"}},"scope":{"type":"ControllersTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":{"ref":{"type":"InSlot","value":"you"},"quantity":{"type":"Literal","value":1}}}]}]}]},"intervening":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
+      """ {"condition":{"type":"StepBegins","value":{"phase":{"type":"Beginning","value":{"type":"Upkeep"}},"scope":{"type":"ControllersTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":{"ref":{"type":"InSlot","value":"you"},"quantity":{"type":"Literal","value":1}}}]}]}]},"intervening":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
   -- CR 603.7: Face.delayedAbilities is a name-keyed map, rendered as a JSON
   -- OBJECT keyed by the name in ascending order. The two entries are inserted in
   -- DESCENDING name order, so a trip that emitted the map's incidental traversal

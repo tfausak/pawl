@@ -2,10 +2,11 @@ module Pawl.Types.EntryRewrite where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CopyException as CopyException
-import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.WithCounters as WithCounters
 
 -- | CR 614.1c-d: how an entry replacement modifies the entry. AsCopy is Clone
 -- (CR 707.5, and a real "may" -- declining is legal) and, with CR 707.9's
@@ -89,7 +90,7 @@ data EntryRewrite
     -- intrinsic ability is minted per object from the PROJECTION
     -- (Pawl.Engine.Projection.intrinsicReplacementsOf) and the number is settled
     -- there, where CR 707.2's copiable loyalty is visible.
-    WithCounters (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
+    WithCounters WithCounters.WithCounters
   | -- | CR 616.1b's shape: a replacement modifying UNDER WHOSE CONTROL an object
     -- enters the battlefield. Gather Specimens is the one producer, and the whole
     -- of its text is this rewrite.
@@ -139,7 +140,7 @@ data EntryRewrite
     -- counters for EACH creature sacrificed this way" -- so it wants this
     -- constructor plus a per-permanent count. Not carried: one is what Shimatsu
     -- needs, and no devour card is in the pool.
-    SacrificeAnyNumber (Filter.Filter Keyword.Keyword) (Maybe (CounterKind.CounterKind Keyword.Keyword))
+    SacrificeAnyNumber SacrificeAnyNumber.SacrificeAnyNumber
   | -- | CR 702.136a via CR 614.1c: riot. "You may have this permanent enter with
     -- an additional +1/+1 counter on it. If you don't, it gains haste."
     --

@@ -11,12 +11,15 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Chooser as Chooser
+import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
@@ -39,8 +42,8 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
-      """ {"type":"EachCardInGraveyard","value":[{"type":"EachPlayer"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
+      (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)))
+      """ {"type":"EachCardInGraveyard","value":{"players":{"type":"EachPlayer"},"filter":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   -- Common.tuple rejects any other length, which is what makes the schema's
   -- prefixItems/minItems/maxItems a claim rather than a description. The TOO
   -- LONG case is the discriminating one: a decoder that read the first two
@@ -68,8 +71,8 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)
-      """ {"type":"TopOfLibrary","value":[{"type":"Relative","value":{"type":"You"}},3]} """
+      (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3))
+      """ {"type":"TopOfLibrary","value":{"player":{"type":"Relative","value":{"type":"You"}},"count":3}} """
   Spec.it s "TopOfLibrary rejects a bare player reference with no depth" $
     Spec.assertBool
       s
@@ -89,20 +92,20 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInGraveyard Chooser.TheController PlayerScope.You (Filter.HasCardType CardType.Creature))
-      """ {"type":"ChosenCardInGraveyard","value":[{"type":"TheController"},{"type":"You"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
+      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.You (Filter.HasCardType CardType.Creature)))
+      """ {"type":"ChosenCardInGraveyard","value":{"chooser":{"type":"TheController"},"players":{"type":"You"},"filter":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   Spec.it s "ChosenCardInGraveyard carries the chooser Exhume needs" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInGraveyard Chooser.EachInScope PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
-      """ {"type":"ChosenCardInGraveyard","value":[{"type":"EachInScope"},{"type":"EachPlayer"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
+      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.EachInScope PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)))
+      """ {"type":"ChosenCardInGraveyard","value":{"chooser":{"type":"EachInScope"},"players":{"type":"EachPlayer"},"filter":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   Spec.it s "ChosenCardInGraveyard carries the slot-named chooser Skullwinder needs" $
     Common.assertCodec
       s
       ObjectRef.codec
-      (ObjectRef.ChosenCardInGraveyard (Chooser.BoundInSlot (SlotName.MkSlotName (Text.pack "opponent"))) PlayerScope.EachPlayer (Filter.And []))
-      """ {"type":"ChosenCardInGraveyard","value":[{"type":"BoundInSlot","value":"opponent"},{"type":"EachPlayer"},{"type":"And","value":[]}]} """
+      (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard (Chooser.BoundInSlot (SlotName.MkSlotName (Text.pack "opponent"))) PlayerScope.EachPlayer (Filter.And [])))
+      """ {"type":"ChosenCardInGraveyard","value":{"chooser":{"type":"BoundInSlot","value":"opponent"},"players":{"type":"EachPlayer"},"filter":{"type":"And","value":[]}}} """
   Spec.it s "ChosenCardInGraveyard rejects a bare filter with no chooser or scope" $
     Spec.assertBool
       s
@@ -128,10 +131,10 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
-                Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)),
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
-                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3),
-                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))
+                Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)),
+                Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)))
               ]
           )
       )

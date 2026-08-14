@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 
 -- CR 707.9: the "except ..." clause of a copy effect. One constructor -- and
 -- the printed card it comes from, Quicksilver Gargantuan, is square, so the
@@ -19,15 +20,15 @@ spec s = Spec.describe s "Pawl.Codec.CopyException" $ do
     Common.assertCodec
       s
       CopyException.codec
-      (CopyException.SetPowerToughness 7 7)
-      """ {"type":"SetPowerToughness","value":[7,7]} """
+      (CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 7 7))
+      """ {"type":"SetPowerToughness","value":{"power":7,"toughness":7}} """
 
   Spec.it s "SetPowerToughness writes power before toughness" $
     Common.assertCodec
       s
       CopyException.codec
-      (CopyException.SetPowerToughness 4 5)
-      """ {"type":"SetPowerToughness","value":[4,5]} """
+      (CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 4 5))
+      """ {"type":"SetPowerToughness","value":{"power":4,"toughness":5}} """
 
   Spec.it s "rejects a payload of the wrong length" $
     Spec.assertBool

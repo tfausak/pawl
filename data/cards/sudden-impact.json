@@ -38,15 +38,15 @@
                           },
                           "scope": {
                             "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Hand"
-                              },
-                              {
+                            "value": {
+                              "player": {
                                 "type": "InSlot",
                                 "value": "target"
+                              },
+                              "zone": {
+                                "type": "Hand"
                               }
-                            ]
+                            }
                           }
                         }
                       },

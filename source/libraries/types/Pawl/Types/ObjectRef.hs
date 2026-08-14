@@ -1,12 +1,11 @@
 module Pawl.Types.ObjectRef where
 
-import qualified Numeric.Natural as Natural
-import qualified Pawl.Types.Chooser as Chooser
+import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
+import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
 -- | WHICH OBJECTS an object-affecting effect names -- the object-side counterpart
 -- of Pawl.Types.PlayerRef.
@@ -66,7 +65,7 @@ data ObjectRef
     --
     -- Not a target and never one (CR 115.10a), and swept when the effect executes
     -- (CR 608.2c) -- the two properties EachMatching above has, for its reasons.
-    EachCardInGraveyard PlayerScope.PlayerScope (Filter.Filter Keyword.Keyword)
+    EachCardInGraveyard EachCardInGraveyard.EachCardInGraveyard
   | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The one
     -- arm that names no object at all, and it is here rather than on
     -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:
@@ -112,7 +111,7 @@ data ObjectRef
     -- cards are not -- so CR 608.2b has nothing to fizzle. Read when the effect
     -- executes (CR 608.2c), which is what makes an empty library a no-op rather
     -- than an error: there is no top card, so the arm names nothing.
-    TopOfLibrary PlayerRef.PlayerRef Natural.Natural
+    TopOfLibrary TopOfLibrary.TopOfLibrary
   | -- | A card in a graveyard, matching the Filter, CHOSEN as the effect runs
     -- rather than swept -- Port of Karfell's "return a creature card from your
     -- graveyard to the battlefield tapped".
@@ -165,5 +164,5 @@ data ObjectRef
     -- error of the same kind as a stated origin zone on somebody else's
     -- permanent (Pawl.Engine.EffectZone's note), and gets no lint for the same
     -- reason: nothing reaches the wire and no rule is misread.
-    ChosenCardInGraveyard Chooser.Chooser PlayerScope.PlayerScope (Filter.Filter Keyword.Keyword)
+    ChosenCardInGraveyard ChosenCardInGraveyard.ChosenCardInGraveyard
   deriving (Eq, Ord, Show)

@@ -90,6 +90,7 @@ import Pawl.Types.ReplacementEntry (ReplacementEntry)
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
@@ -663,8 +664,8 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ EntryRewrite.ChooseBasicLandType -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> ReplacementBucket.Other
-  ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
-  ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber _ _) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR _ (EntryRewrite.WithCounters {}) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber {}) -> ReplacementBucket.Other
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
   ReplacementEffect.EntryR _ EntryRewrite.Riot -> ReplacementBucket.Other
@@ -736,12 +737,12 @@ readsApplier re = case re of
   ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> False
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's loyalty included).
-  ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> False
+  ReplacementEffect.EntryR _ (EntryRewrite.WithCounters {}) -> False
   -- CR 614.1c again, and NO despite performing a sacrifice: the sacrificing
   -- player is the ENTERING object's controller, read live off the board at CR
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
   -- the effect. Two such rows would offer the same player the same permanents.
-  ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber _ _) -> False
+  ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber {}) -> False
   -- CR 702.136a: riot's chooser is the ENTERING object's controller, read live
   -- off the board for AsCopy's reason, and the rewrite carries no payload at all
   -- -- rule 702.136a fixes both halves. Two riot rows are always on the SAME
@@ -790,7 +791,7 @@ readsApplier re = case re of
   -- WithCounters' answer one event class over. The inner sum is cased so a
   -- second TurnUpRewrite -- CR 208.2b's power-and-toughness setter -- has to be
   -- decided here rather than inheriting this answer.
-  ReplacementEffect.TurnUpR _ (TurnUpRewrite.WithCounters _ _) -> False
+  ReplacementEffect.TurnUpR _ (TurnUpRewrite.WithCounters {}) -> False
   -- CR 303.4k: "the AURA's controller" makes the choice, and the Aura is the
   -- object the event already named -- so the player asked is read off the event
   -- rather than off whose row is applying, and two identical rows would put the
@@ -976,7 +977,7 @@ applyCopyException snapshot exception = case exception of
   -- in the snapshot would let layer 7a overwrite the pair
   -- (Projection.applyCharacteristicPT). Not defensive, unlike applyEntryOption's
   -- same write: Quicksilver Gargantuan copying a Tarmogoyf is exactly this case.
-  CopyException.SetPowerToughness p t ->
+  CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness p t) ->
     snapshot
       { PC.power = Just p,
         PC.toughness = Just t,

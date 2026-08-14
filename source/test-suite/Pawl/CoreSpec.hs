@@ -20,6 +20,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -34,7 +35,7 @@ import qualified Pawl.Types.Zone as Zone
 cardsInYourHand :: Count.Type.Count Quantity.Type.Quantity
 cardsInYourHand =
   Count.Type.MkCount
-    (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
+    (Scope.InZone (InZone.MkInZone Zone.Hand (PlayerRef.Relative PlayerRelation.You)))
     (Filter.Type.And [])
     Aggregation.Members
 
@@ -42,7 +43,7 @@ cardsInYourHand =
 cardTypesInAllGraveyards :: Count.Type.Count Quantity.Type.Quantity
 cardTypesInAllGraveyards =
   Count.Type.MkCount
-    (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
+    (Scope.InZone (InZone.MkInZone Zone.Graveyard PlayerRef.EachPlayer))
     (Filter.Type.And [])
     Aggregation.DistinctCardTypes
 

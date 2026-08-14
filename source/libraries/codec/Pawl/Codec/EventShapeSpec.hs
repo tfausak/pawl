@@ -6,6 +6,7 @@ import qualified Pawl.Codec.EventShape as EventShape
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.EventShape as EventShape
+import qualified Pawl.Types.MovedBetween as MovedBetween
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -15,8 +16,8 @@ spec s = Spec.describe s "Pawl.Codec.EventShape" $ do
     Common.assertCodec
       s
       EventShape.codec
-      (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard)
-      """ {"type":"MovedBetween","value":[{"type":"Battlefield"},{"type":"Graveyard"}]} """
+      (EventShape.MovedBetween (MovedBetween.MkMovedBetween Zone.Battlefield Zone.Graveyard))
+      """ {"type":"MovedBetween","value":{"from":{"type":"Battlefield"},"to":{"type":"Graveyard"}}} """
   -- CR 601.2i's cast: PAYLOADLESS, so the encoded form is the bare tag and a
   -- decoder that demanded a value would reject every card that names it.
   Spec.it s "SpellCast" $

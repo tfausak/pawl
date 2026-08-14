@@ -16,6 +16,7 @@ import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -59,7 +60,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           ( Just
               ( Condition.Compares
                   ( Compares.MkCompares
-                      (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Forest) Aggregation.Members))
+                      (Quantity.Count (Count.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) (Filter.HasSubtype Subtype.Forest) Aggregation.Members))
                       Comparison.AtLeast
                       (Quantity.Literal 1)
                   )
@@ -68,7 +69,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Nothing
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
-      """ {"affected":{"type":"Attached"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Forest"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
+      """ {"affected":{"type":"Attached"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"HasSubtype","value":{"type":"Forest"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- Titania's Song's second sentence: CR 604.2's other override, and optional
   -- for the condition's reason -- absent means the effect ends with its
   -- permanent, which is every other ability in the pool.

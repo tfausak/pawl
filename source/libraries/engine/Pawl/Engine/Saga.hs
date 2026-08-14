@@ -51,6 +51,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.WithCounters as WithCounters
 
 -- | CR 714.2b's threshold crossing: did a count going from `before` to `after`
 -- pass chapter `n`? "Was less than N and became at least N", verbatim.
@@ -165,7 +166,7 @@ tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect]
 entryReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source.
-  ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters CounterKind.Lore 1)
+  ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore 1))
   | isSaga pc
   ]
 

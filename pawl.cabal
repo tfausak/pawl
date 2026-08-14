@@ -132,6 +132,8 @@ library codec
     Pawl.Codec.ChooseBetweenSpec
     Pawl.Codec.Chooser
     Pawl.Codec.ChooserSpec
+    Pawl.Codec.ChosenCardInGraveyard
+    Pawl.Codec.ChosenCardInGraveyardSpec
     Pawl.Codec.Clause
     Pawl.Codec.ClauseIndex
     Pawl.Codec.ClauseIndexSpec
@@ -216,6 +218,8 @@ library codec
     Pawl.Codec.DurationSpec
     Pawl.Codec.DuringPhase
     Pawl.Codec.DuringPhaseSpec
+    Pawl.Codec.EachCardInGraveyard
+    Pawl.Codec.EachCardInGraveyardSpec
     Pawl.Codec.Effect
     Pawl.Codec.EffectSpec
     Pawl.Codec.EndingStep
@@ -246,6 +250,10 @@ library codec
     Pawl.Codec.GraveyardScopeSpec
     Pawl.Codec.HalfUnlocked
     Pawl.Codec.HalfUnlockedSpec
+    Pawl.Codec.Hybrid
+    Pawl.Codec.HybridSpec
+    Pawl.Codec.InZone
+    Pawl.Codec.InZoneSpec
     Pawl.Codec.Keyword
     Pawl.Codec.KeywordFamily
     Pawl.Codec.KeywordFamilySpec
@@ -297,6 +305,8 @@ library codec
     Pawl.Codec.MorphVariant
     Pawl.Codec.MorphVariantSpec
     Pawl.Codec.Moved
+    Pawl.Codec.MovedBetween
+    Pawl.Codec.MovedBetweenSpec
     Pawl.Codec.MovedSpec
     Pawl.Codec.MoveToZone
     Pawl.Codec.MoveToZoneSpec
@@ -382,6 +392,8 @@ library codec
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
     Pawl.Codec.RoundingSpec
+    Pawl.Codec.SacrificeAnyNumber
+    Pawl.Codec.SacrificeAnyNumberSpec
     Pawl.Codec.SacrificeRestriction
     Pawl.Codec.SacrificeRestrictionSpec
     Pawl.Codec.Scaling
@@ -394,6 +406,8 @@ library codec
     Pawl.Codec.SearchSpec
     Pawl.Codec.SelfCountersReached
     Pawl.Codec.SelfCountersReachedSpec
+    Pawl.Codec.SetPowerToughness
+    Pawl.Codec.SetPowerToughnessSpec
     Pawl.Codec.ShuffleIntoLibrary
     Pawl.Codec.ShuffleIntoLibrarySpec
     Pawl.Codec.SkipNextPhase
@@ -430,6 +444,8 @@ library codec
     Pawl.Codec.TargetSlotSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
+    Pawl.Codec.TopOfLibrary
+    Pawl.Codec.TopOfLibrarySpec
     Pawl.Codec.Toughness
     Pawl.Codec.ToughnessSpec
     Pawl.Codec.TriggerCondition
@@ -456,6 +472,8 @@ library codec
     Pawl.Codec.VentureMarkerEnteredSpec
     Pawl.Codec.While
     Pawl.Codec.WhileSpec
+    Pawl.Codec.WithCounters
+    Pawl.Codec.WithCountersSpec
     Pawl.Codec.Zone
     Pawl.Codec.ZoneChange
     Pawl.Codec.ZoneChangePattern
@@ -794,6 +812,7 @@ library types
     Pawl.Types.CharacteristicPT
     Pawl.Types.ChooseBetween
     Pawl.Types.Chooser
+    Pawl.Types.ChosenCardInGraveyard
     Pawl.Types.Claim
     Pawl.Types.Clause
     Pawl.Types.ClauseIndex
@@ -849,6 +868,7 @@ library types
     Pawl.Types.Duration
     Pawl.Types.DurationRef
     Pawl.Types.DuringPhase
+    Pawl.Types.EachCardInGraveyard
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption
@@ -873,8 +893,10 @@ library types
     Pawl.Types.HalfUnlocked
     Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
+    Pawl.Types.Hybrid
     Pawl.Types.HybridPayment
     Pawl.Types.IgnoredAbility
+    Pawl.Types.InZone
     Pawl.Types.Keyword
     Pawl.Types.KeywordFamily
     Pawl.Types.KickerDecision
@@ -909,6 +931,7 @@ library types
     Pawl.Types.MonarchWatch
     Pawl.Types.MorphVariant
     Pawl.Types.Moved
+    Pawl.Types.MovedBetween
     Pawl.Types.MoveToZone
     Pawl.Types.MulliganDecision
     Pawl.Types.MulliganOffer
@@ -973,12 +996,14 @@ library types
     Pawl.Types.Revealed
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
+    Pawl.Types.SacrificeAnyNumber
     Pawl.Types.SacrificeRestriction
     Pawl.Types.Scaling
     Pawl.Types.Scope
     Pawl.Types.Search
     Pawl.Types.SearchDestination
     Pawl.Types.SelfCountersReached
+    Pawl.Types.SetPowerToughness
     Pawl.Types.ShuffleIntoLibrary
     Pawl.Types.Sickness
     Pawl.Types.SkipNextPhase
@@ -1002,6 +1027,7 @@ library types
     Pawl.Types.TargetSlot
     Pawl.Types.Timestamp
     Pawl.Types.TokenPattern
+    Pawl.Types.TopOfLibrary
     Pawl.Types.Toughness
     Pawl.Types.TriggerCondition
     Pawl.Types.TriggeredAbility
@@ -1017,6 +1043,7 @@ library types
     Pawl.Types.Uses
     Pawl.Types.VentureMarkerEntered
     Pawl.Types.While
+    Pawl.Types.WithCounters
     Pawl.Types.Zone
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern

@@ -79,6 +79,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
@@ -1526,7 +1527,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         gs = fill S.alice 5 (fill S.bob 2 gs0)
         yourHand =
           Count.Type.MkCount
-            (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
+            (Scope.InZone (InZone.MkInZone Zone.Hand (PlayerRef.Relative PlayerRelation.You)))
             (Filter.Type.And [])
             Aggregation.Members
     Spec.assertEqWith

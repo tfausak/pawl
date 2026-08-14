@@ -16,17 +16,17 @@
           },
           "scope": {
             "type": "InZone",
-            "value": [
-              {
-                "type": "Graveyard"
-              },
-              {
+            "value": {
+              "player": {
                 "type": "Relative",
                 "value": {
                   "type": "You"
                 }
+              },
+              "zone": {
+                "type": "Graveyard"
               }
-            ]
+            }
           }
         }
       },

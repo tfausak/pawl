@@ -28,20 +28,20 @@
             "mana": [
               {
                 "type": "Hybrid",
-                "value": [
-                  {
+                "value": {
+                  "left": {
                     "type": "Colored",
                     "value": {
                       "type": "Black"
                     }
                   },
-                  {
+                  "right": {
                     "type": "Colored",
                     "value": {
                       "type": "Red"
                     }
                   }
-                ]
+                }
               }
             ]
           }

@@ -30,6 +30,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
+import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
@@ -49,6 +50,7 @@ import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DurationRef as DurationRef
+import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
@@ -56,6 +58,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Hybrid as Hybrid
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -102,6 +105,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.WithCounters as WithCounters
 
 -- CR 613.1: the layer a modification applies in. A classification, never the
 -- modification's identity.
@@ -1110,7 +1114,7 @@ symbolColors :: ManaSymbol.ManaSymbol -> [Color.Color]
 symbolColors symbol = case symbol of
   ManaSymbol.OfType (ManaType.Colored c) -> [c]
   ManaSymbol.OfType ManaType.Colorless -> []
-  ManaSymbol.Hybrid a b -> Maybe.mapMaybe colorOfManaType [a, b]
+  ManaSymbol.Hybrid (Hybrid.MkHybrid a b) -> Maybe.mapMaybe colorOfManaType [a, b]
   -- CR 107.4b/107.4e: a monocolored hybrid's other half is generic, which is not
   -- one of CR 107.4a's coloured symbols, so the named half is the whole
   -- contribution.
@@ -1652,10 +1656,10 @@ rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
-  ObjectRef.EachCardInGraveyard s f -> ObjectRef.EachCardInGraveyard s (Filter.rewrite pairs f)
+  ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s f) -> ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s (Filter.rewrite pairs f))
   ObjectRef.EachPlayer -> ref
-  ObjectRef.TopOfLibrary _ _ -> ref
-  ObjectRef.ChosenCardInGraveyard c s f -> ObjectRef.ChosenCardInGraveyard c s (Filter.rewrite pairs f)
+  ObjectRef.TopOfLibrary {} -> ref
+  ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
 
 -- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --
@@ -3700,7 +3704,7 @@ intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
 intrinsicReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
   -- is Filter.IsSource.
-  ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Loyalty n)
+  ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty n))
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
   ]
@@ -3708,7 +3712,7 @@ intrinsicReplacementsOf pc =
     -- counters on it equal to its printed defense number" -- CR 306.5b's clause
     -- one rule number over, keyed on the projected card type and reading the
     -- projected defense for the same three reasons.
-    <> [ ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Defense n)
+    <> [ ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Defense n))
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]

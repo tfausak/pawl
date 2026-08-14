@@ -35,6 +35,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
@@ -264,7 +265,7 @@ noZombiesOnBattlefield =
     ( Compares.MkCompares
         ( Quantity.Count
             ( Count.Type.MkCount
-                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
                 (Filter.Type.HasSubtype Subtype.Zombie)
                 Aggregation.Members
             )

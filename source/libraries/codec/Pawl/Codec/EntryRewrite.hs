@@ -2,11 +2,11 @@ module Pawl.Codec.EntryRewrite where
 
 import qualified Data.Maybe as Maybe
 import qualified Pawl.Codec.CopyException as CopyException
-import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryOption as EntryOption
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.Codec.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Codec.WithCounters as WithCounters
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -24,7 +24,7 @@ codec =
     encode
     [ Arm.optionalPayload "AsCopy" (Common.list CopyException.codec) (EntryRewrite.AsCopy . Maybe.fromMaybe []),
       Arm.payload "ChoiceOf" (Common.list EntryOption.codec) EntryRewrite.ChoiceOf,
-      Arm.payload "WithCounters" (Common.tuple (CounterKind.codec Keyword.codec) Common.natural) (uncurry EntryRewrite.WithCounters),
+      Arm.payload "WithCounters" WithCounters.codec EntryRewrite.WithCounters,
       Arm.nullary "ChooseColor" EntryRewrite.ChooseColor,
       Arm.nullary "ChooseBasicLandType" EntryRewrite.ChooseBasicLandType,
       Arm.payload "ChooseCardNames" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardNames,
@@ -33,14 +33,14 @@ codec =
       Arm.nullary "Unleash" EntryRewrite.Unleash,
       Arm.nullary "Tapped" EntryRewrite.Tapped,
       Arm.payload "PayLifeOrTapped" Common.natural EntryRewrite.PayLifeOrTapped,
-      Arm.payload "SacrificeAnyNumber" (Common.tuple (Filter.codec Keyword.codec) (Common.maybe (CounterKind.codec Keyword.codec))) (uncurry EntryRewrite.SacrificeAnyNumber)
+      Arm.payload "SacrificeAnyNumber" SacrificeAnyNumber.codec EntryRewrite.SacrificeAnyNumber
     ]
   where
     encode r = case r of
       EntryRewrite.AsCopy [] -> Common.nullary "AsCopy"
       EntryRewrite.AsCopy exceptions -> Common.tagged "AsCopy" . Just $ Common.encodeList (Codec.encode CopyException.codec) exceptions
       EntryRewrite.ChoiceOf options -> Common.tagged "ChoiceOf" . Just $ Common.encodeList (Codec.encode EntryOption.codec) options
-      EntryRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Value.array $ [Codec.encode (CounterKind.codec Keyword.codec) kind, Common.encodeNatural n]
+      EntryRewrite.WithCounters x -> Common.tagged "WithCounters" . Just $ Codec.encode WithCounters.codec x
       EntryRewrite.ChooseColor -> Common.nullary "ChooseColor"
       EntryRewrite.ChooseBasicLandType -> Common.nullary "ChooseBasicLandType"
       EntryRewrite.ChooseCardNames f -> Common.tagged "ChooseCardNames" . Just $ Codec.encode (Filter.codec Keyword.codec) f
@@ -49,4 +49,4 @@ codec =
       EntryRewrite.Unleash -> Common.nullary "Unleash"
       EntryRewrite.Tapped -> Common.nullary "Tapped"
       EntryRewrite.PayLifeOrTapped n -> Common.tagged "PayLifeOrTapped" . Just $ Common.encodeNatural n
-      EntryRewrite.SacrificeAnyNumber f kind -> Common.tagged "SacrificeAnyNumber" . Just . Value.array $ [Codec.encode (Filter.codec Keyword.codec) f, Common.encodeMaybe (Codec.encode (CounterKind.codec Keyword.codec)) kind]
+      EntryRewrite.SacrificeAnyNumber x -> Common.tagged "SacrificeAnyNumber" . Just $ Codec.encode SacrificeAnyNumber.codec x

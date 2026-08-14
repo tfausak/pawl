@@ -30,15 +30,15 @@
             },
             {
               "type": "SacrificeAnyNumber",
-              "value": [
-                {
+              "value": {
+                "filter": {
                   "type": "And",
                   "value": []
                 },
-                {
+                "kind": {
                   "type": "PlusOnePlusOne"
                 }
-              ]
+              }
             }
           ]
         }

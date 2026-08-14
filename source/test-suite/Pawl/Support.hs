@@ -73,6 +73,7 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
+import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaOption as ManaOption
@@ -407,7 +408,7 @@ youControlSource =
     ( Compares.MkCompares
         ( Quantity.Type.Count
             ( Count.Type.MkCount
-                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
                 (Filter.Type.And [Filter.Type.IsSource, Filter.Type.ControlledBy PlayerRelation.You])
                 Aggregation.Members
             )
@@ -427,7 +428,7 @@ youControlNoSwamps =
     ( Compares.MkCompares
         ( Quantity.Type.Count
             ( Count.Type.MkCount
-                (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
+                (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer))
                 (Filter.Type.And [Filter.Type.HasSubtype Subtype.Swamp, Filter.Type.ControlledBy PlayerRelation.You])
                 Aggregation.Members
             )

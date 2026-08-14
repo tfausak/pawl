@@ -38,12 +38,12 @@
             },
             {
               "type": "WithCounters",
-              "value": [
-                {
+              "value": {
+                "amount": 1,
+                "kind": {
                   "type": "Shield"
-                },
-                1
-              ]
+                }
+              }
             }
           ]
         }
