@@ -3905,8 +3905,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any (anyFace (any asks . cardResolutionEffects) . Printing.card) ps) "the pool has a card leaving the end to each owner"
     Spec.assertEqWith s "only a library has ends" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 406.3's rider is a rule about the EXILE ZONE, so on any other destination
-  -- it is inert card data, and on a Create it is inert twice over -- a token
-  -- created into exile ceases to exist (CR 111.7). Event.changeZoneAttaching
+  -- it is inert card data, and on a Create it is inert outright -- a token is
+  -- created onto the battlefield, and CR 111.7 makes one anywhere else cease to
+  -- exist, so no Create ever reaches exile. Event.changeZoneAttaching
   -- gates on the destination, so this lints an authoring mistake rather than
   -- guarding the engine.
   Spec.it s "no effect exiles face down anywhere but exile" $ do

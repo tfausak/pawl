@@ -6,10 +6,11 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.TapState as TapState
 
--- | What an effect says about a permanent AS IT ENTERS the battlefield, beyond the
--- permanent's own text -- Hanweir Garrison's "that are tapped and attacking",
+-- | What an effect says about an object AS IT ARRIVES in a zone, beyond the
+-- object's own text -- Hanweir Garrison's "that are tapped and attacking",
 -- Meandering Towershell's "return it to the battlefield tapped and attacking",
--- and Befriending the Moths' "return it to the battlefield transformed".
+-- Befriending the Moths' "return it to the battlefield transformed", and
+-- Ignorant Bliss' "exile all cards from your hand face down".
 --
 -- Carried by the OPCODE (Create, MoveToZone) and not by the entering object,
 -- because neither is one of its characteristics (CR 109.3, CR 111.3). Two tokens
@@ -17,11 +18,11 @@ import qualified Pawl.Types.TapState as TapState
 -- tapped by one effect and untapped by another.
 --
 -- Each rider is meaningful only in the zone its own rule scopes it to, and every
--- other destination carries the default: `tapped`, `attacking`, `transformed`
--- `counters`, `transformed` and `underOwner` are battlefield-only (CR 110.5d, CR
--- 508.4, CR 122.6a, CR 712.14a, CR 110.2a) and `exiledFaceDown` is exile-only
--- (CR 406.3). A card stating one on the wrong
--- zone states something nothing reads, which Pawl.CardSpec lints.
+-- other destination carries the default: `tapped`, `attacking`, `counters`,
+-- `transformed` and `underOwner` are battlefield-only (CR 110.5d, CR 508.4, CR
+-- 122.6a, CR 712.14a, CR 110.2a), and `exiledFaceDown` is exile-only (CR 406.3).
+-- A card stating one on the wrong zone states something nothing reads, which
+-- Pawl.CardSpec lints.
 --
 -- Independent riders, not one flag, because the rules make them independent.
 -- Tapped is CR 110.5's status category, defaulted by CR 110.5b.

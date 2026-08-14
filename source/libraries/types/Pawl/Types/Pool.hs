@@ -79,7 +79,7 @@ data Pool
     -- at it, and nothing grants that permission, so
     -- Pawl.Engine.Target.exileRecipients leaves every face-down card out of the
     -- pool for EVERY card that names one. Riftsweeper's qualifier is then
-    -- redundant rather than vacuous -- Ignorant Bliss really does put cards in
-    -- here that it may not have.
+    -- redundant rather than vacuous: Ignorant Bliss really does put cards into
+    -- exile that Riftsweeper may not name.
     CardsInExile
   deriving (Eq, Ord, Show)
