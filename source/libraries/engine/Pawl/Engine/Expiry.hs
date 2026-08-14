@@ -96,7 +96,8 @@ arm players controller source duration gs = case duration of
 -- the next projection revert -- nothing is explicitly undone.
 --
 -- Not implemented: a turn whose ENDING PHASE was skipped never reaches the
--- cleanup step, so this never runs and every AtCleanup entry outlives its turn
+-- cleanup step, so this never runs and every entry it would have ended --
+-- AtCleanup, and an AtEndOfTurnOf whose turn this is -- outlives its turn
 -- (#491).
 dropAtCleanup :: GameState -> GameState
 dropAtCleanup gs =
@@ -106,11 +107,11 @@ dropAtCleanup gs =
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
         -- CR 611.2a: "until the end of your next turn" ends as that turn ends,
-        -- which is this same CR 514.2 moment -- so the sweep that ends an
-        -- until-end-of-turn effect is the one that ends this too, one named turn
-        -- later. The turn is named by the pair (see Pawl.Types.AfterTurn): this
-        -- cleanup belongs to that player, and its number is above the one the
-        -- duration began on, so it is not the duration's own turn.
+        -- and the cleanup step is where a turn's effects end -- so the sweep
+        -- CR 514.2 runs for the until-end-of-turn ones ends this too, one NAMED
+        -- turn later. The turn is named by the pair (see Pawl.Types.AfterTurn):
+        -- this cleanup belongs to that player, and its number is above the one
+        -- the duration began on, so it is not the duration's own turn.
         Expiry.AtEndOfTurnOf afterTurn ->
           AfterTurn.player afterTurn /= GameState.activePlayer gs
             || GameState.turnNumber gs <= AfterTurn.turn afterTurn

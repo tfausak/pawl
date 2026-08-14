@@ -18,9 +18,9 @@ data Duration
     -- be a PlayerId here, because a printed card does not know one.
     UntilYourNextTurn
   | -- | CR 611.2a: "until the end of your next turn" (Soulfire Eruption), which
-    -- ends a whole turn later than the arm above -- as that turn ENDS (CR
-    -- 514.2's moment) rather than as it begins. Both "your"s are resolved the
-    -- same way, by Pawl.Engine.Expiry.arm.
+    -- ends a whole turn later than the arm above: as that turn ENDS, in its
+    -- cleanup step (CR 514), rather than as it begins. Both "your"s are resolved
+    -- the same way, by Pawl.Engine.Expiry.arm.
     UntilEndOfYourNextTurn
   | -- | CR 611.2b: "for as long as ...". The duration has a BEGINNING as well as
     -- an end -- "if the 'for as long as' duration never starts, the effect does
@@ -29,8 +29,8 @@ data Duration
   | -- | CR 500.5a / 511.2: expires at the end of the combat PHASE, not at the
     -- beginning of the end of combat step. Jade Statue's animation.
     --
-    -- Nullary, and the only end-of-window duration a card can print: the stored
-    -- Pawl.Types.Expiry it arms to can name any window CR 500.5 can end, but no
+    -- Nullary, and the only CR 500.5 WINDOW a card can print: the stored
+    -- Pawl.Types.Expiry it arms to can name any window that rule can end, but no
     -- card in the pool prints the others (#353).
     --
     -- WHICH combat phase is not carried. CR 500.8 permits more than one in a

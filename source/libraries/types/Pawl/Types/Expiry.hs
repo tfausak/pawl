@@ -34,8 +34,8 @@ data Expiry
     -- player's turn begins.
     AtTurnOf PlayerId.PlayerId
   | -- | CR 611.2a: "until the end of your next turn", as a concrete player and
-    -- the turn the duration began on. Ends as that player's next turn ends --
-    -- CR 514.2's moment, a whole turn later than AtTurnOf above.
+    -- the turn the duration began on. Ends as that player's next turn ends, in
+    -- its cleanup step (CR 514) -- a whole turn later than AtTurnOf above.
     --
     -- Carries the turn NUMBER as well as the player because the two readings
     -- differ only when the duration begins during that player's own turn: the
