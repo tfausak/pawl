@@ -95,6 +95,7 @@ import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.ForEach as ForEach
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -420,6 +421,13 @@ slotsOf effect = case effect of
   -- by a MoveToZone earlier in the same list (CR 400.7) exactly as OfferCast's
   -- slot is, and the Duration's Condition may read a slot as a Quantity.
   Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> joinTwo (durationSlots duration) (objectRefSlots ref)
+  -- Both the swept ref and everything the BODY reads, the shape
+  -- PreventNextDamage's rider takes. The loop's own slot is NOT subtracted, as
+  -- the rider's reserved amount slot is: this one is authored by the card and
+  -- reported by boundSlots below, so the D4 lint pairs the body's read of it
+  -- with this opcode's definition of it rather than seeing a dangling name.
+  Effect.ForEach (ForEach.MkForEach ref _ body) ->
+    joinTwo (objectRefSlots ref) (joinSlots (fmap slotsOf (Foldable.toList body)))
 
 -- CR 611.2b: the only Duration carrying a Quantity is ForAsLongAs, through its
 -- Condition.
@@ -617,6 +625,9 @@ slotsAreExhaustive effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   Effect.OfferCast {} -> True
   Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration _) -> durationSlotsAreExhaustive duration
+  -- PreventNextDamage's answer: the ref is reported by slotsOf, so only the
+  -- body can hide a read, and each of its effects answers for itself.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> all slotsAreExhaustive body
 
 -- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
 durationSlotsAreExhaustive :: Duration.Duration -> Bool
@@ -724,6 +735,9 @@ readsX = any effectReadsX
       Effect.ShuffleIntoLibrary {} -> False
       Effect.OfferCast {} -> False
       Effect.GrantPlayFromExile {} -> False
+      -- CR 608.2f's body is an effect list like any other, so an X inside it is
+      -- an X this card reads -- PreventNextDamage's rider, one opcode over.
+      Effect.ForEach (ForEach.MkForEach _ _ body) -> readsX (Foldable.toList body)
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -815,6 +829,11 @@ searchesLibrary effect = case effect of
   Effect.OfferCast {} -> False
   Effect.GrantPlayFromExile {} -> False
   Effect.TakeExtraTurn {} -> False
+  -- Descended into, unlike PreventNextDamage's rider: this body runs INSIDE the
+  -- resolution being asked about (CR 608.2f considers each member as the
+  -- instruction is followed), so a Search in it wants CR 601.3's window opened
+  -- here. No body in the pool searches.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> any searchesLibrary body
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name. The read half of
 -- the AbilityName dataflow lint, exactly as slotsOf is for target slots.
@@ -952,6 +971,10 @@ boundSlots effect = case effect of
   -- Reads a slot, binds none: the object it permits already exists and already
   -- has a name.
   Effect.GrantPlayFromExile {} -> Set.empty
+  -- The loop's member slot, plus every name the BODY authors -- the body is an
+  -- effect list like any other, which is what keeps Pawl.CardSpec's
+  -- reserved-name sweep over it (PreventNextDamage's rider, for its reason).
+  Effect.ForEach (ForEach.MkForEach _ slot body) -> Set.insert slot (foldMap boundSlots body)
 
 -- Does a Create's slot name EVERY token it minted ("those tokens") rather than
 -- one particular one (CR 603.7c's "it")? Which of the two a card means is its own
@@ -1914,6 +1937,34 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- answer is made, and why an opcode that is not MoveToZone reading this ref is
   -- an inert card-data error.
   ObjectRef.ChosenCardInGraveyard {} -> []
+
+-- CR 608.2f's order for the per-object loop: APNAP first ("APNAP order is used
+-- to make the primary determination of the order of those actions"), reading a
+-- player recipient as that seat and an object as its controller's.
+--
+-- Imposed HERE rather than left to objectRefRecipients, whose sweeping arms
+-- already sort this way but whose InSlot arm answers in Recipient order -- a
+-- set's own, and an announcement of targets has no order of its own to keep
+-- (Binding.targets is a Set for that reason). Every other ObjectRef reader
+-- hands its whole answer to a funnel as ONE simultaneous batch, so the order
+-- never showed; this loop is the first reader that takes them one at a time.
+--
+-- The second key is the ObjectId, and it is the ENGINE's choice where CR
+-- 608.2f's secondary sentence gives it to the resolving controller (#379) --
+-- observable through this opcode for the first time, since a body drawing on a
+-- depleting resource answers differently per position. A recipient the board no
+-- longer holds has no controller and sorts last -- CR 608.2b already dropped an
+-- illegal TARGET, but a group binding names ids that may since have moved (CR
+-- 400.7), so the fallback is reachable rather than defensive.
+forEachOrder :: GameState -> [Recipient] -> [Recipient]
+forEachOrder gs recipients =
+  let order = Game.apnapOrder gs
+      last_ = length order
+      playerOf recipient = case recipient of
+        Recipient.ToPlayer pid -> Just pid
+        _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
+      seat recipient = maybe last_ (\pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)) (playerOf recipient)
+   in List.sortOn (\recipient -> (seat recipient, recipient)) recipients
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
 -- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
@@ -3024,6 +3075,61 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                     }
                 grant o = o {Object.playableFromExile = Just permission}
              in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}
+  Effect.ForEach (ForEach.MkForEach ref slot body) -> do
+    gs0 <- State.get
+    -- CR 608.2f's first half, and the same read every set-naming opcode makes:
+    -- WHICH members, swept ONCE from the pre-loop board and then fixed. A
+    -- library the body empties therefore cannot shorten the batch, and a
+    -- permanent the body makes matching cannot join it.
+    --
+    -- Recipients rather than objects, DealDamage's ref reader: rule 608.2f's own
+    -- sentence is about "players and/or objects", and Soulfire Eruption's
+    -- targets are both.
+    let members = forEachOrder gs0 (objectRefRecipients legal resolving controller source gs0 ref)
+        -- The slots the BODY defines, computed off the instruction rather than
+        -- read off the board: a body effect binds into the RESOLVING object's
+        -- live bindings (MoveToZone's CR 400.7 arrival), and the next effect of
+        -- the same body has to see it. Restricted to those names so that a
+        -- target slot cannot come back in under the instance name CR 700.2d
+        -- renamed it away from.
+        bodyDefined = foldMap boundSlots body
+        -- The member is bound HERE, in the map handed down, and never onto the
+        -- resolving object -- which is what scopes it to this iteration without
+        -- anything to undo afterwards. The insert is OUTERMOST, so the loop's
+        -- own name wins over both other sources.
+        --
+        -- `m` beats `defined` where the two collide: `m` is the CR 608.2b
+        -- re-validated map, and a body definition shadowing a target slot would
+        -- skip a re-validation that slot was owed. The collision is ruled out by
+        -- Pawl.CardSpec rather than by the types, exactly as slotGroup's is, so
+        -- this is which way to fail rather than a live choice.
+        withMember member defined m = Map.insert slot (Set.singleton member) (Map.union m defined)
+        bindingsOf gs = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+        -- Whatever those names held BEFORE the loop, to be put back at each
+        -- iteration's start and once at the end.
+        beforeLoop = Map.restrictKeys (bindingsOf gs0) bodyDefined
+        -- The other half of the scoping, and it is not tidiness: an iteration
+        -- whose MoveToZone found an empty library binds nothing, and without
+        -- this its DealDamage would read the card the PREVIOUS member's
+        -- iteration exiled -- "that card" naming a card this pass never
+        -- produced. Restoring rather than merely deleting keeps the rest of the
+        -- resolution reading the environment it had.
+        rescope gs =
+          gs
+            { GameState.objects =
+                Map.adjust
+                  (\o -> o {Object.bindings = Map.union beforeLoop (Map.withoutKeys (Object.bindings o) bodyDefined)})
+                  resolving
+                  (GameState.objects gs)
+            }
+    Monad.forM_ members $ \member -> do
+      State.modify' rescope
+      -- CR 608.2c: the body's own instructions, in written order, once for this
+      -- member before the next member is considered at all.
+      Monad.forM_ body $ \eff -> do
+        defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
+        applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
+    State.modify' rescope
   Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

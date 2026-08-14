@@ -14,6 +14,11 @@ import qualified Numeric.Natural as Natural
 -- printed words allow. `least == most` is that rule's "in some cases, the number
 -- of targets will be defined by the spell's text" -- nothing to announce.
 --
+-- Not implemented, recorded here because the card's JSON cannot carry a comment:
+-- "any number of target creatures, planeswalkers, and/or players" (Soulfire
+-- Eruption), which no `most` can say. data/cards/soulfire-eruption.json writes a
+-- literal cap in its place (#1476).
+--
 -- `least <= most` and `1 <= most` are invariants nothing in this module
 -- maintains: a slot is card DATA, so Pawl.Codec.TargetCount rejects a range that
 -- breaks either. Neither is a safety property -- an impossible range makes a mode

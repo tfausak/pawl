@@ -17,6 +17,7 @@
 -- below answers the one question in the type.
 module Pawl.Engine.ManaAbility where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Modal as Modal
@@ -27,6 +28,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.ForEach as ForEach
 import Pawl.Types.ManaProduction (ManaProduction)
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
@@ -134,3 +136,7 @@ manaProduced effect = case effect of
   Effect.ShuffleIntoLibrary {} -> Nothing
   Effect.OfferCast {} -> Nothing
   Effect.GrantPlayFromExile {} -> Nothing
+  -- Descended into, unlike CR 615.5's rider above: rule 608.2f's body runs as
+  -- part of THIS effect, so an AddMana in it would be mana this ability adds.
+  -- No card in the pool writes one, and CR 605.1a would want it seen if one did.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe manaProduced (Foldable.toList body))

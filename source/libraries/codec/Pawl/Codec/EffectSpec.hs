@@ -16,6 +16,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
@@ -50,6 +51,7 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -644,6 +646,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       """ {"type":"PreventNextDamage","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3},"riders":[{"type":"PutCounters","value":{"kind":{"type":"PlusOnePlusOne"},"quantity":{"type":"InSlot","value":"thatMuch"},"ref":{"type":"InSlot","value":"target"}}}]}} """
+  -- CR 608.2f: Soulfire Eruption's per-object body, the other nesting of an
+  -- effect inside an effect -- a DealDamage reading the mana value of the card
+  -- an earlier body instruction exiled for THIS member.
+  Spec.it s "ForEach" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.ForEach
+          ForEach.MkForEach
+            { ForEach.ref = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victims")),
+              ForEach.slot = SlotName.MkSlotName (Text.pack "victim"),
+              ForEach.body =
+                Seq.singleton (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "victim"))) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot (SlotName.MkSlotName (Text.pack "exiled")) Quantity.ManaValue))))
+            }
+      )
+      """ {"type":"ForEach","value":{"ref":{"type":"InSlot","value":"victims"},"slot":"victim","body":[{"type":"DealDamage","value":{"ref":{"type":"InSlot","value":"victim"},"quantity":{"type":"AgainstSlot","value":{"slot":"exiled","quantity":{"type":"ManaValue"}}}}}]}} """
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
   Spec.it s "PreventAllDamage" $
     Common.assertJsonCodec

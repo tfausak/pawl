@@ -1,0 +1,142 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 6
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Soulfire Eruption",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "ForEach",
+                    "value": {
+                      "body": [
+                        {
+                          "type": "MoveToZone",
+                          "value": {
+                            "ref": {
+                              "type": "TopOfLibrary",
+                              "value": {
+                                "count": 1,
+                                "player": {
+                                  "type": "Relative",
+                                  "value": {
+                                    "type": "You"
+                                  }
+                                }
+                              }
+                            },
+                            "slot": "exiled",
+                            "zone": {
+                              "type": "Exile"
+                            }
+                          }
+                        },
+                        {
+                          "type": "DealDamage",
+                          "value": {
+                            "quantity": {
+                              "type": "AgainstSlot",
+                              "value": {
+                                "quantity": {
+                                  "type": "ManaValue"
+                                },
+                                "slot": "exiled"
+                              }
+                            },
+                            "ref": {
+                              "type": "InSlot",
+                              "value": "victim"
+                            }
+                          }
+                        },
+                        {
+                          "type": "GrantPlayFromExile",
+                          "value": {
+                            "duration": {
+                              "type": "UntilYourNextTurn"
+                            },
+                            "ref": {
+                              "type": "InSlot",
+                              "value": "exiled"
+                            }
+                          }
+                        }
+                      ],
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "victims"
+                      },
+                      "slot": "victim"
+                    }
+                  }
+                ]
+              }
+            ],
+            "targetSlots": {
+              "victims": {
+                "count": {
+                  "least": 0,
+                  "most": 3
+                },
+                "filter": {
+                  "type": "Not",
+                  "value": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Battle"
+                    }
+                  }
+                },
+                "pool": {
+                  "type": "AnyTarget"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

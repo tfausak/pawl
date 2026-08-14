@@ -17,6 +17,8 @@
 -- type.
 module Pawl.Engine.EffectZone where
 
+import qualified Data.Foldable as Foldable
+import qualified Data.Maybe as Maybe
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.DealDamage as DealDamage
@@ -24,6 +26,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import Pawl.Types.Zone (Zone)
@@ -137,3 +140,9 @@ zoneFunctionedFrom effect = case effect of
   -- of it. This opcode moves nothing -- it writes a permission onto objects an
   -- earlier effect already placed -- so it names no zone.
   Effect.GrantPlayFromExile {} -> Nothing
+  -- Descended into, unlike CR 615.5's rider above: rule 608.2f's body runs as
+  -- part of THIS effect, so a move it states is a move this ability's effect
+  -- states, and CR 113.6m reads it. The loop's own reference names the members
+  -- and is never "the object it's on", so only the body can answer at all. No
+  -- card in the pool writes such a body.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> Maybe.listToMaybe (Maybe.mapMaybe zoneFunctionedFrom (Foldable.toList body))
