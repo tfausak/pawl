@@ -645,6 +645,9 @@ effectCounts effect = case effect of
   -- Amass's N is a Quantity like the Search's above, so its Counts are reachable
   -- from here.
   Effect.Amass (Amass.MkAmass quantity _) -> quantityCounts quantity
+  -- Blight's N is a Quantity like bolster's above, so its Counts are reachable
+  -- from here.
+  Effect.Blight quantity -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -964,6 +967,7 @@ effectReplacements effect = case effect of
   Effect.Proliferate -> []
   Effect.Bolster _ -> []
   Effect.Amass _ -> []
+  Effect.Blight _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -1497,6 +1501,7 @@ effectMintedFaces effect = case effect of
   -- The Army token is Pawl.Engine.Amass.armyToken's, minted from the rulebook
   -- rather than embedded in card data, so this arm mints no face of the card's own.
   Effect.Amass _ -> []
+  Effect.Blight _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -2527,6 +2532,9 @@ effectFilters effect = case effect of
   -- Only the count's Filters: rule 701.47a describes the candidate pool, so no
   -- Filter on the card names it.
   Effect.Amass (Amass.MkAmass quantity _) -> unframed (quantityFilters quantity)
+  -- Only the count's Filters: rule 701.68a describes the candidate pool, so no
+  -- Filter on the card names it.
+  Effect.Blight quantity -> unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []

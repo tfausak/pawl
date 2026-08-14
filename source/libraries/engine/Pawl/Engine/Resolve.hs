@@ -302,6 +302,7 @@ slotsOf effect = case effect of
   Effect.Proliferate -> Map.empty
   Effect.Bolster quantity -> quantitySlots quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
+  Effect.Blight quantity -> quantitySlots quantity
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
@@ -542,6 +543,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Proliferate -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Blight quantity -> Quantity.slotsAreExhaustive quantity
   Effect.TemptWithTheRing -> True
   Effect.Venture -> True
   Effect.ExileHandThenDraw -> True
@@ -678,6 +680,7 @@ readsX = any effectReadsX
       Effect.Proliferate -> False
       Effect.Bolster quantity -> Quantity.readsX quantity
       Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
+      Effect.Blight quantity -> Quantity.readsX quantity
       Effect.TemptWithTheRing -> False
       Effect.Venture -> False
       Effect.ExileHandThenDraw -> False
@@ -757,6 +760,7 @@ searchesLibrary effect = case effect of
   Effect.Proliferate -> False
   Effect.Bolster _ -> False
   Effect.Amass _ -> False
+  Effect.Blight _ -> False
   Effect.TemptWithTheRing -> False
   Effect.Venture -> False
   Effect.PlayerSacrifices {} -> False
@@ -927,6 +931,7 @@ boundSlots effect = case effect of
   Effect.Proliferate -> Set.empty
   Effect.Bolster _ -> Set.empty
   Effect.Amass _ -> Set.empty
+  Effect.Blight _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
   Effect.Venture -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
@@ -4476,6 +4481,55 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
       Just n -> Amass.amass controller source resolving subtype (Integer.toNaturalSaturating n)
+  -- CR 701.68a: "blight N" -- put N -1/-1 counters on a creature you control.
+  --
+  -- Bolster's arm above with its narrowing removed, which is the whole of the
+  -- difference: rule 701.68a qualifies its candidate by CONTROL and nothing else,
+  -- where rule 701.39a goes on to take the least toughness. So the prompt is
+  -- raised for two or more creatures rather than for a tie, and no toughness is
+  -- read at all -- a creature the projection gives no toughness is still a
+  -- candidate here.
+  --
+  -- CR 101.3 covers the empty pool: a player controlling no creature blights
+  -- nothing. That is the MANDATORY reading, the only one a card in the pool
+  -- reaches today. CR 701.68b's "they can't choose to blight" is the OPTIONAL one
+  -- and is not implemented (#1490).
+  --
+  -- Not implemented: nothing records which creature was blighted, so CR 701.68c's
+  -- "blighted creature" cannot be named by a later effect and CR 701.68d's trigger
+  -- has nothing to fire on (#1492).
+  --
+  -- Targetless: nothing was targeted, so unlike every slot-reading opcode here
+  -- there is no CR 608.2b legality to re-check.
+  Effect.Blight quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        -- Ascending, so both the single-candidate shortcut and a transcript are
+        -- deterministic -- Bolster's posture, and Ring.tempt's before it.
+        creatures = List.sort (filter (\oid -> Projection.isCreatureOf oid gs) (Projection.controls controller gs))
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
+      Just n -> case creatures of
+        -- CR 101.3: a player controlling no creature blights nothing.
+        [] -> pure ()
+        first : rest -> do
+          blighted <- case rest of
+            -- One creature is the whole of rule 701.68a's candidate set, and the
+            -- instruction is mandatory -- where the rules leave nothing to ask,
+            -- don't prompt.
+            [] -> pure first
+            second : more -> do
+              let offered = first NonEmpty.:| (second : more)
+              answer <- Game.choose (Prompt.ChooseBlight (Decide.deciderFor controller gs) controller resolving offered)
+              -- FILTERED, NOT TRUSTED, the ChooseBolster posture: an answer naming
+              -- something never offered falls back to the first candidate, since
+              -- the action is mandatory and must put its counters on someone.
+              pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
+          -- CR 122.6: through the single funnel, so CR 614.16's counter
+          -- replacements (Vorinclex, Monstrous Raider) get their opportunity.
+          Monad.when (n > 0) . Monad.void $
+            Event.putCounters (CounterCause.ByEffect controller) blighted CounterKind.MinusOneMinusOne (Integer.toNaturalSaturating n)
   -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
   -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
   -- this arm knows only that some effect asked for it, exactly as the arms around
