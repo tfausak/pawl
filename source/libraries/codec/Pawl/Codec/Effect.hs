@@ -1,9 +1,10 @@
 -- | Where the effect knot is tied. The card codec is a PARAMETER, so this module
 -- names no concrete card type; Pawl.Codec.Card passes its own codec in.
 --
--- RECURSIVE twice over: PreventNextDamage's CR 615.5 rider holds effects, and
--- CreateEmblem's payload is a whole card whose faces hold effects. Both name
--- 'codec' inside its own definition, which terminates for Pawl.Codec.TriggerCondition's
+-- RECURSIVE three times over: PreventNextDamage's CR 615.5 rider and ForEach's
+-- CR 608.2f body both hold effects, and CreateEmblem's payload is a whole card
+-- whose faces hold effects. Each names 'codec' inside its own definition, which
+-- terminates for Pawl.Codec.TriggerCondition's
 -- reason -- 'Arm.tagged' reaches WHNF without forcing its arm list, and
 -- 'Define.define' registers the type's name before running the schema body.
 --
@@ -26,6 +27,7 @@ import qualified Pawl.Codec.DurationRef as DurationRef
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
+import qualified Pawl.Codec.ForEach as ForEach
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.ModifyTarget as ModifyTarget
@@ -124,8 +126,10 @@ codec cardCodec =
       Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
       Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
       Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
-      Arm.payload "GrantPlayFromExile" DurationRef.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing)
+      Arm.payload "GrantPlayFromExile" DurationRef.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
+      Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing)
     ]
   where
     createCodec = Create.codec cardCodec
     preventCodec = PreventNextDamage.codec (codec cardCodec)
+    forEachCodec = ForEach.codec (codec cardCodec)

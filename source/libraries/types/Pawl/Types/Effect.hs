@@ -15,6 +15,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
@@ -39,9 +40,14 @@ import qualified Pawl.Types.SpeedDecrease as SpeedDecrease
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 
 -- | The ISA (design.md section 1): first-order, non-recursive in CONTROL FLOW --
--- no loops, branches, or recursive calls -- and with no functions in any field.
--- The ONLY module that may case on a constructor is Pawl.Engine.Resolve; the
--- rules core asks classifications, never identities.
+-- no branches and no recursive calls -- and with no functions in any field. The
+-- ONLY module that may case on a constructor is Pawl.Engine.Resolve; the rules
+-- core asks classifications, never identities.
+--
+-- The one iteration in it is ForEach's, and it is not a loop in that sense: CR
+-- 608.2f's per-object processing runs a body over a set SWEPT ONCE before the
+-- first pass, so the count is data an analysis can read off the instruction
+-- rather than a jump the game state decides. See that arm.
 --
 -- The `card` parameter lets an opcode embed a card's characteristics (a created
 -- token, a future copy) WITHOUT a module cycle: Card embeds [Effect Card], so a
@@ -1280,4 +1286,51 @@ data Effect card
     -- Pawl.Engine.Expiry.arm answers Nothing and Resolve stores no permission at
     -- all, rather than storing one that a later sweep would remove.
     GrantPlayFromExile DurationRef.DurationRef
+  | -- | CR 608.2f: an action taken on several objects and/or players that cannot
+    -- be processed simultaneously "is instead processed considering each
+    -- affected player or object individually" -- so take the swept set one
+    -- member at a time and run the BODY for each, with that member bound under
+    -- the payload's slot for that iteration.
+    --
+    -- Soulfire Eruption is rule 608.2f's own second example, and what makes it
+    -- unwritable without this opcode is that its per-object step acts on what
+    -- that same step produced: "exile the top card of your library, THEN ...
+    -- deals damage equal to THAT CARD's mana value to that permanent or
+    -- player". A MoveToZone naming the top card takes ONE card for the whole
+    -- instruction, and a DealDamage beside it has no way to say which exiled
+    -- card belongs to which victim.
+    --
+    -- The ONE arm that runs a sequence per member, and the distinction is the
+    -- whole of it: every other set-naming opcode applies ITSELF across the
+    -- swept set (Destroy's "all creatures", DealDamage's "each creature with
+    -- flying"), which is one instruction repeated and needs no binding. Reach
+    -- for those first -- a body of one self-contained opcode is that shape
+    -- written the long way round.
+    --
+    -- NOT the control flow design.md section 1 keeps out of the ISA. The bound
+    -- is the SWEPT SET, read once before the first iteration and fixed (CR
+    -- 608.2c), so there is no condition to evaluate, no branch to take and no
+    -- recursive call -- the loop count is data the analyses can already see,
+    -- and a nested one is bounded by the structure it is written in. What the
+    -- section forbids is a jump whose destination depends on the game state,
+    -- which nothing here has.
+    --
+    -- The slot is a DEFINITION and never a target (CR 115.10a), which is why
+    -- Pawl.Engine.Resolve.boundSlots reports it: the REF may name a slot CR
+    -- 601.2c filled by targeting and carry CR 608.2b's re-validation with it,
+    -- but the per-iteration name is the loop's own.
+    --
+    -- Scoped to the iteration, both halves. The member binding is passed down
+    -- rather than written onto the resolving object, so it is gone when the loop
+    -- is; and a name the BODY defines is reset to its pre-loop value before each
+    -- pass, so an iteration that produced nothing reads nothing rather than the
+    -- previous member's answer.
+    --
+    -- ORDER: APNAP (CR 608.2f's primary determination) and then the engine's
+    -- own tiebreak within one controller, which that rule's secondary sentence
+    -- gives to the resolving controller instead (#379). Observable here for the
+    -- first time, because a body drawing on a depleting resource -- your own
+    -- library -- gives two members of one batch different answers depending on
+    -- which went first.
+    ForEach (ForEach.ForEach (Effect card))
   deriving (Eq, Ord, Show)

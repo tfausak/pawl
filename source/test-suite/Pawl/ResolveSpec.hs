@@ -8856,6 +8856,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   supportSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
+  soulfireEruptionSpec s registry
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.
@@ -9239,3 +9240,123 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
         Spec.assertEqWith s "taking the target draws too" (S.handSize S.alice taken) 1
         Spec.assertEqWith s "and the Piker went to the library" (graveyardSize taken) 1
       abilities -> Spec.assertFailure s ("expected one ability, got " <> show (length abilities))
+
+-- CR 608.2f's per-object BODY, and the per-iteration binding that makes it more
+-- than a repeated opcode.
+--
+-- Soulfire Eruption {6}{R}{R}{R} Sorcery (data/cards/soulfire-eruption.json) --
+-- "Choose any number of target creatures, planeswalkers, and/or players. For
+-- each of them, exile the top card of your library, then Soulfire Eruption deals
+-- damage equal to that card's mana value to that permanent or player. You may
+-- play the exiled cards until the end of your next turn." (name, cost, type line
+-- and Oracle text checked against api.scryfall.com.) It is rule 608.2f's own
+-- second example.
+--
+-- TWO DEPARTURES FROM THE PRINTED CARD, both stricter than printed and both
+-- irrelevant to what is asserted here: "any number of target" is written as up
+-- to three (#1476), and "until the end of your next turn" as "until your next
+-- turn" (#1477).
+--
+-- alice casts it off nine Mountains at a THREE-seat board and the priority loop
+-- resolves it, which is what makes this gameplay-level rather than an
+-- applyEffect call. The board tells apart every wrong reading of the loop:
+--
+--   * A BODY PER MEMBER, not one body. Three victims are named, so a loop that
+--     ran the body once damages one seat and leaves two at twenty.
+--   * A FRESH BINDING PER MEMBER, not one shared. The three cards exiled have
+--     mana values 1, 2 and 4 -- pairwise distinct AND pairwise-sum distinct, so
+--     no two readings land on one number -- and each victim's damage must be its
+--     OWN card's. A loop that bound the first exiled card, or the last, for
+--     every victim gives all three seats the same damage.
+--   * A DEPLETING RESOURCE, which is the whole reason this shape needs an
+--     opcode. Each iteration reads "the top card of your library" AFTER the
+--     previous one exiled its own, so the three cards must be three DIFFERENT
+--     cards, and the two under them must still be in the library in order (CR
+--     401.2). A body re-reading the pre-loop board would exile one card three
+--     times.
+--   * APNAP (CR 608.2f's primary determination). alice is the active player and
+--     the seating is [alice, bob, carol], so the top card goes to alice, the
+--     next to bob and the third to carol -- reversing or permuting the order
+--     permutes the three life totals, which are distinct.
+--   * A PER-ITERATION GRANT. Every exiled card carries CR 601.3's play
+--     permission, so the third body instruction ran for each member rather than
+--     once for whichever card was bound last.
+--
+-- Ogre Sentry sits under bob so the target pool holds a fourth candidate the
+-- announcement does not take: the choice is a real choice rather than one
+-- short-circuited by having exactly as many candidates as it needs, and a loop
+-- that swept the battlefield instead of the slot would reach it.
+soulfireEruptionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulfireEruptionSpec s registry =
+  let -- alice's library holds `stock`, DEEPEST FIRST -- S.addLibraryCard puts
+      -- each card on top, so the last name given is the top card.
+      board stock = do
+        mountain <- S.printingOf s registry "Mountain"
+        soulfireEruption <- S.printingOf s registry "Soulfire Eruption"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        stocked <- mapM (S.printingOf s registry) stock
+        let g1 = S.landsFor mountain S.alice 9 S.threePlayerGame
+            g2 = List.foldl' (\g pr -> snd (S.addLibraryCard pr S.alice g)) g1 stocked
+            g3 = snd (S.addCreature sentry S.bob g2)
+            (withSpell, spell) = S.handOne soulfireEruption g3
+            afterCast = S.runPure aimingAtEveryPlayer withSpell (S.cast S.alice spell)
+        pure (S.runPure aimingAtEveryPlayer afterCast Engine.priorityLoop)
+      named = Just . CardName.MkCardName . Text.pack
+      exiledNames pid = List.sort . namesIn Zone.Exile pid
+      permissionsIn pid gs = fmap (Maybe.isJust . Object.playableFromExile) (Maybe.mapMaybe (\oid -> Game.lookupObject oid gs) (Game.zoneMembers Zone.Exile pid gs))
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+   in Spec.describe s "SoulfireEruption" $ do
+        Spec.it s "CR 608.2f each victim takes the mana value of the card exiled FOR IT, in APNAP order" $ do
+          after <- board ["Sabretooth Tiger", "Bird Maiden", "Hill Giant", "Goblin Piker", "Benalish Hero"]
+          Spec.assertEqWith
+            s
+            "three DIFFERENT cards left the library, top first, and the two under them stayed in order"
+            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
+            ( List.sort [named "Benalish Hero", named "Goblin Piker", named "Hill Giant"],
+              [named "Bird Maiden", named "Sabretooth Tiger"]
+            )
+          Spec.assertEqWith
+            s
+            "Benalish Hero (1) to alice, Goblin Piker (2) to bob, Hill Giant (4) to carol"
+            (lives after)
+            (Just 19, Just 18, Just 16)
+          Spec.assertEqWith
+            s
+            "all three exiled cards carry the play permission, so the grant ran once per iteration"
+            (permissionsIn S.alice after)
+            [True, True, True]
+        -- CR 609.3 inside the loop: the library runs out mid-sweep, so the
+        -- iterations that find no top card exile nothing and their DealDamage
+        -- has no mana value to read (Quantity.AgainstSlot answers Nothing, and an
+        -- unevaluable quantity is a no-op). The batch is not shortened -- the
+        -- members were swept before the first pass -- so the third seat simply
+        -- takes nothing.
+        Spec.it s "CR 609.3 a library that runs out mid-loop leaves the later members untouched" $ do
+          after <- board ["Goblin Piker", "Benalish Hero"]
+          Spec.assertEqWith
+            s
+            "alice took 1 and bob took 2; carol found no card and took nothing"
+            (lives after)
+            (Just 19, Just 18, Just 20)
+          Spec.assertEqWith
+            s
+            "both cards were exiled and the library is empty"
+            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
+            (List.sort [named "Benalish Hero", named "Goblin Piker"], [])
+          Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
+
+-- CR 601.2c: announce three targets per slot and aim them at the PLAYERS, which
+-- on this board leaves bob's Ogre Sentry -- a legal candidate of the same
+-- AnyTarget pool -- deliberately unchosen.
+aimingAtEveryPlayer :: Prompt.Prompt r -> r
+aimingAtEveryPlayer p = case p of
+  Prompt.AnnounceTargets {} -> announcingCount 3 p
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring isPlayerRecipient sets
+  _ -> S.identityAnswer p
+  where
+    isPlayerRecipient r = case r of
+      Recipient.ToPlayer _ -> True
+      Recipient.ToCreature _ -> False
+      Recipient.ToPlaneswalker _ -> False
+      Recipient.ToBattle _ -> False
+      Recipient.ToObject _ -> False

@@ -260,6 +260,8 @@ library codec
     Pawl.Codec.FaceSpec
     Pawl.Codec.Filter
     Pawl.Codec.FilterSpec
+    Pawl.Codec.ForEach
+    Pawl.Codec.ForEachSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
     Pawl.Codec.GraveyardScope
@@ -938,6 +940,7 @@ library types
     Pawl.Types.Face
     Pawl.Types.Facing
     Pawl.Types.Filter
+    Pawl.Types.ForEach
     Pawl.Types.Game
     Pawl.Types.GameEvent
     Pawl.Types.GameState

@@ -106,6 +106,7 @@ import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
 import qualified Pawl.Codec.FaceSpec
 import qualified Pawl.Codec.FilterSpec
+import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GraveyardScopeSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
@@ -479,6 +480,7 @@ spec s registry = do
   Pawl.Codec.ExtraPhaseSpec.spec s
   Pawl.Codec.FaceSpec.spec s
   Pawl.Codec.FilterSpec.spec s
+  Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GraveyardScopeSpec.spec s
   Pawl.Codec.HalfUnlockedSpec.spec s
