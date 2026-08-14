@@ -651,7 +651,7 @@ data GameEvent
     --
     -- Not derivable from GameEvent.SpellCast, which is why it is its own
     -- constructor: that event says a spell was cast and names none of its
-    -- targets, an ACTIVATED ability records no cast event at all, and CR 115.7a
-    -- is one event per target rather than one per announcement.
+    -- targets, an ACTIVATED ability records no cast event at all, and this is one
+    -- event per target rather than one per announcement.
     BecameTarget BecameTarget.BecameTarget
   deriving (Eq, Ord, Show)

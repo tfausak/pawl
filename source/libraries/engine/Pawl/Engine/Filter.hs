@@ -731,13 +731,12 @@ rewrite pairs predicate = case predicate of
 -- so a new one carrying a Filter must break this build rather than silently keep
 -- the printed word.
 --
--- The Cost that cycling, flashback, morph and entwine carry goes through
--- rewriteCost below, for CR 612.1's own reason: rule 702 states those costs as
--- part of the keyword, so they are printed in the text box exactly as an
--- activated ability's activation cost is. No printing pairs one of those costs
--- with a basic land type, so those four arms are a regression fence rather than
--- a proven path -- Pawl.ActivateSpec's Dark Heart of the Wood is what proves
--- rewriteCost itself.
+-- Every Cost a keyword carries goes through rewriteCost below, for CR 612.1's own
+-- reason: rule 702 states those costs as part of the keyword, so they are printed
+-- in the text box exactly as an activated ability's activation cost is. No
+-- printing pairs one of those costs with a basic land type, so each of those arms
+-- is a regression fence rather than a proven path -- Pawl.ActivateSpec's Dark
+-- Heart of the Wood is what proves rewriteCost itself.
 rewriteKeyword :: [(Subtype.Subtype, Subtype.Subtype)] -> Keyword.Type.Keyword -> Keyword.Type.Keyword
 rewriteKeyword pairs keyword = case keyword of
   -- CR 702.14a's "[type]walk".

@@ -184,7 +184,7 @@ data Keyword
     -- two instances are two abilities and each offers its own cost.
     --
     -- Not implemented: CR 702.21b's X in a ward cost, which needs a value
-    -- determined as the ability RESOLVES (#703's family of resolution-time X).
+    -- determined as the ability RESOLVES (#1526).
     Ward (Cost.Cost Keyword)
   | -- | 702.22: banding. Only the two COMBAT-DAMAGE-DIVISION halves are modeled --
     -- CR 702.22j, where a banding blocker moves the choice of how the ATTACKING
