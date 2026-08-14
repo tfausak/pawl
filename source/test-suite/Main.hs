@@ -122,6 +122,7 @@ import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
 import qualified Pawl.Codec.LifeChangeSpec
 import qualified Pawl.Codec.LimitUnlessSpec
+import qualified Pawl.Codec.LookAtSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaCountSpec
@@ -498,6 +499,7 @@ spec s registry = do
   Pawl.Codec.LibraryPositionSpec.spec s
   Pawl.Codec.LifeChangeSpec.spec s
   Pawl.Codec.LimitUnlessSpec.spec s
+  Pawl.Codec.LookAtSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
   Pawl.Codec.ManaCountSpec.spec s

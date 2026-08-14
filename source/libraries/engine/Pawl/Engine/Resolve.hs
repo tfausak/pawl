@@ -108,6 +108,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
@@ -323,6 +324,9 @@ slotsOf effect = case effect of
   -- it belongs to boundSlots below -- Destroy's third field takes the same
   -- posture, for the same reason.
   Effect.Mill (Mill.MkMill ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  -- The bound slot is a DEFINITION and not a read, the posture Mill's tally
+  -- above takes; boundSlots below is where it is reported.
+  Effect.LookAt (LookAt.MkLookAt ref _) -> objectRefSlots ref
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -559,6 +563,7 @@ slotsAreExhaustive effect = case effect of
   Effect.MoveToZone {} -> True
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.LookAt {} -> True
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -697,6 +702,7 @@ readsX = any effectReadsX
       Effect.MoveToZone {} -> False
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
+      Effect.LookAt {} -> False
       Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -782,9 +788,10 @@ searchesLibrary effect = case effect of
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
   Effect.Mill {} -> False
-  -- The three look-and-split actions look at the top N, where CR 701.23a's
-  -- search looks at ALL of a zone; Panglacial Wurm's window is the latter's
-  -- alone.
+  -- CR 701.20e's look and the three look-and-split actions each look at NAMED
+  -- cards, where CR 701.23a's search looks through ALL of a zone; Panglacial
+  -- Wurm's window is the latter's alone.
+  Effect.LookAt {} -> False
   Effect.Scry {} -> False
   Effect.Surveil {} -> False
   Effect.Fateseal {} -> False
@@ -921,6 +928,11 @@ boundSlots effect = case effect of
   -- How many of the cards this mill put in the graveyard matched the tally's
   -- filter, for CR 728.1's "for each nonland card milled this way" to read.
   Effect.Mill (Mill.MkMill _ _ mTally) -> foldMap (Set.singleton . MillTally.slot) mTally
+  -- The cards CR 701.20e's look showed, for a later clause of the same
+  -- resolution to name -- Into the Wilds' "if it's a land card ... put it onto
+  -- the battlefield", which reads the slot twice over (Filter.IsBound, then
+  -- ObjectRef.InSlot).
+  Effect.LookAt (LookAt.MkLookAt _ slot) -> Set.singleton slot
   Effect.Scry {} -> Set.empty
   Effect.Surveil {} -> Set.empty
   Effect.Fateseal {} -> Set.empty
@@ -1200,7 +1212,23 @@ resolveSpellWith runSubgame oid = do
                     -- CR 701.46a's printed "if" first: it precedes the
                     -- instructions in written order (CR 608.2c), and a clause
                     -- that cannot happen is no question to ask.
-                    gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) chosen) clause
+                    -- The LIVE bindings, not the start-of-resolution ones, for the
+                    -- reason the gate is asked here at all (CR 608.2c): a slot an
+                    -- earlier clause of this resolution DEFINED is part of the
+                    -- state this clause is read against -- Into the Wilds' "if
+                    -- it's a land card" over the card its first clause looked at.
+                    -- Same re-read `applyOne` above makes, and it adds only
+                    -- defined slots: CR 608.2b's re-validation is still the one
+                    -- made once, as the resolution began.
+                    --
+                    -- A REGRESSION FENCE on this path rather than a proved
+                    -- behaviour: every card in the pool whose gate reads a
+                    -- mid-resolution slot is a triggered ability, so mutating
+                    -- this half back to the start-of-resolution map leaves the
+                    -- suite green. It is here because the two paths must read
+                    -- CR 608.2c the same way.
+                    gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                    gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) clause
                     -- CR 603.5 / 608.2d: then the printed "may".
                     taken <- if gated then exercises oid effectController idx cIdx clause else pure False
                     -- CR 118.12a: and then this clause's "unless [a player]
@@ -1369,7 +1397,14 @@ resolveModes stackId srcId modes = do
                   -- reason. Read against `srcId`, the source permanent, not the
                   -- ability object -- CR 701.46a says "this permanent", which is
                   -- also why `paid` is given `srcId`.
-                  gated <- gateHolds effectController srcId (instanceView chosen) clause
+                  -- The LIVE bindings off the STACK object, the spell path's own
+                  -- re-read and for its reason (CR 608.2c) -- and off that object
+                  -- rather than off `srcId`, because that is where this
+                  -- resolution's slots are bound (see bindSlot). Proved by
+                  -- Pawl.ResolveSpec's LookAt group, whose card is Into the
+                  -- Wilds.
+                  gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
+                  gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) clause
                   -- CR 603.5 / 608.2d: then the printed "may", answered as this
                   -- clause's instructions are applied.
                   taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
@@ -3323,6 +3358,23 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             Nothing -> False
             Just face -> Filter.matches tallyContext (Projection.viewOfCardIn gs oid face) (MillTally.filter tally)
        in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
+  Effect.LookAt (LookAt.MkLookAt ref slot) -> do
+    gs <- State.get
+    -- CR 608.2c: the cards are named as this instruction is reached, and CR
+    -- 701.20b (reached by rule 701.20e) leaves every one of them where it is --
+    -- so this whole arm is the binding, and an empty library binds nothing.
+    --
+    -- No prompt and no event. Rule 701.20e shows the cards to one player, which
+    -- pawl has no way to do (#1412); what reaches the seat is the later clause's
+    -- own question, and a public GameEvent.Revealed would be a different rule
+    -- (CR 701.20a).
+    case objectRefObjects legal resolving controller source gs ref of
+      [] -> pure ()
+      -- bindArrivals' one-versus-many line, minus its prompt: one card takes the
+      -- SINGLE binding, which is the only one a Filter.IsBound can see, and is
+      -- what every printing in the corpus looks at (#1532).
+      [only] -> State.modify' (bindSlot resolving slot only)
+      several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

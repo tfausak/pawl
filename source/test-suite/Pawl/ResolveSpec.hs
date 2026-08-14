@@ -6011,19 +6011,21 @@ runExplore answer spell gs =
    in S.runPure answer afterCast Engine.priorityLoop
 
 -- The card NAMES in one of alice's zones, in zone order. Names and not ids
--- because CR 400.7 mints a fresh incarnation for the card the explore moves, so
--- the id the fixture stocked is gone by the time the assertion reads the hand.
-exploreZone :: Zone.Zone -> GameState.GameState -> [String]
-exploreZone zone gs =
+-- because CR 400.7 mints a fresh incarnation for the card a move takes out of
+-- the library, so the id the fixture stocked is gone by the time the assertion
+-- reads the hand or the battlefield.
+zoneNames :: Zone.Zone -> GameState.GameState -> [String]
+zoneNames zone gs =
   fmap
     (\oid -> maybe "?" (Text.unpack . CardName.unwrap . Face.name) (Game.faceOf oid gs))
     (Game.zoneMembers zone S.alice gs)
 
--- The names alice revealed this turn, in order. CR 701.44a's reveal is PUBLIC
--- (CR 701.20a), so unlike scry's private look it leaves a GameEvent behind, and
--- that event is the only thing an assertion can read it through.
-exploreReveals :: GameState.GameState -> [String]
-exploreReveals gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
+-- The names alice revealed this turn, in order. A reveal is PUBLIC (CR 701.20a),
+-- so it leaves a GameEvent behind and that event is the only thing an assertion
+-- can read it through -- which is also what makes the empty list the assertion
+-- that CR 701.20e's look was NOT one.
+revealedNames :: GameState.GameState -> [String]
+revealedNames gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
   where
     revealedName event = case event of
       GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
@@ -6041,11 +6043,11 @@ exploreSpec s registry = Spec.describe s "Explore" $ do
         walker = namedOnBattlefield "Merfolk Branchwalker" after
     Spec.assertBool s (Maybe.isJust walker) "the Branchwalker resolved onto the battlefield"
     Spec.assertEqWith s "stack empty: the spell and its trigger both resolved" (length (GameState.stack after)) 0
-    Spec.assertEqWith s "the Mountain left the top of the library" (exploreZone Zone.Library after) ["Bird Maiden"]
-    Spec.assertEqWith s "and is in hand" (exploreZone Zone.Hand after) ["Mountain"]
+    Spec.assertEqWith s "the Mountain left the top of the library" (zoneNames Zone.Library after) ["Bird Maiden"]
+    Spec.assertEqWith s "and is in hand" (zoneNames Zone.Hand after) ["Mountain"]
     -- CR 701.20a: the reveal is public, so it is in the log every player reads.
-    Spec.assertEqWith s "the Mountain was revealed on the way" (exploreReveals after) ["Mountain"]
-    Spec.assertEqWith s "nothing was binned" (exploreZone Zone.Graveyard after) []
+    Spec.assertEqWith s "the Mountain was revealed on the way" (revealedNames after) ["Mountain"]
+    Spec.assertEqWith s "nothing was binned" (zoneNames Zone.Graveyard after) []
     -- The counter is the discriminator between the branches: rule 701.44a's
     -- "otherwise" is the only sentence that puts one on.
     Spec.assertEqWith s "CR 701.44a no +1/+1 counter on the land branch" (plusOnePlusOnesOn walker after) 0
@@ -6057,11 +6059,11 @@ exploreSpec s registry = Spec.describe s "Explore" $ do
         walker = namedOnBattlefield "Merfolk Branchwalker" after
     Spec.assertBool s (Maybe.isJust walker) "the Branchwalker resolved onto the battlefield"
     Spec.assertEqWith s "one +1/+1 counter" (plusOnePlusOnesOn walker after) 1
-    Spec.assertEqWith s "the Piker is in the graveyard" (exploreZone Zone.Graveyard after) ["Goblin Piker"]
-    Spec.assertEqWith s "the Maiden it was sitting on is now the top card" (exploreZone Zone.Library after) ["Bird Maiden"]
+    Spec.assertEqWith s "the Piker is in the graveyard" (zoneNames Zone.Graveyard after) ["Goblin Piker"]
+    Spec.assertEqWith s "the Maiden it was sitting on is now the top card" (zoneNames Zone.Library after) ["Bird Maiden"]
     -- The TOP card and not just a card: the Maiden beneath it was never shown.
-    Spec.assertEqWith s "only the Piker was revealed" (exploreReveals after) ["Goblin Piker"]
-    Spec.assertEqWith s "a nonland card never reaches the hand" (exploreZone Zone.Hand after) []
+    Spec.assertEqWith s "only the Piker was revealed" (revealedNames after) ["Goblin Piker"]
+    Spec.assertEqWith s "a nonland card never reaches the hand" (zoneNames Zone.Hand after) []
     -- The counter went on the permanent that EXPLORED, not on every creature.
     Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
   -- The other half of the "may", the ONE thing changed being the answer. Without
@@ -6071,8 +6073,8 @@ exploreSpec s registry = Spec.describe s "Explore" $ do
     let after = runExplore (exploreAnswer OptionalDecision.Declines) spell board
         walker = namedOnBattlefield "Merfolk Branchwalker" after
     Spec.assertEqWith s "the counter went on either way" (plusOnePlusOnesOn walker after) 1
-    Spec.assertEqWith s "the library is untouched, Piker still on top" (exploreZone Zone.Library after) ["Goblin Piker", "Bird Maiden"]
-    Spec.assertEqWith s "nothing was binned" (exploreZone Zone.Graveyard after) []
+    Spec.assertEqWith s "the library is untouched, Piker still on top" (zoneNames Zone.Library after) ["Goblin Piker", "Bird Maiden"]
+    Spec.assertEqWith s "nothing was binned" (zoneNames Zone.Graveyard after) []
     Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
   -- CR 701.44b: the permanent explores "even if some or all of those actions were
   -- impossible". No card is revealed, so nothing is a land card and the
@@ -6083,8 +6085,8 @@ exploreSpec s registry = Spec.describe s "Explore" $ do
         walker = namedOnBattlefield "Merfolk Branchwalker" after
     Spec.assertBool s (Maybe.isJust walker) "the Branchwalker resolved onto the battlefield"
     Spec.assertEqWith s "one +1/+1 counter" (plusOnePlusOnesOn walker after) 1
-    Spec.assertEqWith s "no card moved anywhere" (exploreZone Zone.Hand after <> exploreZone Zone.Graveyard after) []
-    Spec.assertEqWith s "and nothing was revealed" (exploreReveals after) []
+    Spec.assertEqWith s "no card moved anywhere" (zoneNames Zone.Hand after <> zoneNames Zone.Graveyard after) []
+    Spec.assertEqWith s "and nothing was revealed" (revealedNames after) []
     Spec.assertEqWith s "the bystanding creature stayed bare" (plusOnePlusOnesOn (Just bystander) after) 0
 
 -- The elision half: which boards raise CR 701.44a's question at all. Each case
@@ -6118,6 +6120,110 @@ explorePromptSpec s registry = Spec.describe s "ExplorePrompt" $ do
   Spec.it s "CR 701.44b an empty library raises no question" $ do
     (spell, _, board) <- exploreBoard s registry []
     Spec.assertEqWith s "not asked" (asks spell board) 0
+
+-- Into the Wilds on the battlefield under alice's control, over a library
+-- stocked from the top down. Two seats and no other permanent: the card reads
+-- only its controller's own library, so nothing here needs telling apart.
+wildsBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> [String] -> m GameState.GameState
+wildsBoard s registry deck = do
+  wilds <- S.printingOf s registry "Into the Wilds"
+  printings <- mapM (S.printingOf s registry) deck
+  let (_, withWilds) = S.addCreature wilds S.alice (Setup.emptyGame S.bothPlayers)
+      -- addLibraryCard puts its card ON TOP, so the deepest is stocked first.
+      deal gs printing = snd (S.addLibraryCard printing S.alice gs)
+   in pure (List.foldl' deal withWilds (reverse printings))
+
+-- Begin alice's upkeep, place what triggers (CR 603.3) and resolve it.
+runWildsUpkeep :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runWildsUpkeep answer gs =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      began =
+        Event.recordEvent
+          (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
+          (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settled = S.runPure answer began Engine.settleForPriority
+   in S.runPure answer settled Engine.priorityLoop
+
+-- Answers CR 603.5's "may" with a FIXED decision, exploreAnswer's posture and
+-- for its reason: an answerer deriving its answer from the prompt would still
+-- answer legally after a mutation broke which card was looked at.
+wildsAnswer :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+wildsAnswer decision p = case p of
+  Prompt.ChooseOptional {} -> decision
+  _ -> S.identityAnswer p
+
+-- CR 701.20e's look, through Into the Wilds: "At the beginning of your upkeep,
+-- look at the top card of your library. If it's a land card, you may put it onto
+-- the battlefield."
+--
+-- The look itself changes NOTHING a board can see, so every case here is about
+-- what the clause after it does: the branch has to be taken from the card that
+-- was looked at rather than from the library it sits in, which is what the
+-- second case pins down.
+lookAtSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lookAtSpec s registry = Spec.describe s "LookAt" $ do
+  Spec.it s "CR 701.20e the looked-at land card reaches the battlefield" $ do
+    board <- wildsBoard s registry ["Forest", "Bird Maiden"]
+    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) board
+    Spec.assertEqWith s "the Forest left the library" (zoneNames Zone.Library after) ["Bird Maiden"]
+    Spec.assertEqWith s "and is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 1
+    Spec.assertEqWith s "stack empty: the trigger resolved" (length (GameState.stack after)) 0
+    -- The whole of CR 701.20e: a look is shown to one player, so it records
+    -- nothing where CR 701.20a's reveal would have.
+    Spec.assertEqWith s "nothing was revealed on the way" (revealedNames after) []
+  -- The pair's other half, and the ONE thing changed is which of the two cards
+  -- is on top. A land is in the library either way, so an implementation reading
+  -- the library rather than the looked-at card passes the case above and fails
+  -- this one.
+  Spec.it s "CR 701.20e a nonland top card leaves the land beneath it alone" $ do
+    board <- wildsBoard s registry ["Bird Maiden", "Forest"]
+    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) board
+    Spec.assertEqWith s "the library is untouched" (zoneNames Zone.Library after) ["Bird Maiden", "Forest"]
+    Spec.assertEqWith s "and nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 0
+  -- CR 603.5's "may", declined. Without this case a put-always implementation
+  -- passes the first one.
+  Spec.it s "CR 603.5 declining leaves the land on top of the library" $ do
+    board <- wildsBoard s registry ["Forest", "Bird Maiden"]
+    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Declines) board
+    Spec.assertEqWith s "the library is untouched" (zoneNames Zone.Library after) ["Forest", "Bird Maiden"]
+    Spec.assertEqWith s "and nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 0
+  -- CR 609.3: an empty library has no top card, so the look names nothing, the
+  -- slot goes unbound and the clause after it finds no land.
+  Spec.it s "CR 609.3 an empty library looks at nothing and does nothing" $ do
+    board <- wildsBoard s registry []
+    let after = runWildsUpkeep (wildsAnswer OptionalDecision.Exercises) board
+    Spec.assertEqWith s "the library is still empty" (zoneNames Zone.Library after) []
+    Spec.assertEqWith s "stack empty: the trigger resolved" (length (GameState.stack after)) 0
+
+-- The elision half: CR 608.2a's gate is asked BEFORE CR 603.5's "may", so a top
+-- card that is not a land is never a question. Counts the optional prompts one
+-- upkeep raises.
+lookAtPromptSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lookAtPromptSpec s registry = Spec.describe s "LookAtPrompt" $ do
+  let counting :: Prompt.Prompt r -> State.State Int r
+      counting p = case p of
+        Prompt.ChooseOptional {} -> do
+          State.modify (+ 1)
+          pure (S.identityAnswer p)
+        _ -> pure (S.identityAnswer p)
+      asks gs =
+        let upkeep = Phase.Beginning BeginningStep.Upkeep
+            began =
+              Event.recordEvent
+                (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep S.alice))
+                (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+         in State.execState
+              (Engine.runGame counting began (Engine.settleForPriority >> Engine.priorityLoop))
+              0
+  Spec.it s "a looked-at land card is asked about" $ do
+    board <- wildsBoard s registry ["Forest", "Bird Maiden"]
+    Spec.assertEqWith s "asked once" (asks board) 1
+  Spec.it s "a looked-at nonland card raises no question" $ do
+    board <- wildsBoard s registry ["Bird Maiden", "Forest"]
+    Spec.assertEqWith s "not asked" (asks board) 0
+  Spec.it s "CR 609.3 an empty library raises no question" $ do
+    board <- wildsBoard s registry []
+    Spec.assertEqWith s "not asked" (asks board) 0
 
 slotTarget :: SlotName.SlotName
 slotTarget = SlotName.MkSlotName (Text.pack "target")
@@ -8965,6 +9071,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   fatesealSpec s registry
   exploreSpec s registry
   explorePromptSpec s registry
+  lookAtSpec s registry
+  lookAtPromptSpec s registry
   playerSacrificesSpec s registry
   createEmblemSpec s registry
   becomeMonarchSpec s registry

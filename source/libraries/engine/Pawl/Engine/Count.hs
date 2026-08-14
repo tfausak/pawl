@@ -197,6 +197,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.ControlledByRecipient -> predicate
   Filter.Type.OwnedBy _ -> predicate
   Filter.Type.IsSource -> predicate
+  Filter.Type.IsBound _ -> predicate
   Filter.Type.IsPlayer _ -> predicate
   Filter.Type.IsAttacking -> predicate
   Filter.Type.IsBlocking -> predicate
