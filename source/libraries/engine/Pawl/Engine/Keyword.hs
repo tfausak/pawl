@@ -244,6 +244,11 @@ abilitiesFor keyword count = case keyword of
   Keyword.Trample -> []
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
+  -- CR 702.21a's ability, one per instance: rule 702.21 states no "each instance"
+  -- sentence, so two of them are two abilities for CR 603.2's general reason --
+  -- exalted's case rather than shadow's redundancy -- and a spell targeting a
+  -- doubly warded permanent is offered both costs.
+  Keyword.Ward cost -> List.genericReplicate count (ward cost)
   Keyword.Banding -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
@@ -324,6 +329,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Trample -> []
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
+  Keyword.Ward _ -> []
   Keyword.Banding -> []
   Keyword.Flanking -> []
   Keyword.Phasing -> []
@@ -524,6 +530,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Trample -> []
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
+  Keyword.Ward _ -> []
   Keyword.Banding -> []
   Keyword.Flanking -> []
   Keyword.Phasing -> []
@@ -772,6 +779,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Trample -> []
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
+  Keyword.Ward _ -> []
   Keyword.Banding -> []
   Keyword.Flanking -> []
   Keyword.Phasing -> []
@@ -1206,6 +1214,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Trample -> []
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
+  Keyword.Ward _ -> []
   Keyword.Banding -> []
   Keyword.Flanking -> []
   Keyword.Phasing -> []
@@ -1370,6 +1379,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Trample -> []
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
+  Keyword.Ward _ -> []
   Keyword.Banding -> []
   Keyword.Flanking -> []
   Keyword.Phasing -> []
@@ -1489,6 +1499,7 @@ familyOf keyword = case keyword of
   Keyword.Trample -> Nothing
   Keyword.TrampleOverPlaneswalkers -> Nothing
   Keyword.Vigilance -> Nothing
+  Keyword.Ward _ -> Just KeywordFamily.Ward
   Keyword.Banding -> Nothing
   Keyword.Flanking -> Nothing
   Keyword.Haunt -> Nothing
@@ -2204,6 +2215,47 @@ training =
     }
   where
     effect = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
+
+-- CR 702.21a: ward [cost]. "Whenever this permanent becomes the target of a spell
+-- or ability an opponent controls, counter that spell or ability unless that
+-- player pays [cost]." Rule 702 states it as a triggered ability, minted here like
+-- its siblings in `abilitiesFor`.
+--
+-- ONE CLAUSE and no branching opcode, fabricate's shape: CR 118.12a rewrites "[do
+-- something] unless [a player does something else]" as an offer followed by the
+-- thing, so the Counter is the clause's "if they don't" branch and
+-- Pawl.Types.UnlessPaid is the offer. CR 118.12 puts that payment at RESOLUTION,
+-- which is what rule 702.21a needs -- the opponent has already paid to cast.
+--
+-- THE PAYER IS THE TARGETER'S CONTROLLER, not the bearer's: rule 702.21a's "that
+-- player" is the opponent whose spell or ability named the bearer, and
+-- Resolve.payerOf reads a slot bound to an object as whoever controls it -- so
+-- the same Binding.targetingObject slot answers both halves of the sentence.
+-- Binding.you would be the ward controller and would offer the cost to the wrong
+-- player.
+--
+-- "THAT SPELL OR ABILITY" is the object the event named, read out of the reserved
+-- Binding.targetingObject slot -- flanking's shape, and NOT a target slot: rule
+-- 702.21a targets nothing, so nothing here is re-checked at CR 608.2b and a
+-- shroud-bearing spell is countered as readily as any other.
+--
+-- Optionality.Mandatory: the gate's offer IS the only choice rule 702.21a gives.
+-- Single mode, ChooseExactly 1, and intervening = Nothing -- the rule has no "if"
+-- clause.
+ward :: Cost Keyword -> TriggeredAbility Card
+ward cost =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
+    gate = UnlessPaid.MkUnlessPaid {UnlessPaid.payer = Binding.targetingObject, UnlessPaid.cost = cost}
+    effect = Effect.Counter Binding.targetingObject
 
 -- CR 702.147a's TRIGGERED half: "When this creature attacks, sacrifice it at end
 -- of combat." CR 508.3a is what "attacks" means, so the condition is mentor's and

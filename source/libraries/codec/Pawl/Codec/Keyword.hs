@@ -41,6 +41,7 @@ codec =
       Arm.nullary "Trample" Keyword.Trample,
       Arm.nullary "TrampleOverPlaneswalkers" Keyword.TrampleOverPlaneswalkers,
       Arm.nullary "Vigilance" Keyword.Vigilance,
+      Arm.payload "Ward" (Cost.codec codec) Keyword.Ward (\x -> case x of Keyword.Ward y -> Just y; _ -> Nothing),
       Arm.nullary "Banding" Keyword.Banding,
       Arm.payload "Rampage" Common.natural Keyword.Rampage (\x -> case x of Keyword.Rampage y -> Just y; _ -> Nothing),
       Arm.nullary "Flanking" Keyword.Flanking,

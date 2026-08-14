@@ -625,6 +625,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SpellCast {} -> []
   -- The same rule read off the spell itself carries nothing at all.
   TriggerCondition.SelfCast -> []
+  -- CR 702.21a's condition carries a PlayerRelation and no Count.
+  TriggerCondition.SelfBecomesTargeted _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -1431,6 +1433,7 @@ reservedSlots =
       Binding.eventAmount,
       Binding.sacrificedCount,
       Binding.castSpell,
+      Binding.targetingObject,
       Binding.blockingCreature,
       Binding.blockedCreature,
       Binding.attackingCreature,
@@ -1820,6 +1823,7 @@ keywordFilters keyword = case keyword of
   Keyword.Plot cost -> costFilters cost
   -- CR 702.143a: the foretell cost, reached the same way.
   Keyword.Foretell cost -> costFilters cost
+  Keyword.Ward cost -> costFilters cost
   -- CR 702.94a's payload is a Cost too, so its filters are reached the same way.
   Keyword.Miracle cost -> costFilters cost
   -- CR 702.37a: the morph cost, whose components may hold a Filter exactly as
@@ -2206,6 +2210,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SpellCast (SpellCast.MkSpellCast f _) -> [f]
   -- "This spell" names the bearer and needs no Filter to say so.
   TriggerCondition.SelfCast -> []
+  -- Rule 702.21a names the bearer as well, and asks only a relation of the
+  -- targeting object's controller -- no Filter over the object itself.
+  TriggerCondition.SelfBecomesTargeted _ -> []
 
 -- CR 613.11: which objects a player effect names -- a cost modifier's (CR
 -- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR

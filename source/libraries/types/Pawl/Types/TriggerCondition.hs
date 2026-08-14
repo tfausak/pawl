@@ -759,6 +759,35 @@ data TriggerCondition
     -- No TurnScope and no Filter: "this spell" is the whole subject, and no
     -- printing narrows its own cast by whose turn it is.
     SelfCast
+  | -- | CR 601.2c: "whenever this permanent becomes the target of a spell or
+    -- ability [a player] controls" -- CR 702.21a's ward. Matched against
+    -- GameEvent.BecameTarget, whose `targeted` is compared with the bearer; the
+    -- PlayerRelation reads the targeting object's controller against CR 109.5's
+    -- "you", the ability's controller (CR 603.3a).
+    --
+    -- Self-scoped like SelfCast above, plus a relation: rule 702.21a's subject is
+    -- the bearer itself, and its "an opponent controls" is the only part of the
+    -- sentence a bystander form would generalise. A Filter over the targeting
+    -- object would be the fuller shape and no printing in the pool wants one --
+    -- the relation is what ward asks and all it asks.
+    --
+    -- On the STACK as well as on the battlefield, unlike SelfCast above: rule
+    -- 601.2c's event is about the bearer being NAMED, so a spell on the stack
+    -- becomes a target as readily as a permanent does. Ward is printed on
+    -- permanents (rule 702.21a says "this permanent"), so no reader is on the
+    -- stack today, and Pawl.Engine.Event.zonesTriggeredFrom answering the
+    -- battlefield is what confines it.
+    --
+    -- Fires ONCE PER ANNOUNCEMENT of the bearer as a target, which is rule
+    -- 601.2c's own arity: that rule lets one object be chosen once for each
+    -- instance of the word "target", and each choice is a becoming. A spell that
+    -- names the bearer once fires this once, however many other things it also
+    -- targets.
+    --
+    -- No re-targeting site fires it, and CR 115.7's effects are why one would: an
+    -- effect that changes a target makes the new object become a target too. No
+    -- such effect is in the pool (#1524).
+    SelfBecomesTargeted PlayerRelation.PlayerRelation
   | -- | CR 709.5h: "when you unlock this door" -- fires when the permanent bearing
     -- the ability is given the unlocked designation for the NAMED half. "Some
     -- abilities trigger when a player unlocks a particular half of a permanent.

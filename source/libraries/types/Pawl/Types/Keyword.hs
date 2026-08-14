@@ -160,6 +160,32 @@ data Keyword
     -- multiple instances redundant, so no KeywordFamily constructor is owed.
     TrampleOverPlaneswalkers
   | Vigilance -- 702.20
+  | -- | 702.21a: ward [cost]. A TRIGGERED ability meaning "Whenever this
+    -- permanent becomes the target of a spell or ability an opponent controls,
+    -- counter that spell or ability unless that player pays [cost]." Minted by
+    -- Pawl.Engine.Keyword.ward and handed to the ordinary CR 603 machinery, as
+    -- flanking and fabricate are.
+    --
+    -- A TRIGGER and not a targeting restriction, which is the whole difference
+    -- from Shroud and Hexproof above: those are read by the CR 115 legality gate,
+    -- so a spell that names a warded permanent is announced and paid for
+    -- normally, and only then does rule 702.21a's ability go on the stack over
+    -- it -- where it can itself be responded to.
+    --
+    -- The cost rides the constructor, as Flashback's and Foretell's do, because
+    -- rule 702.21a states it as part of the keyword; so `Ward {1}` and `Ward {2}`
+    -- are distinct keywords and KeywordFamily.Ward is how a card says "a creature
+    -- with ward". A whole Cost and not a ManaCost, because CR 702.21's ability is
+    -- a CR 118.12 offer like any other and non-mana ward costs are printed
+    -- (ward -- pay 3 life); the pool's producer is Tomakul Honor Guard's ward {2}.
+    --
+    -- Rule 702.21 states no "each instance" sentence, so its reader takes the
+    -- per-keyword COUNT for CR 603.2's general reason, exactly as exalted does:
+    -- two instances are two abilities and each offers its own cost.
+    --
+    -- Not implemented: CR 702.21b's X in a ward cost, which needs a value
+    -- determined as the ability RESOLVES (#703's family of resolution-time X).
+    Ward (Cost.Cost Keyword)
   | -- | 702.22: banding. Only the two COMBAT-DAMAGE-DIVISION halves are modeled --
     -- CR 702.22j, where a banding blocker moves the choice of how the ATTACKING
     -- creature's damage is divided from the active player to the defending one,

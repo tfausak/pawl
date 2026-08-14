@@ -105,6 +105,7 @@ library codec
     Pawl.Codec.AttackRequirementSpec
     Pawl.Codec.BecameDesignated
     Pawl.Codec.BecameDesignatedSpec
+    Pawl.Codec.BecameTarget
     Pawl.Codec.BeginningStep
     Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
@@ -849,6 +850,7 @@ library types
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget
     Pawl.Types.BecameDesignated
+    Pawl.Types.BecameTarget
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
     Pawl.Types.BlockerDeclared

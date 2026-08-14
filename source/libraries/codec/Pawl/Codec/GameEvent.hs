@@ -10,6 +10,7 @@ import qualified Pawl.Codec.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Codec.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Codec.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Codec.BecameDesignated as BecameDesignated
+import qualified Pawl.Codec.BecameTarget as BecameTarget
 import qualified Pawl.Codec.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Codec.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Codec.ControlChanged as ControlChanged
@@ -64,5 +65,6 @@ codec =
       Arm.payload "PermanentSacrificed" PermanentSacrificed.codec GameEvent.PermanentSacrificed (\x -> case x of GameEvent.PermanentSacrificed y -> Just y; _ -> Nothing),
       Arm.payload "AbilityTriggered" AbilityTriggered.codec GameEvent.AbilityTriggered (\x -> case x of GameEvent.AbilityTriggered y -> Just y; _ -> Nothing),
       Arm.payload "ControlChanged" ControlChanged.codec GameEvent.ControlChanged (\x -> case x of GameEvent.ControlChanged y -> Just y; _ -> Nothing),
-      Arm.payload "VentureMarkerEntered" VentureMarkerEntered.codec GameEvent.VentureMarkerEntered (\x -> case x of GameEvent.VentureMarkerEntered y -> Just y; _ -> Nothing)
+      Arm.payload "VentureMarkerEntered" VentureMarkerEntered.codec GameEvent.VentureMarkerEntered (\x -> case x of GameEvent.VentureMarkerEntered y -> Just y; _ -> Nothing),
+      Arm.payload "BecameTarget" BecameTarget.codec GameEvent.BecameTarget (\x -> case x of GameEvent.BecameTarget y -> Just y; _ -> Nothing)
     ]

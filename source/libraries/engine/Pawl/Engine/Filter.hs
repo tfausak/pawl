@@ -783,6 +783,10 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Trample -> keyword
   Keyword.Type.TrampleOverPlaneswalkers -> keyword
   Keyword.Type.Vigilance -> keyword
+  -- CR 702.21a states its cost as part of the keyword too, so CR 612.1 reaches it
+  -- the same way -- a ward cost naming a basic land type is the unprinted case
+  -- the arms below are also a fence for.
+  Keyword.Type.Ward cost -> Keyword.Type.Ward (rewriteCost pairs cost)
   -- CR 702.33a, CR 702.34a, CR 702.37a and CR 702.42a: each states a cost as part
   -- of the keyword, so rewriteCost carries CR 612.1 into it.
   Keyword.Type.Kicker cost -> Keyword.Type.Kicker (rewriteCost pairs cost)

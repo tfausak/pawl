@@ -681,6 +681,7 @@ castOf event = case event of
   GameEvent.CountersRemoved {} -> Nothing
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing
 
 -- The discarding player an event describes, if it is a discard (CR 701.9a).
 --
@@ -727,3 +728,4 @@ discardOf event = case event of
   GameEvent.CountersRemoved {} -> Nothing
   GameEvent.ControlChanged {} -> Nothing
   GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing

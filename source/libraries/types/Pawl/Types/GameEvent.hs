@@ -4,6 +4,7 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
+import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.ControlChanged as ControlChanged
@@ -642,4 +643,15 @@ data GameEvent
     -- alone names nothing: two players may be in room 1 of two different dungeons,
     -- and CR 309.4c makes each room ability the dungeon card's own.
     VentureMarkerEntered VentureMarkerEntered.VentureMarkerEntered
+  | -- | CR 601.2c: an object BECAME A TARGET of a spell or ability. Emitted by
+    -- Pawl.Engine.Event.becameTarget, once per targeted object, as the targets
+    -- are announced -- which is the moment that rule names, and the reason
+    -- nothing here fires for an object merely CHOSEN at resolution (CR 115.10a
+    -- makes such a choice no target at all).
+    --
+    -- Not derivable from GameEvent.SpellCast, which is why it is its own
+    -- constructor: that event says a spell was cast and names none of its
+    -- targets, an ACTIVATED ability records no cast event at all, and CR 115.7a
+    -- is one event per target rather than one per announcement.
+    BecameTarget BecameTarget.BecameTarget
   deriving (Eq, Ord, Show)
