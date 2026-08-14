@@ -45,6 +45,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
@@ -62,6 +63,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.MoveToZone as MoveToZone
@@ -100,12 +102,14 @@ import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- Rule 702 in its OTHER voice. Most keywords this pool has are read where they
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
@@ -1067,12 +1071,14 @@ castFromGraveyardReplacementsOf keywords =
 castFromGraveyardExile :: ReplacementEffect
 castFromGraveyardExile =
   ReplacementEffect.ZoneChangeR
-    ZoneChangePattern.MkZoneChangePattern
-      { ZoneChangePattern.whenDestination = Zone.Graveyard,
-        ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-        ZoneChangePattern.whatObject = Filter.IsSource
-      }
-    Zone.Exile
+    ( ZoneChangeR.MkZoneChangeR
+        ZoneChangePattern.MkZoneChangePattern
+          { ZoneChangePattern.whenDestination = Zone.Graveyard,
+            ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
+            ZoneChangePattern.whatObject = Filter.IsSource
+          }
+        Zone.Exile
+    )
 
 -- CR 702.136a: the AS-ENTERS REPLACEMENT rule 702 gives a permanent for holding
 -- riot -- "You may have this permanent enter with an additional +1/+1 counter on
@@ -1114,12 +1120,12 @@ mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toA
 -- produce nothing.
 mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
 mintedReplacementsFor keyword count = case keyword of
-  Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Riot)
+  Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Riot))
   -- CR 702.98a's FIRST static ability, riot's row with the declining half
   -- deleted: "You may have this permanent enter with an additional +1/+1
   -- counter on it." Filter.IsSource for riot's reason, and ONE ROW PER INSTANCE
   -- -- two instances are two abilities, so two counters are offered.
-  Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Unleash)
+  Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Unleash))
   -- CR 702.63a's FIRST ability: "this permanent enters with N time counters on
   -- it", a CR 614.1c self-replacement in riot's exact position, down to
   -- Filter.IsSource. Where riot's rewrite asks a question and this one does not,
@@ -1128,11 +1134,11 @@ mintedReplacementsFor keyword count = case keyword of
   -- ONE ROW PER INSTANCE for riot's reason, and CR 702.63c makes the counters
   -- add up: two instances of vanishing 2 enter the permanent with four time
   -- counters, since each rewrite places its own N.
-  Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time n)))
+  Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time n))))
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind:
   -- "this permanent enters with N +1/+1 counters on it". One row per instance
   -- for the same reason, and CR 702.43b makes them add up.
-  Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne n)))
+  Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne n))))
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
@@ -1184,7 +1190,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- ordinal, not the effect value, is what separates two equal rows. Unexercised
   -- here: no card grants megamorph to a creature that already has it.
   Keyword.Morph _ MorphVariant.Mega ->
-    List.genericReplicate count (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1)))
+    List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))))
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Cycling _ _ -> []
@@ -1644,7 +1650,7 @@ battleCry =
       Effect.ModifyTarget
         ( ModifyTarget.MkModifyTarget
             Duration.UntilEndOfTurn
-            (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 0))
+            (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 0)))
             ( ObjectRef.EachMatching
                 (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking, Filter.Not Filter.IsSource])
             )
@@ -1759,7 +1765,7 @@ prowess =
       Effect.ModifyTarget
         ( ModifyTarget.MkModifyTarget
             Duration.UntilEndOfTurn
-            (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+            (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
@@ -1805,7 +1811,7 @@ melee =
       Effect.ModifyTarget
         ( ModifyTarget.MkModifyTarget
             Duration.UntilEndOfTurn
-            (Modification.ModifyPowerToughness bonus bonus)
+            (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness bonus bonus))
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
@@ -1851,7 +1857,7 @@ rampage n =
       Effect.ModifyTarget
         ( ModifyTarget.MkModifyTarget
             Duration.UntilEndOfTurn
-            (Modification.ModifyPowerToughness bonus bonus)
+            (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness bonus bonus))
             (ObjectRef.EachMatching Filter.IsSource)
         )
 
@@ -1901,7 +1907,7 @@ flankingEffect =
   Effect.ModifyTarget
     ( ModifyTarget.MkModifyTarget
         Duration.UntilEndOfTurn
-        (Modification.ModifyPowerToughness (Quantity.Literal (-1)) (Quantity.Literal (-1)))
+        (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal (-1)) (Quantity.Literal (-1))))
         (ObjectRef.InSlot Binding.blockingCreature)
     )
 
@@ -1948,7 +1954,7 @@ exalted =
       Effect.ModifyTarget
         ( ModifyTarget.MkModifyTarget
             Duration.UntilEndOfTurn
-            (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+            (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))
             (ObjectRef.InSlot Binding.attackingCreature)
         )
 
@@ -2000,7 +2006,7 @@ bushidoHalf condition n =
       Effect.ModifyTarget
         ( ModifyTarget.MkModifyTarget
             Duration.UntilEndOfTurn
-            (Modification.ModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal (toInteger n)))
+            (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal (toInteger n))))
             (ObjectRef.EachMatching Filter.IsSource)
         )
 

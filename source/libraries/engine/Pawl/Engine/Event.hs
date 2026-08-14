@@ -67,12 +67,14 @@ import qualified Pawl.Types.ControlChanged as ControlChanged
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
 import Pawl.Types.DamageEvent (DamageEvent)
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePrevented as DamagePrevented
+import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
@@ -82,6 +84,7 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import Pawl.Types.EventGroup (EventGroup)
@@ -141,12 +144,14 @@ import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.TokenR as TokenR
 import Pawl.Types.TriggerCondition (TriggerCondition)
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import Pawl.Types.TurnWindow (TurnWindow)
 import qualified Pawl.Types.TurnWindow as TurnWindow
@@ -156,6 +161,7 @@ import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
 import qualified Pawl.Types.ZoneChange as ZoneChange
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- CR 608.2i: append one entry to the turn-scoped log. The single APPEND point,
 -- which is also what lets it be where CR 603.3a's controller is sampled: an event
@@ -662,11 +668,11 @@ loop asOf batch applied prevented event = do
 apply :: Set ObjectId -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
 apply batch candidate event =
   case (ReplacementCandidate.effect candidate, event) of
-    (ReplacementEffect.ZoneChangeR _ toDest, ProposedEvent.WouldChangeZone zc) -> do
+    (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR _ toDest), ProposedEvent.WouldChangeZone zc) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest}))
     -- Unreachable: `applies` admits ZoneChangeR only against WouldChangeZone.
-    (ReplacementEffect.ZoneChangeR _ _, _) -> pure (Just event)
+    (ReplacementEffect.ZoneChangeR {}, _) -> pure (Just event)
     -- CR 707.5 / 614.1c / 614.12a: the entering object's controller chooses a
     -- permanent to copy, and its copiable characteristics are stamped as this
     -- object's copy snapshot. Writing to the COPIABLE layer (CR 613.1a) is what
@@ -678,7 +684,7 @@ apply batch candidate event =
     -- what carries the exhaustiveness obligation -- a wildcard-bound `_` on the
     -- outer pattern would let a new EntryRewrite constructor fall through
     -- silently whenever it happened to pair with WouldEnter.
-    (ReplacementEffect.EntryR _ rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
+    (ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite), ProposedEvent.WouldEnter oid) -> case rewrite of
       EntryRewrite.AsCopy exceptions -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -1134,8 +1140,8 @@ apply batch candidate event =
               OptionalDecision.Declines -> enterTapped oid
             pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
-    (ReplacementEffect.EntryR _ _, _) -> pure (Just event)
-    (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) -> case rewrite of
+    (ReplacementEffect.EntryR {}, _) -> pure (Just event)
+    (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite), ProposedEvent.WouldDealDamage de) -> case rewrite of
       -- CR 615.6: a prevented event never happens -- it is not marked, not
       -- drained, and never recorded, so no deathtouch bit exists for the CR
       -- 704.5h SBA to read.
@@ -1214,7 +1220,7 @@ apply batch candidate event =
           Nothing -> event
           Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
-    (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
+    (ReplacementEffect.DamageR {}, _) -> pure (Just event)
     -- CR 701.19a / 122.1c: under either arm the DESTRUCTION does not happen, so
     -- nothing downstream of it (a put-into-graveyard, and therefore Rest in Peace's
     -- redirect) ever runs. What each does INSTEAD is all that separates them, and
@@ -1244,7 +1250,7 @@ apply batch candidate event =
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
     -- CR 122.6/614.16: Hardened Scales/Doubling Season scale a counter placement.
-    (ReplacementEffect.CounterR _ scaling, ProposedEvent.WouldPutCounters cause oid kind n) -> do
+    (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldPutCounters cause oid kind (Replacement.scale scaling n)))
     -- CR 122.1: the same rewrite against a player -- Vorinclex, Monstrous Raider's
@@ -1254,17 +1260,17 @@ apply batch candidate event =
     -- The event SURVIVES at a scaled count of zero rather than being cancelled
     -- here, so CR 616.2's next iteration still sees it and CR 614.5 still spends
     -- this row; putPlayerCounters is what declines to write a zero.
-    (ReplacementEffect.CounterR _ scaling, ProposedEvent.WouldPutPlayerCounters cause pid kind n) -> do
+    (ReplacementEffect.CounterR (CounterR.MkCounterR _ scaling), ProposedEvent.WouldPutPlayerCounters cause pid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldPutPlayerCounters cause pid kind (Replacement.scale scaling n)))
     -- Unreachable: `applies` admits CounterR only against the two counter events.
-    (ReplacementEffect.CounterR _ _, _) -> pure (Just event)
+    (ReplacementEffect.CounterR {}, _) -> pure (Just event)
     -- CR 614.16: Doubling Season scales token creation.
-    (ReplacementEffect.TokenR _ scaling, ProposedEvent.WouldCreateTokens pid card n) -> do
+    (ReplacementEffect.TokenR (TokenR.MkTokenR _ scaling), ProposedEvent.WouldCreateTokens pid card n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
       pure (Just (ProposedEvent.WouldCreateTokens pid card (Replacement.scale scaling n)))
     -- Unreachable: `applies` admits TokenR only against WouldCreateTokens.
-    (ReplacementEffect.TokenR _ _, _) -> pure (Just event)
+    (ReplacementEffect.TokenR {}, _) -> pure (Just event)
     -- CR 614.1b / 614.10: a skip is "instead of doing X, do nothing", so the
     -- step or phase simply does not begin. Nothing is done first, unlike
     -- DamageRewrite.PreventAll's sibling arm: a skip has no consequence of its
@@ -1308,7 +1314,7 @@ apply batch candidate event =
     -- The event survives: turning face up is not replaced by the counter, only
     -- accompanied by it, so Just is returned and FaceDown.turnFaceUp goes on to
     -- record CR 708.7's event.
-    (ReplacementEffect.TurnUpR _ rewrite, ProposedEvent.WouldTurnFaceUp oid) -> case rewrite of
+    (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ rewrite), ProposedEvent.WouldTurnFaceUp oid) -> case rewrite of
       TurnUpRewrite.WithCounters (WithCounters.MkWithCounters kind n) -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         Monad.void (putOwnCounters oid kind n)
@@ -1353,7 +1359,7 @@ apply batch candidate event =
                 Monad.mapM_ (Attach.attach oid . Recipient.ToObject) chosen
             pure (Just event)
     -- Unreachable: `applies` admits TurnUpR only against WouldTurnFaceUp.
-    (ReplacementEffect.TurnUpR _ _, _) -> pure (Just event)
+    (ReplacementEffect.TurnUpR {}, _) -> pure (Just event)
 
 -- CR 707.2 / 202.3b: the copiable values a copy takes off the object it copies.
 -- Projection.copiableCharacteristics answers all but one of them; the exception
@@ -2052,7 +2058,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
               -- so a CR 616.1 rewrite that redirects the move decides this too
               -- (CR 614.6: the modified event is what happens). Indistinguishable
               -- from gating on the request today, and not because of a claim
-              -- about Magic: no ReplacementEffect.ZoneChangeR in the pool names
+              -- about Magic: no ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR in the) pool names
               -- the battlefield as its destination (Leyline of the Void and Rest
               -- in Peace, the two that exist, both name exile).
               --

@@ -33,6 +33,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.GameEvent (GameEvent)
@@ -166,7 +167,7 @@ tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect]
 entryReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source.
-  ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore 1))
+  ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore 1)))
   | isSaga pc
   ]
 

@@ -41,8 +41,8 @@
           "modifications": [
             {
               "type": "ModifyPowerToughness",
-              "value": [
-                {
+              "value": {
+                "power": {
                   "type": "Count",
                   "value": {
                     "aggregation": {
@@ -68,7 +68,7 @@
                     }
                   }
                 },
-                {
+                "toughness": {
                   "type": "Count",
                   "value": {
                     "aggregation": {
@@ -94,7 +94,7 @@
                     }
                   }
                 }
-              ]
+              }
             }
           ]
         }

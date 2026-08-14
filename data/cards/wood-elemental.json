@@ -27,11 +27,11 @@
       "replacementEffects": [
         {
           "type": "EntryR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "type": "IsSource"
             },
-            {
+            "rewrite": {
               "type": "SacrificeAnyNumber",
               "value": {
                 "filter": {
@@ -54,7 +54,7 @@
                 "kind": null
               }
             }
-          ]
+          }
         }
       ],
       "toughness": {

@@ -49,8 +49,8 @@
                       },
                       "effect": {
                         "type": "EntryR",
-                        "value": [
-                          {
+                        "value": {
+                          "matching": {
                             "type": "And",
                             "value": [
                               {
@@ -67,10 +67,10 @@
                               }
                             ]
                           },
-                          {
+                          "rewrite": {
                             "type": "UnderSourceControl"
                           }
-                        ]
+                        }
                       },
                       "origin": {
                         "type": "Other"

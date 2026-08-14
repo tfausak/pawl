@@ -72,6 +72,8 @@ library codec
     Pawl.Codec.ActivatedAbilitySpec
     Pawl.Codec.ActivationRestriction
     Pawl.Codec.ActivationRestrictionSpec
+    Pawl.Codec.AddActivationCost
+    Pawl.Codec.AddActivationCostSpec
     Pawl.Codec.Affected
     Pawl.Codec.AffectedPlayers
     Pawl.Codec.AffectedPlayersSpec
@@ -124,6 +126,8 @@ library codec
     Pawl.Codec.CastingRestrictionSpec
     Pawl.Codec.CastOffer
     Pawl.Codec.CastOfferSpec
+    Pawl.Codec.ChangeSubtypeWord
+    Pawl.Codec.ChangeSubtypeWordSpec
     Pawl.Codec.ChangeText
     Pawl.Codec.ChangeTextSpec
     Pawl.Codec.CharacteristicPT
@@ -171,6 +175,8 @@ library codec
     Pawl.Codec.CounterKindSpec
     Pawl.Codec.CounterPattern
     Pawl.Codec.CounterPatternSpec
+    Pawl.Codec.CounterR
+    Pawl.Codec.CounterRSpec
     Pawl.Codec.CountSpec
     Pawl.Codec.Create
     Pawl.Codec.CreateCopy
@@ -184,8 +190,10 @@ library codec
     Pawl.Codec.DamagePatternSpec
     Pawl.Codec.DamagePrevented
     Pawl.Codec.DamagePreventedSpec
+    Pawl.Codec.DamageR
     Pawl.Codec.DamageRewrite
     Pawl.Codec.DamageRewriteSpec
+    Pawl.Codec.DamageRSpec
     Pawl.Codec.Daytime
     Pawl.Codec.DaytimeSpec
     Pawl.Codec.DealDamage
@@ -226,10 +234,12 @@ library codec
     Pawl.Codec.EndingStepSpec
     Pawl.Codec.EntryOption
     Pawl.Codec.EntryOptionSpec
+    Pawl.Codec.EntryR
     Pawl.Codec.EntryRewrite
     Pawl.Codec.EntryRewriteSpec
     Pawl.Codec.EntryRiders
     Pawl.Codec.EntryRidersSpec
+    Pawl.Codec.EntryRSpec
     Pawl.Codec.EventShape
     Pawl.Codec.EventShapeSpec
     Pawl.Codec.ExchangeSides
@@ -252,6 +262,8 @@ library codec
     Pawl.Codec.HalfUnlockedSpec
     Pawl.Codec.Hybrid
     Pawl.Codec.HybridSpec
+    Pawl.Codec.IncreaseSpellCost
+    Pawl.Codec.IncreaseSpellCostSpec
     Pawl.Codec.InZone
     Pawl.Codec.InZoneSpec
     Pawl.Codec.Keyword
@@ -298,6 +310,8 @@ library codec
     Pawl.Codec.ModeSpec
     Pawl.Codec.Modification
     Pawl.Codec.ModificationSpec
+    Pawl.Codec.ModifyPowerToughness
+    Pawl.Codec.ModifyPowerToughnessSpec
     Pawl.Codec.ModifyTarget
     Pawl.Codec.ModifyTargetSpec
     Pawl.Codec.MonarchTarget
@@ -372,6 +386,8 @@ library codec
     Pawl.Codec.RedirectDamageSpec
     Pawl.Codec.ReduceActivationCost
     Pawl.Codec.ReduceActivationCostSpec
+    Pawl.Codec.ReduceSpellCost
+    Pawl.Codec.ReduceSpellCostSpec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
     Pawl.Codec.RemoveCounters
@@ -406,6 +422,8 @@ library codec
     Pawl.Codec.SearchSpec
     Pawl.Codec.SelfCountersReached
     Pawl.Codec.SelfCountersReachedSpec
+    Pawl.Codec.SetBasePowerToughness
+    Pawl.Codec.SetBasePowerToughnessSpec
     Pawl.Codec.SetPowerToughness
     Pawl.Codec.SetPowerToughnessSpec
     Pawl.Codec.ShuffleIntoLibrary
@@ -444,6 +462,8 @@ library codec
     Pawl.Codec.TargetSlotSpec
     Pawl.Codec.TokenPattern
     Pawl.Codec.TokenPatternSpec
+    Pawl.Codec.TokenR
+    Pawl.Codec.TokenRSpec
     Pawl.Codec.TopOfLibrary
     Pawl.Codec.TopOfLibrarySpec
     Pawl.Codec.Toughness
@@ -456,8 +476,10 @@ library codec
     Pawl.Codec.TriggerFrequencySpec
     Pawl.Codec.TurnScope
     Pawl.Codec.TurnScopeSpec
+    Pawl.Codec.TurnUpR
     Pawl.Codec.TurnUpRewrite
     Pawl.Codec.TurnUpRewriteSpec
+    Pawl.Codec.TurnUpRSpec
     Pawl.Codec.TurnWindow
     Pawl.Codec.TurnWindowSpec
     Pawl.Codec.TypeLine
@@ -478,6 +500,8 @@ library codec
     Pawl.Codec.ZoneChange
     Pawl.Codec.ZoneChangePattern
     Pawl.Codec.ZoneChangePatternSpec
+    Pawl.Codec.ZoneChangeR
+    Pawl.Codec.ZoneChangeRSpec
     Pawl.Codec.ZoneChangeSpec
     Pawl.Codec.ZoneSpec
 
@@ -779,6 +803,7 @@ library types
     Pawl.Types.ActiveBlockRequirement
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
+    Pawl.Types.AddActivationCost
     Pawl.Types.Affected
     Pawl.Types.AffectedPlayers
     Pawl.Types.AffectedUnless
@@ -808,6 +833,7 @@ library types
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
     Pawl.Types.CastOffer
+    Pawl.Types.ChangeSubtypeWord
     Pawl.Types.ChangeText
     Pawl.Types.CharacteristicPT
     Pawl.Types.ChooseBetween
@@ -839,12 +865,14 @@ library types
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterPattern
+    Pawl.Types.CounterR
     Pawl.Types.Create
     Pawl.Types.CreateCopy
     Pawl.Types.DamageEvent
     Pawl.Types.DamageKind
     Pawl.Types.DamagePattern
     Pawl.Types.DamagePrevented
+    Pawl.Types.DamageR
     Pawl.Types.DamageRewrite
     Pawl.Types.Daytime
     Pawl.Types.DealDamage
@@ -872,6 +900,7 @@ library types
     Pawl.Types.Effect
     Pawl.Types.EndingStep
     Pawl.Types.EntryOption
+    Pawl.Types.EntryR
     Pawl.Types.EntryRewrite
     Pawl.Types.EntryRiders
     Pawl.Types.EntwineDecision
@@ -896,6 +925,7 @@ library types
     Pawl.Types.Hybrid
     Pawl.Types.HybridPayment
     Pawl.Types.IgnoredAbility
+    Pawl.Types.IncreaseSpellCost
     Pawl.Types.InZone
     Pawl.Types.Keyword
     Pawl.Types.KeywordFamily
@@ -926,6 +956,7 @@ library types
     Pawl.Types.ModeInstance
     Pawl.Types.ModeSelection
     Pawl.Types.Modification
+    Pawl.Types.ModifyPowerToughness
     Pawl.Types.ModifyTarget
     Pawl.Types.MonarchTarget
     Pawl.Types.MonarchWatch
@@ -980,6 +1011,7 @@ library types
     Pawl.Types.Recipient
     Pawl.Types.RedirectDamage
     Pawl.Types.ReduceActivationCost
+    Pawl.Types.ReduceSpellCost
     Pawl.Types.Regenerability
     Pawl.Types.RemoveCounters
     Pawl.Types.Replace
@@ -1003,6 +1035,7 @@ library types
     Pawl.Types.Search
     Pawl.Types.SearchDestination
     Pawl.Types.SelfCountersReached
+    Pawl.Types.SetBasePowerToughness
     Pawl.Types.SetPowerToughness
     Pawl.Types.ShuffleIntoLibrary
     Pawl.Types.Sickness
@@ -1027,6 +1060,7 @@ library types
     Pawl.Types.TargetSlot
     Pawl.Types.Timestamp
     Pawl.Types.TokenPattern
+    Pawl.Types.TokenR
     Pawl.Types.TopOfLibrary
     Pawl.Types.Toughness
     Pawl.Types.TriggerCondition
@@ -1035,6 +1069,7 @@ library types
     Pawl.Types.TriggerFrequency
     Pawl.Types.TriggerSource
     Pawl.Types.TurnScope
+    Pawl.Types.TurnUpR
     Pawl.Types.TurnUpRewrite
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
@@ -1047,6 +1082,7 @@ library types
     Pawl.Types.Zone
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern
+    Pawl.Types.ZoneChangeR
 
 -- URI components, and the encoding each of them takes.
 library uri

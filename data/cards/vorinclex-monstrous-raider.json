@@ -41,8 +41,8 @@
       "replacementEffects": [
         {
           "type": "CounterR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "byWhom": {
                 "type": "Yours"
               },
@@ -54,16 +54,16 @@
                 "type": "Anyones"
               }
             },
-            {
+            "scaling": {
               "type": "Multiply",
               "value": 2
             }
-          ]
+          }
         },
         {
           "type": "CounterR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "byWhom": {
                 "type": "Opponents"
               },
@@ -75,10 +75,10 @@
                 "type": "Anyones"
               }
             },
-            {
+            "scaling": {
               "type": "Halve"
             }
-          ]
+          }
         }
       ],
       "toughness": {

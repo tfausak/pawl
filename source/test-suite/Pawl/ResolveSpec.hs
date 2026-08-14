@@ -50,6 +50,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.ClauseIndex as ClauseIndex
@@ -94,6 +95,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.Object as Object
@@ -472,7 +474,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         let gs0 = Setup.emptyGame S.bothPlayers
             (smallOid, gs) = S.addCreature piker S.bob gs0 -- power 2, {1}{R}
             legalBefore = Target.legalRecipients Nothing S.noSource theSlot gs
-            pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0)) gs
+            pumped = S.withEffect smallOid (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 0))) gs
             legalAfter = Target.legalRecipients Nothing S.noSource theSlot pumped
         Spec.assertBool s (not (Set.member (Recipient.ToCreature smallOid) legalBefore)) "power 2 is illegal (below the PowerAtLeast 4 floor)"
         Spec.assertBool s (Set.member (Recipient.ToCreature smallOid) legalAfter) "pumped to power 4 becomes legal"
@@ -647,7 +649,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         resolve g = snd (Engine.runGamePure S.identityAnswer g (Resolve.resolveSpell boilId))
         onBattlefield oid g = Set.member oid (GameState.battlefield g)
         plain = resolve g4
-        hacked = resolve (S.withEffectAt boilId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Island Subtype.Forest) g4)
+        hacked = resolve (S.withEffectAt boilId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Island Subtype.Forest)) g4)
     -- The control: unhacked, Boil does what it prints.
     Spec.assertBool s (not (onBattlefield islandId plain)) "unhacked, the Island dies"
     Spec.assertBool s (onBattlefield forestId plain) "unhacked, the Forest lives"
@@ -694,7 +696,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
             { GameState.objects = Map.insert bloodMoonSpellId bmObj (GameState.objects g2),
               GameState.stack = bloodMoonSpellId : GameState.stack g2
             }
-        hacked = S.withEffectAt bloodMoonSpellId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island) g3
+        hacked = S.withEffectAt bloodMoonSpellId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Mountain Subtype.Island)) g3
         after = snd (Engine.runGamePure S.identityAnswer hacked Stack.resolveTop)
     -- CR 400.7 mints a NEW object for the permanent, but CR 400.7a is the
     -- exception: an effect that changes a PERMANENT SPELL's characteristics
@@ -1590,8 +1592,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               (Map.singleton slot (Set.singleton (Recipient.ToCreature pikerId)))
               (Map.singleton slot (Set.singleton (Recipient.ToCreature pikerId)))
               (Effect.ModifyTarget (ModifyTarget.MkModifyTarget Duration.UntilEndOfTurn m (ObjectRef.InSlot slot)))
-        refused = store (Modification.ModifyPowerToughness (Quantity.Literal 3) Quantity.Star)
-        stored = store (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))
+        refused = store (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) Quantity.Star))
+        stored = store (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)))
     Spec.assertEqWith s "no effect is stored for an unevaluable quantity" (GameState.continuousEffects refused) []
     Spec.assertEqWith s "and the Piker is its printed 2/1" (Projection.powerOf pikerId refused, Projection.toughnessOf pikerId refused) (Just 2, Just 1)
     Spec.assertEqWith s "the same call with two Literals DOES store one -- the refusal is what did it" (length (GameState.continuousEffects stored)) 1

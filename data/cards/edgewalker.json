@@ -30,14 +30,8 @@
         {
           "effect": {
             "type": "ReduceSpellCost",
-            "value": [
-              {
-                "type": "HasSubtype",
-                "value": {
-                  "type": "Cleric"
-                }
-              },
-              [
+            "value": {
+              "reduction": [
                 {
                   "type": "OfType",
                   "value": {
@@ -56,8 +50,14 @@
                     }
                   }
                 }
-              ]
-            ]
+              ],
+              "whichSpells": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Cleric"
+                }
+              }
+            }
           },
           "scope": {
             "type": "You"

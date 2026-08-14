@@ -12,22 +12,22 @@
         {
           "effect": {
             "type": "ReduceSpellCost",
-            "value": [
-              {
-                "type": "HasColor",
-                "value": {
-                  "type": "Green"
-                }
-              },
-              [
+            "value": {
+              "reduction": [
                 {
                   "type": "Phyrexian",
                   "value": {
                     "type": "Green"
                   }
                 }
-              ]
-            ]
+              ],
+              "whichSpells": {
+                "type": "HasColor",
+                "value": {
+                  "type": "Green"
+                }
+              }
+            }
           },
           "scope": {
             "type": "You"

@@ -86,16 +86,16 @@
           "modifications": [
             {
               "type": "ModifyPowerToughness",
-              "value": [
-                {
+              "value": {
+                "power": {
                   "type": "Literal",
                   "value": 1
                 },
-                {
+                "toughness": {
                   "type": "Literal",
                   "value": 1
                 }
-              ]
+              }
             }
           ]
         }

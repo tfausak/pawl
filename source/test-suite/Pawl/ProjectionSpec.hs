@@ -39,6 +39,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
@@ -57,6 +58,7 @@ import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -67,6 +69,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.Supertype as Supertype
@@ -75,6 +78,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- alice has a Forest for mana, a Piker on the battlefield, and Giant Growth in
 -- hand, in her main phase. Cast Giant Growth (identityAnswer targets the only
@@ -367,8 +371,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "layer classification matches CR 613.1" $ do
     Spec.assertEqWith s "grant is layer 6" (Projection.layer (Modification.GainKeyword Keyword.Deathtouch)) Layer.Ability
     Spec.assertEqWith s "lose-all is layer 6" (Projection.layer Modification.LoseAllAbilities) Layer.Ability
-    Spec.assertEqWith s "set base is 7b" (Projection.layer (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) Layer.SetPT
-    Spec.assertEqWith s "modify is 7c" (Projection.layer (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) Layer.ModifyPT
+    Spec.assertEqWith s "set base is 7b" (Projection.layer (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))) Layer.SetPT
+    Spec.assertEqWith s "modify is 7c" (Projection.layer (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)))) Layer.ModifyPT
 
   -- CR 613.1b: layer 2 is where control-changing effects apply, whether the new
   -- controller was baked at resolution (SetController) or is derived from the
@@ -388,7 +392,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
-        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs0
+        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs0
     Spec.assertEqWith s "power" (Projection.powerOf oid gs) (Just 5)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) (Just 4)
 
@@ -443,7 +447,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
-        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)) gs0
+        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) gs0
     Spec.assertEqWith s "power" (Projection.powerOf oid gs) (Just 1)
     Spec.assertEqWith s "toughness" (Projection.toughnessOf oid gs) (Just 1)
 
@@ -453,8 +457,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
         -- Deliberately give 7c the EARLIER timestamp to prove layer beats
         -- timestamp: 7b still applies first.
-        gs1 = S.withEffectAt oid (Timestamp.MkTimestamp 50) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs0
-        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)) gs1
+        gs1 = S.withEffectAt oid (Timestamp.MkTimestamp 50) (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs0
+        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))) gs1
     Spec.assertEqWith s "power 1 then +3" (Projection.powerOf oid gs) (Just 4)
     Spec.assertEqWith s "toughness 1 then +3" (Projection.toughnessOf oid gs) (Just 4)
 
@@ -480,7 +484,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
           i : _ -> i
           [] -> ObjectId.MkObjectId 999
-        gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs0
+        gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs0
     Spec.assertEqWith s "still no power" (Projection.powerOf landId gs) Nothing
 
   Spec.it s "CR 611 Giant Growth stores a +3/+3 effect; the Piker is 5/4" $ do
@@ -516,7 +520,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       s
       "the stored modification is a pair of Literals"
       (fmap ContinuousEffect.modification (GameState.continuousEffects gs))
-      [Modification.ModifyPowerToughness (Quantity.Literal 4) (Quantity.Literal 4)]
+      [Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 4) (Quantity.Literal 4))]
     -- And it stays frozen across later passes: a state-based-action pass
     -- reprojects everything, and CR 514.2 is what finally ends it.
     let afterSba = S.settleSba gs
@@ -536,15 +540,15 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith
       s
       "read against the SOURCE, the Piker's power locks in at 2"
-      (freeze (Modification.ModifyPowerToughness Quantity.Power Quantity.Power))
-      (Just (Modification.ModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 2)))
+      (freeze (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness Quantity.Power Quantity.Power)))
+      (Just (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 2) (Quantity.Literal 2))))
     -- CR 208.2: a bare star has no value of its own -- the projection
     -- substitutes the object's characteristic-defining quantity for it at the
     -- seed, so one reaching here was never resolved and has no answer.
     Spec.assertEqWith
       s
       "one unanswerable half refuses the whole modification"
-      (freeze (Modification.ModifyPowerToughness (Quantity.Literal 3) Quantity.Star))
+      (freeze (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) Quantity.Star)))
       Nothing
     Spec.assertEqWith
       s
@@ -742,7 +746,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "add card type" (Projection.layer (Modification.AddCardType CardType.Creature)) Layer.Type
 
   Spec.it s "CR 613.1c layer 3: ChangeSubtypeWord is Text" $
-    Spec.assertEqWith s "text layer" (Projection.layer (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)) Layer.Text
+    Spec.assertEqWith s "text layer" (Projection.layer (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island))) Layer.Text
 
   Spec.it s "CR 612.1 ChangeSubtypeWord rewrites a Forest's subtype to Island" $ do
     forest <- S.printingOf s registry "Forest"
@@ -750,7 +754,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
           i : _ -> i
           [] -> ObjectId.MkObjectId 999
-        gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Forest Subtype.Type.Island) gs0
+        gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Forest Subtype.Type.Island)) gs0
     Spec.assertEqWith s "only Island" (Projection.subtypesOf landId gs) (Set.singleton Subtype.Type.Island)
 
   Spec.it s "CR 612.2 ChangeSubtypeWord for an absent type is a no-op" $ do
@@ -759,7 +763,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         landId = case Game.zoneMembers Zone.Battlefield S.alice gs0 of
           i : _ -> i
           [] -> ObjectId.MkObjectId 999
-        gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) gs0
+        gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)) gs0
     Spec.assertEqWith s "still Forest" (Projection.subtypesOf landId gs) (Set.singleton Subtype.Type.Forest)
 
   -- CR 612.1 colliding two KEYS of the projection's keyword map. Stalker Hag
@@ -779,7 +783,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 612.1 a swap that collides two landwalk keys keeps both abilities" $ do
     stalkerHag <- S.printingOf s registry "Stalker Hag"
     let (hagId, gs0) = S.addCreature stalkerHag S.alice (Setup.emptyGame S.bothPlayers)
-        gs = S.withEffectAt hagId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Forest Subtype.Type.Swamp) gs0
+        gs = S.withEffectAt hagId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Forest Subtype.Type.Swamp)) gs0
         walk t = Keyword.Landwalk (Filter.Type.HasSubtype t)
     Spec.assertEqWith
       s
@@ -813,7 +817,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (swampId, g2) = S.addCreature swamp S.alice g1
         (islandId, plain) = S.addCreature island S.alice g2
         -- The swap is on the BELL, which is where the words are printed.
-        hacked = S.withEffectAt bellId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island) plain
+        hacked = S.withEffectAt bellId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island)) plain
     -- Unhacked, the Bell animates the Swamp and nothing else.
     Spec.assertBool s (Projection.isCreatureOf swampId plain) "the Swamp is a creature"
     Spec.assertEqWith s "a 1/1" (Projection.powerOf swampId plain) (Just 1)
@@ -845,7 +849,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     tidalWarrior <- S.printingOf s registry "Tidal Warrior"
     let base = Setup.emptyGame S.bothPlayers
         (warriorId, plain) = S.addCreature tidalWarrior S.alice base
-        hacked = S.withEffectAt warriorId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Island Subtype.Type.Swamp) plain
+        hacked = S.withEffectAt warriorId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Island Subtype.Type.Swamp)) plain
         setsTo gs = case Projection.abilitiesOf warriorId gs of
           ability : _ -> concatMap (Maybe.mapMaybe landTypeSet . Foldable.toList . Mode.allEffects) (Modal.modes (ActivatedAbility.modal ability))
           [] -> []
@@ -874,7 +878,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     barbarianOutcast <- S.printingOf s registry "Barbarian Outcast"
     let base = Setup.emptyGame S.bothPlayers
         (outcastId, plain) = S.addCreature barbarianOutcast S.alice base
-        hacked = S.withEffectAt outcastId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island) plain
+        hacked = S.withEffectAt outcastId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island)) plain
         asksAbout gs = case Projection.triggeredAbilitiesOf outcastId gs of
           ability : _ -> case TriggeredAbility.condition ability of
             TriggerCondition.StateIs (Condition.Type.Compares (Compares.MkCompares measured _ _)) -> countedSubtypes measured
@@ -913,7 +917,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     bogWraith <- S.printingOf s registry "Bog Wraith"
     let (_, withAshaya) = S.addCreature ashaya S.alice (S.landsInPlay island 3)
         (wraithId, plain) = S.addCreature bogWraith S.alice withAshaya
-        swapped from to = S.withEffectAt wraithId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord from to) plain
+        swapped from to = S.withEffectAt wraithId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to)) plain
     Spec.assertEqWith
       s
       "unswapped: Ashaya's Forest beside the printed Wraith"
@@ -1149,7 +1153,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let (oid, gs0) = S.addCreature piker S.bob (S.landsInPlay mountain 1)
-        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness Quantity.ManaValue Quantity.ManaValue) gs0
+        gs = S.withEffectAt oid (Timestamp.MkTimestamp 100) (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness Quantity.ManaValue Quantity.ManaValue)) gs0
     Spec.assertEqWith s "power = mana value" (Projection.powerOf oid gs) (Just 2)
     Spec.assertEqWith s "toughness = mana value" (Projection.toughnessOf oid gs) (Just 2)
 
@@ -1600,7 +1604,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         -- A Magical Hack on Conversion: "All Mountains are Plains" becomes "All
         -- Islands are Plains". The swap reaches the AFFECTED set, not a
         -- modification, which is the read-point this card exists to exercise.
-        gs = S.withEffectAt conversionId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) g3
+        gs = S.withEffectAt conversionId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)) g3
     Spec.assertBool s (Set.member Subtype.Type.Plains (Projection.subtypesOf islandId gs)) "the Island is now a Plains"
     Spec.assertBool s (not (Set.member Subtype.Type.Island (Projection.subtypesOf islandId gs))) "and no longer an Island"
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf mountainId gs)) "the Mountain is left alone"
@@ -1640,7 +1644,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         -- Mountains are Plains" becomes "All Islands are Plains". The Estuary's
         -- printed type line still says Mountain, so the rewritten clause no longer
         -- names it.
-        hacked = S.withEffectAt conversionId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) printed
+        hacked = S.withEffectAt conversionId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)) printed
         -- The anti-vacuity control: with no Conversion at all the Estuary's
         -- ability plainly works, so "the Forest is a Swamp" below is the strip
         -- lifting rather than the card doing nothing either way.
@@ -1778,7 +1782,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let base = Setup.emptyGame S.bothPlayers
         (nonbasicId, g1) = S.addCreature urborg S.alice base
         (bloodMoonId, g2) = S.addCreature bloodMoon S.alice g1
-        gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 500) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) g2
+        gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 500) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)) g2
     Spec.assertEqWith s "nonbasic land is now Island" (Projection.subtypesOf nonbasicId gs) (Set.singleton Subtype.Type.Island)
 
   Spec.it s "CR 612 hacking Blood Moon is order-independent (hack older)" $ do
@@ -1789,7 +1793,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (bloodMoonId, g2) = S.addCreature bloodMoon S.alice g1
         -- Timestamp 1 is older than Blood Moon's own object timestamp; the
         -- outcome must not change.
-        gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) g2
+        gs = S.withEffectAt bloodMoonId (Timestamp.MkTimestamp 1) (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island)) g2
     Spec.assertEqWith s "nonbasic land is Island, order-independent" (Projection.subtypesOf nonbasicId gs) (Set.singleton Subtype.Type.Island)
 
   Spec.it s "Opalescence makes Humility a creature: legal creature target and SBA-killable" $ do
@@ -2281,7 +2285,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       s
       "one redirect replacement"
       (Projection.replacementsOf rip gs)
-      [ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones (Filter.Type.And [])) Zone.Exile]
+      [ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones (Filter.Type.And [])) Zone.Exile)]
 
   Spec.it s "a vanilla creature projects no replacements" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -2312,7 +2316,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let base = S.landsInPlay forest 0
         (oid, gs0) = S.addCreature piker S.bob base
         gs1 = S.addCounter CounterKind.PlusOnePlusOne 1 oid gs0
-        gs = S.withEffectAt oid (Timestamp.MkTimestamp 9) (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs1
+        gs = S.withEffectAt oid (Timestamp.MkTimestamp 9) (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs1
     Spec.assertEqWith s "power 2 + 1 + 3" (Projection.powerOf oid gs) (Just 6)
     Spec.assertEqWith s "toughness 1 + 1 + 3" (Projection.toughnessOf oid gs) (Just 5)
 
@@ -2496,7 +2500,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, gs1) = S.addCreature piker S.alice gs0
-        gs = S.withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)) gs1
+        gs = S.withEffect pikerId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))) gs1
         cands = Projection.gather gs
     Spec.assertEqWith
       s

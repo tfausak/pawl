@@ -7,11 +7,14 @@ import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -36,15 +39,15 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
     Common.assertCodec
       s
       Modification.codec
-      (Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
-      """ {"type":"SetBasePowerToughness","value":[{"type":"Literal","value":1},{"type":"Literal","value":1}]} """
+      (Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)))
+      """ {"type":"SetBasePowerToughness","value":{"power":{"type":"Literal","value":1},"toughness":{"type":"Literal","value":1}}} """
   -- layer 7c (Giant Growth +3/+3).
   Spec.it s "ModifyPowerToughness" $
     Common.assertCodec
       s
       Modification.codec
-      (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))
-      """ {"type":"ModifyPowerToughness","value":[{"type":"Literal","value":3},{"type":"Literal","value":3}]} """
+      (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3)))
+      """ {"type":"ModifyPowerToughness","value":{"power":{"type":"Literal","value":3},"toughness":{"type":"Literal","value":3}}} """
   -- layer 4, CR 305.7 set (Blood Moon -> Mountain).
   Spec.it s "SetLandSubtype" $
     Common.assertCodec
@@ -114,8 +117,8 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
     Common.assertCodec
       s
       Modification.codec
-      (Modification.ChangeSubtypeWord Subtype.Mountain Subtype.Island)
-      """ {"type":"ChangeSubtypeWord","value":[{"type":"Mountain"},{"type":"Island"}]} """
+      (Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Mountain Subtype.Island))
+      """ {"type":"ChangeSubtypeWord","value":{"from":{"type":"Mountain"},"to":{"type":"Island"}}} """
   -- layer 2, CR 613.1b: the PlayerId is BAKED at effect creation, unlike
   -- SetControllerToSource below.
   Spec.it s "SetController carries its baked PlayerId" $

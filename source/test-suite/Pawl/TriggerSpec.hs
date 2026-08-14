@@ -263,6 +263,7 @@ import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Expiry as Expiry.Type
@@ -281,6 +282,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -4924,7 +4926,7 @@ evolveSpec s registry =
           piker <- S.printingOf s registry "Goblin Piker"
           let (raptorId, _, gs) = board raptor piker S.alice
               onStack = settle gs
-              responded = S.withEffect raptorId (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) onStack
+              responded = S.withEffect raptorId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2))) onStack
               after = resolveAll responded
           Spec.assertBool s (not (null (GameState.stack onStack))) "the trigger really was on the stack"
           Spec.assertEqWith s "the Raptor is a 2/3, which the Piker beats on neither axis" (S.powerToughnessOf raptorId responded) (Just (2, 3))
@@ -4965,7 +4967,7 @@ evolveSpec s registry =
           piker <- S.printingOf s registry "Goblin Piker"
           let (raptorId, pikerId, gs) = board raptor piker S.alice
               onStack = settle gs
-              shrunk = S.withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) onStack
+              shrunk = S.withEffect pikerId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1)))) onStack
               dead = settle shrunk
               after = resolveAll dead
           Spec.assertBool s (not (null (GameState.stack onStack))) "the trigger really was on the stack"
@@ -5460,7 +5462,7 @@ vanishingSpec s registry =
             s
             "and two entry rewrites of two time counters each, which is what makes them add up"
             (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing 2) 2)
-            (replicate 2 (ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time 2))))
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time 2)))))
 
 -- CR 702.43 modular, whose rule text also spans BOTH of
 -- Pawl.Engine.Keyword's mints -- one CR 614.1c entry replacement and one death
@@ -5616,7 +5618,7 @@ modularSpec s registry =
             s
             "and two entry rewrites of two counters each, which is what makes them add up"
             (Keyword.mintedReplacementsFor (Keyword.Type.Modular 2) 2)
-            (replicate 2 (ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 2))))
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 2)))))
 
 -- CR 510.1b / 510.2's combat damage watched by a BYSTANDER rather than by the
 -- creature that dealt it -- TriggerCondition.PermanentDealsCombatDamageToPlayer,

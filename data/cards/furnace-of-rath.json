@@ -38,16 +38,16 @@
       "replacementEffects": [
         {
           "type": "DamageR",
-          "value": [
-            {},
-            {
+          "value": {
+            "matching": {},
+            "rewrite": {
               "type": "Scale",
               "value": {
                 "type": "Multiply",
                 "value": 2
               }
             }
-          ]
+          }
         }
       ],
       "typeLine": {

@@ -56,6 +56,7 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
@@ -87,11 +88,13 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Designate as Designate
@@ -103,11 +106,13 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.InZone as InZone
+import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
@@ -124,6 +129,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -150,6 +156,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
+import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
@@ -162,6 +169,7 @@ import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Search as Search
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SkipNextPhase as SkipNextPhase
 import qualified Pawl.Types.SlotArity as SlotArity
@@ -181,11 +189,13 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 import qualified System.Directory as Directory
 
 -- Not red-specific despite its first callers: just the Maybe wrapper every
@@ -487,8 +497,8 @@ modificationCounts :: Modification.Modification -> [Count.Type.Count Quantity.Ty
 modificationCounts modification = case modification of
   Modification.GainKeyword _ -> []
   Modification.LoseAllAbilities -> []
-  Modification.SetBasePowerToughness p t -> quantityCounts p <> quantityCounts t
-  Modification.ModifyPowerToughness p t -> quantityCounts p <> quantityCounts t
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityCounts p <> quantityCounts t
+  Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
@@ -498,7 +508,7 @@ modificationCounts modification = case modification of
   Modification.AddCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
-  Modification.ChangeSubtypeWord _ _ -> []
+  Modification.ChangeSubtypeWord {} -> []
   Modification.SetController _ -> []
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
@@ -1027,13 +1037,13 @@ effectReplacements effect = case effect of
 phasePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
 phasePatternOffends replacement = case replacement of
   ReplacementEffect.PhaseR phasePattern -> Maybe.isJust (PhasePattern.whosePhase phasePattern)
-  ReplacementEffect.CounterR _ _ -> False
-  ReplacementEffect.ZoneChangeR _ _ -> False
-  ReplacementEffect.EntryR _ _ -> False
-  ReplacementEffect.DamageR _ _ -> False
+  ReplacementEffect.CounterR {} -> False
+  ReplacementEffect.ZoneChangeR {} -> False
+  ReplacementEffect.EntryR {} -> False
+  ReplacementEffect.DamageR {} -> False
   ReplacementEffect.DestructionR _ -> False
-  ReplacementEffect.TokenR _ _ -> False
-  ReplacementEffect.TurnUpR _ _ -> False
+  ReplacementEffect.TokenR {} -> False
+  ReplacementEffect.TurnUpR {} -> False
 
 -- Every replacement shape the codec accepts and no card may author, for
 -- phasePatternOffends' reason and one more. A card cannot name an ObjectId or a
@@ -1046,18 +1056,18 @@ phasePatternOffends replacement = case replacement of
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
 engineOnlyOffends :: ReplacementEffect.ReplacementEffect -> Bool
 engineOnlyOffends replacement = case replacement of
-  ReplacementEffect.DamageR damagePattern rewrite ->
+  ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite) ->
     Maybe.isJust (DamagePattern.whichRecipient damagePattern) || engineMintedDamage rewrite
   -- CR 122.1c's destruction half is engine-minted for the same reason its damage
   -- half is, so the sweep reaches it through this arm rather than through a lint
   -- of its own.
   ReplacementEffect.DestructionR rewrite -> engineMintedDestruction rewrite
   ReplacementEffect.PhaseR _ -> False
-  ReplacementEffect.CounterR _ _ -> False
-  ReplacementEffect.ZoneChangeR _ _ -> False
-  ReplacementEffect.EntryR _ _ -> False
-  ReplacementEffect.TokenR _ _ -> False
-  ReplacementEffect.TurnUpR _ _ -> False
+  ReplacementEffect.CounterR {} -> False
+  ReplacementEffect.ZoneChangeR {} -> False
+  ReplacementEffect.EntryR {} -> False
+  ReplacementEffect.TokenR {} -> False
+  ReplacementEffect.TurnUpR {} -> False
 
 -- Is this damage rewrite one the ENGINE mints and no card may print? Two of them,
 -- for two rules:
@@ -1097,7 +1107,7 @@ isPhaseR replacement = case replacement of
 -- The non-vacuity half of engineOnlyOffends' lint, isPhaseR's shape.
 isDamageR :: ReplacementEffect.ReplacementEffect -> Bool
 isDamageR replacement = case replacement of
-  ReplacementEffect.DamageR _ _ -> True
+  ReplacementEffect.DamageR {} -> True
   _ -> False
 
 -- Do these slot-name sets overlap? True when any name appears in more than one
@@ -2026,8 +2036,8 @@ durationFilters = countFilters . durationCounts
 modificationFilters :: Modification.Modification -> [Filter.Type.Filter Keyword.Keyword]
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
-  Modification.SetBasePowerToughness p t -> quantityFilters p <> quantityFilters t
-  Modification.ModifyPowerToughness p t -> quantityFilters p <> quantityFilters t
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityFilters p <> quantityFilters t
+  Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []
   Modification.SetLandSubtype _ -> []
   Modification.SetLandSubtypeToChosen -> []
@@ -2038,7 +2048,7 @@ modificationFilters modification = case modification of
   Modification.AddCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
-  Modification.ChangeSubtypeWord _ _ -> []
+  Modification.ChangeSubtypeWord {} -> []
   Modification.SetController _ -> []
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
@@ -2155,8 +2165,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
 -- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
-  PlayerEffect.IncreaseSpellCost f _ -> [f]
-  PlayerEffect.ReduceSpellCost f _ -> [f]
+  PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f _) -> [f]
+  PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f _) -> [f]
   -- CR 601.2f's other moment: Heartstone's Filter narrows the ability's SOURCE
   -- PERMANENT rather than a spell, and is authored the same way.
   PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f _ _) -> [f]
@@ -2165,7 +2175,7 @@ playerEffectFilters playerEffect = case playerEffect of
   -- land"). Both are authored by the card, so both are linted, and the inner
   -- ones go through costComponentFilters so an added component and a printed
   -- one are held to one standard.
-  PlayerEffect.AddActivationCost f components -> f : concatMap costComponentFilters components
+  PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost f components) -> f : concatMap costComponentFilters components
   PlayerEffect.CantCastSpells -> []
   PlayerEffect.CantCastMoreThan _ -> []
   -- CR 601.3 / 305.1: the quality both prohibitions name is a CardName chosen as
@@ -2243,8 +2253,8 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   -- written and any of the three is legitimate: Rule of Law and Thalia say
   -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
   -- Serpopard says You.
-  PlayerEffect.IncreaseSpellCost _ _ -> False
-  PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.IncreaseSpellCost {} -> False
+  PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
   PlayerEffect.CantCastSpells -> False
@@ -2282,8 +2292,8 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_)
   PlayerEffect.CantSearchLibraries -> False
   PlayerEffect.CantBecomeMonarch -> False
-  PlayerEffect.IncreaseSpellCost _ _ -> False
-  PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.IncreaseSpellCost {} -> False
+  PlayerEffect.ReduceSpellCost {} -> False
   PlayerEffect.ReduceActivationCost {} -> False
   PlayerEffect.AddActivationCost {} -> False
   PlayerEffect.CantCastSpells -> False
@@ -2398,16 +2408,16 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
 -- attachment may land.
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
-  ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
-  ReplacementEffect.ZoneChangeR zoneChangePattern _ -> [ZoneChangePattern.whatObject zoneChangePattern]
-  ReplacementEffect.EntryR entryPattern entryRewrite -> entryPattern : entryRewriteFilters entryRewrite
+  ReplacementEffect.CounterR (CounterR.MkCounterR counterPattern _) -> [CounterPattern.onWhat counterPattern]
+  ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _) -> [ZoneChangePattern.whatObject zoneChangePattern]
+  ReplacementEffect.EntryR (EntryR.MkEntryR entryPattern entryRewrite) -> entryPattern : entryRewriteFilters entryRewrite
   -- CR 615.1's shields narrow by their source, which is a Filter over the object
   -- dealing the damage (Luminesce's "black sources and red sources", Galvanic
   -- Blast's `IsSource`). The kind and recipient beside it are not Filters.
-  ReplacementEffect.DamageR damagePattern _ -> [DamagePattern.whatSource damagePattern]
+  ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _) -> [DamagePattern.whatSource damagePattern]
   ReplacementEffect.DestructionR _ -> []
-  ReplacementEffect.TokenR _ _ -> []
-  ReplacementEffect.TurnUpR turnUpPattern turnUpRewrite -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
+  ReplacementEffect.TokenR {} -> []
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.PhaseR _ -> []
 
 -- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
@@ -3898,16 +3908,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- which is the sweep's own input either way.
     let printed = cardReplacementEffects (S.combinedFace fog)
         bakeRecipient replacement = case replacement of
-          ReplacementEffect.DamageR damagePattern rewrite ->
-            ReplacementEffect.DamageR
-              damagePattern {DamagePattern.whichRecipient = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 1))}
-              rewrite
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite) ->
+            ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern {DamagePattern.whichRecipient = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 1))} rewrite)
           other -> other
         bakeShield replacement = case replacement of
-          ReplacementEffect.DamageR damagePattern _ -> ReplacementEffect.DamageR damagePattern (DamageRewrite.PreventNext 4)
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern (DamageRewrite.PreventNext 4))
           other -> other
         bakeCounterShield replacement = case replacement of
-          ReplacementEffect.DamageR damagePattern _ -> ReplacementEffect.DamageR damagePattern DamageRewrite.PreventRemovingShieldCounter
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern DamageRewrite.PreventRemovingShieldCounter)
           other -> other
     Spec.assertBool s (any isDamageR printed) "setup: Fog prints a damage replacement to bake"
     Spec.assertBool s (not (any engineOnlyOffends printed)) "the real Fog names no recipient and counts nothing"
@@ -4363,7 +4371,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (Affected.Matching Filter.Type.IsSource)
             Nothing
             Nothing
-            (NonEmpty.singleton (Modification.ModifyPowerToughness quantity (Quantity.Type.Literal 0)))
+            (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness quantity (Quantity.Type.Literal 0))))
         planted =
           [ ( "a target slot",
               base {Face.spell = spellOf [] (Map.singleton slot (TargetSlot.required Pool.Permanents (Just buried)))}
@@ -4378,7 +4386,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                         (Affected.Matching buried)
                         Nothing
                         Nothing
-                        (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)))
+                        (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
                     ]
                 }
             ),
@@ -4421,7 +4429,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 613.11's spell-cost modifier",
               base
                 { Face.playerAbilities =
-                    [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.IncreaseSpellCost buried 1)]
+                    [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost buried 1))]
                 }
             ),
             ( "CR 508.1c's combat restriction",
@@ -4433,7 +4441,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 614.1's counter-placement pattern",
               base
                 { Face.replacementEffects =
-                    [ReplacementEffect.CounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)]
+                    [ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1))]
                 }
             ),
             ( "a created token's own static ability",

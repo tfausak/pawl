@@ -57,6 +57,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
@@ -456,7 +457,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
     -- known information answers 5 for one that was pumped before it left.
     ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
     let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
-        pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
+        pumped = S.withEffect srcId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3))) g0
         g1 = pumped {GameState.priority = Just S.alice}
         activated = snd (Engine.runGamePure (aimAt S.bob) g1 (Activate.activateAbility S.alice srcId (theAbility ghituFireEater)))
         resolved = snd (Engine.runGamePure (aimAt S.bob) activated Stack.resolveTop)
@@ -469,7 +470,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
     -- this map has to be keyed by.
     ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
     let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
-        pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
+        pumped = S.withEffect srcId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3))) g0
     Spec.assertEqWith s "nothing filed before it moves" (Map.lookup srcId (GameState.lastKnown pumped)) Nothing
     let moved = S.runPure S.identityAnswer pumped (Event.changeZone srcId Zone.Graveyard)
     Spec.assertEqWith
@@ -492,7 +493,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
     -- and the map has nothing filed for it at all.
     ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
     let (srcId, g0) = S.addCreature ghituFireEater S.alice (Setup.emptyGame S.bothPlayers)
-        pumped = S.withEffect srcId (Modification.ModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3)) g0
+        pumped = S.withEffect srcId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 3) (Quantity.Type.Literal 3))) g0
     Spec.assertEqWith
       s
       "the live projection is what the source-aware view returns"

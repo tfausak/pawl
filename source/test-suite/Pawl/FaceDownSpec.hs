@@ -104,6 +104,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -947,7 +948,7 @@ declining fodder p = case p of
 giftDestinationFilter :: Printing.Printing -> Maybe (Filter.Type.Filter Keyword.Keyword)
 giftDestinationFilter printing =
   case Face.replacementEffects (S.combinedFace printing) of
-    [ReplacementEffect.TurnUpR _ (TurnUpRewrite.MayAttachTo f)] -> Just f
+    [ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo f))] -> Just f
     _ -> Nothing
 
 -- A resolved face-down permanent of a morph printing on a board of `n` lands,

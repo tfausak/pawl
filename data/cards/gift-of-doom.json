@@ -65,11 +65,11 @@
       "replacementEffects": [
         {
           "type": "TurnUpR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "type": "IsSource"
             },
-            {
+            "rewrite": {
               "type": "MayAttachTo",
               "value": {
                 "type": "HasCardType",
@@ -78,7 +78,7 @@
                 }
               }
             }
-          ]
+          }
         }
       ],
       "staticAbilities": [

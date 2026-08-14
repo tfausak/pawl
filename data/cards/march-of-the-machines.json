@@ -57,14 +57,14 @@
             },
             {
               "type": "SetBasePowerToughness",
-              "value": [
-                {
+              "value": {
+                "power": {
                   "type": "ManaValue"
                 },
-                {
+                "toughness": {
                   "type": "ManaValue"
                 }
-              ]
+              }
             }
           ]
         }

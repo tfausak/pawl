@@ -38,8 +38,11 @@
       "replacementEffects": [
         {
           "type": "ZoneChangeR",
-          "value": [
-            {
+          "value": {
+            "destination": {
+              "type": "Exile"
+            },
+            "matching": {
               "whatObject": {
                 "type": "And",
                 "value": [
@@ -63,11 +66,8 @@
               "whoseObject": {
                 "type": "Opponents"
               }
-            },
-            {
-              "type": "Exile"
             }
-          ]
+          }
         }
       ],
       "toughness": {

@@ -12,14 +12,8 @@
         {
           "effect": {
             "type": "ReduceSpellCost",
-            "value": [
-              {
-                "type": "HasColor",
-                "value": {
-                  "type": "Black"
-                }
-              },
-              [
+            "value": {
+              "reduction": [
                 {
                   "type": "Hybrid",
                   "value": {
@@ -37,8 +31,14 @@
                     }
                   }
                 }
-              ]
-            ]
+              ],
+              "whichSpells": {
+                "type": "HasColor",
+                "value": {
+                  "type": "Black"
+                }
+              }
+            }
           },
           "scope": {
             "type": "You"

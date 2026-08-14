@@ -5,11 +5,13 @@ module Pawl.Codec.PlayerEffectSpec where
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -17,6 +19,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
+import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -55,26 +58,23 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.IncreaseSpellCost (Filter.Not (Filter.HasCardType CardType.Creature)) 1)
-      """ {"type":"IncreaseSpellCost","value":[{"type":"Not","value":{"type":"HasCardType","value":{"type":"Creature"}}},1]} """
+      (PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.Not (Filter.HasCardType CardType.Creature)) 1))
+      """ {"type":"IncreaseSpellCost","value":{"whichSpells":{"type":"Not","value":{"type":"HasCardType","value":{"type":"Creature"}}},"amount":1}} """
   -- CR 613.11 / 601.2f / Sapphire Medallion.
   Spec.it s "ReduceSpellCost" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.ReduceSpellCost (Filter.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
-      """ {"type":"ReduceSpellCost","value":[{"type":"HasColor","value":{"type":"Blue"}},[{"type":"Generic","value":1}]]} """
+      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasColor Color.Blue) (ManaCost.MkManaCost [ManaSymbol.Generic 1])))
+      """ {"type":"ReduceSpellCost","value":{"whichSpells":{"type":"HasColor","value":{"type":"Blue"}},"reduction":[{"type":"Generic","value":1}]}} """
   -- The reduction that names a mana type, which the generic one above would not
   -- catch a regression in.
   Spec.it s "ReduceSpellCost, naming a mana type" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      ( PlayerEffect.ReduceSpellCost
-          (Filter.HasSubtype Subtype.Cleric)
-          (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)])
-      )
-      """ {"type":"ReduceSpellCost","value":[{"type":"HasSubtype","value":{"type":"Cleric"}},[{"type":"OfType","value":{"type":"Colored","value":{"type":"White"}}},{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}]]} """
+      (PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.HasSubtype Subtype.Cleric) (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)])))
+      """ {"type":"ReduceSpellCost","value":{"whichSpells":{"type":"HasSubtype","value":{"type":"Cleric"}},"reduction":[{"type":"OfType","value":{"type":"Colored","value":{"type":"White"}}},{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}]}} """
   -- CR 613.11 / 601.2f / Heartstone, floor and all.
   Spec.it s "ReduceActivationCost" $
     Common.assertCodec
@@ -97,16 +97,16 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken]) [CostComponent.Sacrifice 1 (Filter.HasCardType CardType.Land)])
-      """ {"type":"AddActivationCost","value":[{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Rebel"}},{"type":"Not","value":{"type":"IsToken"}}]},[{"type":"Sacrifice","value":[1,{"type":"HasCardType","value":{"type":"Land"}}]}]]} """
+      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken]) [CostComponent.Sacrifice 1 (Filter.HasCardType CardType.Land)]))
+      """ {"type":"AddActivationCost","value":{"whichAbilities":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Rebel"}},{"type":"Not","value":{"type":"IsToken"}}]},"components":[{"type":"Sacrifice","value":[1,{"type":"HasCardType","value":{"type":"Land"}}]}]}} """
   -- TWO components, so a codec that read only the first would round-trip the one
   -- above and not this -- and an EMPTY list is a legal value the same way.
   Spec.it s "AddActivationCost, two components" $
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (Filter.And []) [CostComponent.DiscardCards 1, CostComponent.PayLife 2])
-      """ {"type":"AddActivationCost","value":[{"type":"And","value":[]},[{"type":"DiscardCards","value":1},{"type":"PayLife","value":2}]]} """
+      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) [CostComponent.DiscardCards 1, CostComponent.PayLife 2]))
+      """ {"type":"AddActivationCost","value":{"whichAbilities":{"type":"And","value":[]},"components":[{"type":"DiscardCards","value":1},{"type":"PayLife","value":2}]}} """
   -- CR 305.2 / Exploration.
   Spec.it s "PlayAdditionalLands, Exploration's one" $
     Common.assertCodec

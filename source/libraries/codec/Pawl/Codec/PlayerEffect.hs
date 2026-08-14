@@ -1,14 +1,14 @@
 module Pawl.Codec.PlayerEffect where
 
-import qualified Pawl.Codec.CostComponent as CostComponent
+import qualified Pawl.Codec.AddActivationCost as AddActivationCost
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Codec.Keyword as Keyword
-import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Codec.ManaFilter as ManaFilter
 import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.ReduceActivationCost as ReduceActivationCost
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.Codec.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -16,9 +16,6 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 
 -- | The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
---
--- The multi-payload arms keep a 'Common.tuple'. Under the #1305 decision they
--- owe records of their own, like every other multi-payload arm.
 codec :: Codec.Codec PlayerEffect.PlayerEffect
 codec =
   Arm.tagged
@@ -27,10 +24,10 @@ codec =
       Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan,
       Arm.nullary "CantCastChosenName" PlayerEffect.CantCastChosenName,
       Arm.nullary "CantPlayLandChosenName" PlayerEffect.CantPlayLandChosenName,
-      Arm.payload "IncreaseSpellCost" (Common.tuple filterCodec Common.natural) (uncurry PlayerEffect.IncreaseSpellCost),
-      Arm.payload "ReduceSpellCost" (Common.tuple filterCodec ManaCost.codec) (uncurry PlayerEffect.ReduceSpellCost),
+      Arm.payload "IncreaseSpellCost" IncreaseSpellCost.codec PlayerEffect.IncreaseSpellCost,
+      Arm.payload "ReduceSpellCost" ReduceSpellCost.codec PlayerEffect.ReduceSpellCost,
       Arm.payload "ReduceActivationCost" ReduceActivationCost.codec PlayerEffect.ReduceActivationCost,
-      Arm.payload "AddActivationCost" (Common.tuple filterCodec (Common.list (CostComponent.codec Keyword.codec))) (uncurry PlayerEffect.AddActivationCost),
+      Arm.payload "AddActivationCost" AddActivationCost.codec PlayerEffect.AddActivationCost,
       Arm.payload "PlayAdditionalLands" Common.natural PlayerEffect.PlayAdditionalLands,
       Arm.nullary "NoMaximumHandSize" PlayerEffect.NoMaximumHandSize,
       Arm.payload "SetMaximumHandSize" Common.natural PlayerEffect.SetMaximumHandSize,
@@ -52,10 +49,10 @@ codec =
       PlayerEffect.CantCastMoreThan n -> Common.tagged "CantCastMoreThan" . Just $ Common.encodeNatural n
       PlayerEffect.CantCastChosenName -> Common.nullary "CantCastChosenName"
       PlayerEffect.CantPlayLandChosenName -> Common.nullary "CantPlayLandChosenName"
-      PlayerEffect.IncreaseSpellCost c n -> Common.tagged "IncreaseSpellCost" . Just . Value.array $ [Codec.encode filterCodec c, Common.encodeNatural n]
-      PlayerEffect.ReduceSpellCost c m -> Common.tagged "ReduceSpellCost" . Just . Value.array $ [Codec.encode filterCodec c, Codec.encode ManaCost.codec m]
+      PlayerEffect.IncreaseSpellCost x -> Common.tagged "IncreaseSpellCost" . Just $ Codec.encode IncreaseSpellCost.codec x
+      PlayerEffect.ReduceSpellCost x -> Common.tagged "ReduceSpellCost" . Just $ Codec.encode ReduceSpellCost.codec x
       PlayerEffect.ReduceActivationCost x -> Common.tagged "ReduceActivationCost" . Just $ Codec.encode ReduceActivationCost.codec x
-      PlayerEffect.AddActivationCost c cs -> Common.tagged "AddActivationCost" . Just . Value.array $ [Codec.encode filterCodec c, Codec.encode (Common.list (CostComponent.codec Keyword.codec)) cs]
+      PlayerEffect.AddActivationCost x -> Common.tagged "AddActivationCost" . Just $ Codec.encode AddActivationCost.codec x
       PlayerEffect.PlayAdditionalLands n -> Common.tagged "PlayAdditionalLands" . Just $ Common.encodeNatural n
       PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
       PlayerEffect.SetMaximumHandSize n -> Common.tagged "SetMaximumHandSize" . Just $ Common.encodeNatural n

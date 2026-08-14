@@ -32,6 +32,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Printing as Printing
@@ -430,7 +431,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         -- The evolve ability resolves; the settle that follows puts the
         -- Radstag's own "whenever this creature evolves" on the stack.
         onStack = resolveAndSettle declineCopy (settle declineCopy entered)
-        shrunk = S.withEffect radstagId (Modification.ModifyPowerToughness (Quantity.Type.Literal (-5)) (Quantity.Type.Literal (-5))) onStack
+        shrunk = S.withEffect radstagId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-5)) (Quantity.Type.Literal (-5)))) onStack
         dead = settle declineCopy shrunk
         after = resolveAll declineCopy dead
     Spec.assertBool s (not (null (GameState.stack onStack))) "the Radstag's trigger really was on the stack"
