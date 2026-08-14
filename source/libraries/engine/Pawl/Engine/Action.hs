@@ -7,6 +7,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.FaceDown as FaceDown
+import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -169,6 +170,11 @@ legalActions pid gs =
       -- Turn.sorcerySpeedWindow, asked inside Plot.canPlot beside the cost, so
       -- the clauses of one rule stay together.
       plots = fmap Action.Plot (Plot.plottable pid gs)
+      -- CR 116.2h / 702.143a: the seventh special action, and a THIRD window --
+      -- "any time a player has priority during their turn", which is neither CR
+      -- 116.2b's (any priority at all) nor CR 116.2a's sorcery speed. The gate is
+      -- asked inside Foretell.canForetell beside the {2}, for plots' reason.
+      foretells = fmap Action.Foretell (Foretell.foretellable pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
@@ -239,4 +245,4 @@ legalActions pid gs =
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
       manaAbilityActivations = fmap Action.ActivateManaAbility manaSources
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> plots <> activations <> manaAbilityActivations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> plots <> foretells <> activations <> manaAbilityActivations

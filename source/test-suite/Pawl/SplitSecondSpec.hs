@@ -116,6 +116,7 @@ isCast action = case action of
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
+  A.Foretell _ -> False
   A.Ignore _ -> False
   A.ActivateManaAbility _ -> False
 
@@ -129,6 +130,7 @@ isActivate action = case action of
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
+  A.Foretell _ -> False
   A.Ignore _ -> False
   A.ActivateManaAbility _ -> False
 
@@ -143,6 +145,7 @@ isManaAbility action = case action of
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
+  A.Foretell _ -> False
   A.Ignore _ -> False
 
 castOf :: ObjectId.ObjectId -> Printing.Printing -> A.Action
