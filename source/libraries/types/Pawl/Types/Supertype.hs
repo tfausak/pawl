@@ -12,4 +12,4 @@ data Supertype
     Snow
   | -- | CR 205.4f
     World
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

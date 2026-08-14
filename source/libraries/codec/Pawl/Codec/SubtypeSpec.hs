@@ -399,5 +399,9 @@ spec s = Spec.describe s "Pawl.Codec.Subtype" $ do
       Subtype.codec
       Subtype.Knight
       """ {"type":"Knight"} """
+  -- Exhaustive where the literals above are representative: Arm.enum derives
+  -- the arm list from the type, so this is what would catch a constructor the
+  -- derivation missed or two that encode alike.
+  Spec.it s "round trips every constructor" $ Common.assertEnumCodec s Subtype.codec
   Spec.it s "has a schema" $
     Common.assertHasSchema s Subtype.codec

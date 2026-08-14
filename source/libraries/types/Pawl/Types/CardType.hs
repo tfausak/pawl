@@ -32,4 +32,4 @@ data CardType
     Sorcery
   | -- | CR 313
     Vanguard
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

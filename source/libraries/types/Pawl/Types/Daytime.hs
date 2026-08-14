@@ -18,4 +18,4 @@ module Pawl.Types.Daytime where
 data Daytime
   = Day
   | Night
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

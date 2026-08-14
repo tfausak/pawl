@@ -55,4 +55,4 @@ data PlayerScope
     -- BOARD rather than about the two players being compared, which is why
     -- inScope takes a GameState at all.
     ControllingMostPermanents
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

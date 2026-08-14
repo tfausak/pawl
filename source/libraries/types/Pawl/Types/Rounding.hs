@@ -17,4 +17,4 @@ module Pawl.Types.Rounding where
 data Rounding
   = Up
   | Down
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

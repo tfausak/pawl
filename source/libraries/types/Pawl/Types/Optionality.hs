@@ -21,4 +21,4 @@ module Pawl.Types.Optionality where
 data Optionality
   = Mandatory
   | Optional
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

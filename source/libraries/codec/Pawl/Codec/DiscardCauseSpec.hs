@@ -21,5 +21,9 @@ spec s = Spec.describe s "Pawl.Codec.DiscardCause" $ do
       DiscardCause.codec
       DiscardCause.ToPayCyclingCost
       """ {"type":"ToPayCyclingCost"} """
+  -- Exhaustive where the literals above are representative: Arm.enum derives
+  -- the arm list from the type, so this is what would catch a constructor the
+  -- derivation missed or two that encode alike.
+  Spec.it s "round trips every constructor" $ Common.assertEnumCodec s DiscardCause.codec
   Spec.it s "has a schema" $
     Common.assertHasSchema s DiscardCause.codec

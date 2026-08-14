@@ -91,4 +91,4 @@ data KeywordFamily
     Toxic
   | -- | CR 702.170a: plot [cost].
     Plot
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

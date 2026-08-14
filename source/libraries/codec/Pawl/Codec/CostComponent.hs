@@ -45,16 +45,16 @@ codec keywordCodec =
       CostComponent.TapThis -> Common.nullary "TapThis"
       CostComponent.UntapThis -> Common.nullary "UntapThis"
       CostComponent.SacrificeThis -> Common.nullary "SacrificeThis"
-      CostComponent.PayLife n -> Common.tagged "PayLife" . Just $ Common.encodeNatural n
+      CostComponent.PayLife n -> Common.tagged "PayLife" . Just $ Codec.encode Common.natural n
       CostComponent.PayLifeX -> Common.nullary "PayLifeX"
       CostComponent.Sacrifice x -> Common.tagged "Sacrifice" . Just $ Codec.encode (Sacrifice.codec keywordCodec) x
       CostComponent.TapForTotalPower x -> Common.tagged "TapForTotalPower" . Just $ Codec.encode (TapForTotalPower.codec keywordCodec) x
-      CostComponent.DiscardCards n -> Common.tagged "DiscardCards" . Just $ Common.encodeNatural n
+      CostComponent.DiscardCards n -> Common.tagged "DiscardCards" . Just $ Codec.encode Common.natural n
       CostComponent.DiscardThis -> Common.nullary "DiscardThis"
-      CostComponent.PayEnergy n -> Common.tagged "PayEnergy" . Just $ Common.encodeNatural n
-      CostComponent.AddLoyaltyToThis n -> Common.tagged "AddLoyaltyToThis" . Just $ Common.encodeNatural n
-      CostComponent.RemoveLoyaltyFromThis n -> Common.tagged "RemoveLoyaltyFromThis" . Just $ Common.encodeNatural n
-      CostComponent.PutPlusOneCountersOnThis n -> Common.tagged "PutPlusOneCountersOnThis" . Just $ Common.encodeNatural n
+      CostComponent.PayEnergy n -> Common.tagged "PayEnergy" . Just $ Codec.encode Common.natural n
+      CostComponent.AddLoyaltyToThis n -> Common.tagged "AddLoyaltyToThis" . Just $ Codec.encode Common.natural n
+      CostComponent.RemoveLoyaltyFromThis n -> Common.tagged "RemoveLoyaltyFromThis" . Just $ Codec.encode Common.natural n
+      CostComponent.PutPlusOneCountersOnThis n -> Common.tagged "PutPlusOneCountersOnThis" . Just $ Codec.encode Common.natural n
       CostComponent.ExileThisFromGraveyard -> Common.nullary "ExileThisFromGraveyard"
       CostComponent.ExileCardsFromGraveyard x -> Common.tagged "ExileCardsFromGraveyard" . Just $ Codec.encode (ExileCardsFromGraveyard.codec keywordCodec) x
       CostComponent.ExileTopFromGraveyard c_ -> Common.tagged "ExileTopFromGraveyard" . Just $ Codec.encode (Filter.codec keywordCodec) c_

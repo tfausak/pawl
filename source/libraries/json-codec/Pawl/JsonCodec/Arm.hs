@@ -3,11 +3,17 @@
 -- | Building a codec for a tagged sum from its arms.
 --
 -- The decoder and the schema are derived from the arm list; the ENCODER is
--- passed in as a hand-written total case. Deriving it too would need a
+-- passed in as a hand-written total case. Deriving it in general would need a
 -- projection per arm, and then a constructor added to the type would compile
 -- clean and silently stop being encodable. A case is exhaustiveness-checked,
 -- and keeping @-Wincomplete-patterns@ able to see a new constructor is worth
 -- more than collapsing a table that is written twice either way.
+--
+-- 'enum' is the one shape where that trade does not apply, and it goes the
+-- other way for the same reason: an ALL-NULLARY type needs no projection, so
+-- both directions come off @Bounded@ and @Show@ and a new constructor is picked
+-- up automatically -- which is strictly better than the exhaustiveness check it
+-- replaces, not a weakening of it.
 module Pawl.JsonCodec.Arm where
 
 import qualified Data.List as List
@@ -89,6 +95,27 @@ tagged enc arms =
   where
     proxy = Typeable.Proxy :: Typeable.Proxy a
     name = Text.unpack . Name.unwrap $ Name.typeName proxy
+
+-- | The whole codec for an ALL-NULLARY tagged sum, derived from the datatype.
+--
+-- @[minBound ..]@ is the arm list and derived 'Show' is the tag, so neither half
+-- carries anything the type does not already say. A constructor added to the
+-- type is encodable, decodable and in the schema without touching this module or
+-- the caller's.
+--
+-- DERIVED 'Show' BECOMES THE WIRE FORMAT: renaming a constructor renames its
+-- tag, and so silently changes every card file that names it. That coupling is
+-- not new -- every hand-written arm in @pawl:codec@ already spells the tag as
+-- the constructor's name, as an unenforced convention -- but this makes it
+-- structural, and a rename is now a data migration.
+--
+-- Only for types whose constructors are ALL nullary. One that grows a payload
+-- loses @Enum@, which is a compile error here rather than a silent wrong answer.
+--
+-- Decoding is 'tagged'\'s linear scan over the arm list, unchanged: this
+-- replaces a hand-written list of the same length rather than adding one.
+enum :: forall a. (Bounded a, Enum a, Show a, Typeable.Typeable a) => Codec.Codec a
+enum = tagged (Common.nullary . show) (fmap (\c -> nullary (show c) c) [minBound .. maxBound :: a])
 
 armSchema :: Arm a -> Define.SchemaM Schema.Schema
 armSchema arm = case arm of

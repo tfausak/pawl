@@ -14,4 +14,4 @@ module Pawl.Types.Uses where
 data Uses
   = Unlimited
   | Once
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

@@ -22,4 +22,4 @@ data CastingPermission
     -- "may this be cast from the graveyard?" and never "does this have
     -- flashback?".
     CastFromGraveyard
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

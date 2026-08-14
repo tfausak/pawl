@@ -28,7 +28,7 @@ codec =
     ]
   where
     encode ms = case ms of
-      ManaSymbol.Generic n -> Common.tagged "Generic" . Just $ Common.encodeNatural n
+      ManaSymbol.Generic n -> Common.tagged "Generic" . Just $ Codec.encode Common.natural n
       ManaSymbol.OfType mt -> Common.tagged "OfType" . Just $ Codec.encode ManaType.codec mt
       ManaSymbol.Hybrid x -> Common.tagged "Hybrid" . Just $ Codec.encode Hybrid.codec x
       ManaSymbol.MonocoloredHybrid mt -> Common.tagged "MonocoloredHybrid" . Just $ Codec.encode ManaType.codec mt

@@ -87,4 +87,4 @@ data Layout
     -- modal spells everywhere else in pawl (Pawl.Types.Modal, Pawl.Engine.Modal,
     -- Face.spell's modes) and the two have nothing to do with each other.
     ModalDoubleFaced
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

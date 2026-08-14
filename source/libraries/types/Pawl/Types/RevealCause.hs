@@ -19,4 +19,4 @@ data RevealCause
     -- miracle's static ability. Recorded by Pawl.Engine.Event's draw funnel, the
     -- one place that window exists.
     ForMiracle
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

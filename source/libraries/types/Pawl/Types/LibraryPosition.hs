@@ -19,7 +19,7 @@ module Pawl.Types.LibraryPosition where
 data LibraryPosition
   = Top
   | Bottom
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
 
 -- | The position a move that says nothing about one uses.
 --

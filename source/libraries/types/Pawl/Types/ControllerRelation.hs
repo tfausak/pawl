@@ -15,4 +15,4 @@ data ControllerRelation
     -- "Any other player" is CR 806.1's free-for-all reading. Teams (CR 102.3)
     -- would make it wrong and have no representation (#175).
     Opponents
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

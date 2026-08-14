@@ -10,4 +10,4 @@ module Pawl.Types.PlayerRelation where
 data PlayerRelation
   = You
   | Opponent
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

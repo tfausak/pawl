@@ -23,4 +23,4 @@ data DestructionRewrite
     -- Pawl.Types.DestructionCause: the restriction is on which events the effect
     -- applies to, exactly as CR 701.19c's is.
     RemoveShieldCounter
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

@@ -12,4 +12,4 @@ data Zone
     -- across players (not per-player), like Battlefield and Exile. Emblems (CR
     -- 114) are its first resident.
     Command
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

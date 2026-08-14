@@ -23,7 +23,7 @@ codec =
     encode r = case r of
       DamageRewrite.PreventAll -> Common.nullary "PreventAll"
       DamageRewrite.PreventRemovingShieldCounter -> Common.nullary "PreventRemovingShieldCounter"
-      DamageRewrite.PreventNext n -> Common.tagged "PreventNext" . Just $ Common.encodeNatural n
-      DamageRewrite.SetAmount n -> Common.tagged "SetAmount" . Just $ Common.encodeNatural n
+      DamageRewrite.PreventNext n -> Common.tagged "PreventNext" . Just $ Codec.encode Common.natural n
+      DamageRewrite.SetAmount n -> Common.tagged "SetAmount" . Just $ Codec.encode Common.natural n
       DamageRewrite.Scale s -> Common.tagged "Scale" . Just $ Codec.encode Scaling.codec s
       DamageRewrite.Redirect recipient -> Common.tagged "Redirect" . Just $ Codec.encode Recipient.codec recipient

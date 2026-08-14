@@ -15,6 +15,17 @@ data Example
   | Loose (Maybe Integer)
   deriving (Eq, Show)
 
+-- | An all-nullary sum, for 'Arm.enum'. Separate from 'Example' because that
+-- one carries payloads and so cannot be 'Enum'.
+data Flat
+  = First
+  | Middle
+  | Last
+  deriving (Bounded, Enum, Eq, Show)
+
+flatCodec :: Codec.Codec Flat
+flatCodec = Arm.enum
+
 size :: Codec.Codec Integer
 size = Common.integer
 
@@ -58,6 +69,24 @@ spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
   Spec.it s "round trips an optional-payload arm with and without a value" $ do
     Common.assertCodec s codec (Loose (Just 2)) """ {"type":"Loose","value":2} """
     Common.assertCodec s codec (Loose Nothing) """ {"type":"Loose"} """
+
+  -- Every constructor, not a representative one: the whole point of 'Arm.enum'
+  -- is that the arm list IS @[minBound ..]@, so the exhaustive assertion is the
+  -- one that would catch a derivation covering only part of the type.
+  Spec.it s "enum round trips every constructor, tagged by its name" $ do
+    Common.assertCodec s flatCodec First """ {"type":"First"} """
+    Common.assertCodec s flatCodec Middle """ {"type":"Middle"} """
+    Common.assertCodec s flatCodec Last """ {"type":"Last"} """
+
+  -- An unknown tag still fails rather than falling through to some arm, and the
+  -- error names the type the same way a hand-written 'tagged' does.
+  Spec.it s "enum rejects an unknown tag" $
+    Spec.assertBool
+      s
+      (Either.isLeft (Common.parse (Text.pack """ {"type":"Absent"} """) >>= Codec.decode flatCodec))
+      "expected a decode failure"
+
+  Spec.it s "enum has a schema" $ Common.assertHasSchema s flatCodec
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec

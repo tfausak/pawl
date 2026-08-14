@@ -38,8 +38,8 @@ codec =
   where
     encode r = case r of
       EntryRewrite.AsCopy [] -> Common.nullary "AsCopy"
-      EntryRewrite.AsCopy exceptions -> Common.tagged "AsCopy" . Just $ Common.encodeList (Codec.encode CopyException.codec) exceptions
-      EntryRewrite.ChoiceOf options -> Common.tagged "ChoiceOf" . Just $ Common.encodeList (Codec.encode EntryOption.codec) options
+      EntryRewrite.AsCopy exceptions -> Common.tagged "AsCopy" . Just $ Codec.encode (Common.list CopyException.codec) exceptions
+      EntryRewrite.ChoiceOf options -> Common.tagged "ChoiceOf" . Just $ Codec.encode (Common.list EntryOption.codec) options
       EntryRewrite.WithCounters x -> Common.tagged "WithCounters" . Just $ Codec.encode WithCounters.codec x
       EntryRewrite.ChooseColor -> Common.nullary "ChooseColor"
       EntryRewrite.ChooseBasicLandType -> Common.nullary "ChooseBasicLandType"
@@ -48,5 +48,5 @@ codec =
       EntryRewrite.Riot -> Common.nullary "Riot"
       EntryRewrite.Unleash -> Common.nullary "Unleash"
       EntryRewrite.Tapped -> Common.nullary "Tapped"
-      EntryRewrite.PayLifeOrTapped n -> Common.tagged "PayLifeOrTapped" . Just $ Common.encodeNatural n
+      EntryRewrite.PayLifeOrTapped n -> Common.tagged "PayLifeOrTapped" . Just $ Codec.encode Common.natural n
       EntryRewrite.SacrificeAnyNumber x -> Common.tagged "SacrificeAnyNumber" . Just $ Codec.encode SacrificeAnyNumber.codec x

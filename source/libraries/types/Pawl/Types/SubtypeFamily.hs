@@ -16,4 +16,4 @@ data SubtypeFamily
   | -- | CR 205.3m's list, CR 612.2's "creature type word used as a creature
     -- type".
     CreatureType
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

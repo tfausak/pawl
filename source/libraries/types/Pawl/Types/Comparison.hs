@@ -14,4 +14,4 @@ data Comparison
   = Exactly
   | AtLeast
   | AtMost
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

@@ -8,4 +8,4 @@ data Color
   | Black
   | Red
   | Green
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
