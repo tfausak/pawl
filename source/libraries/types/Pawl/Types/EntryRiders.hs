@@ -120,12 +120,12 @@ import qualified Pawl.Types.TapState as TapState
 -- enters-the-battlefield trigger on the way in, which is the one thing the rule
 -- exists to forbid.
 --
--- The OPPOSITE POLARITY to `exiledFaceDown`, one field over, and the two are not
--- one flag: CR 110.5d says an exiled card's face-downness "has no correlation to
--- the face-down status of a permanent". This one writes Object.facing, which CR
--- 708.2a spends on a wholesale substitution of characteristics; that one writes
--- Object.exiledFaceDown, which is about who may look. An effect that set both
--- would be saying two unrelated things, and no zone reads both.
+-- A SECOND rider beside `exiledFaceDown` and not the same one widened, which is
+-- CR 110.5d in as many words: an exiled card's face-downness "has no correlation
+-- to the face-down status of a permanent". This one writes Object.facing, which
+-- CR 708.2a spends on a wholesale substitution of characteristics; that one
+-- writes Object.exiledFaceDown, which is about who may look. Their zones are
+-- disjoint, so no move reads both.
 --
 -- Applied by Pawl.Engine.Event.changeZoneEntering, which is also where the
 -- battlefield gate lives -- a card stating it on a move anywhere else says

@@ -1872,8 +1872,8 @@ changeZoneEntering oid requestedDest position riders under = do
       -- permanent's enters-the-battlefield abilities won't trigger (if
       -- triggered) or have any effect (if static)" needs no branch of its own.
       -- Manifest (CR 701.40a) is what prints it; Pawl.FaceDownSpec's Soul
-      -- Summons group is the proof, with Aether Channeler's loud enters trigger
-      -- underneath.
+      -- Summons group is the proof, with Thragtusk's "you gain 5 life" enters
+      -- trigger as the card underneath.
       --
       -- BATTLEFIELD-ONLY, which is CR 110.5d's scope for the status and this
       -- door's own responsibility: mkObj's `facing` write serves the stack too
