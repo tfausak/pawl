@@ -9467,7 +9467,7 @@ decliningTargets p = case p of
 -- Announces one named slot and declines the rest.
 announcingOnly :: SlotName.SlotName -> Prompt.Prompt r -> r
 announcingOnly slot p = case p of
-  Prompt.AnnounceTargets _ _ _ offers -> Map.mapWithKey (\name (count, _) -> if name == slot then TargetCount.most count else 0) offers
+  Prompt.AnnounceTargets _ _ _ offers -> Map.mapWithKey (\name (count, legal) -> if name == slot then TargetCount.ceilingOn (Natural.length legal) count else 0) offers
   _ -> S.identityAnswer p
 
 -- CR 115.6's "up to one target", read at resolution.
@@ -9573,14 +9573,11 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
 -- and Oracle text checked against api.scryfall.com.) It is rule 608.2f's own
 -- second example.
 --
--- TWO DEPARTURES FROM THE PRINTED CARD, both stricter than printed and both
--- irrelevant to what is asserted here: "any number of target" is written as up
--- to three (#1476), and "until the end of your next turn" as "until your next
--- turn" (#1477).
+-- ONE DEPARTURE FROM THE PRINTED CARD, stricter than printed and irrelevant to
+-- what is asserted here: "until the end of your next turn" is written as "until
+-- your next turn" (#1477).
 --
--- alice casts it off nine Mountains at a THREE-seat board and the priority loop
--- resolves it, which is what makes this gameplay-level rather than an
--- applyEffect call. The board tells apart every wrong reading of the loop:
+-- The THREE-seat board tells apart every wrong reading of the loop:
 --
 --   * A BODY PER MEMBER, not one body. Three victims are named, so a loop that
 --     ran the body once damages one seat and leaves two at twenty.
@@ -9603,32 +9600,41 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
 --     permission, so the third body instruction ran for each member rather than
 --     once for whichever card was bound last.
 --
--- Ogre Sentry sits under bob so the target pool holds a fourth candidate the
--- announcement does not take: the choice is a real choice rather than one
+-- Ogre Sentry sits under bob so the target pool always holds one more candidate
+-- than the announcement takes: the choice is a real choice rather than one
 -- short-circuited by having exactly as many candidates as it needs, and a loop
 -- that swept the battlefield instead of the slot would reach it.
+--
+-- The FOUR-SEAT case is CR 601.2c's "any number" proper: the card prints no
+-- maximum, so four is announceable on a board that offers five candidates, and
+-- nothing but the board bounds it. The ZERO case is the other end of the same
+-- range, and CR 608.2b does not fizzle a spell that chose no targets at all
+-- (CR 115.6).
 soulfireEruptionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulfireEruptionSpec s registry =
-  let -- alice's library holds `stock`, DEEPEST FIRST -- S.addLibraryCard puts
+  let -- alice casts off nine Mountains at `seats`, announcing `n` targets and
+      -- aiming them at the players; the priority loop resolves the spell, which
+      -- is what makes this gameplay-level rather than an applyEffect call.
+      -- alice's library holds `stock`, DEEPEST FIRST -- S.addLibraryCard puts
       -- each card on top, so the last name given is the top card.
-      board stock = do
+      board n seats stock = do
         mountain <- S.printingOf s registry "Mountain"
         soulfireEruption <- S.printingOf s registry "Soulfire Eruption"
         sentry <- S.printingOf s registry "Ogre Sentry"
         stocked <- mapM (S.printingOf s registry) stock
-        let g1 = S.landsFor mountain S.alice 9 S.threePlayerGame
+        let g1 = S.landsFor mountain S.alice 9 seats
             g2 = List.foldl' (\g pr -> snd (S.addLibraryCard pr S.alice g)) g1 stocked
             g3 = snd (S.addCreature sentry S.bob g2)
             (withSpell, spell) = S.handOne soulfireEruption g3
-            afterCast = S.runPure aimingAtEveryPlayer withSpell (S.cast S.alice spell)
-        pure (S.runPure aimingAtEveryPlayer afterCast Engine.priorityLoop)
+            afterCast = S.runPure (aimingAtEveryPlayer n) withSpell (S.cast S.alice spell)
+        pure (S.runPure (aimingAtEveryPlayer n) afterCast Engine.priorityLoop)
       named = Just . CardName.MkCardName . Text.pack
       exiledNames pid = List.sort . namesIn Zone.Exile pid
       permissionsIn pid gs = fmap (Maybe.isJust . Object.playableFromExile) (Maybe.mapMaybe (\oid -> Game.lookupObject oid gs) (Game.zoneMembers Zone.Exile pid gs))
       lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
    in Spec.describe s "SoulfireEruption" $ do
         Spec.it s "CR 608.2f each victim takes the mana value of the card exiled FOR IT, in APNAP order" $ do
-          after <- board ["Sabretooth Tiger", "Bird Maiden", "Hill Giant", "Goblin Piker", "Benalish Hero"]
+          after <- board 3 S.threePlayerGame ["Sabretooth Tiger", "Bird Maiden", "Hill Giant", "Goblin Piker", "Benalish Hero"]
           Spec.assertEqWith
             s
             "three DIFFERENT cards left the library, top first, and the two under them stayed in order"
@@ -9653,7 +9659,7 @@ soulfireEruptionSpec s registry =
         -- members were swept before the first pass -- so the third seat simply
         -- takes nothing.
         Spec.it s "CR 609.3 a library that runs out mid-loop leaves the later members untouched" $ do
-          after <- board ["Goblin Piker", "Benalish Hero"]
+          after <- board 3 S.threePlayerGame ["Goblin Piker", "Benalish Hero"]
           Spec.assertEqWith
             s
             "alice took 1 and bob took 2; carol found no card and took nothing"
@@ -9665,13 +9671,61 @@ soulfireEruptionSpec s registry =
             (exiledNames S.alice after, namesIn Zone.Library S.alice after)
             (List.sort [named "Benalish Hero", named "Goblin Piker"], [])
           Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
+        -- CR 601.2c's "any number of target ...", which is what the card prints
+        -- and what data/cards/soulfire-eruption.json now says: no printed
+        -- maximum, so the ceiling is the candidate count and nothing else. FOUR
+        -- seats and bob's Ogre Sentry make five candidates, four are announced,
+        -- and four is MORE than any literal cap the file used to carry -- so this
+        -- case goes red against a bounded count and is the proof the unbounded
+        -- arm carries.
+        --
+        -- The four cards exiled have mana values 1, 2, 4 and 8: pairwise distinct
+        -- and pairwise-sum distinct, so no two readings of the loop land on one
+        -- life total.
+        Spec.it s "CR 601.2c any number of targets: four announced on a five-candidate board" $ do
+          after <- board 4 S.fourPlayerGame ["Sabretooth Tiger", "Bird Maiden", "Excruciator", "Hill Giant", "Goblin Piker", "Benalish Hero"]
+          Spec.assertEqWith
+            s
+            "FOUR different cards left the library, top first, and the two under them stayed in order"
+            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
+            ( List.sort [named "Benalish Hero", named "Goblin Piker", named "Hill Giant", named "Excruciator"],
+              [named "Bird Maiden", named "Sabretooth Tiger"]
+            )
+          Spec.assertEqWith
+            s
+            "Benalish Hero (1) to alice, Goblin Piker (2) to bob, Hill Giant (4) to carol, Excruciator (8) to dave"
+            (lives after, S.lifeOf S.dave after)
+            ((Just 19, Just 18, Just 16), Just 12)
+        -- The same card and the same board as the first case, differing in
+        -- exactly one thing: the CR 601.2c announcement is zero rather than
+        -- three. "Any number" includes none, so the low end of an unbounded range
+        -- is announceable, and the sweep runs over an empty set.
+        --
+        -- What this case CANNOT tell apart is resolving from fizzling: CR 608.2b
+        -- puts a fizzled spell in the same graveyard a resolved one reaches, and
+        -- with no targets the effect does nothing either way. That CR 115.6 leaves
+        -- a zero-target spell untargeted, and so not fizzled, is proved by Rat
+        -- Out's token in upToOneTargetSpec above.
+        Spec.it s "CR 601.2c zero announced against an unbounded count: nothing is exiled and nobody is damaged" $ do
+          after <- board 0 S.threePlayerGame ["Sabretooth Tiger", "Bird Maiden", "Hill Giant", "Goblin Piker", "Benalish Hero"]
+          Spec.assertEqWith s "no seat lost life" (lives after) (Just 20, Just 20, Just 20)
+          Spec.assertEqWith
+            s
+            "the library is untouched and nothing was exiled"
+            (exiledNames S.alice after, namesIn Zone.Library S.alice after)
+            ([], [named "Benalish Hero", named "Goblin Piker", named "Hill Giant", named "Bird Maiden", named "Sabretooth Tiger"])
+          Spec.assertEqWith
+            s
+            "and the spell left the stack for its owner's graveyard"
+            (namesIn Zone.Graveyard S.alice after)
+            [named "Soulfire Eruption"]
 
--- CR 601.2c: announce three targets per slot and aim them at the PLAYERS, which
--- on this board leaves bob's Ogre Sentry -- a legal candidate of the same
+-- CR 601.2c: announce `n` targets per slot and aim them at the PLAYERS, which on
+-- these boards leaves bob's Ogre Sentry -- a legal candidate of the same
 -- AnyTarget pool -- deliberately unchosen.
-aimingAtEveryPlayer :: Prompt.Prompt r -> r
-aimingAtEveryPlayer p = case p of
-  Prompt.AnnounceTargets {} -> announcingCount 3 p
+aimingAtEveryPlayer :: Natural -> Prompt.Prompt r -> r
+aimingAtEveryPlayer n p = case p of
+  Prompt.AnnounceTargets {} -> announcingCount n p
   Prompt.ChooseTargets _ _ _ sets -> S.preferring isPlayerRecipient sets
   _ -> S.identityAnswer p
   where

@@ -924,7 +924,7 @@ modalCountsOffend :: Modal.Modal Card.Type.Card -> Bool
 modalCountsOffend modal =
   let modeOffends mode =
         let read_ = Resolve.modeSlots mode
-            plural targetSlot = TargetCount.most (TargetSlot.count targetSlot) > 1
+            plural targetSlot = TargetCount.plural (TargetSlot.count targetSlot)
             offends slot targetSlot = plural targetSlot && Map.lookup slot read_ == Just SlotArity.One
          in or (Map.elems (Map.mapWithKey offends (Mode.targetSlots mode)))
    in any modeOffends (Modal.modes modal)
@@ -3523,7 +3523,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     <> fmap TriggeredAbility.modal (Face.triggeredAbilities face)
         modals = concatMap carriers ps
         takesSeveral (_, modal) =
-          any (any ((> 1) . TargetCount.most . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
+          any (any (TargetCount.plural . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
     -- The pool must actually contain one, or the sweep says nothing.
     Spec.assertBool s (any takesSeveral modals) "the pool has a slot that takes more than one target"
     Spec.assertEqWith s "no multi-target slot is read one at a time" (fmap fst (filter (modalCountsOffend . snd) modals)) []

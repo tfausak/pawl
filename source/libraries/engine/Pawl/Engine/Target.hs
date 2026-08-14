@@ -762,10 +762,14 @@ dependsOnSlot pool = case pool of
 -- and a slot whose range has collapsed to a single number is not a variable
 -- number of targets at all ("in some cases, the number of targets will be
 -- defined by the spell's text").
+--
+-- The board narrowing is the WHOLE ceiling for "any number of target ..."
+-- (Soulfire Eruption), which prints no maximum -- TargetCount.ceilingOn is where
+-- the two cases meet.
 announcedRange :: TargetSlot -> Set Recipient -> (Natural, Natural)
 announcedRange slot legal =
   let count = TargetSlot.count slot
-      ceiling_ = min (TargetCount.most count) (Natural.length legal)
+      ceiling_ = TargetCount.ceilingOn (Natural.length legal) count
    in (min (TargetCount.least count) ceiling_, ceiling_)
 
 -- CR 601.2c's two announcements over one slot map, in the rule's own order: how
