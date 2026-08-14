@@ -131,11 +131,14 @@ dueToTurn gs = case GameState.daytime gs of
 -- permanent over swaps which of the pair of keywords it has, so no permanent this
 -- sweep touches is still due afterwards.
 --
--- CR 702.145b's first static ability -- "if it is night and this permanent is
--- represented by a double-faced card, it enters transformed" -- is not
--- implemented. A daybound permanent entering while it is night is turned over
--- HERE instead, one settle later, so it enters front face up and then transforms
--- (#772).
+-- CR 702.145b's FIRST static ability -- "if it is night and this permanent is
+-- represented by a double-faced card, it enters transformed" -- is NOT this
+-- sweep, and the two must not be confused. That one is CR 712.13a's replacement
+-- effect (EntryRewrite.EntersTransformed, minted by
+-- Pawl.Engine.Keyword.mintedReplacementsFor), applied as the permanent enters, so
+-- its enters-the-battlefield triggers are the back face's. This sweep is the
+-- SECOND ability, and reaches only permanents already on the battlefield.
+-- Pawl.DaytimeSpec's entrySpec proves the pair apart.
 --
 -- This is the ONE turn CR 702.145b's and CR 702.145e's transform restriction
 -- permits, and it reaches Game.turnFaceOver DIRECTLY for exactly that reason:

@@ -2442,6 +2442,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.Unleash -> []
   EntryRewrite.Tapped -> []
   EntryRewrite.PayLifeOrTapped _ -> []
+  EntryRewrite.EntersTransformed -> []
   EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f _) -> [f]
 
 -- The Filter a TurnUpRewrite carries. CR 303.4k's destination text -- Gift of

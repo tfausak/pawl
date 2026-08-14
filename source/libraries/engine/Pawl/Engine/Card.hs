@@ -387,9 +387,10 @@ castableFaces card = case Card.layout card of
   -- Pawl.Engine.Resolve answers it with `backFace` below. CR 712.14a's wording
   -- reaches a back face without one on the stack, and likewise does not come
   -- through here: Pawl.Types.EntryRiders carries it and
-  -- Pawl.Engine.Event.changeZoneEntering applies it. What is still absent is the
-  -- CONVERT wording (#698), and CR 712.13a's ability causing a double-faced
-  -- spell already on the stack to enter transformed (#906).
+  -- Pawl.Engine.Event.changeZoneEntering applies it. CR 712.13a's ability causing
+  -- a double-faced spell already on the stack to enter transformed does not
+  -- either -- it is a replacement effect, EntryRewrite.EntersTransformed. What is
+  -- still absent is the CONVERT wording (#698).
   Layout.Transforming -> [NonEmpty.head (Card.faces card)]
   -- CR 712.11b: "A player casting a modal double-faced card or a copy of a modal
   -- double-faced card as a spell chooses which face they are casting before

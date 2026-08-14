@@ -106,6 +106,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.codec
       EntryRewrite.Tapped
       """ {"type":"Tapped"} """
+  -- CR 712.13a via CR 702.145b: the enters-transformed rewrite, payload-free
+  -- because the rule fixes every half -- which face comes from the card's layout,
+  -- and the condition from the game's designation.
+  Spec.it s "EntersTransformed (Infestation Expert)" $
+    Common.assertCodec
+      s
+      EntryRewrite.codec
+      EntryRewrite.EntersTransformed
+      """ {"type":"EntersTransformed"} """
   -- CR 614.1c: the same tap-state rewrite with a price on avoiding it, and the
   -- amount is card text rather than a rule's, so unlike Tapped above it carries a
   -- payload.

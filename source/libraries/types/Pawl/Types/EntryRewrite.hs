@@ -240,4 +240,46 @@ data EntryRewrite
     -- sentence, and CR 614.12a settles the choice before the permanent enters, so
     -- there is no board for a variable amount to be measured against yet.
     PayLifeOrTapped Natural.Natural
+  | -- | CR 712.13a via CR 614.1c: the ability that makes a double-faced spell
+    -- with its FRONT face up on the stack enter the battlefield transformed. CR
+    -- 616.1d ranks it a bucket of its own
+    -- (Pawl.Types.ReplacementBucket.BackFaceOnEntry), which is what distinguishes
+    -- it from every other arm here.
+    --
+    -- A REPLACEMENT and not Pawl.Types.EntryRiders' `transformed`, which is CR
+    -- 712.14a: that rule is an instruction an effect carries into a move it is
+    -- performing ("put it onto the battlefield transformed"), while this one
+    -- rewrites an entry the effect had nothing to do with -- the resolution of a
+    -- spell somebody else's ability is watching. Neither can express the other,
+    -- and CR 616.1d exists because only this one competes for an order.
+    --
+    -- NOT WRITTEN BY A CARD, and NULLARY, the position Riot and Unleash take: it
+    -- is minted from the finished projection by
+    -- Pawl.Engine.Keyword.mintedReplacementsOf, so a card says only
+    -- `Keyword.Daybound` and rule 702.145b says what it means. It still
+    -- round-trips through the codec, because every arm of this type does.
+    --
+    -- WHICH FACE is not carried, for CR 712.14a's reason one rule over: the
+    -- ability names none, and the answer falls out of the card's layout
+    -- (Pawl.Engine.Card.backFace). So this stays clear of CR 712.11b's choice of
+    -- face when casting a modal double-faced card, which is a list of castable
+    -- faces offered to the player rather than an instruction.
+    --
+    -- The CONDITION is not carried either, and rule 702.145b is why: "IF IT IS
+    -- NIGHT and this permanent is represented by a double-faced card, it enters
+    -- transformed." Both halves are the rule's, so both are asked by
+    -- Pawl.Engine.Replacement.applies -- the row is collected on every entry and
+    -- admits only the ones the rule admits, which is what keeps a daybound
+    -- permanent entering by day out of CR 616.1d's bucket entirely.
+    --
+    -- Applied by Pawl.Engine.Event's arm as a write to Object.face on the
+    -- already-materialized incarnation, Tapped's footing exactly: runEntry runs
+    -- before the Moved event is recorded, so no trigger scan and no state-based
+    -- action can see the interim front face, and the permanent's own
+    -- enters-the-battlefield triggers are the BACK face's.
+    --
+    -- Not implemented: CR 712.13a's second sentence, where a back face that is an
+    -- instant or sorcery face sends the spell to its owner's graveyard instead of
+    -- the battlefield (#1547).
+    EntersTransformed
   deriving (Eq, Ord, Show)
