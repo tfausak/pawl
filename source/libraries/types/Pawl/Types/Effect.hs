@@ -1402,9 +1402,9 @@ data Effect card
     -- pass, so an iteration that produced nothing reads nothing rather than the
     -- previous member's answer.
     --
-    -- ORDER: APNAP (CR 608.2f's primary determination) and then the engine's
-    -- own tiebreak within one controller, which that rule's secondary sentence
-    -- gives to the resolving controller instead (#379). Observable here for the
+    -- ORDER: APNAP (CR 608.2f's primary determination) and then, within one
+    -- controller, that rule's secondary sentence -- which is the RESOLVING
+    -- controller's choice, asked as Prompt.OrderForEach. Observable here for the
     -- first time, because a body drawing on a depleting resource -- your own
     -- library -- gives two members of one batch different answers depending on
     -- which went first.
