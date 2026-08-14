@@ -1589,8 +1589,10 @@ declareAttackers pid = do
 -- three, and the degradation for an out-of-list answer is the defending player,
 -- whom the guard below has already checked is in the game.
 --
--- CR 508.4d's unblocked-on-entry rule is not implemented: every source in the
--- pool enters during the declare attackers step, before blockers exist (#368).
+-- CR 508.4d's unblocked-on-entry rule holds by construction rather than by a
+-- check: Combat.blockers is added to only by declareBlockers, so a creature that
+-- arrives here after blockers were declared sits in no blocker's set and is
+-- unblocked for the rest of the combat.
 putOntoBattlefieldAttacking :: ObjectId -> Game ()
 putOntoBattlefieldAttacking oid = do
   gs <- State.get
