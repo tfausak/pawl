@@ -125,6 +125,7 @@ import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LimitUnless as LimitUnless
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -662,6 +663,9 @@ effectCounts effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
+  -- No Quantity: rule 701.20e's look names its cards through an ObjectRef, and
+  -- ObjectRef.TopOfLibrary's depth is a literal Natural.
+  Effect.LookAt {} -> []
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -982,6 +986,7 @@ effectReplacements effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.Mill {} -> []
+  Effect.LookAt {} -> []
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
@@ -1517,6 +1522,7 @@ effectMintedFaces effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.Mill {} -> []
+  Effect.LookAt {} -> []
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
@@ -1775,6 +1781,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.OwnedBy _ -> 0
   Filter.Type.IsSource -> 0
   Filter.Type.IsPlayer _ -> 0
+  Filter.Type.IsBound _ -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   Filter.Type.IsAttacking -> 0
   Filter.Type.IsBlocking -> 0
@@ -2054,6 +2061,9 @@ objectRefFilters ref = case ref of
   -- Ignorant Bliss' "all cards from your hand" holds none either: CR 400.2
   -- makes a hand hidden, so the arm carries no Filter to lint.
   ObjectRef.EachCardInYourHand -> []
+  -- Hoarding Dragon's "the exiled card" holds none either: CR 607.2a's set is
+  -- named by which object exiled the cards, never by their characteristics.
+  ObjectRef.EachCardExiledWithSource -> []
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it holds
@@ -2561,6 +2571,9 @@ effectFilters effect = case effect of
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
   Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
+  -- The ObjectRef's Filter is a position a card author writes, so the lint
+  -- reaches it, as Explore's does.
+  Effect.LookAt (LookAt.MkLookAt ref _) -> unframed (objectRefFilters ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
@@ -3876,6 +3889,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachMatching _ -> False
           ObjectRef.EachCardInGraveyard {} -> False
           ObjectRef.EachCardInYourHand -> False
+          -- CR 607.3 is what makes this one plural even where the card's own
+          -- words are singular: an ability referring to "the exiled card" whose
+          -- linked ability exiled several performs its action on each of them.
+          ObjectRef.EachCardExiledWithSource -> False
           ObjectRef.EachPlayer -> False
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
             depth <= 1 && case player of

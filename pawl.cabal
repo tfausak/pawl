@@ -294,6 +294,8 @@ library codec
     Pawl.Codec.LifeChangeSpec
     Pawl.Codec.LimitUnless
     Pawl.Codec.LimitUnlessSpec
+    Pawl.Codec.LookAt
+    Pawl.Codec.LookAtSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
@@ -973,6 +975,7 @@ library types
     Pawl.Types.LibraryPosition
     Pawl.Types.LifeChange
     Pawl.Types.LimitUnless
+    Pawl.Types.LookAt
     Pawl.Types.Loyalty
     Pawl.Types.Mana
     Pawl.Types.ManaCost

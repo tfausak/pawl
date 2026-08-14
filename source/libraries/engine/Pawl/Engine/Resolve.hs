@@ -108,6 +108,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
@@ -251,6 +252,7 @@ objectRefSlots ref = case ref of
   ObjectRef.EachMatching _ -> Map.empty
   ObjectRef.EachCardInGraveyard {} -> Map.empty
   ObjectRef.EachCardInYourHand -> Map.empty
+  ObjectRef.EachCardExiledWithSource -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> playerRefSlots player
   -- A PlayerScope names players by their relation to the effect's controller (CR
@@ -322,6 +324,9 @@ slotsOf effect = case effect of
   -- it belongs to boundSlots below -- Destroy's third field takes the same
   -- posture, for the same reason.
   Effect.Mill (Mill.MkMill ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  -- The bound slot is a DEFINITION and not a read, the posture Mill's tally
+  -- above takes; boundSlots below is where it is reported.
+  Effect.LookAt (LookAt.MkLookAt ref _) -> objectRefSlots ref
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -558,6 +563,7 @@ slotsAreExhaustive effect = case effect of
   Effect.MoveToZone {} -> True
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.LookAt {} -> True
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -696,6 +702,7 @@ readsX = any effectReadsX
       Effect.MoveToZone {} -> False
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
+      Effect.LookAt {} -> False
       Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -781,9 +788,10 @@ searchesLibrary effect = case effect of
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
   Effect.Mill {} -> False
-  -- The three look-and-split actions look at the top N, where CR 701.23a's
-  -- search looks at ALL of a zone; Panglacial Wurm's window is the latter's
-  -- alone.
+  -- CR 701.20e's look and the three look-and-split actions each look at NAMED
+  -- cards, where CR 701.23a's search looks through ALL of a zone; Panglacial
+  -- Wurm's window is the latter's alone.
+  Effect.LookAt {} -> False
   Effect.Scry {} -> False
   Effect.Surveil {} -> False
   Effect.Fateseal {} -> False
@@ -920,6 +928,11 @@ boundSlots effect = case effect of
   -- How many of the cards this mill put in the graveyard matched the tally's
   -- filter, for CR 728.1's "for each nonland card milled this way" to read.
   Effect.Mill (Mill.MkMill _ _ mTally) -> foldMap (Set.singleton . MillTally.slot) mTally
+  -- The cards CR 701.20e's look showed, for a later clause of the same
+  -- resolution to name -- Into the Wilds' "if it's a land card ... put it onto
+  -- the battlefield", which reads the slot twice over (Filter.IsBound, then
+  -- ObjectRef.InSlot).
+  Effect.LookAt (LookAt.MkLookAt _ slot) -> Set.singleton slot
   Effect.Scry {} -> Set.empty
   Effect.Surveil {} -> Set.empty
   Effect.Fateseal {} -> Set.empty
@@ -1199,7 +1212,23 @@ resolveSpellWith runSubgame oid = do
                     -- CR 701.46a's printed "if" first: it precedes the
                     -- instructions in written order (CR 608.2c), and a clause
                     -- that cannot happen is no question to ask.
-                    gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) chosen) clause
+                    -- The LIVE bindings, not the start-of-resolution ones, for the
+                    -- reason the gate is asked here at all (CR 608.2c): a slot an
+                    -- earlier clause of this resolution DEFINED is part of the
+                    -- state this clause is read against -- Into the Wilds' "if
+                    -- it's a land card" over the card its first clause looked at.
+                    -- Same re-read `applyOne` above makes, and it adds only
+                    -- defined slots: CR 608.2b's re-validation is still the one
+                    -- made once, as the resolution began.
+                    --
+                    -- A REGRESSION FENCE on this path rather than a proved
+                    -- behaviour: every card in the pool whose gate reads a
+                    -- mid-resolution slot is a triggered ability, so mutating
+                    -- this half back to the start-of-resolution map leaves the
+                    -- suite green. It is here because the two paths must read
+                    -- CR 608.2c the same way.
+                    gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
+                    gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) clause
                     -- CR 603.5 / 608.2d: then the printed "may".
                     taken <- if gated then exercises oid effectController idx cIdx clause else pure False
                     -- CR 118.12a: and then this clause's "unless [a player]
@@ -1368,7 +1397,14 @@ resolveModes stackId srcId modes = do
                   -- reason. Read against `srcId`, the source permanent, not the
                   -- ability object -- CR 701.46a says "this permanent", which is
                   -- also why `paid` is given `srcId`.
-                  gated <- gateHolds effectController srcId (instanceView chosen) clause
+                  -- The LIVE bindings off the STACK object, the spell path's own
+                  -- re-read and for its reason (CR 608.2c) -- and off that object
+                  -- rather than off `srcId`, because that is where this
+                  -- resolution's slots are bound (see bindSlot). Proved by
+                  -- Pawl.ResolveSpec's LookAt group, whose card is Into the
+                  -- Wilds.
+                  gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
+                  gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) clause
                   -- CR 603.5 / 608.2d: then the printed "may", answered as this
                   -- clause's instructions are applied.
                   taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
@@ -1542,7 +1578,7 @@ resolveAbility abilId srcId ability = do
        in resolveModes abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
 
 -- CR 701.27a over ONE object: turn it over, or leave the map exactly as it was.
--- The Transform arm of applyEffectWith folds this over its victims.
+-- The Transform arm of applyOneEffect folds this over its victims.
 --
 -- The turn itself is Game.turnFaceOver, shared with the CR 702.145c/f sweep in
 -- Pawl.Engine.Daytime, and that is where the account of what a turn writes and of
@@ -1767,6 +1803,27 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- keeps and no rule reads: CR 400.5 leaves a hand's arrangement to its owner,
   -- so nothing observes it and nothing may depend on it.
   ObjectRef.EachCardInYourHand -> Game.zoneMembers Zone.Hand controller gs
+  -- CR 607.2a's linked set: the cards in exile GameState.exiledWith files against
+  -- this effect's SOURCE. Not a filter and not a zone sweep -- the relation is the
+  -- membership test, so a card exiled by a second copy of the same printing is a
+  -- different entry and is not named here.
+  --
+  -- `source` and not `resolving`, which is the whole point: rule 607.2a links two
+  -- abilities of one OBJECT, and for a dies trigger the two ids differ (the
+  -- ability object on the stack is not the permanent that exiled anything).
+  --
+  -- Read off GameState.exile directly, where every sibling arm goes through
+  -- Game.zoneMembers: CR 400.1 makes exile one SHARED zone, so there is no player
+  -- to ask it about.
+  --
+  -- In exile-set order, which is ascending id and so arrival order, since
+  -- Pawl.Engine.Game mints ids increasing. No APNAP sort, unlike the battlefield
+  -- and graveyard arms: one shared zone has no seats to interleave, and CR 101.4
+  -- asks for an order only where a per-player question is put.
+  ObjectRef.EachCardExiledWithSource ->
+    filter
+      (\oid -> Map.lookup oid (GameState.exiledWith gs) == Just source)
+      (Set.toList (GameState.exile gs))
   -- Names players and so no objects at all. Empty rather than an error: every
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
   -- empty answer is what a slot holding a player already gives them.
@@ -1946,6 +2003,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- CR 109.2a draws the set from the hand the card's own words name, and what
   -- kind of object each one is stays the OPCODE's question.
   ObjectRef.EachCardInYourHand -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  -- Cards a third time, so Recipient.ToObject a third time: CR 607.2a's set is
+  -- cards in exile, and which kind each one is stays the OPCODE's question.
+  ObjectRef.EachCardExiledWithSource -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- A card, so it arrives as Recipient.ToObject for EachMatching's reason: what
   -- kind of object a library's top card is, is the OPCODE's question.
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -2223,6 +2283,54 @@ effectContext controller source legal =
     . Map.mapMaybe Recipient.objectOf
     $ Map.mapMaybe Binding.onlyOne legal
 
+-- One effect, applied, wrapped in the window CR 607.2a's link is filed from: what
+-- was in exile before, and what is in it after. The effect itself is
+-- applyOneEffect below, whose comment documents every parameter.
+applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
+applyEffectWith runSubgame resolving source controller legal chosen effect = do
+  before <- State.gets GameState.exile
+  applyOneEffect runSubgame resolving source controller legal chosen effect
+  State.modify' (recordExiledWith source before)
+
+-- CR 607.2a's link, filed as the instruction that made it finishes: every card
+-- that ARRIVED in exile while the effect ran is filed against that effect's
+-- source, which is the object whose ability the instruction was in.
+--
+-- A DIFFERENCE over GameState.exile rather than a case over the opcode, and that
+-- is the design call: rule 607.2a asks whether an ability's instruction exiled
+-- the card, never which instruction it was, so a Search with an exile
+-- destination, a MoveToZone naming exile and a keyword that exiles are all one
+-- road and the rules core stays off effect identity.
+--
+-- New IDS and not new cards, so the set difference cannot mistake a card already
+-- in exile for an arrival: CR 400.7 mints a fresh incarnation for every move, and
+-- a card that leaves exile takes its old id with it.
+--
+-- The INNERMOST filing wins, which is what insertWith keeps: applyEffectWith
+-- recurses (Effect.ForEach's body, Effect.PreventNextDamage's payload), so an
+-- outer window sees what an inner one already filed. Both recursive callers pass
+-- the same `source` today, so nothing observes the choice; keeping the inner one
+-- is the answer that stays right if one ever does not.
+--
+-- Then RESTRICTED to what is still in exile, which is what keeps the map from
+-- growing over a game: an entry whose card has left exile can never be named
+-- again (the reader intersects with GameState.exile, and CR 400.7 mints a new id
+-- for the card that left), so dropping it changes no answer. Pawl.Engine.Departure
+-- deletes on the other axis, by owner, when CR 800.4a takes a player's cards out
+-- of the game.
+--
+-- Filed for a SPELL's effects too, where rule 607.2a scopes the link to an
+-- activated or triggered ability. Unreadable rather than wrong: the only reader
+-- is ObjectRef.EachCardExiledWithSource, which matches against a source id, and
+-- CR 608.2n puts the spell into its owner's graveyard as the last part of its own
+-- resolution -- so the id it filed under names nothing any later ability can be
+-- the source of.
+recordExiledWith :: ObjectId -> Set ObjectId -> GameState -> GameState
+recordExiledWith source before gs =
+  let arrived = Set.difference (GameState.exile gs) before
+      file oid = Map.insertWith (\_ inner -> inner) oid source
+   in gs {GameState.exiledWith = Map.restrictKeys (foldr file (GameState.exiledWith gs) arrived) (GameState.exile gs)}
+
 -- One effect, applied. The case on the constructor is this module's charter.
 -- `runSubgame` is the injected nested-game runner; only the PlaySubgame arm
 -- consults it, and the bare applyEffect below passes noSubgame.
@@ -2247,8 +2355,8 @@ effectContext controller source legal =
 -- why every Quantity goes through Quantity.evaluateFor with both ids rather than
 -- Quantity.evaluate with `source` alone: an X-cost ability that sacrifices its
 -- source to pay leaves the announced value only on the ability object (#544).
-applyEffectWith :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
-applyEffectWith runSubgame resolving source controller legal chosen effect = case effect of
+applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
+applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -2949,6 +3057,14 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             ObjectRef.EachCardInYourHand -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
+            -- Hoarding Dragon's "put the exiled card into its owner's hand" (CR
+            -- 607.2a), swept once from the PRE-MOVE state for the three sweeps
+            -- above's reason (CR 608.2c, CR 608.2f). "Its owner's hand" needs
+            -- nothing here for EachMatching's reason: CR 400.3 files a hand
+            -- arrival under Object.owner.
+            ObjectRef.EachCardExiledWithSource -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
             -- Players, and no card moves one to a zone. objectRefObjects' empty
             -- answer, so the move is a no-op rather than a rejected card.
             ObjectRef.EachPlayer -> pure []
@@ -3242,6 +3358,23 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             Nothing -> False
             Just face -> Filter.matches tallyContext (Projection.viewOfCardIn gs oid face) (MillTally.filter tally)
        in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
+  Effect.LookAt (LookAt.MkLookAt ref slot) -> do
+    gs <- State.get
+    -- CR 608.2c: the cards are named as this instruction is reached, and CR
+    -- 701.20b (reached by rule 701.20e) leaves every one of them where it is --
+    -- so this whole arm is the binding, and an empty library binds nothing.
+    --
+    -- No prompt and no event. Rule 701.20e shows the cards to one player, which
+    -- pawl has no way to do (#1412); what reaches the seat is the later clause's
+    -- own question, and a public GameEvent.Revealed would be a different rule
+    -- (CR 701.20a).
+    case objectRefObjects legal resolving controller source gs ref of
+      [] -> pure ()
+      -- bindArrivals' one-versus-many line, minus its prompt: one card takes the
+      -- SINGLE binding, which is the only one a Filter.IsBound can see, and is
+      -- what every printing in the corpus looks at (#1532).
+      [only] -> State.modify' (bindSlot resolving slot only)
+      several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -5022,9 +5155,10 @@ putFound searcher destination cardId = case destination of
   -- Hoarding Dragon's "exile it": the move alone, with NO Event.reveal ahead of
   -- it. CR 701.23e is what makes that right rather than an omission -- the card
   -- says only "exile it", so nothing is revealed, and the exiled card being
-  -- visible afterwards is CR 400.2 making exile a public zone. Which card was
-  -- exiled by this instruction is not recorded (#968), so no later ability can
-  -- name it.
+  -- visible afterwards is CR 400.2 making exile a public zone. Which card this
+  -- instruction exiled is CR 607.2a's link, filed by recordExiledWith off the
+  -- effect that ran rather than here, which is what the Dragon's dies trigger
+  -- reads back through ObjectRef.EachCardExiledWithSource.
   SearchDestination.Exile -> Event.changeZone cardId Zone.Exile
 
 -- Put a library card onto the battlefield tapped (CR 701.23's Evolving Wilds

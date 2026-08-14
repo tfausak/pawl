@@ -71,6 +71,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -1607,6 +1608,9 @@ rewriteEffect pairs effect = case effect of
   -- swap reaches it; the slot it binds to is a name no card prints.
   Effect.Mill (Mill.MkMill ref quantity mTally) ->
     Effect.Mill (Mill.MkMill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally))
+  -- The ObjectRef alone, as Explore below: the slot name is not a word a CR
+  -- 612.1 swap reaches.
+  Effect.LookAt (LookAt.MkLookAt ref slot) -> Effect.LookAt (LookAt.MkLookAt (rewriteObjectRef pairs ref) slot)
   Effect.Scry {} -> effect
   Effect.Surveil {} -> effect
   Effect.Fateseal {} -> effect
@@ -1706,13 +1710,15 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- Chooser name players rather than subtypes. EachPlayer, TopOfLibrary and
 -- EachCardInYourHand carry no word at all -- CR 612.1 changes subtype words, and
 -- "each player", "the top card of your library" and "all cards from your hand"
--- have none.
+-- have none. Nor does EachCardExiledWithSource: CR 607.2a's set is named by which
+-- object exiled the cards, so "the exiled card" carries no subtype either.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s f) -> ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s (Filter.rewrite pairs f))
   ObjectRef.EachCardInYourHand -> ref
+  ObjectRef.EachCardExiledWithSource -> ref
   ObjectRef.EachPlayer -> ref
   ObjectRef.TopOfLibrary {} -> ref
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
@@ -2795,6 +2801,10 @@ filterReads f = case f of
   -- should.
   Filter.Type.OwnedBy _ -> Set.empty
   Filter.Type.IsSource -> Set.empty
+  -- Reads an object's IDENTITY, which CR 109.3 does not count among its
+  -- characteristics and no CR 613 layer writes -- IsSource's answer, and for its
+  -- reason.
+  Filter.Type.IsBound _ -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   -- Reads a CONTROLLER rather than a characteristic (CR 109.3 lists none), so it
   -- declares nothing -- IsPlayer's answer, and ControlledBy's.
