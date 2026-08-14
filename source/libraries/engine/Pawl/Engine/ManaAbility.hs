@@ -70,6 +70,7 @@ manaProduced effect = case effect of
   Effect.Search {} -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
+  Effect.Bolster _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.Venture -> Nothing
   Effect.ExileHandThenDraw -> Nothing

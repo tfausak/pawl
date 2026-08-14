@@ -638,6 +638,9 @@ effectCounts effect = case effect of
   Effect.Search (Search.MkSearch _ _ quantity _ _) -> quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  -- Bolster's N is a Quantity like the Search's above, so its Counts are
+  -- reachable from here.
+  Effect.Bolster quantity -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -955,6 +958,7 @@ effectReplacements effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Bolster _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -1484,6 +1488,7 @@ effectMintedFaces effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Bolster _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -2506,6 +2511,9 @@ effectFilters effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ f _) -> unframed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
+  -- Filter on the card names it.
+  Effect.Bolster quantity -> unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []

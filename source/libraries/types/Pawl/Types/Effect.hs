@@ -28,6 +28,7 @@ import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import qualified Pawl.Types.PutCounters as PutCounters
+import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
@@ -1113,6 +1114,30 @@ data Effect card
     -- (Hardened Scales, Doubling Season, Vorinclex) get their opportunity against
     -- either recipient.
     Proliferate
+  | -- | CR 701.39a: "bolster N" -- choose a creature the resolving controller
+    -- controls with the least toughness, or tied for least, among the creatures
+    -- they control, then put that many +1\/+1 counters on it.
+    --
+    -- CHOOSE, not target, Proliferate's and TemptWithTheRing's posture: rule
+    -- 701.39a says "choose", so no slot is declared (CR 601.2c), the creature is
+    -- picked on RESOLUTION via Prompt.ChooseBolster, and nothing is subject to CR
+    -- 608.2b's illegal-target check -- which is why this carries no SlotName.
+    --
+    -- ONE payload and no more, because rule 701.39a fixes everything else an
+    -- author could vary: the chooser is "you", the counter is a +1\/+1 counter,
+    -- the count of creatures is one, and the candidate set is "creatures you
+    -- control with the least toughness". Only N varies, and it is a Quantity
+    -- rather than a Natural because the pool prints it as an expression:
+    -- Dragonscale General's "bolster X, where X is the number of tapped creatures
+    -- you control" and Sunbringer's Touch's "where X is the number of cards in
+    -- your hand" are counts over game state rather than literals.
+    --
+    -- NOT a PutCounters over some cleverer ObjectRef. An ObjectRef DESCRIBES a set
+    -- and the whole set is counted (CR 115.10a); rule 701.39a describes a set and
+    -- then has a player pick ONE out of it, which no ref can say. That choice is
+    -- also the reason this is an opcode at all rather than card data: support
+    -- (CR 701.41a) needed none because targeting already had the shape.
+    Bolster Quantity.Quantity
   | -- | CR 701.54a: the Ring tempts the resolving controller -- they get an emblem
     -- named The Ring if they have none (CR 701.54c), then choose a creature they
     -- control to become their Ring-bearer.
