@@ -244,6 +244,7 @@ dirtied :: PlayerId -> Object.Object -> Object.Object
 dirtied pid object =
   object
     { Object.tapped = TapState.Tapped,
+      Object.exiledFaceDown = True,
       Object.damage = 1,
       Object.sickness = Sickness.Settled pid,
       Object.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "target")) Binding.empty,
@@ -267,6 +268,11 @@ dirtied pid object =
 -- forgetting again changes nothing exactly when the move already applied it in
 -- full, so this stays honest as fields are added -- unlike a list of field
 -- comparisons, which would have to be extended by hand alongside Object.
+--
+-- ONE BLIND SPOT, since the predicate is Object.newIncarnation's own fixed
+-- point: a field that function never resets is invisible here however dirty
+-- `dirtied` above leaves it. Deleting a line from newIncarnation therefore
+-- leaves this green.
 forgotten :: Object.Object -> Bool
 forgotten object = Object.newIncarnation object == object
 

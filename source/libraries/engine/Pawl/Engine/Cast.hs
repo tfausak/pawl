@@ -463,6 +463,11 @@ permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
 -- Every other zone in castZones is one the rules scope by player anyway: a hand
 -- and a graveyard are per-player piles (CR 400.1), and CR 903.8 lets only a
 -- commander's owner cast it from the command zone.
+-- Not implemented: CR 601.3f's gate on a card exiled FACE DOWN -- "a player may
+-- begin to cast such a spell only if they can look at the face-down card in
+-- exile". Unreachable today, since the only card that exiles face down grants no
+-- permission to play what it exiled, and Effect.GrantPlayFromExile is the only
+-- writer of the permission this list is then filtered by (#1480).
 zoneCandidates :: Zone.Zone -> PlayerId -> GameState -> [ObjectId]
 zoneCandidates zone pid gs = case zone of
   Zone.Exile -> Set.toList (GameState.exile gs)

@@ -2189,6 +2189,11 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                     -- 616.1 redirect into any other zone leaves an ordinary face
                     -- up card, and an effect that names the rider on a move
                     -- somewhere else says something no rule reads.
+                    --
+                    -- Nothing observes either gate today: the pool's one
+                    -- face-down exile names exile, and no replacement redirects
+                    -- it. Both are regression fences rather than proven
+                    -- behaviour -- dropping them leaves the suite green.
                     Object.exiledFaceDown = concealed && dest == requestedDest && dest == Zone.Exile
                   }
               -- CR 604.2 ends a static ability's continuous effect the moment
@@ -6175,6 +6180,9 @@ eventTriggers events gs =
       -- 108.4a), also for `inGraveyards`' reasons: CR 108.4 gives a card in exile
       -- no controller at all, so Blind Hunter's "you gain 2 life" pays the player
       -- who owns the haunting card.
+      -- Not implemented: a card exiled FACE DOWN is scanned here like any other,
+      -- so its printed abilities are offered where CR 406.3a leaves it none
+      -- (#1479).
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
           case filter (functionsIn Zone.Exile) (Face.triggeredAbilities face) of

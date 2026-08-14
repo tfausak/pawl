@@ -90,6 +90,10 @@ spec s registry = Spec.describe s "Face-down exile" $ do
       Spec.assertEqWith s "alice's hand was emptied by the spell" (S.handSize S.alice board) 0
       Spec.assertEqWith s "two cards returned, plus the draw" (S.handSize S.alice after) 3
       Spec.assertEqWith s "only the face-up card is left in exile" (Set.size (GameState.exile after)) 1
+      -- A REGRESSION FENCE, not a proof: the returning move carries the default
+      -- rider, so its arrival is face up by construction rather than by any
+      -- guard. Dropping Event.changeZoneAttaching's destination gate leaves
+      -- this green.
       Spec.assertEqWith s "and nothing in a hand is face down in exile" (concealedIn Zone.Hand S.alice after) []
       Spec.assertEqWith s "the delayed ability was spent" (length (GameState.delayedTriggers after)) 0
 
