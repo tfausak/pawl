@@ -8405,8 +8405,9 @@ becameSlotSpec s registry =
 -- here where becameSlotSpec's Endless Cockroaches had to keep two incarnations
 -- of one card apart. Not transcribed: the second ability, "at the beginning of
 -- each end step, if you control no creatures, sacrifice this enchantment and
--- return all cards exiled with it to the battlefield under your control"
--- (#968).
+-- return all cards exiled with it to the battlefield under your control" -- CR
+-- 607.2a's link is recorded now, so what is left is the end-step trigger, the
+-- sacrifice of the ability's own source, and the battlefield destination (#968).
 --
 -- The discriminating assertion is WHICH id the payload moves. CR 603.10a makes
 -- Event.matchesTrigger's PermanentDies arm match on ZoneChange.departed, so
