@@ -36,6 +36,13 @@ already written down** --- `t:aura o:/morph/`, not the two cards the thread
 argued about. The two best producers found in that run were each one query
 away, sitting behind cards everyone had already rejected.
 
+**"This needs a subsystem pawl doesn't have" is the least reliable rejection.**
+One sweep found four of them wrong --- populate, bloodthirst, recover and
+fortify --- each because the rejection named a plausible missing capability
+without checking whether it was missing. Verify at the *carrier*: the specific
+type or function that would hold the behaviour. Read it, and name it in the
+finding. "Needs X" with no carrier named is not a derivation.
+
 **A false claim can live in a code comment.** One sentence in an engine module
 asserted that nothing in the pool could attach to a particular creature, while
 the card that could sat in the same tree. That sentence made an issue look
