@@ -1576,7 +1576,8 @@ ingest =
                 EntryRiders.attacking = False,
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.empty,
-                EntryRiders.underOwner = False
+                EntryRiders.underOwner = False,
+                EntryRiders.exiledFaceDown = False
               }
             Nothing
             Nothing
@@ -2471,7 +2472,8 @@ returns kind =
                 EntryRiders.attacking = False,
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.singleton kind 1,
-                EntryRiders.underOwner = True
+                EntryRiders.underOwner = True,
+                EntryRiders.exiledFaceDown = False
               }
             Nothing
             Nothing
@@ -2529,7 +2531,8 @@ afterlife n =
                   EntryRiders.attacking = False,
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.empty,
-                  EntryRiders.underOwner = False
+                  EntryRiders.underOwner = False,
+                  EntryRiders.exiledFaceDown = False
                 },
             Create.slot = Nothing
           }
@@ -2646,7 +2649,8 @@ fabricate n =
                   EntryRiders.attacking = False,
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.empty,
-                  EntryRiders.underOwner = False
+                  EntryRiders.underOwner = False,
+                  EntryRiders.exiledFaceDown = False
                 },
             Create.slot = Nothing
           }
@@ -2757,7 +2761,8 @@ soulshift n =
                 EntryRiders.attacking = False,
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.empty,
-                EntryRiders.underOwner = False
+                EntryRiders.underOwner = False,
+                EntryRiders.exiledFaceDown = False
               }
             Nothing
             Nothing

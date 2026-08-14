@@ -66,6 +66,24 @@ data ObjectRef
     -- Not a target and never one (CR 115.10a), and swept when the effect executes
     -- (CR 608.2c) -- the two properties EachMatching above has, for its reasons.
     EachCardInGraveyard EachCardInGraveyard.EachCardInGraveyard
+  | -- | Every card in the RESOLVING CONTROLLER's hand -- Ignorant Bliss' "exile
+    -- all cards from your hand". EachMatching's sibling with CR 109.2's
+    -- battlefield default switched off the same way EachCardInGraveyard switches
+    -- it off, CR 109.2a.
+    --
+    -- Nullary, where the graveyard arms carry a scope and a filter, and each
+    -- omission is a rule rather than an economy. NO PLAYER: CR 400.2 makes a hand
+    -- a hidden zone, so an arm reaching anyone else's would owe a visibility
+    -- question this one never asks -- CR 109.5's "you" is the resolving
+    -- controller, who may already look at their own hand. NO FILTER: a filtered
+    -- sweep of a hidden zone is the same question, since matching would reveal
+    -- which cards matched, and nothing needs to be told apart when EVERY card
+    -- goes (#1309).
+    --
+    -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
+    -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
+    -- properties EachMatching above has.
+    EachCardInYourHand
   | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The one
     -- arm that names no object at all, and it is here rather than on
     -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:

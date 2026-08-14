@@ -493,6 +493,7 @@ activateAbility pid srcId ability = do
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
+            Object.exiledFaceDown = False,
             Object.damage = 0,
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,

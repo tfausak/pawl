@@ -59,7 +59,9 @@ data Pool
     CardsInGraveyard GraveyardScope.GraveyardScope
   | -- | CR 406.1: the cards in the exile zone (ToObject) -- Riftsweeper's "choose
     -- target face-up exiled card". Clause (a)'s other-zone half again. Public
-    -- (CR 400.2), so every candidate is visible to the chooser.
+    -- (CR 400.2), so every candidate is visible to the chooser -- that rule's
+    -- own exception for the cards an effect exiles face down being what the
+    -- last paragraph here disposes of.
     --
     -- NO PlayerScope, and the asymmetry with CardsInGraveyard above is the whole
     -- point: CR 400.1 makes exile a SHARED zone, so there is no per-player copy
@@ -72,8 +74,12 @@ data Pool
     -- zone, and CR 109.2's battlefield default is switched off by the card's own
     -- word.
     --
-    -- "FACE-UP" is not modelled, and is vacuous rather than elided: CR 406.3
-    -- keeps exiled cards face up by default, and no card in pawl's pool exiles
-    -- anything face down (#557).
+    -- "FACE-UP" is not a Filter and does not need to be: CR 406.4 lets a player
+    -- choose a specific face-down exiled card only if they are allowed to look
+    -- at it, and nothing grants that permission, so
+    -- Pawl.Engine.Target.exileRecipients leaves every face-down card out of the
+    -- pool for EVERY card that names one. Riftsweeper's qualifier is then
+    -- redundant rather than vacuous: Ignorant Bliss really does put cards into
+    -- exile that Riftsweeper may not name.
     CardsInExile
   deriving (Eq, Ord, Show)

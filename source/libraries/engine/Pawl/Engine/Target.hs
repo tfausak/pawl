@@ -25,6 +25,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
@@ -659,11 +660,25 @@ playerOf recipient = case recipient of
 -- objects still controlled by that player are exiled, and they are owned by
 -- somebody still here.
 --
--- CR 406.3's face-up default is what makes the whole set offerable. No card in
--- pawl's pool exiles face down, so there is no face-down pile for CR 406.4's
--- choose-at-random rule to reach (#557).
+-- CR 406.4's first half is the one filter this pool does carry: "if a player is
+-- instructed to choose an exiled card, the player may choose a specific
+-- face-down card ONLY IF the player is allowed to look at that card". Nothing in
+-- pawl grants that permission to anybody, so a card exiled face down (Ignorant
+-- Bliss) is a candidate for no one -- which is also what makes Riftsweeper's
+-- printed "face-up exiled card" pick out exactly this set.
+--
+-- Not implemented: the rule's second half, where a player who may NOT look
+-- chooses a pile of face-down exiled cards and a card is taken at random out of
+-- it. That is a candidate that is not an object, which no Prompt can carry, so
+-- the face-down cards are offered as nothing at all rather than as a pile
+-- (#1480).
 exileRecipients :: GameState -> Set Recipient
-exileRecipients gs = Set.fromList (fmap Recipient.ToObject (Set.toList (GameState.exile gs)))
+exileRecipients gs =
+  Set.fromList
+    ( fmap
+        Recipient.ToObject
+        (filter (\oid -> not (any Object.exiledFaceDown (Game.lookupObject oid gs))) (Set.toList (GameState.exile gs)))
+    )
 
 -- CR 608.2b: a target that left the zone it was chosen in is illegal (its id
 -- names an object that no longer exists, per CR 400.7), and legality is

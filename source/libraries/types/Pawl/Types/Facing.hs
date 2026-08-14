@@ -15,7 +15,8 @@ module Pawl.Types.Facing where
 --
 -- Face-down EXILE is a different thing wearing the same words, and this type is
 -- not it: CR 406.3's face-down exiled card has no relation to a permanent's
--- face-down status, which CR 110.5d says in as many words (#557).
+-- face-down status, which CR 110.5d says in as many words. Object.exiledFaceDown
+-- is that other thing, and its own haddock has the rest of the distinction.
 data Facing
   = FaceUp
   | FaceDown

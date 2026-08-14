@@ -91,6 +91,31 @@ data Object = MkObject
     -- holds the printing, so CR 708.5's "you can't look at face-down permanents
     -- controlled by another player" is unimplemented (#682).
     facing :: Facing.Facing,
+    -- | CR 406.3: this card was "exiled face down". NOT `facing` above, and
+    -- deliberately a second field rather than a second writer of that one: CR
+    -- 110.5d says in as many words that "although an exiled card may be face
+    -- down, this has no correlation to the face-down status of a permanent",
+    -- and the two differ in every consequence -- CR 708.2a substitutes a 2/2
+    -- creature where CR 406.3a leaves no characteristics at all, and only this
+    -- one is about who may LOOK.
+    --
+    -- WHAT IT DOES today, which is CR 406.4's first half: a player may choose a
+    -- specific face-down exiled card "only if the player is allowed to look at
+    -- that card", and pawl grants that permission to nobody, so
+    -- Pawl.Engine.Target.exileRecipients offers no such card as a target.
+    --
+    -- Not implemented: CR 406.3a's "no characteristics", so a filter that read a
+    -- face-down exiled card's card types would see the printed ones (#1479). Nor
+    -- CR 406.4's second half -- the pile a player who may not look chooses
+    -- instead, and the random card out of it -- nor CR 406.3's continuing
+    -- permission to look (#1480).
+    --
+    -- Per-incarnation state, like `facing`: reset by newIncarnation, so a card
+    -- that leaves exile is face up again wherever it lands (CR 400.7). The one
+    -- door that writes it is Event.changeZoneEntering, off Effect.MoveToZone's
+    -- rider, which is CR 406.3's "by default" being overridden by the effect
+    -- that does the exiling.
+    exiledFaceDown :: Bool,
     -- | CR 120.3e: damage dealt to a creature is MARKED on it. A count, not a list
     -- of tagged units -- unlike mana, every damage rider (wither, infect,
     -- lifelink, toxic) is consumed at deal time and never re-read, and CR 704.5g
@@ -532,6 +557,11 @@ newIncarnation object =
       -- and a face-down permanent leaving the battlefield is revealed to all
       -- players as it goes. Event.changeZoneFaceDown is the "otherwise".
       facing = Facing.FaceUp,
+      -- CR 406.3: exiled cards are kept face up by default, and every other zone
+      -- is face up outright, so the forgetting puts every arrival back to the
+      -- default. Event.changeZoneEntering is the "otherwise", off the effect's
+      -- own rider.
+      exiledFaceDown = False,
       damage = 0,
       sickness = Sickness.Sick,
       bindings = Map.empty,
