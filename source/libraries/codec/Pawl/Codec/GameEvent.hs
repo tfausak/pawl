@@ -66,5 +66,6 @@ codec =
       Arm.payload "AbilityTriggered" AbilityTriggered.codec GameEvent.AbilityTriggered (\x -> case x of GameEvent.AbilityTriggered y -> Just y; _ -> Nothing),
       Arm.payload "ControlChanged" ControlChanged.codec GameEvent.ControlChanged (\x -> case x of GameEvent.ControlChanged y -> Just y; _ -> Nothing),
       Arm.payload "VentureMarkerEntered" VentureMarkerEntered.codec GameEvent.VentureMarkerEntered (\x -> case x of GameEvent.VentureMarkerEntered y -> Just y; _ -> Nothing),
-      Arm.payload "BecameTarget" BecameTarget.codec GameEvent.BecameTarget (\x -> case x of GameEvent.BecameTarget y -> Just y; _ -> Nothing)
+      Arm.payload "BecameTarget" BecameTarget.codec GameEvent.BecameTarget (\x -> case x of GameEvent.BecameTarget y -> Just y; _ -> Nothing),
+      Arm.payload "LeftTheGame" ObjectId.codec GameEvent.LeftTheGame (\x -> case x of GameEvent.LeftTheGame y -> Just y; _ -> Nothing)
     ]

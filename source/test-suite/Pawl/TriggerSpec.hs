@@ -8086,9 +8086,12 @@ representativeEvents cond =
         TriggerCondition.PermanentDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- CR 603.6c admits every destination, and CR 400.2 splits them into
         -- public and hidden, so both sides of CR 400.7e's proviso have to be
-        -- here for the floor to be the honest answer.
+        -- here for the floor to be the honest answer. Rule 603.6c's second
+        -- trigger event is the third: CR 800.4a's departure reaches no zone at
+        -- all, so there is no arriving object for CR 400.7e to offer and it
+        -- binds nothing -- which is what keeps the floor empty.
         TriggerCondition.SelfLeavesTheBattlefield ->
-          moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand]
+          moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all

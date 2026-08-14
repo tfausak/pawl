@@ -6,12 +6,14 @@ import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.CastSpec as CastSpec
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
@@ -19,20 +21,25 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import Pawl.Types.Printing (Printing)
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
@@ -61,6 +68,17 @@ entersResolved oid gs =
   let entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
       withEvent = S.withEvents [GameEvent.Moved (Moved.MkMoved entered (Projection.project oid gs))] gs
    in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
+
+-- CR 117.5 then CR 608.2: settle the board so any ability that triggered is
+-- gathered onto the stack, then run priority out so it resolves.
+-- `entersResolved` above is the same pair; this one takes a board that has
+-- already had its event recorded rather than stamping one.
+resolveTriggers :: GameState.GameState -> GameState.GameState
+resolveTriggers gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs Engine.settleForPriority) Engine.priorityLoop
+
+-- The token Thragtusk's leaves-the-battlefield ability makes.
+beastToken :: CardName.CardName
+beastToken = CardName.MkCardName (Text.pack "Beast Token")
 
 -- bob's Meandering Towershell, stolen by alice's Control Magic, on a board that
 -- has not started its first turn -- so alice's own untap step is what writes CR
@@ -528,3 +546,88 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "the seam says CR 800.4a does not run" (Departure.continuesAfterDeparture returned) False
     Spec.assertEqWith s "so bob simply wins (CR 104.2a)" (GameState.result after) (Just (Result.Won S.bob))
     Spec.assertEqWith s "and the Towershell is not exiled" (fmap (Object.zone . snd) (soleObjectOf towershell after)) (Just Zone.Battlefield)
+
+  -- CR 603.6c's SECOND trigger event: "Leaves-the-battlefield abilities trigger
+  -- when a permanent moves from the battlefield to another zone, OR WHEN A
+  -- PHASED-IN PERMANENT LEAVES THE GAME BECAUSE ITS OWNER LEAVES THE GAME."
+  --
+  -- Three seats, and each one is doing a different job. Bob OWNS the Thragtusk,
+  -- so CR 800.4a's first clause is what takes it. Carol CONTROLS it, so CR
+  -- 603.3a hands her the trigger and CR 800.4d -- which drops a triggered
+  -- ability a departed player would control -- cannot be what decides the case.
+  -- Alice is the active player and the bystander the token count is checked
+  -- against.
+  --
+  -- The trigger can only be read from CR 608.2h last known information: the
+  -- Thragtusk is not merely off the battlefield at the CR 117.5 scan, it is not
+  -- in the game, so #1548's live-board ability read has nothing to find. What
+  -- fires is the ability the record says it had.
+  Spec.it s "CR 603.6c a phased-in permanent leaving the game with its owner triggers its leaves-the-battlefield ability" $ do
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    let (tusk, g1) = S.addCreature thragtusk S.bob S.threePlayerGame
+        board = S.giveControl tusk S.carol (S.addCounter CounterKind.PlusOnePlusOne 1 tusk g1)
+        gone = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.bob)
+        after = resolveTriggers gone
+    Spec.assertEqWith s "carol controls the creature bob owns" (Projection.controllerOf tusk board) (Just S.carol)
+    Spec.assertEqWith s "bob leaving takes it out of the game" (Game.lookupObject tusk after) Nothing
+    Spec.assertEqWith s "CR 104.2a: alice and carol are still playing" (GameState.result after) Nothing
+    -- The rule under test. Carol has the Beast because CR 603.3a gave her the
+    -- trigger; alice's count is the control for a trigger handed to the wrong
+    -- seat, and bob cannot hold one at all (CR 800.4d).
+    Spec.assertEqWith s "carol got the Beast the leaves-the-battlefield ability makes" (S.countOnBattlefieldByName beastToken S.carol after) 1
+    Spec.assertEqWith s "and nobody else did" (S.countOnBattlefieldByName beastToken S.alice after) 0
+
+  -- CR 702.26k: "Phased-out permanents owned by a player who leaves the game
+  -- also leave the game. THIS DOESN'T CAUSE ZONE-CHANGE ABILITIES TO TRIGGER."
+  -- The paired negative for the case above: the same board, the same seats, the
+  -- same departure, and the one difference is that the Thragtusk is phased out
+  -- when bob leaves.
+  --
+  -- Carol's control is asserted on the phased-out board too, which is what keeps
+  -- the pair one-thing-different: the grant is a stored layer-2 effect rather
+  -- than an Aura, so CR 702.26b's "does not exist" does not quietly hand the
+  -- creature back to bob and let CR 800.4d answer instead.
+  --
+  -- Built with Pawl.Engine.Phasing.phaseOut, CR 702.26b's own performer, because
+  -- the only thing that phases a permanent out today is CR 702.26a's schedule
+  -- for a permanent WITH phasing, and no card in the pool has both phasing and a
+  -- leaves-the-battlefield ability. Effects that phase a permanent out are #929.
+  Spec.it s "CR 702.26k a PHASED-OUT permanent leaves the game with its owner and triggers nothing" $ do
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    let (tusk, g1) = S.addCreature thragtusk S.bob S.threePlayerGame
+        board = S.giveControl tusk S.carol (S.addCounter CounterKind.PlusOnePlusOne 1 tusk g1)
+        phased = Phasing.phaseOut (PhasedOut.Directly S.carol) tusk board
+        gone = S.runPure S.identityAnswer phased (Departure.leaveGame Departure.Type.Conceded S.bob)
+        after = resolveTriggers gone
+    Spec.assertEqWith s "it is phased out" (Phasing.isPhasedOut tusk phased) True
+    Spec.assertEqWith s "and carol still controls it, so CR 800.4d is not what answers here" (Projection.controllerOf tusk phased) (Just S.carol)
+    Spec.assertEqWith s "bob leaving takes it out of the game just the same (CR 702.26k's first sentence)" (Game.lookupObject tusk after) Nothing
+    Spec.assertEqWith s "but no zone-change ability triggered" (S.countOnBattlefieldByName beastToken S.carol after) 0
+
+  -- CR 608.2h on the departure path: the record is what the object WAS as it
+  -- left, and the two fields asserted here each differ from the answer a reader
+  -- would get any other way. The +1/+1 counter makes the power 6 where the
+  -- printed box says 5 (CR 613.4c), and the controller is carol where CR 108.4a
+  -- would hand back its owner, bob.
+  Spec.it s "CR 608.2h a departure files last known information under the id the object had" $ do
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    let (tusk, g1) = S.addCreature thragtusk S.bob S.threePlayerGame
+        board = S.giveControl tusk S.carol (S.addCounter CounterKind.PlusOnePlusOne 1 tusk g1)
+        gone = S.runPure S.identityAnswer board (Departure.leaveGame Departure.Type.Conceded S.bob)
+    Spec.assertEqWith s "nothing is filed while it is still in the game" (Map.lookup tusk (GameState.lastKnown board)) Nothing
+    Spec.assertEqWith s "it was a 6/4 as it left" (Projection.powerOf tusk board) (Just 6)
+    Spec.assertEqWith
+      s
+      "and the record says 6, not the printed 5"
+      (fmap (PC.power . LastKnown.characteristics) (Map.lookup tusk (GameState.lastKnown gone)))
+      (Just (Just 6))
+    Spec.assertEqWith
+      s
+      "with carol as its controller, not bob its owner"
+      (fmap LastKnown.controller (Map.lookup tusk (GameState.lastKnown gone)))
+      (Just S.carol)
+    Spec.assertEqWith
+      s
+      "and its counters, which CR 122.2 makes this the last moment to record"
+      (fmap LastKnown.counters (Map.lookup tusk (GameState.lastKnown gone)))
+      (Just (Map.singleton CounterKind.PlusOnePlusOne 1))
