@@ -248,6 +248,7 @@ objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Map.singleton slot SlotArity.Many
   ObjectRef.EachMatching _ -> Map.empty
   ObjectRef.EachCardInGraveyard {} -> Map.empty
+  ObjectRef.EachCardInYourHand -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> playerRefSlots player
   -- A PlayerScope names players by their relation to the effect's controller (CR
@@ -1737,6 +1738,13 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- player instead of one shared one. Whose graveyards, which cards match and in
   -- what order are all graveyardCards below, shared with the chosen-card arm.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard scope filter_) -> graveyardCards controller source gs scope filter_
+  -- Ignorant Bliss' "all cards from your hand": CR 400.1's per-player zone
+  -- again, but only ever the RESOLVING CONTROLLER's, so there is no scope to
+  -- fold over and no APNAP order to impose -- one seat cannot be out of order
+  -- with itself. In the zone's own order, which is the order Game.zoneMembers
+  -- keeps and no rule reads: CR 400.5 leaves a hand's arrangement to its owner,
+  -- so nothing observes it and nothing may depend on it.
+  ObjectRef.EachCardInYourHand -> Game.zoneMembers Zone.Hand controller gs
   -- Names players and so no objects at all. Empty rather than an error: every
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
   -- empty answer is what a slot holding a player already gives them.
@@ -1911,6 +1919,10 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- 109.2a draws the set from the graveyards named and says nothing about card
   -- types beyond the Filter's own.
   ObjectRef.EachCardInGraveyard {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  -- Cards again, so Recipient.ToObject again, for the graveyard arm's reason:
+  -- CR 109.2a draws the set from the hand the card's own words name, and what
+  -- kind of object each one is stays the OPCODE's question.
+  ObjectRef.EachCardInYourHand -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- A card, so it arrives as Recipient.ToObject for EachMatching's reason: what
   -- kind of object a library's top card is, is the OPCODE's question.
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -2882,6 +2894,13 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
             -- battlefield arrival to the player the effect instructed, which is
             -- what EntryRiders.underOwner would have to override.
             ObjectRef.EachCardInGraveyard {} -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
+            -- Ignorant Bliss' "exile all cards from your hand face down", swept
+            -- once from the PRE-MOVE state for the two sweeps above's reason (CR
+            -- 608.2c, CR 608.2f). The spell itself is on the stack while it
+            -- resolves (CR 608.1), so it is not among what it exiles.
+            ObjectRef.EachCardInYourHand -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- Players, and no card moves one to a zone. objectRefObjects' empty

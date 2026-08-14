@@ -26,7 +26,8 @@ plain =
       EntryRiders.attacking = False,
       EntryRiders.transformed = False,
       EntryRiders.counters = Map.empty,
-      EntryRiders.underOwner = False
+      EntryRiders.underOwner = False,
+      EntryRiders.exiledFaceDown = False
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

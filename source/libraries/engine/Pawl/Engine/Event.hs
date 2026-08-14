@@ -463,6 +463,7 @@ createEmblem pid card =
             Object.zone = Zone.Command,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
+            Object.exiledFaceDown = False,
             Object.damage = 0,
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
@@ -1859,7 +1860,7 @@ changeZoneEntering oid requestedDest position riders under = do
       under' = if EntryRiders.underOwner riders then Nothing else under
   if refused
     then pure Nothing
-    else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown Facing.FaceUp
+    else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown Facing.FaceUp (EntryRiders.exiledFaceDown riders)
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being
@@ -1892,7 +1893,7 @@ changeZoneEntering oid requestedDest position riders under = do
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
 changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp
+changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp False
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
 -- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.
@@ -1917,7 +1918,7 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requ
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceDown
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceDown False
 
 -- CR 601.2a's move: the card goes onto the stack and "that player becomes its
 -- controller". The caster is carried BY THE MOVE, for the reason CR 709.3a
@@ -1936,7 +1937,7 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid req
 -- battlefield drops the stamp, exactly as it drops the face, because CR 109.4
 -- gives an object there no controller to record.
 changeZoneCasting :: PlayerId -> ObjectId -> Zone -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
-changeZoneCasting caster oid requestedDest = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster)
+changeZoneCasting caster oid requestedDest shown facing = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just caster) shown facing False
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -1946,14 +1947,14 @@ changeZoneCasting caster oid requestedDest = changeZoneAttaching Nothing oid req
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False)
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp False
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -1977,15 +1978,17 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- half or CR 712.13's carried face, Nothing for every door but
 -- changeZoneShowing. `facing` is CR 110.5's face-up/face-down status, FaceUp for
 -- every door but changeZoneFaceDown (CR 110.5b). `position` is CR 401.2's end of
--- a library, the default for every door but changeZoneEntering.
+-- a library, the default for every door but changeZoneEntering. `concealed` is
+-- CR 406.3's "exiled face down", False for every door but changeZoneEntering and
+-- inert for every destination but exile.
 --
 -- `position` needs no `dest == requestedDest` gate, unlike `face` and `facing`
 -- below: it is inert everywhere but a library, so a CR 616.1 redirect AWAY from
 -- one drops it for free, and a redirect INTO one from a move that named no
 -- position carries the default -- which is the right answer, since nothing said
 -- top.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
-changeZoneAttaching asOf oid requestedDest position seed tapped entering under shown facing = do
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Bool -> Game (Maybe ObjectId)
+changeZoneAttaching asOf oid requestedDest position seed tapped entering under shown facing concealed = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -2174,7 +2177,24 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                     -- face-down permanent to all players as it leaves the
                     -- battlefield, so a CR 616.1 redirect that lands the object
                     -- anywhere else must leave it face up.
-                    Object.facing = if dest == requestedDest then facing else Facing.FaceUp
+                    Object.facing = if dest == requestedDest then facing else Facing.FaceUp,
+                    -- CR 406.3: an exiled card is kept face up unless the effect
+                    -- exiled it face down, so this is part of the move for
+                    -- `facing`'s reason -- the card is never face up in exile
+                    -- for an instant, not even for the Moved event.
+                    --
+                    -- Gated on the destination as well as on the move arriving
+                    -- there, which the two statuses above need only the second
+                    -- half of: CR 406.3 is a rule about the EXILE ZONE, so a CR
+                    -- 616.1 redirect into any other zone leaves an ordinary face
+                    -- up card, and an effect that names the rider on a move
+                    -- somewhere else says something no rule reads.
+                    --
+                    -- Nothing observes either gate today: the pool's one
+                    -- face-down exile names exile, and no replacement redirects
+                    -- it. Both are regression fences rather than proven
+                    -- behaviour -- dropping them leaves the suite green.
+                    Object.exiledFaceDown = concealed && dest == requestedDest && dest == Zone.Exile
                   }
               -- CR 604.2 ends a static ability's continuous effect the moment
               -- its permanent leaves the battlefield. A card whose own text
@@ -2681,6 +2701,7 @@ createTokens controller card copy n tapped entering = do
                     -- CR 110.5b: face up, for the same rule's reason. No effect
                     -- in the pool creates a token face down.
                     Object.facing = Facing.FaceUp,
+                    Object.exiledFaceDown = False,
                     Object.damage = 0,
                     Object.sickness = Sickness.Sick,
                     -- CR 707.2 / 111.3: a token copy's copiable values are the
@@ -6159,6 +6180,9 @@ eventTriggers events gs =
       -- 108.4a), also for `inGraveyards`' reasons: CR 108.4 gives a card in exile
       -- no controller at all, so Blind Hunter's "you gain 2 life" pays the player
       -- who owns the haunting card.
+      -- Not implemented: a card exiled FACE DOWN is scanned here like any other,
+      -- so its printed abilities are offered where CR 406.3a leaves it none
+      -- (#1479).
       exileCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
           case filter (functionsIn Zone.Exile) (Face.triggeredAbilities face) of
