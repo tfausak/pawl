@@ -74,6 +74,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Proliferate -> Nothing
   Effect.Bolster _ -> Nothing
   Effect.Amass _ -> Nothing
+  Effect.Blight _ -> Nothing
   Effect.TemptWithTheRing -> Nothing
   Effect.Venture -> Nothing
   Effect.ExileHandThenDraw -> Nothing

@@ -8866,6 +8866,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   supportSpec s registry
   bolsterSpec s registry
   amassSpec s registry
+  blightSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
   soulfireEruptionSpec s registry
@@ -9193,6 +9194,138 @@ resolveFor :: PlayerId.PlayerId -> (forall r. Prompt.Prompt r -> r) -> GameState
 resolveFor pid answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast pid spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
+
+-- CR 701.68 blight, which is an opcode: Effect.Blight over a Quantity, whose
+-- candidate pool and counter kind are rule 701.68a's rather than the card's.
+--
+-- Sinister Gnarlbark {2}{B} 0/4 Creature -- Treefolk Warlock
+-- (data/cards/sinister-gnarlbark.json): "At the beginning of your end step, draw a
+-- card and blight 1." (Name, cost, type line, P/T and oracle text checked against
+-- Scryfall.) Every -1/-1 counter on these boards came from the keyword action, and
+-- the draw beside it is what shows the REST of a mandatory instruction still runs
+-- when the blight itself cannot (CR 101.3).
+--
+-- The pool is UNCONSTRAINED, which is the whole difference from bolster: the
+-- boards below carry a 2/1, a 1/1, a 0/8 and the 0/4 source, four distinct
+-- toughnesses, so a case that names the 0/8 proves no least-toughness narrowing is
+-- happening and a case that names the source proves the blighting permanent is in
+-- its own pool.
+--
+-- One is blight's own N and every toughness on the board differs from it, so no
+-- counter assertion can be satisfied by a coincidence.
+blightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blightSpec s registry = Spec.describe s "Blight" $ do
+  Spec.it s "CR 701.68a blight 1 counters the creature its controller chose" $ do
+    (pikerId, ratsId, wallId, gnarlbarkId, gs) <- blightBoard s registry S.alice
+    let after = S.runPure (blighting pikerId) gs Stack.resolveTop
+    Spec.assertEqWith s "the Piker, whom their controller named, took one" (minusCountersOn pikerId after) (Just 1)
+    Spec.assertEqWith s "the Rats took none" (minusCountersOn ratsId after) (Just 0)
+    Spec.assertEqWith s "nor did the Wall" (minusCountersOn wallId after) (Just 0)
+    Spec.assertEqWith s "nor the Gnarlbark itself" (minusCountersOn gnarlbarkId after) (Just 0)
+    Spec.assertEqWith s "and the card was drawn" (S.handSize S.alice after) 1
+  -- The same board and the same trigger, differing only in the answer: the engine
+  -- makes no choice, so every other creature in the pool is equally reachable.
+  Spec.it s "CR 701.68a the same board answered another way counters that creature" $ do
+    (pikerId, ratsId, wallId, gnarlbarkId, gs) <- blightBoard s registry S.alice
+    let after = S.runPure (blighting ratsId) gs Stack.resolveTop
+    Spec.assertEqWith s "the Rats, whom their controller named, took one" (minusCountersOn ratsId after) (Just 1)
+    Spec.assertEqWith s "the Piker took none" (minusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "nor did the Wall" (minusCountersOn wallId after) (Just 0)
+    Spec.assertEqWith s "nor the Gnarlbark itself" (minusCountersOn gnarlbarkId after) (Just 0)
+  -- Rule 701.68a's pool is "a creature you control" and stops there. The 0/8 is the
+  -- TOUGHEST creature on the board and the 0/4 is the blighting permanent itself;
+  -- both are candidates, where CR 701.39a's least-toughness narrowing would offer
+  -- neither.
+  Spec.it s "CR 701.68a any creature its controller controls is a candidate, including the source" $ do
+    (pikerId, ratsId, wallId, _, wallBoard) <- blightBoard s registry S.alice
+    (_, _, _, gnarlbarkId, sourceBoard) <- blightBoard s registry S.alice
+    let onWall = S.runPure (blighting wallId) wallBoard Stack.resolveTop
+        onSource = S.runPure (blighting gnarlbarkId) sourceBoard Stack.resolveTop
+    Spec.assertEqWith s "the Wall, at toughness 8, took one" (minusCountersOn wallId onWall) (Just 1)
+    Spec.assertEqWith s "and the 1/1 beside it took none" (minusCountersOn ratsId onWall) (Just 0)
+    Spec.assertEqWith s "the Gnarlbark blighted itself" (minusCountersOn gnarlbarkId onSource) (Just 1)
+    Spec.assertEqWith s "and the Piker took none" (minusCountersOn pikerId onSource) (Just 0)
+  -- CR 701.68a's "a creature YOU CONTROL". The two boards hold the same four
+  -- printings and differ in exactly one thing -- which seat the other three
+  -- creatures sit on -- and the answer names bob's Piker on both. It is never
+  -- offered, so alice's own Gnarlbark takes the counter instead.
+  Spec.it s "CR 701.68a an opponent's creature is not a creature you control" $ do
+    (pikerId, ratsId, wallId, gnarlbarkId, gs) <- blightBoard s registry S.bob
+    let after = S.runPure (blighting pikerId) gs Stack.resolveTop
+    Spec.assertEqWith s "alice's Gnarlbark, her only creature, took one" (minusCountersOn gnarlbarkId after) (Just 1)
+    Spec.assertEqWith s "bob's Piker, whom the answer named, took none" (minusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "nor did bob's Rats" (minusCountersOn ratsId after) (Just 0)
+    Spec.assertEqWith s "nor his Wall" (minusCountersOn wallId after) (Just 0)
+  -- Where the rules leave nothing to ask, do not ask. The same pair of boards, and
+  -- what differs is how many creatures the blighting player controls -- which is
+  -- the whole of what makes rule 701.68a's choice a choice.
+  Spec.it s "CR 701.68a a lone creature raises no prompt" $ do
+    (_, _, _, _, four) <- blightBoard s registry S.alice
+    (_, _, _, _, alone) <- blightBoard s registry S.bob
+    let countingAnswer :: Prompt.Prompt r -> State.State Int r
+        countingAnswer p = case p of
+          Prompt.ChooseBlight {} -> do
+            State.modify (+ 1)
+            pure (S.identityAnswer p)
+          _ -> pure (S.identityAnswer p)
+        asks g = State.execState (Engine.runGame countingAnswer g Stack.resolveTop) 0
+    Spec.assertEqWith s "one creature: nothing to ask" (asks alone) 0
+    Spec.assertEqWith s "four creatures: one real decision" (asks four) 1
+  -- CR 101.3: the impossible PART is ignored, not the instruction. The Gnarlbark
+  -- dies to state-based actions with its own trigger already on the stack (CR
+  -- 603.3b), so the blight has no creature to reach -- and the draw beside it still
+  -- happens, which is what tells "ignored" apart from "aborted".
+  Spec.it s "CR 101.3 a controller with no creature blights nothing and draws anyway" $ do
+    (pikerId, _, _, gnarlbarkId, gs) <- blightBoard s registry S.bob
+    let dead = S.settleSba (S.markDamage gnarlbarkId 4 gs)
+        after = S.runPure S.identityAnswer dead Stack.resolveTop
+    Spec.assertBool s (not (S.onBattlefield gnarlbarkId after)) "the Gnarlbark left the battlefield before its trigger resolved"
+    Spec.assertEqWith s "the card was drawn all the same" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "and bob's creatures, who were never candidates, took nothing" (minusCountersOn pikerId after) (Just 0)
+
+-- Sinister Gnarlbark on alice's battlefield and Goblin Piker, Typhoid Rats and Wall
+-- of Stone on `pid`'s, with a card in alice's library for the draw (CR 104.3c), her
+-- end step begun and the trigger settled onto the stack (CR 603.3b). Returns the
+-- three creatures, the Gnarlbark and that state.
+--
+-- The seat is the ONLY parameter, so the pool board and its negative are the same
+-- four printings, the same library and the same step.
+blightBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+blightBoard s registry pid = do
+  swamp <- S.printingOf s registry "Swamp"
+  gnarlbark <- S.printingOf s registry "Sinister Gnarlbark"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  let (pikerId, g1) = S.addCreature piker pid (Setup.emptyGame S.bothPlayers)
+      (ratsId, g2) = S.addCreature rats pid g1
+      (wallId, g3) = S.addCreature wall pid g2
+      (gnarlbarkId, g4) = S.addCreature gnarlbark S.alice g3
+      g5 = snd (S.addLibraryCard swamp S.alice g4)
+      endStep = Phase.Ending EndingStep.EndStep
+      begun =
+        Event.recordEvent
+          (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice))
+          (g5 {GameState.phase = endStep, GameState.activePlayer = S.alice})
+  pure (pikerId, ratsId, wallId, gnarlbarkId, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
+
+-- Answers Prompt.ChooseBlight with a named creature, deferring everything else to
+-- S.identityAnswer. PINNED BY ID rather than picked by searching the candidates, so
+-- a mutation to the candidate sweep cannot quietly repair the answer.
+blighting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+blighting oid p = case p of
+  Prompt.ChooseBlight {} -> oid
+  _ -> S.identityAnswer p
+
+-- The -1/-1 counters on one permanent, plusCountersOn's sibling: Nothing once the
+-- object is gone, which is what keeps "took none" apart from "is not there".
+minusCountersOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
+minusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject oid gs)
 
 -- Answers Prompt.ChooseAmass with a named Army, deferring everything else to
 -- S.identityAnswer. PINNED BY ID rather than picked by searching the candidates, so

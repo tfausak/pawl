@@ -813,6 +813,32 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseAmass decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 701.68a: which creature a blighting player put the counters on is a
+        -- decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseBlight round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseBlight decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "blighting the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "blighting the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a blight choice does not decode as a Ring-bearer choice" $ do
+          -- Discriminating: fails if ChooseBlight reuses ChoseRingBearer rather than
+          -- getting its own ObjectId-shaped constructor. These two are not merely
+          -- the same shape -- they offer the same CANDIDATES, every creature their
+          -- chooser controls -- so nothing but a distinct constructor keeps a
+          -- transcript of one from replaying as the other.
+          let p = Prompt.ChooseBlight decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseRingBearer (ObjectId.MkObjectId 7))) Nothing
+        Spec.it s "a short blight transcript returns the first candidate offered" $
+          -- CR 701.68a: every offered creature is one its controller controls, so
+          -- the head is legal.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseBlight decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
+            (ObjectId.MkObjectId 7)
         -- CR 608.2d: which card the resolving controller took out of a graveyard
         -- is a decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseCardInGraveyard round-trips through the transcript" $ do

@@ -308,6 +308,27 @@ data Prompt r where
   -- Armies), and Pawl.Engine.Replay's transcript would otherwise let one prompt's
   -- recorded answer satisfy another.
   ChooseAmass :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 701.68a: which creature a blighting player puts the -1\/-1 counters on.
+  -- The ObjectId is the spell or ability being resolved; the NonEmpty is the
+  -- creatures they control, UNNARROWED -- rule 701.68a qualifies its candidate by
+  -- control and nothing else, which is the whole difference from ChooseBolster.
+  --
+  -- CHOOSE, not target, ChooseRingBearer's posture: rule 701.68a names "a creature
+  -- you control" rather than a target, so nothing is declared on the stack (CR
+  -- 601.2c) and nothing is re-checked at resolution (CR 608.2b).
+  --
+  -- Raised only for TWO OR MORE candidates, ChooseRingBearer's shape and reason: a
+  -- lone creature is the whole of the rule's candidate set and the instruction is
+  -- mandatory, so performing it decides nothing. Not raised for zero, where CR
+  -- 101.3 ignores the instruction -- a player who controls no creature blights
+  -- nothing.
+  --
+  -- Its own constructor though its candidate set is ChooseRingBearer's exactly --
+  -- every creature its chooser controls. What separates them is not the pool but
+  -- the question: Pawl.Engine.Replay's transcript would otherwise let a recorded
+  -- Ring-bearer answer satisfy a blight, and a game holding both would replay
+  -- wrong.
+  ChooseBlight :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 608.2d: which card in a graveyard a player chooses for an
   -- Pawl.Types.ObjectRef.ChosenCardInGraveyard -- Port of Karfell's "return a
   -- creature card from your graveyard to the battlefield tapped". The PlayerId is
