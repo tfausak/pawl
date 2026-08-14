@@ -3289,9 +3289,9 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- (CR 701.20a).
     case objectRefObjects legal resolving controller source gs ref of
       [] -> pure ()
-      -- One card is what every printing looks at, and the single binding is the
-      -- one a Filter.IsBound can see -- bindArrivals draws the same line, for
-      -- the same reason.
+      -- bindArrivals' one-versus-many line, minus its prompt: one card takes the
+      -- SINGLE binding, which is the only one a Filter.IsBound can see, and is
+      -- what every printing in the corpus looks at (#1532).
       [only] -> State.modify' (bindSlot resolving slot only)
       several -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList several))
   Effect.Scry (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
