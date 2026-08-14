@@ -90,6 +90,7 @@ import Pawl.Types.ReplacementEntry (ReplacementEntry)
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
+import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
@@ -976,7 +977,7 @@ applyCopyException snapshot exception = case exception of
   -- in the snapshot would let layer 7a overwrite the pair
   -- (Projection.applyCharacteristicPT). Not defensive, unlike applyEntryOption's
   -- same write: Quicksilver Gargantuan copying a Tarmogoyf is exactly this case.
-  CopyException.SetPowerToughness p t ->
+  CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness p t) ->
     snapshot
       { PC.power = Just p,
         PC.toughness = Just t,

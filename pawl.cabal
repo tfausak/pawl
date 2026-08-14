@@ -406,6 +406,8 @@ library codec
     Pawl.Codec.SearchSpec
     Pawl.Codec.SelfCountersReached
     Pawl.Codec.SelfCountersReachedSpec
+    Pawl.Codec.SetPowerToughness
+    Pawl.Codec.SetPowerToughnessSpec
     Pawl.Codec.ShuffleIntoLibrary
     Pawl.Codec.ShuffleIntoLibrarySpec
     Pawl.Codec.SkipNextPhase
@@ -1001,6 +1003,7 @@ library types
     Pawl.Types.Search
     Pawl.Types.SearchDestination
     Pawl.Types.SelfCountersReached
+    Pawl.Types.SetPowerToughness
     Pawl.Types.ShuffleIntoLibrary
     Pawl.Types.Sickness
     Pawl.Types.SkipNextPhase

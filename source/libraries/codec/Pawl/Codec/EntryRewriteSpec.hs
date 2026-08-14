@@ -15,6 +15,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
+import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.WithCounters as WithCounters
@@ -34,8 +35,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
     Common.assertCodec
       s
       EntryRewrite.codec
-      (EntryRewrite.AsCopy [CopyException.SetPowerToughness 7 7])
-      """ {"type":"AsCopy","value":[{"type":"SetPowerToughness","value":[7,7]}]} """
+      (EntryRewrite.AsCopy [CopyException.SetPowerToughness (SetPowerToughness.MkSetPowerToughness 7 7)])
+      """ {"type":"AsCopy","value":[{"type":"SetPowerToughness","value":{"power":7,"toughness":7}}]} """
   -- CR 208.2b: two P/T-and-keyword choices, enough to show the keyword union
   -- isn't lost on the wire.
   Spec.it s "ChoiceOf (Primal Plasma)" $
