@@ -120,17 +120,17 @@
                           },
                           "quantity": {
                             "type": "PlayerCounters",
-                            "value": [
-                              {
+                            "value": {
+                              "kind": {
+                                "type": "Experience"
+                              },
+                              "player": {
                                 "type": "Relative",
                                 "value": {
                                   "type": "You"
                                 }
-                              },
-                              {
-                                "type": "Experience"
                               }
-                            ]
+                            }
                           },
                           "ref": {
                             "type": "InSlot",

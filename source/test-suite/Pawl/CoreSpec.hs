@@ -25,6 +25,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -139,7 +140,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
           noContext
           (Setup.emptyGame S.bothPlayers)
           (ObjectId.MkObjectId 0)
-          (Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2))
+          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2)))
       )
       $ Just 3
 
@@ -151,7 +152,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
           noContext
           (Setup.emptyGame S.bothPlayers)
           (ObjectId.MkObjectId 0)
-          (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
+          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star))
       )
       Nothing
 
@@ -183,7 +184,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
           noContext
           (Setup.emptyGame S.bothPlayers)
           (ObjectId.MkObjectId 0)
-          (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
+          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star))
       )
       1
 
@@ -195,7 +196,7 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
           noContext
           (Setup.emptyGame S.bothPlayers)
           (ObjectId.MkObjectId 0)
-          (Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2))
+          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 2)))
       )
       3
 
@@ -204,9 +205,9 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
       s
       ( Quantity.substituteStar
           (Quantity.Type.Literal 7)
-          (Quantity.Type.Plus (Quantity.Type.Literal 1) Quantity.Type.Star)
+          (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) Quantity.Type.Star))
       )
-      $ Quantity.Type.Plus (Quantity.Type.Literal 1) (Quantity.Type.Literal 7)
+      $ Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) (Quantity.Type.Literal 7))
 
   Spec.it s "Count CardsInYourHand is Nothing with no 'you'" $ do
     let gs = Setup.emptyGame S.bothPlayers

@@ -4,19 +4,22 @@ module Pawl.Codec.QuantitySpec where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Quantity as Quantity
-import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
 import qualified Pawl.Types.Scope as Scope
@@ -65,8 +68,8 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Plus (Quantity.Literal 1) (Quantity.InSlot slot))
-      """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"InSlot","value":"destroyed"}]} """
+      (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.InSlot slot)))
+      """ {"type":"Plus","value":{"left":{"type":"Literal","value":1},"right":{"type":"InSlot","value":"destroyed"}}} """
   Spec.it s "Star" $
     Common.assertCodec
       s
@@ -77,8 +80,8 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Plus (Quantity.Literal 1) Quantity.Star)
-      """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"Star"}]} """
+      (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) Quantity.Star))
+      """ {"type":"Plus","value":{"left":{"type":"Literal","value":1},"right":{"type":"Star"}}} """
   -- Toxic Deluge's -X on the wire: one whole Quantity under the tag, not a pair.
   -- The second case nests a NEGATIVE Literal under it -- the other way this type
   -- says a negative number -- so a decoder that folded the two into one could not
@@ -195,13 +198,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
-      """ {"type":"PlayerCounters","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Rad"}]} """
+      (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad))
+      """ {"type":"PlayerCounters","value":{"player":{"type":"Relative","value":{"type":"You"}},"kind":{"type":"Rad"}}} """
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.PlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PlayerCounterKind.Experience)
-      """ {"type":"PlayerCounters","value":[{"type":"InSlot","value":"target"},{"type":"Experience"}]} """
+      (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PlayerCounterKind.Experience))
+      """ {"type":"PlayerCounters","value":{"player":{"type":"InSlot","value":"target"},"kind":{"type":"Experience"}}} """
   -- CR 122.1's OBJECT reading, with only a CounterKind on the wire: the object
   -- is whichever one the quantity is evaluated against, so there is no reference
   -- beside the kind. The payload-bearing CounterKind arm (CR 122.1b's keyword
@@ -264,13 +267,13 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.AgainstSlot slot Quantity.Power)
-      """ {"type":"AgainstSlot","value":["creature",{"type":"Power"}]} """
+      (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot Quantity.Power))
+      """ {"type":"AgainstSlot","value":{"slot":"creature","quantity":{"type":"Power"}}} """
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Plus (Quantity.Literal 1) (Quantity.AgainstSlot slot (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)))
-      """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"AgainstSlot","value":["creature",{"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}}]}]} """
+      (Quantity.Plus (Plus.MkPlus (Quantity.Literal 1) (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)))))
+      """ {"type":"Plus","value":{"left":{"type":"Literal","value":1},"right":{"type":"AgainstSlot","value":{"slot":"creature","quantity":{"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}}}}}} """
   -- CR 107.1a's direction and the value it applies to, in that order. Nested
   -- once for AgainstSlot's reason -- a recursive decoder is where a payload gets
   -- lost -- and over a Count, which is the shape both producers print.
@@ -278,23 +281,17 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Halved Rounding.Down (Quantity.Literal 5))
-      """ {"type":"Halved","value":[{"type":"Down"},{"type":"Literal","value":5}]} """
+      (Quantity.Halved (Halved.MkHalved Rounding.Down (Quantity.Literal 5)))
+      """ {"type":"Halved","value":{"rounding":{"type":"Down"},"quantity":{"type":"Literal","value":5}}} """
     Common.assertCodec
       s
       Quantity.codec
-      (Quantity.Halved Rounding.Up (Quantity.LifeTotal PlayerRef.Candidate))
-      """ {"type":"Halved","value":[{"type":"Up"},{"type":"LifeTotal","value":{"type":"Candidate"}}]} """
-  Spec.describe s "fromJsonPair" . Spec.it s "the [a, b] pair Plus writes" $
-    Common.assertFromJson
-      s
-      (Codec.decode Quantity.pairCodec)
-      "[{\"type\":\"Literal\",\"value\":1},{\"type\":\"Star\"}]"
-      (Quantity.Literal 1, Quantity.Star)
-  -- Forcing the schema is what proves the RECURSIVE definition terminates:
-  -- Plus, AgainstSlot and the Count arm all name `codec` itself, and
-  -- assertHasSchema renders the whole tree rather than just its outer tag, so a
-  -- definition that failed to emit a $ref on re-entry would hang here rather
-  -- than pass.
+      (Quantity.Halved (Halved.MkHalved Rounding.Up (Quantity.LifeTotal PlayerRef.Candidate)))
+      """ {"type":"Halved","value":{"rounding":{"type":"Up"},"quantity":{"type":"LifeTotal","value":{"type":"Candidate"}}}} """
+  -- Forcing the schema is what proves the RECURSIVE definition terminates, and
+  -- it proves more of that now than it used to: Negate names `codec` itself
+  -- while Plus, Halved, AgainstSlot and Count each hand it to a payload codec in
+  -- another module, so the loop runs through four siblings. assertHasSchema
+  -- renders the whole tree rather than just its outer tag, so a definition that
+  -- failed to emit a $ref on re-entry would hang here rather than pass.
   Spec.it s "has a schema" $ Common.assertHasSchema s Quantity.codec
-  Spec.it s "the [a, b] pair has a schema" $ Common.assertHasSchema s Quantity.pairCodec

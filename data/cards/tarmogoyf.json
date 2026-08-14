@@ -45,15 +45,15 @@
       },
       "toughness": {
         "type": "Plus",
-        "value": [
-          {
+        "value": {
+          "left": {
             "type": "Literal",
             "value": 1
           },
-          {
+          "right": {
             "type": "Star"
           }
-        ]
+        }
       },
       "typeLine": {
         "subtypes": [

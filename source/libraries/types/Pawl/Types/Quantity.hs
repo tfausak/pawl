@@ -1,13 +1,15 @@
 module Pawl.Types.Quantity where
 
+import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCount as ManaCount
-import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerRef as PlayerRef
-import qualified Pawl.Types.Rounding as Rounding
+import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | A number that may not be a literal number.
@@ -19,7 +21,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Grows further: OneHalf (Little Girl's printed ½ power, which is a fractional
 -- LITERAL and not the Halved arm below), Infinite (Mox Lotus). Plus is binary and
 -- recursive so composition covers the awkward printed values without new cases:
--- 1+* is Plus (Literal 1) Star.
+-- 1+* is a Plus of Literal 1 and Star.
 --
 -- Deliberately NO Num instance. "Numeric tower" names the problem domain, not a
 -- class hierarchy. Num would be lawless and partial once Star and Infinite exist
@@ -96,7 +98,7 @@ data Quantity
     --     where a surviving star is a hole rather than a zero.
     Star
   | -- | CR 208.2: composition, so a printed 1+* needs no constructor of its own.
-    Plus Quantity Quantity
+    Plus (Plus.Plus Quantity)
   | -- | CR 107.1a: half the inner quantity, rounded the way the card prints --
     -- Malignus' "half the highest life total among your opponents, rounded up",
     -- Aspect of Wolf's "half the number of Forests you control, rounded down".
@@ -114,7 +116,7 @@ data Quantity
     -- Not a leaf: the payload is a whole Quantity, so composition reaches
     -- everything the type can read -- half a count, half a life total, half a
     -- slot's amount.
-    Halved Rounding.Rounding Quantity
+    Halved (Halved.Halved Quantity)
   | -- | The negation of the quantity inside it -- Toxic Deluge's "all creatures
     -- get -X/-X until end of turn", where the minus sign is in front of a value
     -- the card does not print.
@@ -245,7 +247,7 @@ data Quantity
     -- player.
     --
     -- A LEAF, like LifeTotal, Speed and ManaCount: it holds no Quantity.
-    PlayerCounters PlayerRef.PlayerRef PlayerCounterKind.PlayerCounterKind
+    PlayerCounters PlayerCounterTally.PlayerCounterTally
   | -- | CR 122.1: how many counters of a kind are on the OBJECT this quantity is
     -- evaluated against -- Promising Duskmage's "if it had a +1/+1 counter on
     -- it".
@@ -415,5 +417,5 @@ data Quantity
     -- Nothing when the slot names no object -- a player recipient, a slot the
     -- resolution never filled, an illegal target (CR 608.2b), or any evaluation
     -- outside a resolution, where there are no slots at all.
-    AgainstSlot SlotName.SlotName Quantity
+    AgainstSlot (AgainstSlot.AgainstSlot Quantity)
   deriving (Eq, Ord, Show)

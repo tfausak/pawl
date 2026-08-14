@@ -11,6 +11,7 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaCount as ManaCount
+import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Combat as Combat
@@ -18,6 +19,7 @@ import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaCount as ManaCount.Type
@@ -25,8 +27,10 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.Plus as Plus
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Rounding as Rounding
@@ -161,16 +165,16 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- caller already treats as a no-op.
   --
   -- Terminating: the payload is a strictly smaller subterm.
-  Quantity.AgainstSlot slot inner -> case Map.lookup slot (Filter.slotObjects context) of
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> case Map.lookup slot (Filter.slotObjects context) of
     Nothing -> Nothing
     Just oid -> evaluateAgainst viewOf context gs announcedOn (Just oid) (viewOf oid) inner
-  Quantity.Plus a b -> case (recur a, recur b) of
+  Quantity.Plus (Plus.MkPlus a b) -> case (recur a, recur b) of
     (Just x, Just y) -> Just (x + y)
     _ -> Nothing
   -- CR 107.1 / 107.1a: halve, then round the way the card printed. Nothing
   -- propagates from the payload, Plus' posture: half of a number nobody could
   -- determine is not a number either.
-  Quantity.Halved rounding inner -> fmap (halve rounding) (recur inner)
+  Quantity.Halved (Halved.MkHalved rounding inner) -> fmap (halve rounding) (recur inner)
   -- CR 107.1b: the negated value, with no floor here -- a creature's power may be
   -- less than zero, and the readers that need a nonnegative count apply that
   -- rule's "zero is used instead" themselves. Unanswerable stays unanswerable:
@@ -252,7 +256,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- is Player.counters' own convention and not this arm's invention: an absent
   -- key means the player has none of that counter, and "none" is a number. The
   -- outer Nothing is reserved for the reference, exactly as above.
-  Quantity.PlayerCounters ref kind -> case playersOf ref of
+  Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> case playersOf ref of
     Just [pid] -> fmap (toInteger . Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
     _ -> Nothing
   -- CR 122.1's OBJECT reading, through the injected view exactly as the Power
@@ -421,8 +425,8 @@ halve rounding n = case rounding of
 -- readers.
 determine :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Quantity -> Integer
 determine viewOf context gs oid quantity = case quantity of
-  Quantity.Plus a b -> determine viewOf context gs oid a + determine viewOf context gs oid b
-  Quantity.Halved rounding inner -> halve rounding (determine viewOf context gs oid inner)
+  Quantity.Plus (Plus.MkPlus a b) -> determine viewOf context gs oid a + determine viewOf context gs oid b
+  Quantity.Halved (Halved.MkHalved rounding inner) -> halve rounding (determine viewOf context gs oid inner)
   Quantity.Negate a -> negate (determine viewOf context gs oid a)
   _ -> Maybe.fromMaybe 0 (evaluate viewOf context gs oid quantity)
 
@@ -431,11 +435,11 @@ determine viewOf context gs oid quantity = case quantity of
 substituteStar :: Quantity -> Quantity -> Quantity
 substituteStar star quantity = case quantity of
   Quantity.Star -> star
-  Quantity.Plus a b -> Quantity.Plus (substituteStar star a) (substituteStar star b)
+  Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (substituteStar star a) (substituteStar star b))
   -- The same descent Plus takes, for CR 208.2's reason: a printed star inside a
   -- halving is still the value the CDA supplies. No card prints one there --
   -- Malignus' star is the whole P/T box and its CDA carries the halving.
-  Quantity.Halved rounding inner -> Quantity.Halved rounding (substituteStar star inner)
+  Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (substituteStar star inner))
   -- Plus's descent, for Plus's reason: a star under a minus sign is still the
   -- star the characteristic-defining ability defines.
   Quantity.Negate a -> Quantity.Negate (substituteStar star a)
@@ -449,7 +453,7 @@ substituteStar star quantity = case quantity of
   Quantity.LifeTotal _ -> quantity
   Quantity.Speed _ -> quantity
   Quantity.IsMonarch _ -> quantity
-  Quantity.PlayerCounters _ _ -> quantity
+  Quantity.PlayerCounters {} -> quantity
   Quantity.ObjectCounters _ -> quantity
   Quantity.HasDesignation _ -> quantity
   Quantity.WasKicked -> quantity
@@ -459,7 +463,7 @@ substituteStar star quantity = case quantity of
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
   -- ability with no resolution and so no slots, and Pawl.CardSpec's
   -- powerToughnessSlots keeps a slot-naming quantity out of a printed P/T.
-  Quantity.AgainstSlot _ _ -> quantity
+  Quantity.AgainstSlot {} -> quantity
 
 -- The binding slots a quantity READS. The read half of the dataflow lint whose
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
@@ -479,10 +483,10 @@ slots quantity = case quantity of
   Quantity.Toughness -> Set.empty
   Quantity.InSlot slot -> Set.singleton slot
   Quantity.Star -> Set.empty
-  Quantity.Plus a b -> Set.union (slots a) (slots b)
+  Quantity.Plus (Plus.MkPlus a b) -> Set.union (slots a) (slots b)
   -- Composition, as Plus is: the rounding names no slot and the payload may name
   -- any.
-  Quantity.Halved _ inner -> slots inner
+  Quantity.Halved (Halved.MkHalved _ inner) -> slots inner
   -- Whatever the payload reads, since a minus sign changes no slot: Toxic
   -- Deluge's -X is a Negate over the InSlot that names X. A REGRESSION FENCE
   -- rather than proven behaviour -- emptying this arm leaves the suite green,
@@ -509,7 +513,7 @@ slots quantity = case quantity of
   -- And a fifth, CR 725.1's designation -- a PlayerRef and nothing else.
   Quantity.IsMonarch _ -> Set.empty
   -- And a sixth. The PlayerCounterKind beside it names no slot either.
-  Quantity.PlayerCounters _ _ -> Set.empty
+  Quantity.PlayerCounters {} -> Set.empty
   -- A bare CounterKind, which names no slot at all -- this arm carries no
   -- reference of any sort, the object being the one the evaluation is aimed at.
   Quantity.ObjectCounters _ -> Set.empty
@@ -530,7 +534,7 @@ slots quantity = case quantity of
   -- which cannot see it (#1079); reporting this one is what lets slotsOf recover
   -- it, and so what keeps Soul's Majesty's declared target on the read side of
   -- the D4 lint. The payload may hide slots of its own.
-  Quantity.AgainstSlot slot inner -> Set.insert slot (slots inner)
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Set.insert slot (slots inner)
 
 -- CR 603.3b: is `slots` above the WHOLE of what evaluating this quantity reads
 -- off the resolving object's bindings? It is not wherever a PlayerRef is nested
@@ -549,10 +553,10 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.Toughness -> True
   Quantity.InSlot _ -> True
   Quantity.Star -> True
-  Quantity.Plus a b -> slotsAreExhaustive a && slotsAreExhaustive b
+  Quantity.Plus (Plus.MkPlus a b) -> slotsAreExhaustive a && slotsAreExhaustive b
   -- Plus' answer: the rounding hides no reference, so what the payload hides is
   -- the whole question.
-  Quantity.Halved _ inner -> slotsAreExhaustive inner
+  Quantity.Halved (Halved.MkHalved _ inner) -> slotsAreExhaustive inner
   Quantity.Negate a -> slotsAreExhaustive a
   -- Both halves `slots` skips: the Scope's PlayerRef, and the per-member
   -- quantity of a Greatest, which may hide one of its own.
@@ -563,7 +567,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.LifeTotal ref -> playerRefIsSlotless ref
   Quantity.Speed ref -> playerRefIsSlotless ref
   Quantity.IsMonarch ref -> playerRefIsSlotless ref
-  Quantity.PlayerCounters ref _ -> playerRefIsSlotless ref
+  Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref _) -> playerRefIsSlotless ref
   Quantity.ObjectCounters _ -> True
   Quantity.HasDesignation _ -> True
   Quantity.WasKicked -> True
@@ -572,7 +576,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.BlockersBeyondFirst -> True
   -- True because `slots` above DOES report this arm's slot, unlike the nested
   -- PlayerRefs -- so the reported set is the whole of what evaluating it reads.
-  Quantity.AgainstSlot _ inner -> slotsAreExhaustive inner
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> slotsAreExhaustive inner
 
 -- Only InSlot names a slot; the other three are answered from the evaluation
 -- context alone (Resolve.playerRefSlots says the same thing as a set).
@@ -613,7 +617,7 @@ bakeBound players quantity = case quantity of
   Quantity.LifeTotal ref -> Quantity.LifeTotal (bakePlayerRef players ref)
   Quantity.Speed ref -> Quantity.Speed (bakePlayerRef players ref)
   Quantity.IsMonarch ref -> Quantity.IsMonarch (bakePlayerRef players ref)
-  Quantity.PlayerCounters ref kind -> Quantity.PlayerCounters (bakePlayerRef players ref) kind
+  Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (bakePlayerRef players ref) kind)
   Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (bakePlayerRef players ref)
   Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (bakePlayerRef players ref)
   Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = bakePlayerRef players (ManaCount.Type.player c)}
@@ -624,10 +628,10 @@ bakeBound players quantity = case quantity of
   Quantity.Count c ->
     let baked = Count.mapQuantity (bakeBound players) c
      in Quantity.Count baked {Count.Type.scope = bakeScope players (Count.Type.scope c)}
-  Quantity.Plus a b -> Quantity.Plus (bakeBound players a) (bakeBound players b)
-  Quantity.Halved rounding inner -> Quantity.Halved rounding (bakeBound players inner)
+  Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (bakeBound players a) (bakeBound players b))
+  Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (bakeBound players inner))
   Quantity.Negate a -> Quantity.Negate (bakeBound players a)
-  Quantity.AgainstSlot slot inner -> Quantity.AgainstSlot slot (bakeBound players inner)
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (bakeBound players inner))
   -- Every arm below holds no PlayerRef and no Quantity. InSlot names an AMOUNT
   -- slot rather than a player one, so nothing here substitutes it -- an amount an
   -- earlier effect bound is not a seat.
@@ -699,12 +703,12 @@ readsX quantity = case quantity of
   Quantity.InSlot slot -> slot == Binding.variableX
   -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
   -- Plus X (Literal 3), which reads X without being equal to it.
-  Quantity.Plus a b -> readsX a || readsX b
+  Quantity.Plus (Plus.MkPlus a b) -> readsX a || readsX b
   -- The same recursion: "half X, rounded down" would be a Halved over an X that
   -- is not equal to one. A REGRESSION FENCE rather than proven behaviour --
   -- neither producer halves an announced value, so answering False here leaves
   -- the suite green.
-  Quantity.Halved _ inner -> readsX inner
+  Quantity.Halved (Halved.MkHalved _ inner) -> readsX inner
   -- Toxic Deluge's "-X" is Negate X, which reads X the same way. Without this
   -- arm the CR 107.3 lint would call the card an unannounced-X reader on one
   -- side and an unread announcement on the other.
@@ -725,7 +729,7 @@ readsX quantity = case quantity of
   Quantity.LifeTotal _ -> False
   Quantity.Speed _ -> False
   Quantity.IsMonarch _ -> False
-  Quantity.PlayerCounters _ _ -> False
+  Quantity.PlayerCounters {} -> False
   Quantity.ObjectCounters _ -> False
   Quantity.HasDesignation _ -> False
   Quantity.WasKicked -> False
@@ -735,7 +739,7 @@ readsX quantity = case quantity of
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion
   -- Plus above needs. Its own SlotName names a target rather than an amount, and X
   -- is only ever an amount.
-  Quantity.AgainstSlot _ inner -> readsX inner
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> readsX inner
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A

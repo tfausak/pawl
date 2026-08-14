@@ -22,11 +22,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- was waiting on. The wire format is unchanged by that conversion -- the same
 -- five tags, emitted identically -- and what it adds is the schema.
 --
--- 'EachCardInGraveyard' and 'TopOfLibrary' are the arms with two payloads and
--- 'ChosenCardInGraveyard' the one with three, so each takes a 'Common.tuple' or
--- 'Common.tuple3'. Under the #1305 decision they owe records of
--- their own like every other multi-payload arm; that lands with the
--- payload-records unit.
+-- 'EachCardInGraveyard', 'TopOfLibrary' and 'ChosenCardInGraveyard' each carry a
+-- payload record of their own (#1464), so no arm here writes a positional array.
 codec :: Codec.Codec ObjectRef.ObjectRef
 codec =
   Arm.tagged

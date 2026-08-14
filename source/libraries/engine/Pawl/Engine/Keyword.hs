@@ -18,6 +18,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
@@ -81,6 +82,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PutCounters as PutCounters
@@ -1744,9 +1746,9 @@ evolve =
     entrantExceeds quantity =
       Condition.Compares
         ( Compares.MkCompares
-            (Quantity.AgainstSlot Binding.became quantity)
+            (Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot Binding.became quantity))
             Comparison.AtLeast
-            (Quantity.Plus quantity (Quantity.Literal 1))
+            (Quantity.Plus (Plus.MkPlus quantity (Quantity.Literal 1)))
         )
 
 prowess :: TriggeredAbility Card
@@ -1856,7 +1858,7 @@ rampage n =
       TriggeredAbility.intervening = Nothing
     }
   where
-    bonus = foldr Quantity.Plus (Quantity.Literal 0) (List.genericReplicate n Quantity.BlockersBeyondFirst)
+    bonus = foldr (\a b -> Quantity.Plus (Plus.MkPlus a b)) (Quantity.Literal 0) (List.genericReplicate n Quantity.BlockersBeyondFirst)
     effect =
       Effect.ModifyTarget
         ( ModifyTarget.MkModifyTarget

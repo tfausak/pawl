@@ -17,6 +17,7 @@ import qualified Pawl.Codec.AffectPlayersSpec
 import qualified Pawl.Codec.AffectedPlayersSpec
 import qualified Pawl.Codec.AffectedSpec
 import qualified Pawl.Codec.AffectedUnlessSpec
+import qualified Pawl.Codec.AgainstSlotSpec
 import qualified Pawl.Codec.AggregationSpec
 import qualified Pawl.Codec.AlternativeCostSpec
 import qualified Pawl.Codec.ArmDelayedTriggerSpec
@@ -108,6 +109,7 @@ import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.GraveyardScopeSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
+import qualified Pawl.Codec.HalvedSpec
 import qualified Pawl.Codec.HybridSpec
 import qualified Pawl.Codec.InZoneSpec
 import qualified Pawl.Codec.IncreaseSpellCostSpec
@@ -152,6 +154,7 @@ import qualified Pawl.Codec.PhasePatternSpec
 import qualified Pawl.Codec.PhaseSelectorSpec
 import qualified Pawl.Codec.PhaseSpec
 import qualified Pawl.Codec.PlayerCounterKindSpec
+import qualified Pawl.Codec.PlayerCounterTallySpec
 import qualified Pawl.Codec.PlayerCountersSpec
 import qualified Pawl.Codec.PlayerDrawsNthCardSpec
 import qualified Pawl.Codec.PlayerEffectSpec
@@ -162,6 +165,7 @@ import qualified Pawl.Codec.PlayerRelationSpec
 import qualified Pawl.Codec.PlayerSacrificesSpec
 import qualified Pawl.Codec.PlayerScopeSpec
 import qualified Pawl.Codec.PlayerStaticAbilitySpec
+import qualified Pawl.Codec.PlusSpec
 import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.PowerSpec
 import qualified Pawl.Codec.PreventNextDamageSpec
@@ -386,6 +390,7 @@ spec s registry = do
   Pawl.Codec.AffectedPlayersSpec.spec s
   Pawl.Codec.AffectedSpec.spec s
   Pawl.Codec.AffectedUnlessSpec.spec s
+  Pawl.Codec.AgainstSlotSpec.spec s
   Pawl.Codec.AggregationSpec.spec s
   Pawl.Codec.AlternativeCostSpec.spec s
   Pawl.Codec.ArmDelayedTriggerSpec.spec s
@@ -477,6 +482,7 @@ spec s registry = do
   Pawl.Codec.GameEventSpec.spec s
   Pawl.Codec.GraveyardScopeSpec.spec s
   Pawl.Codec.HalfUnlockedSpec.spec s
+  Pawl.Codec.HalvedSpec.spec s
   Pawl.Codec.HybridSpec.spec s
   Pawl.Codec.InZoneSpec.spec s
   Pawl.Codec.IncreaseSpellCostSpec.spec s
@@ -521,6 +527,7 @@ spec s registry = do
   Pawl.Codec.PhaseSelectorSpec.spec s
   Pawl.Codec.PhaseSpec.spec s
   Pawl.Codec.PlayerCounterKindSpec.spec s
+  Pawl.Codec.PlayerCounterTallySpec.spec s
   Pawl.Codec.PlayerCountersSpec.spec s
   Pawl.Codec.PlayerDrawsNthCardSpec.spec s
   Pawl.Codec.PlayerEffectSpec.spec s
@@ -531,6 +538,7 @@ spec s registry = do
   Pawl.Codec.PlayerSacrificesSpec.spec s
   Pawl.Codec.PlayerScopeSpec.spec s
   Pawl.Codec.PlayerStaticAbilitySpec.spec s
+  Pawl.Codec.PlusSpec.spec s
   Pawl.Codec.PoolSpec.spec s
   Pawl.Codec.PowerSpec.spec s
   Pawl.Codec.PreventNextDamageSpec.spec s

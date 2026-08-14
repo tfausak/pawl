@@ -61,6 +61,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
+import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
@@ -113,6 +114,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
@@ -150,6 +152,7 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
@@ -418,10 +421,10 @@ quantityCounts quantity = case quantity of
   -- effect of the same resolution and there is no Count inside it.
   Quantity.Type.InSlot _ -> []
   Quantity.Type.Star -> []
-  Quantity.Type.Plus a b -> quantityCounts a <> quantityCounts b
+  Quantity.Type.Plus (Plus.MkPlus a b) -> quantityCounts a <> quantityCounts b
   -- Plus' descent: CR 107.1a's rounding holds no Count, and the payload it
   -- halves may be one -- Malignus halves a fold over players.
-  Quantity.Type.Halved _ inner -> quantityCounts inner
+  Quantity.Type.Halved (Halved.MkHalved _ inner) -> quantityCounts inner
   -- Not a leaf: a minus sign hides nothing, so the lints reach through it --
   -- Toxic Deluge's -X, and any negated count a card comes to print.
   Quantity.Type.Negate a -> quantityCounts a
@@ -441,7 +444,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.HasDesignation _ -> []
   Quantity.Type.WasKicked -> []
   -- CR 122.1's per-player counter tally, another such scalar.
-  Quantity.Type.PlayerCounters _ _ -> []
+  Quantity.Type.PlayerCounters {} -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
   -- against: a bare CounterKind with no Count and no Filter beside it.
   Quantity.Type.ObjectCounters _ -> []
@@ -456,7 +459,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.BlockersBeyondFirst -> []
   -- Not a leaf: aiming the evaluation at another object does not stop the payload
   -- from being a Count, so the Filter lints must reach through it.
-  Quantity.Type.AgainstSlot _ inner -> quantityCounts inner
+  Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ inner) -> quantityCounts inner
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this

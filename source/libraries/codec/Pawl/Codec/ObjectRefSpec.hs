@@ -35,20 +35,18 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))
       """ {"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
-  -- A two-payload arm, so it keeps an array -- inside the tag's value now,
-  -- rather than being the array that carried the tag. Common.tuple writes the
-  -- same two elements the hand-written pair did.
+  -- A two-payload arm, so its value is a payload record keyed by the field
+  -- names (#1464) rather than the positional array it once was.
   Spec.it s "EachCardInGraveyard" $
     Common.assertCodec
       s
       ObjectRef.codec
       (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)))
       """ {"type":"EachCardInGraveyard","value":{"players":{"type":"EachPlayer"},"filter":{"type":"HasCardType","value":{"type":"Creature"}}}} """
-  -- Common.tuple rejects any other length, which is what makes the schema's
-  -- prefixItems/minItems/maxItems a claim rather than a description. The TOO
-  -- LONG case is the discriminating one: a decoder that read the first two
-  -- elements and ignored the rest would still reject the short payload, so
-  -- testing only that proves nothing about the arm's use of Common.tuple.
+  -- The record codec rejects an ARRAY of any length, which is what keeps the
+  -- old positional wire format from decoding silently. Both lengths are asserted
+  -- rather than one: a decoder that had kept a tuple fallback would reject the
+  -- short payload on arity alone, so the too-long case is what discriminates.
   Spec.it s "EachCardInGraveyard rejects a too-short payload" $
     Spec.assertBool
       s

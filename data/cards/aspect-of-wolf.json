@@ -35,11 +35,8 @@
               "value": {
                 "power": {
                   "type": "Halved",
-                  "value": [
-                    {
-                      "type": "Down"
-                    },
-                    {
+                  "value": {
+                    "quantity": {
                       "type": "Count",
                       "value": {
                         "aggregation": {
@@ -74,16 +71,16 @@
                           }
                         }
                       }
+                    },
+                    "rounding": {
+                      "type": "Down"
                     }
-                  ]
+                  }
                 },
                 "toughness": {
                   "type": "Halved",
-                  "value": [
-                    {
-                      "type": "Up"
-                    },
-                    {
+                  "value": {
+                    "quantity": {
                       "type": "Count",
                       "value": {
                         "aggregation": {
@@ -118,8 +115,11 @@
                           }
                         }
                       }
+                    },
+                    "rounding": {
+                      "type": "Up"
                     }
-                  ]
+                  }
                 }
               }
             }
