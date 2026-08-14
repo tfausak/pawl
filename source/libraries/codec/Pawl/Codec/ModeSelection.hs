@@ -12,16 +12,10 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 codec :: Codec.Codec ModeSelection.ModeSelection
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "ChooseExactly" Common.natural ModeSelection.ChooseExactly,
+    [ Arm.payload "ChooseExactly" Common.natural ModeSelection.ChooseExactly (\x -> case x of ModeSelection.ChooseExactly y -> Just y; _ -> Nothing),
       -- CR 700.2d: "You may choose the same mode more than once." A separate tag
       -- rather than a field on the one above, so a card printing the ordinary
       -- instruction encodes exactly as it always did.
-      Arm.payload "ChooseExactlyWithRepeats" Common.natural ModeSelection.ChooseExactlyWithRepeats,
-      Arm.payload "ChooseBetween" ChooseBetween.codec ModeSelection.ChooseBetween
+      Arm.payload "ChooseExactlyWithRepeats" Common.natural ModeSelection.ChooseExactlyWithRepeats (\x -> case x of ModeSelection.ChooseExactlyWithRepeats y -> Just y; _ -> Nothing),
+      Arm.payload "ChooseBetween" ChooseBetween.codec ModeSelection.ChooseBetween (\x -> case x of ModeSelection.ChooseBetween y -> Just y; _ -> Nothing)
     ]
-  where
-    encode m = case m of
-      ModeSelection.ChooseExactly n -> Common.tagged "ChooseExactly" . Just $ Codec.encode Common.natural n
-      ModeSelection.ChooseExactlyWithRepeats n -> Common.tagged "ChooseExactlyWithRepeats" . Just $ Codec.encode Common.natural n
-      ModeSelection.ChooseBetween cb -> Common.tagged "ChooseBetween" . Just $ Codec.encode ChooseBetween.codec cb

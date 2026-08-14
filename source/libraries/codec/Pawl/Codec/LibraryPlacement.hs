@@ -3,7 +3,6 @@ module Pawl.Codec.LibraryPlacement where
 import qualified Pawl.Codec.LibraryPosition as LibraryPosition
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 
 -- | A stated placement writes its OWN tag and carries the position as the
@@ -20,12 +19,6 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 codec :: Codec.Codec LibraryPlacement.LibraryPlacement
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "Stated" LibraryPosition.codec LibraryPlacement.Stated,
+    [ Arm.payload "Stated" LibraryPosition.codec LibraryPlacement.Stated (\x -> case x of LibraryPlacement.Stated y -> Just y; _ -> Nothing),
       Arm.nullary "OwnerChooses" LibraryPlacement.OwnerChooses
     ]
-  where
-    encode p = case p of
-      LibraryPlacement.Stated position ->
-        Common.tagged "Stated" . Just $ Codec.encode LibraryPosition.codec position
-      LibraryPlacement.OwnerChooses -> Common.nullary "OwnerChooses"

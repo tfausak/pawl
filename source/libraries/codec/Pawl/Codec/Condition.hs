@@ -21,11 +21,6 @@ import qualified Pawl.Types.Condition as Condition
 codec :: Codec.Codec Condition.Condition
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "Compares" Compares.codec Condition.Compares,
-      Arm.payload "Any" (Common.list codec) Condition.Any
+    [ Arm.payload "Compares" Compares.codec Condition.Compares (\x -> case x of Condition.Compares y -> Just y; _ -> Nothing),
+      Arm.payload "Any" (Common.list codec) Condition.Any (\x -> case x of Condition.Any y -> Just y; _ -> Nothing)
     ]
-  where
-    encode condition = case condition of
-      Condition.Compares c -> Common.tagged "Compares" . Just $ Codec.encode Compares.codec c
-      Condition.Any cs -> Common.tagged "Any" . Just $ Codec.encode (Common.list codec) cs

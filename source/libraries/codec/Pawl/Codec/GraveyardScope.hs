@@ -4,7 +4,6 @@ import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.GraveyardScope as GraveyardScope
 
 -- | Tagged, in the shape Pawl.Codec.PlayerRef already uses for the same pair of
@@ -13,11 +12,6 @@ import qualified Pawl.Types.GraveyardScope as GraveyardScope
 codec :: Codec.Codec GraveyardScope.GraveyardScope
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "Scoped" PlayerScope.codec GraveyardScope.Scoped,
-      Arm.payload "InSlot" SlotName.codec GraveyardScope.InSlot
+    [ Arm.payload "Scoped" PlayerScope.codec GraveyardScope.Scoped (\x -> case x of GraveyardScope.Scoped y -> Just y; _ -> Nothing),
+      Arm.payload "InSlot" SlotName.codec GraveyardScope.InSlot (\x -> case x of GraveyardScope.InSlot y -> Just y; _ -> Nothing)
     ]
-  where
-    encode s = case s of
-      GraveyardScope.Scoped scope -> Common.tagged "Scoped" . Just $ Codec.encode PlayerScope.codec scope
-      GraveyardScope.InSlot n -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec n

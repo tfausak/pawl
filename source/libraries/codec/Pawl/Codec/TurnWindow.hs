@@ -11,13 +11,7 @@ import qualified Pawl.Types.TurnWindow as TurnWindow
 codec :: Codec.Codec TurnWindow.TurnWindow
 codec =
   Arm.tagged
-    encode
     [ Arm.nullary "AnyTurn" TurnWindow.AnyTurn,
       Arm.nullary "ControllersNextTurn" TurnWindow.ControllersNextTurn,
-      Arm.payload "OnTurn" Common.natural TurnWindow.OnTurn
+      Arm.payload "OnTurn" Common.natural TurnWindow.OnTurn (\x -> case x of TurnWindow.OnTurn y -> Just y; _ -> Nothing)
     ]
-  where
-    encode w = case w of
-      TurnWindow.AnyTurn -> Common.nullary "AnyTurn"
-      TurnWindow.ControllersNextTurn -> Common.nullary "ControllersNextTurn"
-      TurnWindow.OnTurn n -> Common.tagged "OnTurn" . Just $ Codec.encode Common.natural n

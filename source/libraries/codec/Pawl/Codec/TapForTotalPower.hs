@@ -12,7 +12,7 @@ import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 -- | A bare object keyed by the record's field names, replacing the two-element
 -- array this payload used to be (#1464). The keyword codec is a PARAMETER; see
 -- Pawl.Codec.Filter's header.
-codec :: (Typeable.Typeable keyword) => Codec.Codec keyword -> Codec.Codec (TapForTotalPower.TapForTotalPower keyword)
+codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (TapForTotalPower.TapForTotalPower keyword)
 codec keywordCodec = Fields.object $ do
   totalPower <- Fields.required "totalPower" Common.natural TapForTotalPower.totalPower
   whichPermanents <- Fields.required "whichPermanents" (Filter.codec keywordCodec) TapForTotalPower.whichPermanents

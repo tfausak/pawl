@@ -3074,9 +3074,15 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         -- renamed it away from.
         bodyDefined = foldMap boundSlots body
         -- The member is bound HERE, in the map handed down, and never onto the
-        -- resolving object -- which is what scopes it to this iteration: the
-        -- loop leaves nothing behind for a later effect to read, and the rest of
-        -- the resolution sees the environment it had.
+        -- resolving object -- which is what scopes it to this iteration without
+        -- anything to undo afterwards. The insert is OUTERMOST, so the loop's
+        -- own name wins over both other sources.
+        --
+        -- `m` beats `defined` where the two collide: `m` is the CR 608.2b
+        -- re-validated map, and a body definition shadowing a target slot would
+        -- skip a re-validation that slot was owed. The collision is ruled out by
+        -- Pawl.CardSpec rather than by the types, exactly as slotGroup's is, so
+        -- this is which way to fail rather than a live choice.
         withMember member defined m = Map.insert slot (Set.singleton member) (Map.union m defined)
         bindingsOf gs = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
         -- Whatever those names held BEFORE the loop, to be put back at each

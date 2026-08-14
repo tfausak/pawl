@@ -3,8 +3,8 @@
 --
 -- RECURSIVE three times over: PreventNextDamage's CR 615.5 rider and ForEach's
 -- CR 608.2f body both hold effects, and CreateEmblem's payload is a whole card
--- whose faces hold effects. Each names
--- 'codec' inside its own definition, which terminates for Pawl.Codec.TriggerCondition's
+-- whose faces hold effects. Each names 'codec' inside its own definition, which
+-- terminates for Pawl.Codec.TriggerCondition's
 -- reason -- 'Arm.tagged' reaches WHNF without forcing its arm list, and
 -- 'Define.define' registers the type's name before running the schema body.
 --
@@ -58,151 +58,78 @@ import qualified Pawl.Types.Effect as Effect
 codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (Effect.Effect card)
 codec cardCodec =
   Arm.tagged
-    encode
-    [ Arm.payload "DealDamage" DealDamage.codec Effect.DealDamage,
-      Arm.payload "ModifyTarget" ModifyTarget.codec Effect.ModifyTarget,
-      Arm.payload "ChangeText" ChangeText.codec Effect.ChangeText,
-      Arm.payload "AddMana" ManaProduction.codec Effect.AddMana,
-      Arm.payload "Search" Search.codec Effect.Search,
+    [ Arm.payload "DealDamage" DealDamage.codec Effect.DealDamage (\x -> case x of Effect.DealDamage y -> Just y; _ -> Nothing),
+      Arm.payload "ModifyTarget" ModifyTarget.codec Effect.ModifyTarget (\x -> case x of Effect.ModifyTarget y -> Just y; _ -> Nothing),
+      Arm.payload "ChangeText" ChangeText.codec Effect.ChangeText (\x -> case x of Effect.ChangeText y -> Just y; _ -> Nothing),
+      Arm.payload "AddMana" ManaProduction.codec Effect.AddMana (\x -> case x of Effect.AddMana y -> Just y; _ -> Nothing),
+      Arm.payload "Search" Search.codec Effect.Search (\x -> case x of Effect.Search y -> Just y; _ -> Nothing),
       Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
       Arm.nullary "Proliferate" Effect.Proliferate,
       Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
       Arm.nullary "Venture" Effect.Venture,
       Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,
-      Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices,
+      Arm.payload "PlayerSacrifices" PlayerSacrifices.codec Effect.PlayerSacrifices (\x -> case x of Effect.PlayerSacrifices y -> Just y; _ -> Nothing),
       Arm.nullary "RestartGame" Effect.RestartGame,
-      Arm.payload "ControlPlayerNextTurn" SlotName.codec Effect.ControlPlayerNextTurn,
-      Arm.payload "Destroy" Destroy.codec Effect.Destroy,
-      Arm.payload "Sacrifice" SlotName.codec Effect.Sacrifice,
-      Arm.payload "TurnFaceDown" SlotName.codec Effect.TurnFaceDown,
-      Arm.payload "RemoveFromCombat" SlotName.codec Effect.RemoveFromCombat,
-      Arm.payload "Counter" SlotName.codec Effect.Counter,
-      Arm.payload "MoveToZone" MoveToZone.codec Effect.MoveToZone,
-      Arm.payload "Draw" PlayerQuantity.codec Effect.Draw,
-      Arm.payload "Scry" PlayerQuantity.codec Effect.Scry,
-      Arm.payload "Surveil" PlayerQuantity.codec Effect.Surveil,
-      Arm.payload "Fateseal" PlayerQuantity.codec Effect.Fateseal,
-      Arm.payload "Explore" ObjectRef.codec Effect.Explore,
-      Arm.payload "Mill" Mill.codec Effect.Mill,
-      Arm.payload "Discard" Discard.codec Effect.Discard,
-      Arm.payload "LoseLife" PlayerQuantity.codec Effect.LoseLife,
-      Arm.payload "GainLife" PlayerQuantity.codec Effect.GainLife,
-      Arm.payload "ExchangeLifeTotals" ExchangeSides.codec Effect.ExchangeLifeTotals,
-      Arm.payload "SetLifeTotal" PlayerQuantity.codec Effect.SetLifeTotal,
+      Arm.payload "ControlPlayerNextTurn" SlotName.codec Effect.ControlPlayerNextTurn (\x -> case x of Effect.ControlPlayerNextTurn y -> Just y; _ -> Nothing),
+      Arm.payload "Destroy" Destroy.codec Effect.Destroy (\x -> case x of Effect.Destroy y -> Just y; _ -> Nothing),
+      Arm.payload "Sacrifice" SlotName.codec Effect.Sacrifice (\x -> case x of Effect.Sacrifice y -> Just y; _ -> Nothing),
+      Arm.payload "TurnFaceDown" SlotName.codec Effect.TurnFaceDown (\x -> case x of Effect.TurnFaceDown y -> Just y; _ -> Nothing),
+      Arm.payload "RemoveFromCombat" SlotName.codec Effect.RemoveFromCombat (\x -> case x of Effect.RemoveFromCombat y -> Just y; _ -> Nothing),
+      Arm.payload "Counter" SlotName.codec Effect.Counter (\x -> case x of Effect.Counter y -> Just y; _ -> Nothing),
+      Arm.payload "MoveToZone" MoveToZone.codec Effect.MoveToZone (\x -> case x of Effect.MoveToZone y -> Just y; _ -> Nothing),
+      Arm.payload "Draw" PlayerQuantity.codec Effect.Draw (\x -> case x of Effect.Draw y -> Just y; _ -> Nothing),
+      Arm.payload "Scry" PlayerQuantity.codec Effect.Scry (\x -> case x of Effect.Scry y -> Just y; _ -> Nothing),
+      Arm.payload "Surveil" PlayerQuantity.codec Effect.Surveil (\x -> case x of Effect.Surveil y -> Just y; _ -> Nothing),
+      Arm.payload "Fateseal" PlayerQuantity.codec Effect.Fateseal (\x -> case x of Effect.Fateseal y -> Just y; _ -> Nothing),
+      Arm.payload "Explore" ObjectRef.codec Effect.Explore (\x -> case x of Effect.Explore y -> Just y; _ -> Nothing),
+      Arm.payload "Mill" Mill.codec Effect.Mill (\x -> case x of Effect.Mill y -> Just y; _ -> Nothing),
+      Arm.payload "Discard" Discard.codec Effect.Discard (\x -> case x of Effect.Discard y -> Just y; _ -> Nothing),
+      Arm.payload "LoseLife" PlayerQuantity.codec Effect.LoseLife (\x -> case x of Effect.LoseLife y -> Just y; _ -> Nothing),
+      Arm.payload "GainLife" PlayerQuantity.codec Effect.GainLife (\x -> case x of Effect.GainLife y -> Just y; _ -> Nothing),
+      Arm.payload "ExchangeLifeTotals" ExchangeSides.codec Effect.ExchangeLifeTotals (\x -> case x of Effect.ExchangeLifeTotals y -> Just y; _ -> Nothing),
+      Arm.payload "SetLifeTotal" PlayerQuantity.codec Effect.SetLifeTotal (\x -> case x of Effect.SetLifeTotal y -> Just y; _ -> Nothing),
       Arm.nullary "RedistributeLifeTotals" Effect.RedistributeLifeTotals,
-      Arm.payload "IncreaseSpeed" PlayerQuantity.codec Effect.IncreaseSpeed,
-      Arm.payload "DecreaseSpeed" SpeedDecrease.codec Effect.DecreaseSpeed,
-      Arm.payload "Create" createCodec Effect.Create,
-      Arm.payload "CreateCopy" CreateCopy.codec Effect.CreateCopy,
-      Arm.payload "Replace" Replace.codec Effect.Replace,
-      Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase,
-      Arm.payload "PreventNextDamage" preventCodec Effect.PreventNextDamage,
-      Arm.payload "PreventAllDamage" DurationRef.codec Effect.PreventAllDamage,
-      Arm.payload "RedirectDamage" RedirectDamage.codec Effect.RedirectDamage,
-      Arm.payload "PutCounters" PutCounters.codec Effect.PutCounters,
-      Arm.payload "RemoveCounters" RemoveCounters.codec Effect.RemoveCounters,
-      Arm.payload "GainPlayerCounters" PlayerCounters.codec Effect.GainPlayerCounters,
-      Arm.payload "RemovePlayerCounters" PlayerCounters.codec Effect.RemovePlayerCounters,
-      Arm.payload "Tap" ObjectRef.codec Effect.Tap,
-      Arm.payload "Untap" ObjectRef.codec Effect.Untap,
-      Arm.payload "Transform" ObjectRef.codec Effect.Transform,
-      Arm.payload "AddPhases" (Common.list ExtraPhase.codec) Effect.AddPhases,
-      Arm.payload "GainControl" DurationRef.codec Effect.GainControl,
-      Arm.payload "ArmDelayedTrigger" ArmDelayedTrigger.codec Effect.ArmDelayedTrigger,
-      Arm.payload "AffectPlayers" AffectPlayers.codec Effect.AffectPlayers,
-      Arm.payload "RequireBlock" RequireBlock.codec Effect.RequireBlock,
-      Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem,
-      Arm.payload "BecomeMonarch" MonarchTarget.codec Effect.BecomeMonarch,
-      Arm.payload "Designate" Designate.codec Effect.Designate,
-      Arm.payload "Unsuspect" ObjectRef.codec Effect.Unsuspect,
-      Arm.payload "Evolve" SlotName.codec Effect.Evolve,
-      Arm.payload "Mentor" SlotName.codec Effect.Mentor,
-      Arm.payload "ItBecomes" Daytime.codec Effect.ItBecomes,
-      Arm.payload "ExileUntilMonarch" SlotName.codec Effect.ExileUntilMonarch,
-      Arm.payload "ExileHaunting" ExileHaunting.codec Effect.ExileHaunting,
-      Arm.payload "Attach" SlotName.codec Effect.Attach,
-      Arm.payload "AttachTarget" AttachTarget.codec Effect.AttachTarget,
-      Arm.payload "PlaySubgame" SlotName.codec Effect.PlaySubgame,
-      Arm.payload "ChooseOpponent" SlotName.codec Effect.ChooseOpponent,
-      Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn,
-      Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary,
-      Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast,
-      Arm.payload "GrantPlayFromExile" DurationRef.codec Effect.GrantPlayFromExile,
-      Arm.payload "ForEach" forEachCodec Effect.ForEach
+      Arm.payload "IncreaseSpeed" PlayerQuantity.codec Effect.IncreaseSpeed (\x -> case x of Effect.IncreaseSpeed y -> Just y; _ -> Nothing),
+      Arm.payload "DecreaseSpeed" SpeedDecrease.codec Effect.DecreaseSpeed (\x -> case x of Effect.DecreaseSpeed y -> Just y; _ -> Nothing),
+      Arm.payload "Create" createCodec Effect.Create (\x -> case x of Effect.Create y -> Just y; _ -> Nothing),
+      Arm.payload "CreateCopy" CreateCopy.codec Effect.CreateCopy (\x -> case x of Effect.CreateCopy y -> Just y; _ -> Nothing),
+      Arm.payload "Replace" Replace.codec Effect.Replace (\x -> case x of Effect.Replace y -> Just y; _ -> Nothing),
+      Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase (\x -> case x of Effect.SkipNextPhase y -> Just y; _ -> Nothing),
+      Arm.payload "PreventNextDamage" preventCodec Effect.PreventNextDamage (\x -> case x of Effect.PreventNextDamage y -> Just y; _ -> Nothing),
+      Arm.payload "PreventAllDamage" DurationRef.codec Effect.PreventAllDamage (\x -> case x of Effect.PreventAllDamage y -> Just y; _ -> Nothing),
+      Arm.payload "RedirectDamage" RedirectDamage.codec Effect.RedirectDamage (\x -> case x of Effect.RedirectDamage y -> Just y; _ -> Nothing),
+      Arm.payload "PutCounters" PutCounters.codec Effect.PutCounters (\x -> case x of Effect.PutCounters y -> Just y; _ -> Nothing),
+      Arm.payload "RemoveCounters" RemoveCounters.codec Effect.RemoveCounters (\x -> case x of Effect.RemoveCounters y -> Just y; _ -> Nothing),
+      Arm.payload "GainPlayerCounters" PlayerCounters.codec Effect.GainPlayerCounters (\x -> case x of Effect.GainPlayerCounters y -> Just y; _ -> Nothing),
+      Arm.payload "RemovePlayerCounters" PlayerCounters.codec Effect.RemovePlayerCounters (\x -> case x of Effect.RemovePlayerCounters y -> Just y; _ -> Nothing),
+      Arm.payload "Tap" ObjectRef.codec Effect.Tap (\x -> case x of Effect.Tap y -> Just y; _ -> Nothing),
+      Arm.payload "Untap" ObjectRef.codec Effect.Untap (\x -> case x of Effect.Untap y -> Just y; _ -> Nothing),
+      Arm.payload "Transform" ObjectRef.codec Effect.Transform (\x -> case x of Effect.Transform y -> Just y; _ -> Nothing),
+      Arm.payload "AddPhases" (Common.list ExtraPhase.codec) Effect.AddPhases (\x -> case x of Effect.AddPhases y -> Just y; _ -> Nothing),
+      Arm.payload "GainControl" DurationRef.codec Effect.GainControl (\x -> case x of Effect.GainControl y -> Just y; _ -> Nothing),
+      Arm.payload "ArmDelayedTrigger" ArmDelayedTrigger.codec Effect.ArmDelayedTrigger (\x -> case x of Effect.ArmDelayedTrigger y -> Just y; _ -> Nothing),
+      Arm.payload "AffectPlayers" AffectPlayers.codec Effect.AffectPlayers (\x -> case x of Effect.AffectPlayers y -> Just y; _ -> Nothing),
+      Arm.payload "RequireBlock" RequireBlock.codec Effect.RequireBlock (\x -> case x of Effect.RequireBlock y -> Just y; _ -> Nothing),
+      Arm.payload "CreateEmblem" cardCodec Effect.CreateEmblem (\x -> case x of Effect.CreateEmblem y -> Just y; _ -> Nothing),
+      Arm.payload "BecomeMonarch" MonarchTarget.codec Effect.BecomeMonarch (\x -> case x of Effect.BecomeMonarch y -> Just y; _ -> Nothing),
+      Arm.payload "Designate" Designate.codec Effect.Designate (\x -> case x of Effect.Designate y -> Just y; _ -> Nothing),
+      Arm.payload "Unsuspect" ObjectRef.codec Effect.Unsuspect (\x -> case x of Effect.Unsuspect y -> Just y; _ -> Nothing),
+      Arm.payload "Evolve" SlotName.codec Effect.Evolve (\x -> case x of Effect.Evolve y -> Just y; _ -> Nothing),
+      Arm.payload "Mentor" SlotName.codec Effect.Mentor (\x -> case x of Effect.Mentor y -> Just y; _ -> Nothing),
+      Arm.payload "ItBecomes" Daytime.codec Effect.ItBecomes (\x -> case x of Effect.ItBecomes y -> Just y; _ -> Nothing),
+      Arm.payload "ExileUntilMonarch" SlotName.codec Effect.ExileUntilMonarch (\x -> case x of Effect.ExileUntilMonarch y -> Just y; _ -> Nothing),
+      Arm.payload "ExileHaunting" ExileHaunting.codec Effect.ExileHaunting (\x -> case x of Effect.ExileHaunting y -> Just y; _ -> Nothing),
+      Arm.payload "Attach" SlotName.codec Effect.Attach (\x -> case x of Effect.Attach y -> Just y; _ -> Nothing),
+      Arm.payload "AttachTarget" AttachTarget.codec Effect.AttachTarget (\x -> case x of Effect.AttachTarget y -> Just y; _ -> Nothing),
+      Arm.payload "PlaySubgame" SlotName.codec Effect.PlaySubgame (\x -> case x of Effect.PlaySubgame y -> Just y; _ -> Nothing),
+      Arm.payload "ChooseOpponent" SlotName.codec Effect.ChooseOpponent (\x -> case x of Effect.ChooseOpponent y -> Just y; _ -> Nothing),
+      Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
+      Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
+      Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
+      Arm.payload "GrantPlayFromExile" DurationRef.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
+      Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing)
     ]
   where
     createCodec = Create.codec cardCodec
     preventCodec = PreventNextDamage.codec (codec cardCodec)
     forEachCodec = ForEach.codec (codec cardCodec)
-    tag t = Common.tagged t . Just
-    encode e = case e of
-      Effect.DealDamage x -> tag "DealDamage" $ Codec.encode DealDamage.codec x
-      Effect.ModifyTarget x -> tag "ModifyTarget" $ Codec.encode ModifyTarget.codec x
-      Effect.ChangeText x -> tag "ChangeText" $ Codec.encode ChangeText.codec x
-      Effect.AddMana x -> tag "AddMana" $ Codec.encode ManaProduction.codec x
-      Effect.Search x -> tag "Search" $ Codec.encode Search.codec x
-      Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
-      Effect.Proliferate -> Common.nullary "Proliferate"
-      Effect.TemptWithTheRing -> Common.nullary "TemptWithTheRing"
-      Effect.Venture -> Common.nullary "Venture"
-      Effect.ExileHandThenDraw -> Common.nullary "ExileHandThenDraw"
-      Effect.PlayerSacrifices x -> tag "PlayerSacrifices" $ Codec.encode PlayerSacrifices.codec x
-      Effect.RestartGame -> Common.nullary "RestartGame"
-      Effect.ControlPlayerNextTurn x -> tag "ControlPlayerNextTurn" $ Codec.encode SlotName.codec x
-      Effect.Destroy x -> tag "Destroy" $ Codec.encode Destroy.codec x
-      Effect.Sacrifice x -> tag "Sacrifice" $ Codec.encode SlotName.codec x
-      Effect.TurnFaceDown x -> tag "TurnFaceDown" $ Codec.encode SlotName.codec x
-      Effect.RemoveFromCombat x -> tag "RemoveFromCombat" $ Codec.encode SlotName.codec x
-      Effect.Counter x -> tag "Counter" $ Codec.encode SlotName.codec x
-      Effect.MoveToZone x -> tag "MoveToZone" $ Codec.encode MoveToZone.codec x
-      Effect.Draw x -> tag "Draw" $ Codec.encode PlayerQuantity.codec x
-      Effect.Scry x -> tag "Scry" $ Codec.encode PlayerQuantity.codec x
-      Effect.Surveil x -> tag "Surveil" $ Codec.encode PlayerQuantity.codec x
-      Effect.Fateseal x -> tag "Fateseal" $ Codec.encode PlayerQuantity.codec x
-      Effect.Explore x -> tag "Explore" $ Codec.encode ObjectRef.codec x
-      Effect.Mill x -> tag "Mill" $ Codec.encode Mill.codec x
-      Effect.Discard x -> tag "Discard" $ Codec.encode Discard.codec x
-      Effect.LoseLife x -> tag "LoseLife" $ Codec.encode PlayerQuantity.codec x
-      Effect.GainLife x -> tag "GainLife" $ Codec.encode PlayerQuantity.codec x
-      Effect.ExchangeLifeTotals x -> tag "ExchangeLifeTotals" $ Codec.encode ExchangeSides.codec x
-      Effect.SetLifeTotal x -> tag "SetLifeTotal" $ Codec.encode PlayerQuantity.codec x
-      Effect.RedistributeLifeTotals -> Common.nullary "RedistributeLifeTotals"
-      Effect.IncreaseSpeed x -> tag "IncreaseSpeed" $ Codec.encode PlayerQuantity.codec x
-      Effect.DecreaseSpeed x -> tag "DecreaseSpeed" $ Codec.encode SpeedDecrease.codec x
-      Effect.Create x -> tag "Create" $ Codec.encode createCodec x
-      Effect.CreateCopy x -> tag "CreateCopy" $ Codec.encode CreateCopy.codec x
-      Effect.Replace x -> tag "Replace" $ Codec.encode Replace.codec x
-      Effect.SkipNextPhase x -> tag "SkipNextPhase" $ Codec.encode SkipNextPhase.codec x
-      Effect.PreventNextDamage x -> tag "PreventNextDamage" $ Codec.encode preventCodec x
-      Effect.ForEach x -> tag "ForEach" $ Codec.encode forEachCodec x
-      Effect.PreventAllDamage x -> tag "PreventAllDamage" $ Codec.encode DurationRef.codec x
-      Effect.RedirectDamage x -> tag "RedirectDamage" $ Codec.encode RedirectDamage.codec x
-      Effect.PutCounters x -> tag "PutCounters" $ Codec.encode PutCounters.codec x
-      Effect.RemoveCounters x -> tag "RemoveCounters" $ Codec.encode RemoveCounters.codec x
-      Effect.GainPlayerCounters x -> tag "GainPlayerCounters" $ Codec.encode PlayerCounters.codec x
-      Effect.RemovePlayerCounters x -> tag "RemovePlayerCounters" $ Codec.encode PlayerCounters.codec x
-      Effect.Tap x -> tag "Tap" $ Codec.encode ObjectRef.codec x
-      Effect.Untap x -> tag "Untap" $ Codec.encode ObjectRef.codec x
-      Effect.Transform x -> tag "Transform" $ Codec.encode ObjectRef.codec x
-      Effect.AddPhases x -> tag "AddPhases" $ Codec.encode (Common.list ExtraPhase.codec) x
-      Effect.GainControl x -> tag "GainControl" $ Codec.encode DurationRef.codec x
-      Effect.ArmDelayedTrigger x -> tag "ArmDelayedTrigger" $ Codec.encode ArmDelayedTrigger.codec x
-      Effect.AffectPlayers x -> tag "AffectPlayers" $ Codec.encode AffectPlayers.codec x
-      Effect.RequireBlock x -> tag "RequireBlock" $ Codec.encode RequireBlock.codec x
-      Effect.CreateEmblem x -> tag "CreateEmblem" $ Codec.encode cardCodec x
-      Effect.BecomeMonarch x -> tag "BecomeMonarch" $ Codec.encode MonarchTarget.codec x
-      Effect.Designate x -> tag "Designate" $ Codec.encode Designate.codec x
-      Effect.Unsuspect x -> tag "Unsuspect" $ Codec.encode ObjectRef.codec x
-      Effect.Evolve x -> tag "Evolve" $ Codec.encode SlotName.codec x
-      Effect.Mentor x -> tag "Mentor" $ Codec.encode SlotName.codec x
-      Effect.ItBecomes x -> tag "ItBecomes" $ Codec.encode Daytime.codec x
-      Effect.ExileUntilMonarch x -> tag "ExileUntilMonarch" $ Codec.encode SlotName.codec x
-      Effect.ExileHaunting x -> tag "ExileHaunting" $ Codec.encode ExileHaunting.codec x
-      Effect.Attach x -> tag "Attach" $ Codec.encode SlotName.codec x
-      Effect.AttachTarget x -> tag "AttachTarget" $ Codec.encode AttachTarget.codec x
-      Effect.PlaySubgame x -> tag "PlaySubgame" $ Codec.encode SlotName.codec x
-      Effect.ChooseOpponent x -> tag "ChooseOpponent" $ Codec.encode SlotName.codec x
-      Effect.TakeExtraTurn x -> tag "TakeExtraTurn" $ Codec.encode TakeExtraTurn.codec x
-      Effect.ShuffleIntoLibrary x -> tag "ShuffleIntoLibrary" $ Codec.encode ShuffleIntoLibrary.codec x
-      Effect.OfferCast x -> tag "OfferCast" $ Codec.encode OfferCast.codec x
-      Effect.GrantPlayFromExile x -> tag "GrantPlayFromExile" $ Codec.encode DurationRef.codec x

@@ -5,7 +5,6 @@ import qualified Pawl.Codec.CantBeBlockedBy as CantBeBlockedBy
 import qualified Pawl.Codec.LimitUnless as LimitUnless
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 
 -- | TAGGED, where each arm's payload is an object with named keys: this type is
@@ -26,19 +25,10 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 codec :: Codec.Codec CombatRestriction.CombatRestriction
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "CantAttack" AffectedUnless.codec CombatRestriction.CantAttack,
-      Arm.payload "CantBlock" AffectedUnless.codec CombatRestriction.CantBlock,
-      Arm.payload "CantBeBlockedBy" CantBeBlockedBy.codec CombatRestriction.CantBeBlockedBy,
-      Arm.payload "CantAttackAlone" AffectedUnless.codec CombatRestriction.CantAttackAlone,
-      Arm.payload "CantAttackMoreThan" LimitUnless.codec CombatRestriction.CantAttackMoreThan,
-      Arm.payload "CantBlockMoreThan" LimitUnless.codec CombatRestriction.CantBlockMoreThan
+    [ Arm.payload "CantAttack" AffectedUnless.codec CombatRestriction.CantAttack (\x -> case x of CombatRestriction.CantAttack y -> Just y; _ -> Nothing),
+      Arm.payload "CantBlock" AffectedUnless.codec CombatRestriction.CantBlock (\x -> case x of CombatRestriction.CantBlock y -> Just y; _ -> Nothing),
+      Arm.payload "CantBeBlockedBy" CantBeBlockedBy.codec CombatRestriction.CantBeBlockedBy (\x -> case x of CombatRestriction.CantBeBlockedBy y -> Just y; _ -> Nothing),
+      Arm.payload "CantAttackAlone" AffectedUnless.codec CombatRestriction.CantAttackAlone (\x -> case x of CombatRestriction.CantAttackAlone y -> Just y; _ -> Nothing),
+      Arm.payload "CantAttackMoreThan" LimitUnless.codec CombatRestriction.CantAttackMoreThan (\x -> case x of CombatRestriction.CantAttackMoreThan y -> Just y; _ -> Nothing),
+      Arm.payload "CantBlockMoreThan" LimitUnless.codec CombatRestriction.CantBlockMoreThan (\x -> case x of CombatRestriction.CantBlockMoreThan y -> Just y; _ -> Nothing)
     ]
-  where
-    encode cr = case cr of
-      CombatRestriction.CantAttack x -> Common.tagged "CantAttack" . Just $ Codec.encode AffectedUnless.codec x
-      CombatRestriction.CantBlock x -> Common.tagged "CantBlock" . Just $ Codec.encode AffectedUnless.codec x
-      CombatRestriction.CantBeBlockedBy x -> Common.tagged "CantBeBlockedBy" . Just $ Codec.encode CantBeBlockedBy.codec x
-      CombatRestriction.CantAttackAlone x -> Common.tagged "CantAttackAlone" . Just $ Codec.encode AffectedUnless.codec x
-      CombatRestriction.CantAttackMoreThan x -> Common.tagged "CantAttackMoreThan" . Just $ Codec.encode LimitUnless.codec x
-      CombatRestriction.CantBlockMoreThan x -> Common.tagged "CantBlockMoreThan" . Just $ Codec.encode LimitUnless.codec x

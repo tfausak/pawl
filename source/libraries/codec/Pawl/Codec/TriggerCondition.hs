@@ -30,110 +30,57 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 codec :: Codec.Codec TriggerCondition.TriggerCondition
 codec =
   Arm.tagged
-    encode
     [ Arm.nullary "SelfEnters" TriggerCondition.SelfEnters,
-      Arm.payload "PermanentEnters" filterCodec TriggerCondition.PermanentEnters,
-      Arm.payload "StepBegins" StepBegins.codec TriggerCondition.StepBegins,
-      Arm.payload "StateIs" Condition.codec TriggerCondition.StateIs,
+      Arm.payload "PermanentEnters" filterCodec TriggerCondition.PermanentEnters (\x -> case x of TriggerCondition.PermanentEnters y -> Just y; _ -> Nothing),
+      Arm.payload "StepBegins" StepBegins.codec TriggerCondition.StepBegins (\x -> case x of TriggerCondition.StepBegins y -> Just y; _ -> Nothing),
+      Arm.payload "StateIs" Condition.codec TriggerCondition.StateIs (\x -> case x of TriggerCondition.StateIs y -> Just y; _ -> Nothing),
       Arm.nullary "SelfDealsCombatDamageToPlayer" TriggerCondition.SelfDealsCombatDamageToPlayer,
-      Arm.payload "PermanentDealsCombatDamageToPlayer" filterCodec TriggerCondition.PermanentDealsCombatDamageToPlayer,
+      Arm.payload "PermanentDealsCombatDamageToPlayer" filterCodec TriggerCondition.PermanentDealsCombatDamageToPlayer (\x -> case x of TriggerCondition.PermanentDealsCombatDamageToPlayer y -> Just y; _ -> Nothing),
       Arm.nullary "CreatureDealtCombatDamageToMonarch" TriggerCondition.CreatureDealtCombatDamageToMonarch,
       Arm.nullary "OpponentLostLifeDuringYourTurn" TriggerCondition.OpponentLostLifeDuringYourTurn,
-      Arm.payload "SelfAttacks" TriggerFrequency.codec TriggerCondition.SelfAttacks,
-      Arm.payload "SelfAttacksWithAnother" filterCodec TriggerCondition.SelfAttacksWithAnother,
-      Arm.payload "CreatureAttacksAlone" filterCodec TriggerCondition.CreatureAttacksAlone,
+      Arm.payload "SelfAttacks" TriggerFrequency.codec TriggerCondition.SelfAttacks (\x -> case x of TriggerCondition.SelfAttacks y -> Just y; _ -> Nothing),
+      Arm.payload "SelfAttacksWithAnother" filterCodec TriggerCondition.SelfAttacksWithAnother (\x -> case x of TriggerCondition.SelfAttacksWithAnother y -> Just y; _ -> Nothing),
+      Arm.payload "CreatureAttacksAlone" filterCodec TriggerCondition.CreatureAttacksAlone (\x -> case x of TriggerCondition.CreatureAttacksAlone y -> Just y; _ -> Nothing),
       Arm.nullary "SelfAttacksPlayerWithMostLife" TriggerCondition.SelfAttacksPlayerWithMostLife,
       Arm.nullary "SelfBlocks" TriggerCondition.SelfBlocks,
       Arm.nullary "SelfBlocksCreature" TriggerCondition.SelfBlocksCreature,
-      Arm.payload "SelfBlocksAtLeast" Common.natural TriggerCondition.SelfBlocksAtLeast,
-      Arm.payload "SelfBlocksOneOrMore" filterCodec TriggerCondition.SelfBlocksOneOrMore,
+      Arm.payload "SelfBlocksAtLeast" Common.natural TriggerCondition.SelfBlocksAtLeast (\x -> case x of TriggerCondition.SelfBlocksAtLeast y -> Just y; _ -> Nothing),
+      Arm.payload "SelfBlocksOneOrMore" filterCodec TriggerCondition.SelfBlocksOneOrMore (\x -> case x of TriggerCondition.SelfBlocksOneOrMore y -> Just y; _ -> Nothing),
       Arm.nullary "SelfBecomesBlocked" TriggerCondition.SelfBecomesBlocked,
-      Arm.payload "SelfBecomesBlockedBy" filterCodec TriggerCondition.SelfBecomesBlockedBy,
-      Arm.payload "SelfBecomesBlockedByOneOrMore" filterCodec TriggerCondition.SelfBecomesBlockedByOneOrMore,
+      Arm.payload "SelfBecomesBlockedBy" filterCodec TriggerCondition.SelfBecomesBlockedBy (\x -> case x of TriggerCondition.SelfBecomesBlockedBy y -> Just y; _ -> Nothing),
+      Arm.payload "SelfBecomesBlockedByOneOrMore" filterCodec TriggerCondition.SelfBecomesBlockedByOneOrMore (\x -> case x of TriggerCondition.SelfBecomesBlockedByOneOrMore y -> Just y; _ -> Nothing),
       Arm.nullary "SelfCycled" TriggerCondition.SelfCycled,
       Arm.nullary "SelfRevealedForMiracle" TriggerCondition.SelfRevealedForMiracle,
-      Arm.payload "PlayerDiscards" PlayerRelation.codec TriggerCondition.PlayerDiscards,
-      Arm.payload "PlayerDrawsNthCard" PlayerDrawsNthCard.codec TriggerCondition.PlayerDrawsNthCard,
+      Arm.payload "PlayerDiscards" PlayerRelation.codec TriggerCondition.PlayerDiscards (\x -> case x of TriggerCondition.PlayerDiscards y -> Just y; _ -> Nothing),
+      Arm.payload "PlayerDrawsNthCard" PlayerDrawsNthCard.codec TriggerCondition.PlayerDrawsNthCard (\x -> case x of TriggerCondition.PlayerDrawsNthCard y -> Just y; _ -> Nothing),
       Arm.nullary "SelfPutIntoGraveyardFromLibrary" TriggerCondition.SelfPutIntoGraveyardFromLibrary,
       Arm.nullary "SelfPutIntoGraveyardFromAnywhere" TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
       Arm.nullary "SelfDies" TriggerCondition.SelfDies,
-      Arm.payload "PermanentDies" filterCodec TriggerCondition.PermanentDies,
+      Arm.payload "PermanentDies" filterCodec TriggerCondition.PermanentDies (\x -> case x of TriggerCondition.PermanentDies y -> Just y; _ -> Nothing),
       Arm.nullary "SelfLeavesTheBattlefield" TriggerCondition.SelfLeavesTheBattlefield,
       Arm.nullary "HauntedCreatureDies" TriggerCondition.HauntedCreatureDies,
-      Arm.payload "SpellOrAbilityCounters" PlayerRelation.codec TriggerCondition.SpellOrAbilityCounters,
-      Arm.payload "DamageToPlayerPrevented" PlayerRelation.codec TriggerCondition.DamageToPlayerPrevented,
-      Arm.payload "PlayerGainsLife" PlayerRelation.codec TriggerCondition.PlayerGainsLife,
-      Arm.payload "PlayerLosesLife" PlayerRelation.codec TriggerCondition.PlayerLosesLife,
-      Arm.payload "SelfCountersReached" SelfCountersReached.codec TriggerCondition.SelfCountersReached,
-      Arm.payload "SelfLastCounterRemoved" counterKindCodec TriggerCondition.SelfLastCounterRemoved,
-      Arm.payload "SpellCast" SpellCast.codec TriggerCondition.SpellCast,
+      Arm.payload "SpellOrAbilityCounters" PlayerRelation.codec TriggerCondition.SpellOrAbilityCounters (\x -> case x of TriggerCondition.SpellOrAbilityCounters y -> Just y; _ -> Nothing),
+      Arm.payload "DamageToPlayerPrevented" PlayerRelation.codec TriggerCondition.DamageToPlayerPrevented (\x -> case x of TriggerCondition.DamageToPlayerPrevented y -> Just y; _ -> Nothing),
+      Arm.payload "PlayerGainsLife" PlayerRelation.codec TriggerCondition.PlayerGainsLife (\x -> case x of TriggerCondition.PlayerGainsLife y -> Just y; _ -> Nothing),
+      Arm.payload "PlayerLosesLife" PlayerRelation.codec TriggerCondition.PlayerLosesLife (\x -> case x of TriggerCondition.PlayerLosesLife y -> Just y; _ -> Nothing),
+      Arm.payload "SelfCountersReached" SelfCountersReached.codec TriggerCondition.SelfCountersReached (\x -> case x of TriggerCondition.SelfCountersReached y -> Just y; _ -> Nothing),
+      Arm.payload "SelfLastCounterRemoved" counterKindCodec TriggerCondition.SelfLastCounterRemoved (\x -> case x of TriggerCondition.SelfLastCounterRemoved y -> Just y; _ -> Nothing),
+      Arm.payload "SpellCast" SpellCast.codec TriggerCondition.SpellCast (\x -> case x of TriggerCondition.SpellCast y -> Just y; _ -> Nothing),
       Arm.nullary "SelfCast" TriggerCondition.SelfCast,
-      Arm.payload "SelfHalfUnlocked" CardName.codec TriggerCondition.SelfHalfUnlocked,
-      Arm.payload "RoomFullyUnlocked" PlayerRelation.codec TriggerCondition.RoomFullyUnlocked,
-      Arm.payload "AnyOf" (Common.list codec) TriggerCondition.AnyOf,
+      Arm.payload "SelfHalfUnlocked" CardName.codec TriggerCondition.SelfHalfUnlocked (\x -> case x of TriggerCondition.SelfHalfUnlocked y -> Just y; _ -> Nothing),
+      Arm.payload "RoomFullyUnlocked" PlayerRelation.codec TriggerCondition.RoomFullyUnlocked (\x -> case x of TriggerCondition.RoomFullyUnlocked y -> Just y; _ -> Nothing),
+      Arm.payload "AnyOf" (Common.list codec) TriggerCondition.AnyOf (\x -> case x of TriggerCondition.AnyOf y -> Just y; _ -> Nothing),
       Arm.nullary "SelfTurnedFaceUp" TriggerCondition.SelfTurnedFaceUp,
-      Arm.payload "PermanentTurnedFaceUp" filterCodec TriggerCondition.PermanentTurnedFaceUp,
-      Arm.payload "PermanentBecomesDesignated" PermanentBecomesDesignated.codec TriggerCondition.PermanentBecomesDesignated,
+      Arm.payload "PermanentTurnedFaceUp" filterCodec TriggerCondition.PermanentTurnedFaceUp (\x -> case x of TriggerCondition.PermanentTurnedFaceUp y -> Just y; _ -> Nothing),
+      Arm.payload "PermanentBecomesDesignated" PermanentBecomesDesignated.codec TriggerCondition.PermanentBecomesDesignated (\x -> case x of TriggerCondition.PermanentBecomesDesignated y -> Just y; _ -> Nothing),
       Arm.nullary "SelfEvolves" TriggerCondition.SelfEvolves,
       Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
       Arm.nullary "PermanentSacrificed" TriggerCondition.PermanentSacrificed,
-      Arm.payload "SagaFinalChapterTriggers" PlayerRelation.codec TriggerCondition.SagaFinalChapterTriggers,
-      Arm.payload "PlayerBecomesMonarch" PlayerRelation.codec TriggerCondition.PlayerBecomesMonarch,
-      Arm.payload "LoseControlOfBound" SlotName.codec TriggerCondition.LoseControlOfBound,
-      Arm.payload "RoomEntered" RoomIndex.codec TriggerCondition.RoomEntered
+      Arm.payload "SagaFinalChapterTriggers" PlayerRelation.codec TriggerCondition.SagaFinalChapterTriggers (\x -> case x of TriggerCondition.SagaFinalChapterTriggers y -> Just y; _ -> Nothing),
+      Arm.payload "PlayerBecomesMonarch" PlayerRelation.codec TriggerCondition.PlayerBecomesMonarch (\x -> case x of TriggerCondition.PlayerBecomesMonarch y -> Just y; _ -> Nothing),
+      Arm.payload "LoseControlOfBound" SlotName.codec TriggerCondition.LoseControlOfBound (\x -> case x of TriggerCondition.LoseControlOfBound y -> Just y; _ -> Nothing),
+      Arm.payload "RoomEntered" RoomIndex.codec TriggerCondition.RoomEntered (\x -> case x of TriggerCondition.RoomEntered y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec
     counterKindCodec = CounterKind.codec Keyword.codec
-    tag t = Common.tagged t . Just
-    encode c = case c of
-      TriggerCondition.SelfEnters -> Common.nullary "SelfEnters"
-      TriggerCondition.PermanentEnters f -> tag "PermanentEnters" $ Codec.encode filterCodec f
-      TriggerCondition.StepBegins x -> tag "StepBegins" $ Codec.encode StepBegins.codec x
-      TriggerCondition.StateIs c2 -> tag "StateIs" $ Codec.encode Condition.codec c2
-      TriggerCondition.SelfDealsCombatDamageToPlayer -> Common.nullary "SelfDealsCombatDamageToPlayer"
-      TriggerCondition.PermanentDealsCombatDamageToPlayer f -> tag "PermanentDealsCombatDamageToPlayer" $ Codec.encode filterCodec f
-      TriggerCondition.CreatureDealtCombatDamageToMonarch -> Common.nullary "CreatureDealtCombatDamageToMonarch"
-      TriggerCondition.OpponentLostLifeDuringYourTurn -> Common.nullary "OpponentLostLifeDuringYourTurn"
-      TriggerCondition.SelfAttacks f -> tag "SelfAttacks" $ Codec.encode TriggerFrequency.codec f
-      TriggerCondition.SelfAttacksWithAnother f -> tag "SelfAttacksWithAnother" $ Codec.encode filterCodec f
-      TriggerCondition.CreatureAttacksAlone f -> tag "CreatureAttacksAlone" $ Codec.encode filterCodec f
-      TriggerCondition.SelfAttacksPlayerWithMostLife -> Common.nullary "SelfAttacksPlayerWithMostLife"
-      TriggerCondition.SelfBlocks -> Common.nullary "SelfBlocks"
-      TriggerCondition.SelfBlocksCreature -> Common.nullary "SelfBlocksCreature"
-      TriggerCondition.SelfBlocksAtLeast n -> tag "SelfBlocksAtLeast" $ Codec.encode Common.natural n
-      TriggerCondition.SelfBlocksOneOrMore f -> tag "SelfBlocksOneOrMore" $ Codec.encode filterCodec f
-      TriggerCondition.SelfBecomesBlocked -> Common.nullary "SelfBecomesBlocked"
-      TriggerCondition.SelfBecomesBlockedBy f -> tag "SelfBecomesBlockedBy" $ Codec.encode filterCodec f
-      TriggerCondition.SelfBecomesBlockedByOneOrMore f -> tag "SelfBecomesBlockedByOneOrMore" $ Codec.encode filterCodec f
-      TriggerCondition.SelfCycled -> Common.nullary "SelfCycled"
-      TriggerCondition.SelfRevealedForMiracle -> Common.nullary "SelfRevealedForMiracle"
-      TriggerCondition.PlayerDiscards r -> tag "PlayerDiscards" $ Codec.encode PlayerRelation.codec r
-      TriggerCondition.PlayerDrawsNthCard x -> tag "PlayerDrawsNthCard" $ Codec.encode PlayerDrawsNthCard.codec x
-      TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Common.nullary "SelfPutIntoGraveyardFromLibrary"
-      TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Common.nullary "SelfPutIntoGraveyardFromAnywhere"
-      TriggerCondition.SelfDies -> Common.nullary "SelfDies"
-      TriggerCondition.PermanentDies f -> tag "PermanentDies" $ Codec.encode filterCodec f
-      TriggerCondition.SelfLeavesTheBattlefield -> Common.nullary "SelfLeavesTheBattlefield"
-      TriggerCondition.HauntedCreatureDies -> Common.nullary "HauntedCreatureDies"
-      TriggerCondition.SpellOrAbilityCounters r -> tag "SpellOrAbilityCounters" $ Codec.encode PlayerRelation.codec r
-      TriggerCondition.DamageToPlayerPrevented r -> tag "DamageToPlayerPrevented" $ Codec.encode PlayerRelation.codec r
-      TriggerCondition.PlayerGainsLife r -> tag "PlayerGainsLife" $ Codec.encode PlayerRelation.codec r
-      TriggerCondition.PlayerLosesLife r -> tag "PlayerLosesLife" $ Codec.encode PlayerRelation.codec r
-      TriggerCondition.SelfCountersReached x -> tag "SelfCountersReached" $ Codec.encode SelfCountersReached.codec x
-      TriggerCondition.SelfLastCounterRemoved kind -> tag "SelfLastCounterRemoved" $ Codec.encode counterKindCodec kind
-      TriggerCondition.SpellCast x -> tag "SpellCast" $ Codec.encode SpellCast.codec x
-      TriggerCondition.SelfCast -> Common.nullary "SelfCast"
-      TriggerCondition.SelfHalfUnlocked n -> tag "SelfHalfUnlocked" $ Codec.encode CardName.codec n
-      TriggerCondition.RoomFullyUnlocked r -> tag "RoomFullyUnlocked" $ Codec.encode PlayerRelation.codec r
-      TriggerCondition.AnyOf cs -> tag "AnyOf" $ Codec.encode (Common.list codec) cs
-      TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
-      TriggerCondition.PermanentTurnedFaceUp f -> tag "PermanentTurnedFaceUp" $ Codec.encode filterCodec f
-      TriggerCondition.PermanentBecomesDesignated x -> tag "PermanentBecomesDesignated" $ Codec.encode PermanentBecomesDesignated.codec x
-      TriggerCondition.SelfEvolves -> Common.nullary "SelfEvolves"
-      TriggerCondition.AttachedCreatureMentors -> Common.nullary "AttachedCreatureMentors"
-      TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
-      TriggerCondition.SagaFinalChapterTriggers r -> tag "SagaFinalChapterTriggers" $ Codec.encode PlayerRelation.codec r
-      TriggerCondition.PlayerBecomesMonarch r -> tag "PlayerBecomesMonarch" $ Codec.encode PlayerRelation.codec r
-      TriggerCondition.LoseControlOfBound s -> tag "LoseControlOfBound" $ Codec.encode SlotName.codec s
-      TriggerCondition.RoomEntered r -> tag "RoomEntered" $ Codec.encode RoomIndex.codec r

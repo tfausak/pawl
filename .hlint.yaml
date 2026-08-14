@@ -41,6 +41,12 @@
 # rule bans list comprehensions outright, so this can never be applied.
 - ignore: {name: "Use list comprehension"}
 
+# HLint rewrites the matcher an Arm carries, `\x -> case x of ...`, into
+# `\case`. That needs LambdaCase, which is not on the allowlist above, and
+# #1461 decided against adding an extension for brevity when it settled on the
+# matcher's shape: the lambda stays explicit.
+- ignore: {name: "Use lambda-case"}
+
 # HLint suggests `(, x)` for `\y -> (y, x)`. That needs TupleSections, and the
 # project is Haskell 2010 with only GADTs and RankNTypes permitted, so the
 # suggestion can never be applied.

@@ -8,7 +8,6 @@ import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TopOfLibrary as TopOfLibrary
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ObjectRef as ObjectRef
 
 -- | Tagged like every other sum. The arms were previously told apart by
@@ -27,22 +26,14 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 codec :: Codec.Codec ObjectRef.ObjectRef
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "InSlot" SlotName.codec ObjectRef.InSlot,
-      Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching,
-      Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard,
+    [ Arm.payload "InSlot" SlotName.codec ObjectRef.InSlot (\x -> case x of ObjectRef.InSlot y -> Just y; _ -> Nothing),
+      Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching (\x -> case x of ObjectRef.EachMatching y -> Just y; _ -> Nothing),
+      Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard (\x -> case x of ObjectRef.EachCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
-      Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary,
-      Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard
+      Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
+      Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing)
     ]
   where
     -- Written once so the encoder, the decoder and the schema cannot disagree
     -- about which keyword codec the filter carries.
     filterCodec = Filter.codec Keyword.codec
-    encode r = case r of
-      ObjectRef.InSlot n -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec n
-      ObjectRef.EachMatching f -> Common.tagged "EachMatching" . Just $ Codec.encode filterCodec f
-      ObjectRef.EachCardInGraveyard x -> Common.tagged "EachCardInGraveyard" . Just $ Codec.encode EachCardInGraveyard.codec x
-      ObjectRef.EachPlayer -> Common.nullary "EachPlayer"
-      ObjectRef.TopOfLibrary x -> Common.tagged "TopOfLibrary" . Just $ Codec.encode TopOfLibrary.codec x
-      ObjectRef.ChosenCardInGraveyard x -> Common.tagged "ChosenCardInGraveyard" . Just $ Codec.encode ChosenCardInGraveyard.codec x
