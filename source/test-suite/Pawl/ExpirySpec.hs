@@ -3,8 +3,8 @@
 
 -- Covers Pawl.Engine.Expiry and Pawl.Types.Expiry: the printed Duration -> stored Expiry
 -- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 500.5, 611.2a,
--- 611.2b), and the three gate cards (Master Thief, Hag of Inner Weakness, Jade
--- Statue).
+-- 611.2b), and the four gate cards (Master Thief, Hag of Inner Weakness, Jade
+-- Statue, and Soulfire Eruption for "until the END of your next turn").
 module Pawl.ExpirySpec where
 
 import qualified Data.List as List
