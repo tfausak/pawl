@@ -53,6 +53,16 @@ and `_` patterns for where those live, and say in the PR which ones you read
 and why each is correct as it stands. "I read all of them" is a finding;
 silence is not.
 
+## Stale reads
+
+pawl's recurring defect shape is a consumer reading a snapshot where the rule
+asks about live state --- a condition that went derived while its consumer
+stayed stored, or a gate reading the bindings captured when resolution began,
+so a slot an earlier clause defined is invisible to a later one. When your
+change adds a gate, a prompt or a condition, ask what it reads and WHEN that
+was captured; `Pawl.Engine.Resolve.gateHolds` and its callers are where this
+has bitten.
+
 ## Mutation testing
 
 `CLAUDE.md` requires mutating the change away and re-running. What it does not
@@ -152,13 +162,26 @@ These have each shipped a green-but-meaningless test in this repository:
 
 Verify Oracle text with `curl` against `api.scryfall.com` --- WebFetch gets
 403s here, and the vendored dumps under `_scratch/` are stale. Never transcribe
-from a brief; briefs have carried a wrong mana cost and a card claimed to be in
-the pool that was not.
+a card's printed values from a brief OR from an issue body; both have carried a
+wrong mana cost --- `{3}{R}` for a card printed `{3}{R}{R}` --- and a card
+claimed to be in the pool that was not.
 
 If a clause cannot be expressed, say which, and say whether the omission leaves
 pawl's card **stricter** or **weaker** than printed. Weaker in the controller's
 favour is the dishonest direction and disqualifies the card --- find another
 producer or stop. Stricter is admissible with an issue and an inline `(#N)`.
+
+**A stale transcription looks exactly like a missing capability.** Before
+concluding the engine cannot express something, grep `data/cards/` for a card
+that already uses it. One issue filed as "no optional as-enters life payment
+exists" was a single card transcribed a clause short, against a capability that
+had been in the tree for months. Report it in the same stricter/weaker terms:
+a card missing a clause plays wrong, and which way it errs is the finding.
+
+Having fixed one card, **sweep the corpus for its siblings** --- every other
+card written in the same shape. It is one grep, and it turns a one-card fix
+into a claim about the corpus; without it the next instance of the same defect
+waits for an issue of its own.
 
 ## Prompts
 
@@ -189,6 +212,11 @@ told this separately.
   actions) and #877 (CR 702 keyword abilities). PR #1485 landed amass and closed
   its issue but left #876's row under "not implemented"; nothing catches that
   but you.
+- **Closing #N means re-deriving every inline `(#N)` in the tree, not just the
+  one at the site you fixed.** Other sites cite the same issue for their own
+  reasons. One PR found three of four `(#379)` sites were guarded off by
+  unrelated work, and their comments now carry the argument instead of a
+  number; a citation left pointing at a closed issue says nothing.
 
 `Closes #N` must be bare plain text in the PR body --- backticks break the
 link. **Never write close, fix or resolve next to an issue number you do not
@@ -212,6 +240,8 @@ Two of the hooks bite differently when you run them by hand:
   `docs/rules.txt` and defaults to the whole tree. Run it bare after taking a
   CR update, since a renumbering breaks citations in files you never touched.
   It found eight wrong citations on one branch, two of them rule numbers that
-  never existed --- write CR numbers from `docs/rules.txt`, never from memory.
+  never existed --- write CR numbers from `docs/rules.txt`, never from memory,
+  and treat a number a brief or an issue hands you as memory: one brief cited
+  CR 118 for paying life, which this revision numbers 119.
 
 Then stop. Do not wait on CI, and do not start another unit.
