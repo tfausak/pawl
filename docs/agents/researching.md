@@ -75,10 +75,11 @@ the retyping step.
 A brief is dispatch-ready when it carries:
 
 - the **verdict**: dispatchable, or blocked with the missing capability named
-- the **blocked-by line, verbatim**, whenever the verdict is blocked:
-  `Blocked by #N --- <capability>. Derived against origin/main @ <sha>, <date>.`
-  You may not post it yourself. Return it in your report, spelled exactly, for
-  the dispatcher to paste as a comment on the blocked issue
+- the **blocker's issue number and the capability it holds**, whenever the
+  verdict is blocked. A blocker is recorded as a GitHub dependency, not as
+  prose (see `CLAUDE.md`), and you may not record it yourself --- name it in
+  your report for the dispatcher to link. If the blocker has no issue, say so:
+  that is an untracked deficiency and it needs one
 - the **producer**, with exact Oracle text fetched this session, whether it is
   already in `data/cards/`, and a clause-by-clause expressibility check naming
   the opcode for each. If a clause must be omitted, say whether the omission
