@@ -1906,9 +1906,8 @@ ringsAndRestoration ringsFirst plains island tenRings restoration =
 --
 -- Sea Gate Restoration, the front face of a modal double-faced card: "Draw cards
 -- equal to the number of cards in your hand plus one. You have no maximum hand
--- size for the rest of the game." Its back face Sea Gate, Reborn always enters
--- tapped -- the "you may pay 3 life" that buys it in untapped is not implemented
--- (#1240).
+-- size for the rest of the game." Only the front face is cast here; the back
+-- face's "you may pay 3 life" is exercised in Pawl.ReplacementSpec.
 --
 -- Together they are the pair CR 613.11's timestamp order decides, one on each
 -- carrier: a SET maximum and a REMOVED one disagree, and Reliquary Tower's own
