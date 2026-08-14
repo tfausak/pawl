@@ -140,6 +140,13 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 --     haunt ability targeted after that object is gone. Only an entry whose KEY --
 --     the haunting card itself -- belongs to the departing player is dropped,
 --     because that card is leaving the game.
+--
+--   * a GameState.exiledWith entry whose VALUE is the departing player's
+--     permanent, for haunting's reason a third time: CR 607.2a's link keeps
+--     naming the object whose ability exiled the card after that object is gone,
+--     which is the whole of what Hoarding Dragon's dies trigger reads. Only an
+--     entry whose KEY -- the exiled card -- belongs to the departing player is
+--     dropped.
 objectsLeaveWith :: PlayerId -> GameState -> GameState
 objectsLeaveWith pid gs =
   let owned = Map.keys (Map.filter (\obj -> Object.owner obj == pid) (GameState.objects gs))
@@ -155,7 +162,8 @@ objectsLeaveWith pid gs =
                       Combat.struckFirst = fmap (Set.delete oid) (Combat.struckFirst combat)
                     },
                 GameState.exiledUntilMonarch = Map.delete oid (GameState.exiledUntilMonarch g1),
-                GameState.haunting = Map.delete oid (GameState.haunting g1)
+                GameState.haunting = Map.delete oid (GameState.haunting g1),
+                GameState.exiledWith = Map.delete oid (GameState.exiledWith g1)
               }
    in List.foldl' leave gs owned
 

@@ -515,6 +515,12 @@ matches context view predicate = case predicate of
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
     _ -> False
+  -- IsSource one field over: the id the RESOLUTION bound rather than the id the
+  -- evaluation is sourced at. Vacuously False for a view with no object behind
+  -- it and for a slot naming nothing, which is the posture the atom above takes.
+  Filter.IsBound slot -> case (identity view, Map.lookup slot (slotObjects context)) of
+    (Just oid, Just bound) -> oid == bound
+    _ -> False
   -- CR 115.1's "target opponent". Same "every other player is an opponent"
   -- reading the ControlledBy arm above argues for, and wrong for the same one
   -- case (CR 102.3's teams, #175). Vacuously False for an object candidate,
@@ -673,6 +679,7 @@ rewrite pairs predicate = case predicate of
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
+  Filter.IsBound _ -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
   -- atom names a slot rather than a subtype.
@@ -969,6 +976,10 @@ bakeBound players predicate = case predicate of
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
+  -- Untouched for the reason IsControllerOfBound below is, and one step shorter:
+  -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
+  -- OBJECT. Pawl.Engine.Filter.matches answers it as it stands.
+  Filter.IsBound _ -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
   -- holding an OBJECT -- there is nothing here to substitute.
@@ -1037,6 +1048,7 @@ manaValueThresholds predicate = case predicate of
   Filter.ControlledByRecipient -> []
   Filter.OwnedBy _ -> []
   Filter.IsSource -> []
+  Filter.IsBound _ -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
   Filter.IsAttacking -> []
@@ -1105,6 +1117,7 @@ statesAQuality predicate = case predicate of
   Filter.ControlledByRecipient -> True
   Filter.OwnedBy _ -> True
   Filter.IsSource -> True
+  Filter.IsBound _ -> True
   Filter.IsPlayer _ -> True
   Filter.IsControllerOfBound _ -> True
   Filter.IsAttacking -> True
@@ -1139,6 +1152,10 @@ boundSlots predicate = case predicate of
   -- over, at Pawl.Engine.Count.bakePerspective, which holds the board a
   -- controller has to be projected off.
   Filter.IsControllerOfBound slot -> Set.singleton slot
+  -- Reported although `bakeBound` leaves it standing too, and answerable in the
+  -- same sense the atom above is -- here rather than one module over, off the
+  -- Context `matches` is already handed.
+  Filter.IsBound slot -> Set.singleton slot
   Filter.And fs -> foldMap boundSlots fs
   Filter.Or fs -> foldMap boundSlots fs
   Filter.Not f -> boundSlots f

@@ -57,6 +57,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
@@ -98,6 +99,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -389,6 +391,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)))
       """ {"type":"Draw","value":{"player":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3}}} """
+  -- Into the Wilds' "look at the top card of your library", whose slot the next
+  -- clause reads back.
+  Spec.it s "LookAt" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.LookAt
+          ( LookAt.MkLookAt
+              (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 1))
+              (SlotName.MkSlotName (Text.pack "looked"))
+          )
+      )
+      """ {"type":"LookAt","value":{"ref":{"type":"TopOfLibrary","value":{"count":1,"player":{"type":"Relative","value":{"type":"You"}}}},"slot":"looked"}} """
   -- Both of Scry's PlayerRef shapes: Crystal Ball's controller scry and
   -- Kozilek's Command's "target player scries 2".
   Spec.it s "Scry" $ do

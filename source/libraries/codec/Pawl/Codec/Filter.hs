@@ -61,6 +61,7 @@ codec keywordCodec =
       -- combinator's: the payload describes the permanents being counted.
       Arm.payload "ControlsMoreThanYou" (codec keywordCodec) Filter.ControlsMoreThanYou (\x -> case x of Filter.ControlsMoreThanYou y -> Just y; _ -> Nothing),
       Arm.nullary "IsSource" Filter.IsSource,
+      Arm.payload "IsBound" SlotName.codec Filter.IsBound (\x -> case x of Filter.IsBound y -> Just y; _ -> Nothing),
       Arm.nullary "IsAttacking" Filter.IsAttacking,
       Arm.nullary "IsBlocking" Filter.IsBlocking,
       Arm.nullary "AttackedThisTurn" Filter.AttackedThisTurn,

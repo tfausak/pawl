@@ -72,6 +72,14 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       ObjectRef.EachCardInYourHand
       """ {"type":"EachCardInYourHand"} """
+  -- Nullary for a rule too: CR 607.2a's set is defined by which object exiled the
+  -- card, so there is no player to name and no filter to narrow it by.
+  Spec.it s "EachCardExiledWithSource" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      ObjectRef.EachCardExiledWithSource
+      """ {"type":"EachCardExiledWithSource"} """
   -- The other two-payload arm: whose library, and how deep. A depth ABOVE ONE,
   -- since a 1 is what a decoder that dropped the field would answer anyway.
   Spec.it s "TopOfLibrary" $
@@ -130,23 +138,24 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   -- collapse two of these. The two graveyard arms are the pair it really
   -- guards: they carry the SAME payload, so a copied tag would quietly turn one
   -- card's chosen return into a mass one.
-  Spec.it s "the seven arms carry seven distinct tags" $
+  Spec.it s "the eight arms carry eight distinct tags" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the player sweep, a library's top card and a chosen graveyard card all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the player sweep, a library's top card and a chosen graveyard card all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourHand,
+                Codec.encode ObjectRef.codec ObjectRef.EachCardExiledWithSource,
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)))
               ]
           )
       )
-      7
+      8
   -- A tag the decoder does not know is an error rather than a silent slot.
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool
