@@ -15,7 +15,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- that swapped them would still typecheck.
 --
 -- Only an OBJECT target is recorded. Rule 601.2c names a targeted PLAYER in the
--- same breath, and no card in the pool watches for that (#1523); the sibling that
+-- same breath, and no card in the pool watches for that (#1524); the sibling that
 -- would carry one is a Recipient in place of `targeted` rather than a second
 -- event.
 data BecameTarget = MkBecameTarget

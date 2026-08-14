@@ -2553,7 +2553,7 @@ counter source controller oid = do
 -- and a spell naming the same permanent under two instances records two.
 --
 -- Players are dropped. Rule 601.2c names a targeted player in the same breath,
--- and no card in the pool watches for one (#1523).
+-- and no card in the pool watches for one (#1524).
 --
 -- CALLED AFTER THE ANNOUNCEMENT SUCCEEDS rather than at rule 601.2c's own
 -- position in the sequence. The rule puts the trigger before the costs are paid

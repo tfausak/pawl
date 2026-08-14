@@ -786,7 +786,7 @@ data TriggerCondition
     --
     -- No re-targeting site fires it, and CR 115.7's effects are why one would: an
     -- effect that changes a target makes the new object become a target too. No
-    -- such effect is in the pool (#1524).
+    -- such effect is in the pool (#1525).
     SelfBecomesTargeted PlayerRelation.PlayerRelation
   | -- | CR 709.5h: "when you unlock this door" -- fires when the permanent bearing
     -- the ability is given the unlocked designation for the NAMED half. "Some
