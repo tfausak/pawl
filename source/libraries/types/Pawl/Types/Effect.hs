@@ -1163,6 +1163,32 @@ data Effect card
     -- those actions were impossible" is why that is one procedure rather than a
     -- chain that can stop early.
     Amass Amass.Amass
+  | -- | CR 701.68a: "blight N" -- the resolving controller puts N -1\/-1 counters
+    -- on a creature they control.
+    --
+    -- CHOOSE, not target, Bolster's and Amass's posture: rule 701.68a names "a
+    -- creature you control" without saying "target", so no slot is declared (CR
+    -- 601.2c), the creature is picked on RESOLUTION via Prompt.ChooseBlight, and
+    -- nothing is subject to CR 608.2b's illegal-target check -- which is why this
+    -- carries no SlotName.
+    --
+    -- ONE payload and no more, because rule 701.68a fixes everything else an
+    -- author could vary: the counter is a -1\/-1 counter, the count of creatures is
+    -- one, and the candidate set is "a creature you control" UNCONSTRAINED --
+    -- Bolster's pool narrowed by least toughness is the contrast. Only N varies,
+    -- and it is a Quantity for Bolster's and Amass's shape rather than because a
+    -- card demands one: every N printed in an EFFECT position is a literal, and the
+    -- one non-literal (Soul Immolation's "blight X") is a cost, which is a separate
+    -- axis (#1493).
+    --
+    -- The blighter is the resolving controller, so no PlayerRef. Champion of the
+    -- Weird's "target opponent blights 2" is the other reading, and is not
+    -- expressible (#1491).
+    --
+    -- NOT a PutCounters over some cleverer ObjectRef, for Bolster's reason: an
+    -- ObjectRef DESCRIBES a set and the whole set is counted (CR 115.10a), where
+    -- rule 701.68a has a player pick ONE creature out of one.
+    Blight Quantity.Quantity
   | -- | CR 701.54a: the Ring tempts the resolving controller -- they get an emblem
     -- named The Ring if they have none (CR 701.54c), then choose a creature they
     -- control to become their Ring-bearer.

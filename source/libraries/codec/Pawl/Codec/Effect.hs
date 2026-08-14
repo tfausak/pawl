@@ -69,6 +69,7 @@ codec cardCodec =
       Arm.nullary "Proliferate" Effect.Proliferate,
       Arm.payload "Bolster" Quantity.codec Effect.Bolster (\x -> case x of Effect.Bolster y -> Just y; _ -> Nothing),
       Arm.payload "Amass" Amass.codec Effect.Amass (\x -> case x of Effect.Amass y -> Just y; _ -> Nothing),
+      Arm.payload "Blight" Quantity.codec Effect.Blight (\x -> case x of Effect.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
       Arm.nullary "Venture" Effect.Venture,
       Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,

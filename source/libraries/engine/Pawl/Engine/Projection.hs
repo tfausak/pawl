@@ -1559,6 +1559,9 @@ rewriteEffect pairs effect = case effect of
   -- count holds no word.
   Effect.Amass (Amass.MkAmass quantity subtype) ->
     Effect.Amass (Amass.MkAmass quantity (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
+  -- Bolster's case: CR 612.1 swaps a subtype word, blight's count holds none, and
+  -- its candidate pool is rule 701.68a's rather than a Filter the card wrote.
+  Effect.Blight _ -> effect
   Effect.TemptWithTheRing -> effect
   Effect.Venture -> effect
   Effect.ExileHandThenDraw -> effect

@@ -97,6 +97,14 @@ data Response
     -- constructor either: bolster offers the creatures tied for the least
     -- toughness, amass offers the Armies its chooser controls.
     ChoseAmass ObjectId.ObjectId
+  | -- | CR 701.68a: the creature a blighting player chose to put the -1\/-1
+    -- counters on.
+    --
+    -- Its own constructor for ChoseBolster's reason, and this is the one that
+    -- needs the reason most: blight's candidates are ChoseRingBearer's exactly
+    -- (every creature its chooser controls), so nothing but a distinct
+    -- constructor keeps a transcript of one from replaying as the other.
+    ChoseBlight ObjectId.ObjectId
   | -- | CR 608.2d: the graveyard card a player chose for an
     -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a
     -- transcript of Exhume resolving holds one for each stocked graveyard.

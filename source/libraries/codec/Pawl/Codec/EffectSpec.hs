@@ -1126,6 +1126,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Amass (Amass.MkAmass (Quantity.Literal 3) Subtype.Zombie))
       """ {"type":"Amass","value":{"quantity":{"type":"Literal","value":3},"subtype":{"type":"Zombie"}}} """
+  -- CR 701.68a: the count alone, Bolster's shape -- rule 701.68a fixes the
+  -- chooser, the kind of counter and the candidate pool, leaving an author only N.
+  Spec.it s "Blight" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Blight (Quantity.Literal 1))
+      """ {"type":"Blight","value":{"type":"Literal","value":1}} """
   -- CR 701.54a: nullary, because rule 701.54 fixes the chooser, the count and the
   -- qualification, leaving an author nothing to write.
   Spec.it s "TemptWithTheRing" $
