@@ -56,6 +56,15 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.codec Keyword.codec)
       CounterKind.Time
       """ {"type":"Time"} """
+  -- CR 702.32a's kind, which the wire keeps apart from CR 702.63a's above: the
+  -- two count the same way and the rules name them apart, so a card that spends
+  -- one must not read the other.
+  Spec.it s "Fade" $
+    Common.assertCodec
+      s
+      (CounterKind.codec Keyword.codec)
+      CounterKind.Fade
+      """ {"type":"Fade"} """
   -- CR 122.1c, the kind whose count is how many events its pair may still
   -- replace.
   Spec.it s "Shield" $

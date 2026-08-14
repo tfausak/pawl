@@ -95,6 +95,13 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Vanishing
       """ {"type":"Vanishing"} """
 
+  Spec.it s "Fading" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Fading
+      """ {"type":"Fading"} """
+
   Spec.it s "Poisonous" $
     Common.assertCodec
       s

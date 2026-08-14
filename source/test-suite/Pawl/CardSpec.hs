@@ -1723,6 +1723,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Lore -> 0
     CounterKind.Defense -> 0
     CounterKind.Time -> 0
+    CounterKind.Fade -> 0
     CounterKind.Shield -> 0
   -- Zero and not a descent, unlike the atom above: a family is payload-free, so
   -- there is no Filter position inside it for a card author to reach.
@@ -1785,6 +1786,7 @@ counterKindFilters kind = case kind of
   CounterKind.Lore -> []
   CounterKind.Defense -> []
   CounterKind.Time -> []
+  CounterKind.Fade -> []
   CounterKind.Shield -> []
 
 keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
@@ -1949,6 +1951,9 @@ keywordFilters keyword = case keyword of
   -- into the replacement effect and the two abilities Pawl.Engine.Keyword mints,
   -- not into the keyword.
   Keyword.Vanishing _ -> []
+  -- CR 702.32a names no quality either, for rule 702.63a's reason above: the fade
+  -- counters and the upkeep are in what Pawl.Engine.Keyword mints.
+  Keyword.Fading _ -> []
   Keyword.Toxic _ -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.

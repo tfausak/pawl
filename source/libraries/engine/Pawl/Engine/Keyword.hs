@@ -193,6 +193,10 @@ abilitiesFor keyword count = case keyword of
   -- Another: rule 702.63a states three abilities, and the first of
   -- them is a replacement effect rather than a trigger, so two land here.
   Keyword.Vanishing _ -> concat (List.genericReplicate count vanishing)
+  -- CR 702.32a's SECOND ability, one per instance: rule 702.32a states two and the
+  -- first of them is a replacement effect, so unlike vanishing's arm above only
+  -- one trigger lands here.
+  Keyword.Fading _ -> List.genericReplicate count fading
   -- CR 702.43a's SECOND ability, one per instance -- CR 702.43b says each works
   -- separately, so a permanent with modular twice dies with two triggers and
   -- each moves the whole pile.
@@ -361,6 +365,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
+  Keyword.Fading _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -564,6 +569,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
+  Keyword.Fading _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -828,6 +834,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
+  Keyword.Fading _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -1141,6 +1148,11 @@ mintedReplacementsFor keyword count = case keyword of
   -- add up: two instances of vanishing 2 enter the permanent with four time
   -- counters, since each rewrite places its own N.
   Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time n))))
+  -- CR 702.32a's FIRST ability, vanishing's row in the fade counter: "this
+  -- permanent enters with N fade counters on it". One row per instance for riot's
+  -- reason, so two instances would place two piles -- rule 702.32 states no
+  -- multiplicity clause of its own and no printing carries fading twice.
+  Keyword.Fading n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade n))))
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind:
   -- "this permanent enters with N +1/+1 counters on it". One row per instance
   -- for the same reason, and CR 702.43b makes them add up.
@@ -1306,6 +1318,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
     ]
   Keyword.Riot -> []
   Keyword.Vanishing _ -> []
+  Keyword.Fading _ -> []
   Keyword.Modular _ -> []
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
@@ -1417,6 +1430,7 @@ familyOf keyword = case keyword of
   Keyword.Reinforce {} -> Just KeywordFamily.Reinforce
   Keyword.Modular _ -> Just KeywordFamily.Modular
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
+  Keyword.Fading _ -> Just KeywordFamily.Fading
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Crew _ -> Just KeywordFamily.Crew
@@ -2937,6 +2951,61 @@ vanishingLastCounter =
     }
   where
     effect = Effect.Sacrifice Binding.triggerSource
+
+-- CR 702.32a's SECOND ability: "at the beginning of your upkeep, remove a fade
+-- counter from this permanent. If you can't, sacrifice the permanent."
+--
+-- vanishingUpkeep's trigger condition exactly -- rule 702.32a prints the same
+-- "your upkeep", so TurnScope.ControllersTurn for that arm's reason -- and
+-- everything after it differs, which is why fading is not vanishing with a
+-- counter kind swapped. Rule 702.32a states NO intervening "if", so this fires on
+-- every one of its controller's upkeeps including the one where the pile is
+-- already empty; that firing is the whole of the rule's sacrifice.
+--
+-- ONE ability with TWO clauses, not two abilities: rule 702.32a's "if you can't"
+-- is a second sentence of the same ability, and splitting it would put two
+-- objects on the stack that CR 603.4 would then re-check separately -- a fade
+-- counter removed in response between trigger and resolution would leave the
+-- removal half doing nothing and no sacrifice half to have triggered.
+--
+-- THE CLAUSES ARE INVERTED against the printed order, and the printed order is
+-- unwritable: a gate is read as its clause is REACHED (Pawl.Engine.Resolve's
+-- gateHolds, CR 608.2c's written order), so a sacrifice clause standing after the
+-- removal would read a pile the removal had already emptied and take the
+-- permanent on the very upkeep the rule keeps it. Asking "are there none?" first
+-- reads the count rule 702.32a's "can't" is about. Observably equivalent to the
+-- printed order because nothing runs between two clauses of one resolution -- no
+-- player gets priority (CR 117.3) and CR 603.3b holds the triggers until it
+-- finishes -- so no board tells the two apart.
+--
+-- Both clauses Mandatory: rule 702.32a prints no "may" on either sentence.
+--
+-- Effect.Sacrifice, never Destroy, and Binding.triggerSource for the reasons
+-- vanishing's two arms give.
+fading :: TriggeredAbility Card
+fading =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn),
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.fromList [sacrificeClause, removeClause]) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    counted = Quantity.ObjectCounters CounterKind.Fade
+    sacrificeClause =
+      Clause.MkClause
+        (Just (Condition.Compares (Compares.MkCompares counted Comparison.AtMost (Quantity.Literal 0))))
+        Optionality.Mandatory
+        Nothing
+        (Seq.singleton (Effect.Sacrifice Binding.triggerSource))
+    removeClause =
+      Clause.MkClause
+        (Just (Condition.Compares (Compares.MkCompares counted Comparison.AtLeast (Quantity.Literal 1))))
+        Optionality.Mandatory
+        Nothing
+        (Seq.singleton (Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Fade (Quantity.Literal 1) Binding.triggerSource)))
 
 -- CR 702.43a's SECOND ability: "when this permanent is put into a graveyard from
 -- the battlefield, you may put a +1/+1 counter on target artifact creature for

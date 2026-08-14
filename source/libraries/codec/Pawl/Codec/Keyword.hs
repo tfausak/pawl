@@ -55,6 +55,7 @@ codec =
       -- this rides inside a POSITIONAL pair (the tuple's second slot) rather than
       -- a named field an absent key could skip.
       Arm.payload "Cycling" (Cycling.codec codec) Keyword.Cycling (\x -> case x of Keyword.Cycling y -> Just y; _ -> Nothing),
+      Arm.payload "Fading" Common.natural Keyword.Fading (\x -> case x of Keyword.Fading y -> Just y; _ -> Nothing),
       Arm.payload "Kicker" (Cost.codec codec) Keyword.Kicker (\x -> case x of Keyword.Kicker y -> Just y; _ -> Nothing),
       Arm.payload "Flashback" (Cost.codec codec) Keyword.Flashback (\x -> case x of Keyword.Flashback y -> Just y; _ -> Nothing),
       Arm.nullary "Fear" Keyword.Fear,
