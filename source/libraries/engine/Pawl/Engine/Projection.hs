@@ -2306,7 +2306,10 @@ frozenStaticParts src gs =
   let cands = gather gs
       -- gather's own seed list, and the same one it feeds its two gates.
       ungated = gatherGiven (const False) alwaysFunctioning gs
-      parts = permanentParts (abilitiesRemoved ungated gs) (conditionHolds ungated gs) (setLandSubtypeEffectsGiven (conditionHolds ungated gs) gs) gs src
+      -- gather's CR 604.2 gate, shared by the two readers that must agree on it:
+      -- which abilities are gathered, and which of them CR 305.7 strips.
+      functioning = conditionHolds ungated gs
+      parts = permanentParts (abilitiesRemoved ungated gs) functioning (setLandSubtypeEffectsGiven functioning gs) gs src
       applies c oid =
         let lyr = gLowest c
             partial = projectUpTo lyr cands oid gs
