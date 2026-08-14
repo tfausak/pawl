@@ -169,24 +169,25 @@ manaProduced effect = case effect of
 -- this over an ability's effects to answer it.
 --
 -- WITHIN a library is neither "to" nor "from" one, which is why Scry and
--- Fateseal answer False: CR 701.18 and CR 701.21 reorder cards that never leave
+-- Fateseal answer False: CR 701.22 and CR 701.29 reorder cards that never leave
 -- the zone they are in. Surveil and Explore answer True because both have a
--- branch that takes the card OUT (CR 701.44, CR 701.40), and CR 605.1a's test is
+-- branch that takes the card OUT (CR 701.25a, CR 701.44a), and CR 605.1a's test is
 -- what the effect may do rather than what it did on one resolution -- the same
 -- reading `manaProduced` gives "could add mana".
 movesLibraryCard :: Effect Card.Type.Card -> Bool
 movesLibraryCard effect = case effect of
   -- CR 121.1: a draw takes the top card of a library into a hand.
   Effect.Draw {} -> True
-  -- CR 701.13: milling puts cards from the top of a library into a graveyard.
+  -- CR 701.17a: milling puts cards from the top of a library into a graveyard.
   Effect.Mill {} -> True
-  -- CR 701.44's surveil may put the looked-at cards into a graveyard.
+  -- CR 701.25a's surveil may put the looked-at cards into a graveyard.
   Effect.Surveil {} -> True
-  -- CR 701.40's explore reveals the top card and may put it into a hand or a
+  -- CR 701.44a's explore reveals the top card and may put it into a hand or a
   -- graveyard.
   Effect.Explore {} -> True
-  -- CR 701.23: a search is always of a library, and CR 701.23e moves what it
-  -- finds. A search finding nothing moves nothing, which CR 605.1a's "don't
+  -- CR 701.23a searches a zone, and this opcode's zone is always a LIBRARY --
+  -- Pawl.Types.Search names whose, and its SearchDestination is where the found
+  -- card goes. A search finding nothing moves nothing, which CR 605.1a's "don't
   -- move any card" tolerates no better than a mode that adds no mana defeats
   -- "could add mana".
   Effect.Search {} -> True
@@ -194,7 +195,7 @@ movesLibraryCard effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   -- The draw half.
   Effect.ExileHandThenDraw -> True
-  -- CR 727.2 / 103.2: every card involved in the restarted game is in the new
+  -- CR 727.2 / 103.3: every card involved in the restarted game is in the new
   -- game, which starts by shuffling each player's deck into their library.
   Effect.RestartGame -> True
   -- CR 729.2: as a subgame starts, "each player takes all the cards in their
@@ -230,7 +231,7 @@ movesLibraryCard effect = case effect of
   Effect.Sacrifice _ -> False
   Effect.TurnFaceDown _ -> False
   Effect.RemoveFromCombat _ -> False
-  -- CR 701.18 and CR 701.21 rearrange a library's own cards; nothing enters or
+  -- CR 701.22 and CR 701.29 rearrange a library's own cards; nothing enters or
   -- leaves it.
   Effect.Scry {} -> False
   Effect.Fateseal {} -> False
