@@ -183,6 +183,14 @@ to agents as written. What it doesn't say:
   dies in the commit that closes the issue. A comment citing the test that
   *proves* a behavior is a different genre and outlives the issue.
 
+  Which genre a `(#N)` is has to be readable, because `script/check-gaps.sh`
+  checks the elision genre for exactly that death: an elision comment whose
+  issue has closed is a comment claiming a capability is missing that landed.
+  It reads the WORDING --- a comment paragraph saying "not implemented" is an
+  elision paragraph, and every `(#N)` in it must be open. An elision phrased
+  otherwise marks its citation `(gap #N)`, and a historical reference that
+  shares a paragraph with an elision drops the parentheses (`see #1116`).
+
   A BLOCKED issue records its blocker as a GitHub dependency, not as prose:
 
   ```

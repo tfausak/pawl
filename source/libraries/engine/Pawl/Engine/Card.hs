@@ -59,12 +59,14 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- of the rule: nothing about Ainok Tracker survives into what the face-down
 -- permanent is. That is also why nothing here can leak the card's identity.
 --
--- A constant is also all rule 708.2 needs while morph is the only way in, since
--- morph lists nothing and CR 708.2a fixes the default. An ability that DOES list
--- characteristics -- disguise's and cloak's ward {2} -- would make this a
--- function of what allowed the object to be face down, and is not implemented
--- (#922). Nor is CR 708.2a's other producer, a spell that turns a FACE-UP
--- permanent face down (#920).
+-- A constant is also all rule 708.2 needs while nothing that turns an object
+-- face down LISTS characteristics, and neither way in does: morph lists nothing
+-- and CR 708.2a fixes the default, and the rule's other producer -- a spell that
+-- turns a FACE-UP permanent face down, Effect.TurnFaceDown -- lists nothing
+-- either. An ability or effect that DOES list them would make this a function of
+-- what allowed the object to be face down: disguise's and cloak's ward {2} is
+-- not implemented (#922), nor is Cyber Conversion's "it's a 2/2 Cyberman
+-- artifact creature" (#957).
 --
 -- "No characteristics other than those listed" reaches past the fields rule
 -- 708.2a names: no colour (the empty colour indicator and absent mana cost make

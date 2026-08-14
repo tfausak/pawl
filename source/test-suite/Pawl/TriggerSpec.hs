@@ -3418,10 +3418,11 @@ counterTriggerSpec s registry =
         -- before the gate, or that read the zone change instead.
         --
         -- Rending Volley rather than Blurred Mongoose, whose "this spell
-        -- can't be countered" sits on a creature card: the Mongoose also
-        -- prints shroud, and CR 702.18 is not implemented (#488), so it could
-        -- not be modelled faithfully. Both cards reach this gate the same way
-        -- -- through Face.counterability, read off the spell on the stack.
+        -- can't be countered" sits on a creature card, so an uncountered
+        -- resolution leaves a permanent behind for the rest of the case to
+        -- carry, where the instant's resolution ends the board it was cast on.
+        -- Both cards are in the pool and both reach this gate the same way --
+        -- through Face.counterability, read off the spell on the stack.
         Spec.it s "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger" $ do
           island <- S.printingOf s registry "Island"
           cancel <- S.printingOf s registry "Cancel"

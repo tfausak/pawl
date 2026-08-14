@@ -978,9 +978,11 @@ activationCostAdjustments pid srcId gs =
 -- proposal could give the spell the qualities the effect names, and nothing here
 -- searches choice space (#721).
 --
--- Takes the OBJECT and not the half being proposed, so a split card's filter is
--- matched against CR 709.4's combined view rather than against the chosen half
--- (#656) -- the same seam spellCostAdjustments has, through the same matchesObject.
+-- Takes the OBJECT and not the half being proposed, and reaches the half through
+-- the STATE instead: Pawl.Engine.Cast.castable asks this of an
+-- asProposed-stamped state, so Projection.viewOfObject shows the chosen half
+-- rather than CR 709.4's combined view. The posture spellCostAdjustments takes,
+-- through the same matchesObject.
 mayCastAsThoughItHadFlash :: PlayerId -> ObjectId -> GameState -> Bool
 mayCastAsThoughItHadFlash pid oid gs =
   let allows effect = case effect of
@@ -1031,10 +1033,10 @@ mayCastAsThoughItHadFlash pid oid gs =
 -- board with no such effect on it runs no projections at all -- the posture
 -- mayCastAsThoughItHadFlash takes above.
 --
--- Takes the OBJECT and not the half being proposed, so a split card's filter is
--- matched against CR 709.4's combined view rather than against the chosen half
--- (#656) -- the same seam mayCastAsThoughItHadFlash has, through the same
--- matchesObject.
+-- Takes the OBJECT and not the half being proposed, and reaches the half through
+-- the STATE, exactly as mayCastAsThoughItHadFlash does above: the callers stamp
+-- the proposal through Pawl.Engine.Cast.asProposed first, so the same
+-- matchesObject reads the chosen half rather than CR 709.4's combined view.
 mayCastFromGraveyard :: PlayerId -> ObjectId -> GameState -> Bool
 mayCastFromGraveyard pid oid gs =
   let allows effect = case effect of
