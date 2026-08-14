@@ -74,6 +74,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PayBranch as PayBranch
+import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -111,7 +113,6 @@ import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
-import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -2243,7 +2244,7 @@ training =
 -- ONE CLAUSE and no branching opcode, fabricate's shape: CR 118.12a rewrites "[do
 -- something] unless [a player does something else]" as an offer followed by the
 -- thing, so the Counter is the clause's "if they don't" branch and
--- Pawl.Types.UnlessPaid is the offer. CR 118.12 puts that payment at RESOLUTION,
+-- Pawl.Types.PayGate is the offer. CR 118.12 puts that payment at RESOLUTION,
 -- which is what rule 702.21a needs -- the opponent has already paid to cast.
 --
 -- THE PAYER IS THE TARGETER'S CONTROLLER, not the bearer's: rule 702.21a's "that
@@ -2273,7 +2274,7 @@ ward cost =
     }
   where
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
-    gate = UnlessPaid.MkUnlessPaid {UnlessPaid.payer = Binding.targetingObject, UnlessPaid.cost = cost}
+    gate = PayGate.MkPayGate {PayGate.payer = Binding.targetingObject, PayGate.cost = cost, PayGate.branch = PayBranch.IfNotPaid}
     effect = Effect.Counter Binding.targetingObject
 
 -- CR 702.147a's TRIGGERED half: "When this creature attacks, sacrifice it at end
@@ -2703,7 +2704,7 @@ spiritToken =
 --
 -- ONE CLAUSE and not two, and no branching opcode: rule 702.123a prints CR
 -- 118.12a's rewriting already performed, so CR 118.12 makes the counters a COST
--- paid as the ability resolves (Pawl.Types.UnlessPaid, over
+-- paid as the ability resolves (Pawl.Types.PayGate, over
 -- CostComponent.PutPlusOneCountersOnThis) and the clause's own effects are its
 -- "if you don't" branch. The counters go on the ability's SOURCE (CR 113.7a),
 -- which is what rule 702.123a's "it" names, so no slot is needed for them.
@@ -2735,15 +2736,18 @@ fabricate n =
   where
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton spawn)
     gate =
-      UnlessPaid.MkUnlessPaid
-        { UnlessPaid.payer = Binding.you,
-          UnlessPaid.cost =
+      PayGate.MkPayGate
+        { PayGate.payer = Binding.you,
+          PayGate.cost =
             Cost.MkCost
               { -- CR 118.5, crew's note above: no mana part is `Just` an empty
                 -- one, never the Nothing that means unpayable.
                 Cost.mana = Just (ManaCost.MkManaCost []),
                 Cost.components = [CostComponent.PutPlusOneCountersOnThis n]
-              }
+              },
+          -- CR 701.63a prints CR 118.12a's rewriting already done, so the token
+          -- is the "if you don't" branch.
+          PayGate.branch = PayBranch.IfNotPaid
         }
     spawn =
       Effect.Create

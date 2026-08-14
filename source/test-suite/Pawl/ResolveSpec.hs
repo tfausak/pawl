@@ -2501,6 +2501,96 @@ circlingVulturesSpec s registry = Spec.describe s "CirclingVultures" $ do
     Spec.assertEqWith s "and the Piker under it is still in the graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName piker)]
     Spec.assertEqWith s "with two candidates, alice was still never asked which" (filter isExileResponse transcript) []
 
+-- Merfolk Seer dead and its CR 603.6c trigger settled onto the stack, with two
+-- untapped lands of ONE printing under alice and two cards in her library. The
+-- Seer is killed by lethal damage (CR 704.5g) rather than put into the graveyard
+-- by hand, so the trigger fires the way a game fires it.
+--
+-- `land` is the only thing the two boards below differ in: two Islands can pay
+-- {1}{U} and two Mountains cannot, while the seats, the stock, the library and
+-- the damage are the same either way. A negative built by taking the lands AWAY
+-- would prove only that a player with no mana pays nothing.
+--
+-- The library is a Mountain under a Goblin Piker, so the drawn card has a name
+-- no other card in the fixture shares and the assertion cannot be satisfied by
+-- some other card arriving in hand. Two cards, so the draw does not empty the
+-- library and CR 104.3c never enters into it.
+seerDies :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+seerDies land mountain piker seer =
+  let (seerId, g1) = S.addCreature seer S.alice (Setup.emptyGame S.bothPlayers)
+      g2 = S.landsFor land S.alice 2 g1
+      (_, g3) = S.addLibraryCard mountain S.alice g2
+      (_, g4) = S.addLibraryCard piker S.alice g3
+      damaged = S.markDamage seerId 3 g4
+   in (seerId, snd (Engine.runGamePure S.identityAnswer damaged Engine.settleForPriority))
+
+-- CR 118.12's OTHER branch, the one CR 118.12a's rewriting does not reach:
+-- Merfolk Seer's "When this creature dies, you may pay {1}{U}. If you do, draw a
+-- card" -- the instructions run when the cost WAS paid (PayBranch.IfPaid), where
+-- Mana Leak's and Whipstitched Zombie's run when it was not.
+--
+-- THE COMPETING READING these three cases exist to rule out is that the draw is
+-- unconditional and the payment merely offered beside it -- which is what an
+-- engine ignoring the gate does, and what every board where the payment always
+-- succeeds looks like. Two of the three cases have alice NOT draw: one where she
+-- could pay and would not, one where she could not pay at all. The other
+-- competing reading, that the effects hang off the refusal, is ruled out by the
+-- first case drawing.
+--
+-- The answerer is pinned rather than searching for a legal option -- `paysFor
+-- S.alice` pays whoever is alice and declines otherwise, S.identityAnswer
+-- declines -- so a mutation cannot be repaired by answering differently.
+merfolkSeerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+merfolkSeerSpec s registry = Spec.describe s "MerfolkSeer" $ do
+  Spec.it s "CR 118.12 paying the {1}{U} draws the card" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    seer <- S.printingOf s registry "Merfolk Seer"
+    let (seerId, onStack) = seerDies island mountain piker seer
+        ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    -- The two controls: the Seer really died, and its trigger really reached the
+    -- stack. Without them the draw assertions below would be about nothing.
+    Spec.assertBool s (not (S.onBattlefield seerId onStack)) "the Seer died before its trigger resolved"
+    Spec.assertBool s (not (null (GameState.stack onStack))) "and the dies trigger reached the stack"
+    Spec.assertEqWith s "alice's hand was empty" (S.handSize S.alice onStack) 0
+    Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- CR 605.3a lets her tap both Islands for it mid-resolution.
+    Spec.assertEqWith s "paying tapped both Islands" (S.tappedCount S.alice after) 2
+    -- Named rather than counted: the card that arrived is the one off the top of
+    -- her library.
+    Spec.assertEqWith s "and she drew the Piker" (namesIn Zone.Hand S.alice after) [Just (S.printingName piker)]
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+  -- The same board, the same trigger, and NOTHING different but the answer.
+  Spec.it s "CR 118.12 declining the {1}{U} draws nothing" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    seer <- S.printingOf s registry "Merfolk Seer"
+    let (_seerId, onStack) = seerDies island mountain piker seer
+        ((_, after), transcript) = Replay.record S.identityAnswer onStack Stack.resolveTop
+    -- alice COULD have paid -- two untapped Islands -- so the refusal is hers
+    -- rather than CR 118.3's, and the empty hand below is the branch and not the
+    -- board.
+    Spec.assertEqWith s "alice was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    Spec.assertEqWith s "declining spent nothing: both Islands are untapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "and drew nothing" (namesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+  -- CR 118.3: two Mountains cannot pay {1}{U}, so there is one possible answer
+  -- and the prompt is not raised -- proved by the transcript, under the
+  -- interpreter that WOULD have paid. Mana is present and only the COLOUR is
+  -- wrong, so nothing here passes for want of lands.
+  Spec.it s "CR 118.3 a controller who cannot pay {1}{U} is not asked, and draws nothing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    seer <- S.printingOf s registry "Merfolk Seer"
+    let (_seerId, onStack) = seerDies mountain mountain piker seer
+        ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    Spec.assertEqWith s "alice was never asked" (payResponses transcript) []
+    Spec.assertEqWith s "nothing was tapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "and she drew nothing" (namesIn Zone.Hand S.alice after) []
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+
 -- The battlefield objects whose current face carries this name. Used instead of
 -- an id taken before the cast, since CR 400.7 mints a new object on the way in.
 byNameOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
@@ -9053,6 +9143,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   manaLeakSpec s registry
   whipstitchedZombieSpec s registry
   circlingVulturesSpec s registry
+  merfolkSeerSpec s registry
   fortressKinGuardSpec s registry
   magicalHackTimingSpec s registry
   artificialEvolutionSpec s registry

@@ -352,6 +352,10 @@ library codec
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
     Pawl.Codec.OptionalitySpec
+    Pawl.Codec.PayBranch
+    Pawl.Codec.PayBranchSpec
+    Pawl.Codec.PayGate
+    Pawl.Codec.PayGateSpec
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
     Pawl.Codec.PermanentSacrificed
@@ -512,8 +516,6 @@ library codec
     Pawl.Codec.TurnWindowSpec
     Pawl.Codec.TypeLine
     Pawl.Codec.TypeLineSpec
-    Pawl.Codec.UnlessPaid
-    Pawl.Codec.UnlessPaidSpec
     Pawl.Codec.UntapRestriction
     Pawl.Codec.UntapRestrictionSpec
     Pawl.Codec.Uses
@@ -1013,6 +1015,8 @@ library types
     Pawl.Types.Onset
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
+    Pawl.Types.PayBranch
+    Pawl.Types.PayGate
     Pawl.Types.Payment
     Pawl.Types.PaymentDecision
     Pawl.Types.PendingTrigger
@@ -1118,7 +1122,6 @@ library types
     Pawl.Types.TurnUpRewrite
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
-    Pawl.Types.UnlessPaid
     Pawl.Types.UntapRestriction
     Pawl.Types.Uses
     Pawl.Types.VentureMarkerEntered
