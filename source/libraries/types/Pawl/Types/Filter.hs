@@ -257,6 +257,26 @@ data Filter keyword
     -- relation, one spelling, rather than a parallel Exclusion field on each
     -- (#163).
     IsSource
+  | -- | The candidate IS the object the resolution bound in this slot -- Into the
+    -- Wilds' "if it's a land card", where the clause before it looked at the top
+    -- card of the library and bound it (Effect.LookAt).
+    --
+    -- IsSource's sibling: that atom tests the candidate against the evaluation's
+    -- source and this one against an object the RESOLUTION named, and neither
+    -- carries an id -- both read Pawl.Engine.Filter.Context, this one through
+    -- `slotObjects`. So the atom is what lets a Count NARROW a zone to one card
+    -- the effect already has in hand, which is the only reason a count over a
+    -- hidden zone (CR 400.2) answers a question the card is entitled to ask.
+    --
+    -- NOT ControlledByBound, which asks after the bound object's CONTROLLER: CR
+    -- 108.4 gives a card in a library none at all, so that atom is vacuously
+    -- False for the very candidates this one exists to match.
+    --
+    -- Vacuously False where the slot names no object: outside a resolution the
+    -- map is empty, an illegal target (CR 608.2b) and a multi-object slot drop
+    -- out of it, and a slot bound to a GROUP never enters it (#1532). That is
+    -- the posture every context-relative atom here takes.
+    IsBound SlotName.SlotName
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
     -- "target opponent". Context-relative like ControlledBy, but separate from it
     -- rather than a reuse, because ControlledBy asks who controls an OBJECT

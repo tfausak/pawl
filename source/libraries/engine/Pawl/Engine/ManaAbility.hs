@@ -106,6 +106,7 @@ manaProduced effect = case effect of
   Effect.MoveToZone {} -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
+  Effect.LookAt {} -> Nothing
   Effect.Scry {} -> Nothing
   Effect.Surveil {} -> Nothing
   Effect.Fateseal {} -> Nothing
@@ -180,6 +181,9 @@ movesLibraryCard effect = case effect of
   Effect.Draw {} -> True
   -- CR 701.17a: milling puts cards from the top of a library into a graveyard.
   Effect.Mill {} -> True
+  -- CR 701.20e's look moves nothing at all (CR 701.20b), which is Scry's answer
+  -- below and one step shorter: it does not even reorder the library.
+  Effect.LookAt {} -> False
   -- CR 701.25a's surveil may put the looked-at cards into a graveyard.
   Effect.Surveil {} -> True
   -- CR 701.44a's explore reveals the top card and may put it into a hand or a

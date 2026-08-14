@@ -174,6 +174,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsSource
       """ {"type":"IsSource"} """
+  Spec.it s "IsBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.IsBound (SlotName.MkSlotName (Text.pack "looked")))
+      """ {"type":"IsBound","value":"looked"} """
   Spec.it s "IsAttacking" $
     Common.assertCodec
       s
