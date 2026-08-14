@@ -9046,6 +9046,9 @@ amassSpec s registry = Spec.describe s "Amass" $ do
     case S.tokensOf after of
       [army] -> do
         Spec.assertEqWith s "black, which is the rule's colour and not the card's" (Projection.colorsOf army after) (Set.singleton Color.Black)
+        -- CR 111.4: rule 701.47a names no token, so the name is its subtypes plus
+        -- the word "Token".
+        Spec.assertEqWith s "named for its subtypes" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Zombie Army Token") S.alice after) 1
         Spec.assertEqWith s "a Zombie Army" (Projection.subtypesOf army after) (Set.fromList [Subtype.Zombie, Subtype.Army])
         Spec.assertEqWith s "three +1/+1 counters" (plusCountersOn army after) (Just 3)
         -- CR 704.3: state-based actions are not checked mid-resolution, so the 0/0

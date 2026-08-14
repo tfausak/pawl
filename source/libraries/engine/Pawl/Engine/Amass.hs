@@ -53,13 +53,14 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- than carried in card data, on Pawl.Engine.Keyword's terms -- its characteristics
 -- are printed in the comprehensive rules, not on Relentless Advance.
 --
--- CR 111.4 supplies the name from the subtypes, so a Zombie Army token is named
--- "Zombie Army". The word comes from Pawl.Engine.Subtype.creatureTypeWord, the same
--- list CR 205.3m holds, so a text-changed amass (CR 612.2a) mints a token named for
--- the NEW word -- Pawl.Engine.Projection.rewriteEffect has already swapped the
+-- CR 111.4 supplies the name, rule 701.47a naming none: the subtypes plus the word
+-- "Token", so a Zombie Army token is named "Zombie Army Token" -- the Servo token's
+-- shape. The subtype's word comes from Pawl.Engine.Subtype.creatureTypeWord, the
+-- same list CR 205.3m holds, so a text-changed amass (CR 612.2a) mints a token named
+-- for the NEW word -- Pawl.Engine.Projection.rewriteEffect has already swapped the
 -- subtype by the time this is called. Nothing there means card data wrote a subtype
--- of another family, which no printing does; the Army half of the name stands
--- alone in that case rather than this being partial.
+-- of another family, which no printing does; the name is "Army Token" in that case
+-- rather than this being partial.
 --
 -- Black is a colorIndicator (CR 202.2e), the Servo token's shape with a colour in
 -- it. The 0\/0 is exactly what rule 701.47a prints: the counters land before any
@@ -75,7 +76,7 @@ armyToken subtype =
             { Face.name =
                 CardName.MkCardName
                   ( Text.unwords
-                      (Maybe.maybeToList (Subtype.creatureTypeWord subtype) <> [Text.pack "Army"])
+                      (Maybe.maybeToList (Subtype.creatureTypeWord subtype) <> [Text.pack "Army", Text.pack "Token"])
                   ),
               Face.manaCost = Nothing,
               Face.typeLine =
