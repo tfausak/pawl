@@ -1015,7 +1015,7 @@ morphCost keywords =
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
 --
 -- Nothing beyond the FIRST kicker cost is reachable, so CR 702.33b's "kicker
--- [cost 1] and/or [cost 2]" is unrepresented (#1235).
+-- [cost 1] and/or [cost 2]" is unrepresented (gap #1235).
 kickerCost :: Set Keyword -> Maybe (Cost Keyword)
 kickerCost keywords =
   let costOf keyword = case keyword of
@@ -1031,7 +1031,7 @@ kickerCost keywords =
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
 --
 -- Nothing beyond the FIRST entwine cost is reachable: a card printing two
--- entwine abilities is expressible and unrepresented (#474).
+-- entwine abilities is expressible and unrepresented (gap #474).
 entwineCost :: Set Keyword -> Maybe (Cost Keyword)
 entwineCost keywords =
   let costOf keyword = case keyword of

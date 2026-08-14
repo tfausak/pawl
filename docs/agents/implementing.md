@@ -209,9 +209,11 @@ told this separately.
 - Resolve conflicts by taking **both** sides, then re-run the mutations.
 - **Landing a capability a census tracks means editing the census in the same
   PR.** The censuses are #875 (CR 116 special actions), #876 (CR 701 keyword
-  actions) and #877 (CR 702 keyword abilities). PR #1485 landed amass and closed
-  its issue but left #876's row under "not implemented"; nothing catches that
-  but you.
+  actions) and #877 (CR 702 keyword abilities). PR #1485 landed amass and left
+  #876's row under "not implemented", PR #1527 landed ward and left #877's, so
+  `script/check-census.sh` now catches the eponymous case --- run it, and edit
+  the body it names. #875 and a row landed under another name are still yours
+  alone.
 - **Closing #N means re-deriving every inline `(#N)` in the tree, not just the
   one at the site you fixed.** Other sites cite the same issue for their own
   reasons. One PR found three of four `(#379)` sites were guarded off by
@@ -243,5 +245,12 @@ Two of the hooks bite differently when you run them by hand:
   never existed --- write CR numbers from `docs/rules.txt`, never from memory,
   and treat a number a brief or an issue hands you as memory: one brief cited
   CR 118 for paying life, which this revision numbers 119.
+
+Two more checks are NOT hooks, because they read GitHub and `hooky fix` is
+offline: `script/check-census.sh` (a census row still saying "not implemented"
+about a constructor that exists) and `script/check-gaps.sh` (an elision comment
+citing a closed issue). Both take no arguments, take a second, and run in CI's
+Tracker job --- which you will not be waiting for, so run them yourself before
+you push.
 
 Then stop. Do not wait on CI, and do not start another unit.
