@@ -899,11 +899,14 @@ discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid g
 -- zone, and a card in one has no controller for a control-shaped gate to read,
 -- so Game.zoneMembers Zone.Graveyard pid is the whole of "your graveyard".
 --
--- Matched against the PRINTED card and never a projection: nothing off the
--- battlefield is projected (#160), so Projection.viewOfCardIn is the view --
--- printed on every axis but CR 208.2a's characteristic-defining power, which
--- functions in a graveyard too -- and a candidate whose card cannot be found
--- matches nothing. The context carries the
+-- Matched against the PRINTED card and never a projection: Projection.viewOfCardIn
+-- is the view -- printed on every axis but CR 208.2a's characteristic-defining
+-- power, which functions in a graveyard too -- and a candidate whose card cannot
+-- be found matches nothing.
+--
+-- Not implemented: a graveyard card HAS a projection, so a continuous effect
+-- that changed the axis this criterion reads is missed here (#160).
+-- The context carries the
 -- payer as its perspective and no source -- the criterion narrows a card by its
 -- own qualities, and CR 601.2a has already moved the spell being cast to the
 -- stack, so IsSource would have nothing in this pool to compare against anyway.

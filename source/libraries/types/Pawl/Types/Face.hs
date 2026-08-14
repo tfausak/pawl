@@ -87,8 +87,8 @@ data Face card = MkFace
     --
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
-    -- keyword whose ability functions in a zone pawl's projection does not reach
-    -- (#160) -- a HAND, where flash is read here -- the same carve-out
+    -- keyword whose ability functions in a zone no pool effect changes a card's
+    -- keywords in (#160) -- a HAND, where flash is read here -- the same carve-out
     -- castingPermissions and additionalCosts take. A GRAVEYARD is no longer one
     -- of those zones: rule 702.34a's flashback is read there through the
     -- projection, so a granted one reaches the cost (Pawl.Engine.Cost.costsFor).
@@ -210,7 +210,7 @@ data Face card = MkFace
     -- | CR 118.8: this face's printed additional costs, paid at the same time as
     -- the spell's mana cost (Village Rites). Read directly from the card, the
     -- castingPermissions precedent: a cost is consulted while the object is in
-    -- hand, which pawl's projection does not reach (#160). CR 118.8d: this does not
+    -- hand, where no pool effect changes a card's costs (#160). CR 118.8d: this does not
     -- change the card's mana cost, so 'manaCost' above and every reader of mana
     -- value is unaffected.
     --
@@ -308,8 +308,8 @@ data Face card = MkFace
     -- | CR 103.5b: this face's "any time you could mulligan" actions, in printed
     -- order, each one its own list of effects in written order (Serum Powder).
     -- Read directly from the card, the castingPermissions precedent: the ability
-    -- functions in the HAND (CR 113.6), which pawl's projection does not reach
-    -- (#160).
+    -- functions in the HAND (CR 113.6), where no pool effect changes a card's
+    -- abilities (#160).
     --
     -- A LIST OF ACTIONS and not one action's effects: nothing in CR 103 caps how
     -- many such actions a face may grant, and two are two separate offers a
@@ -331,8 +331,8 @@ data Face card = MkFace
     -- | CR 116.2: the special actions this face's printed text grants -- CR
     -- 116.2e's "you may discard this card any time you could cast an instant"
     -- (Circling Vultures). Read directly from the card, the castingPermissions
-    -- precedent: the ability functions in the HAND (CR 113.6), which pawl's
-    -- projection does not reach (#160).
+    -- precedent: the ability functions in the HAND (CR 113.6), where no pool
+    -- effect changes a card's abilities (#160).
     --
     -- A LIST rather than a flag, matching every neighbouring permission field:
     -- nothing in CR 116.2 caps how many such lines a face may print, and

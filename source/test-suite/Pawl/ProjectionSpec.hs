@@ -1517,9 +1517,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf oid board)) "before: a Merfolk among the rest"
     Spec.assertEqWith s "after: Creature -- Frog alone" (Projection.subtypesOf oid after) (Set.singleton Subtype.Type.Frog)
 
-  -- CR 702.73a says the ability "works everywhere", and nothing off the
-  -- battlefield is projected (#160), so viewOfCard applies it too -- devoid's
-  -- posture at CR 702.114a.
+  -- CR 702.73a says the ability "works everywhere", and viewOfCard is built from
+  -- a face rather than folded through CR 613, so it applies the ability itself --
+  -- devoid's posture at CR 702.114a.
   Spec.it s "CR 702.73a a changeling is every creature type OFF the battlefield too" $ do
     changeling <- S.printingOf s registry "Woodland Changeling"
     let view = Projection.viewOfCard (S.combinedFace changeling)

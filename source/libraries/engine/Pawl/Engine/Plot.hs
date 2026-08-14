@@ -44,7 +44,7 @@ import qualified Pawl.Types.Zone as Zone
 --
 -- Read off the CARD (Card.combined) and never a projection, the reading
 -- Pawl.Engine.Action.discardableCards gives for CR 116.2e one rule over: the
--- ability functions in the hand, which pawl's projection does not reach (#160). A
+-- ability functions in the hand, where no pool effect changes a card's costs (#160). A
 -- hand member with no card behind it -- a token, an ability -- has no plot cost.
 plotCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 plotCostOf oid gs = do

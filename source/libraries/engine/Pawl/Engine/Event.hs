@@ -2959,7 +2959,7 @@ discard cause pid oid = do
 --
 -- The snapshot is Projection.project, deliberately not the printed-card view a
 -- search filter matches a library card through. The two can disagree on any axis
--- a continuous effect reaches off the battlefield (#160, #623), where a reveal
+-- a continuous effect reaches off the battlefield (#160), where a reveal
 -- has to show what a player at the table would see. They now AGREE on CR 208.2a's
 -- characteristic-defining power, which Projection.viewOfCardIn evaluates in every
 -- zone as CR 604.3 requires. No card in the pool makes them differ today.
@@ -6296,8 +6296,8 @@ eventTriggers events gs =
       -- "these abilities trigger from whatever zone the card winds up in after
       -- it's cycled", the graveyard for every printing today.
       --
-      -- Abilities come from the PRINTED card rather than a projection, pawl's
-      -- projection reaching the battlefield only (#160). Rule 702's minted
+      -- Abilities come from the PRINTED card rather than a projection, no pool
+      -- effect changing the abilities of a card in a graveyard (#160). Rule 702's minted
       -- abilities are not consulted either -- none functions from a graveyard.
       --
       -- The controller is the OWNER, CR 113.8's second clause: a card in a

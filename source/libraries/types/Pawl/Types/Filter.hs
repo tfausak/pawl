@@ -49,9 +49,10 @@ data Filter keyword
     -- so Quagmire's "creatures with swampwalk" must not reach islandwalk. Ask the
     -- family with HasKeywordFamily below; Pawl.FilterSpec pins the pair apart.
     --
-    -- Read through the PROJECTION wherever one exists, so a creature that gains
-    -- flying at CR 613.1f layer 6 matches and a Humility'd one stops matching;
-    -- Projection.viewOfCardIn is the printed-card fallback off the battlefield.
+    -- Read through the PROJECTION, so a creature that gains flying at CR 613.1f
+    -- layer 6 matches and a Humility'd one stops matching. The readers that take
+    -- Projection.viewOfCardIn instead -- a search, a cost criterion, a mill tally
+    -- -- see the printed keywords of a card off the battlefield (#160).
     HasKeyword keyword
   | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
     -- its payload -- Flensing Raptor's "another target creature you control with

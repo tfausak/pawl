@@ -53,7 +53,7 @@ import qualified Pawl.Types.Zone as Zone
 
 -- | CR 309.1 \/ 205.2a: is this a dungeon card? Read off the PRINTED type line
 -- rather than the projection, because CR 309.2c keeps a dungeon in the command
--- zone and pawl's projection walks the battlefield (#160) -- and because nothing
+-- zone and this reader takes the printed card (#160) -- and because nothing
 -- in the rules changes a dungeon's card type: CR 613 layer 4 reaches permanents,
 -- and CR 309.2c makes a dungeon card never one.
 isDungeonFace :: Face.Face Card.Card -> Bool

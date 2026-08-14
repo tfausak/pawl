@@ -553,8 +553,8 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 --
 -- The exact counterweight to permissionsWith below, and read the way its LIBRARY
 -- caller reads keywords: off the card, never through the projection (CR 113.6e,
--- which for this pool means a hand, which pawl's projection does not reach --
--- #160). ALL of them must hold, which is what CR 601.3's "no ... prohibits"
+-- which for this pool means a hand, where no pool effect changes a card's
+-- keywords -- #160). ALL of them must hold, which is what CR 601.3's "no ... prohibits"
 -- means; one permission, by contrast, suffices.
 --
 -- Casing on the arms is a classification, not an effect's identity:
