@@ -302,10 +302,11 @@ data Prompt r where
   -- is CR 701.47b's "even if some or all of those actions were impossible" -- a
   -- player whose token creation was replaced away amassed all the same.
   --
-  -- Its own constructor rather than ChooseRingBearer reused, though both name one
-  -- creature its chooser controls: the candidate sets are different questions
-  -- (every creature against the Armies alone), and Pawl.Engine.Replay's transcript
-  -- would otherwise let one prompt's recorded answer satisfy the other.
+  -- Its own constructor rather than ChooseRingBearer or ChooseBolster reused,
+  -- though all three name one creature their chooser controls: the candidate sets
+  -- are three different questions (every creature, the least-toughness tie, the
+  -- Armies), and Pawl.Engine.Replay's transcript would otherwise let one prompt's
+  -- recorded answer satisfy another.
   ChooseAmass :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 608.2d: which card in a graveyard a player chooses for an
   -- Pawl.Types.ObjectRef.ChosenCardInGraveyard -- Port of Karfell's "return a

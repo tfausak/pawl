@@ -9037,8 +9037,9 @@ resolveOne answer gs spellId =
 -- cannot tell the type addition from the token's printed types, because the token it
 -- would have created already has them.
 --
--- Three and one are distinct from each other and from every toughness on the board,
--- so no assertion can be satisfied by a coincidence.
+-- Three and one are distinct from each other and from their sum, so a counter
+-- assertion cannot be satisfied by a coincidence: 3, 1, 4 and 6 each name exactly
+-- one history of amasses.
 amassSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 amassSpec s registry = Spec.describe s "Amass" $ do
   Spec.it s "CR 701.47a amass with no Army creates the 0/0 black Army token the rule prints" $ do
@@ -9056,9 +9057,9 @@ amassSpec s registry = Spec.describe s "Amass" $ do
         -- the rule prints lives to take its counters.
         Spec.assertEqWith s "0/0 plus three counters" (S.powerToughnessOf army after) (Just (3, 3))
       other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
-  -- The two halves of rule 701.47a's first instruction, on one board: the second
-  -- amass finds an Army and so creates nothing, and its subtype lands on the Army
-  -- that was already there.
+  -- Rule 701.47a's first instruction taken the other way, and its last, on one
+  -- board: the second amass finds an Army and so creates nothing, and its subtype
+  -- lands on the Army that was already there.
   Spec.it s "CR 701.47a a second amass creates no second token and adds its subtype to the Army" $ do
     (gs, advanceId, musterId) <- amassBoard s registry
     let after = resolveOne S.identityAnswer (resolveOne S.identityAnswer gs advanceId) musterId
@@ -9162,6 +9163,9 @@ opposedAmassBoard s registry = do
 -- then gains control of bob's Army (CR 613.1b's layer 2) -- so her second Relentless
 -- Advance sees two Armies, one of each subtype. Returns bob's Army, alice's own, the
 -- board and the spell still in her hand.
+--
+-- Ten Islands, since alice casts Relentless Advance twice: six leaves the second
+-- unpayable, and an uncast spell is a board that proves nothing.
 stolenArmyBoard ::
   (Monad m) =>
   Spec.Spec m n ->
