@@ -1219,6 +1219,13 @@ resolveSpellWith runSubgame oid = do
                     -- Same re-read `applyOne` above makes, and it adds only
                     -- defined slots: CR 608.2b's re-validation is still the one
                     -- made once, as the resolution began.
+                    --
+                    -- A REGRESSION FENCE on this path rather than a proved
+                    -- behaviour: every card in the pool whose gate reads a
+                    -- mid-resolution slot is a triggered ability, so mutating
+                    -- this half back to the start-of-resolution map leaves the
+                    -- suite green. It is here because the two paths must read
+                    -- CR 608.2c the same way.
                     gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                     gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) clause
                     -- CR 603.5 / 608.2d: then the printed "may".
@@ -1392,7 +1399,9 @@ resolveModes stackId srcId modes = do
                   -- The LIVE bindings off the STACK object, the spell path's own
                   -- re-read and for its reason (CR 608.2c) -- and off that object
                   -- rather than off `srcId`, because that is where this
-                  -- resolution's slots are bound (see bindSlot).
+                  -- resolution's slots are bound (see bindSlot). Proved by
+                  -- Pawl.ResolveSpec's LookAt group, whose card is Into the
+                  -- Wilds.
                   gateBindings <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
                   gated <- gateHolds effectController srcId (instanceView (Binding.targetsOf gateBindings)) clause
                   -- CR 603.5 / 608.2d: then the printed "may", answered as this
