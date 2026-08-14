@@ -1289,10 +1289,10 @@ mintedReplacementsFor keyword count = case keyword of
   -- than here, because neither is knowable from a keyword count: the designation
   -- is the game's and the layout is the entering object's.
   --
-  -- ONE ROW PER INSTANCE for riot's reason, and harmless twice over: applying one
-  -- row turns the permanent over, and the permanent that results is nightbound
-  -- rather than daybound, so CR 616.1f's re-collection drops the second row
-  -- before it can apply.
+  -- ONE ROW PER INSTANCE for riot's reason, and unreachable twice over: nothing in
+  -- the pool grants daybound, so the only instance is a printed one, and rule 702.145a
+  -- puts nightbound rather than daybound on the face this rewrite turns to --
+  -- which CR 616.1f's re-collection would drop a second row on regardless.
   Keyword.Daybound -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.EntersTransformed))
   -- CR 702.145e gives nightbound only TWO static abilities, and neither rewrites
   -- an entry: the enters-transformed half is daybound's alone.

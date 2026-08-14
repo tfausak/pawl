@@ -248,10 +248,11 @@ data EntryRewrite
     --
     -- A REPLACEMENT and not Pawl.Types.EntryRiders' `transformed`, which is CR
     -- 712.14a: that rule is an instruction an effect carries into a move it is
-    -- performing ("put it onto the battlefield transformed"), while this one
-    -- rewrites an entry the effect had nothing to do with -- the resolution of a
-    -- spell somebody else's ability is watching. Neither can express the other,
-    -- and CR 616.1d exists because only this one competes for an order.
+    -- PERFORMING ("put it onto the battlefield transformed"), while this one
+    -- WATCHES an entry nobody instructed -- a permanent spell resolving under CR
+    -- 608.3, where the only thing to rewrite is the entry itself. Neither can
+    -- express the other, and CR 616.1d exists because only this one competes for
+    -- an order.
     --
     -- NOT WRITTEN BY A CARD, and NULLARY, the position Riot and Unleash take: it
     -- is minted from the finished projection by
