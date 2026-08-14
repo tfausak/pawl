@@ -846,13 +846,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   -- library for an artifact card, exile it, then shuffle." The whole-card proof
   -- of SearchDestination.Exile, cast and resolved rather than assembled.
   --
-  -- The printed card also has "When this creature dies, you may put the exiled
-  -- card into its owner's hand". CR 607.2a links that ability to the first one,
-  -- and pawl records nothing about which cards an instruction exiled (#968), so
-  -- that trigger is omitted from data/cards/hoarding-dragon.json. The omission
-  -- runs STRICTER for the card's controller: the printed second half only ever
-  -- hands its controller a card back, so pawl's Dragon buries the artifact for
-  -- good and no assertion below can pass because of what is missing.
+  -- The printed card's second half -- "When this creature dies, you may put the
+  -- exiled card into its owner's hand" -- is CR 607.2a's linked ability, and the
+  -- two cases at the end of this group are what prove the link picks out the
+  -- right card.
   --
   -- The destination is the assertion, and three readings have to be told apart:
   -- exile, hand (RevealThenHand) and battlefield (BattlefieldTapped). So the
@@ -900,6 +897,33 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "the Dragon still resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Hoarding Dragon") S.alice settled) 1
     Spec.assertEqWith s "exile is empty" (Game.zoneMembers Zone.Exile S.alice settled) []
     Spec.assertEqWith s "both library cards are still there" (Set.fromList (Game.zoneMembers Zone.Library S.alice settled)) (Set.fromList [altarId, pikerId])
+  -- CR 607.2a's linked set, on the board that can tell it from "every card in
+  -- exile": TWO Hoarding Dragons, each of which exiled a different artifact, and
+  -- one of them dies. The pair below runs the SAME board twice and differs in
+  -- exactly one thing -- which Dragon takes the lethal damage -- so an engine
+  -- whose "the exiled card" named all of exile, or the oldest entry, or the
+  -- newest, fails one of the two.
+  --
+  -- Two objects of ONE NAME rather than two different exilers, because that is
+  -- the reading CR 607.2a singles out: the link is per OBJECT, and a second copy
+  -- of the same printing is a different object with its own set.
+  --
+  -- Each search is PINNED to a named card rather than taking the head of the
+  -- offered list, so which Dragon holds which artifact is decided by the fixture
+  -- and not by where a shuffle left the library.
+  --
+  -- The kill is marked damage plus CR 704.5g, which is a LEAVE-THE-BATTLEFIELD
+  -- event: CR 603.10a makes the dies trigger look back, so its source is the
+  -- permanent as it was on the battlefield -- the same id that did the exiling,
+  -- and the whole reason the link survives its own object's death.
+  Spec.it s "CR 607.2a: the dead Dragon returns the card IT exiled, not the other Dragon's" $ do
+    board <- twoDragonBoard s registry
+    Spec.assertEqWith s "the first Dragon's artifact came back to her hand" (handNames (kill (firstDragon board) board)) [firstArtifact board]
+    Spec.assertEqWith s "and the surviving Dragon's is still in exile" (exileNames (kill (firstDragon board) board)) [secondArtifact board]
+  Spec.it s "CR 607.2a: killing the OTHER Dragon returns the OTHER card" $ do
+    board <- twoDragonBoard s registry
+    Spec.assertEqWith s "the second Dragon's artifact came back to her hand" (handNames (kill (secondDragon board) board)) [secondArtifact board]
+    Spec.assertEqWith s "and the first Dragon's is still in exile" (exileNames (kill (secondDragon board) board)) [firstArtifact board]
   -- Fertilid's Favor -- "Target player searches their library for a basic land
   -- card, puts it onto the battlefield tapped, then shuffles. Put two +1/+1
   -- counters on up to one target artifact or creature." The whole-card proof that
@@ -1763,6 +1787,92 @@ findFirstDeclining :: Prompt.Prompt r -> r
 findFirstDeclining p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
   _ -> findFirst p
+
+-- findFirstExercising with the FIND pinned to one named card. The two Dragons of
+-- the CR 607.2a pair have to exile DIFFERENT artifacts for the linked set to be
+-- provable at all, and the head of the offered list is where a shuffle left it
+-- rather than something the fixture chose.
+findPinnedExercising :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+findPinnedExercising wanted p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  Prompt.SearchLibrary {} -> [wanted]
+  _ -> S.identityAnswer p
+
+-- The board CR 607.2a's two cases share: two Hoarding Dragons of alice's, each
+-- having exiled a different artifact, plus what an assertion needs to tell the
+-- two halves apart.
+data TwoDragons = MkTwoDragons
+  { dragonBoard :: GameState.GameState,
+    firstDragon :: ObjectId.ObjectId,
+    secondDragon :: ObjectId.ObjectId,
+    firstArtifact :: CardName.CardName,
+    secondArtifact :: CardName.CardName
+  }
+
+-- Cast one spell and settle, so the entry trigger has resolved by the time the
+-- next Dragon is cast.
+settleCast :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+settleCast answer spellId gs =
+  let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+   in snd (Engine.runGamePure answer cast Engine.priorityLoop)
+
+dragonsOf :: GameState.GameState -> [ObjectId.ObjectId]
+dragonsOf gs =
+  filter
+    (\oid -> S.soleFaceName oid gs == CardName.MkCardName (Text.pack "Hoarding Dragon"))
+    (Game.zoneMembers Zone.Battlefield S.alice gs)
+
+-- The Dragons are cast one at a time so that the SECOND one's id is the
+-- battlefield Dragon the first cast did not leave behind. Every claim the board
+-- makes is asserted here rather than assumed, since both cases below read the
+-- board's own answer back: an exile that held one card, or a hand that already
+-- held one, would make them pass for the wrong reason.
+twoDragonBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m TwoDragons
+twoDragonBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  dragon <- S.printingOf s registry "Hoarding Dragon"
+  altar <- S.printingOf s registry "Ashnod's Altar"
+  sphere <- S.printingOf s registry "Chromatic Sphere"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let base0 = S.landsInPlay mountain 10
+      (altarId, base1) = S.addLibraryCard altar S.alice base0
+      (sphereId, base2) = S.addLibraryCard sphere S.alice base1
+      (_, base3) = S.addLibraryCard piker S.alice base2
+      (base4, firstSpell) = S.handOne dragon base3
+      (secondSpell, base5) = S.addHandCard dragon S.alice base4
+      afterFirst = settleCast (findPinnedExercising altarId) firstSpell base5
+      afterSecond = settleCast (findPinnedExercising sphereId) secondSpell afterFirst
+      earlier = dragonsOf afterFirst
+      later = filter (`notElem` earlier) (dragonsOf afterSecond)
+  Spec.assertEqWith s "the first Dragon is alone on the battlefield" (length earlier) 1
+  Spec.assertEqWith s "the second Dragon joined it" (length later) 1
+  Spec.assertEqWith s "her hand is empty, so anything in it later was returned" (S.handSize S.alice afterSecond) 0
+  Spec.assertEqWith
+    s
+    "each Dragon exiled a different artifact"
+    (Set.fromList (exileNames afterSecond))
+    (Set.fromList [S.printingName altar, S.printingName sphere])
+  pure
+    MkTwoDragons
+      { dragonBoard = afterSecond,
+        firstDragon = Maybe.fromMaybe S.noSource (Maybe.listToMaybe earlier),
+        secondDragon = Maybe.fromMaybe S.noSource (Maybe.listToMaybe later),
+        firstArtifact = S.printingName altar,
+        secondArtifact = S.printingName sphere
+      }
+
+-- CR 704.5g: lethal damage on a 4/4, swept by the state-based actions the
+-- priority loop runs before it hands anybody priority, which is what fires the
+-- dies trigger and resolves it.
+kill :: ObjectId.ObjectId -> TwoDragons -> GameState.GameState
+kill oid board =
+  snd (Engine.runGamePure findFirstExercising (S.markDamage oid 4 (dragonBoard board)) Engine.priorityLoop)
+
+handNames :: GameState.GameState -> [CardName.CardName]
+handNames gs = fmap (`S.soleFaceName` gs) (Game.zoneMembers Zone.Hand S.alice gs)
+
+exileNames :: GameState.GameState -> [CardName.CardName]
+exileNames gs = fmap (`S.soleFaceName` gs) (Game.zoneMembers Zone.Exile S.alice gs)
 
 findNothing :: Prompt.Prompt r -> r
 findNothing p = case p of

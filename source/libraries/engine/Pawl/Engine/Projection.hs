@@ -1706,13 +1706,15 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- Chooser name players rather than subtypes. EachPlayer, TopOfLibrary and
 -- EachCardInYourHand carry no word at all -- CR 612.1 changes subtype words, and
 -- "each player", "the top card of your library" and "all cards from your hand"
--- have none.
+-- have none. Nor does EachCardExiledWithSource: CR 607.2a's set is named by which
+-- object exiled the cards, so "the exiled card" carries no subtype either.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s f) -> ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s (Filter.rewrite pairs f))
   ObjectRef.EachCardInYourHand -> ref
+  ObjectRef.EachCardExiledWithSource -> ref
   ObjectRef.EachPlayer -> ref
   ObjectRef.TopOfLibrary {} -> ref
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
