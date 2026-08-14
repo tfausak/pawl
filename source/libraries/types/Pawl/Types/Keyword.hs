@@ -276,6 +276,24 @@ data Keyword
     -- multiple instances redundant -- so its reader takes membership rather than
     -- the per-keyword count the projection carries.
     Horsemanship
+  | -- | 702.32a: fading N, a keyword representing TWO abilities -- "this permanent
+    -- enters with N fade counters on it" and "at the beginning of your upkeep,
+    -- remove a fade counter from this permanent. If you can't, sacrifice the
+    -- permanent."
+    --
+    -- Vanishing's (702.63a) pair of jobs with a different countdown, and NOT that
+    -- constructor with a flag: rule 702.63a states THREE abilities and hangs the
+    -- sacrifice on the removal of the LAST counter, while this rule states two and
+    -- hangs it on an upkeep where no counter can come off. So a fading N permanent
+    -- sees one more of its controller's upkeeps than a vanishing N one does, which
+    -- is what keeps the two from being each other with the counter kind swapped.
+    --
+    -- N rides the constructor, as Vanishing's does. Rule 702.32 states no
+    -- multiplicity clause -- there is no 702.32b to match CR 702.63c -- so
+    -- Pawl.Engine.Keyword mints one instance's worth per instance and leaves each
+    -- to apply on its own. No printing carries fading twice, so nothing observes
+    -- that choice.
+    Fading Natural.Natural
   | -- | 702.33a: "You may pay an additional [cost] as you cast this spell", and CR
     -- 702.33d's designation for the spell whose controller declares they will --
     -- that spell has been "kicked".

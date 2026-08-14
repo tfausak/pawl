@@ -2596,6 +2596,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- Nor a time counter (CR 702.63a): vanishing's three minted
               -- abilities count Object.counters directly, as those three do.
               CounterKind.Time -> []
+              -- Nor a fade counter (CR 702.32a): fading's minted upkeep ability
+              -- counts Object.counters directly, as vanishing's three do.
+              CounterKind.Fade -> []
               -- Nor a shield counter (CR 122.1c), and that one is worth saying
               -- twice: "'shield' is not an ability that creatures have and shield
               -- counters are not keyword counters", so the grant CR 122.1b's arm

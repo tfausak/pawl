@@ -703,6 +703,7 @@ rewrite pairs predicate = case predicate of
     CounterKind.Lore -> kind
     CounterKind.Defense -> kind
     CounterKind.Time -> kind
+    CounterKind.Fade -> kind
     CounterKind.Shield -> kind
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
@@ -809,6 +810,10 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.63a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "time counter" is the rule's own noun and no card prints it.
   Keyword.Type.Vanishing _ -> keyword
+  -- CR 702.32a's N is a number and not a word, so CR 612.2 has nothing to swap;
+  -- "fade counter" is in the replacement and the ability Pawl.Engine.Keyword mints
+  -- rather than in this value.
+  Keyword.Type.Fading _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
   Keyword.Type.Renown _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.

@@ -396,6 +396,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Vanishing 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "vanishing 3 is not bushido 3"
+  -- CR 702.32a's N is the same kind of number as rule 702.63a's, and the two
+  -- keywords differ in more than the counter's name -- so the tag is what keeps
+  -- fading 2 from vanishing 2 as well.
+  Spec.it s "Fading carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Fading 2)
+      """ {"type":"Fading","value":2} """
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Fading 3) /= Codec.encode Keyword.codec (Keyword.Vanishing 3))
+      "fading 3 is not vanishing 3"
   Spec.it s "SplitSecond" $
     Common.assertCodec
       s
