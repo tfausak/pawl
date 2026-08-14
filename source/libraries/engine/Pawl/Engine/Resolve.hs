@@ -3078,12 +3078,32 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         -- loop leaves nothing behind for a later effect to read, and the rest of
         -- the resolution sees the environment it had.
         withMember member defined m = Map.insert slot (Set.singleton member) (Map.union m defined)
-    Monad.forM_ members $ \member ->
+        bindingsOf gs = maybe Map.empty Object.bindings (Game.lookupObject resolving gs)
+        -- Whatever those names held BEFORE the loop, to be put back at each
+        -- iteration's start and once at the end.
+        beforeLoop = Map.restrictKeys (bindingsOf gs0) bodyDefined
+        -- The other half of the scoping, and it is not tidiness: an iteration
+        -- whose MoveToZone found an empty library binds nothing, and without
+        -- this its DealDamage would read the card the PREVIOUS member's
+        -- iteration exiled -- "that card" naming a card this pass never
+        -- produced. Restoring rather than merely deleting keeps the rest of the
+        -- resolution reading the environment it had.
+        rescope gs =
+          gs
+            { GameState.objects =
+                Map.adjust
+                  (\o -> o {Object.bindings = Map.union beforeLoop (Map.withoutKeys (Object.bindings o) bodyDefined)})
+                  resolving
+                  (GameState.objects gs)
+            }
+    Monad.forM_ members $ \member -> do
+      State.modify' rescope
       -- CR 608.2c: the body's own instructions, in written order, once for this
       -- member before the next member is considered at all.
       Monad.forM_ body $ \eff -> do
-        defined <- State.gets (\gs -> Map.restrictKeys (maybe Map.empty (Binding.targetsOf . Object.bindings) (Game.lookupObject resolving gs)) bodyDefined)
+        defined <- State.gets (\gs -> Map.restrictKeys (Binding.targetsOf (bindingsOf gs)) bodyDefined)
         applyEffectWith runSubgame resolving source controller (withMember member defined legal) (withMember member defined chosen) eff
+    State.modify' rescope
   Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

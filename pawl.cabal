@@ -261,6 +261,7 @@ library codec
     Pawl.Codec.Filter
     Pawl.Codec.FilterSpec
     Pawl.Codec.ForEach
+    Pawl.Codec.ForEachSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
     Pawl.Codec.GraveyardScope

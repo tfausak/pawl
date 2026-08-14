@@ -1320,9 +1320,11 @@ data Effect card
     -- 601.2c filled by targeting and carry CR 608.2b's re-validation with it,
     -- but the per-iteration name is the loop's own.
     --
-    -- Scoped to the iteration: the member binding is passed down rather than
-    -- written onto the resolving object, so it is gone when the loop is, and a
-    -- slot the BODY defines is rewritten by the next iteration's own producer.
+    -- Scoped to the iteration, both halves. The member binding is passed down
+    -- rather than written onto the resolving object, so it is gone when the loop
+    -- is; and a name the BODY defines is reset to its pre-loop value before each
+    -- pass, so an iteration that produced nothing reads nothing rather than the
+    -- previous member's answer.
     --
     -- ORDER: APNAP (CR 608.2f's primary determination) and then the engine's
     -- own tiebreak within one controller, which that rule's secondary sentence
