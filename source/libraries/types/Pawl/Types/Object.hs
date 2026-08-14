@@ -204,7 +204,7 @@ data Object = MkObject
     -- `Map ChoiceKind ChoiceValue` would need a sum over colour, subtype and
     -- name, which every reader would then have to re-narrow at a site where the
     -- wrong arm is unrepresentable today; three typed fields keep each read
-    -- total. A fourth would not change that either -- and CR 310.8a's protector
+    -- total. A fourth would not change that either -- and CR 310.9a's protector
     -- is evidence for the prediction rather than against it: it arrived as its
     -- own field too, for the reason chosenColor's note gives.
     --
@@ -407,34 +407,34 @@ data Object = MkObject
     -- because CR 400.7 makes the moved object a new one -- a Ring-bearer that
     -- dies and returns is a different creature, and no longer designated.
     ringBearerFor :: Maybe PlayerId.PlayerId,
-    -- | CR 310.8: the player designated as this battle's protector. Chosen as the
-    -- battle enters (CR 310.8a) by the CR 614.12a as-enters route every other
+    -- | CR 310.9: the player designated as this battle's protector. Chosen as the
+    -- battle enters (CR 310.9a) by the CR 614.12a as-enters route every other
     -- choice-on-entry takes, which is why it is an Object field and not a
-    -- projection: CR 310.8g keeps the designation across the permanent ceasing to
+    -- projection: CR 310.9g keeps the designation across the permanent ceasing to
     -- be a battle or becoming a copy of another one, so nothing a layer computes
     -- may be allowed to move it.
     --
     -- A Maybe rather than a bare PlayerId for two reasons the rules give, not for
-    -- convenience. CR 704.5w names the state "no player in the game designated as
+    -- convenience. CR 704.5x names the state "no player in the game designated as
     -- its protector" outright and makes recovering from it a state-based action,
     -- so it is a state the rules expect to observe. And no non-battle object has a
-    -- protector at all -- CR 310.8's designation is battle-only, so the field is
+    -- protector at all -- CR 310.9's designation is battle-only, so the field is
     -- Nothing for the rest of the board.
     --
-    -- Nothing is NOT "the controller by default". CR 310.8a's fallback to the
-    -- controller applies only to a battle with no battle types, and every printed
-    -- battle is a Siege (CR 310.11), whose protector CR 310.11a requires to be an
-    -- opponent. Reading Nothing as the controller would therefore invent the one
-    -- designation CR 704.5x exists to undo.
+    -- Nothing is NOT "the controller by default". CR 310.9a's fallback to the
+    -- controller applies only to a battle with no battle types, and every battle
+    -- printed so far has the Siege subtype CR 310.12 describes, whose protector CR
+    -- 310.12a requires to be an opponent. Reading Nothing as the controller would
+    -- therefore invent the one designation CR 704.5y exists to undo.
     --
-    -- NOT a copiable value: CR 707.2 lists characteristics, and CR 310.8g says a
+    -- NOT a copiable value: CR 707.2 lists characteristics, and CR 310.9g says a
     -- battle that becomes a copy of another battle keeps its own protector. Falls
     -- out with nothing to enforce, as ringBearerFor's note above explains.
     --
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
     -- because CR 400.7 makes the moved object a new one -- a battle that returns
     -- to the battlefield is a new battle and chooses a protector afresh (CR
-    -- 310.8a).
+    -- 310.9a).
     protector :: Maybe PlayerId.PlayerId,
     -- | CR 309.4: the room this object's venture marker is on, for a dungeon card
     -- in the command zone. Nothing for everything else, which is every object but a

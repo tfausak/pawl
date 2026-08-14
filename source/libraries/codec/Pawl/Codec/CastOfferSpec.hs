@@ -15,7 +15,7 @@ import qualified Pawl.Types.ManaType as ManaType
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CastOffer" $ do
-  -- CR 310.11b's own offer: both riders written out.
+  -- CR 310.12b's own offer: both riders written out.
   Spec.it s "MkCastOffer, transformed and without paying its mana cost" $
     Common.assertCodec
       s

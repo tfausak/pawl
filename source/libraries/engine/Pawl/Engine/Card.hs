@@ -383,7 +383,7 @@ castableFaces card = case Card.layout card of
   -- something a player may elect to cast. Only an effect allowing the card to be
   -- cast "transformed" or "converted" puts a back face on the stack (CR 712.8c /
   -- 712.11a), and such an effect names the face itself rather than reaching this
-  -- list -- Effect.OfferCast carries CR 310.11b's "transformed" rider and
+  -- list -- Effect.OfferCast carries CR 310.12b's "transformed" rider and
   -- Pawl.Engine.Resolve answers it with `backFace` below. CR 712.14a's wording
   -- reaches a back face without one on the stack, and likewise does not come
   -- through here: Pawl.Types.EntryRiders carries it and
@@ -542,7 +542,7 @@ backFace card =
         -- 712.11a's.
         --
         -- No printing reaches it today: the pool's only producer of a cast
-        -- "transformed" is CR 310.11b's defeated Siege, and no battle is a modal
+        -- "transformed" is CR 310.12b's defeated Siege, and no battle is a modal
         -- double-faced card. The wording that could is CR 701.28's "converted"
         -- (#698), which CR 712.3 names on exactly this layout.
         Layout.ModalDoubleFaced -> successor
@@ -652,7 +652,7 @@ enteringFace card shown = case Card.layout card of
   -- CR 712.11 casts one with its front face up, so for an ordinary cast `shown`
   -- IS the front face and CR 712.8a would resolve Nothing to that same face. The
   -- two answers part where CR 712.11a's "transformed" cast does put a back face
-  -- on the stack, which CR 310.11b's defeated Siege reaches (Pawl.BattleSpec's
+  -- on the stack, which CR 310.12b's defeated Siege reaches (Pawl.BattleSpec's
   -- "she may then cast it TRANSFORMED and FREE" is the proof). The CONVERT
   -- spelling of the same permission is still absent (#698).
   Layout.Transforming -> shown

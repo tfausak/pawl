@@ -16,13 +16,13 @@ data AttackTarget
     -- (Pawl.Engine.Combat.stillAttacked).
     OfPlaneswalker ObjectId.ObjectId
   | -- | CR 310.5. Named by id for OfPlaneswalker's reason, and the id is the
-    -- battle's rather than its protector's: CR 310.8f lets the designation move
+    -- battle's rather than its protector's: CR 310.9f lets the designation move
     -- while the attack stands, so who is being attacked THROUGH is re-read from
-    -- the battle at every use (Pawl.Engine.Defender.playerOf, CR 310.8d).
+    -- the battle at every use (Pawl.Engine.Defender.playerOf, CR 310.9d).
     --
     -- Unlike OfPlaneswalker, this arm does NOT imply the target belongs to the
-    -- defending player: CR 310.8b makes a battle attackable by anyone for whom
+    -- defending player: CR 310.9b makes a battle attackable by anyone for whom
     -- its protector is a defending player, so a Siege's own controller can attack
-    -- it (CR 310.11a puts the protector among the controller's opponents).
+    -- it (CR 310.12a puts the protector among the controller's opponents).
     OfBattle ObjectId.ObjectId
   deriving (Eq, Ord, Show)

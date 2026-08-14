@@ -522,7 +522,7 @@ defaultAnswer p = case p of
   -- Every candidate is an opponent the card's own text offered, and the prompt
   -- is raised only when there are two or more.
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
-  -- CR 310.8a: the head of Battle.protectorCandidates, the same filter-not-trust
+  -- CR 310.9a: the head of Battle.protectorCandidates, the same filter-not-trust
   -- fallback Battle.designateProtector applies to a wrong answer.
   Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   -- CR 305.6: any of the five basic land types is legal. Mountain is what the

@@ -6,9 +6,9 @@ module Pawl.Types.CounterKind where
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
 -- loyalty, rule 714 for lore, CR 702.63 for time and CR 702.32 for fade -- none
 -- of which rule 122.1 lists at all, and CR 122.1c for shield. What rule 122.1
--- names and this type does not are CR 122.1d's stun counter and CR 122.1h's
--- finality counter; 122.1f's poison and 122.1i's rad are a PLAYER's and live in
--- Pawl.Types.PlayerCounterKind.
+-- names and this type does not are CR 122.1d's stun counter, CR 122.1h's
+-- finality counter and CR 122.1j's hone counter (#1519); 122.1f's poison and
+-- 122.1i's rad are a PLAYER's and live in Pawl.Types.PlayerCounterKind.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 --
 -- PARAMETRIC in the keyword, for the reason Pawl.Types.Filter is and only that
@@ -40,7 +40,7 @@ data CounterKind keyword
     -- both counting Object.counters directly.
     Loyalty
   | -- | CR 714.3: the counters a Saga tracks its progress with. Rule 122.1 gives
-    -- lore counters no lettered clause of their own -- 122.1a-i never name them --
+    -- lore counters no lettered clause of their own -- 122.1a-j never name them --
     -- so rule 714 is the whole citation. Contrast CR 122.1e, which does give
     -- loyalty a clause of its own and cross-refers rule 704 from it.
     --
@@ -59,13 +59,13 @@ data CounterKind keyword
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind.
     --
     -- Three readers, and unlike Loyalty's they are the whole of the count's story:
-    -- CR 310.6 / 120.3h takes counters off in Pawl.Engine.Damage, CR 310.11b's
+    -- CR 310.6 / 120.3h takes counters off in Pawl.Engine.Damage, CR 310.12b's
     -- intrinsic Siege ability fires when the last one goes, and CR 704.5v buries a
     -- battle sitting at 0 that owes no ability. All three count Object.counters
     -- directly, as loyalty's and lore's readers do.
     Defense
   | -- | CR 702.63a: the counters vanishing counts down. Rule 122.1 gives time
-    -- counters no lettered clause either -- 122.1a-i never name them -- so rule
+    -- counters no lettered clause either -- 122.1a-j never name them -- so rule
     -- 702.63 is the whole citation, exactly as rule 714 is Lore's.
     --
     -- Contributes nothing to the CR 613 layer system, so

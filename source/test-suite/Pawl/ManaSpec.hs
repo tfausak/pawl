@@ -1945,6 +1945,95 @@ villageRitesSpec s registry = Spec.describe s "A cost's own sacrifice and its so
     Spec.assertBool s (not (pays 1)) "one Piker is not enough"
     Spec.assertBool s (pays 2) "two are"
 
+-- CR 605.1a's FOURTH clause, which the 2026-08-07 rules added: an activated
+-- ability is a mana ability only if "its cost and effect don't move any card to
+-- or from a library". Chromatic Sphere and Chromatic Star are the pair that
+-- clause splits, and they were chosen because they differ in one thing and
+-- nothing else. Both are {1} artifacts whose only activated ability is
+-- "{1}, {T}, Sacrifice this artifact: Add one mana of any color" -- same cost,
+-- same production, same seat. The Sphere's ability goes on to say "Draw a card";
+-- the Star's draw is a SEPARATE triggered ability off its own death (CR 603),
+-- which CR 605.1a never reads. So the Sphere stops being a mana ability under the
+-- new clause and the Star does not.
+--
+-- The Sphere's negative is never routed through Activate.activatable, which
+-- answers False for a mana ability on every board (CR 605.3b): every assertion
+-- here reads the menu Action.legalActions builds, or the board a priority loop
+-- leaves behind.
+chromaticSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+chromaticSpec s registry = Spec.describe s "Chromatic Sphere and Chromatic Star" $ do
+  Spec.it s "CR 605.1a the Star's ability is a mana ability and the Sphere's draw disqualifies its own" $ do
+    star <- S.printingOf s registry "Chromatic Star"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    forest <- S.printingOf s registry "Forest"
+    let (starId, starBoard) = chromaticBoard star forest
+        (sphereId, sphereBoard) = chromaticBoard sphere forest
+    Spec.assertBool s (elem starId (Mana.manaSources Cost.manaActivations S.alice starBoard)) "the Star is a mana source"
+    Spec.assertBool s (notElem sphereId (Mana.manaSources Cost.manaActivations S.alice sphereBoard)) "the Sphere is not"
+
+  -- The same split at the menu, which is what the priority loop actually reads.
+  -- Both directions are asserted on both boards, so neither half can pass because
+  -- the artifact was simply unaffordable: the Sphere IS offered, just under the
+  -- other constructor -- CR 605.3b's stack.
+  Spec.it s "CR 605.3b the Sphere is offered as an ordinary activation instead" $ do
+    star <- S.printingOf s registry "Chromatic Star"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    forest <- S.printingOf s registry "Forest"
+    let (starId, starBoard) = chromaticBoard star forest
+        (sphereId, sphereBoard) = chromaticBoard sphere forest
+        starActions = Action.legalActions S.alice starBoard
+        sphereActions = Action.legalActions S.alice sphereBoard
+    Spec.assertBool s (elem (Action.Type.ActivateManaAbility starId) starActions) "the Star is menued as a mana ability"
+    Spec.assertBool s (notElem (Action.Type.ActivateManaAbility sphereId) sphereActions) "the Sphere is not"
+    Spec.assertBool s (any (isActivateOf sphereId) sphereActions) "the Sphere is menued as an ordinary activation"
+    Spec.assertBool s (not (any (isActivateOf starId) starActions)) "which a mana ability never is"
+
+  -- End to end. tapEverything takes ONLY mana activations, so what it reaches is
+  -- exactly CR 605.3a's window: the Star is sacrificed to its own cost and its
+  -- death trigger draws, while the Sphere is never touched at all and its draw
+  -- never happens.
+  Spec.it s "CR 605.3a the mana window reaches the Star and never the Sphere" $ do
+    star <- S.printingOf s registry "Chromatic Star"
+    sphere <- S.printingOf s registry "Chromatic Sphere"
+    forest <- S.printingOf s registry "Forest"
+    let (_, starBoard) = chromaticBoard star forest
+        (_, sphereBoard) = chromaticBoard sphere forest
+        starAfter = S.runPure tapEverything starBoard Engine.priorityLoop
+        sphereAfter = S.runPure tapEverything sphereBoard Engine.priorityLoop
+    Spec.assertEqWith s "the Star paid its own sacrifice" (length (Game.zoneMembers Zone.Graveyard S.alice starAfter)) 1
+    Spec.assertEqWith s "the Sphere was never activated" (length (Game.zoneMembers Zone.Graveyard S.alice sphereAfter)) 0
+    Spec.assertEqWith s "the Star's death trigger drew one card" (length (Game.zoneMembers Zone.Hand S.alice starAfter)) 1
+    Spec.assertEqWith s "and nothing drew on the Sphere's board" (length (Game.zoneMembers Zone.Hand S.alice sphereAfter)) 0
+
+-- alice, active, in her precombat main phase: one of the two artifacts, a Forest
+-- to pay the {1} activation cost with, and a stocked library so a draw has a card
+-- to take and CR 104.3c decides nothing first. Identical for both artifacts, so
+-- the printing is the only difference between the two boards.
+chromaticBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+chromaticBoard artifact forest =
+  let base = (Setup.emptyGame S.bothPlayers) {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+      (artifactId, g1) = S.addCreature artifact S.alice base
+      (_, g2) = S.addCreature forest S.alice g1
+      stocked = foldr (\p gs -> snd (S.addLibraryCard p S.alice gs)) g2 (replicate 3 forest)
+   in (artifactId, stocked)
+
+-- Whether an action is the ordinary CR 602 activation of this object's ability,
+-- which is the constructor Action.legalActions uses for everything that is NOT a
+-- mana ability.
+isActivateOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isActivateOf oid action = case action of
+  Action.Type.Activate other _ -> other == oid
+  Action.Type.ActivateManaAbility _ -> False
+  Action.Type.Cast {} -> False
+  Action.Type.Play {} -> False
+  Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
+  Action.Type.Ignore _ -> False
+  Action.Type.Pass -> False
+
 -- Whether alice is offered the cast of one card of this printing from her hand.
 offersCast :: Printing.Printing -> GameState.GameState -> Bool
 offersCast printing board =
@@ -2002,6 +2091,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   treasonousOgreSpec s registry
   sharedVictimSpec s registry
   villageRitesSpec s registry
+  chromaticSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against

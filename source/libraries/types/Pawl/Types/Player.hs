@@ -37,7 +37,7 @@ data Player = MkPlayer
     ringTemptations :: Natural.Natural,
     -- | CR 702.179b: this player's speed, or Nothing for a player who has none.
     -- "Players do not have speed until a rule or effect sets their speed to a
-    -- specific value", so the absence is a THIRD state and not a zero: CR 704.5z
+    -- specific value", so the absence is a THIRD state and not a zero: CR 704.5aa
     -- starts a player's engines only when they have NO speed, and would fire
     -- forever against a player whose speed had been driven to 0 if the two were
     -- spelled alike.

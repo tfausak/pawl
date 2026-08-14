@@ -2967,7 +2967,7 @@ vanishingUpkeep =
 -- "When the last time counter is removed from this permanent, sacrifice it."
 --
 -- Pawl.Engine.Battle.siegeDefeat's condition with a different kind and a
--- different payload: CR 310.11b and rule 702.63a ask the same question of
+-- different payload: CR 310.12b and rule 702.63a ask the same question of
 -- Object.counters, which is why TriggerCondition.SelfLastCounterRemoved needed no
 -- widening for this row.
 --

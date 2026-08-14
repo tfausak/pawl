@@ -2072,7 +2072,7 @@ slotOne slot resolving gs = do
 --
 -- Then, and only then, the "may" (CR 601.2b's decisions are the player's, and so
 -- is this one). Declining leaves the card exactly where the earlier effect put
--- it, which for CR 310.11b is exile.
+-- it, which for CR 310.12b is exile.
 --
 -- THE INVARIANT: everything above is a CLASSIFICATION carried by the opcode's
 -- CastOffer -- which face, which cost -- and nothing here asks which effect is
@@ -2111,7 +2111,7 @@ offerCast resolving controller slot offer = do
               | otherwise = fmap (\c -> c {Cost.Type.components = Cost.Type.components c <> Face.additionalCosts face}) (CastOffer.payingInstead offer)
             -- Face up: CR 708.4's face-down cast is a permission a MORPH
             -- ability gives (CR 702.37d), and an OfferCast opcode carries no
-            -- such rider -- CR 310.11b's offer names a face and a cost and
+            -- such rider -- CR 310.12b's offer names a face and a cost and
             -- nothing about turning the card over.
             proposed = Cast.asProposed oid name Facing.FaceUp gs
             candidates = maybe (Cost.costsFor name oid proposed) pure applied

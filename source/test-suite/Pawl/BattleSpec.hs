@@ -3,14 +3,14 @@
 
 -- Covers Pawl.Engine.Battle, rule 310: the defense a battle prints (CR 210.1 /
 -- 310.4a), the defense counters CR 310.4b makes it enter with, the protector CR
--- 310.8a has its controller choose as it enters, CR 310.11a's restriction of that
--- choice to an opponent, and CR 310.10's state-based action -- listed as CR 704.5w
--- and CR 704.5x -- repairing the designation once it is illegal.
+-- 310.9a has its controller choose as it enters, CR 310.12a's restriction of that
+-- choice to an opponent, and CR 310.11's state-based action -- listed as CR 704.5x
+-- and CR 704.5y -- repairing the designation once it is illegal.
 --
 -- And what a protector is FOR, which lives in Pawl.Engine.Combat rather than in
 -- Pawl.Engine.Battle but is rule 310 all the same: CR 310.5's attackable battle
--- (Combat.attackableBattles), CR 310.8b including its "notably, a Siege battle can
--- be attacked by its own controller", CR 310.8c's blocking, and CR 310.8d with CR
+-- (Combat.attackableBattles), CR 310.9b including its "notably, a Siege battle can
+-- be attacked by its own controller", CR 310.9c's blocking, and CR 310.9d with CR
 -- 508.5 (Defender.playerOf). Those are attackSpec below; Pawl.CombatSpec
 -- keeps rule 508's own cases.
 --
@@ -34,7 +34,7 @@
 -- is a battle, so every case below reads rule 310 rather than the attacker.
 --
 -- And how a battle is defeated: CR 310.6 / 120.3h's damage removing defense
--- counters, CR 115.4's "any target" admitting one, CR 310.11b's intrinsic Siege
+-- counters, CR 115.4's "any target" admitting one, CR 310.12b's intrinsic Siege
 -- ability, and CR 310.7 / 704.5v's state-based action. Those are damageSpec and
 -- defeatSpec below.
 --
@@ -44,7 +44,7 @@
 -- on purpose: a defense-5 battle taking 5 at once could not tell "removed all the
 -- counters" from "removed the right number".
 --
--- And the second half of CR 310.11b's sentence, "then you may cast it transformed
+-- And the second half of CR 310.12b's sentence, "then you may cast it transformed
 -- without paying its mana cost": CR 608.2g's offered cast, CR 118.9's alternative
 -- cost, CR 712.11a / 712.8c's back-face spell and CR 712.13's back-face permanent,
 -- all in defeatSpec below.
@@ -108,7 +108,7 @@ spec s registry = Spec.describe s "Battle" $ do
   damageSpec s registry
   defeatSpec s registry
 
--- CR 310.4b and CR 310.8a both fire as the battle enters, and both are visible
+-- CR 310.4b and CR 310.9a both fire as the battle enters, and both are visible
 -- from a cast -- which is what makes this the gameplay-level test rather than a
 -- projection one.
 entrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -123,9 +123,9 @@ entrySpec s registry = Spec.describe s "Entry" $ do
       "the projection carries the printed defense"
       (PC.defense (Projection.project oid after))
       (Just (Defense.MkDefense 5))
-  Spec.it s "CR 310.11a its protector is an opponent of its controller" $ do
+  Spec.it s "CR 310.12a its protector is an opponent of its controller" $ do
     (after, oid) <- castInvasion s registry
-    -- Two seats leave exactly one legal protector, so this asserts CR 310.11a's
+    -- Two seats leave exactly one legal protector, so this asserts CR 310.12a's
     -- restriction rather than a choice; protectorSpec below is where the choice
     -- is made observable.
     Spec.assertEqWith s "bob protects it" (protectorOf oid after) (Just S.bob)
@@ -140,12 +140,12 @@ entrySpec s registry = Spec.describe s "Entry" $ do
     Spec.assertEqWith s "alice gained 4" (S.lifeOf S.alice settled) (Just 24)
     Spec.assertEqWith s "and drew one" (length (Game.zoneMembers Zone.Hand S.alice settled)) 1
 
--- CR 310.8a's choice, made observable. Three seats, because CR 102.2's two-player
+-- CR 310.9a's choice, made observable. Three seats, because CR 102.2's two-player
 -- game leaves a Siege exactly one legal protector and a one-candidate ask decides
 -- nothing.
 protectorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 protectorSpec s registry = Spec.describe s "Protector" $ do
-  Spec.it s "CR 310.8a the controller chooses which opponent protects it" $ do
+  Spec.it s "CR 310.9a the controller chooses which opponent protects it" $ do
     (toBob, oidB) <- castInvasionThreeSeated s registry (protectTo S.bob)
     (toCarol, oidC) <- castInvasionThreeSeated s registry (protectTo S.carol)
     -- Every input the same but the answer to one prompt, the shape M5.6d's
@@ -153,73 +153,73 @@ protectorSpec s registry = Spec.describe s "Protector" $ do
     -- distinguish from an elision.
     Spec.assertEqWith s "bob when bob is named" (protectorOf oidB toBob) (Just S.bob)
     Spec.assertEqWith s "carol when carol is named" (protectorOf oidC toCarol) (Just S.carol)
-  Spec.it s "CR 310.11a the controller is never offered, even with three seats" $ do
+  Spec.it s "CR 310.12a the controller is never offered, even with three seats" $ do
     -- An interpreter that names the controller anyway is filtered, not obeyed:
     -- Battle.designateProtector falls back to the head of the candidate list.
     (chosen, oid) <- castInvasionThreeSeated s registry (protectTo S.alice)
     Spec.assertBool s (protectorOf oid chosen /= Just S.alice) "alice does not protect her own Siege"
     Spec.assertBool s (protectorOf oid chosen `elem` [Just S.bob, Just S.carol]) "an opponent does"
 
--- CR 310.8a's candidate rule at the level Pawl.Engine.Battle states it, which is
--- the arithmetic the entry choice and the CR 704.5w re-choice SHARE -- so a drift
+-- CR 310.9a's candidate rule at the level Pawl.Engine.Battle states it, which is
+-- the arithmetic the entry choice and the CR 704.5x re-choice SHARE -- so a drift
 -- between them would show here.
 --
 -- The projections are the REAL card's, taken off the board a cast produced, so
 -- these cases cannot pass against a Siege pawl does not actually build. The
 -- no-battle-types half is that same projection with its subtypes stripped, which
--- has no printing to take it from: CR 310.11 makes every battle printed so far a
--- Siege.
+-- has no printing to take it from: every battle printed so far has the Siege
+-- subtype CR 310.12 describes.
 candidateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 candidateSpec s registry = Spec.describe s "Candidates" $ do
-  Spec.it s "CR 310.11a a Siege offers its controller's opponents and not its controller" $ do
+  Spec.it s "CR 310.12a a Siege offers its controller's opponents and not its controller" $ do
     siege <- siegePC s registry
     Spec.assertEqWith
       s
       "bob and carol"
       (Battle.protectorCandidates siege S.alice [S.alice, S.bob, S.carol])
       [S.bob, S.carol]
-  Spec.it s "CR 310.8a a battle with no battle types offers only its controller" $ do
+  Spec.it s "CR 310.9a a battle with no battle types offers only its controller" $ do
     siege <- siegePC s registry
     Spec.assertEqWith
       s
       "alice alone"
       (Battle.protectorCandidates siege {PC.subtypes = Set.empty} S.alice [S.alice, S.bob, S.carol])
       [S.alice]
-  Spec.it s "CR 704.5w a departed player is not a candidate" $ do
+  Spec.it s "CR 704.5x a departed player is not a candidate" $ do
     siege <- siegePC s registry
     Spec.assertEqWith
       s
       "carol alone, bob having left"
       (Battle.protectorCandidates siege S.alice [S.alice, S.carol])
       [S.carol]
-  -- CR 310.10's second sentence, listed as CR 704.5w's and CR 704.5x's: the branch
+  -- CR 310.11's second sentence, listed as CR 704.5x's and CR 704.5y's: the branch
   -- that puts the battle into its owner's graveyard. Held HERE rather than at the
   -- game level because it is
   -- unreachable there: a Siege's candidates are its controller's opponents still
   -- in the game, and a game in which its controller has no opponent left has
   -- already ended under CR 104.2a. Pawl.Engine.Sba routes an empty answer into
   -- the put-into-graveyard batch whether or not a game can reach it (#853).
-  Spec.it s "CR 704.5w a Siege whose controller is alone has no candidate" $ do
+  Spec.it s "CR 704.5x a Siege whose controller is alone has no candidate" $ do
     siege <- siegePC s registry
     Spec.assertEqWith s "nobody" (Battle.protectorCandidates siege S.alice [S.alice]) []
-  Spec.it s "CR 704.5x a Siege protected by its own controller needs repair" $ do
+  Spec.it s "CR 704.5y a Siege protected by its own controller needs repair" $ do
     siege <- siegePC s registry
     Spec.assertBool
       s
       (Battle.needsProtector siege S.alice [S.alice, S.bob] False (Just S.alice))
       "the controller is not a legal protector of their own Siege"
-  Spec.it s "CR 310.10 a legal designation needs no repair" $ do
+  Spec.it s "CR 310.11 a legal designation needs no repair" $ do
     siege <- siegePC s registry
     Spec.assertBool
       s
       (not (Battle.needsProtector siege S.alice [S.alice, S.bob] False (Just S.bob)))
       "bob is legal and is left alone"
 
--- CR 704.5w: the designation is repaired by a state-based action once the
+-- CR 704.5x: the designation is repaired by a state-based action once the
 -- designated player is no longer in the game.
 repairSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 repairSpec s registry = Spec.describe s "Repair" $ do
-  Spec.it s "CR 704.5w a battle whose protector leaves the game gets a new one" $ do
+  Spec.it s "CR 704.5x a battle whose protector leaves the game gets a new one" $ do
     (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
     Spec.assertEqWith s "carol protects it to begin with" (protectorOf oid entered) (Just S.carol)
     let gone = Departure.depart Departure.Type.Conceded S.carol entered
@@ -229,9 +229,9 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     -- answerer's preference.
     Spec.assertEqWith s "bob protects it now" (protectorOf oid repaired) (Just S.bob)
     Spec.assertBool s (S.onBattlefield oid repaired) "and the battle is still on the battlefield"
-  Spec.it s "CR 704.5w a legal protector is not re-chosen" $ do
+  Spec.it s "CR 704.5x a legal protector is not re-chosen" $ do
     (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
-    -- Nobody has left, so CR 704.5w does not apply and the pass must not ask
+    -- Nobody has left, so CR 704.5x does not apply and the pass must not ask
     -- again. Run under an answerer that would name BOB if it were asked: with all
     -- three seats filled the re-choice would have two candidates and could not be
     -- elided, so the designation still standing at carol is what says the
@@ -240,7 +240,7 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     -- the only candidate either way.
     let checked = S.runPure (protectTo S.bob) entered Sba.checkStateBasedActions
     Spec.assertEqWith s "carol still protects it" (protectorOf oid checked) (Just S.carol)
-  Spec.it s "CR 704.5w the repair reports that an action was performed" $ do
+  Spec.it s "CR 704.5x the repair reports that an action was performed" $ do
     (entered, _) <- castInvasionThreeSeated s registry (protectTo S.carol)
     -- CR 704.3: the check repeats until no state-based action is performed, so a
     -- pass that repaired a designation must SAY it acted. Read off
@@ -254,7 +254,7 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     Spec.assertEqWith s "carol protects it while it is on the battlefield" (protectorOf oid entered) (Just S.carol)
     -- CR 400.7 makes the object that reaches the graveyard a new one with no
     -- memory of this existence, so the designation may not ride along; a battle
-    -- that returns chooses afresh (CR 310.8a). Asserted over the WHOLE object map
+    -- that returns chooses afresh (CR 310.9a). Asserted over the WHOLE object map
     -- rather than over `oid`, because the move mints a new id -- and the old
     -- incarnation lingering with a stale protector is exactly the failure this
     -- rules out.
@@ -263,12 +263,12 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     Spec.assertEqWith s "nobody protects anything now" designations []
 
 -- CR 310.5: battles can be attacked, and everything that follows from WHOM they
--- are attacked through -- CR 310.8b's protector rule, CR 310.8c's blocking, CR
--- 310.8d with CR 508.5's defending player, and CR 704.5w's rider once one of them
+-- are attacked through -- CR 310.9b's protector rule, CR 310.9c's blocking, CR
+-- 310.9d with CR 508.5's defending player, and CR 704.5x's rider once one of them
 -- is under attack.
 attackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 attackSpec s registry = Spec.describe s "Attacking" $ do
-  Spec.it s "CR 310.5 / 310.8b a Siege is offered as an attack target through its PROTECTOR" $ do
+  Spec.it s "CR 310.5 / 310.9b a Siege is offered as an attack target through its PROTECTOR" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
     -- The three seats really are three here, which is what makes the pair of
@@ -276,9 +276,9 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     -- protects it, bob is neither.
     Spec.assertEqWith s "alice controls the Siege" (Projection.controllerOf battle gs) (Just S.alice)
     Spec.assertEqWith s "carol protects it" (protectorOf battle gs) (Just S.carol)
-    -- CR 310.8b's "notably, a Siege battle can be attacked by its own controller":
+    -- CR 310.9b's "notably, a Siege battle can be attacked by its own controller":
     -- alice is the attacking player AND the battle's controller, and the battle is
-    -- on her list anyway, because CR 310.11a put the protector among her
+    -- on her list anyway, because CR 310.12a put the protector among her
     -- opponents. Exact rather than a membership test, so a list that grew a
     -- spurious entry fails too.
     Spec.assertEqWith
@@ -286,12 +286,12 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
       "carol herself and the Siege she protects"
       (NonEmpty.toList (Combat.attackTargets S.carol gs))
       [AttackTarget.OfPlayer S.carol, AttackTarget.OfBattle battle]
-  Spec.it s "CR 310.8b and NOT through an opponent who merely does not protect it" $ do
+  Spec.it s "CR 310.9b and NOT through an opponent who merely does not protect it" $ do
     -- THE FALSIFIER for the case above, and the reason it cannot pass vacuously:
     -- the same board read through the other opponent. bob is a legal defending
     -- player (CR 506.2a) with a legal attack available, so this is not "nothing
     -- can be attacked" -- it is the battle alone dropping off the list, which is
-    -- CR 310.8b's "any attacking player for whom its protector is a defending
+    -- CR 310.9b's "any attacking player for whom its protector is a defending
     -- player" and no wider a rule.
     piker <- S.printingOf s registry "Goblin Piker"
     (gs, battle, _, _, _) <- battleCombat s registry S.carol S.bob [piker] [] []
@@ -316,7 +316,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         -- the record being written past it.
         Spec.assertEqWith s "and it is tapped" (fmap Object.tapped (Game.lookupObject attacker after)) (Just TapState.Tapped)
       _ -> Spec.assertFailure s "fixture should have exactly one attacker"
-  Spec.it s "CR 310.8b the identical announcement is refused when the protector is not the defending player" $ do
+  Spec.it s "CR 310.9b the identical announcement is refused when the protector is not the defending player" $ do
     -- THE FALSIFIER for the declaration: same board, same answerer, bob defending
     -- instead of carol. announceAttackTarget filters an answer outside CR 508.1b's
     -- list down to the defending player, so a recorded OfPlayer bob is the list
@@ -333,7 +333,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
           (Just (AttackTarget.OfPlayer S.bob))
       _ -> Spec.assertFailure s "fixture should have exactly one attacker"
 
-  Spec.it s "CR 310.8d / 508.5 the defending player of a creature attacking a battle is the battle's protector" $ do
+  Spec.it s "CR 310.9d / 508.5 the defending player of a creature attacking a battle is the battle's protector" $ do
     -- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so this
     -- reads CR 508.5's defending player and no other text: CR 702.14c's swampwalk
     -- is exactly an ability of an attacking creature that refers to one. carol
@@ -359,9 +359,9 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "legal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
-  Spec.it s "CR 310.8d the battle's CONTROLLER's lands are not the ones read" $ do
+  Spec.it s "CR 310.9d the battle's CONTROLLER's lands are not the ones read" $ do
     -- THE FALSIFIER for reading CR 508.5's defending player off the battle's
-    -- controller instead of its protector, which is the one substitution CR 310.8d
+    -- controller instead of its protector, which is the one substitution CR 310.9d
     -- exists to make. The Swamp has moved to alice, who controls the Siege and is
     -- attacking it; carol, who protects it, holds an Island. Nothing about the
     -- board changed except which of two distinct players owns the Swamp, and a
@@ -373,11 +373,11 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "legal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
 
-  Spec.it s "CR 310.8c a creature the protector does not control can't block the battle's attacker" $ do
-    -- CR 310.8c: "creatures controlled by other players can't block those
+  Spec.it s "CR 310.9c a creature the protector does not control can't block the battle's attacker" $ do
+    -- CR 310.9c: "creatures controlled by other players can't block those
     -- attackers". bob holds the board's only untapped creature besides the
     -- attacker, and bob protects nothing. Nothing forbids it explicitly -- CR
-    -- 509.1a already restricts blocking to the defending player, and CR 310.8b
+    -- 509.1a already restricts blocking to the defending player, and CR 310.9b
     -- makes the battle attackable only through its protector, so the two rules
     -- meet and bob is never asked.
     piker <- S.printingOf s registry "Goblin Piker"
@@ -392,7 +392,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
       (Map.elems (Combat.Type.attackers (GameState.combat attacked)))
       (fmap (const (AttackTarget.OfBattle battle)) mine)
     Spec.assertEqWith s "nothing blocks" (Combat.Type.blockers (GameState.combat blocked)) Map.empty
-  Spec.it s "CR 310.8c and one the protector does control blocks it" $ do
+  Spec.it s "CR 310.9c and one the protector does control blocks it" $ do
     -- THE FALSIFIER for the case above: the same Piker moved from bob's side to
     -- carol's, under the same answerer, which blocks with everything it is
     -- offered. Without this the empty map above would pass on a board where
@@ -411,8 +411,8 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         Spec.assertEqWith s "carol blocks" (Combat.blockersOf attacker blocked) (Set.singleton blocker)
       _ -> Spec.assertFailure s "fixture should have one creature a side"
 
-  Spec.it s "CR 704.5w a battle that IS being attacked keeps a protector who has left" $ do
-    -- The rider CR 704.5w carries and CR 704.5x does not: "no attacking creatures
+  Spec.it s "CR 704.5x a battle that IS being attacked keeps a protector who has left" $ do
+    -- The rider CR 704.5x carries and CR 704.5y does not: "no attacking creatures
     -- are currently attacking that battle". carol concedes with alice's creature
     -- still attacking her Siege, so the designation is illegal -- no player in the
     -- game holds it -- and the state-based action must nonetheless leave it be.
@@ -427,7 +427,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     Spec.assertBool s (Battle.isBeingAttacked battle gone) "the Siege is under attack"
     Spec.assertBool s (notElem S.carol (Game.stillPlaying gone)) "and carol is gone"
     Spec.assertEqWith s "the illegal designation stands" (protectorOf battle checked) (Just S.carol)
-  Spec.it s "CR 704.5w the same concession on the same board DOES repair it when nothing attacks" $ do
+  Spec.it s "CR 704.5x the same concession on the same board DOES repair it when nothing attacks" $ do
     -- THE FALSIFIER for the rider: the identical fixture with the declaration
     -- skipped. bob is the only opponent left, so the re-choice is forced and the
     -- new designation is the state-based action firing rather than an answerer's
@@ -501,27 +501,27 @@ damageSpec s registry = Spec.describe s "Damage" $ do
         dealt = S.runPure S.identityAnswer killed (Monad.void Damage.dealCombatDamage)
     Spec.assertEqWith s "no damage was dealt at all" (S.damageEventsOf dealt) []
 
--- CR 310.11b and CR 310.7 / 704.5v: what happens when the last defense counter
+-- CR 310.12b and CR 310.7 / 704.5v: what happens when the last defense counter
 -- comes off. The two rules are only jointly observable -- 704.5v alone would send
--- the Siege to a graveyard where 310.11b exiles it -- so every case here asserts
+-- the Siege to a graveyard where 310.12b exiles it -- so every case here asserts
 -- the DESTINATION zone rather than merely that the battle left.
 defeatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 defeatSpec s registry = Spec.describe s "Defeat" $ do
-  Spec.it s "CR 310.11b a Siege has the intrinsic defeat ability" $ do
+  Spec.it s "CR 310.12b a Siege has the intrinsic defeat ability" $ do
     siege <- siegePC s registry
     Spec.assertEqWith
       s
       "one ability, conditioned on the last defense counter"
       (fmap TriggeredAbility.condition (Battle.triggeredAbilitiesOf siege))
       [TriggerCondition.SelfLastCounterRemoved CounterKind.Defense]
-  Spec.it s "CR 310.11b a battle with no battle types does not" $ do
-    -- Rule 310.11b says "Sieges", not "battles", and this is the falsifier for
+  Spec.it s "CR 310.12b a battle with no battle types does not" $ do
+    -- Rule 310.12b says "Sieges", not "battles", and this is the falsifier for
     -- gating the mint on the card type instead: the same real projection with its
-    -- subtypes stripped, which candidateSpec above uses for CR 310.8a's other
+    -- subtypes stripped, which candidateSpec above uses for CR 310.9a's other
     -- branch.
     siege <- siegePC s registry
     Spec.assertEqWith s "no intrinsic ability" (Battle.triggeredAbilitiesOf siege {PC.subtypes = Set.empty}) []
-  Spec.it s "CR 310.11b / 704.5v three plus two defeats it, and it is EXILED" $ do
+  Spec.it s "CR 310.12b / 704.5v three plus two defeats it, and it is EXILED" $ do
     -- THE PROVING CASE. Bolt for 3 then Firebolt for 2 against a printed defense of
     -- 5, so the last counter comes off on the second spell and not the first.
     invasion <- S.printingOf s registry "Invasion of Dominaria"
@@ -540,8 +540,8 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
         Spec.assertEqWith s "and in nobody's graveyard" (copiesIn Zone.Graveyard) 0
         Spec.assertBool s (not (S.onBattlefield battle afterBoth)) "and not on the battlefield"
       _ -> Spec.assertFailure s "fixture should have a Bolt and a Firebolt"
-  Spec.it s "CR 310.11b / 118.9 / 712.11a she may then cast it TRANSFORMED and FREE" $ do
-    -- THE PROVING CASE for the second half of rule 310.11b's sentence, on the
+  Spec.it s "CR 310.12b / 118.9 / 712.11a she may then cast it TRANSFORMED and FREE" $ do
+    -- THE PROVING CASE for the second half of rule 310.12b's sentence, on the
     -- identical board as the exile case above with alice ACCEPTING the offer
     -- rather than declining it.
     --
@@ -578,8 +578,8 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
             Spec.assertEqWith s "under alice's control" (Projection.controllerOf oid afterBoth) (Just S.alice)
             Spec.assertEqWith s "and the card has left exile" (invasionsIn (S.printingName invasion) Zone.Exile afterBoth) 0
       _ -> Spec.assertFailure s "fixture should have a Bolt and a Firebolt"
-  Spec.it s "CR 310.11b declining the offer leaves the card in exile" $ do
-    -- THE FALSIFIER for casting it unasked. Rule 310.11b says "you MAY cast it",
+  Spec.it s "CR 310.12b declining the offer leaves the card in exile" $ do
+    -- THE FALSIFIER for casting it unasked. Rule 310.12b says "you MAY cast it",
     -- so the identical board with the offer declined must leave the Angel
     -- unmade -- which is also what the exile case above depends on, since its
     -- answerer declines.
@@ -604,14 +604,14 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
   Spec.it s "CR 704.5v a battle at defense 0 with nothing pending is named by the state-based action" $ do
     -- The clause's own reading, at the level Pawl.Engine.Battle states it.
     -- Unreachable for a SIEGE in a real game, and that is rule 704.5v's design: the
-    -- counters hitting 0 fires CR 310.11b, whose exemption holds the battle there
+    -- counters hitting 0 fires CR 310.12b, whose exemption holds the battle there
     -- until the ability exiles it. What this pins is that the clause exists, so
     -- that the case below shows the RIDER and not the clause doing the holding.
     (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
     let drained = drain battle entered
     Spec.assertEqWith s "it is named" (Battle.defeated (Projection.projectAll drained) [] drained) [battle]
   Spec.it s "CR 704.5v and is NOT while its defeat ability is still owed a resolution" $ do
-    -- THE FALSIFIER for the rider, on the identical board with CR 310.11b's own
+    -- THE FALSIFIER for the rider, on the identical board with CR 310.12b's own
     -- event still unscanned. Pawl.Engine.Engine.performSettle runs the state-based
     -- action pass BEFORE placePendingTriggers, so this window is real rather than
     -- hypothetical, and it is the whole reason the Siege above reaches exile.
@@ -622,13 +622,13 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
     Spec.assertEqWith s "so nothing is buried" (Battle.defeated (Projection.projectAll drained) removal drained) []
 
 -- Cast the spell in `caster`'s hand at `battle`, then settle: the spell resolves,
--- CR 310.6 takes its counters off, and CR 310.11b's ability -- if the last one came
+-- CR 310.6 takes its counters off, and CR 310.12b's ability -- if the last one came
 -- off -- is placed and resolved inside the same loop. Every case above reads the
 -- board that loop leaves.
 castAt :: ObjectId.ObjectId -> PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 castAt = castAtWith S.identityAnswer
 
--- castAt with the fallback answerer named, so one case can accept CR 310.11b's
+-- castAt with the fallback answerer named, so one case can accept CR 310.12b's
 -- offered cast while every other one declines it (Replay.defaultAnswer's arm).
 castAtWith ::
   (forall r. Prompt.Prompt r -> r) ->
@@ -645,7 +645,7 @@ castAtWith fallback battle caster spell gs =
       cast = S.runPure answer gs (S.cast caster spell)
    in S.runPure answer cast Engine.priorityLoop
 
--- CR 608.2g: take the cast CR 310.11b offers, and answer everything else as
+-- CR 608.2g: take the cast CR 310.12b offers, and answer everything else as
 -- S.identityAnswer does.
 takesTheCast :: Prompt.Prompt r -> r
 takesTheCast p = case p of
@@ -733,7 +733,7 @@ battleCombatOf s registry protector defender mine theirs hers = do
   hers' <- printings hers
   battleCombat s registry protector defender mine' theirs' hers'
 
--- alice is active and controls a Siege that `protector` protects (CR 310.8a),
+-- alice is active and controls a Siege that `protector` protects (CR 310.9a),
 -- plus one Settled permanent per printing in `mine`; bob and carol get one each
 -- per printing in `theirs` and `hers`. The board sits in the declare attackers
 -- step with `defender` already designated -- stated rather than derived for
@@ -863,7 +863,7 @@ siegePC s registry = do
 
 -- Name a protector and answer everything else the ordinary way, the shape
 -- S.attackTo takes for CR 507.1's defending player.
--- CR 310.8a is not a replacement effect (see Event.designateProtector), so nothing
+-- CR 310.9a is not a replacement effect (see Event.designateProtector), so nothing
 -- competes with CR 310.4b's counters for a CR 616.1e ordering. An answerer that
 -- refuses to order replacements is how that is asserted rather than assumed: when
 -- the protector choice WAS an EntryRewrite, both rows landed in

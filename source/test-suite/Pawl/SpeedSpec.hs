@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers: Pawl.Engine.Speed (CR 702.179, "start your engines!"), the CR 704.5z
+-- Covers: Pawl.Engine.Speed (CR 702.179, "start your engines!"), the CR 704.5aa
 -- arm Pawl.Engine.Sba runs from it, Pawl.Types.Player's speed field,
 -- Pawl.Engine.Quantity's Speed arm (CR 702.179e/702.179f), CR 702.178a's max
 -- speed gate -- Pawl.Types.ActivatedAbility's condition, applied by
@@ -60,7 +60,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
 
 -- This player's speed, as Player.speed holds it -- Nothing for a player who has
--- none (CR 702.179b), which is the state CR 704.5z looks for and is NOT the same
+-- none (CR 702.179b), which is the state CR 704.5aa looks for and is NOT the same
 -- as Just 0.
 speedOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe (Maybe Natural.Natural)
 speedOf pid gs = fmap Player.speed (Map.lookup pid (GameState.players gs))
@@ -249,22 +249,22 @@ maxSpeedZoneSpec s registry = Spec.describe s "MaxSpeedZone" $ do
 
 startYourEnginesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 startYourEnginesSpec s registry = Spec.describe s "StartYourEngines" $ do
-  -- CR 704.5z, and CR 702.179a's whole content: the keyword does nothing on its
+  -- CR 704.5aa, and CR 702.179a's whole content: the keyword does nothing on its
   -- own, and the state-based action is what turns controlling the permanent into
   -- having speed.
-  Spec.it s "CR 704.5z a player controlling Muraganda Raceway with no speed gets speed 1" $ do
+  Spec.it s "CR 704.5aa a player controlling Muraganda Raceway with no speed gets speed 1" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     let (_, gs) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "before the check, nobody has speed (CR 702.179b)" (speedOf S.alice gs) (Just Nothing)
     let after = S.settleSba gs
     Spec.assertEqWith s "alice's engines started" (speedOf S.alice after) (Just (Just 1))
-    -- Bob controls no such permanent, so CR 704.5z passes him by. The falsifier
+    -- Bob controls no such permanent, so CR 704.5aa passes him by. The falsifier
     -- for an implementation that gave everybody speed.
     Spec.assertEqWith s "bob, who controls none, still has no speed" (speedOf S.bob after) (Just Nothing)
-  -- CR 704.5z fires only for a player who has NO speed, which is what makes it
+  -- CR 704.5aa fires only for a player who has NO speed, which is what makes it
   -- terminate: the settle loop re-checks until nothing acts (CR 704.3), and a
   -- clause that set speed to 1 unconditionally would never stop acting.
-  Spec.it s "CR 704.5z does not fire again once speed exists" $ do
+  Spec.it s "CR 704.5aa does not fire again once speed exists" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     swamp <- S.printingOf s registry "Swamp"
     signInBlood <- S.printingOf s registry "Sign in Blood"
@@ -469,7 +469,7 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
 -- 702.179c names "a certain value" and no player in particular.
 --
 -- Every number here is chosen to be unreachable any other way. The increase is 2,
--- so no reading of rule 702.179's own machinery -- CR 704.5z's "becomes 1", CR
+-- so no reading of rule 702.179's own machinery -- CR 704.5aa's "becomes 1", CR
 -- 702.179d's "+1" -- produces it; and the effect names EACH PLAYER, so bob, who
 -- controls nothing at all, is moved by the card or by nothing.
 --
@@ -479,7 +479,7 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
 cardIncreaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
   -- CR 702.179c's FIRST reading: a player who already has speed and is instructed
-  -- to increase it by a value goes up by that value. Alice is at 1 from CR 704.5z
+  -- to increase it by a value goes up by that value. Alice is at 1 from CR 704.5aa
   -- before the spell is cast, so 3 is arithmetic no other rule performs.
   Spec.it s "CR 702.179c a card's own text raises the speed a player already has" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
@@ -488,7 +488,7 @@ cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
         (withSpell, spellId) = S.handOne boost board
         gs = S.settleSba withSpell
         after = castOnce S.alice spellId gs
-    Spec.assertEqWith s "alice starts at 1 (CR 704.5z)" (speedOf S.alice gs) (Just (Just 1))
+    Spec.assertEqWith s "alice starts at 1 (CR 704.5aa)" (speedOf S.alice gs) (Just (Just 1))
     Spec.assertEqWith s "and bob, controlling nothing, has none (CR 702.179b)" (speedOf S.bob gs) (Just Nothing)
     -- The control that isolates the card. Rule 702.179d's ability fires on an
     -- opponent losing life, and nothing here loses any -- so the set of players
@@ -498,7 +498,7 @@ cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
     Spec.assertEqWith s "alice's 1 became 3" (speedOf S.alice after) (Just (Just 3))
     Spec.assertEqWith s "and bob's none became 2, CR 702.179c's other reading" (speedOf S.bob after) (Just (Just 2))
   -- CR 702.179c's SECOND reading on its own, with rule 702.179's own machinery
-  -- entirely absent: no permanent with start your engines!, so CR 704.5z never
+  -- entirely absent: no permanent with start your engines!, so CR 704.5aa never
   -- acts, and nobody has speed for CR 702.179d's ability to exist on. The speed
   -- both players end at is the card's value and nothing else.
   Spec.it s "CR 702.179c a player with no speed instructed to increase becomes that value" $ do

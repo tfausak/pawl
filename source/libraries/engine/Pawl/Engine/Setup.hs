@@ -76,7 +76,7 @@ emptyGame order =
               Player.ringTemptations = 0,
               -- CR 702.179b: "players do not have speed until a rule or effect
               -- sets their speed to a specific value", and no rule has. CR
-              -- 704.5z gives one to a player who controls a permanent with start
+              -- 704.5aa gives one to a player who controls a permanent with start
               -- your engines!, which is a state-based action and so cannot have
               -- happened before the game began.
               Player.speed = Nothing,

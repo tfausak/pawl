@@ -795,16 +795,16 @@ data Prompt r where
   -- the player doing the looking. Asked only when there are two or more: CR
   -- 102.2's two-player game leaves exactly one opponent and nothing to ask.
   ChooseOpponent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
-  -- | CR 310.8a: which player protects a battle. The PlayerId is the chooser --
-  -- CR 310.8a assigns it to the battle's controller, so this one is the rule's
+  -- | CR 310.9a: which player protects a battle. The PlayerId is the chooser --
+  -- CR 310.9a assigns it to the battle's controller, so this one is the rule's
   -- and not pawl's reading, unlike ChooseOpponent above. The ObjectId is the
   -- battle, and the NonEmpty is Pawl.Engine.Battle.protectorCandidates: for a
-  -- Siege, CR 310.11a's opponents of its controller.
+  -- Siege, CR 310.12a's opponents of its controller.
   --
   -- Asked from TWO places, which is why it carries the battle rather than
-  -- assuming an entry. CR 310.8a asks as the battle enters, through the CR 614.12a
-  -- as-enters route (EntryRewrite.ChooseProtector); CR 310.10 -- listed as CR
-  -- 704.5w and CR 704.5x -- asks again as a state-based action when the
+  -- assuming an entry. CR 310.9a asks as the battle enters, through the CR 614.12a
+  -- as-enters route (EntryRewrite.ChooseProtector); CR 310.11 -- listed as CR
+  -- 704.5x and CR 704.5y -- asks again as a state-based action when the
   -- designation has become illegal, on a battle that has been on the battlefield
   -- for turns.
   --
@@ -812,7 +812,7 @@ data Prompt r where
   -- argument: a responder that knows which prompt it is answering knows which
   -- question it was asked, and "who protects this battle" is not "which opponent
   -- does this card's text name". Reusing it would also be wrong on candidates --
-  -- a battle with no battle types takes its own controller (CR 310.8a), whom
+  -- a battle with no battle types takes its own controller (CR 310.9a), whom
   -- ChooseOpponent by construction never offers.
   --
   -- Asked only when there are two or more candidates, the elision ChooseDefender
@@ -1177,7 +1177,7 @@ data Prompt r where
   -- | CR 608.2g: a cast that a RESOLVING effect specifically allows -- "if an
   -- effect specifically instructs or allows a player to cast a spell during
   -- resolution, they do so by following the steps in rules 601.2a-i". CR
-  -- 310.11b's "then you may cast it transformed without paying its mana cost" is
+  -- 310.12b's "then you may cast it transformed without paying its mana cost" is
   -- the producer: Exercises casts it, Declines leaves the card where it is.
   --
   -- The ObjectId is the CARD being offered -- the exiled incarnation CR 400.7
@@ -1195,7 +1195,7 @@ data Prompt r where
   -- yes-or-no and is asked once.
   --
   -- Distinct from ChooseOptional, which is CR 603.5's printed "may" over a clause
-  -- of a card's own text. CR 310.11b's "may" is not printed on any card at all --
+  -- of a card's own text. CR 310.12b's "may" is not printed on any card at all --
   -- it is the rule's own offer, made mid-resolution by an ability the engine
   -- mints -- so it has no Clause to ride and no ModeIndex/ClauseIndex pair to
   -- name it.

@@ -57,7 +57,7 @@ import qualified Pawl.Types.Zone as Zone
 -- 704.6b / 810) is out of scope (design.md §6).
 --
 -- Rule 704.6c's disjunct is delegated to Pawl.Engine.Commander, the way CR
--- 704.5z's is to Pawl.Engine.Speed: this module owns WHEN a state-based action
+-- 704.5aa's is to Pawl.Engine.Speed: this module owns WHEN a state-based action
 -- is checked, not what each one means.
 losesNow :: GameState -> PlayerId -> Bool
 losesNow gs pid = case Map.lookup pid (GameState.players gs) of
@@ -212,7 +212,7 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- Subtype.Fortification is the one clause of the rule with no constructor to case
 -- on, and is therefore unreachable rather than elided. The BATTLE clause is
--- written out, though nothing reaches it: the pool has a battle, but CR 310.9
+-- written out, though nothing reaches it: the pool has a battle, but CR 310.10
 -- forbids attaching one and no effect in the pool tries. That is
 -- becomesUnattached's posture toward CR
 -- 704.5n's "or to a player" -- express the clause, and let the pool decide when it
@@ -554,20 +554,20 @@ performStateBasedActions = Event.simultaneously $ do
       -- CR 704.5k, from the SAME pre-pass state, for the same CR 704.3 reason.
       -- Unlike the legend rule this one asks nobody.
       worldLosers = worldVictims pcs gs
-      -- CR 704.5z, from the SAME pre-pass state again. Lives in
+      -- CR 704.5aa, from the SAME pre-pass state again. Lives in
       -- Pawl.Engine.Speed with the rest of rule 702.179 rather than here, the way
       -- Pawl.Engine.Monarch keeps rule 725's settle-loop work: this module owns
       -- WHEN a state-based action is checked, not what each one means.
       revving = Speed.startingEngines pcs gs
       -- CR 704.5t / 309.6, from the SAME pre-pass state. Lives in
-      -- Pawl.Engine.Dungeon with the rest of rule 309, the way CR 704.5z lives in
+      -- Pawl.Engine.Dungeon with the rest of rule 309, the way CR 704.5aa lives in
       -- Pawl.Engine.Speed. Like CR 704.5s it reads the unscanned event log, and for
       -- the same reason: the rule exempts a dungeon whose room ability has
       -- triggered but not yet left the stack, and a trigger this settle has not
       -- scanned is on no stack yet.
       finishedDungeons = Dungeon.finished gs
       -- CR 704.5s / 714.4, from the SAME pre-pass state as everything above.
-      -- Lives in Pawl.Engine.Saga with the rest of rule 714, the way CR 704.5z
+      -- Lives in Pawl.Engine.Saga with the rest of rule 714, the way CR 704.5aa
       -- lives in Pawl.Engine.Speed.
       --
       -- The unscanned event log is an input because CR 704.5s exempts a Saga whose
@@ -600,9 +600,9 @@ performStateBasedActions = Event.simultaneously $ do
       -- exempts a battle whose ability "has triggered but not yet left the stack",
       -- and this pass runs before placePendingTriggers. See Battle.awaitingAbility.
       routed = Battle.defeated pcs (Event.unscannedEvents gs) gs
-      -- CR 704.5w / 704.5x: the battles whose protector designation has become
+      -- CR 704.5x / 704.5y: the battles whose protector designation has become
       -- illegal, paired with the projection and controller the re-choice needs.
-      -- What "illegal" means is CR 310.10, and it lives in Pawl.Engine.Battle with
+      -- What "illegal" means is CR 310.11, and it lives in Pawl.Engine.Battle with
       -- the rest of rule 310, the way CR 704.5s lives in Pawl.Engine.Saga.
       --
       -- Computed from the SAME pre-pass pcs/gs as every classification above, so
@@ -616,14 +616,14 @@ performStateBasedActions = Event.simultaneously $ do
         pure (oid, pc, controller)
       undefended = Maybe.mapMaybe undefendedOne onBattlefield
   -- CR 704.5j: the legend rule is one of the two state-based actions that ASK --
-  -- CR 310.10's protector re-choice below is the other -- and both ask BEFORE
+  -- CR 310.11's protector re-choice below is the other -- and both ask BEFORE
   -- anything below moves, so every choice is made against the state this pass
   -- began in (CR 704.3's simultaneity).
   legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
-  -- CR 704.5w / 704.5x: the other state-based action that ASKS, in the same window
+  -- CR 704.5x / 704.5y: the other state-based action that ASKS, in the same window
   -- and for the same reason as the legend rule above. A battle for which no player
   -- can be chosen joins the put-into-graveyard batch below, which is what the
-  -- second sentence of each of those rules, and of CR 310.10, says.
+  -- second sentence of each of those rules, and of CR 310.11, says.
   --
   -- A battle this pass is ALSO about to move is still asked, which CR 704.3 is
   -- what settles: the actions are simultaneous, so neither is conditioned on the
@@ -634,8 +634,8 @@ performStateBasedActions = Event.simultaneously $ do
   redesignated <- Monad.mapM (\(oid, pc, controller) -> fmap ((,) oid) (Battle.designateProtector pc controller oid)) undefended
   -- The chosen protectors are stamped BEFORE the batch below moves anything, so a
   -- battle that found one is not also read as one that did not. Not a zone change
-  -- and not an event: CR 310.8a's designation is a mark on the object, and neither
-  -- rule 704.5w nor 704.5x makes it trigger anything.
+  -- and not an event: CR 310.9a's designation is a mark on the object, and neither
+  -- rule 704.5x nor 704.5y makes it trigger anything.
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m (oid, picked) -> Map.adjust (\o -> o {Object.protector = picked}) oid m) (GameState.objects g) redesignated})
   -- CR 903.9a: the THIRD state-based action that asks, in the same window and for
   -- the same reason as the two above -- a commander that reached a graveyard or
@@ -651,7 +651,7 @@ performStateBasedActions = Event.simultaneously $ do
       pure $ case decision of
         CommandZoneDecision.Returns -> Just oid
         CommandZoneDecision.Leaves -> Nothing
-  -- CR 310.10's second sentence: "if no player can be chosen this way, the battle
+  -- CR 310.11's second sentence: "if no player can be chosen this way, the battle
   -- is put into its owner's graveyard". NOT EXERCISED by any test, and not for want
   -- of trying -- a Siege's candidates are its controller's opponents still in the
   -- game, so reaching this needs a game whose battle's controller has no opponent
@@ -662,7 +662,7 @@ performStateBasedActions = Event.simultaneously $ do
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
   -- rule's losers), CR 704.5k (the world rule's), CR 704.5m (an Aura attached to
-  -- nothing), CR 704.5v (a battle at defense 0) and CR 704.5w/704.5x (a battle no
+  -- nothing), CR 704.5v (a battle at defense 0) and CR 704.5x/704.5y (a battle no
   -- player can protect). None of the seven is a destruction, so none consults
   -- indestructible or a regeneration shield.
   --
@@ -712,7 +712,7 @@ performStateBasedActions = Event.simultaneously $ do
   -- live, which is what keeps a permanent the buries already moved from being
   -- offered a destruction that never happens (CR 614.7). TWO members are left to
   -- that filter rather than excluded by name here: CR 704.5m's Aura, and CR
-  -- 310.10's undefendable battle -- an animated Siege with lethal damage whose
+  -- 310.11's undefendable battle -- an animated Siege with lethal damage whose
   -- protector has just left is in both `toDestroy` and `undefendable`.
   Event.destroyInBatch gs DestructionCause.ByRule Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
   -- CR 704.5s / 714.4: the Saga's controller SACRIFICES it. Neither a
@@ -765,7 +765,7 @@ performStateBasedActions = Event.simultaneously $ do
       outcome = Departure.outcomeAfterLeaving leaving departed
       drained = vanished {GameState.damageScannedThrough = watermark}
       balanced = List.foldl' balance drained annihilations
-      -- CR 704.5z: "that player's speed becomes 1", applied to the players
+      -- CR 704.5aa: "that player's speed becomes 1", applied to the players
       -- classified from the pre-pass board above. Applied LATE like every other
       -- action in this pass, so a permanent this same pass destroyed still starts
       -- its controller's engines -- CR 704.3 makes the whole check one event.

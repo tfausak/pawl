@@ -507,7 +507,7 @@ data Effect card
     -- already has speed. Only a card gets to any of that.
     --
     -- NOT a "set speed to" opcode. CR 702.179b does name a set -- "until a rule
-    -- or effect sets their speed to a specific value" -- and CR 704.5z is one, but
+    -- or effect sets their speed to a specific value" -- and CR 704.5aa is one, but
     -- that clause is the rules core's own (Pawl.Engine.Speed's startEngines)
     -- rather than something a card asks for; no printing sets a speed. The
     -- decrease below is the arm a card did ask for.
@@ -1314,12 +1314,12 @@ data Effect card
   | -- | CR 608.2g: offer this effect's controller the cast of the object the slot
     -- names -- "if an effect specifically instructs or allows a player to cast a
     -- spell during resolution, they do so by following the steps in rules
-    -- 601.2a-i, except no player receives priority after it's cast". CR 310.11b's
+    -- 601.2a-i, except no player receives priority after it's cast". CR 310.12b's
     -- "then you may cast it transformed without paying its mana cost" is the
     -- producer, and the CastOffer is that sentence's two riders.
     --
     -- The slot is a READ, not a definition, and the one it reads is normally
-    -- bound by a MoveToZone earlier in the same instruction list -- rule 310.11b's
+    -- bound by a MoveToZone earlier in the same instruction list -- rule 310.12b's
     -- "exile it, THEN you may cast it" is one sentence about two incarnations of
     -- one card (CR 400.7). Resolve reads it off the resolving object's LIVE
     -- bindings for that reason, the way Sacrifice reads a group slot.

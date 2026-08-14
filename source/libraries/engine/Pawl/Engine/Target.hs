@@ -500,7 +500,7 @@ planeswalkerRecipientsGiven pcs gs =
 -- Game.zoneMembers cuts by OWNER -- the same walk the two arms above make, and the
 -- reason it is right here is that CR 115.4 draws no line at all: neither the
 -- battle's controller nor its protector narrows the candidates. Being a legal
--- target is not being attackable (CR 310.8b): a "deals 3 damage to any target"
+-- target is not being attackable (CR 310.9b): a "deals 3 damage to any target"
 -- spell may name a battle whose protector the caster is.
 battleRecipients :: GameState -> Set Recipient
 battleRecipients gs = battleRecipientsGiven (Projection.projectAll gs) gs
