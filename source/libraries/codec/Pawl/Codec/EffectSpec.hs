@@ -1107,6 +1107,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Proliferate
       """ {"type":"Proliferate"} """
+  -- CR 701.39a: the count alone, because rule 701.39a fixes the chooser, the kind
+  -- of counter and the candidate pool, leaving an author only N to write.
+  Spec.it s "Bolster" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Bolster (Quantity.Literal 3))
+      """ {"type":"Bolster","value":{"type":"Literal","value":3}} """
   -- CR 701.47a: the subtype and the count, which are rule 701.47a's two printed
   -- variables. The Army type and the token's other characteristics are the
   -- rulebook's and appear nowhere in card data.

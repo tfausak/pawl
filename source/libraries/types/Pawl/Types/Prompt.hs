@@ -265,6 +265,27 @@ data Prompt r where
   -- omission: the player is tempted anyway, so Pawl.Engine.Ring.tempt still counts
   -- the temptation and still gives them the emblem.
   ChooseRingBearer :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 701.39a: which creature a bolstering player puts the +1\/+1 counters on.
+  -- The ObjectId is the spell or ability being resolved; the NonEmpty is the
+  -- creatures they control that are tied for the LEAST toughness, which the engine
+  -- has already narrowed -- so every candidate offered is a legal answer and the
+  -- rule's "with the least toughness" is settled before the question is asked.
+  --
+  -- CHOOSE, not target, ChooseRingBearer's posture: rule 701.39a says "choose a
+  -- creature you control", so nothing is declared on the stack (CR 601.2c) and
+  -- nothing is re-checked at resolution (CR 608.2b).
+  --
+  -- Raised only for TWO OR MORE candidates, ChooseRingBearer's shape and reason: a
+  -- lone creature tied for least toughness is the whole of the rule's candidate
+  -- set, the instruction is mandatory, and performing it decides nothing. Not
+  -- raised at all for zero, where CR 101.3 ignores the instruction -- a player who
+  -- controls no creature bolsters nothing.
+  --
+  -- Its own constructor rather than ChooseRingBearer reused, though both name one
+  -- creature its chooser controls: the candidate sets are different questions
+  -- (every creature against the least-toughness tie), and Pawl.Engine.Replay's
+  -- transcript would otherwise let one prompt's recorded answer satisfy the other.
+  ChooseBolster :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 701.47a: which Army creature an amassing player puts the +1\/+1 counters
   -- on. The ObjectId is the spell or ability being resolved; the NonEmpty is the
   -- Army creatures they control, which the engine has already narrowed -- and it is

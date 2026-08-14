@@ -1549,6 +1549,9 @@ rewriteEffect pairs effect = case effect of
   Effect.Search (Search.MkSearch searcher owner quantity filter_ destination) -> Effect.Search (Search.MkSearch searcher owner quantity (Filter.rewrite pairs filter_) destination)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
+  -- CR 612.1 swaps a subtype word; bolster's count holds none, and its candidate
+  -- pool is rule 701.39a's rather than a Filter the card wrote.
+  Effect.Bolster _ -> effect
   -- CR 612.1 / 612.2a: amass's subtype is a PRINTED word of CR 205.3m's family,
   -- so a text change swaps it -- and with it the token's own name, which
   -- Pawl.Engine.Amass.armyToken writes from the swapped word. The Army type beside

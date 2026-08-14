@@ -81,14 +81,21 @@ data Response
     ChoseRedistribution (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   | -- | CR 701.54a: the creature a tempted player chose as their Ring-bearer.
     ChoseRingBearer ObjectId.ObjectId
-  | -- | CR 701.47a: the Army creature an amassing player chose to put the +1\/+1
+  | -- | CR 701.39a: the creature a bolstering player chose to put the +1\/+1
     -- counters on.
     --
     -- Its own constructor rather than ChoseRingBearer reused, for
     -- ChoseCardInGraveyard's reason: every prompt gets its own response so a decode
     -- can reject one that does not match the prompt asked, and these two questions
-    -- offer different candidates -- every creature its chooser controls against the
-    -- Armies among them.
+    -- offer different candidates -- every creature its chooser controls against
+    -- only those tied for the least toughness.
+    ChoseBolster ObjectId.ObjectId
+  | -- | CR 701.47a: the Army creature an amassing player chose to put the +1\/+1
+    -- counters on.
+    --
+    -- Its own constructor for ChoseBolster's reason, and the two are not one
+    -- constructor either: bolster offers the creatures tied for the least
+    -- toughness, amass offers the Armies its chooser controls.
     ChoseAmass ObjectId.ObjectId
   | -- | CR 608.2d: the graveyard card a player chose for an
     -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a

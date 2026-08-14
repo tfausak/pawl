@@ -639,6 +639,9 @@ effectCounts effect = case effect of
   Effect.Search (Search.MkSearch _ _ quantity _ _) -> quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  -- Bolster's N is a Quantity like the Search's above, so its Counts are
+  -- reachable from here.
+  Effect.Bolster quantity -> quantityCounts quantity
   -- Amass's N is a Quantity like the Search's above, so its Counts are reachable
   -- from here.
   Effect.Amass (Amass.MkAmass quantity _) -> quantityCounts quantity
@@ -959,6 +962,7 @@ effectReplacements effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Bolster _ -> []
   Effect.Amass _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
@@ -1489,6 +1493,7 @@ effectMintedFaces effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Bolster _ -> []
   -- The Army token is Pawl.Engine.Amass.armyToken's, minted from the rulebook
   -- rather than embedded in card data, so this arm mints no face of the card's own.
   Effect.Amass _ -> []
@@ -2514,6 +2519,9 @@ effectFilters effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ f _) -> unframed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
+  -- Filter on the card names it.
+  Effect.Bolster quantity -> unframed (quantityFilters quantity)
   -- Only the count's Filters: rule 701.47a describes the candidate pool, so no
   -- Filter on the card names it.
   Effect.Amass (Amass.MkAmass quantity _) -> unframed (quantityFilters quantity)
