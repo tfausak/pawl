@@ -1940,9 +1940,10 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
 -- The second key is the ObjectId, and it is the ENGINE's choice where CR
 -- 608.2f's secondary sentence gives it to the resolving controller (#379) --
 -- observable through this opcode for the first time, since a body drawing on a
--- depleting resource answers differently per position. A recipient with no
--- controller sorts last, which is unreachable: every id here came out of a slot
--- or a sweep.
+-- depleting resource answers differently per position. A recipient the board no
+-- longer holds has no controller and sorts last -- CR 608.2b already dropped an
+-- illegal TARGET, but a group binding names ids that may since have moved (CR
+-- 400.7), so the fallback is reachable rather than defensive.
 forEachOrder :: GameState -> [Recipient] -> [Recipient]
 forEachOrder gs recipients =
   let order = Game.apnapOrder gs
