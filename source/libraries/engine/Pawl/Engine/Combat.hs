@@ -1,5 +1,6 @@
 module Pawl.Engine.Combat where
 
+import qualified Control.Applicative as Applicative
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
@@ -1144,10 +1145,11 @@ blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameStat
 -- becomes blocked, and remains blocked even if all of them are removed from
 -- combat.
 --
--- So blocked-ness is a STATUS the declaration confers once, not a running count
--- of who is still blocking. The map's KEY is that status -- declareBlockers
--- creates it and only Game.removeFromCombat's Map.delete arm (the attacker itself
--- leaving combat, CR 506.4) and Combat.clearCombat ever drop it. The SET behind
+-- So blocked-ness is a STATUS conferred once, not a running count of who is
+-- still blocking. The map's KEY is that status -- declareBlockers creates it, so
+-- does becomeBlocked below for the effect that says a creature becomes blocked
+-- (CR 509.1h again), and only Game.removeFromCombat's Map.delete arm (the
+-- attacker itself leaving combat, CR 506.4) and Combat.clearCombat ever drop it. The SET behind
 -- the key is the separate CR 510.1c question of who is currently blocking, and it
 -- can empty out while the key stays: a regenerated blocker (CR 701.19a) is
 -- deleted from it, and a blocker that merely died is filtered out at assignment
@@ -1155,6 +1157,48 @@ blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameStat
 -- regenerated Drudge Skeletons become unblocked.
 isBlocked :: ObjectId -> GameState -> Bool
 isBlocked oid gs = Map.member oid (Combat.blockers (GameState.combat gs))
+
+-- CR 509.1h's escape clause performed: an effect SAYS an attacking creature
+-- becomes blocked (Effect.BecomesBlocked, Curtain of Light). The second writer of
+-- the map's keys, and the only one that is not the CR 509.1 declaration.
+--
+-- An EMPTY set behind the key, and that is the rule rather than a placeholder:
+-- the key is the status and the set is who is currently blocking (isBlocked
+-- above), so a creature blocked this way is blocked by nothing. CR 510.1c then
+-- gives it no combat damage to assign and nothing to take -- the same state an
+-- attacker reaches when every creature blocking it leaves combat, which is why
+-- Pawl.Engine.Damage needs no arm of its own for this.
+--
+-- Two guards, both CR 509.1h's own words. Only an ATTACKING creature has the
+-- status to change, so a creature that is not in the attack record is left alone
+-- (CR 506.4 may already have removed it between cast and resolution). And an
+-- attacker that is ALREADY blocked is untouched, which is CR 509.3c's "only if
+-- the attacking creature was an unblocked creature at that time" -- without it
+-- the event below would fire a "becomes blocked" trigger a second time.
+--
+-- The event is declareBlockers' AttackerBlocked, and deliberately the same one:
+-- CR 509.3c says a "becomes blocked" ability triggers on the effect exactly as it
+-- does on the declaration. What is NOT recorded is BlockerDeclared -- CR 509.3d's
+-- "it won't trigger if the creature becomes blocked by an effect rather than a
+-- creature" -- and no blocker exists to name in one.
+--
+-- The defending player rides it as it does there, and for CR 508.5's reason.
+-- Combat.defender is the fallback rather than declareBlockers' `pid`: it is the
+-- same player, this being a single-defender engine (#175), and it is the only one
+-- reachable from here.
+becomeBlocked :: ObjectId -> GameState -> GameState
+becomeBlocked oid gs =
+  let c = GameState.combat gs
+   in if not (Map.member oid (Combat.attackers c)) || isBlocked oid gs
+        then gs
+        else
+          let blocked = gs {GameState.combat = c {Combat.blockers = Map.insert oid Set.empty (Combat.blockers c)}}
+           in -- The status is conferred either way: with no defending player to
+              -- name there is nobody for a CR 509.3c trigger to bind, and CR
+              -- 509.1h still says the creature is blocked.
+              case Defender.playerOfAttacker oid gs Applicative.<|> Combat.defender c of
+                Nothing -> blocked
+                Just defending -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked oid defending)) blocked
 
 -- Every creature currently IN combat: the attackers, plus everything still
 -- blocking one of them. Not the keys of Combat.joinedUnder, which can outlive the
@@ -1589,9 +1633,11 @@ declareAttackers pid = do
 -- whom the guard below has already checked is in the game.
 --
 -- CR 508.4d's unblocked-on-entry rule holds by construction rather than by a
--- check: Combat.blockers is added to only by declareBlockers, so a creature that
--- arrives here after blockers were declared sits in no blocker's set and is
--- unblocked for the rest of the combat.
+-- check: a creature that arrives here is given no key in Combat.blockers, so it
+-- is unblocked (isBlocked). It REMAINS so for the rest of the combat by the same
+-- construction -- declareBlockers has already run, and the only other writer is
+-- becomeBlocked, which is that rule's own escape clause ("an effect says it
+-- becomes blocked") rather than a hole in it.
 putOntoBattlefieldAttacking :: ObjectId -> Game ()
 putOntoBattlefieldAttacking oid = do
   gs <- State.get

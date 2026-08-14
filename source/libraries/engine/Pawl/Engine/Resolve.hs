@@ -318,6 +318,7 @@ slotsOf effect = case effect of
   Effect.Sacrifice slot -> oneSlot slot
   Effect.TurnFaceDown slot -> oneSlot slot
   Effect.RemoveFromCombat slot -> oneSlot slot
+  Effect.BecomesBlocked slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> objectRefSlots ref
   Effect.Draw (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   -- The tally's slot is a DEFINITION (how many of them counted), not a read, so
@@ -560,6 +561,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Sacrifice _ -> True
   Effect.TurnFaceDown _ -> True
   Effect.RemoveFromCombat _ -> True
+  Effect.BecomesBlocked _ -> True
   Effect.MoveToZone {} -> True
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
@@ -699,6 +701,7 @@ readsX = any effectReadsX
       Effect.Sacrifice _ -> False
       Effect.TurnFaceDown _ -> False
       Effect.RemoveFromCombat _ -> False
+      Effect.BecomesBlocked _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
@@ -785,6 +788,7 @@ searchesLibrary effect = case effect of
   Effect.Sacrifice _ -> False
   Effect.TurnFaceDown _ -> False
   Effect.RemoveFromCombat _ -> False
+  Effect.BecomesBlocked _ -> False
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
   Effect.Mill {} -> False
@@ -956,6 +960,7 @@ boundSlots effect = case effect of
   Effect.Sacrifice _ -> Set.empty
   Effect.TurnFaceDown _ -> Set.empty
   Effect.RemoveFromCombat _ -> Set.empty
+  Effect.BecomesBlocked _ -> Set.empty
   Effect.Draw {} -> Set.empty
   Effect.Discard {} -> Set.empty
   Effect.LoseLife {} -> Set.empty
@@ -2878,6 +2883,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- that has already left combat needs no guard either -- removing a
         -- creature that is not in the record is what Game.removeFromCombat
         -- already does to it, which is nothing.
+        _ -> gs
+  Effect.BecomesBlocked slot ->
+    State.modify' $ \gs ->
+      case legalOne slot legal of
+        Just recipient -> case Recipient.objectOf recipient of
+          Nothing -> gs -- a player recipient is not in combat
+          -- CR 509.1h: through Combat.becomeBlocked, which owns every write of
+          -- the blocked status and carries the rule's two conditions and CR
+          -- 509.3c's event with it. Argued in full there.
+          --
+          -- Unprompted and undirected, RemoveFromCombat's posture: the rule says
+          -- what becoming blocked does, and an effect that says it leaves nothing
+          -- to ask -- least of all which creature blocks, since none does.
+          Just target -> Combat.becomeBlocked target gs
+        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone entry mSlot _ placement) ->
     -- ONE object through CR 400.7's funnel, shared by the two arms below so that

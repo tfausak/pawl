@@ -192,6 +192,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsBlocking
       """ {"type":"IsBlocking"} """
+  Spec.it s "IsBlocked" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsBlocked
+      """ {"type":"IsBlocked"} """
   Spec.it s "AttackedThisTurn" $
     Common.assertCodec
       s

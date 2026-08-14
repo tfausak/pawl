@@ -5427,6 +5427,132 @@ landSubtypeStripSpec s registry = Spec.describe s "LandSubtypeStrip" $ do
     Spec.assertEqWith s "the Piker attacked anyway" (S.attackerDeclarationsOf (declared stripped)) mine
     Spec.assertBool s (allUntapped forests (declared stripped)) "and not one Forest went"
 
+-- alice attacks with one creature per printing in `mine`; bob defends with a
+-- Goblin Piker, holds Curtain of Light and the two Plains that pay its {1}{W},
+-- and has one card left in his library so the spell's draw is not a CR 104.3c
+-- loss. Returns the attackers, the blocker and the spell.
+curtainBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  [Printing.Printing] ->
+  (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId], ObjectId.ObjectId)
+curtainBoard plains piker curtain mine =
+  let (gs0, ours, yours) = S.combatBoardOf mine [piker]
+      paid = snd (S.addCreature plains S.bob (snd (S.addCreature plains S.bob gs0)))
+      (curtainId, withCard) = S.addHandCard curtain S.bob paid
+      stocked = snd (S.addLibraryCard plains S.bob withCard)
+   in (stocked, ours, yours, curtainId)
+
+-- Decline every block, cast whatever is castable, and aim every target at
+-- `victim`. The cast is bob's: Curtain of Light is the only card in his hand.
+--
+-- Blocks are DECLINED so that the only route into CR 509.1h's status is the
+-- spell -- an aggressive block would confer it by declaration and hide the case.
+castCurtain :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+castCurtain victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
+  Prompt.ChooseAction {} -> S.castAnswer p
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- castCurtain's paired control: the same declined blocks, and no cast. The ONE
+-- difference between the two answerers is whether the spell is cast.
+declineBlocks :: Prompt.Prompt r -> r
+declineBlocks p = case p of
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- CR 509.1h's escape clause: "an effect says that it becomes blocked". Curtain
+-- of Light is the pool's producer -- {1}{W} INSTANT, "Cast this spell only
+-- during combat after blockers are declared. Target unblocked attacking creature
+-- becomes blocked. Draw a card."
+--
+-- pawl's card states its window as the declare blockers step, which is a SUBSET
+-- of the printed one: CR 509.1 declares blockers as a turn-based action before
+-- anyone gets priority, so every priority window in that step is already "after
+-- blockers are declared", and what is lost is the combat damage and end of
+-- combat steps. Stricter than printed, never weaker (#1557).
+--
+-- Sacred Prey ("Whenever this creature becomes blocked, you gain 1 life") is the
+-- observer for CR 509.3c, which says a "becomes blocked" ability triggers on the
+-- effect exactly as it does on the declaration. Its 1 life and the Prey's 1
+-- power are the two numbers every leg is read off, and they move different
+-- players' totals.
+--
+-- THREE readings of the board are told apart, because two of them agree about
+-- bob's life total: became blocked by the effect (blocked, nothing blocking it,
+-- both creatures alive), blocked by the declaration (blocked, the Piker in the
+-- set, both creatures dead), and never blocked (unblocked, bob down 1).
+becomesBlockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
+  Spec.it s "CR 509.1h whole card: Curtain of Light blocks an unblocked attacker, with nothing blocking it" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    prey <- S.printingOf s registry "Sacred Prey"
+    curtain <- S.printingOf s registry "Curtain of Light"
+    case curtainBoard plains piker curtain [prey] of
+      (gs, [attacker], [blocker], _) -> do
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+            cast = runToEndOfCombat (castCurtain attacker) atBlockers
+            -- The control: the same board, the same declined blocks, nothing
+            -- cast. The Prey is unblocked and bob takes its 1.
+            uncast = runToEndOfCombat declineBlocks atBlockers
+            -- The other reading: blocked by the DECLARATION rather than by the
+            -- effect. Same board again, and the only change is that bob blocks.
+            declared = runToEndOfCombat S.aggressiveAnswer atBlockers
+        Spec.assertEqWith s "the leg hands over at the declare blockers step, so the spell is cast after the declaration" (GameState.phase atBlockers) (Phase.Combat CombatStep.DeclareBlockers)
+        -- The discriminating assertions: blocked, and blocked by NOTHING.
+        Spec.assertBool s (Combat.isBlocked attacker cast) "CR 509.1h: the effect made it a blocked creature"
+        Spec.assertEqWith s "and no creature is blocking it" (Combat.blockersOf attacker cast) Set.empty
+        Spec.assertEqWith s "CR 510.1c: so it assigns no combat damage and bob takes nothing" (S.lifeOf S.bob cast) (Just 20)
+        Spec.assertEqWith s "CR 509.3c: the Prey's becomes-blocked trigger fired" (S.lifeOf S.alice cast) (Just 21)
+        Spec.assertBool s (S.onBattlefield attacker cast && S.onBattlefield blocker cast) "nothing was dealt damage either way"
+        Spec.assertEqWith s "and bob drew the card the spell says to draw" (length (Game.zoneMembers Zone.Library S.bob cast)) 0
+        -- Never blocked: the trigger is silent and the Prey connects.
+        Spec.assertBool s (not (Combat.isBlocked attacker uncast)) "control: with no spell the attacker is unblocked"
+        Spec.assertEqWith s "control: so bob takes the Prey's 1" (S.lifeOf S.bob uncast) (Just 19)
+        Spec.assertEqWith s "control: and alice gains nothing" (S.lifeOf S.alice uncast) (Just 20)
+        Spec.assertEqWith s "control: bob's library is untouched" (length (Game.zoneMembers Zone.Library S.bob uncast)) 1
+        -- Blocked by the declaration: the same status from the other writer,
+        -- and the board tells them apart by the set and by who is left alive.
+        Spec.assertBool s (Combat.isBlocked attacker declared) "declaration leg: blocked as well"
+        Spec.assertEqWith s "declaration leg: but the Piker is what is blocking it" (Combat.blockersOf attacker declared) (Set.singleton blocker)
+        Spec.assertEqWith s "declaration leg: the same trigger fires" (S.lifeOf S.alice declared) (Just 21)
+        Spec.assertBool s (not (S.onBattlefield attacker declared) && not (S.onBattlefield blocker declared)) "declaration leg: and the two creatures trade"
+      _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
+  Spec.it s "CR 509.1h a creature already blocked is not a legal target" $ do
+    -- CR 509.1h again, read through the card's own committed target slot:
+    -- Pool.Creatures under `And [IsAttacking, Not IsBlocked]`. The pair differs
+    -- in exactly one thing -- both attackers are alice's, both are attacking,
+    -- and bob's one Piker blocks the first of them.
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    prey <- S.printingOf s registry "Sacred Prey"
+    curtain <- S.printingOf s registry "Curtain of Light"
+    case (curtainBoard plains piker curtain [prey, prey], S.spellTargetSlot curtain) of
+      ((gs, [first, second], _, _), Just slot) -> do
+        let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer gs
+            legal = Target.legalRecipients Nothing S.noSource slot atDamage
+        Spec.assertBool s (Combat.isBlocked first atDamage) "the declaration blocked the first attacker"
+        Spec.assertBool s (not (Combat.isBlocked second atDamage)) "and left the second unblocked"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature first) legal)) "Not IsBlocked refuses the blocked attacker"
+        Spec.assertBool s (Set.member (Recipient.ToCreature second) legal) "and admits the unblocked one"
+      _ -> Spec.assertFailure s "fixture should have two attackers and Curtain of Light a 'target' slot"
+  Spec.it s "CR 500.1 the printed window: castable in the declare blockers step, refused in a main phase" $ do
+    -- ONE board, read twice, differing only in GameState.phase -- the same mana,
+    -- the same hand and the same legal target both times, so the refusal is the
+    -- casting restriction and nothing else.
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    prey <- S.printingOf s registry "Sacred Prey"
+    curtain <- S.printingOf s registry "Curtain of Light"
+    let (gs, _, _, curtainId) = curtainBoard plains piker curtain [prey]
+        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        inMain = atBlockers {GameState.phase = Phase.PostcombatMain}
+    Spec.assertBool s (S.castable S.bob curtainId atBlockers) "castable during the declare blockers step"
+    Spec.assertBool s (not (S.castable S.bob curtainId inMain)) "and refused in a main phase"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatLegalitySpec s registry
@@ -5455,6 +5581,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   boundedDeclarationSpec s registry
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry
+  becomesBlockedSpec s registry
   typeChangeRemovalSpec s registry
   effectRemovalSpec s registry
   putOntoBattlefieldAttackingSpec s registry
