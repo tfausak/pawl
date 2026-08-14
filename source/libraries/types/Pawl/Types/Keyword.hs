@@ -900,6 +900,28 @@ data Keyword
     -- is a copiable value, which is what rules out reusing
     -- Pawl.Types.EntryOption's keyword set (CR 707.2).
     Riot
+  | -- | 702.143a: foretell [cost]. "Any time a player has priority during their
+    -- turn, that player may pay {2} and exile a card with foretell from their
+    -- hand face down. ... They may cast that card after the current turn has
+    -- ended by paying any foretell cost it has." CR 702.143b makes taking it CR
+    -- 116.2h's special action, and the later cast is what a foretold card is FOR.
+    --
+    -- The cost rides the constructor, as Plot's and Flashback's do, because rule
+    -- 702.143a states it as part of the keyword. It is the cost of the CAST and
+    -- never of the special action, which CR 116.2h fixes at {2} for every printing
+    -- -- the opposite split from Plot, whose one cost is the action's, and
+    -- Flashback's shape exactly.
+    --
+    -- A STATIC ability functioning in the hand (CR 702.143a's "while the card
+    -- with foretell is in a player's hand"), so nothing here mints an ability on
+    -- the battlefield; Pawl.Engine.Foretell reads the cost off the card the way
+    -- Pawl.Engine.Plot reads a plot cost.
+    --
+    -- Not implemented: CR 702.143d's other producer -- an effect that makes an
+    -- exiled card foretold without this keyword, and may give it a foretell cost
+    -- -- nor CR 702.143c's "a card or spell that was foretold" as something an
+    -- effect can refer to (#1486).
+    Foretell (Cost.Cost Keyword)
   | -- | 702.145b: daybound, the front-face half of the pair rule 702.145 states.
     -- Three static abilities in one keyword, exactly as the rule bundles them:
     -- "if it is night and this permanent is represented by a double-faced card,

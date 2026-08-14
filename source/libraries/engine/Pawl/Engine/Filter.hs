@@ -854,6 +854,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Toxic _ -> keyword
   -- CR 702.170a states a cost, so rewriteCost reaches it as flashback's does.
   Keyword.Type.Plot cost -> Keyword.Type.Plot (rewriteCost pairs cost)
+  -- CR 702.143a states a cost too, so it is reached the same way.
+  Keyword.Type.Foretell cost -> Keyword.Type.Foretell (rewriteCost pairs cost)
   -- CR 702.94a states a cost too, so it is reached the same way.
   Keyword.Type.Miracle cost -> Keyword.Type.Miracle (rewriteCost pairs cost)
   Keyword.Type.StartYourEngines -> keyword

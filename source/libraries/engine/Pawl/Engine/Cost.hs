@@ -289,6 +289,23 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             -- plotted.
             Zone.Exile
               | Maybe.isJust (Object.plotted obj) -> [withoutPayingManaCost face]
+            -- CR 702.143a: a FORETOLD card is cast "by paying any foretell cost
+            -- it has rather than paying that spell's mana cost", which is CR
+            -- 118.9's alternative cost -- so the keyword's payload is wrapped by
+            -- withAdditional exactly as flashback's is, and the card's own
+            -- additional costs ride along.
+            --
+            -- INSTEAD of the printed cost, the plotted arm's argument above:
+            -- rule 702.143a is the only thing permitting this cast.
+            --
+            -- A card foretold with NO foretell cost yields no candidate at all,
+            -- so CR 601.3's default prohibition arrives through the affordability
+            -- gate. That is unreachable from this module's own writer -- CR
+            -- 116.2h exiles only a card WITH foretell -- and is CR 702.143d's
+            -- shape, which pawl cannot state (#1486).
+            Zone.Exile
+              | Maybe.isJust (Object.foretold obj) ->
+                  fmap withAdditional (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
             _ -> printed : alternatives
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []

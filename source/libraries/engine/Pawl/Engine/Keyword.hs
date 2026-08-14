@@ -271,6 +271,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Decayed -> List.genericReplicate count decayed
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  Keyword.Foretell _ -> []
   -- CR 702.94a's linked triggered half, one per instance for CR 603.2's general
   -- reason -- rule 702.94 states no "each instance" sentence, and no printing
   -- carries miracle twice. Minted HERE rather than in a hand-only roster because
@@ -372,6 +373,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  Keyword.Foretell _ -> []
   -- CR 702.94a's hand ability is TRIGGERED rather than activated, so it is
   -- minted by `abilitiesFor` above and reached from a hand by CR 113.6k.
   Keyword.Miracle _ -> []
@@ -576,6 +578,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  Keyword.Foretell _ -> []
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
@@ -848,6 +851,13 @@ permissionsFor cardTypes keyword = case keyword of
   -- (Object.plotted) that Pawl.Engine.Cast.permitsCastFromExile reads, the
   -- shape CR 715.3d's Adventure permission already has.
   Keyword.Plot _ -> []
+  -- CR 702.143a, the arm above's argument unchanged: the static ability
+  -- functions in a HAND and what it grants there is CR 116.2h's special action.
+  -- The permission to cast the card from EXILE belongs to the FORETOLD card --
+  -- CR 702.143d gives one to a card that never had the keyword -- so it is
+  -- object state (Object.foretold) that Pawl.Engine.Cast.permitsCastFromExile
+  -- reads.
+  Keyword.Foretell _ -> []
   -- CR 702.94a's cast is one CR 608.2g offers during the linked ability's
   -- resolution, so it is not a standing CR 601.3 permission the way flashback's
   -- graveyard cast is: nothing may be cast from a hand by miracle at a player's
@@ -1038,6 +1048,27 @@ plotCost :: Set Keyword -> Maybe (Cost Keyword)
 plotCost keywords =
   let costOf keyword = case keyword of
         Keyword.Plot cost -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- CR 702.143a: what a foretold card is CAST for -- "they may cast that card
+-- after the current turn has ended by PAYING ANY FORETELL COST it has" -- or
+-- Nothing when the card has no foretell. Read by Pawl.Engine.Cost, and by
+-- Pawl.Engine.Foretell only to answer whether the keyword is there at all.
+--
+-- The cost of the CAST and never of the special action, which is the mirror of
+-- plotCost above and flashbackCost's shape exactly: CR 116.2h fixes the action's
+-- cost at {2} for every printing, so Pawl.Engine.Foretell mints that itself.
+--
+-- A wildcard rather than an exhaustive case, exactly as flashbackCost.
+--
+-- Nothing beyond the FIRST foretell cost is reachable: a card printing two
+-- foretell abilities is expressible and unrepresented, as for flashback and
+-- entwine, and no printing does it.
+foretellCost :: Set Keyword -> Maybe (Cost Keyword)
+foretellCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Foretell cost -> Just cost
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
@@ -1245,6 +1276,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  Keyword.Foretell _ -> []
   -- CR 702.94a's static half is a PERMISSION to reveal, not a replacement: CR
   -- 121.9's window changes nothing about the draw, so there is no event to
   -- rewrite. Pawl.Engine.Event's draw funnel asks miracleCost directly.
@@ -1387,6 +1419,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.Plot _ -> []
+  Keyword.Foretell _ -> []
   -- CR 702.94a states no combat restriction.
   Keyword.Miracle _ -> []
   Keyword.StartYourEngines -> []
@@ -1439,6 +1472,7 @@ familyOf keyword = case keyword of
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Plot _ -> Just KeywordFamily.Plot
+  Keyword.Foretell _ -> Just KeywordFamily.Foretell
   -- CR 702.94a's parameterized keyword: "a card with miracle" drops the cost.
   Keyword.Miracle _ -> Just KeywordFamily.Miracle
   Keyword.Deathtouch -> Nothing

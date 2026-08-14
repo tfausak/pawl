@@ -9,8 +9,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 -- | What a player with priority may do. The SPECIAL actions CR 116.2 lists that
 -- are here are CR 116.2a's land play, CR 116.2b's turning a face-down permanent
 -- face up, CR 116.2d's ignoring a static ability's effect, CR 116.2e's Circling
--- Vultures discard, CR 116.2k's plot and CR 116.2m's unlock cost; the tracker for
--- the rest of rule 116.2 is #875. Grows.
+-- Vultures discard, CR 116.2h's foretell, CR 116.2k's plot and CR 116.2m's
+-- unlock cost; the tracker for the rest of rule 116.2 is #875. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The
@@ -139,4 +139,18 @@ data Action
     -- plot on one half would plot the whole card all the same. No printing has
     -- plot on a multi-faced card.
     Plot ObjectId.ObjectId
+  | -- | CR 116.2h / 702.143a: pay {2} and exile a card with foretell from your
+    -- hand face down, making it a foretold card. "Any time a player has priority
+    -- during their turn", and it does not use the stack (CR 702.143b) -- so it is
+    -- an Action rather than anything that goes through Pawl.Engine.Stack, exactly
+    -- as CR 116.2a's land play is.
+    --
+    -- Carries only the card, Plot's shape: rule 702.143a leaves nothing to
+    -- choose. What it costs is not the keyword's payload but the rule's own {2},
+    -- which Pawl.Engine.Foretell mints, and the destination is fixed at exile.
+    --
+    -- WHICH HALF is not carried, for Plot's reason: rule 702.143a exiles "a card
+    -- with foretell" rather than a half. No printing has foretell on a
+    -- multi-faced card.
+    Foretell ObjectId.ObjectId
   deriving (Eq, Ord, Show)

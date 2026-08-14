@@ -331,6 +331,7 @@ playLandAnswer p = case p of
           A.Activate _ _ -> False
           A.DiscardFromHand _ -> False
           A.Plot _ -> False
+          A.Foretell _ -> False
           A.Ignore _ -> False
           A.ActivateManaAbility _ -> False
      in case filter isPlay actions of
@@ -366,6 +367,7 @@ addCreature printing pid gs =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -585,6 +587,7 @@ addToken card pid gs =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -627,6 +630,7 @@ addLibraryCard printing pid gs =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -673,6 +677,7 @@ addGraveyardCard printing pid gs =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -724,6 +729,7 @@ addExiledCard printing pid gs =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -780,6 +786,7 @@ addHandCard printing pid gs =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -845,6 +852,7 @@ landsFor land pid n base =
                   Object.worldSince = Nothing,
                   Object.playableFromExile = Nothing,
                   Object.plotted = Nothing,
+                  Object.foretold = Nothing,
                   Object.ringBearerFor = Nothing,
                   Object.protector = Nothing,
                   Object.ventureRoom = Nothing,
@@ -886,6 +894,7 @@ handOne printing base =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -933,6 +942,7 @@ pikerInHand land piker n ph =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -1452,6 +1462,7 @@ oneMountainState mountain ph =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -1567,6 +1578,7 @@ isCastOf oid action = case action of
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.Plot _ -> False
+  A.Foretell _ -> False
   A.Ignore _ -> False
   A.ActivateManaAbility _ -> False
 
@@ -1615,6 +1627,7 @@ spellOnStack printing pid gs =
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,

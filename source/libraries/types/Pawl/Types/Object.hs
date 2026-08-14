@@ -360,6 +360,24 @@ data Object = MkObject
     -- cast and dies is not plotted in its graveyard, which is CR 702.170d read
     -- forward -- the permission is about a card in exile.
     plotted :: Maybe Natural.Natural,
+    -- | CR 702.143a: this exiled card is a FORETOLD card, stamped with the turn
+    -- on which it was foretold. Nothing for everything that is not foretold.
+    --
+    -- plotted's field one rule over, and every argument above applies unchanged:
+    -- the turn number rather than a Bool because CR 702.143a scopes the cast by
+    -- it ("after the current turn has ended"), per-incarnation because CR 400.7
+    -- mints a new object, and beside playableFromExile rather than inside it
+    -- because the cost and the player each rule names differ.
+    --
+    -- SEPARATE from plotted rather than one "exiled with a delayed permission"
+    -- field carrying a tag: the two costs are opposites -- rule 702.170d's cast
+    -- is free and rule 702.143a's is a foretell cost read off the card -- and
+    -- Pawl.Engine.Cost prices them in two different arms. A card cannot be both.
+    --
+    -- Object.exiledFaceDown is a separate field still: CR 702.143a exiles the
+    -- card face down, but CR 702.143d makes a card foretold that was already in
+    -- exile face up, so neither field implies the other.
+    foretold :: Maybe Natural.Natural,
     -- | CR 701.54b: the Ring-bearer designation, as the player it was made for.
     -- Nothing for every permanent that is not anyone's Ring-bearer, which is
     -- almost all of them.
@@ -576,6 +594,7 @@ newIncarnation object =
       worldSince = Nothing,
       playableFromExile = Nothing,
       plotted = Nothing,
+      foretold = Nothing,
       ringBearerFor = Nothing,
       protector = Nothing,
       ventureRoom = Nothing,
