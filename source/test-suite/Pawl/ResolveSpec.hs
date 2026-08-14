@@ -9206,13 +9206,14 @@ resolveFor pid answer gs spellId =
 -- when the blight itself cannot (CR 101.3).
 --
 -- The pool is UNCONSTRAINED, which is the whole difference from bolster: the
--- boards below carry a 2/1, a 1/1, a 0/8 and the 0/4 source, four distinct
--- toughnesses, so a case that names the 0/8 proves no least-toughness narrowing is
--- happening and a case that names the source proves the blighting permanent is in
--- its own pool.
+-- boards below carry a 2/1, a 1/1, a 0/8 and the 0/4 source -- toughnesses 1, 1, 8
+-- and 4, so the least is TIED and two creatures are clear of it. A case that names
+-- the 0/8 proves no least-toughness narrowing is happening, and one that names the
+-- source proves the blighting permanent is in its own pool.
 --
--- One is blight's own N and every toughness on the board differs from it, so no
--- counter assertion can be satisfied by a coincidence.
+-- Every assertion below reads counters on ONE named creature and reads the other
+-- three back as zero, so no case can be satisfied by counters that landed
+-- somewhere else.
 blightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blightSpec s registry = Spec.describe s "Blight" $ do
   Spec.it s "CR 701.68a blight 1 counters the creature its controller chose" $ do

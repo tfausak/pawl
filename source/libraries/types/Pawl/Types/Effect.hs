@@ -1176,12 +1176,14 @@ data Effect card
     -- author could vary: the counter is a -1\/-1 counter, the count of creatures is
     -- one, and the candidate set is "a creature you control" UNCONSTRAINED --
     -- Bolster's pool narrowed by least toughness is the contrast. Only N varies,
-    -- and it is a Quantity rather than a Natural for Bolster's reason: Soul
-    -- Immolation prints "blight X".
+    -- and it is a Quantity for Bolster's and Amass's shape rather than because a
+    -- card demands one: every N printed in an EFFECT position is a literal, and the
+    -- one non-literal (Soul Immolation's "blight X") is a cost, which is a separate
+    -- axis (#1493).
     --
     -- The blighter is the resolving controller, so no PlayerRef. Champion of the
     -- Weird's "target opponent blights 2" is the other reading, and is not
-    -- expressible (#1489).
+    -- expressible (#1491).
     --
     -- NOT a PutCounters over some cleverer ObjectRef, for Bolster's reason: an
     -- ObjectRef DESCRIBES a set and the whole set is counted (CR 115.10a), where

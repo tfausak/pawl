@@ -4495,6 +4495,10 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- reaches today. CR 701.68b's "they can't choose to blight" is the OPTIONAL one
   -- and is not implemented (#1490).
   --
+  -- Not implemented: nothing records which creature was blighted, so CR 701.68c's
+  -- "blighted creature" cannot be named by a later effect and CR 701.68d's trigger
+  -- has nothing to fire on (#1492).
+  --
   -- Targetless: nothing was targeted, so unlike every slot-reading opcode here
   -- there is no CR 608.2b legality to re-check.
   Effect.Blight quantity -> do
