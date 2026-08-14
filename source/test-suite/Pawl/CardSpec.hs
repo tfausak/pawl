@@ -114,6 +114,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
@@ -711,6 +712,9 @@ effectCounts effect = case effect of
   -- "for as long as you control this creature" is a Count, and dropping it here
   -- would take its Filters out of the lint with it.
   Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration _) -> durationCounts duration
+  -- CR 608.2f's body is an effect list a card authors, so its Counts are this
+  -- card's -- the rider's recursion one opcode over.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectCounts body
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -976,6 +980,8 @@ effectReplacements effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can carry an Effect.Replace, so this descends.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ rider) -> concatMap effectReplacements rider
+  -- CR 608.2f's body can too, for the same reason.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectReplacements body
   Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
@@ -1503,6 +1509,8 @@ effectMintedFaces effect = case effect of
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ rider) -> concatMap effectMintedFaces rider
+  -- CR 608.2f's body can too, for the same reason.
+  Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectMintedFaces body
   Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
@@ -2578,6 +2586,9 @@ effectFilters effect = case effect of
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
   -- take them out of the lint without failing anything.
   Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
+  -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
+  -- list is exactly what this traversal must not stop at.
+  Effect.ForEach (ForEach.MkForEach ref _ body) -> unframed (objectRefFilters ref) <> concatMap effectFilters body
 
 -- Per MODE rather than through Modal.allTargetSlots, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check

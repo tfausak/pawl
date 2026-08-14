@@ -1,8 +1,9 @@
 -- | Where the effect knot is tied. The card codec is a PARAMETER, so this module
 -- names no concrete card type; Pawl.Codec.Card passes its own codec in.
 --
--- RECURSIVE twice over: PreventNextDamage's CR 615.5 rider holds effects, and
--- CreateEmblem's payload is a whole card whose faces hold effects. Both name
+-- RECURSIVE three times over: PreventNextDamage's CR 615.5 rider and ForEach's
+-- CR 608.2f body both hold effects, and CreateEmblem's payload is a whole card
+-- whose faces hold effects. Each names
 -- 'codec' inside its own definition, which terminates for Pawl.Codec.TriggerCondition's
 -- reason -- 'Arm.tagged' reaches WHNF without forcing its arm list, and
 -- 'Define.define' registers the type's name before running the schema body.
@@ -26,6 +27,7 @@ import qualified Pawl.Codec.DurationRef as DurationRef
 import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
+import qualified Pawl.Codec.ForEach as ForEach
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.ModifyTarget as ModifyTarget
@@ -125,11 +127,13 @@ codec cardCodec =
       Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn,
       Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary,
       Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast,
-      Arm.payload "GrantPlayFromExile" DurationRef.codec Effect.GrantPlayFromExile
+      Arm.payload "GrantPlayFromExile" DurationRef.codec Effect.GrantPlayFromExile,
+      Arm.payload "ForEach" forEachCodec Effect.ForEach
     ]
   where
     createCodec = Create.codec cardCodec
     preventCodec = PreventNextDamage.codec (codec cardCodec)
+    forEachCodec = ForEach.codec (codec cardCodec)
     tag t = Common.tagged t . Just
     encode e = case e of
       Effect.DealDamage x -> tag "DealDamage" $ Codec.encode DealDamage.codec x
@@ -170,6 +174,7 @@ codec cardCodec =
       Effect.Replace x -> tag "Replace" $ Codec.encode Replace.codec x
       Effect.SkipNextPhase x -> tag "SkipNextPhase" $ Codec.encode SkipNextPhase.codec x
       Effect.PreventNextDamage x -> tag "PreventNextDamage" $ Codec.encode preventCodec x
+      Effect.ForEach x -> tag "ForEach" $ Codec.encode forEachCodec x
       Effect.PreventAllDamage x -> tag "PreventAllDamage" $ Codec.encode DurationRef.codec x
       Effect.RedirectDamage x -> tag "RedirectDamage" $ Codec.encode RedirectDamage.codec x
       Effect.PutCounters x -> tag "PutCounters" $ Codec.encode PutCounters.codec x

@@ -136,3 +136,9 @@ zoneFunctionedFrom effect = case effect of
   -- of it. This opcode moves nothing -- it writes a permission onto objects an
   -- earlier effect already placed -- so it names no zone.
   Effect.GrantPlayFromExile {} -> Nothing
+  -- Nothing, and the rule is what says so rather than a stop like the rider's
+  -- above: CR 113.6m asks about "the object it's on", which only a bare slot
+  -- naming that object can be, and this opcode's own reference names a SET.
+  -- Descending into the body would answer about whatever the body moves, which
+  -- is a member of that set and never the source.
+  Effect.ForEach {} -> Nothing

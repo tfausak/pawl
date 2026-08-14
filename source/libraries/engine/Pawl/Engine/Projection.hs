@@ -59,6 +59,7 @@ import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
+import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -1646,6 +1647,10 @@ rewriteEffect pairs effect = case effect of
   -- asymmetry is GainControl's and predates this opcode; matching it keeps the
   -- two arms one behaviour rather than two.
   Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration (rewriteObjectRef pairs ref))
+  -- CR 612.1 reaches the body for the rider's reason one opcode over, and the
+  -- swept ref alongside it -- both are this card's own text.
+  Effect.ForEach (ForEach.MkForEach ref slot body) ->
+    Effect.ForEach (ForEach.MkForEach (rewriteObjectRef pairs ref) slot (fmap (rewriteEffect pairs) body))
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.
