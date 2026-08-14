@@ -4,8 +4,8 @@
       "keywords": [
         {
           "type": "Cycling",
-          "value": [
-            {
+          "value": {
+            "cost": {
               "mana": [
                 {
                   "type": "Generic",
@@ -13,8 +13,8 @@
                 }
               ]
             },
-            null
-          ]
+            "searchFor": null
+          }
         }
       ],
       "manaCost": [

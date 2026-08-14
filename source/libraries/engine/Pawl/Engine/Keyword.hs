@@ -41,6 +41,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
+import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Duration as Duration
@@ -65,6 +66,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
+import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -83,6 +85,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -93,6 +96,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -242,16 +246,16 @@ abilitiesFor keyword count = case keyword of
   Keyword.JumpStart -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
-  Keyword.Morph _ _ -> []
+  Keyword.Morph {} -> []
   Keyword.Menace -> []
-  Keyword.Cycling _ _ -> []
+  Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Changeling -> []
-  Keyword.Reinforce _ _ -> []
+  Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Riot -> []
@@ -292,8 +296,8 @@ handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 -- silently produce nothing.
 handAbilitiesFor :: Keyword -> [ActivatedAbility Card]
 handAbilitiesFor keyword = case keyword of
-  Keyword.Cycling cost searchFor -> [cycling cost searchFor]
-  Keyword.Reinforce n cost -> [reinforce n cost]
+  Keyword.Cycling (Cycling.MkCycling cost searchFor) -> [cycling cost searchFor]
+  Keyword.Reinforce (Reinforce.MkReinforce n cost) -> [reinforce n cost]
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
@@ -322,7 +326,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.JumpStart -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
-  Keyword.Morph _ _ -> []
+  Keyword.Morph {} -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
@@ -494,7 +498,7 @@ battlefieldAbilitiesFor :: Keyword -> Natural -> [ActivatedAbility Card]
 battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Crew n -> List.genericReplicate count (crew n)
   Keyword.Fabricate _ -> []
-  Keyword.Cycling _ _ -> []
+  Keyword.Cycling {} -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -524,7 +528,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   -- CR 702.37e: turning a face-down permanent face up is a SPECIAL ACTION and
   -- doesn't use the stack (CR 116), so morph gives a permanent no activated
   -- ability. Pawl.Engine.Keyword.morphCost serves that action instead.
-  Keyword.Morph _ _ -> []
+  Keyword.Morph {} -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Kicker _ -> []
@@ -548,7 +552,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
-  Keyword.Reinforce _ _ -> []
+  Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
@@ -630,7 +634,7 @@ crew n =
           { -- CR 118.5: rule 702.122a's cost has no mana part, which is
             -- `Just` an empty one and not the Nothing that means unpayable.
             Cost.mana = Just (ManaCost.MkManaCost []),
-            Cost.components = [CostComponent.TapForTotalPower n criterion]
+            Cost.components = [CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion)]
           },
       ActivatedAbility.modal =
         Modal.MkModal
@@ -730,7 +734,7 @@ permissionsFor cardTypes keyword = case keyword of
     | otherwise -> []
   -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling
   -- discards the card, it never casts it. See handAbilitiesOf above.
-  Keyword.Cycling _ _ -> []
+  Keyword.Cycling {} -> []
   -- CR 702.122a is an activated ability too, and one that functions on the
   -- battlefield -- see battlefieldAbilitiesOf above.
   Keyword.Crew _ -> []
@@ -783,7 +787,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
-  Keyword.Morph _ _ -> []
+  Keyword.Morph {} -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   -- CR 702.33a grants no permission either, for entwine's reason below: kicker
@@ -812,7 +816,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
-  Keyword.Reinforce _ _ -> []
+  Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
@@ -973,7 +977,7 @@ flashbackCost keywords =
 morphCost :: Set Keyword -> Maybe (Cost Keyword)
 morphCost keywords =
   let costOf keyword = case keyword of
-        Keyword.Morph cost _ -> Just cost
+        Keyword.Morph (Morph.MkMorph cost _) -> Just cost
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
@@ -1169,7 +1173,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Intimidate -> []
   -- CR 702.37a's plain morph mints nothing: rule 702.37a is one alternative cost
   -- and one special action, and neither rewrites an event.
-  Keyword.Morph _ MorphVariant.Plain -> []
+  Keyword.Morph (Morph.MkMorph _ MorphVariant.Plain) -> []
   -- CR 702.37b's SECOND clause, minted the way riot's is: "As this permanent is
   -- turned face up, put a +1/+1 counter on it if its megamorph cost was paid to
   -- turn it face up." The card says only which variant and rule 702.37b says what
@@ -1189,11 +1193,11 @@ mintedReplacementsFor keyword count = case keyword of
   -- ONE ROW PER INSTANCE, as riot's is, and reached the same way -- the instance
   -- ordinal, not the effect value, is what separates two equal rows. Unexercised
   -- here: no card grants megamorph to a creature that already has it.
-  Keyword.Morph _ MorphVariant.Mega ->
+  Keyword.Morph (Morph.MkMorph _ MorphVariant.Mega) ->
     List.genericReplicate count (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))))
   Keyword.Menace -> []
   Keyword.Renown _ -> []
-  Keyword.Cycling _ _ -> []
+  Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
@@ -1215,7 +1219,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
-  Keyword.Reinforce _ _ -> []
+  Keyword.Reinforce {} -> []
   Keyword.Devoid -> []
   Keyword.Ingest -> []
   Keyword.Skulk -> []
@@ -1329,10 +1333,10 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
-  Keyword.Morph _ _ -> []
+  Keyword.Morph {} -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
-  Keyword.Cycling _ _ -> []
+  Keyword.Cycling {} -> []
   Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
@@ -1374,7 +1378,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Persist -> []
   Keyword.Undying -> []
   Keyword.Changeling -> []
-  Keyword.Reinforce _ _ -> []
+  Keyword.Reinforce {} -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when some base
@@ -1401,14 +1405,14 @@ familyOf :: Keyword -> Maybe KeywordFamily.KeywordFamily
 familyOf keyword = case keyword of
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
-  Keyword.Cycling _ _ -> Just KeywordFamily.Cycling
+  Keyword.Cycling {} -> Just KeywordFamily.Cycling
   Keyword.Kicker _ -> Just KeywordFamily.Kicker
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
-  Keyword.Morph _ _ -> Just KeywordFamily.Morph
+  Keyword.Morph {} -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
   Keyword.Soulshift _ -> Just KeywordFamily.Soulshift
-  Keyword.Reinforce _ _ -> Just KeywordFamily.Reinforce
+  Keyword.Reinforce {} -> Just KeywordFamily.Reinforce
   Keyword.Modular _ -> Just KeywordFamily.Modular
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous

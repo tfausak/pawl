@@ -67,6 +67,7 @@ import qualified Pawl.Codec.CounterabilitySpec
 import qualified Pawl.Codec.CounteringSpec
 import qualified Pawl.Codec.CreateCopySpec
 import qualified Pawl.Codec.CreateSpec
+import qualified Pawl.Codec.CyclingSpec
 import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
@@ -98,6 +99,7 @@ import qualified Pawl.Codec.EntryRewriteSpec
 import qualified Pawl.Codec.EntryRidersSpec
 import qualified Pawl.Codec.EventShapeSpec
 import qualified Pawl.Codec.ExchangeSidesSpec
+import qualified Pawl.Codec.ExileCardsFromGraveyardSpec
 import qualified Pawl.Codec.ExileHauntingSpec
 import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
@@ -134,6 +136,7 @@ import qualified Pawl.Codec.ModificationSpec
 import qualified Pawl.Codec.ModifyPowerToughnessSpec
 import qualified Pawl.Codec.ModifyTargetSpec
 import qualified Pawl.Codec.MonarchTargetSpec
+import qualified Pawl.Codec.MorphSpec
 import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.MoveToZoneSpec
 import qualified Pawl.Codec.MovedBetweenSpec
@@ -171,6 +174,7 @@ import qualified Pawl.Codec.RedirectDamageSpec
 import qualified Pawl.Codec.ReduceActivationCostSpec
 import qualified Pawl.Codec.ReduceSpellCostSpec
 import qualified Pawl.Codec.RegenerabilitySpec
+import qualified Pawl.Codec.ReinforceSpec
 import qualified Pawl.Codec.RemoveCountersSpec
 import qualified Pawl.Codec.ReplaceSpec
 import qualified Pawl.Codec.ReplacementEffectSpec
@@ -182,6 +186,7 @@ import qualified Pawl.Codec.RoomIndexSpec
 import qualified Pawl.Codec.RoundingSpec
 import qualified Pawl.Codec.SacrificeAnyNumberSpec
 import qualified Pawl.Codec.SacrificeRestrictionSpec
+import qualified Pawl.Codec.SacrificeSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
@@ -203,6 +208,7 @@ import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TakeExtraTurnSpec
+import qualified Pawl.Codec.TapForTotalPowerSpec
 import qualified Pawl.Codec.TapStateSpec
 import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSlotSpec
@@ -430,6 +436,7 @@ spec s registry = do
   Pawl.Codec.CounteringSpec.spec s
   Pawl.Codec.CreateCopySpec.spec s
   Pawl.Codec.CreateSpec.spec s
+  Pawl.Codec.CyclingSpec.spec s
   Pawl.Codec.DamageEventSpec.spec s
   Pawl.Codec.DamageKindSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
@@ -461,6 +468,7 @@ spec s registry = do
   Pawl.Codec.EntryRidersSpec.spec s
   Pawl.Codec.EventShapeSpec.spec s
   Pawl.Codec.ExchangeSidesSpec.spec s
+  Pawl.Codec.ExileCardsFromGraveyardSpec.spec s
   Pawl.Codec.ExileHauntingSpec.spec s
   Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
@@ -497,6 +505,7 @@ spec s registry = do
   Pawl.Codec.ModifyPowerToughnessSpec.spec s
   Pawl.Codec.ModifyTargetSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
+  Pawl.Codec.MorphSpec.spec s
   Pawl.Codec.MorphVariantSpec.spec s
   Pawl.Codec.MoveToZoneSpec.spec s
   Pawl.Codec.MovedBetweenSpec.spec s
@@ -534,6 +543,7 @@ spec s registry = do
   Pawl.Codec.ReduceActivationCostSpec.spec s
   Pawl.Codec.ReduceSpellCostSpec.spec s
   Pawl.Codec.RegenerabilitySpec.spec s
+  Pawl.Codec.ReinforceSpec.spec s
   Pawl.Codec.RemoveCountersSpec.spec s
   Pawl.Codec.ReplaceSpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
@@ -545,6 +555,7 @@ spec s registry = do
   Pawl.Codec.RoundingSpec.spec s
   Pawl.Codec.SacrificeAnyNumberSpec.spec s
   Pawl.Codec.SacrificeRestrictionSpec.spec s
+  Pawl.Codec.SacrificeSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
@@ -566,6 +577,7 @@ spec s registry = do
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.TakeExtraTurnSpec.spec s
+  Pawl.Codec.TapForTotalPowerSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
   Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSlotSpec.spec s

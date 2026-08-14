@@ -9,11 +9,14 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MorphVariant as MorphVariant
+import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -247,13 +250,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Cycling cost Nothing)
-      """ {"type":"Cycling","value":[{"mana":[{"type":"Generic","value":1}]},null]} """
+      (Keyword.Cycling (Cycling.MkCycling cost Nothing))
+      """ {"type":"Cycling","value":{"cost":{"mana":[{"type":"Generic","value":1}]},"searchFor":null}} """
     Common.assertCodec
       s
       Keyword.codec
-      (Keyword.Cycling cost (Just (Filter.HasCardType CardType.Land)))
-      """ {"type":"Cycling","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"HasCardType","value":{"type":"Land"}}]} """
+      (Keyword.Cycling (Cycling.MkCycling cost (Just (Filter.HasCardType CardType.Land))))
+      """ {"type":"Cycling","value":{"cost":{"mana":[{"type":"Generic","value":1}]},"searchFor":{"type":"HasCardType","value":{"type":"Land"}}}} """
   -- CR 702.34a's payload is a whole Cost, not a number -- the first keyword
   -- whose parameter is itself a composite.
   Spec.it s "Flashback carries its cost" $ do
@@ -313,25 +316,28 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.37a's payload is a whole Cost too -- the MORPH cost, which CR 702.37e
   -- pays to turn the permanent face up, never the {3} the cast pays.
   Spec.it s "Morph carries its cost, and is not Flashback" $ do
-    let morph n = Keyword.Morph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) MorphVariant.Plain
+    let morph n = Keyword.Morph (Morph.MkMorph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) MorphVariant.Plain)
         flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
     Common.assertCodec
       s
       Keyword.codec
       (morph 1)
-      """ {"type":"Morph","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"Plain"}]} """
+      """ {"type":"Morph","value":{"cost":{"mana":[{"type":"Generic","value":1}]},"variant":{"type":"Plain"}}} """
     Spec.assertBool s (Codec.encode Keyword.codec (morph 1) /= Codec.encode Keyword.codec (flashbackOf 1)) "morph {1} is not flashback {1}"
   -- CR 702.37b: megamorph is the SAME constructor with a different variant, so
   -- the two must not encode alike -- a codec that dropped the variant would make
   -- Misthoof Kirin's megamorph {1}{W} indistinguishable from a morph {1}{W}.
   Spec.it s "Morph's variant tells megamorph from plain morph" $ do
-    let morphOf = Keyword.Morph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
+    let morphOf = Keyword.Morph . Morph.MkMorph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
     Common.assertCodec
       s
       Keyword.codec
       (morphOf MorphVariant.Mega)
-      """ {"type":"Morph","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"Mega"}]} """
-    Spec.assertBool s (Codec.encode Keyword.codec (morphOf MorphVariant.Mega) /= Codec.encode Keyword.codec (morphOf MorphVariant.Plain)) "megamorph {1} is not morph {1}"
+      """ {"type":"Morph","value":{"cost":{"mana":[{"type":"Generic","value":1}]},"variant":{"type":"Mega"}}} """
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (morphOf MorphVariant.Mega) /= Codec.encode Keyword.codec (morphOf MorphVariant.Plain))
+      "megamorph {1} is not morph {1}"
   -- CR 702.33a's payload is a whole Cost too, and it must not share Flashback's
   -- tag either.
   Spec.it s "Kicker carries its cost, and is not Flashback" $ do
@@ -455,12 +461,12 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.77a writes BOTH an N and a cost, so the array carries two fields the
   -- way cycling's and morph's do, and both must survive the round trip.
   Spec.it s "Reinforce carries its N and its cost" $ do
-    let reinforce n g = Keyword.Reinforce n (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic g])) [])
+    let reinforce n g = Keyword.Reinforce (Reinforce.MkReinforce n (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic g])) []))
     Common.assertCodec
       s
       Keyword.codec
       (reinforce 2 1)
-      """ {"type":"Reinforce","value":[2,{"mana":[{"type":"Generic","value":1}]}]} """
+      """ {"type":"Reinforce","value":{"amount":2,"cost":{"mana":[{"type":"Generic","value":1}]}}} """
     Spec.assertBool s (Codec.encode Keyword.codec (reinforce 2 1) /= Codec.encode Keyword.codec (reinforce 3 1)) "the N is part of the encoding"
     Spec.assertBool s (Codec.encode Keyword.codec (reinforce 2 1) /= Codec.encode Keyword.codec (reinforce 2 4)) "the cost is part of the encoding"
   -- CR 702.86a's N rides the constructor the same way poisonous' does, and the

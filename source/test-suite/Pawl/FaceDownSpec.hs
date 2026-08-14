@@ -102,6 +102,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -252,7 +253,7 @@ turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
         case FaceDown.morphCostOf aura before of
           Nothing -> Spec.assertFailure s "Gift of Doom should have a morph cost"
           Just cost -> case Cost.components cost of
-            [CostComponent.Sacrifice _ criterion] ->
+            [CostComponent.Sacrifice (Sacrifice.MkSacrifice _ criterion)] ->
               Spec.assertEqWith
                 s
                 "CR 701.21a every creature alice controls except the Aura itself"

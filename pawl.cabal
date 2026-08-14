@@ -182,6 +182,8 @@ library codec
     Pawl.Codec.CreateCopy
     Pawl.Codec.CreateCopySpec
     Pawl.Codec.CreateSpec
+    Pawl.Codec.Cycling
+    Pawl.Codec.CyclingSpec
     Pawl.Codec.DamageEvent
     Pawl.Codec.DamageEventSpec
     Pawl.Codec.DamageKind
@@ -244,6 +246,8 @@ library codec
     Pawl.Codec.EventShapeSpec
     Pawl.Codec.ExchangeSides
     Pawl.Codec.ExchangeSidesSpec
+    Pawl.Codec.ExileCardsFromGraveyard
+    Pawl.Codec.ExileCardsFromGraveyardSpec
     Pawl.Codec.ExileHaunting
     Pawl.Codec.ExileHauntingSpec
     Pawl.Codec.Expiry
@@ -316,6 +320,8 @@ library codec
     Pawl.Codec.ModifyTargetSpec
     Pawl.Codec.MonarchTarget
     Pawl.Codec.MonarchTargetSpec
+    Pawl.Codec.Morph
+    Pawl.Codec.MorphSpec
     Pawl.Codec.MorphVariant
     Pawl.Codec.MorphVariantSpec
     Pawl.Codec.Moved
@@ -390,6 +396,8 @@ library codec
     Pawl.Codec.ReduceSpellCostSpec
     Pawl.Codec.Regenerability
     Pawl.Codec.RegenerabilitySpec
+    Pawl.Codec.Reinforce
+    Pawl.Codec.ReinforceSpec
     Pawl.Codec.RemoveCounters
     Pawl.Codec.RemoveCountersSpec
     Pawl.Codec.Replace
@@ -408,10 +416,12 @@ library codec
     Pawl.Codec.RoomIndexSpec
     Pawl.Codec.Rounding
     Pawl.Codec.RoundingSpec
+    Pawl.Codec.Sacrifice
     Pawl.Codec.SacrificeAnyNumber
     Pawl.Codec.SacrificeAnyNumberSpec
     Pawl.Codec.SacrificeRestriction
     Pawl.Codec.SacrificeRestrictionSpec
+    Pawl.Codec.SacrificeSpec
     Pawl.Codec.Scaling
     Pawl.Codec.ScalingSpec
     Pawl.Codec.Scope
@@ -454,6 +464,8 @@ library codec
     Pawl.Codec.SupertypeSpec
     Pawl.Codec.TakeExtraTurn
     Pawl.Codec.TakeExtraTurnSpec
+    Pawl.Codec.TapForTotalPower
+    Pawl.Codec.TapForTotalPowerSpec
     Pawl.Codec.TapState
     Pawl.Codec.TapStateSpec
     Pawl.Codec.TargetCount
@@ -868,6 +880,7 @@ library types
     Pawl.Types.CounterR
     Pawl.Types.Create
     Pawl.Types.CreateCopy
+    Pawl.Types.Cycling
     Pawl.Types.DamageEvent
     Pawl.Types.DamageKind
     Pawl.Types.DamagePattern
@@ -907,6 +920,7 @@ library types
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
     Pawl.Types.ExchangeSides
+    Pawl.Types.ExileCardsFromGraveyard
     Pawl.Types.ExileHaunting
     Pawl.Types.ExilePlayPermission
     Pawl.Types.Expiry
@@ -960,6 +974,7 @@ library types
     Pawl.Types.ModifyTarget
     Pawl.Types.MonarchTarget
     Pawl.Types.MonarchWatch
+    Pawl.Types.Morph
     Pawl.Types.MorphVariant
     Pawl.Types.Moved
     Pawl.Types.MovedBetween
@@ -1013,6 +1028,7 @@ library types
     Pawl.Types.ReduceActivationCost
     Pawl.Types.ReduceSpellCost
     Pawl.Types.Regenerability
+    Pawl.Types.Reinforce
     Pawl.Types.RemoveCounters
     Pawl.Types.Replace
     Pawl.Types.ReplacementBucket
@@ -1028,6 +1044,7 @@ library types
     Pawl.Types.Revealed
     Pawl.Types.RoomIndex
     Pawl.Types.Rounding
+    Pawl.Types.Sacrifice
     Pawl.Types.SacrificeAnyNumber
     Pawl.Types.SacrificeRestriction
     Pawl.Types.Scaling
@@ -1055,6 +1072,7 @@ library types
     Pawl.Types.SubtypeFamily
     Pawl.Types.Supertype
     Pawl.Types.TakeExtraTurn
+    Pawl.Types.TapForTotalPower
     Pawl.Types.TapState
     Pawl.Types.TargetCount
     Pawl.Types.TargetSlot

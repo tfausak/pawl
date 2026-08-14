@@ -1,7 +1,10 @@
 module Pawl.Types.CostComponent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Sacrifice as Sacrifice
+import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 
 -- | One component of a Pawl.Types.Cost's non-mana part, alongside its mana part
 -- (CR 601.2f).
@@ -63,9 +66,9 @@ data CostComponent keyword
     -- The Filter is matched against the PROJECTION, never a printed
     -- characteristic: Blood Moon makes a nonbasic land a Mountain, and it may be
     -- sacrificed as one.
-    Sacrifice Natural.Natural (Filter.Filter keyword)
+    Sacrifice (Sacrifice.Sacrifice keyword)
   | -- | CR 702.122a's cost half: tap ANY NUMBER of untapped permanents matching
-    -- the Filter, chosen so that their TOTAL power is the Natural or greater.
+    -- the Filter, chosen so that their TOTAL power reaches totalPower.
     -- Crew 6's "tap any number of other untapped creatures you control with
     -- total power 6 or greater" is the printing, and the whole of "other
     -- untapped creatures you control" rides the Filter rather than this
@@ -74,8 +77,10 @@ data CostComponent keyword
     -- already in the vocabulary.
     --
     -- NOT `Sacrifice`-shaped, and the difference is the whole point of a second
-    -- arm: Sacrifice's Natural is HOW MANY objects, which the payer must match
-    -- exactly, while this one is a THRESHOLD on an aggregate of the chosen set.
+    -- arm -- which is why the two payload records are separate despite holding
+    -- the same two types: Sacrifice's count is HOW MANY objects, which the payer
+    -- must match exactly, while totalPower is a THRESHOLD on an aggregate of the
+    -- chosen set.
     -- CR 702.122a's "or greater" makes overpaying legal, so the number of
     -- objects is not determined by the cost at all -- one 7-power creature and
     -- three 2-power ones are both legal answers to crew 6.
@@ -92,7 +97,7 @@ data CostComponent keyword
     -- to reach -- so it will not reuse this arm.
     --
     -- A Natural and not a Quantity, for PayLife's reason above.
-    TapForTotalPower Natural.Natural (Filter.Filter keyword)
+    TapForTotalPower (TapForTotalPower.TapForTotalPower keyword)
   | -- | CR 601.2f: discard this many cards from hand (Cathartic Reunion's two).
     -- CR 701.9b gives the choice to the discarding player, so this is a prompt
     -- and never an engine pick -- the same shape Sacrifice above has.
@@ -219,7 +224,7 @@ data CostComponent keyword
     -- player's own. Whose graveyard is fixed by the constructor for the same
     -- reason the zone is, so a cost reading somebody else's would be a second
     -- constructor rather than a field here.
-    ExileCardsFromGraveyard Natural.Natural (Filter.Filter keyword)
+    ExileCardsFromGraveyard (ExileCardsFromGraveyard.ExileCardsFromGraveyard keyword)
   | -- | CR 406.2 a third time, in its FIXED form: exile the topmost card of the
     -- paying player's graveyard that matches the Filter. Circling Vultures'
     -- "unless you exile the top creature card of your graveyard" is the

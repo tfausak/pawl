@@ -92,6 +92,7 @@ import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
+import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
@@ -109,6 +110,7 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.InZone as InZone
@@ -131,6 +133,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
+import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
@@ -158,11 +161,13 @@ import qualified Pawl.Types.RedirectDamage as RedirectDamage
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Reinforce as Reinforce
 import qualified Pawl.Types.RemoveCounters as RemoveCounters
 import qualified Pawl.Types.Replace as Replace
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.RoomIndex as RoomIndex
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SacrificeAnyNumber as SacrificeAnyNumber
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Scaling as Scaling
@@ -182,6 +187,7 @@ import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
+import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
@@ -1772,7 +1778,7 @@ counterKindFilters kind = case kind of
 
 keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
-  Keyword.Cycling cost mFilter -> costFilters cost <> Maybe.maybeToList mFilter
+  Keyword.Cycling (Cycling.MkCycling cost mFilter) -> costFilters cost <> Maybe.maybeToList mFilter
   Keyword.Flashback cost -> costFilters cost
   Keyword.Kicker cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
@@ -1783,7 +1789,7 @@ keywordFilters keyword = case keyword of
   Keyword.Miracle cost -> costFilters cost
   -- CR 702.37a: the morph cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
-  Keyword.Morph cost _ -> costFilters cost
+  Keyword.Morph (Morph.MkMorph cost _) -> costFilters cost
   -- CR 702.22: plain banding names no quality, so it filters nothing.
   Keyword.Banding -> []
   -- CR 702.26a: phasing names no quality -- who phases is "the permanents that
@@ -1862,7 +1868,7 @@ keywordFilters keyword = case keyword of
   Keyword.SplitSecond -> []
   -- CR 702.77a's cost can carry one, as cycling's can; its N and "target
   -- creature" are written into the ability Pawl.Engine.Keyword mints.
-  Keyword.Reinforce _ cost -> costFilters cost
+  Keyword.Reinforce (Reinforce.MkReinforce _ cost) -> costFilters cost
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []
@@ -1956,11 +1962,11 @@ specialActionFilters specialAction = case specialAction of
 costComponentFilters :: CostComponent.CostComponent Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 costComponentFilters component = case component of
   -- CR 601.2f's "sacrificing permanents": Village Rites' "a creature".
-  CostComponent.Sacrifice _ f -> [f]
+  CostComponent.Sacrifice (Sacrifice.MkSacrifice _ f) -> [f]
   -- CR 702.122a's "other untapped creatures you control".
-  CostComponent.TapForTotalPower _ f -> [f]
+  CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower _ f) -> [f]
   -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".
-  CostComponent.ExileCardsFromGraveyard _ f -> [f]
+  CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard _ f) -> [f]
   -- CR 406.2 again: Circling Vultures' "the top creature card of your
   -- graveyard".
   CostComponent.ExileTopFromGraveyard f -> [f]
@@ -4419,12 +4425,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               (S.combinedFace sorcerer)
                 { Face.activatedAbilities =
                     fmap
-                      (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice 1 buried]}})
+                      (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)]}})
                       (Face.activatedAbilities (S.combinedFace sorcerer))
                 }
             ),
             ( "CR 702.29e's typecycling predicate",
-              base {Face.keywords = Set.singleton (Keyword.Cycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried))}
+              base {Face.keywords = Set.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried)))}
             ),
             ( "CR 613.11's spell-cost modifier",
               base
@@ -4488,7 +4494,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             Filter.Type.Or [atom],
             Filter.Type.Not atom,
             buried,
-            Filter.Type.HasKeyword (Keyword.Cycling (Cost.Type.MkCost Nothing []) (Just atom))
+            Filter.Type.HasKeyword (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost Nothing []) (Just atom)))
           ]
       )
       [1, 1, 1, 1, 1, 1]

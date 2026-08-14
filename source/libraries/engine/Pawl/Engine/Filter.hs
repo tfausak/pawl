@@ -10,15 +10,21 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.Morph as Morph
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Reinforce as Reinforce
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 
 -- The characteristics a Filter atom consults. Supplied by the projection on the
 -- battlefield/stack and by the printed card off the battlefield (both builders
@@ -738,7 +744,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.29e's "[Type]cycling", rule 702's other "[type]": "usually a subtype
   -- (as in 'mountaincycling')", so it holds a basic land type exactly as
   -- swampwalk does.
-  Keyword.Type.Cycling cost criterion -> Keyword.Type.Cycling (rewriteCost pairs cost) (fmap (rewrite pairs) criterion)
+  Keyword.Type.Cycling (Cycling.MkCycling cost criterion) -> Keyword.Type.Cycling (Cycling.MkCycling (rewriteCost pairs cost) (fmap (rewrite pairs) criterion))
   -- CR 702.11d's "hexproof from [quality]", rule 702's third carrier of a word.
   -- Not a "[type]" like the two above -- CR 702.11d's quality is any quality, and
   -- the ones cards actually print tend to name a card type or a colour -- but CR
@@ -782,7 +788,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Flashback cost -> Keyword.Type.Flashback (rewriteCost pairs cost)
   Keyword.Type.Fear -> keyword
   Keyword.Type.Intimidate -> keyword
-  Keyword.Type.Morph cost variant -> Keyword.Type.Morph (rewriteCost pairs cost) variant
+  Keyword.Type.Morph (Morph.MkMorph cost variant) -> Keyword.Type.Morph (Morph.MkMorph (rewriteCost pairs cost) variant)
   Keyword.Type.Entwine cost -> Keyword.Type.Entwine (rewriteCost pairs cost)
   -- CR 702.45a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Bushido _ -> keyword
@@ -796,7 +802,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.77a states a cost, so rewriteCost reaches it as flashback's does. The
   -- N is a number and not a word, and "+1/+1 counter" is in the ability
   -- Pawl.Engine.Keyword.reinforce mints rather than in this value.
-  Keyword.Type.Reinforce n cost -> Keyword.Type.Reinforce n (rewriteCost pairs cost)
+  Keyword.Type.Reinforce (Reinforce.MkReinforce n cost) -> Keyword.Type.Reinforce (Reinforce.MkReinforce n (rewriteCost pairs cost))
   -- CR 702.43a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "+1/+1 counter" is the rule's own noun and no card prints it.
   Keyword.Type.Modular _ -> keyword
@@ -882,9 +888,9 @@ rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (
 -- test can falsify them.
 rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
 rewriteComponent pairs component = case component of
-  CostComponent.Sacrifice n criterion -> CostComponent.Sacrifice n (rewrite pairs criterion)
-  CostComponent.TapForTotalPower n criterion -> CostComponent.TapForTotalPower n (rewrite pairs criterion)
-  CostComponent.ExileCardsFromGraveyard n criterion -> CostComponent.ExileCardsFromGraveyard n (rewrite pairs criterion)
+  CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
+  CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n (rewrite pairs criterion))
+  CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component

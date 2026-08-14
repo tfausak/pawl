@@ -56,13 +56,13 @@
             "components": [
               {
                 "type": "Sacrifice",
-                "value": [
-                  1,
-                  {
+                "value": {
+                  "count": 1,
+                  "whichPermanents": {
                     "type": "And",
                     "value": []
                   }
-                ]
+                }
               }
             ],
             "mana": []

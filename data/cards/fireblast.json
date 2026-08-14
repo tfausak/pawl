@@ -7,15 +7,15 @@
             "components": [
               {
                 "type": "Sacrifice",
-                "value": [
-                  2,
-                  {
+                "value": {
+                  "count": 2,
+                  "whichPermanents": {
                     "type": "HasSubtype",
                     "value": {
                       "type": "Mountain"
                     }
                   }
-                ]
+                }
               }
             ],
             "mana": []

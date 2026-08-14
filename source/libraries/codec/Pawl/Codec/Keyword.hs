@@ -1,9 +1,10 @@
 module Pawl.Codec.Keyword where
 
 import qualified Pawl.Codec.Cost as Cost
+import qualified Pawl.Codec.Cycling as Cycling
 import qualified Pawl.Codec.Filter as Filter
-import qualified Pawl.Codec.MorphVariant as MorphVariant
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.Codec.Morph as Morph
+import qualified Pawl.Codec.Reinforce as Reinforce
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -54,12 +55,12 @@ codec =
       -- writes JSON null rather than omitting a key, which is right here because
       -- this rides inside a POSITIONAL pair (the tuple's second slot) rather than
       -- a named field an absent key could skip.
-      Arm.payload "Cycling" (Common.tuple (Cost.codec codec) (Common.maybe (Filter.codec codec))) (uncurry Keyword.Cycling),
+      Arm.payload "Cycling" (Cycling.codec codec) Keyword.Cycling,
       Arm.payload "Kicker" (Cost.codec codec) Keyword.Kicker,
       Arm.payload "Flashback" (Cost.codec codec) Keyword.Flashback,
       Arm.nullary "Fear" Keyword.Fear,
       Arm.nullary "Intimidate" Keyword.Intimidate,
-      Arm.payload "Morph" (Common.tuple (Cost.codec codec) MorphVariant.codec) (uncurry Keyword.Morph),
+      Arm.payload "Morph" (Morph.codec codec) Keyword.Morph,
       Arm.payload "Entwine" (Cost.codec codec) Keyword.Entwine,
       Arm.payload "Modular" Common.natural Keyword.Modular,
       Arm.payload "Bushido" Common.natural Keyword.Bushido,
@@ -69,7 +70,7 @@ codec =
       Arm.payload "Vanishing" Common.natural Keyword.Vanishing,
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous,
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator,
-      Arm.payload "Reinforce" (Common.tuple Common.natural (Cost.codec codec)) (uncurry Keyword.Reinforce),
+      Arm.payload "Reinforce" (Reinforce.codec codec) Keyword.Reinforce,
       Arm.nullary "Persist" Keyword.Persist,
       Arm.nullary "Infect" Keyword.Infect,
       Arm.nullary "Wither" Keyword.Wither,
@@ -135,14 +136,14 @@ codec =
       Keyword.Aftermath -> Common.nullary "Aftermath"
       Keyword.JumpStart -> Common.nullary "JumpStart"
       Keyword.Afflict n -> Common.tagged "Afflict" . Just $ Common.encodeNatural n
-      Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Value.array $ [Codec.encode (Cost.codec codec) cost, Common.encodeMaybe (Codec.encode (Filter.codec codec)) searchFor]
+      Keyword.Cycling x -> Common.tagged "Cycling" . Just $ Codec.encode (Cycling.codec codec) x
       Keyword.Kicker cost -> Common.tagged "Kicker" . Just $ Codec.encode (Cost.codec codec) cost
       Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Codec.encode (Cost.codec codec) cost
       Keyword.Fear -> Common.nullary "Fear"
       Keyword.Intimidate -> Common.nullary "Intimidate"
       -- An ARRAY, as Cycling's is, because CR 702.37b's megamorph is the same
       -- keyword with a second field rather than a tag of its own.
-      Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Value.array $ [Codec.encode (Cost.codec codec) cost, Codec.encode MorphVariant.codec variant]
+      Keyword.Morph x -> Common.tagged "Morph" . Just $ Codec.encode (Morph.codec codec) x
       Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Codec.encode (Cost.codec codec) cost
       Keyword.Modular n -> Common.tagged "Modular" . Just $ Common.encodeNatural n
       Keyword.Bushido n -> Common.tagged "Bushido" . Just $ Common.encodeNatural n
@@ -154,7 +155,7 @@ codec =
       Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Common.encodeNatural n
       -- An ARRAY, as Cycling's and Morph's are: CR 702.77a writes both an N and a
       -- cost.
-      Keyword.Reinforce n cost -> Common.tagged "Reinforce" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Cost.codec codec) cost]
+      Keyword.Reinforce x -> Common.tagged "Reinforce" . Just $ Codec.encode (Reinforce.codec codec) x
       Keyword.Persist -> Common.nullary "Persist"
       Keyword.Infect -> Common.nullary "Infect"
       Keyword.Wither -> Common.nullary "Wither"

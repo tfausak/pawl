@@ -54,6 +54,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -75,7 +76,9 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -485,8 +488,8 @@ substituteXInComponent x component = case component of
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component
-  CostComponent.Sacrifice _ _ -> component
-  CostComponent.TapForTotalPower _ _ -> component
+  CostComponent.Sacrifice {} -> component
+  CostComponent.TapForTotalPower {} -> component
   CostComponent.DiscardCards _ -> component
   CostComponent.DiscardThis -> component
   CostComponent.PayEnergy _ -> component
@@ -494,7 +497,7 @@ substituteXInComponent x component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   CostComponent.ExileThisFromGraveyard -> component
-  CostComponent.ExileCardsFromGraveyard _ _ -> component
+  CostComponent.ExileCardsFromGraveyard {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
 
 -- Does this cost contain an X (CR 107.3)? What decides whether the caster is
@@ -523,8 +526,8 @@ componentHasVariable component = case component of
   CostComponent.TapThis -> False
   CostComponent.UntapThis -> False
   CostComponent.SacrificeThis -> False
-  CostComponent.Sacrifice _ _ -> False
-  CostComponent.TapForTotalPower _ _ -> False
+  CostComponent.Sacrifice {} -> False
+  CostComponent.TapForTotalPower {} -> False
   CostComponent.DiscardCards _ -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
@@ -532,7 +535,7 @@ componentHasVariable component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.ExileThisFromGraveyard -> False
-  CostComponent.ExileCardsFromGraveyard _ _ -> False
+  CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
 
 -- CR 601.2b: the greatest value of X this player could actually pay for -- what
@@ -778,14 +781,14 @@ isLoyaltyComponent component = case component of
   CostComponent.SacrificeThis -> False
   CostComponent.PayLife _ -> False
   CostComponent.PayLifeX -> False
-  CostComponent.Sacrifice _ _ -> False
-  CostComponent.TapForTotalPower _ _ -> False
+  CostComponent.Sacrifice {} -> False
+  CostComponent.TapForTotalPower {} -> False
   CostComponent.DiscardCards _ -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.ExileThisFromGraveyard -> False
-  CostComponent.ExileCardsFromGraveyard _ _ -> False
+  CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
 
 -- CR 113.6m's COST half: "an ability whose cost or effect specifies that it
@@ -824,10 +827,10 @@ zoneOfComponent component = case component of
   CostComponent.SacrificeThis -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
-  CostComponent.Sacrifice _ _ -> Nothing
+  CostComponent.Sacrifice {} -> Nothing
   -- CR 702.122a taps permanents on the battlefield and moves nothing out of any
   -- zone, so CR 113.6m says nothing and CR 113.6's default stands.
-  CostComponent.TapForTotalPower _ _ -> Nothing
+  CostComponent.TapForTotalPower {} -> Nothing
   -- Nothing, and NOT Just Zone.Graveyard -- the one place this component parts
   -- from ExileThisFromGraveyard above. CR 113.6m is about an ability that "moves
   -- THE OBJECT IT'S ON out of a particular zone"; this one moves OTHER cards,
@@ -836,7 +839,7 @@ zoneOfComponent component = case component of
   -- stands -- the same reading TapForTotalPower gets just above. Answering the
   -- graveyard here would make an activated ability with this cost unactivatable
   -- from the battlefield, which no rule asks for.
-  CostComponent.ExileCardsFromGraveyard _ _ -> Nothing
+  CostComponent.ExileCardsFromGraveyard {} -> Nothing
   -- ExileCardsFromGraveyard's answer for its reason: this too moves cards other
   -- than the object the cost is on, so CR 113.6m does not reach it.
   CostComponent.ExileTopFromGraveyard _ -> Nothing
@@ -991,7 +994,7 @@ tapObject target =
 removalClaim :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
 removalClaim pid oid component gs = case component of
   -- CR 701.21a: the permanents this player controls that match the criterion.
-  CostComponent.Sacrifice n criterion ->
+  CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
     claim Zone.Battlefield (Set.fromList (Replacement.sacrificeCandidates pid (Just oid) criterion gs)) n
   CostComponent.SacrificeThis ->
     claim
@@ -1009,7 +1012,7 @@ removalClaim pid oid component gs = case component of
   CostComponent.DiscardCards n ->
     claim Zone.Hand (Set.fromList (discardCandidates pid oid gs)) n
   CostComponent.DiscardThis -> claim Zone.Hand (itself (isOwnedIn Zone.Hand)) 1
-  CostComponent.ExileCardsFromGraveyard n criterion ->
+  CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
     claim Zone.Graveyard (Set.fromList (exileCandidates pid criterion gs)) n
   -- A pool of at most ONE, and the claim is on that one card rather than on a
   -- choice among several: CR 404.2's order picks it. An empty pool is how this
@@ -1019,7 +1022,7 @@ removalClaim pid oid component gs = case component of
   CostComponent.ExileThisFromGraveyard -> claim Zone.Graveyard (itself (isOwnedIn Zone.Graveyard)) 1
   CostComponent.TapThis -> Nothing
   CostComponent.UntapThis -> Nothing
-  CostComponent.TapForTotalPower _ _ -> Nothing
+  CostComponent.TapForTotalPower {} -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.PayLifeX -> Nothing
   CostComponent.PayEnergy _ -> Nothing
@@ -1227,11 +1230,11 @@ repeatsOf pid oid cost gs = case Cost.mana cost of
 uncountedCeiling :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Natural
 uncountedCeiling component = case component of
   -- Counted by `objectCeiling`: every one of these has a removalClaim.
-  CostComponent.Sacrifice _ _ -> Nothing
+  CostComponent.Sacrifice {} -> Nothing
   CostComponent.SacrificeThis -> Nothing
   CostComponent.DiscardCards _ -> Nothing
   CostComponent.DiscardThis -> Nothing
-  CostComponent.ExileCardsFromGraveyard _ _ -> Nothing
+  CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.ExileThisFromGraveyard -> Nothing
   -- Counted by `lifeCeiling`, CR 119.4.
@@ -1243,7 +1246,7 @@ uncountedCeiling component = case component of
   CostComponent.PayLifeX -> Just 0
   CostComponent.TapThis -> Just 1
   CostComponent.UntapThis -> Just 1
-  CostComponent.TapForTotalPower _ _ -> Just 1
+  CostComponent.TapForTotalPower {} -> Just 1
   CostComponent.PayEnergy _ -> Just 1
   CostComponent.AddLoyaltyToThis _ -> Just 1
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1
@@ -1367,8 +1370,8 @@ lifeOwedByComponent component = case component of
   CostComponent.TapThis -> 0
   CostComponent.UntapThis -> 0
   CostComponent.SacrificeThis -> 0
-  CostComponent.Sacrifice _ _ -> 0
-  CostComponent.TapForTotalPower _ _ -> 0
+  CostComponent.Sacrifice {} -> 0
+  CostComponent.TapForTotalPower {} -> 0
   CostComponent.DiscardCards _ -> 0
   CostComponent.DiscardThis -> 0
   CostComponent.PayEnergy _ -> 0
@@ -1376,7 +1379,7 @@ lifeOwedByComponent component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
-  CostComponent.ExileCardsFromGraveyard _ _ -> 0
+  CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
 
 canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
@@ -1433,7 +1436,7 @@ canPayComponent pid oid component gs = case component of
   -- together. Kept because a component is asked about on its own terms here, and
   -- it can only ever be the weaker of the two -- it is the singleton subset of
   -- Hall's condition, spelled out.
-  CostComponent.Sacrifice n criterion ->
+  CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) ->
     Natural.length (Replacement.sacrificeCandidates pid (Just oid) criterion gs) >= n
   -- CR 702.122a: payable iff SOME subset of the candidates reaches the
   -- threshold. Which is decided without enumerating one, because the greatest
@@ -1446,7 +1449,7 @@ canPayComponent pid oid component gs = case component of
   -- A threshold of 0 is payable by the empty set, which this answers True for
   -- without a candidate on the board. No printing has crew 0; the arithmetic
   -- simply does not need a special case.
-  CostComponent.TapForTotalPower n criterion ->
+  CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) ->
     sum (fmap (max 0 . (`tapPower` gs)) (tapCandidates pid oid criterion gs)) >= toInteger n
   -- CR 601.2f: payable only if the hand holds at least that many cards.
   --
@@ -1491,7 +1494,7 @@ canPayComponent pid oid component gs = case component of
   -- Sacrifice's floor above, over a different pool -- and this component ALONE
   -- for Sacrifice's reason, with `jointlyPayable` asking the several
   -- object-removing components of one cost together.
-  CostComponent.ExileCardsFromGraveyard n criterion ->
+  CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
     Natural.length (exileCandidates pid criterion gs) >= n
   -- CR 118.3 again: payable only if the graveyard holds a matching card at all,
   -- since the top one is then determined.
@@ -1642,16 +1645,16 @@ orderObservable components = case filter orderSensitive components of
 -- would want CR 601.2h's second pass as well as an answer here.
 orderSensitive :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 orderSensitive component = case component of
-  CostComponent.Sacrifice _ _ -> True
+  CostComponent.Sacrifice {} -> True
   CostComponent.SacrificeThis -> True
   CostComponent.DiscardCards _ -> True
   CostComponent.DiscardThis -> True
-  CostComponent.ExileCardsFromGraveyard _ _ -> True
+  CostComponent.ExileCardsFromGraveyard {} -> True
   CostComponent.ExileTopFromGraveyard _ -> True
   CostComponent.ExileThisFromGraveyard -> True
   CostComponent.TapThis -> True
   CostComponent.UntapThis -> True
-  CostComponent.TapForTotalPower _ _ -> True
+  CostComponent.TapForTotalPower {} -> True
   CostComponent.AddLoyaltyToThis _ -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
@@ -1936,7 +1939,7 @@ payComponent pid oid component = case component of
   -- Reject-not-repair: an answer that is not a size-`n` subset of the offered
   -- candidates makes the whole payment Unpaid, which pay's restore turns into a
   -- no-op.
-  CostComponent.Sacrifice n criterion -> do
+  CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> do
     gs <- State.get
     let candidates = Replacement.sacrificeCandidates pid (Just oid) criterion gs
         decider = Decide.deciderFor pid gs
@@ -1972,7 +1975,7 @@ payComponent pid oid component = case component of
   -- and so CR 702.122e's "becomes crewed" trigger and CR 702.122d's "can't crew
   -- Vehicles" restriction -- the chosen set is spent here and recorded nowhere
   -- (#915).
-  CostComponent.TapForTotalPower n criterion -> do
+  CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> do
     gs <- State.get
     let candidates = tapCandidates pid oid criterion gs
         decider = Decide.deciderFor pid gs
@@ -2109,7 +2112,7 @@ payComponent pid oid component = case component of
   --
   -- The candidates are read ONCE, before the prompt, so the answer is checked
   -- against the same list the player was offered.
-  CostComponent.ExileCardsFromGraveyard n criterion -> do
+  CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> do
     gs <- State.get
     let candidates = exileCandidates pid criterion gs
         decider = Decide.deciderFor pid gs

@@ -37,8 +37,8 @@
       "keywords": [
         {
           "type": "Cycling",
-          "value": [
-            {
+          "value": {
+            "cost": {
               "mana": [
                 {
                   "type": "Generic",
@@ -46,7 +46,7 @@
                 }
               ]
             },
-            {
+            "searchFor": {
               "type": "And",
               "value": [
                 {
@@ -63,7 +63,7 @@
                 }
               ]
             }
-          ]
+          }
         }
       ],
       "name": "Ash Barrens",

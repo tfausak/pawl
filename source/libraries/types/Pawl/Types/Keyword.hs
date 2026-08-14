@@ -2,8 +2,10 @@ module Pawl.Types.Keyword where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.MorphVariant as MorphVariant
+import qualified Pawl.Types.Morph as Morph
+import qualified Pawl.Types.Reinforce as Reinforce
 
 -- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302. So casing on this is NOT
@@ -259,7 +261,7 @@ data Keyword
     -- cycling; Just is what to search for, and a Filter rather than a Subtype
     -- because rule 702.29e's "[type]" may be any combination of card type, subtype
     -- and supertype.
-    Cycling (Cost.Cost Keyword) (Maybe (Filter.Filter Keyword))
+    Cycling (Cycling.Cycling Keyword)
   | -- | 702.31b: a creature with horsemanship can't be blocked by creatures
     -- without horsemanship.
     --
@@ -329,7 +331,7 @@ data Keyword
     -- variant of the morph ability" and "A megamorph cost is a morph cost". See
     -- Pawl.Types.MorphVariant for what the variant adds and for what a sibling
     -- constructor would have cost.
-    Morph (Cost.Cost Keyword) MorphVariant.MorphVariant
+    Morph (Morph.Morph Keyword)
   | -- | 702.39a: whenever this creature attacks, you may choose to have target
     -- creature defending player controls block this creature this combat if able;
     -- if you do, untap that creature. Rule 702 states it as a triggered ability,
@@ -482,17 +484,17 @@ data Keyword
     -- discard-in-the-cost shape (702.29a); what is new is a target, so
     -- Pawl.Engine.Keyword.reinforce is the first hand ability that has one.
     --
-    -- BOTH halves ride the constructor, and neither is redundant: the cost is
-    -- what is paid, as Cycling's and Flashback's are, and N is how many counters
-    -- the minted ability puts on -- so `Reinforce 1 c` and `Reinforce 2 c` are
-    -- distinct keywords. Rule 702.77 states no redundancy clause and no card
+    -- BOTH halves ride the payload record, and neither is redundant: the cost
+    -- is what is paid, as Cycling's and Flashback's are, and the amount is how
+    -- many counters the minted ability puts on -- so a reinforce 1 and a
+    -- reinforce 2 sharing a cost are distinct keywords. Rule 702.77 states no redundancy clause and no card
     -- prints two, so its reader takes MEMBERSHIP, which is the Set
     -- Pawl.Engine.Keyword.handAbilitiesOf already takes.
     --
     -- Rule 702.77b's other half -- the ability keeps existing in every other
     -- zone, so an object with reinforce counts as having an activated ability --
     -- is not modelled (#1207).
-    Reinforce Natural.Natural (Cost.Cost Keyword)
+    Reinforce (Reinforce.Reinforce Keyword)
   | -- | 702.79a: persist. "When this permanent is put into a graveyard from the
     -- battlefield, if it had no -1/-1 counters on it, return it to the
     -- battlefield under its owner's control with a -1/-1 counter on it" -- which

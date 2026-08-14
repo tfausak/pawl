@@ -9,9 +9,12 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 
 -- | Instantiated at 'Keyword.Keyword', the only concrete instantiation
 -- anywhere in the pool.
@@ -56,8 +59,8 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.Sacrifice 2 (Filter.HasSubtype Subtype.Mountain))
-      """ {"type":"Sacrifice","value":[2,{"type":"HasSubtype","value":{"type":"Mountain"}}]} """
+      (CostComponent.Sacrifice (Sacrifice.MkSacrifice 2 (Filter.HasSubtype Subtype.Mountain)))
+      """ {"type":"Sacrifice","value":{"count":2,"whichPermanents":{"type":"HasSubtype","value":{"type":"Mountain"}}}} """
   -- The THRESHOLD and the Filter ride the payload positionally, Sacrifice's
   -- shape -- but the Natural means something else here (CR 702.122a's total
   -- power, not a count of objects), which is why the two are separate arms.
@@ -65,8 +68,8 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.TapForTotalPower 6 (Filter.HasCardType CardType.Creature))
-      """ {"type":"TapForTotalPower","value":[6,{"type":"HasCardType","value":{"type":"Creature"}}]} """
+      (CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower 6 (Filter.HasCardType CardType.Creature)))
+      """ {"type":"TapForTotalPower","value":{"totalPower":6,"whichPermanents":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   Spec.it s "DiscardCards" $
     Common.assertCodec
       s
@@ -117,8 +120,8 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.ExileCardsFromGraveyard 1 (Filter.HasCardType CardType.Creature))
-      """ {"type":"ExileCardsFromGraveyard","value":[1,{"type":"HasCardType","value":{"type":"Creature"}}]} """
+      (CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard 1 (Filter.HasCardType CardType.Creature)))
+      """ {"type":"ExileCardsFromGraveyard","value":{"count":1,"whichCards":{"type":"HasCardType","value":{"type":"Creature"}}}} """
   Spec.it s "ExileTopFromGraveyard" $
     Common.assertCodec
       s

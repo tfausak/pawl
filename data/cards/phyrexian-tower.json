@@ -41,15 +41,15 @@
               },
               {
                 "type": "Sacrifice",
-                "value": [
-                  1,
-                  {
+                "value": {
+                  "count": 1,
+                  "whichPermanents": {
                     "type": "HasCardType",
                     "value": {
                       "type": "Creature"
                     }
                   }
-                ]
+                }
               }
             ],
             "mana": []

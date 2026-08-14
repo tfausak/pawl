@@ -4,15 +4,15 @@
       "additionalCosts": [
         {
           "type": "ExileCardsFromGraveyard",
-          "value": [
-            1,
-            {
+          "value": {
+            "count": 1,
+            "whichCards": {
               "type": "HasCardType",
               "value": {
                 "type": "Creature"
               }
             }
-          ]
+          }
         }
       ],
       "manaCost": [
