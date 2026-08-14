@@ -36,82 +36,85 @@ import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.JsonSchema.Name as Name
 import qualified Pawl.JsonSchema.Schema as Schema
 
--- | 'Payload' and 'OptionalPayload' store the element codec's decoder and
--- schema rather than the codec itself, so the element type does not escape into
--- an existential and this stays an ordinary sum. 'Nullary' is not a special
--- case of either: a nullary arm's schema carries no @value@ property at all,
--- and its decode ignores one that is present.
--- The matcher is stored with the payload ENCODER already applied to it -- an
--- @a -> Maybe Value.Value@ rather than an @a -> Maybe b@ -- for the reason the
--- decoder is stored pre-applied: it keeps @b@ from escaping into an
--- existential.
-data Arm a
-  = Nullary String a (a -> Bool)
-  | Payload String (Value.Value -> Either Text.Text a) (Define.SchemaM Schema.Schema) (a -> Maybe Value.Value)
-  | OptionalPayload String (Maybe Value.Value -> Either Text.Text a) (Define.SchemaM Schema.Schema) (a -> Maybe (Maybe Value.Value))
+-- | ONE shape for every arm, because all three differ in exactly one thing --
+-- what the @value@ key may be -- and agree on the rest. The decoder and the
+-- projection are stored with the element codec ALREADY APPLIED, which is what
+-- keeps the payload type from escaping into an existential and this from
+-- needing one.
+--
+-- Both directions speak the same @Maybe Value.Value@: 'Nothing' is the bare
+-- tag a nullary arm writes and an optional one may, 'Just' is a @value@ key.
+-- So encoding is one expression for every arm and decoding is one call, where
+-- three constructors needed a case each.
+data Arm a = MkArm
+  { tag :: String,
+    -- | The @value@ key if the document had one. What an absence MEANS is the
+    -- arm's own business: a nullary arm ignores it, a required one fails, an
+    -- optional one reads it as 'Nothing'.
+    decodeValue :: Maybe Value.Value -> Either Text.Text a,
+    valueSchema :: ValueSchema,
+    -- | 'Nothing' when this arm does not describe the value at all, which is
+    -- how 'tagged' picks the arm that does.
+    projectValue :: a -> Maybe (Maybe Value.Value)
+  }
+
+-- | Whether an arm's tagged object carries a @value@, and whether it must.
+-- The one axis the three arm shapes differ on, and the only one that could not
+-- collapse: a nullary arm's schema names no @value@ property AT ALL, which is
+-- different from naming an optional one.
+data ValueSchema
+  = NoValue
+  | RequiredValue (Define.SchemaM Schema.Schema)
+  | OptionalValue (Define.SchemaM Schema.Schema)
 
 -- | A nullary arm derives its own matcher from 'Eq', so its call sites do not
 -- change: there is no payload to project, and the value it carries is the only
--- thing it could match.
+-- thing it could match. Its decode IGNORES a @value@ that is present, rather
+-- than rejecting it.
 nullary :: (Eq a) => String -> a -> Arm a
-nullary t x = Nullary t x (== x)
+nullary t x =
+  MkArm
+    { tag = t,
+      decodeValue = \_ -> Right x,
+      valueSchema = NoValue,
+      projectValue = \y -> if y == x then Just Nothing else Nothing
+    }
 
 -- | @inject@ and @project@ are inverses: @project@ is what makes this arm
 -- encodable, and it answers 'Nothing' for every OTHER constructor of the type.
 payload :: String -> Codec.Codec b -> (b -> a) -> (a -> Maybe b) -> Arm a
 payload t c inject project =
-  Payload t (fmap inject . Codec.decode c) (Codec.schema c) (fmap (Codec.encode c) . project)
+  MkArm
+    { tag = t,
+      decodeValue = \mv -> Common.withValue mv (fmap inject . Codec.decode c),
+      valueSchema = RequiredValue (Codec.schema c),
+      projectValue = fmap (Just . Codec.encode c) . project
+    }
 
 -- | A payload arm whose @value@ key may be absent as well as present, both
--- under the same tag -- 'Pawl.Codec.Keyword'\'s @Hexproof@ is the first user:
+-- under the same tag -- 'Pawl.Codec.Keyword'\'s @Hexproof@ is the first caller:
 -- CR 702.11b's bare hexproof omits @value@ entirely and CR 702.11d's
 -- "hexproof from [quality]" carries it, and both decode to the one
--- constructor. 'payload' cannot express this -- NOT because its schema is
--- wrong: 'payload'\'s schema and its decoder agree exactly, both requiring
--- @value@ ('Common.withValue' fails on 'Nothing' the same way the schema's
--- @required@ list does). The real reason is that 'Hexproof' needs ONE
--- constructor to accept TWO shapes, and a single 'payload' arm only ever
--- accepts one. (The stricter-than-the-codec defect this branch actually
--- shipped belonged to the hand-written decode override 'optionalPayload'
--- replaced, not to 'payload' itself.) Decode here takes an absent @value@ as
--- 'Nothing' and a present one through the element codec as 'Just', and the
--- schema marks @value@ optional to match.
--- | @project@ answers @Just Nothing@ for the shape that writes a bare tag and
+-- constructor. 'payload' cannot express this, because it needs ONE constructor
+-- to accept TWO shapes and a single 'payload' arm only ever accepts one.
+--
+-- @project@ answers @Just Nothing@ for the shape that writes a bare tag and
 -- @Just (Just b)@ for the one that writes a value, which is the distinction
 -- this arm exists to carry; 'Nothing' means some other constructor entirely.
 optionalPayload :: String -> Codec.Codec b -> (Maybe b -> a) -> (a -> Maybe (Maybe b)) -> Arm a
 optionalPayload t c inject project =
-  OptionalPayload
-    t
-    (fmap inject . traverse (Codec.decode c))
-    (Codec.schema c)
-    (fmap (fmap (Codec.encode c)) . project)
-
-tag :: Arm a -> String
-tag arm = case arm of
-  Nullary t _ _ -> t
-  Payload t _ _ _ -> t
-  OptionalPayload t _ _ _ -> t
+  MkArm
+    { tag = t,
+      decodeValue = fmap inject . traverse (Codec.decode c),
+      valueSchema = OptionalValue (Codec.schema c),
+      projectValue = fmap (fmap (Codec.encode c)) . project
+    }
 
 -- | The arm's half of encoding: 'Nothing' when this arm does not describe the
 -- value, so 'tagged' can take the first that does.
 armEncode :: Arm a -> a -> Maybe Value.Value
-armEncode arm x = case arm of
-  Nullary t _ matches -> if matches x then Just (Common.nullary t) else Nothing
-  Payload t _ _ project -> fmap (Common.tagged t . Just) (project x)
-  OptionalPayload t _ _ project -> fmap (Common.tagged t) (project x)
+armEncode arm x = fmap (Common.tagged (tag arm)) (projectValue arm x)
 
--- | Assumes distinct tags across 'arms': 'List.find' takes the first match on
--- decode, so a duplicate tag is dead code, and 'armSchema' does not dedupe
--- either, so a duplicate emits two identical 'Schema.oneOf' branches that
--- nothing (including the value the decoder accepts) validates against.
---
--- A known 'Payload' tag missing its @value@ reports 'Common.withValue''s
--- @"missing tagged value"@, not an unknown-tag message -- an 'OptionalPayload'
--- tag takes the same absence as 'Nothing' instead of failing. Most
--- hand-written codecs fall through their wildcard on a @(tag, mv)@ match
--- instead and report the tag as unknown; converting one to 'tagged' changes
--- that string, deliberately, since the tag genuinely is known here.
 -- | 'taggedWith' with the encoder derived from the arms' matchers.
 --
 -- An unmatched value encodes as @{}@ -- deliberately the one object
@@ -127,6 +130,18 @@ tagged arms = taggedWith (\x -> Maybe.fromMaybe (Value.object []) (Foldable.asum
 -- in-tree user: deriving its encoder would make encoding a scan over every
 -- constructor, which for Pawl.Types.Subtype is several hundred 'Eq' tests per
 -- value, where 'show' answers directly.
+--
+-- Assumes distinct tags across @arms@: 'List.find' takes the first match on
+-- decode, so a duplicate tag is dead code, and 'armSchema' does not dedupe
+-- either, so a duplicate emits two identical 'Schema.oneOf' branches that
+-- nothing (including the value the decoder accepts) validates against.
+--
+-- A 'payload' tag missing its @value@ reports 'Common.withValue''s
+-- @"missing tagged value"@, not an unknown-tag message -- an 'optionalPayload'
+-- tag takes the same absence as 'Nothing' instead of failing. Most
+-- hand-written codecs fall through their wildcard on a @(tag, mv)@ match
+-- instead and report the tag as unknown; converting one to 'tagged' changes
+-- that string, deliberately, since the tag genuinely is known here.
 taggedWith :: forall a. (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a
 taggedWith enc arms =
   Codec.MkCodec
@@ -135,9 +150,7 @@ taggedWith enc arms =
         (t, mv) <- Common.asTagged value
         case List.find ((== t) . tag) arms of
           Nothing -> Left . Text.pack $ "unknown " <> name <> ": " <> t
-          Just (Nullary _ x _) -> Right x
-          Just (Payload _ dec _ _) -> Common.withValue mv dec
-          Just (OptionalPayload _ dec _ _) -> dec mv,
+          Just arm -> decodeValue arm mv,
       Codec.schema = Define.define (Name.typeName proxy) $ do
         schemas <- traverse armSchema arms
         pure (Schema.oneOf schemas)
@@ -168,10 +181,10 @@ enum :: forall a. (Bounded a, Enum a, Eq a, Show a, Typeable.Typeable a) => Code
 enum = taggedWith (Common.nullary . show) (fmap (\c -> nullary (show c) c) [minBound .. maxBound :: a])
 
 armSchema :: Arm a -> Define.SchemaM Schema.Schema
-armSchema arm = case arm of
-  Nullary t _ _ -> pure (armObject t Nothing)
-  Payload t _ s _ -> fmap (armObject t . Just) s
-  OptionalPayload t _ s _ -> fmap (armObjectOptional t) s
+armSchema arm = case valueSchema arm of
+  NoValue -> pure (armObject (tag arm) Nothing)
+  RequiredValue s -> fmap (armObject (tag arm) . Just) s
+  OptionalValue s -> fmap (armObjectOptional (tag arm)) s
 
 -- | No @additionalProperties: false@: 'Common.asTagged' ignores unknown keys,
 -- and a nullary arm ignores a @value@ outright, so forbidding them would reject
