@@ -30,8 +30,10 @@ data ObjectRef
     InSlot SlotName.SlotName
   | -- | Every PERMANENT ON THE BATTLEFIELD matching the Filter -- Day of
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a
-    -- set drawn from a graveyard is EachCardInGraveyard below, and from any
-    -- other zone has no card in the pool (#1309).
+    -- set drawn from another zone is one of the arms below -- a graveyard's is
+    -- EachCardInGraveyard, a hand's EachCardInYourHand, exile's
+    -- EachCardExiledWithSource -- and a FILTERED sweep of any zone but the
+    -- battlefield and a graveyard has no card in the pool (#1309).
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then
