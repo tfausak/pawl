@@ -1,9 +1,10 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Expiry and Pawl.Types.Expiry: the printed Duration -> stored Expiry
 -- arming (CR 611.2), the sweeps that end a duration (CR 514.2, 500.5, 611.2a,
--- 611.2b), and the three gate cards (Master Thief, Hag of Inner Weakness, Jade
--- Statue).
+-- 611.2b), and the four gate cards (Master Thief, Hag of Inner Weakness, Jade
+-- Statue, and Soulfire Eruption for "until the END of your next turn").
 module Pawl.ExpirySpec where
 
 import qualified Data.List as List
@@ -11,6 +12,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Departure as Departure
@@ -29,6 +31,7 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -42,6 +45,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -112,6 +116,11 @@ armSpec s = Spec.describe s "Arm" $ do
     Spec.assertEqWith s "armed" (Expiry.arm Map.empty S.alice S.noSource Duration.Indefinite armGs) (Just Expiry.Type.Never)
   Spec.it s "CR 611.2a / 109.5 'until your next turn' bakes the controller" $
     Spec.assertEqWith s "armed" (Expiry.arm Map.empty S.alice S.noSource Duration.UntilYourNextTurn armGs) (Just (Expiry.Type.AtTurnOf S.alice))
+  -- The turn number is sampled as well as the seat, and armGs is turn 1. Without
+  -- it the sweep could not tell the controller's CURRENT turn from their next
+  -- one, which is exactly the case the two phrasings disagree about.
+  Spec.it s "CR 611.2a / 109.5 'until the end of your next turn' bakes the controller AND the turn" $
+    Spec.assertEqWith s "armed" (Expiry.arm Map.empty S.alice S.noSource Duration.UntilEndOfYourNextTurn armGs) (Just (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.alice 1)))
 
 handoffSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 handoffSpec s = Spec.describe s "DropAtTurnOf" $ do
@@ -192,6 +201,72 @@ handoffSpec s = Spec.describe s "DropAtTurnOf" $ do
         after = S.runPure S.identityAnswer armed Engine.handoffTurn
     Spec.assertEqWith s "alice takes the turn (wrapping past both departed seats)" (GameState.activePlayer after) S.alice
     Spec.assertEqWith s "carol's effect ended at carol's seat, two hops past alice" (GameState.continuousEffects after) []
+
+-- One turn handoff, through the real Engine.handoffTurn -- the same idiom
+-- handoffSpec above uses.
+handoff :: GameState.GameState -> GameState.GameState
+handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
+
+-- CR 611.2a's OTHER phrasing, swept at the cleanup step rather than at the
+-- handoff. Stated against the AtTurnOf cases above, which are the reading this
+-- one is not: every case here names the turn AtTurnOf would have ended on.
+endOfNextTurnSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+endOfNextTurnSpec s = Spec.describe s "DropAtEndOfTurnOf" $ do
+  -- THE case that separates the two readings. An AtTurnOf effect created on
+  -- alice's own turn also survives here, so the assertion below is what makes
+  -- this more than a repeat: it must still be alive at alice's NEXT turn.
+  Spec.it s "CR 611.2a created on the controller's own turn, it survives that turn's cleanup and the opponent's" $ do
+    let gs0 = Setup.emptyGame S.bothPlayers
+        armed = effectWith (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.alice 1)) gs0
+        ownCleanup = Expiry.dropAtCleanup armed
+        bobsTurn = Expiry.dropAtCleanup (handoff ownCleanup)
+    Spec.assertEqWith s "alice is active on turn 1, the turn it was created on" (GameState.activePlayer armed, GameState.turnNumber armed) (S.alice, 1)
+    Spec.assertEqWith s "its own turn's cleanup leaves it" (length (GameState.continuousEffects ownCleanup)) 1
+    Spec.assertEqWith s "bob is active on turn 2" (GameState.activePlayer bobsTurn, GameState.turnNumber bobsTurn) (S.bob, 2)
+    Spec.assertEqWith s "and bob's cleanup leaves it too" (length (GameState.continuousEffects bobsTurn)) 1
+  Spec.it s "CR 611.2a it ends at the cleanup of the controller's next turn, not as that turn begins" $ do
+    let gs0 = Setup.emptyGame S.bothPlayers
+        armed = effectWith (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.alice 1)) gs0
+        alicesNext = handoff (handoff (Expiry.dropAtCleanup armed))
+        ended = Expiry.dropAtCleanup alicesNext
+    Spec.assertEqWith s "alice is active again on turn 3" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 3)
+    -- Where an AtTurnOf effect is already gone (handoffSpec above).
+    Spec.assertEqWith s "it is still there as that turn begins" (length (GameState.continuousEffects alicesNext)) 1
+    Spec.assertEqWith s "and gone once that turn's cleanup runs" (GameState.continuousEffects ended) []
+  -- The mirror board: created on an OPPONENT's turn, so the controller's next
+  -- turn is the very next one and the effect ends one cleanup sooner. Same
+  -- expiry, same sweeps, different arming turn -- so a sweep that ignored the
+  -- turn number would answer the same for both and this pair pins it.
+  Spec.it s "CR 611.2a created on an opponent's turn, it ends at the controller's next turn's cleanup" $ do
+    let gs0 = handoff (Setup.emptyGame S.bothPlayers)
+        armed = effectWith (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.alice 2)) gs0
+        alicesNext = handoff (Expiry.dropAtCleanup armed)
+        ended = Expiry.dropAtCleanup alicesNext
+    Spec.assertEqWith s "bob is active on turn 2, the turn it was created on" (GameState.activePlayer armed, GameState.turnNumber armed) (S.bob, 2)
+    Spec.assertEqWith s "bob's cleanup leaves it" (length (GameState.continuousEffects (Expiry.dropAtCleanup armed))) 1
+    Spec.assertEqWith s "alice is active on turn 3" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 3)
+    Spec.assertEqWith s "and it ends at that turn's cleanup" (GameState.continuousEffects ended) []
+  Spec.it s "CR 611.2a another player's cleanup never ends it, whatever the turn number" $ do
+    let gs0 = S.threePlayerGame
+        armed = effectWith (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.bob 1)) gs0
+        carolsTurn = handoff (handoff armed)
+    Spec.assertEqWith s "carol is active on turn 3, past bob's own turn 2" (GameState.activePlayer carolsTurn, GameState.turnNumber carolsTurn) (S.carol, 3)
+    Spec.assertEqWith s "carol's cleanup is not bob's" (length (GameState.continuousEffects (Expiry.dropAtCleanup carolsTurn))) 1
+  Spec.it s "CR 611.2a the turn handoff leaves it alone: it ends at that turn's END" $ do
+    let gs0 = Setup.emptyGame S.bothPlayers
+        armed = effectWith (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.alice 1)) gs0
+        after = Expiry.dropAtTurnOf S.alice armed
+    Spec.assertEqWith s "the sweep that ends an AtTurnOf effect keeps this one" (length (GameState.continuousEffects after)) 1
+  -- CR 800.4m, the exception to the case above: a departed player's turn never
+  -- begins, so the cleanup that would end this never comes and the rule ends it
+  -- at the point that turn would have begun instead.
+  Spec.it s "CR 800.4m a departed controller's effect ends at the seat their turn would have begun at" $ do
+    let gone = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
+        armed = effectWith (Expiry.Type.AtEndOfTurnOf (AfterTurn.MkAfterTurn S.bob 1)) gone
+        after = handoff armed
+    Spec.assertEqWith s "it survived bob's departure itself" (length (GameState.continuousEffects armed)) 1
+    Spec.assertEqWith s "carol takes the turn, not bob" (GameState.activePlayer after) S.carol
+    Spec.assertEqWith s "bob's effect ended at bob's seat" (GameState.continuousEffects after) []
 
 cleanupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 cleanupSpec s registry = Spec.describe s "DropAtCleanup" $ do
@@ -736,9 +811,6 @@ hagSettle gs = S.runPure S.identityAnswer gs Engine.settleForPriority
 hagResolveAll :: GameState.GameState -> GameState.GameState
 hagResolveAll gs = S.runPure S.identityAnswer gs Engine.priorityLoop
 
-hagHandoff :: GameState.GameState -> GameState.GameState
-hagHandoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
-
 -- alice's Hag, and exactly one creature bob controls, so the CR 603.3d target
 -- choice is forced.
 hagBoardWith :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
@@ -768,7 +840,7 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     let (mammoth, afterTrigger) = hagBoardWith hag warMammoth
         ended = Expiry.dropAtCleanup afterTrigger
-        bobsTurn = hagHandoff ended
+        bobsTurn = handoff ended
         bobsTurnSwept = Expiry.dropAtCleanup bobsTurn
     Spec.assertEqWith s "survives its own turn's CR 514.2 cleanup sweep" (Projection.powerOf mammoth ended) (Just 1)
     Spec.assertEqWith s "bob is active" (GameState.activePlayer bobsTurn) S.bob
@@ -780,7 +852,7 @@ hagSpec s registry = Spec.describe s "HagOfInnerWeakness" $ do
     hag <- S.printingOf s registry "Hag of Inner Weakness"
     warMammoth <- S.printingOf s registry "War Mammoth"
     let (mammoth, afterTrigger) = hagBoardWith hag warMammoth
-        alicesTurn = hagHandoff (hagHandoff (Expiry.dropAtCleanup afterTrigger))
+        alicesTurn = handoff (handoff (Expiry.dropAtCleanup afterTrigger))
     Spec.assertEqWith s "alice is active again" (GameState.activePlayer alicesTurn) S.alice
     -- Asserted BEFORE the upkeep trigger fires a second time, so
     -- the two effects can never be confused.
@@ -1236,6 +1308,101 @@ lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
     Spec.assertBool s (Projection.hasKeyword Keyword.Flying birdId exiled) "with its flying back"
     Spec.assertEqWith s "nothing was handed over" (GameState.continuousEffects exiled) []
 
+-- CR 601.2c: Soulfire Eruption's target slot allows none, so a fixture that
+-- wants a card exiled has to say how many. One target, aimed by S.identityAnswer.
+soulfireCast :: Prompt.Prompt r -> r
+soulfireCast p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
+  _ -> S.identityAnswer p
+
+-- Casts THAT object whenever the engine offers it, and passes otherwise. Pinned
+-- to one id rather than "the first legal cast": an answerer that searched for
+-- something castable would repair the assertion by playing a land or a card from
+-- hand instead, and the test would stay green with the permission broken.
+castingFromExile :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+castingFromExile oid p = case p of
+  Prompt.ChooseAction _ _ actions -> Maybe.fromMaybe A.Pass (List.find (S.isCastOf oid) actions)
+  _ -> S.identityAnswer p
+
+-- Whole steps, through the real turn machinery, until that turn number begins or
+-- the game ends. Bounded so a rules bug cannot hang the suite rather than fail.
+runToTurn :: (forall r. Prompt.Prompt r -> r) -> Natural -> GameState.GameState -> GameState.GameState
+runToTurn answer turn = go (128 :: Int)
+  where
+    go budget gs =
+      if budget <= 0 || GameState.turnNumber gs >= turn || Maybe.isJust (GameState.result gs)
+        then gs
+        else go (budget - 1) (S.runPure answer gs Engine.runStep)
+
+-- CR 601.3's permission, as the player it names.
+permissionOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe PlayerId.PlayerId
+permissionOn oid gs = fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile)
+
+-- alice, on turn 1, casts Soulfire Eruption off nine Mountains at one target.
+-- That exiles the top card of her library -- a Goblin Piker, the one card here
+-- she can afford off Mountains later -- and grants CR 601.3's play permission for
+-- the printed duration. Returns the exiled card and the board the spell left.
+--
+-- BOTH libraries are stocked underneath, because the cases below advance five
+-- turns and a fixture player who runs out of cards loses to CR 104.3c before the
+-- assertion runs.
+soulfireBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, GameState.GameState)
+soulfireBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  soulfire <- S.printingOf s registry "Soulfire Eruption"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let stockedWith printing pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 :: Int .. 6]
+      g1 = S.landsFor mountain S.alice 9 (Setup.emptyGame S.bothPlayers)
+      g2 = stockedWith mountain S.bob (stockedWith mountain S.alice g1)
+      -- Last in is on top, so this is the card the spell exiles.
+      g3 = snd (S.addLibraryCard piker S.alice g2)
+      (withSpell, spell) = S.handOne soulfire g3
+      cast = S.runPure soulfireCast withSpell (S.cast S.alice spell)
+      resolved = S.runPure soulfireCast cast Engine.priorityLoop
+  pure
+    ( case Game.zoneMembers Zone.Exile S.alice resolved of
+        [oid] -> oid
+        oids -> error ("Pawl.ExpirySpec: expected one exiled card, got " <> show (length oids)),
+      resolved
+    )
+
+-- Soulfire Eruption {6}{R}{R}{R} Sorcery (data/cards/soulfire-eruption.json) --
+-- "... You may play the exiled cards until the end of your next turn." (name,
+-- cost, type line and Oracle text checked against api.scryfall.com.) The pool's
+-- producer of CR 611.2a's second phrasing, and the Hag above is its exact
+-- contrast: the Hag's effect is gone as alice's next turn BEGINS, this one lasts
+-- through the whole of it.
+--
+-- alice takes turns 1, 3 and 5, so the two readings disagree about turn 3 and
+-- agree about turns 1, 2 and 4 onwards -- which is why every assertion here is
+-- stated at turn 3 or at turn 4. Both are driven through Engine.runStep, so the
+-- permission is observed the way a player would: by the engine offering the cast
+-- as a legal action, or not.
+soulfireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulfireSpec s registry = Spec.describe s "SoulfireEruption" $ do
+  Spec.it s "CR 611.2a the permission lasts through the controller's next turn, and the card is played on it" $ do
+    (pikerId, resolved) <- soulfireBoard s registry
+    -- Turns 1 and 2 are played out with nothing cast, so the card is played on
+    -- alice's NEXT turn rather than on the turn the spell resolved.
+    let alicesNext = runToTurn S.identityAnswer 3 resolved
+        played = runToTurn (castingFromExile pikerId) 4 alicesNext
+    Spec.assertEqWith s "alice's next turn began" (GameState.activePlayer alicesNext, GameState.turnNumber alicesNext) (S.alice, 3)
+    -- Where an "until your next turn" duration is already over: this is the
+    -- assertion the printed card and pawl's old, stricter reading disagree on.
+    Spec.assertEqWith s "the permission survived the handoff into it" (permissionOn pikerId alicesNext) (Just S.alice)
+    Spec.assertEqWith s "alice played the exiled card during that turn" (S.creaturesInPlay S.alice played) 1
+    Spec.assertEqWith s "so it is no longer in exile" (Game.zoneMembers Zone.Exile S.alice played) []
+  Spec.it s "CR 611.2a / 514.2 it ends as that turn ends, and no later turn of theirs can play the card" $ do
+    (pikerId, resolved) <- soulfireBoard s registry
+    -- The same board, run one turn further with the same answerer: the only
+    -- difference from the case above is which turn the cast is attempted on.
+    let afterwards = runToTurn S.identityAnswer 4 resolved
+        later = runToTurn (castingFromExile pikerId) 6 afterwards
+    Spec.assertEqWith s "turn 4 began, so alice's next turn is over" (GameState.activePlayer afterwards, GameState.turnNumber afterwards) (S.bob, 4)
+    Spec.assertEqWith s "the permission is gone" (permissionOn pikerId afterwards) Nothing
+    Spec.assertEqWith s "the card itself is untouched, still in exile" (Game.zoneMembers Zone.Exile S.alice afterwards) [pikerId]
+    Spec.assertEqWith s "and alice cannot play it on turn 5 either" (S.creaturesInPlay S.alice later, Game.zoneMembers Zone.Exile S.alice later) (0, [pikerId])
+
 poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> length units
@@ -1251,4 +1418,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   monarchSpec s registry
   garlandSpec s registry
   hagSpec s registry
+  endOfNextTurnSpec s
+  soulfireSpec s registry
   lingeringSpec s registry

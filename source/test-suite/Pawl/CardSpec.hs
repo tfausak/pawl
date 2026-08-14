@@ -500,6 +500,7 @@ durationCounts duration = case duration of
   Duration.UntilEndOfTurn -> []
   Duration.Indefinite -> []
   Duration.UntilYourNextTurn -> []
+  Duration.UntilEndOfYourNextTurn -> []
   Duration.ForAsLongAs condition -> conditionCounts condition
   Duration.UntilEndOfCombat -> []
 

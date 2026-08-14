@@ -1,5 +1,6 @@
 module Pawl.Types.Expiry where
 
+import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.While as While
@@ -32,6 +33,15 @@ data Expiry
   | -- | CR 611.2a: "until your next turn", as a concrete player. Ends as that
     -- player's turn begins.
     AtTurnOf PlayerId.PlayerId
+  | -- | CR 611.2a: "until the end of your next turn", as a concrete player and
+    -- the turn the duration began on. Ends as that player's next turn ends, in
+    -- its cleanup step (CR 514) -- a whole turn later than AtTurnOf above.
+    --
+    -- Carries the turn NUMBER as well as the player because the two readings
+    -- differ only when the duration begins during that player's own turn: the
+    -- sweep ends this at the first turn of theirs numbered above it, so their
+    -- current turn is not mistaken for their next one.
+    AtEndOfTurnOf AfterTurn.AfterTurn
   | -- | CR 500.5: effects lasting until the end of a step or phase expire as it
     -- ends. A Pawl.Types.PhaseSelector because CR 500.5 names both grains and
     -- that type spans both.

@@ -9707,9 +9707,9 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
 -- and Oracle text checked against api.scryfall.com.) It is rule 608.2f's own
 -- second example.
 --
--- ONE DEPARTURE FROM THE PRINTED CARD, stricter than printed and irrelevant to
--- what is asserted here: "until the end of your next turn" is written as "until
--- your next turn" (#1477).
+-- NO DEPARTURES FROM THE PRINTED CARD are left: "any number of target" is the
+-- unbounded count, and the permission carries the printed duration. How long
+-- that duration lasts is Pawl.ExpirySpec's question, not this group's.
 --
 -- The THREE-seat board tells apart every wrong reading of the loop:
 --

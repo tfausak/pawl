@@ -82,6 +82,8 @@ library codec
     Pawl.Codec.AffectedUnlessSpec
     Pawl.Codec.AffectPlayers
     Pawl.Codec.AffectPlayersSpec
+    Pawl.Codec.AfterTurn
+    Pawl.Codec.AfterTurnSpec
     Pawl.Codec.AgainstSlot
     Pawl.Codec.AgainstSlotSpec
     Pawl.Codec.Aggregation
@@ -833,6 +835,7 @@ library types
     Pawl.Types.AffectedPlayers
     Pawl.Types.AffectedUnless
     Pawl.Types.AffectPlayers
+    Pawl.Types.AfterTurn
     Pawl.Types.AgainstSlot
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost

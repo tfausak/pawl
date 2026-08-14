@@ -33,6 +33,13 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.codec
       Duration.UntilYourNextTurn
       """ {"type":"UntilYourNextTurn"} """
+  -- CR 611.2a: until the END of your next turn, a whole turn later.
+  Spec.it s "UntilEndOfYourNextTurn" $
+    Common.assertCodec
+      s
+      Duration.codec
+      Duration.UntilEndOfYourNextTurn
+      """ {"type":"UntilEndOfYourNextTurn"} """
   -- CR 611.2b, carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
     Common.assertCodec
