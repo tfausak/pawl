@@ -3993,6 +3993,28 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- prints one.
     Spec.assertBool s (any (anyFace (any hides . cardResolutionEffects) . Printing.card) ps) "the pool has a card exiling face down"
     Spec.assertEqWith s "only exile keeps a card face down (CR 406.3)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The sibling lint for the OTHER face-down rider, one field over and pointed
+  -- at the opposite zone: CR 708.3 is a rule about entering the BATTLEFIELD, so
+  -- on any other destination it is inert card data. Inert on a Create outright,
+  -- for the reason CR 712.14a's transformed rider is -- a token is not a card,
+  -- and no rule puts one onto the battlefield face down.
+  -- Event.changeZoneEntering gates on the destination, so this lints an
+  -- authoring mistake rather than guarding the engine.
+  Spec.it s "no effect enters face down anywhere but the battlefield" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> EntryRiders.faceDown riders && zone /= Zone.Battlefield
+          Effect.Create (Create.MkCreate _ _ riders _) -> EntryRiders.faceDown riders
+          _ -> False
+        manifests effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.faceDown riders
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no face-down entry in the pool at all
+    -- this would pass whatever a card said. Soul Summons is the card that
+    -- prints one.
+    Spec.assertBool s (any (anyFace (any manifests . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
+    Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
   -- the codec accepts. See phasePatternOffends for why a card cannot name a
   -- player, and for why this is a lint rather than a type split (#437).
