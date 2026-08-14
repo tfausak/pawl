@@ -2204,12 +2204,16 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
           (wardenOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
           1
       other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
-  -- The same CR 614.1c sentence on the second card in the pool that prints it:
-  -- Sea Gate, Reborn, the land face of Sea Gate Restoration // Sea Gate, Reborn
-  -- ("As this land enters, you may pay 3 life. If you don't, it enters tapped." --
-  -- oracle checked on Scryfall). Razorgrass Field's pair above proves the rewrite;
-  -- this pair proves the CARD reaches it, which it did not while the face was
-  -- transcribed as a bare EntryRewrite.Tapped.
+  -- The pool's other printing of the same CR 614.1c sentence: Sea Gate, Reborn,
+  -- the land face of Sea Gate Restoration // Sea Gate, Reborn ("As this land
+  -- enters, you may pay 3 life. If you don't, it enters tapped." -- oracle checked
+  -- on Scryfall). Razorgrass Field's pair above proves the rewrite; this pair
+  -- proves the CARD reaches it, which it did not while the face was transcribed as
+  -- a bare EntryRewrite.Tapped.
+  --
+  -- The PAID case is the one that carries that, and it is the only one that can:
+  -- a bare Tapped leaves exactly the board declining leaves, so the DECLINED case
+  -- below passes either way and is a regression fence rather than a proof.
   --
   -- Tidal Warrior, a {U} creature with no enters trigger, plays Soul Warden's part
   -- above: the land's "{T}: Add {U}" is the only mana in the game, so what the
@@ -2253,8 +2257,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- fixed and the only difference between the two boards is alice's life total:
   -- 4, where paying 3 is legal, against 2, where it is not. The engine's own
   -- CR 119.4 gate is therefore the only thing that can move the outcome. Were
-  -- the gate dropped, the 2-life board would pay anyway and land alice on -1;
-  -- were the prompt never raised at all, the 4-life board would enter tapped.
+  -- the gate dropped, the 2-life board would pay anyway and enter untapped; were
+  -- the prompt never raised at all, the 4-life board would enter tapped.
   --
   -- 4 and 2 rather than 3 and 2, because paying 3 at 3 life leaves 0 and CR
   -- 704.5a ends the game before the assertions run.
