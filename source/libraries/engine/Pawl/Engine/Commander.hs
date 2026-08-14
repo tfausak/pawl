@@ -90,7 +90,7 @@ commanderOwnerOf oid gs
 -- by the same commander over the course of the game loses the game". The
 -- predicate Pawl.Engine.Sba.losesNow reads, kept here for the reason this
 -- module's header gives -- Sba owns WHEN a state-based action is checked, not
--- what each one means, the same split it takes with CR 704.5z and
+-- what each one means, the same split it takes with CR 704.5aa and
 -- Pawl.Engine.Speed.
 --
 -- The MAXIMUM over the tally and never its sum, which is the whole of "by the

@@ -8105,7 +8105,7 @@ representativeEvents cond =
         -- bearer here is `departed`, the id Event.matchesTrigger is asked about
         -- below, and the counts straddle N so the event really matches.
         TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached kind n) -> one (GameEvent.CountersPut (CounterChange.MkCounterChange departed kind 0 n))
-        -- CR 310.11b: a removal on the BEARER that took the last counter, so the
+        -- CR 310.12b: a removal on the BEARER that took the last counter, so the
         -- event really matches the condition Event.matchesTrigger is asked about.
         TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved (CounterChange.MkCounterChange departed kind 1 0))
         -- CR 601.2i's own event, and the only one this condition admits. Both

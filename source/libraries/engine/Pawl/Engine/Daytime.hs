@@ -49,7 +49,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 -- The PROJECTED keywords, never the printed ones, because the layer system grants
 -- and removes abilities -- a daybound creature under Humility (CR 613.1f) has no
 -- daybound ability left to turn it over, and an effect that GRANTED one would be
--- found here. Pawl.Engine.Speed's CR 704.5z read has the same posture.
+-- found here. Pawl.Engine.Speed's CR 704.5aa read has the same posture.
 --
 -- MEMBERSHIP, not a count: both rules ask whether a permanent HAS the keyword, so
 -- a second instance turns nothing over twice.

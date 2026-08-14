@@ -195,7 +195,7 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.CountersPut (CounterChange.MkCounterChange (ObjectId.MkObjectId 3) CounterKind.Lore 1 2))
       """ {"type":"CountersPut","value":{"object":3,"kind":{"type":"Lore"},"before":1,"after":2}} """
-  -- CR 310.11b's record, and the pair runs the other way: before > after.
+  -- CR 310.12b's record, and the pair runs the other way: before > after.
   Spec.it s "CountersRemoved" $
     Common.assertCodec
       s

@@ -1,5 +1,5 @@
 -- | CR 702.179, "start your engines!": speed as a per-player resource, the
--- state-based action that starts it (CR 704.5z) and the inherent triggered
+-- state-based action that starts it (CR 704.5aa) and the inherent triggered
 -- ability that raises it (CR 702.179d).
 --
 -- Pawl.Engine.Monarch's sibling, and for the same reason: rule 702.179 gives a
@@ -78,12 +78,12 @@ maxSpeed = 4
 speedOf :: PlayerId -> GameState -> Maybe Natural
 speedOf pid gs = fmap (Maybe.fromMaybe 0 . Player.speed) (Map.lookup pid (GameState.players gs))
 
--- | CR 704.5z: the players who control a permanent with start your engines! and
+-- | CR 704.5aa: the players who control a permanent with start your engines! and
 -- have no speed. The state-based action's CLASSIFIER half, kept pure and taking
 -- the pre-pass projection so Pawl.Engine.Sba can judge it against the same board
 -- as every other CR 704.5 clause (CR 704.3's simultaneity).
 --
--- Membership, not a count: CR 704.5z asks whether a player controls "a permanent
+-- Membership, not a count: CR 704.5aa asks whether a player controls "a permanent
 -- with start your engines!", so a second copy starts no second set of engines.
 --
 -- The PROJECTED keywords, never the printed ones, because the layer system grants
@@ -104,7 +104,7 @@ startingEngines pcs gs =
       unstarted pid = fmap Player.speed (Map.lookup pid (GameState.players gs)) == Just Nothing
    in filter unstarted (Set.toAscList revvers)
 
--- | CR 704.5z's ACTION half: "that player's speed becomes 1".
+-- | CR 704.5aa's ACTION half: "that player's speed becomes 1".
 --
 -- A set and not an increase, so it cannot stack with CR 702.179d's rise -- and
 -- startingEngines above has already established the player had none, which is
@@ -172,7 +172,7 @@ belowMaxSpeed =
 --
 -- Only the ACTIVE player's ability can fire, which is CR 702.179d's "during your
 -- turn" and not a shortcut. Only a player with 1 or more speed HAS the ability at
--- all -- the rule hangs it off exactly that -- so a player CR 704.5z has not yet
+-- all -- the rule hangs it off exactly that -- so a player CR 704.5aa has not yet
 -- reached is asked nothing.
 inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
 inherentPending events gs =

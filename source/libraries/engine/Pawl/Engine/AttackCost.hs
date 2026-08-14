@@ -42,7 +42,7 @@ import Pawl.Types.ObjectId (ObjectId)
 -- a Prison its own controller is attacking WITH taxes nothing.
 --
 -- AttackTarget.OfBattle is untaxed for the same reason and one more: attacking a
--- battle someone protects is not attacking that player at all (CR 310.8b), and
+-- battle someone protects is not attacking that player at all (CR 310.9b), and
 -- the battle is not a player, so the OfPlayer comparison below cannot match it
 -- however the board is arranged.
 --

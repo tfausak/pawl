@@ -1443,7 +1443,7 @@ runEntry batch oid = do
   Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
   designateProtector oid
 
--- CR 310.8a: "as a battle enters the battlefield, its controller chooses a player
+-- CR 310.9a: "as a battle enters the battlefield, its controller chooses a player
 -- to be its protector." Run for every entering object, and a no-op for all but a
 -- battle.
 --
@@ -1451,7 +1451,7 @@ runEntry batch oid = do
 -- beside is the rules' own. CR 310.4b says outright that a battle "has the
 -- intrinsic ability 'This permanent enters with a number of defense counters on it
 -- equal to its printed defense number'" and that "this ability creates a
--- replacement effect (see rule 614.1c)"; CR 310.8a says none of that. It names no
+-- replacement effect (see rule 614.1c)"; CR 310.9a says none of that. It names no
 -- ability, cites no rule 614, and reads as a bare instruction about entering. So
 -- the counters go through the CR 616.1 loop above and this does not.
 --
@@ -1476,7 +1476,7 @@ designateProtector oid = do
     -- Unreachable, and defensive for the entry rewrites' reason: the object is
     -- materialized on the battlefield before this runs, so controllerOf falls
     -- back to its owner. Designates NOBODY rather than conjuring a player -- CR
-    -- 310.10 is exactly the rule for a battle with no protector, and repairs this
+    -- 310.11 is exactly the rule for a battle with no protector, and repairs this
     -- at the next state-based action check.
     Nothing -> pure ()
     Just controller -> do
@@ -4369,8 +4369,8 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
     GameEvent.LifeGained {} -> False
-  -- CR 310.11b: the LAST counter of this kind came off the BEARER. The mirror of
-  -- the arm above, and narrower in the way rule 310.11b is narrower than rule
+  -- CR 310.12b: the LAST counter of this kind came off the BEARER. The mirror of
+  -- the arm above, and narrower in the way rule 310.12b is narrower than rule
   -- 714.2b: there is no threshold to cross, only a count that reached none.
   --
   -- `after == 0` alone, with no `before > 0` conjunct: GameEvent.CountersRemoved is
@@ -5879,7 +5879,7 @@ eventTriggers events gs =
       -- from its keywords. Derived from POST-LAYER counts, so Humility takes them
       -- away and a layer-6 grant adds them without special-casing. Shared by both
       -- candidate sources, so a live and a last-known permanent read alike.
-      -- CR 310.11b's Siege ability is minted the same way and for the same reason,
+      -- CR 310.12b's Siege ability is minted the same way and for the same reason,
       -- off the same finished projection: rule 310 gives it, no card prints it, and
       -- the scan below never learns which rule produced any of these.
       abilitiesOf pc = PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc) <> Battle.triggeredAbilitiesOf pc

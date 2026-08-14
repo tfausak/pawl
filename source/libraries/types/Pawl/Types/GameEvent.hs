@@ -420,7 +420,7 @@ data GameEvent
     CountersPut CounterChange.CounterChange
   | -- | Counters were REMOVED from an object -- the object, the kind, and the
     -- counts of that kind on it BEFORE and AFTER. CountersPut's mirror, and shaped
-    -- the same way for the same reason: CR 310.11b's Siege ability asks whether the
+    -- the same way for the same reason: CR 310.12b's Siege ability asks whether the
     -- LAST counter came off, which is a fact about the pair (before > 0, after ==
     -- 0) and not about the amount alone.
     --

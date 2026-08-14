@@ -156,22 +156,22 @@ attackablePlaneswalkers defender gs =
 -- order.
 --
 -- Protects, not controls -- and that is the whole rule rather than a nicety. CR
--- 310.8b: "A battle can be attacked by any attacking player for whom its protector
+-- 310.9b: "A battle can be attacked by any attacking player for whom its protector
 -- is a defending player. Notably, a Siege battle can be attacked by its own
--- controller." Since CR 310.11a puts a Siege's protector among its controller's
+-- controller." Since CR 310.12a puts a Siege's protector among its controller's
 -- opponents, filtering by the protector is what admits the active player's OWN
 -- battle to this list, which filtering by the controller (attackablePlaneswalkers'
 -- rule, CR 306.6) would never do. So this walks the whole battlefield rather than
 -- Projection.controls' one player's slice.
 --
--- CR 310.8b's first sentence -- "a battle's protector can never attack it" -- needs
+-- CR 310.9b's first sentence -- "a battle's protector can never attack it" -- needs
 -- no check of its own here: the argument is the DEFENDING player, whom CR 506.2a
 -- draws from the active player's opponents, so a battle on this list is protected
 -- by someone the attacking player is not.
 --
 -- PROJECTED card types (Battle.isBattle) for attackablePlaneswalkers' reason: CR
 -- 613.1d puts card types in layer 4, so a permanent that became a battle is one and
--- a battle that stopped being one is not. The protector survives that (CR 310.8g),
+-- a battle that stopped being one is not. The protector survives that (CR 310.9g),
 -- which is exactly why the type has to be re-asked rather than assumed from the
 -- designation being present.
 --
@@ -226,7 +226,7 @@ attackedThisStep pid gs =
 -- way removeChanged samples its two clauses, and the difference is invisible:
 -- Damage.combatRecipient asks it at CR 510.1's assignment, whose own CR 510.1b is
 -- phrased for precisely this case, and Battle.isBeingAttacked asks the record for
--- CR 704.5w's rider, which needs only whether a battle is named at all.
+-- CR 704.5x's rider, which needs only whether a battle is named at all.
 -- Defender.playerOf, CR 508.5's reader, needs no removal test of its own: the
 -- defending player of a creature attacking a planeswalker is the record's
 -- defending player whether or not the planeswalker is still there (rule 508.5's
@@ -267,12 +267,11 @@ stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
 -- the list for the same reason a planeswalker that stopped being one is, and CR
 -- 506.4's "leaves the battlefield" falls out of the list being battlefield-scoped.
 --
--- It is one clause WIDER than CR 506.4, because the list also asks who protects
--- the battle: a protector moved to a third player mid-combat (CR 310.8f) would read
--- here as removed from combat, where rule 506.4 lists no such clause. No effect in
--- the pool can move a designation (#853), and CR 310.8d is why the extra clause is
--- the conservative direction anyway -- the defending player would have moved with
--- it.
+-- The list also asks who protects the battle, so a protector moved to a third
+-- player mid-combat (CR 310.9f) reads here as removed from combat -- which is
+-- what rule 506.4 says, since the 2026-08-07 update named the protector beside
+-- the controller in its list. No effect in the pool can move a designation
+-- (#853), so nothing observes the agreement either way.
 stillAttackedBattle :: ObjectId -> GameState -> Bool
 stillAttackedBattle oid gs = case Combat.defender (GameState.combat gs) of
   Nothing -> False
@@ -828,7 +827,7 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- attacking creature that refers to a defending player, so the player is
       -- read off the ATTACK rather than off the blocker's controller -- those two
       -- coincide only while there is exactly one defending player (CR 802, #175),
-      -- and CR 310.8d breaks them apart at two seats as soon as a battle is
+      -- and CR 310.9d breaks them apart at two seats as soon as a battle is
       -- attacked. Nothing means the object is not attacking, so no landwalk of its
       -- can restrict anything -- or, for an attacker whose BATTLE has left the
       -- battlefield, that pawl has no protector left to read (#1248). This is the
@@ -1637,14 +1636,14 @@ putOntoBattlefieldAttacking oid = do
 -- them. Both need the attack-multiple-players option, which pawl has no options
 -- concept to read (#175).
 --
--- CR 310.8c -- "a battle's protector may block creatures attacking that battle
+-- CR 310.9c -- "a battle's protector may block creatures attacking that battle
 -- with creatures they control; creatures controlled by other players can't block
 -- those attackers" -- needs no clause of its own, and the proof is two rules
 -- meeting rather than an accident. This function asks the defending player and
 -- nobody else, and attackableBattles admits a battle only when the defending
 -- player is its protector, so every creature attacking a battle is being blocked
 -- by that battle's protector or by nobody. Proved by Pawl.BattleSpec's pair of CR
--- 310.8c cases, which move one Piker between two opponents' sides. That equality
+-- 310.9c cases, which move one Piker between two opponents' sides. That equality
 -- of "defending player" and "protector" is a fact about a single defending
 -- player, and CR 802's option is again what would break it (#175).
 --

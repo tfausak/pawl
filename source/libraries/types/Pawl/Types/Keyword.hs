@@ -1018,7 +1018,7 @@ data Keyword
     -- (#1391).
     Plot (Cost.Cost Keyword)
   | -- | 702.179a: "start your engines!". A STATIC ability whose whole content is
-    -- a state-based action -- CR 704.5z gives a player with no speed who controls
+    -- a state-based action -- CR 704.5aa gives a player with no speed who controls
     -- a permanent with this keyword a speed of 1 -- so nothing mints an ability
     -- from it and Pawl.Engine.Sba reads it off the projection directly, the way
     -- flying is read where it matters rather than turned into an object.

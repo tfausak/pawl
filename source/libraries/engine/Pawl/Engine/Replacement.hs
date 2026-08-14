@@ -917,7 +917,7 @@ chooserOf gs event = case event of
     Recipient.ToCreature oid -> Projection.controllerOf oid gs
     Recipient.ToPlaneswalker oid -> Projection.controllerOf oid gs
     -- The battle's CONTROLLER, not its protector. CR 616.1 asks for the affected
-    -- object's controller and CR 310.8d substitutes the protector only for the
+    -- object's controller and CR 310.9d substitutes the protector only for the
     -- "defending player", which rule 616 nowhere says.
     Recipient.ToBattle oid -> Projection.controllerOf oid gs
     Recipient.ToObject oid -> Projection.controllerOf oid gs

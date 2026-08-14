@@ -618,7 +618,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached {} -> []
-  -- CR 310.11b carries a counter kind alone.
+  -- CR 310.12b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- CR 601.2i's Filter is a predicate over the spell that was cast, and a Filter
   -- holds no Count, exactly as CR 603.6a's does above.
@@ -2199,7 +2199,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached {} -> []
-  -- CR 310.11b carries a counter kind alone.
+  -- CR 310.12b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
@@ -3914,7 +3914,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
     -- Half the rejected shape is in the pool: Act on Impulse binds a group. The
     -- OTHER half is not, and cannot be -- no card prints an OfferCast at all,
-    -- since the only writer of that opcode is Pawl.Engine.Battle's CR 310.11b
+    -- since the only writer of that opcode is Pawl.Engine.Battle's CR 310.12b
     -- offer, which the engine bakes. So the REJECTING direction is proven here
     -- against a hand-built pair rather than by a corpus sweep, the posture the
     -- phase-skip lint below takes against Eon Hub, and the sweep is a fence

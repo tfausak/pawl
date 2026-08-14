@@ -21,11 +21,11 @@ import Pawl.Types.PlayerId (PlayerId)
 -- attacking". One arm per AttackTarget arm, because that rule's case split IS this
 -- type's.
 --
--- CR 310.8d is the battle arm's other half, and it is wider than CR 508.5: while a
+-- CR 310.9d is the battle arm's other half, and it is wider than CR 508.5: while a
 -- battle is being attacked, EVERY rule and effect that refers to the defending
 -- player relative to it means the protector. Reading it off the protector here
 -- rather than off Combat.defender is what makes that true of a battle whose
--- controller is the attacking player -- the case CR 310.8b's "notably" creates.
+-- controller is the attacking player -- the case CR 310.9b's "notably" creates.
 --
 -- The planeswalker arm answers CR 508.5's BOTH sentences with the combat record's
 -- defending player, and never asks the planeswalker. Both ways a target is
@@ -48,7 +48,7 @@ import Pawl.Types.PlayerId (PlayerId)
 --
 -- Nothing means the target names no player: no defending player at all (outside
 -- combat), a battle that has left the battlefield, or a battle mid-repair with no
--- designation (CR 310.10).
+-- designation (CR 310.11).
 --
 -- The BATTLE arm still reads live, so CR 508.5's second sentence is unanswered for
 -- a battle removed from combat -- its protector goes with it and this answers

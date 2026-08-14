@@ -727,7 +727,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       """ {"type":"ShuffleIntoLibrary","value":{"library":{"type":"InSlot","value":"player"},"ref":{"type":"InSlot","value":"cards"}}} """
-  -- CR 608.2g. Written by no card -- rule 310.11b's battles and rule 702's
+  -- CR 608.2g. Written by no card -- rule 310.12b's battles and rule 702's
   -- keywords mint this opcode in the engine (Pawl.Engine.Battle,
   -- Pawl.Engine.Keyword) -- so this fixture is the whole of its wire coverage.
   Spec.it s "OfferCast" $ do
@@ -742,7 +742,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
             }
       )
       """ {"type":"OfferCast","value":{"slot":"exiled"}} """
-    -- CR 310.11b's two riders, which is what stops the offer being elided.
+    -- CR 310.12b's two riders, which is what stops the offer being elided.
     Common.assertJsonCodec
       s
       toJson

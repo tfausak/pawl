@@ -2601,7 +2601,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               CounterKind.Lore -> []
               -- Nor does a defense counter, for the reason loyalty's and lore's
               -- arms give: no CR 613 layer reads defense. CR 310.6's removal, CR
-              -- 310.11b's trigger and CR 704.5v's state-based action all count
+              -- 310.12b's trigger and CR 704.5v's state-based action all count
               -- Object.counters directly, exactly as those two do.
               CounterKind.Defense -> []
               -- Nor a time counter (CR 702.63a): vanishing's three minted
@@ -3698,8 +3698,8 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- them; the keyword call at the end also mints CR 702.37b's megamorph row, which
 -- is a CR 614.1e one (see below).
 --
--- CR 310.8a's protector is NOT here, though it is also chosen as a battle enters:
--- rule 310.8a names no ability and cites no rule 614, where CR 310.4b says
+-- CR 310.9a's protector is NOT here, though it is also chosen as a battle enters:
+-- rule 310.9a names no ability and cites no rule 614, where CR 310.4b says
 -- outright that its ability "creates a replacement effect". It lives in
 -- Pawl.Engine.Event.designateProtector instead, which explains what minting it
 -- here cost.
