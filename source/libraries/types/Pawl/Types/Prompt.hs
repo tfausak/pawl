@@ -458,7 +458,9 @@ data Prompt r where
   --
   -- Carrying the candidate sets rather than the bare ranges, because the answer is
   -- a real decision and the player deciding needs to see what they would be
-  -- aiming at.
+  -- aiming at -- and because a count that names no maximum ("any number of target
+  -- ...") is bounded by those candidates and nothing else, so the pair is what
+  -- states the range at all (Pawl.Types.TargetCount.ceilingOn).
   AnnounceTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (TargetCount.TargetCount, Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName Natural.Natural)
   -- | CR 612: choose the two basic land types for a text-changing spell's slot.
   --

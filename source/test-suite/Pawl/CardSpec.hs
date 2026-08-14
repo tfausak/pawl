@@ -928,7 +928,7 @@ modalCountsOffend :: Modal.Modal Card.Type.Card -> Bool
 modalCountsOffend modal =
   let modeOffends mode =
         let read_ = Resolve.modeSlots mode
-            plural targetSlot = TargetCount.most (TargetSlot.count targetSlot) > 1
+            plural targetSlot = TargetCount.plural (TargetSlot.count targetSlot)
             offends slot targetSlot = plural targetSlot && Map.lookup slot read_ == Just SlotArity.One
          in or (Map.elems (Map.mapWithKey offends (Mode.targetSlots mode)))
    in any modeOffends (Modal.modes modal)
@@ -3532,7 +3532,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     <> fmap TriggeredAbility.modal (Face.triggeredAbilities face)
         modals = concatMap carriers ps
         takesSeveral (_, modal) =
-          any (any ((> 1) . TargetCount.most . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
+          any (any (TargetCount.plural . TargetSlot.count) . Mode.targetSlots) (Modal.modes modal)
     -- The pool must actually contain one, or the sweep says nothing.
     Spec.assertBool s (any takesSeveral modals) "the pool has a slot that takes more than one target"
     Spec.assertEqWith s "no multi-target slot is read one at a time" (fmap fst (filter (modalCountsOffend . snd) modals)) []
@@ -3557,6 +3557,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.Sacrifice slot))))
       "nor does a one-target slot read as one object"
+    -- CR 601.2c's "any number of target ...", which states no maximum to compare
+    -- against: an unbounded slot is plural, so the same one-object reader offends.
+    -- No card in the corpus makes this mistake, so this is the only observer
+    -- TargetCount.plural's unbounded arm has.
+    Spec.assertBool
+      s
+      (modalCountsOffend (modeWith (TargetSlot.anyNumber Pool.Creatures Nothing) (Effect.Sacrifice slot)))
+      "an unbounded slot read as one object offends too"
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
   -- proven here instead, against hand-built offenders and against the four real

@@ -110,8 +110,7 @@
             "targetSlots": {
               "victims": {
                 "count": {
-                  "least": 0,
-                  "most": 3
+                  "least": 0
                 },
                 "filter": {
                   "type": "Not",

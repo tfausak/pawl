@@ -169,8 +169,9 @@ protectorCandidates pc controller playing
 -- controller is its own protector, carries no rider at all. Rule 704 governs where
 -- it disagrees with 310.10's shorter statement, since 310.10's own last sentence
 -- defers to it ("This is a state-based action (see rule 704)"). The disagreement
--- is unreachable besides: 704.5x needs a control-change effect that can name a
--- battle, and no card in the pool has one (#853).
+-- is reachable: 704.5x needs a control-change effect that can name a battle, and
+-- Zealous Conscripts is one -- Target.permanentRecipients is the whole
+-- battlefield, so a battle is a legal recipient for its GainControl (#853).
 --
 -- `attacked` is Battle.isBeingAttacked at the call. The rider suspends the
 -- re-choice rather than cancelling it: Gatherer's ruling is that the controller
