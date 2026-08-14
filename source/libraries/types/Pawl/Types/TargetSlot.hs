@@ -40,3 +40,8 @@ required p f = MkTargetSlot p f TargetCount.one
 -- times up to N, the empty answer included.
 upTo :: Natural.Natural -> Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
 upTo n p f = MkTargetSlot p f (TargetCount.upTo n)
+
+-- CR 601.2c's "any number of target ...": the same slot with no printed ceiling,
+-- so the board's candidates are the only bound.
+anyNumber :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
+anyNumber p f = MkTargetSlot p f TargetCount.anyNumber

@@ -3548,6 +3548,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (modalCountsOffend (modeWith (TargetSlot.required Pool.Creatures Nothing) (Effect.Sacrifice slot))))
       "nor does a one-target slot read as one object"
+    -- CR 601.2c's "any number of target ...", which states no maximum to compare
+    -- against: an unbounded slot is plural, so the same one-object reader offends.
+    -- No card in the corpus makes this mistake, so this is the only observer
+    -- TargetCount.plural's unbounded arm has.
+    Spec.assertBool
+      s
+      (modalCountsOffend (modeWith (TargetSlot.anyNumber Pool.Creatures Nothing) (Effect.Sacrifice slot)))
+      "an unbounded slot read as one object offends too"
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
   -- proven here instead, against hand-built offenders and against the four real
