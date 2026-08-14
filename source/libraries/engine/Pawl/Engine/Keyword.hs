@@ -2742,8 +2742,8 @@ fabricate n =
                 Cost.mana = Just (ManaCost.MkManaCost []),
                 Cost.components = [CostComponent.PutPlusOneCountersOnThis n]
               },
-          -- CR 701.63a prints CR 118.12a's rewriting already done, so the token
-          -- is the "if you don't" branch.
+          -- Rule 702.123a prints CR 118.12a's rewriting already done, so the
+          -- Servos are the "if you don't" branch.
           PayGate.branch = PayBranch.IfNotPaid
         }
     spawn =

@@ -7653,8 +7653,8 @@ youngPyromancerSpec s registry =
 -- Desolation Twin, {10} Creature -- Eldrazi 10/10: "When you cast this spell,
 -- create a 10/10 colorless Eldrazi creature token." Chosen from the cast-trigger
 -- family because it is the one member whose WHOLE printed text pawl can write:
--- every other printing in that family wants CR 707.10's copy-a-spell or CR
--- 118.12's positive half (#701). Nothing of this card is omitted.
+-- every other printing in that family wants CR 707.10's copy-a-spell. Nothing of
+-- this card is omitted.
 --
 -- The bearer is the SPELL, which is what makes this a zone test rather than
 -- another SpellCast case: at CR 601.2i the Twin is on nobody's battlefield and in

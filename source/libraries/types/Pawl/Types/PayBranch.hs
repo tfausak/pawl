@@ -13,6 +13,10 @@ module Pawl.Types.PayBranch where
 -- Not a Bool, for Pawl.Types.Optionality's reason: @IfPaid@ says which half of
 -- the rule is in play where @True@ would say nothing.
 --
+-- Not implemented: CR 118.12's mandatory limb. Both arms here describe a cost
+-- its payer may decline, and Standstill's "sacrifice this enchantment. If you
+-- do" is one they must pay if able (#1554).
+--
 -- The "may" is not a separate question in either half. CR 118.12a's rewriting
 -- makes the "unless" cost an offer -- "[A player may do something else]" -- and
 -- the positive half prints that "may" itself, so Pawl.Types.PayGate's own

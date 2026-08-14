@@ -35,10 +35,12 @@ import qualified Pawl.Types.SlotName as SlotName
 -- controller pays {X}. Scry 2", where the scry happens either way. No card in the
 -- pool prints that shape yet, and Condescend itself also wants {X} in a
 -- resolution cost (CR 107.3, CR 118.4), so #703 stays open on the card rather
--- than on the carrier. Neither does any card hang BOTH branches off one payment
--- -- Divert Disaster's "counter target spell unless its controller pays {2}. If
--- they do, you create a Lander token" -- which would be two clauses sharing one
--- answer rather than two offers (#703).
+-- than on the carrier.
+--
+-- Not implemented: two clauses hanging off ONE payment -- Divert Disaster's
+-- "counter target spell unless its controller pays {2}. If they do, you create a
+-- Lander token". A gate per clause is a prompt per clause, so that card would be
+-- asked twice and charged twice (#1555).
 data PayGate = MkPayGate
   { -- | Which player is offered the cost. A SLOT rather than a
     -- Pawl.Types.PlayerRef, because the answer Mana Leak needs is "the
