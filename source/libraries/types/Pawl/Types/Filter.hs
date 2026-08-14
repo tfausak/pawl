@@ -265,8 +265,9 @@ data Filter keyword
     -- source and this one against an object the RESOLUTION named, and neither
     -- carries an id -- both read Pawl.Engine.Filter.Context, this one through
     -- `slotObjects`. So the atom is what lets a Count NARROW a zone to one card
-    -- the effect already has in hand, which is the only reason a count over a
-    -- hidden zone (CR 400.2) answers a question the card is entitled to ask.
+    -- the resolution already named, which is what makes Into the Wilds' count
+    -- over a hidden zone (CR 400.2) a question about the card its controller was
+    -- shown rather than about the library it sits in.
     --
     -- NOT ControlledByBound, which asks after the bound object's CONTROLLER: CR
     -- 108.4 gives a card in a library none at all, so that atom is vacuously

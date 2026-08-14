@@ -329,11 +329,11 @@ data Effect card
     -- is not carried for that reason -- see Pawl.Types.LookAt.
     --
     -- The ObjectRef is what makes this reusable where Scry's look is not:
-    -- ObjectRef.TopOfLibrary is the only arm that can name a card in a library,
-    -- a position rather than a characteristic. Several cards bind as a GROUP,
-    -- which ObjectRef.InSlot reads and Filter.IsBound cannot (#1532); no
-    -- printing in the pool looks at more than one card and then asks a question
-    -- about what it saw.
+    -- ObjectRef.TopOfLibrary names a card in a library by POSITION, which is the
+    -- one thing no Filter can say about a hidden zone (CR 400.2). A look naming
+    -- SEVERAL cards binds them as a group, which ObjectRef.InSlot reads and
+    -- Filter.IsBound cannot -- so no card in the corpus can yet look at more than
+    -- one card and then ask a question about what it saw (#1532).
     --
     -- Not Explore's shape (CR 701.44a), which reveals PUBLICLY and decides its
     -- branch inside the opcode because rule 701.44 is part of the rulebook. This
