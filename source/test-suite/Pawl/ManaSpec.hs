@@ -139,6 +139,28 @@ castabilitySpec s registry = Spec.describe s "Castability" $ do
     Spec.assertEqWith s "one creature in play" (S.creaturesInPlay S.alice gs) 1
     Spec.assertEqWith s "lands tapped" (S.tappedCount S.alice gs) 1
 
+-- The board the two CR 604.2 cases below share: alice controls a Synthetic Waxing
+-- Moon ("As long as you control a Forest, nonbasic lands are Mountains") and a
+-- Reliquary Tower, plus -- and only when `forest` -- one Forest. The two runs
+-- differ in that one permanent and in nothing else, so neither the Tower's mana
+-- nor the Moon's own text can be what moved between them.
+--
+-- The Forest is BASIC, so the Moon's own affected set does not name it: adding it
+-- turns the clause on without adding a second permanent for CR 305.7 to reach.
+-- Reliquary Tower's "{T}: Add {C}" is the discriminator, and colorless is a mana
+-- type the board can produce no other way -- the Forest makes green and a
+-- Mountain'd Tower red.
+waxingMoonBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, GameState.GameState)
+waxingMoonBoard waxingMoon reliquaryTower forest hasForest =
+  let (towerId, g1) = S.addCreature reliquaryTower S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g2) = S.addCreature waxingMoon S.alice g1
+   in (towerId, if hasForest then snd (S.addCreature forest S.alice g2) else g2)
+
+-- One mana unit of `mt`, untagged -- what tapping a land for its one mana ability
+-- floats.
+oneUnit :: ManaType.ManaType -> Mana.Type.Mana
+oneUnit mt = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = mt, ManaUnit.tags = Set.empty}]
+
 pikerCost :: ManaCost.ManaCost
 pikerCost = ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Red)]
 
@@ -274,6 +296,39 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         (_, gs) = S.addCreature bloodMoon S.alice g1
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf towerId gs) "red available (CR 305.6, from the new Mountain type)"
     Spec.assertBool s (ManaType.Colorless `notElem` Mana.manaTypesOf towerId gs) "colorless gone (the printed {T}: Add {C} was stripped)"
+
+  -- CR 604.2's "as long as" clause on the STRIPPER, which CR 305.7's gate used to
+  -- ignore: an ability whose clause is currently false creates no continuous
+  -- effect, so it sets no subtype AND strips no rules text. Wired open, the two
+  -- halves disagreed -- the Tower kept its {C} out of the layer fold (gatherStatic
+  -- gated the ability) and lost it to CR 305.7 anyway (setLandSubtypeEffects did
+  -- not), so it produced no mana at all.
+  --
+  -- Synthetic, and the card file says why: Zhao, the Moon Slayer is the only
+  -- printed static ability pairing a clause with a land-subtype set, and its
+  -- clause counts a conqueror counter, which no card can name yet (#1386).
+  --
+  -- Tapped through Cost.tapForMana rather than read off Mana.manaTypesOf, so what
+  -- is asserted is the mana a player actually floated.
+  Spec.it s "CR 604.2/305.7 with no Forest the Waxing Moon strips nothing, and the Tower still taps for {C}" $ do
+    waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
+    reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+    forest <- S.printingOf s registry "Forest"
+    let (towerId, gs) = waxingMoonBoard waxingMoon reliquaryTower forest False
+    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (Cost.tapForMana towerId))) (oneUnit ManaType.Colorless)
+    Spec.assertBool s (Subtype.Mountain `notElem` Set.toList (Projection.subtypesOf towerId gs)) "and the layer-4 set did not happen either"
+
+  -- The same board with the clause satisfied, which is what keeps the case above
+  -- from passing on a gate wired SHUT: one Forest arrives, the Moon's effect
+  -- starts to apply, and the Tower is a Mountain that taps for red alone.
+  Spec.it s "CR 604.2/305.7 one Forest turns the clause on, and the Tower taps for {R}" $ do
+    waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
+    reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+    forest <- S.printingOf s registry "Forest"
+    let (towerId, gs) = waxingMoonBoard waxingMoon reliquaryTower forest True
+    Spec.assertEqWith s "pool" (Game.poolOf S.alice (S.runPure S.identityAnswer gs (Cost.tapForMana towerId))) (oneUnit (ManaType.Colored Color.Red))
+    Spec.assertBool s (Subtype.Mountain `elem` Set.toList (Projection.subtypesOf towerId gs)) "the Tower is a Mountain (CR 305.7's set)"
+    Spec.assertEqWith s "and its printed ability is gone" (Projection.abilitiesOf towerId gs) []
 
   -- CR 305.7's strip again, with the new type CHOSEN as an Aura entered (CR
   -- 614.1c) rather than printed on the stripper. Reliquary Tower's "{T}: Add
