@@ -240,7 +240,7 @@ data EntryRewrite
     -- sentence, and CR 614.12a settles the choice before the permanent enters, so
     -- there is no board for a variable amount to be measured against yet.
     PayLifeOrTapped Natural.Natural
-  | -- | CR 712.13a via CR 614.1c: the ability that makes a double-faced spell
+  | -- | CR 712.13a via CR 614.1d: the ability that makes a double-faced spell
     -- with its FRONT face up on the stack enter the battlefield transformed. CR
     -- 616.1d ranks it a bucket of its own
     -- (Pawl.Types.ReplacementBucket.BackFaceOnEntry), which is what distinguishes

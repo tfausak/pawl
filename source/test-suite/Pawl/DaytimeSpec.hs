@@ -159,23 +159,30 @@ expertBack = CardName.MkCardName (Text.pack "Infested Werewolf")
 insectToken :: CardName.CardName
 insectToken = CardName.MkCardName (Text.pack "Insect Token")
 
--- The face alice's Infestation Expert permanent is showing, found by name rather
--- than by an ObjectId: CR 400.7 makes the resolving spell a NEW object, so the
--- id the cast returned is not the permanent's.
-expertFace :: GameState.GameState -> Maybe CardName.CardName
-expertFace gs =
-  Maybe.listToMaybe
-    [ name
-    | oid <- Game.zoneMembers Zone.Battlefield S.alice gs,
-      name <- Maybe.maybeToList (faceNameOf oid gs),
-      name == expertFront || name == expertBack
-    ]
+-- Every face alice's battlefield shows that belongs to Infestation Expert, found
+-- by name rather than by an ObjectId: CR 400.7 makes the resolving spell a NEW
+-- object, so the id the cast returned is not the permanent's.
+--
+-- A LIST rather than the first match, so a board that somehow grew two of them
+-- fails loudly instead of answering about one.
+expertFaces :: GameState.GameState -> [CardName.CardName]
+expertFaces gs =
+  [ name
+  | oid <- Game.zoneMembers Zone.Battlefield S.alice gs,
+    name <- Maybe.maybeToList (faceNameOf oid gs),
+    name == expertFront || name == expertBack
+  ]
 
--- alice controls Tovolar and five Forests, with Infestation Expert in hand, in a
--- main phase with priority. `spells` is what the previous turn's active player
--- cast, which is the whole of what decides the designation the spell will enter
--- under: the settle makes it day (CR 702.145d), and CR 502.2's untap check then
--- turns it to night on nothing, or leaves it day on one.
+-- alice controls Tovolar and five Forests, with Infestation Expert in hand.
+-- `spells` is what the previous turn's active player cast, which is the whole of
+-- what decides the designation the spell will enter under: the settle makes it
+-- day (CR 702.145d), and CR 502.2's untap check then turns it to night on
+-- nothing, or leaves it day on one.
+--
+-- S.handOne leaves the board in a main phase with alice holding priority, and
+-- `untapStep` takes the phase it runs CR 502.2 for as an argument rather than
+-- moving the board to it, so that stands. Nothing here is about timing anyway:
+-- S.cast drives Pawl.Engine.Cast directly.
 --
 -- Tovolar is on the board only to give it a designation at all -- CR 702.145d
 -- needs a permanent with daybound -- and five Forests is exactly Infestation
@@ -230,7 +237,7 @@ entrySpec s registry = Spec.describe s "EntersTransformed" $ do
     let (spellId, board) = expertBoard tovolar forest expert 0
         (entered, triggered) = castExpert spellId board
     Spec.assertEqWith s "it is night when the spell resolves" (GameState.daytime board) (Just Daytime.Night)
-    Spec.assertEqWith s "the permanent is showing its back face already" (expertFace entered) (Just expertBack)
+    Spec.assertEqWith s "the permanent is showing its back face already" (expertFaces entered) [expertBack]
     Spec.assertEqWith s "and its back face's trigger made two Insects" (S.countOnBattlefieldByName insectToken S.alice triggered) 2
   -- The negative, the same board with ONE spell cast during the previous turn
   -- instead of none: CR 502.2 leaves it day, CR 702.145b's condition fails, and
@@ -243,7 +250,7 @@ entrySpec s registry = Spec.describe s "EntersTransformed" $ do
     let (spellId, board) = expertBoard tovolar forest expert 1
         (entered, triggered) = castExpert spellId board
     Spec.assertEqWith s "it is day when the spell resolves" (GameState.daytime board) (Just Daytime.Day)
-    Spec.assertEqWith s "the permanent is showing its front face" (expertFace entered) (Just expertFront)
+    Spec.assertEqWith s "the permanent is showing its front face" (expertFaces entered) [expertFront]
     Spec.assertEqWith s "and its front face's trigger made one Insect" (S.countOnBattlefieldByName insectToken S.alice triggered) 1
 
 restrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

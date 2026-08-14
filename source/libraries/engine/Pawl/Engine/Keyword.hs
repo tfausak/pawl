@@ -1282,17 +1282,19 @@ mintedReplacementsFor keyword count = case keyword of
   -- CR 702.145b's FIRST static ability: "if it is night and this permanent is
   -- represented by a double-faced card, it enters transformed" -- CR 712.13a's
   -- rule seen from the keyword side, and the one producer CR 616.1d's bucket has.
-  -- Filter.IsSource for riot's reason: CR 614.1c's ability is the entering
-  -- object's own.
+  -- Filter.IsSource for riot's reason, one subrule over: CR 614.1d's "[this
+  -- permanent] enters . . ." is the entering object's own ability.
   --
   -- The rule's two conditions are asked by Pawl.Engine.Replacement.applies rather
   -- than here, because neither is knowable from a keyword count: the designation
   -- is the game's and the layout is the entering object's.
   --
-  -- ONE ROW PER INSTANCE for riot's reason, and unreachable twice over: nothing in
-  -- the pool grants daybound, so the only instance is a printed one, and rule 702.145a
-  -- puts nightbound rather than daybound on the face this rewrite turns to --
-  -- which CR 616.1f's re-collection would drop a second row on regardless.
+  -- ONE ROW PER INSTANCE for riot's reason, and safe twice over for neither of
+  -- riot's: the second row is a distinct CandidateId, so CR 614.5 would let it
+  -- apply, and it would write the same back face the first one did. Idempotent,
+  -- because the write names Card.backFace outright rather than the successor of
+  -- whatever face is up now. Unreachable anyway -- rule 702.145a puts daybound on
+  -- a front face, and nothing in the pool grants a second instance.
   Keyword.Daybound -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.EntersTransformed))
   -- CR 702.145e gives nightbound only TWO static abilities, and neither rewrites
   -- an entry: the enters-transformed half is daybound's alone.

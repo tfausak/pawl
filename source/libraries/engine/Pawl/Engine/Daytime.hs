@@ -136,9 +136,9 @@ dueToTurn gs = case GameState.daytime gs of
 -- sweep, and the two must not be confused. That one is CR 712.13a's replacement
 -- effect (EntryRewrite.EntersTransformed, minted by
 -- Pawl.Engine.Keyword.mintedReplacementsFor), applied as the permanent enters.
--- This sweep is the SECOND ability, and reaches only permanents already on the
--- battlefield. Pawl.DaytimeSpec's entrySpec proves the pair apart, on the face
--- the permanent shows when its spell finishes resolving.
+-- This sweep is CR 702.145c and CR 702.145f, and reaches only permanents already
+-- on the battlefield. Pawl.DaytimeSpec's entrySpec proves the pair apart, on the
+-- face the permanent shows when its spell finishes resolving.
 --
 -- This is the ONE turn CR 702.145b's and CR 702.145e's transform restriction
 -- permits, and it reaches Game.turnFaceOver DIRECTLY for exactly that reason:

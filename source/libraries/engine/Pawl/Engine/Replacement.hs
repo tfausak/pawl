@@ -385,14 +385,19 @@ applies gs event candidate =
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
 -- the entering object? `admits` and `unspent` above, for the entry class.
 --
--- Almost every rewrite answers True unconditionally, and that is the rule rather
--- than a shortcut: CR 614.1c and CR 614.1d put the whole of a replacement's
--- applicability in its pattern, so an ability with a further condition of its own
--- is what needs an arm here. Only rule 702.145b has one.
+-- Almost every rewrite answers True unconditionally, because every producer but
+-- one states its whole applicability in the wording the pattern already carries.
+-- An ability that states a further condition of its own is what needs an arm
+-- here, and rule 702.145b is the only one that does.
 --
 -- One arm per constructor, no wildcard, so a new rewrite with a condition breaks
 -- the build here as well as in bucketOfEffect, readsApplier and Event.apply. A
 -- wildcard defaulting to True would silently apply such a rewrite always.
+--
+-- The GameState is `applies`' own, which for a CR 608.2f batch is the PRE-BATCH
+-- board rather than the live one (see `applicable`). Immaterial today -- every
+-- WouldEnter reaches here from Event.runEntry, which passes no `asOf` -- but a
+-- batched entry would read the designation and the card off a frozen board.
 admitsEntry :: GameState -> ObjectId -> EntryRewrite.EntryRewrite -> Bool
 admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.AsCopy _ -> True
@@ -832,10 +837,9 @@ readsApplier re = case re of
   -- identical while their controllers are not, and applying one puts the
   -- permanent somewhere applying the other does not.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.UnderSourceControl) -> True
-  -- CR 712.13a / 702.145b: no chooser at all, and no payload -- the rewrite turns
-  -- the object the event already named onto its other face, and which face that
-  -- is comes from the card. Two such rows are the same write twice, Tapped's
-  -- answer.
+  -- CR 712.13a / 702.145b: no chooser at all, and no payload -- the rewrite shows
+  -- the back face of the card the event already named, and which face that is
+  -- comes from the card. Two such rows are the same write twice, Tapped's answer.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.EntersTransformed) -> False
   -- The rewritten amount is the effect's (Galvanic Blast, Furnace of Rath), and
   -- a prevention prevents the same event whoever's row it is (Fog). CR 615.7's

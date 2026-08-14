@@ -1150,7 +1150,7 @@ apply batch candidate event =
       -- transformed." The one producer CR 616.1d's bucket has.
       --
       -- WHICH face is Card.backFace, the same answer CR 712.14a's rider gets in
-      -- changeZoneEntering, so the engine never learns which card is entering.
+      -- changeZoneEntering: the card is read, never cased on.
       --
       -- Object.face and NOT Game.turnFaceOver, which is the write for CR 701.27a's
       -- transform: nothing turned over here. So Object.turnedOverAt stays Nothing,
@@ -1170,7 +1170,10 @@ apply batch candidate event =
       --
       -- Not implemented: CR 712.13a's second sentence, an instant or sorcery back
       -- face sending the spell to its owner's graveyard rather than the
-      -- battlefield (#1547).
+      -- battlefield. The write is unguarded, where Game.turnFaceOver goes through
+      -- Card.turnedOver and CR 701.27d's refusal with it, so such a face would be
+      -- shown on the battlefield rather than merely fail to reach the graveyard
+      -- (#1547).
       EntryRewrite.EntersTransformed -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
