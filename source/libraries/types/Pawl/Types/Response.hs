@@ -81,6 +81,15 @@ data Response
     ChoseRedistribution (Map.Map PlayerId.PlayerId PlayerId.PlayerId)
   | -- | CR 701.54a: the creature a tempted player chose as their Ring-bearer.
     ChoseRingBearer ObjectId.ObjectId
+  | -- | CR 701.47a: the Army creature an amassing player chose to put the +1\/+1
+    -- counters on.
+    --
+    -- Its own constructor rather than ChoseRingBearer reused, for
+    -- ChoseCardInGraveyard's reason: every prompt gets its own response so a decode
+    -- can reject one that does not match the prompt asked, and these two questions
+    -- offer different candidates -- every creature its chooser controls against the
+    -- Armies among them.
+    ChoseAmass ObjectId.ObjectId
   | -- | CR 608.2d: the graveyard card a player chose for an
     -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a
     -- transcript of Exhume resolving holds one for each stocked graveyard.

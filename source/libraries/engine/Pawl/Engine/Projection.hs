@@ -24,6 +24,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.Card as Card.Type
@@ -1548,6 +1549,13 @@ rewriteEffect pairs effect = case effect of
   Effect.Search (Search.MkSearch searcher owner quantity filter_ destination) -> Effect.Search (Search.MkSearch searcher owner quantity (Filter.rewrite pairs filter_) destination)
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
+  -- CR 612.1 / 612.2a: amass's subtype is a PRINTED word of CR 205.3m's family,
+  -- so a text change swaps it -- and with it the token's own name, which
+  -- Pawl.Engine.Amass.armyToken writes from the swapped word. The Army type beside
+  -- it is the rulebook's rather than the card's, so nothing here can reach it. The
+  -- count holds no word.
+  Effect.Amass (Amass.MkAmass quantity subtype) ->
+    Effect.Amass (Amass.MkAmass quantity (List.foldl' (\s (from, to) -> if s == from && Subtype.isCreatureType from then to else s) subtype pairs))
   Effect.TemptWithTheRing -> effect
   Effect.Venture -> effect
   Effect.ExileHandThenDraw -> effect

@@ -12,6 +12,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Amass as Amass
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -48,6 +49,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
+import qualified Pawl.Types.Amass as Amass.Type
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
@@ -298,6 +300,7 @@ slotsOf effect = case effect of
     joinSlots [playerRefSlots searcher, playerRefSlots owner, quantitySlots quantity]
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
+  Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
@@ -536,6 +539,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Search (Search.MkSearch _ _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
+  Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.TemptWithTheRing -> True
   Effect.Venture -> True
   Effect.ExileHandThenDraw -> True
@@ -670,6 +674,7 @@ readsX = any effectReadsX
       Effect.Search (Search.MkSearch _ _ quantity _ _) -> Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
+      Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
       Effect.TemptWithTheRing -> False
       Effect.Venture -> False
       Effect.ExileHandThenDraw -> False
@@ -747,6 +752,7 @@ searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
   Effect.Search {} -> True
   Effect.Proliferate -> False
+  Effect.Amass _ -> False
   Effect.TemptWithTheRing -> False
   Effect.Venture -> False
   Effect.PlayerSacrifices {} -> False
@@ -915,6 +921,7 @@ boundSlots effect = case effect of
   Effect.Search {} -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
+  Effect.Amass _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
   Effect.Venture -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
@@ -4390,6 +4397,20 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       Monad.forM_ keptPlayers $ \pid ->
         Monad.forM_ (kindsFor pid) $ \kind ->
           Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
+  -- CR 701.47a: the resolving controller amasses. The whole keyword action is
+  -- Pawl.Engine.Amass.amass's, which is where rule 701.47's text and its token
+  -- live -- this arm evaluates the printed N and knows nothing else about it,
+  -- exactly as the TemptWithTheRing arm below knows only that some effect asked.
+  --
+  -- Targetless: nothing was targeted, so unlike every slot-reading opcode here
+  -- there is no CR 608.2b legality to re-check.
+  Effect.Amass (Amass.Type.MkAmass quantity subtype) -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
+      Just n -> Amass.amass controller source resolving subtype (Integer.toNaturalSaturating n)
   -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
   -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
   -- this arm knows only that some effect asked for it, exactly as the arms around

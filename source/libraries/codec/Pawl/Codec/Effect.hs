@@ -13,6 +13,7 @@ module Pawl.Codec.Effect where
 
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.AffectPlayers as AffectPlayers
+import qualified Pawl.Codec.Amass as Amass
 import qualified Pawl.Codec.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Codec.AttachTarget as AttachTarget
 import qualified Pawl.Codec.ChangeText as ChangeText
@@ -65,6 +66,7 @@ codec cardCodec =
       Arm.payload "Search" Search.codec Effect.Search (\x -> case x of Effect.Search y -> Just y; _ -> Nothing),
       Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
       Arm.nullary "Proliferate" Effect.Proliferate,
+      Arm.payload "Amass" Amass.codec Effect.Amass (\x -> case x of Effect.Amass y -> Just y; _ -> Nothing),
       Arm.nullary "TemptWithTheRing" Effect.TemptWithTheRing,
       Arm.nullary "Venture" Effect.Venture,
       Arm.nullary "ExileHandThenDraw" Effect.ExileHandThenDraw,

@@ -65,6 +65,7 @@ import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
+import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
@@ -638,6 +639,9 @@ effectCounts effect = case effect of
   Effect.Search (Search.MkSearch _ _ quantity _ _) -> quantityCounts quantity
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  -- Amass's N is a Quantity like the Search's above, so its Counts are reachable
+  -- from here.
+  Effect.Amass (Amass.MkAmass quantity _) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -955,6 +959,7 @@ effectReplacements effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.Amass _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -1484,6 +1489,9 @@ effectMintedFaces effect = case effect of
   Effect.Search {} -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  -- The Army token is Pawl.Engine.Amass.armyToken's, minted from the rulebook
+  -- rather than embedded in card data, so this arm mints no face of the card's own.
+  Effect.Amass _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -2506,6 +2514,9 @@ effectFilters effect = case effect of
   Effect.Search (Search.MkSearch _ _ _ f _) -> unframed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  -- Only the count's Filters: rule 701.47a describes the candidate pool, so no
+  -- Filter on the card names it.
+  Effect.Amass (Amass.MkAmass quantity _) -> unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
