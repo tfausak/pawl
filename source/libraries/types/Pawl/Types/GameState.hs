@@ -401,6 +401,38 @@ data GameState = MkGameState
     -- is the whole point), so only Pawl.Engine.Departure's CR 800.4a sweep removes
     -- an entry, and only by its key.
     haunting :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
+    -- | CR 607.2a's linked set, as a relation: which object's ability exiled each
+    -- card now in exile. Keyed by the EXILED incarnation (the id CR 400.7 minted
+    -- as the card arrived in exile), valued by the source of the ability whose
+    -- instruction exiled it. Read only by ObjectRef.EachCardExiledWithSource.
+    --
+    -- Board state rather than a field on the exiled Object, for `haunting`'s
+    -- reason one field up: it is a relation between two ids that outlives neither.
+    -- The VALUE is what forces it -- Hoarding Dragon's second ability is a dies
+    -- trigger, so the object the link names is already gone by the time the link
+    -- is read, and CR 603.10a's look-back is what makes the trigger's source the
+    -- battlefield incarnation that did the exiling rather than the graveyard card.
+    --
+    -- Written by Pawl.Engine.Resolve.applyEffectWith, which files every card that
+    -- ARRIVED in exile while an effect ran against that effect's source. A
+    -- difference over GameState.exile and not a case over the opcode: rule 607.2a
+    -- asks which ability's instruction exiled the card, never which instruction it
+    -- was, so the rules core stays off effect identity and Search's exile, a
+    -- MoveToZone's and a keyword's are all one road.
+    --
+    -- Scoped to the OBJECT and not to the printed ABILITY, where rule 607.2a
+    -- scopes it to the ability. The two differ only for a card with two exiling
+    -- abilities and two referring ones, since pawl has no ability identity to key
+    -- on at all -- Pawl.Types.Source embeds the ability value, not an index. No
+    -- printing in the pool is in that shape (#1535). Not implemented either: an
+    -- exile another object's REPLACEMENT effect causes inside that window is filed
+    -- against the resolving ability's source, where CR 607.2b links it to the
+    -- replacement's own object (#1536).
+    --
+    -- Cleaned up by key only, in Pawl.Engine.Departure's CR 800.4a sweep, for
+    -- `haunting`'s reason: an entry whose value is gone is exactly the entry
+    -- Hoarding Dragon reads.
+    exiledWith :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
     -- | CR 500.7: the extra turns that have been created and not yet taken, MOST
     -- RECENTLY CREATED FIRST. A stack, not a queue, and a list precisely because
     -- the style guide reserves lists for stacks (GameState.stack is the other

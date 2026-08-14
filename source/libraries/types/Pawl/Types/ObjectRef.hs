@@ -84,6 +84,32 @@ data ObjectRef
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
     -- properties EachMatching above has.
     EachCardInYourHand
+  | -- | CR 607.2a's linked set: every card in exile that an instruction in an
+    -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
+    -- card". EachMatching's sibling with CR 109.2's battlefield default switched
+    -- off, the way EachCardInGraveyard and EachCardInYourHand switch it off, and
+    -- the arm is what makes the rest of rule 607.2a sayable: "the second ability
+    -- refers only to cards in the exile zone that were put there as a result of
+    -- an instruction to exile them in the first ability."
+    --
+    -- Nullary. NO PLAYER: exile is a public zone (CR 400.2) and the set is
+    -- defined by which object exiled the card, not by whose it is. NO FILTER: a
+    -- linked reference names the whole set it is linked to, and every printing in
+    -- the pool takes all of it.
+    --
+    -- Singular and plural are ONE arm, which is CR 607.3: an ability referring to
+    -- "the exiled card" whose linked ability exiled several "performs that action
+    -- on each exiled card". So a sweep is the faithful reading of both wordings,
+    -- and Hoarding Dragon's singular text needs no separate spelling.
+    --
+    -- Read against GameState.exiledWith, which is where the link lives; see that
+    -- field for what the key is and for what rule 607.2a's per-ABILITY scope is
+    -- approximated by.
+    --
+    -- Not a target and never one (CR 115.10a) -- the reference is a definition,
+    -- not a choice -- and swept when the effect executes (CR 608.2c), the two
+    -- properties EachMatching above has.
+    EachCardExiledWithSource
   | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The one
     -- arm that names no object at all, and it is here rather than on
     -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:

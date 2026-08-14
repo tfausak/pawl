@@ -2054,6 +2054,9 @@ objectRefFilters ref = case ref of
   -- Ignorant Bliss' "all cards from your hand" holds none either: CR 400.2
   -- makes a hand hidden, so the arm carries no Filter to lint.
   ObjectRef.EachCardInYourHand -> []
+  -- Hoarding Dragon's "the exiled card" holds none either: CR 607.2a's set is
+  -- named by which object exiled the cards, never by their characteristics.
+  ObjectRef.EachCardExiledWithSource -> []
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it holds
@@ -3876,6 +3879,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachMatching _ -> False
           ObjectRef.EachCardInGraveyard {} -> False
           ObjectRef.EachCardInYourHand -> False
+          -- CR 607.3 is what makes this one plural even where the card's own
+          -- words are singular: an ability referring to "the exiled card" whose
+          -- linked ability exiled several performs its action on each of them.
+          ObjectRef.EachCardExiledWithSource -> False
           ObjectRef.EachPlayer -> False
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
             depth <= 1 && case player of
