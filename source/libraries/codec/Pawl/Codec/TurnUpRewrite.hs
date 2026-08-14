@@ -5,18 +5,13 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.WithCounters as WithCounters
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 
 codec :: Codec.Codec TurnUpRewrite.TurnUpRewrite
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "WithCounters" WithCounters.codec TurnUpRewrite.WithCounters,
-      Arm.payload "MayAttachTo" filterCodec TurnUpRewrite.MayAttachTo
+    [ Arm.payload "WithCounters" WithCounters.codec TurnUpRewrite.WithCounters (\x -> case x of TurnUpRewrite.WithCounters y -> Just y; _ -> Nothing),
+      Arm.payload "MayAttachTo" filterCodec TurnUpRewrite.MayAttachTo (\x -> case x of TurnUpRewrite.MayAttachTo y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec
-    encode r = case r of
-      TurnUpRewrite.WithCounters x -> Common.tagged "WithCounters" . Just $ Codec.encode WithCounters.codec x
-      TurnUpRewrite.MayAttachTo f -> Common.tagged "MayAttachTo" . Just $ Codec.encode filterCodec f

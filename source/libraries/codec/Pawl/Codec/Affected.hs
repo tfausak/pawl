@@ -13,18 +13,11 @@ import qualified Pawl.Types.Affected as Affected
 codec :: Codec.Codec Affected.Affected
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "TheseObjects" (Common.set ObjectId.codec) Affected.TheseObjects,
-      Arm.payload "Matching" filterCodec Affected.Matching,
-      Arm.payload "MatchingAnywhere" filterCodec Affected.MatchingAnywhere,
+    [ Arm.payload "TheseObjects" (Common.set ObjectId.codec) Affected.TheseObjects (\x -> case x of Affected.TheseObjects y -> Just y; _ -> Nothing),
+      Arm.payload "Matching" filterCodec Affected.Matching (\x -> case x of Affected.Matching y -> Just y; _ -> Nothing),
+      Arm.payload "MatchingAnywhere" filterCodec Affected.MatchingAnywhere (\x -> case x of Affected.MatchingAnywhere y -> Just y; _ -> Nothing),
       Arm.nullary "Attached" Affected.Attached,
-      Arm.payload "AttachedPlayerControls" filterCodec Affected.AttachedPlayerControls
+      Arm.payload "AttachedPlayerControls" filterCodec Affected.AttachedPlayerControls (\x -> case x of Affected.AttachedPlayerControls y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec
-    encode a = case a of
-      Affected.TheseObjects ids -> Common.tagged "TheseObjects" . Just $ Codec.encode (Common.set ObjectId.codec) ids
-      Affected.Matching f -> Common.tagged "Matching" . Just $ Codec.encode filterCodec f
-      Affected.MatchingAnywhere f -> Common.tagged "MatchingAnywhere" . Just $ Codec.encode filterCodec f
-      Affected.Attached -> Common.nullary "Attached"
-      Affected.AttachedPlayerControls f -> Common.tagged "AttachedPlayerControls" . Just $ Codec.encode filterCodec f

@@ -21,32 +21,27 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 codec :: Codec.Codec EntryRewrite.EntryRewrite
 codec =
   Arm.tagged
-    encode
-    [ Arm.optionalPayload "AsCopy" (Common.list CopyException.codec) (EntryRewrite.AsCopy . Maybe.fromMaybe []),
-      Arm.payload "ChoiceOf" (Common.list EntryOption.codec) EntryRewrite.ChoiceOf,
-      Arm.payload "WithCounters" WithCounters.codec EntryRewrite.WithCounters,
+    [ -- CR 707.9's exceptions are ELIDED when empty, so the matcher answers
+      -- @Just Nothing@ for a plain Clone and @Just (Just xs)@ otherwise -- which
+      -- is what keeps the bare tag this arm has always written.
+      Arm.optionalPayload
+        "AsCopy"
+        (Common.list CopyException.codec)
+        (EntryRewrite.AsCopy . Maybe.fromMaybe [])
+        ( \x -> case x of
+            EntryRewrite.AsCopy [] -> Just Nothing
+            EntryRewrite.AsCopy exceptions -> Just (Just exceptions)
+            _ -> Nothing
+        ),
+      Arm.payload "ChoiceOf" (Common.list EntryOption.codec) EntryRewrite.ChoiceOf (\x -> case x of EntryRewrite.ChoiceOf y -> Just y; _ -> Nothing),
+      Arm.payload "WithCounters" WithCounters.codec EntryRewrite.WithCounters (\x -> case x of EntryRewrite.WithCounters y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseColor" EntryRewrite.ChooseColor,
       Arm.nullary "ChooseBasicLandType" EntryRewrite.ChooseBasicLandType,
-      Arm.payload "ChooseCardNames" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardNames,
+      Arm.payload "ChooseCardNames" (Filter.codec Keyword.codec) EntryRewrite.ChooseCardNames (\x -> case x of EntryRewrite.ChooseCardNames y -> Just y; _ -> Nothing),
       Arm.nullary "UnderSourceControl" EntryRewrite.UnderSourceControl,
       Arm.nullary "Riot" EntryRewrite.Riot,
       Arm.nullary "Unleash" EntryRewrite.Unleash,
       Arm.nullary "Tapped" EntryRewrite.Tapped,
-      Arm.payload "PayLifeOrTapped" Common.natural EntryRewrite.PayLifeOrTapped,
-      Arm.payload "SacrificeAnyNumber" SacrificeAnyNumber.codec EntryRewrite.SacrificeAnyNumber
+      Arm.payload "PayLifeOrTapped" Common.natural EntryRewrite.PayLifeOrTapped (\x -> case x of EntryRewrite.PayLifeOrTapped y -> Just y; _ -> Nothing),
+      Arm.payload "SacrificeAnyNumber" SacrificeAnyNumber.codec EntryRewrite.SacrificeAnyNumber (\x -> case x of EntryRewrite.SacrificeAnyNumber y -> Just y; _ -> Nothing)
     ]
-  where
-    encode r = case r of
-      EntryRewrite.AsCopy [] -> Common.nullary "AsCopy"
-      EntryRewrite.AsCopy exceptions -> Common.tagged "AsCopy" . Just $ Codec.encode (Common.list CopyException.codec) exceptions
-      EntryRewrite.ChoiceOf options -> Common.tagged "ChoiceOf" . Just $ Codec.encode (Common.list EntryOption.codec) options
-      EntryRewrite.WithCounters x -> Common.tagged "WithCounters" . Just $ Codec.encode WithCounters.codec x
-      EntryRewrite.ChooseColor -> Common.nullary "ChooseColor"
-      EntryRewrite.ChooseBasicLandType -> Common.nullary "ChooseBasicLandType"
-      EntryRewrite.ChooseCardNames f -> Common.tagged "ChooseCardNames" . Just $ Codec.encode (Filter.codec Keyword.codec) f
-      EntryRewrite.UnderSourceControl -> Common.nullary "UnderSourceControl"
-      EntryRewrite.Riot -> Common.nullary "Riot"
-      EntryRewrite.Unleash -> Common.nullary "Unleash"
-      EntryRewrite.Tapped -> Common.nullary "Tapped"
-      EntryRewrite.PayLifeOrTapped n -> Common.tagged "PayLifeOrTapped" . Just $ Codec.encode Common.natural n
-      EntryRewrite.SacrificeAnyNumber x -> Common.tagged "SacrificeAnyNumber" . Just $ Codec.encode SacrificeAnyNumber.codec x

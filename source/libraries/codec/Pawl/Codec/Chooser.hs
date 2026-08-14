@@ -3,7 +3,6 @@ module Pawl.Codec.Chooser where
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Chooser as Chooser
 
 -- | Tagged rather than nullary-only, Pawl.Codec.Pool's shape and for its reason:
@@ -12,13 +11,7 @@ import qualified Pawl.Types.Chooser as Chooser
 codec :: Codec.Codec Chooser.Chooser
 codec =
   Arm.tagged
-    encode
     [ Arm.nullary "TheController" Chooser.TheController,
       Arm.nullary "EachInScope" Chooser.EachInScope,
-      Arm.payload "BoundInSlot" SlotName.codec Chooser.BoundInSlot
+      Arm.payload "BoundInSlot" SlotName.codec Chooser.BoundInSlot (\x -> case x of Chooser.BoundInSlot y -> Just y; _ -> Nothing)
     ]
-  where
-    encode c = case c of
-      Chooser.TheController -> Common.nullary "TheController"
-      Chooser.EachInScope -> Common.nullary "EachInScope"
-      Chooser.BoundInSlot slot -> Common.tagged "BoundInSlot" . Just $ Codec.encode SlotName.codec slot

@@ -32,17 +32,15 @@ size = Common.integer
 codec :: Codec.Codec Example
 codec =
   Arm.tagged
-    encode
     [ Arm.nullary "Plain" Plain,
-      Arm.payload "Sized" size Sized,
-      Arm.optionalPayload "Loose" size Loose
+      Arm.payload "Sized" size Sized (\x -> case x of Sized n -> Just n; _ -> Nothing),
+      Arm.optionalPayload "Loose" size Loose (\x -> case x of Loose mn -> Just mn; _ -> Nothing)
     ]
-  where
-    encode x = case x of
-      Plain -> Common.nullary "Plain"
-      Sized n -> Common.tagged "Sized" . Just $ Codec.encode size n
-      Loose Nothing -> Common.nullary "Loose"
-      Loose (Just n) -> Common.tagged "Loose" . Just $ Codec.encode size n
+
+-- | An arm list that deliberately OMITS a constructor, to pin what 'Arm.tagged'
+-- does when nothing matches.
+partialCodec :: Codec.Codec Example
+partialCodec = Arm.tagged [Arm.nullary "Plain" Plain]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
@@ -85,6 +83,19 @@ spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
       s
       (Either.isLeft (Common.parse (Text.pack """ {"type":"Absent"} """) >>= Codec.decode flatCodec))
       "expected a decode failure"
+
+  -- The cost of deriving the encoder: 'Arm.tagged' cannot see that its arm list
+  -- misses a constructor. What it must NOT do is write something that decodes to
+  -- another value, so the unmatched case is @{}@ -- the one object
+  -- 'Common.asTagged' rejects -- and the round trip fails loudly instead.
+  Spec.it s "an unmatched value encodes as a document that will not decode" $ do
+    Spec.assertEq s (Common.render (Codec.encode partialCodec (Sized 1))) (Text.pack "{}")
+    Spec.assertBool
+      s
+      (Either.isLeft (Codec.decode partialCodec (Codec.encode partialCodec (Sized 1))))
+      "expected the unmatched encoding to fail to decode"
+    -- The arms it DOES name are unaffected.
+    Common.assertCodec s partialCodec Plain """ {"type":"Plain"} """
 
   Spec.it s "enum has a schema" $ Common.assertHasSchema s flatCodec
 

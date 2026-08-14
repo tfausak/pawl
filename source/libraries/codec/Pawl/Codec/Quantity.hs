@@ -11,7 +11,6 @@ import qualified Pawl.Codec.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.Plus as Plus
 import qualified Pawl.Codec.SlotName as SlotName
-import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -35,73 +34,48 @@ import qualified Pawl.Types.Quantity as Quantity
 codec :: Codec.Codec Quantity.Quantity
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "Literal" Common.integer Quantity.Literal,
+    [ Arm.payload "Literal" Common.integer Quantity.Literal (\x -> case x of Quantity.Literal y -> Just y; _ -> Nothing),
       Arm.nullary "ManaValue" Quantity.ManaValue,
       Arm.nullary "Power" Quantity.Power,
       Arm.nullary "Toughness" Quantity.Toughness,
-      Arm.payload "InSlot" SlotName.codec Quantity.InSlot,
+      Arm.payload "InSlot" SlotName.codec Quantity.InSlot (\x -> case x of Quantity.InSlot y -> Just y; _ -> Nothing),
       Arm.nullary "Star" Quantity.Star,
-      Arm.payload "Plus" (Plus.codec codec) Quantity.Plus,
+      Arm.payload "Plus" (Plus.codec codec) Quantity.Plus (\x -> case x of Quantity.Plus y -> Just y; _ -> Nothing),
       -- CR 107.1a's rounding first, then what is halved: the direction is the
       -- card's word and the payload is the value it applies to.
-      Arm.payload "Halved" (Halved.codec codec) Quantity.Halved,
+      Arm.payload "Halved" (Halved.codec codec) Quantity.Halved (\x -> case x of Quantity.Halved y -> Just y; _ -> Nothing),
       -- CR 107.1b's negative game value: one whole Quantity on the wire, since a
       -- minus sign carries nothing of its own.
-      Arm.payload "Negate" codec Quantity.Negate,
-      Arm.payload "Count" (Count.codec codec) Quantity.Count,
-      Arm.payload "ManaCount" ManaCount.codec Quantity.ManaCount,
-      Arm.payload "LifeTotal" PlayerRef.codec Quantity.LifeTotal,
-      Arm.payload "Speed" PlayerRef.codec Quantity.Speed,
+      Arm.payload "Negate" codec Quantity.Negate (\x -> case x of Quantity.Negate y -> Just y; _ -> Nothing),
+      Arm.payload "Count" (Count.codec codec) Quantity.Count (\x -> case x of Quantity.Count y -> Just y; _ -> Nothing),
+      Arm.payload "ManaCount" ManaCount.codec Quantity.ManaCount (\x -> case x of Quantity.ManaCount y -> Just y; _ -> Nothing),
+      Arm.payload "LifeTotal" PlayerRef.codec Quantity.LifeTotal (\x -> case x of Quantity.LifeTotal y -> Just y; _ -> Nothing),
+      Arm.payload "Speed" PlayerRef.codec Quantity.Speed (\x -> case x of Quantity.Speed y -> Just y; _ -> Nothing),
       -- CR 725.1's designation, with only a PlayerRef on the wire: the answer is
       -- a 0/1 rather than a stored number, so there is nothing beside the
       -- reference.
-      Arm.payload "IsMonarch" PlayerRef.codec Quantity.IsMonarch,
-      Arm.payload "PlayerCounters" PlayerCounterTally.codec Quantity.PlayerCounters,
+      Arm.payload "IsMonarch" PlayerRef.codec Quantity.IsMonarch (\x -> case x of Quantity.IsMonarch y -> Just y; _ -> Nothing),
+      Arm.payload "PlayerCounters" PlayerCounterTally.codec Quantity.PlayerCounters (\x -> case x of Quantity.PlayerCounters y -> Just y; _ -> Nothing),
       -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
       -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
-      Arm.payload "ObjectCounters" (CounterKind.codec Keyword.codec) Quantity.ObjectCounters,
+      Arm.payload "ObjectCounters" (CounterKind.codec Keyword.codec) Quantity.ObjectCounters (\x -> case x of Quantity.ObjectCounters y -> Just y; _ -> Nothing),
       -- CR 702.112b's designation, read against the object the quantity is aimed
       -- at, so only the designation is on the wire.
-      Arm.payload "HasDesignation" Designation.codec Quantity.HasDesignation,
+      Arm.payload "HasDesignation" Designation.codec Quantity.HasDesignation (\x -> case x of Quantity.HasDesignation y -> Just y; _ -> Nothing),
       Arm.nullary "WasKicked" Quantity.WasKicked,
       -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted
       -- comes from the combat record rather than from anything the card names.
-      Arm.payload "OpponentsAttacked" PlayerRef.codec Quantity.OpponentsAttacked,
+      Arm.payload "OpponentsAttacked" PlayerRef.codec Quantity.OpponentsAttacked (\x -> case x of Quantity.OpponentsAttacked y -> Just y; _ -> Nothing),
       -- CR 701.9a's tally, with only a PlayerRef on the wire for
       -- OpponentsAttacked's reason: what is counted comes from the event log
       -- rather than from anything the card names, and the turn is the log's
       -- extent rather than a window a card could state.
-      Arm.payload "CardsDiscardedThisTurn" PlayerRef.codec Quantity.CardsDiscardedThisTurn,
+      Arm.payload "CardsDiscardedThisTurn" PlayerRef.codec Quantity.CardsDiscardedThisTurn (\x -> case x of Quantity.CardsDiscardedThisTurn y -> Just y; _ -> Nothing),
       -- CR 509.1h's declaration read against the object the quantity is aimed at,
       -- so there is nothing on the wire at all -- Power's shape rather than
       -- ObjectCounters'.
       Arm.nullary "BlockersBeyondFirst" Quantity.BlockersBeyondFirst,
       -- A slot and a whole Quantity, in that order: which object to aim at, then
       -- what to read off it.
-      Arm.payload "AgainstSlot" (AgainstSlot.codec codec) Quantity.AgainstSlot
+      Arm.payload "AgainstSlot" (AgainstSlot.codec codec) Quantity.AgainstSlot (\x -> case x of Quantity.AgainstSlot y -> Just y; _ -> Nothing)
     ]
-  where
-    encode q = case q of
-      Quantity.Literal n -> Common.tagged "Literal" . Just $ Value.integer n
-      Quantity.ManaValue -> Common.nullary "ManaValue"
-      Quantity.Power -> Common.nullary "Power"
-      Quantity.Toughness -> Common.nullary "Toughness"
-      Quantity.InSlot s -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec s
-      Quantity.Star -> Common.nullary "Star"
-      Quantity.Plus x -> Common.tagged "Plus" . Just $ Codec.encode (Plus.codec codec) x
-      Quantity.Halved x -> Common.tagged "Halved" . Just $ Codec.encode (Halved.codec codec) x
-      Quantity.Negate a -> Common.tagged "Negate" . Just $ encode a
-      Quantity.Count c -> Common.tagged "Count" . Just $ Codec.encode (Count.codec codec) c
-      Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ Codec.encode ManaCount.codec c
-      Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ Codec.encode PlayerRef.codec p
-      Quantity.Speed p -> Common.tagged "Speed" . Just $ Codec.encode PlayerRef.codec p
-      Quantity.IsMonarch p -> Common.tagged "IsMonarch" . Just $ Codec.encode PlayerRef.codec p
-      Quantity.PlayerCounters x -> Common.tagged "PlayerCounters" . Just $ Codec.encode PlayerCounterTally.codec x
-      Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ Codec.encode (CounterKind.codec Keyword.codec) k
-      Quantity.HasDesignation d -> Common.tagged "HasDesignation" . Just $ Codec.encode Designation.codec d
-      Quantity.WasKicked -> Common.nullary "WasKicked"
-      Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ Codec.encode PlayerRef.codec p
-      Quantity.CardsDiscardedThisTurn p -> Common.tagged "CardsDiscardedThisTurn" . Just $ Codec.encode PlayerRef.codec p
-      Quantity.BlockersBeyondFirst -> Common.nullary "BlockersBeyondFirst"
-      Quantity.AgainstSlot x -> Common.tagged "AgainstSlot" . Just $ Codec.encode (AgainstSlot.codec codec) x

@@ -4,7 +4,6 @@ import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.SlotName as SlotName.Type
 
@@ -19,11 +18,6 @@ import qualified Pawl.Types.SlotName as SlotName.Type
 codec :: Codec.Codec (AffectedPlayers.AffectedPlayers SlotName.Type.SlotName)
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "Scoped" PlayerScope.codec AffectedPlayers.Scoped,
-      Arm.payload "Named" SlotName.codec AffectedPlayers.Named
+    [ Arm.payload "Scoped" PlayerScope.codec AffectedPlayers.Scoped (\x -> case x of AffectedPlayers.Scoped y -> Just y; _ -> Nothing),
+      Arm.payload "Named" SlotName.codec AffectedPlayers.Named (\x -> case x of AffectedPlayers.Named y -> Just y; _ -> Nothing)
     ]
-  where
-    encode affected = case affected of
-      AffectedPlayers.Scoped scope -> Common.tagged "Scoped" . Just $ Codec.encode PlayerScope.codec scope
-      AffectedPlayers.Named slot -> Common.tagged "Named" . Just $ Codec.encode SlotName.codec slot

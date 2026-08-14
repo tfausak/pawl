@@ -19,48 +19,26 @@ import qualified Pawl.Types.Modification as Modification
 codec :: Codec.Codec Modification.Modification
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "GainKeyword" Keyword.codec Modification.GainKeyword,
+    [ Arm.payload "GainKeyword" Keyword.codec Modification.GainKeyword (\x -> case x of Modification.GainKeyword y -> Just y; _ -> Nothing),
       Arm.nullary "LoseAllAbilities" Modification.LoseAllAbilities,
-      Arm.payload "SetBasePowerToughness" SetBasePowerToughness.codec Modification.SetBasePowerToughness,
-      Arm.payload "ModifyPowerToughness" ModifyPowerToughness.codec Modification.ModifyPowerToughness,
-      Arm.payload "SetLandSubtype" Subtype.codec Modification.SetLandSubtype,
+      Arm.payload "SetBasePowerToughness" SetBasePowerToughness.codec Modification.SetBasePowerToughness (\x -> case x of Modification.SetBasePowerToughness y -> Just y; _ -> Nothing),
+      Arm.payload "ModifyPowerToughness" ModifyPowerToughness.codec Modification.ModifyPowerToughness (\x -> case x of Modification.ModifyPowerToughness y -> Just y; _ -> Nothing),
+      Arm.payload "SetLandSubtype" Subtype.codec Modification.SetLandSubtype (\x -> case x of Modification.SetLandSubtype y -> Just y; _ -> Nothing),
       Arm.nullary "SetLandSubtypeToChosen" Modification.SetLandSubtypeToChosen,
-      Arm.payload "AddLandSubtype" Subtype.codec Modification.AddLandSubtype,
-      Arm.payload "SetCreatureSubtype" Subtype.codec Modification.SetCreatureSubtype,
-      Arm.payload "AddCreatureSubtype" Subtype.codec Modification.AddCreatureSubtype,
+      Arm.payload "AddLandSubtype" Subtype.codec Modification.AddLandSubtype (\x -> case x of Modification.AddLandSubtype y -> Just y; _ -> Nothing),
+      Arm.payload "SetCreatureSubtype" Subtype.codec Modification.SetCreatureSubtype (\x -> case x of Modification.SetCreatureSubtype y -> Just y; _ -> Nothing),
+      Arm.payload "AddCreatureSubtype" Subtype.codec Modification.AddCreatureSubtype (\x -> case x of Modification.AddCreatureSubtype y -> Just y; _ -> Nothing),
       Arm.nullary "AddEveryCreatureSubtype" Modification.AddEveryCreatureSubtype,
-      Arm.payload "AddCardType" CardType.codec Modification.AddCardType,
-      Arm.payload "AddSupertype" Supertype.codec Modification.AddSupertype,
-      Arm.payload "RemoveSupertype" Supertype.codec Modification.RemoveSupertype,
-      Arm.payload "ChangeSubtypeWord" ChangeSubtypeWord.codec Modification.ChangeSubtypeWord,
-      Arm.payload "SetController" PlayerId.codec Modification.SetController,
+      Arm.payload "AddCardType" CardType.codec Modification.AddCardType (\x -> case x of Modification.AddCardType y -> Just y; _ -> Nothing),
+      Arm.payload "AddSupertype" Supertype.codec Modification.AddSupertype (\x -> case x of Modification.AddSupertype y -> Just y; _ -> Nothing),
+      Arm.payload "RemoveSupertype" Supertype.codec Modification.RemoveSupertype (\x -> case x of Modification.RemoveSupertype y -> Just y; _ -> Nothing),
+      Arm.payload "ChangeSubtypeWord" ChangeSubtypeWord.codec Modification.ChangeSubtypeWord (\x -> case x of Modification.ChangeSubtypeWord y -> Just y; _ -> Nothing),
+      Arm.payload "SetController" PlayerId.codec Modification.SetController (\x -> case x of Modification.SetController y -> Just y; _ -> Nothing),
       Arm.nullary "SetControllerToSource" Modification.SetControllerToSource,
-      Arm.payload "SetColor" colors Modification.SetColor,
-      Arm.payload "AddColor" colors Modification.AddColor,
+      Arm.payload "SetColor" colors Modification.SetColor (\x -> case x of Modification.SetColor y -> Just y; _ -> Nothing),
+      Arm.payload "AddColor" colors Modification.AddColor (\x -> case x of Modification.AddColor y -> Just y; _ -> Nothing),
       Arm.nullary "AddChosenColor" Modification.AddChosenColor,
       Arm.nullary "SwitchPowerToughness" Modification.SwitchPowerToughness
     ]
   where
     colors = Common.set Color.codec
-    encode m = case m of
-      Modification.GainKeyword k -> Common.tagged "GainKeyword" . Just $ Codec.encode Keyword.codec k
-      Modification.LoseAllAbilities -> Common.nullary "LoseAllAbilities"
-      Modification.SetBasePowerToughness x -> Common.tagged "SetBasePowerToughness" . Just $ Codec.encode SetBasePowerToughness.codec x
-      Modification.ModifyPowerToughness x -> Common.tagged "ModifyPowerToughness" . Just $ Codec.encode ModifyPowerToughness.codec x
-      Modification.SetLandSubtype s -> Common.tagged "SetLandSubtype" . Just $ Codec.encode Subtype.codec s
-      Modification.SetLandSubtypeToChosen -> Common.nullary "SetLandSubtypeToChosen"
-      Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Codec.encode Subtype.codec s
-      Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Codec.encode Subtype.codec s
-      Modification.AddCreatureSubtype s -> Common.tagged "AddCreatureSubtype" . Just $ Codec.encode Subtype.codec s
-      Modification.AddEveryCreatureSubtype -> Common.nullary "AddEveryCreatureSubtype"
-      Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ Codec.encode CardType.codec c
-      Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Codec.encode Supertype.codec t
-      Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Codec.encode Supertype.codec t
-      Modification.ChangeSubtypeWord x -> Common.tagged "ChangeSubtypeWord" . Just $ Codec.encode ChangeSubtypeWord.codec x
-      Modification.SetController p -> Common.tagged "SetController" . Just $ Codec.encode PlayerId.codec p
-      Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
-      Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Codec.encode (Common.set Color.codec) cs
-      Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Codec.encode (Common.set Color.codec) cs
-      Modification.AddChosenColor -> Common.nullary "AddChosenColor"
-      Modification.SwitchPowerToughness -> Common.nullary "SwitchPowerToughness"

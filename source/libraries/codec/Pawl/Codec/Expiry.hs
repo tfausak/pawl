@@ -5,7 +5,6 @@ import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.While as While
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Expiry as Expiry
 
 -- | CR 611.2: the STORED duration, which never appears in card JSON -- a card
@@ -15,17 +14,9 @@ import qualified Pawl.Types.Expiry as Expiry
 codec :: Codec.Codec Expiry.Expiry
 codec =
   Arm.tagged
-    encode
     [ Arm.nullary "AtCleanup" Expiry.AtCleanup,
       Arm.nullary "Never" Expiry.Never,
-      Arm.payload "While" While.codec Expiry.While,
-      Arm.payload "AtTurnOf" PlayerId.codec Expiry.AtTurnOf,
-      Arm.payload "AtEndOf" PhaseSelector.codec Expiry.AtEndOf
+      Arm.payload "While" While.codec Expiry.While (\x -> case x of Expiry.While y -> Just y; _ -> Nothing),
+      Arm.payload "AtTurnOf" PlayerId.codec Expiry.AtTurnOf (\x -> case x of Expiry.AtTurnOf y -> Just y; _ -> Nothing),
+      Arm.payload "AtEndOf" PhaseSelector.codec Expiry.AtEndOf (\x -> case x of Expiry.AtEndOf y -> Just y; _ -> Nothing)
     ]
-  where
-    encode e = case e of
-      Expiry.AtCleanup -> Common.nullary "AtCleanup"
-      Expiry.Never -> Common.nullary "Never"
-      Expiry.While x -> Common.tagged "While" . Just $ Codec.encode While.codec x
-      Expiry.AtTurnOf p -> Common.tagged "AtTurnOf" . Just $ Codec.encode PlayerId.codec p
-      Expiry.AtEndOf sel -> Common.tagged "AtEndOf" . Just $ Codec.encode PhaseSelector.codec sel

@@ -17,7 +17,7 @@ import qualified Pawl.Types.Count as Count
 -- types never share one tag across two levels.
 --
 -- Parametric for 'Pawl.Codec.Aggregation''s reason, and converts with it.
-codec :: (Typeable.Typeable q) => Codec.Codec q -> Codec.Codec (Count.Count q)
+codec :: (Typeable.Typeable q, Eq q) => Codec.Codec q -> Codec.Codec (Count.Count q)
 codec quantityCodec = Fields.object $ do
   scope <- Fields.required "scope" Scope.codec Count.scope
   filter_ <- Fields.required "filter" (Filter.codec Keyword.codec) Count.filter
