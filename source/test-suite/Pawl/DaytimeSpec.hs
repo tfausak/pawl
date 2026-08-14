@@ -6,6 +6,13 @@
 -- runs from it, the CR 117.5 settle arm beside it, Pawl.Types.Daytime, and
 -- GameState's daytime and spellsCastLastTurn fields.
 --
+-- Also CR 702.145b's FIRST static ability -- "if it is night and this permanent
+-- is represented by a double-faced card, it enters transformed" -- which is CR
+-- 712.13a's replacement effect, Pawl.Types.EntryRewrite's EntersTransformed,
+-- minted by Pawl.Engine.Keyword.mintedReplacementsFor and applied by
+-- Pawl.Engine.Event's arm under CR 616.1d's bucket. See entrySpec, whose fixture
+-- is Infestation Expert // Infested Werewolf.
+--
 -- Also CR 702.145b's third static ability and CR 702.145e's second -- "this
 -- permanent can't transform except due to its daybound/nightbound ability" --
 -- which is Pawl.Engine.Daytime.restrictsTransform read by Pawl.Engine.Resolve's
@@ -31,6 +38,7 @@
 -- characteristic, and prevention can name a source only by identity (#588).
 module Pawl.DaytimeSpec where
 
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -53,6 +61,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
 
 -- The face this permanent is showing, by name (CR 709.4a). What "transformed"
 -- means to a reader: Object.face is the one field CR 701.27a writes, and every
@@ -139,6 +148,110 @@ spec s registry = Spec.describe s "Pawl.Engine.Daytime" $ do
   transformSpec s registry
   restrictionSpec s registry
   untapCheckSpec s registry
+  entrySpec s registry
+
+expertFront :: CardName.CardName
+expertFront = CardName.MkCardName (Text.pack "Infestation Expert")
+
+expertBack :: CardName.CardName
+expertBack = CardName.MkCardName (Text.pack "Infested Werewolf")
+
+insectToken :: CardName.CardName
+insectToken = CardName.MkCardName (Text.pack "Insect Token")
+
+-- Every face alice's battlefield shows that belongs to Infestation Expert, found
+-- by name rather than by an ObjectId: CR 400.7 makes the resolving spell a NEW
+-- object, so the id the cast returned is not the permanent's.
+--
+-- A LIST rather than the first match, so a board that somehow grew two of them
+-- fails loudly instead of answering about one.
+expertFaces :: GameState.GameState -> [CardName.CardName]
+expertFaces gs =
+  [ name
+  | oid <- Game.zoneMembers Zone.Battlefield S.alice gs,
+    name <- Maybe.maybeToList (faceNameOf oid gs),
+    name == expertFront || name == expertBack
+  ]
+
+-- alice controls Tovolar and five Forests, with Infestation Expert in hand.
+-- `spells` is what the previous turn's active player cast, which is the whole of
+-- what decides the designation the spell will enter under: the settle makes it
+-- day (CR 702.145d), and CR 502.2's untap check then turns it to night on
+-- nothing, or leaves it day on one.
+--
+-- S.handOne leaves the board in a main phase with alice holding priority, and
+-- `untapStep` takes the phase it runs CR 502.2 for as an argument rather than
+-- moving the board to it, so that stands. Nothing here is about timing anyway:
+-- S.cast drives Pawl.Engine.Cast directly.
+--
+-- Tovolar is on the board only to give it a designation at all -- CR 702.145d
+-- needs a permanent with daybound -- and five Forests is exactly Infestation
+-- Expert's {4}{G}, so the cast can be paid without a decision.
+expertBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural.Natural -> (ObjectId.ObjectId, GameState.GameState)
+expertBoard tovolar forest expert spells =
+  let (_, withTovolar) = S.addCreature tovolar S.alice (S.landsInPlay forest 5)
+      (gs, spellId) = S.handOne expert withTovolar
+   in (spellId, untapStep (afterCasting spells (settle gs)))
+
+-- alice casts Infestation Expert and it resolves. Answered in two steps because
+-- the assertion between them is the point: the permanent is on the battlefield
+-- and its enters-the-battlefield trigger has not resolved yet.
+castExpert :: ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, GameState.GameState)
+castExpert spellId gs =
+  let cast = S.runPure S.castAnswer gs (S.cast S.alice spellId)
+      entered = S.runPure S.castAnswer cast Stack.resolveTop
+      triggered = S.runPure S.castAnswer (settle entered) Stack.resolveTop
+   in (entered, triggered)
+
+entrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+entrySpec s registry = Spec.describe s "EntersTransformed" $ do
+  -- CR 712.13a through CR 702.145b's FIRST static ability: "if it is night and
+  -- this permanent is represented by a double-faced card, it enters transformed."
+  -- Infestation Expert is cast with its front face up (CR 712.11) and reaches the
+  -- battlefield showing its back face.
+  --
+  -- THE FACE IS THE DISCRIMINATOR, and it is asserted at a moment that tells the
+  -- competing readings apart. Three of them put a permanent on this board showing
+  -- Infested Werewolf:
+  --
+  --   * it entered transformed -- CR 712.13a, the rule;
+  --   * it entered front face up and the CR 702.145c sweep turned it over
+  --     (Pawl.Engine.Daytime.turnDue, which is what this engine did before);
+  --   * it was never front face up at all, a back-face cast (CR 712.11a) -- which
+  --     this board rules out by casting the card from hand, where CR 712.8a shows
+  --     only the front face.
+  --
+  -- The first two are separated by asserting on `entered`, the board the spell's
+  -- resolution leaves, which is BEFORE the settle the sweep runs in.
+  --
+  -- THE TOKEN COUNT IS A FENCE, NOT A PROOF, and the reason is worth stating: the
+  -- trigger scan reads the permanent's abilities off the live board at settle,
+  -- and Daytime.settle runs earlier in that same settle, so the swept engine
+  -- places the back face's trigger too (#1548). Two Insects here says the back
+  -- face's ability is the live one; it does not say the permanent entered that
+  -- way.
+  Spec.it s "CR 712.13a/702.145b a daybound spell cast at night enters transformed" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    forest <- S.printingOf s registry "Forest"
+    expert <- S.printingOf s registry "Infestation Expert"
+    let (spellId, board) = expertBoard tovolar forest expert 0
+        (entered, triggered) = castExpert spellId board
+    Spec.assertEqWith s "it is night when the spell resolves" (GameState.daytime board) (Just Daytime.Night)
+    Spec.assertEqWith s "the permanent is showing its back face already" (expertFaces entered) [expertBack]
+    Spec.assertEqWith s "and its back face's trigger made two Insects" (S.countOnBattlefieldByName insectToken S.alice triggered) 2
+  -- The negative, the same board with ONE spell cast during the previous turn
+  -- instead of none: CR 502.2 leaves it day, CR 702.145b's condition fails, and
+  -- the permanent enters front face up and stays there. The falsifier for a
+  -- rewrite that applied on every entry.
+  Spec.it s "CR 702.145b by day the same spell enters front face up" $ do
+    tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
+    forest <- S.printingOf s registry "Forest"
+    expert <- S.printingOf s registry "Infestation Expert"
+    let (spellId, board) = expertBoard tovolar forest expert 1
+        (entered, triggered) = castExpert spellId board
+    Spec.assertEqWith s "it is day when the spell resolves" (GameState.daytime board) (Just Daytime.Day)
+    Spec.assertEqWith s "the permanent is showing its front face" (expertFaces entered) [expertFront]
+    Spec.assertEqWith s "and its front face's trigger made one Insect" (S.countOnBattlefieldByName insectToken S.alice triggered) 1
 
 restrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 restrictionSpec s registry = Spec.describe s "TransformRestriction" $ do

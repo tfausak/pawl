@@ -1165,6 +1165,46 @@ apply batch candidate event =
               OptionalDecision.Exercises -> State.modify' (payLife controller n)
               OptionalDecision.Declines -> enterTapped oid
             pure (Just event)
+      -- CR 712.13a via CR 702.145b's first static ability: "if it is night and
+      -- this permanent is represented by a double-faced card, it enters
+      -- transformed." The one producer CR 616.1d's bucket has.
+      --
+      -- WHICH face is Card.backFace, the same answer CR 712.14a's rider gets in
+      -- changeZoneEntering: the card is read, never cased on.
+      --
+      -- Object.face and NOT Game.turnFaceOver, which is the write for CR 701.27a's
+      -- transform: nothing turned over here. So Object.turnedOverAt stays Nothing,
+      -- and CR 701.27f's "has already transformed since" (Pawl.Engine.Resolve's
+      -- alreadyTurnedFor) still reads the permanent as one that has not.
+      --
+      -- Stamped on the ALREADY-MATERIALIZED incarnation, Tapped's footing above:
+      -- runEntry finishes before the Moved event is recorded, so no trigger scan
+      -- and no state-based action can see the interim front face.
+      --
+      -- WHICH enters-the-battlefield trigger fires does not currently tell this
+      -- apart from the CR 702.145c sweep turning the permanent over a settle later
+      -- (Pawl.Engine.Daytime.turnDue), and that is a defect in the scan rather
+      -- than in this arm: the scan reads the permanent's abilities off the live
+      -- board at settle, by which time the sweep has already run (#1548). What
+      -- this arm fixes regardless is the face itself, which the rule is about.
+      --
+      -- Not implemented: CR 712.13a's second sentence, an instant or sorcery back
+      -- face sending the spell to its owner's graveyard rather than the
+      -- battlefield. The write is unguarded, where Game.turnFaceOver goes through
+      -- Card.turnedOver and CR 701.27d's refusal with it, so such a face would be
+      -- shown on the battlefield rather than merely fail to reach the graveyard
+      -- (#1547).
+      EntryRewrite.EntersTransformed -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case fmap Face.name (Game.cardOf oid gs >>= Card.backFace) of
+          -- Unreachable: Replacement.admitsEntry admits this rewrite only where
+          -- Card.backFace answers. Defensive: leave the front face up.
+          Nothing -> pure (Just event)
+          Just name -> do
+            State.modify' $ \g ->
+              g {GameState.objects = Map.adjust (\obj -> obj {Object.face = Just name}) oid (GameState.objects g)}
+            pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR {}, _) -> pure (Just event)
     (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite), ProposedEvent.WouldDealDamage de) -> case rewrite of
@@ -1842,7 +1882,8 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- CR 712.14a and NOT CR 712.13a, which is a different rule with a different
 -- mechanism: an ability causing a double-faced SPELL already on the stack to
 -- enter transformed is a replacement effect, CR 616.1d's own bucket, and no
--- rider on a move can express it (#906).
+-- rider on a move can express it -- EntryRewrite.EntersTransformed is that one,
+-- applied by `apply` above.
 --
 -- The one door CR 712.14b applies to, and that is what the rule's own wording
 -- picks out: "If a player is INSTRUCTED to put a modal double-faced card onto

@@ -34,6 +34,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -56,6 +57,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -355,7 +357,7 @@ applies gs event candidate =
         -- Filter over the entering object (see Pawl.Types.ReplacementEffect).
         -- 614.1c's self-scope is Filter.IsSource; 614.1d's is a characteristic
         -- filter.
-        (ReplacementEffect.EntryR (EntryR.MkEntryR pat _), ProposedEvent.WouldEnter oid) -> matchesFiltered gs candidate pat oid
+        (ReplacementEffect.EntryR (EntryR.MkEntryR pat rewrite), ProposedEvent.WouldEnter oid) -> matchesFiltered gs candidate pat oid && admitsEntry gs oid rewrite
         -- CR 614.1e: which permanents turning face up this replacement watches.
         -- The same Filter language the entry arm above uses, and every producer
         -- writes Filter.IsSource -- CR 614.1e's printed wording is always "as
@@ -379,6 +381,55 @@ applies gs event candidate =
         (ReplacementEffect.TokenR {}, _) -> False
         (ReplacementEffect.TurnUpR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
+
+-- Does the REWRITE itself admit this entry, over and above the pattern matching
+-- the entering object? `admits` and `unspent` above, for the entry class.
+--
+-- Almost every rewrite answers True unconditionally, because every producer but
+-- one states its whole applicability in the wording the pattern already carries.
+-- An ability that states a further condition of its own is what needs an arm
+-- here, and rule 702.145b is the only one that does.
+--
+-- One arm per constructor, no wildcard, so a new rewrite with a condition breaks
+-- the build here as well as in bucketOfEffect, readsApplier and Event.apply. A
+-- wildcard defaulting to True would silently apply such a rewrite always.
+--
+-- The GameState is `applies`' own, which for a CR 608.2f batch is the PRE-BATCH
+-- board rather than the live one (see `applicable`). Immaterial today -- every
+-- WouldEnter reaches here from Event.runEntry, which passes no `asOf` -- but a
+-- batched entry would read the designation and the card off a frozen board.
+admitsEntry :: GameState -> ObjectId -> EntryRewrite.EntryRewrite -> Bool
+admitsEntry gs oid rewrite = case rewrite of
+  EntryRewrite.AsCopy _ -> True
+  EntryRewrite.ChoiceOf _ -> True
+  EntryRewrite.ChooseColor -> True
+  EntryRewrite.ChooseBasicLandType -> True
+  EntryRewrite.ChooseCardNames _ -> True
+  EntryRewrite.WithCounters {} -> True
+  EntryRewrite.UnderSourceControl -> True
+  EntryRewrite.SacrificeAnyNumber {} -> True
+  EntryRewrite.Riot -> True
+  EntryRewrite.Unleash -> True
+  EntryRewrite.Tapped -> True
+  EntryRewrite.PayLifeOrTapped _ -> True
+  -- CR 702.145b's own two conditions, both of them the ability's rather than the
+  -- pattern's: "IF IT IS NIGHT and this permanent is REPRESENTED BY A
+  -- DOUBLE-FACED CARD, it enters transformed."
+  --
+  -- Asked here rather than in Event's arm so that CR 616.1 never offers the row:
+  -- a rewrite that applied and then did nothing would still take CR 616.1d's
+  -- bucket, and CR 616.1's highest-non-empty rule would hand it the entry ahead
+  -- of a rewrite that had something to do.
+  --
+  -- The layout half is Card.backFace, which is Nothing for exactly the cards CR
+  -- 712.1 does not count as double-faced -- the same question CR 712.14a asks one
+  -- rule over (Pawl.Engine.Event.changeZoneEntering). It is asked at all because
+  -- daybound can be GRANTED: nothing stops a static ability from putting it on a
+  -- permanent with no second face, and the rule's condition is what says nothing
+  -- happens then.
+  EntryRewrite.EntersTransformed ->
+    GameState.daytime gs == Just Daytime.Night
+      && Maybe.isJust (Game.cardOf oid gs >>= Card.backFace)
 
 -- CR 614.16 versus CR 614.1: does this placement's PROVENANCE satisfy the
 -- pattern's subject?
@@ -691,6 +742,15 @@ bucketOfEffect re = case re of
   -- choice to the NEW controller, and taking the copy first hands it to the old
   -- one.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.UnderSourceControl) -> ReplacementBucket.ControlOnEntry
+  -- CR 616.1d, and the only arm that is: "replacement and/or prevention effects
+  -- that would cause a card to enter the battlefield with its back face up".
+  -- That is the whole of what CR 712.13a's rewrite does, so it ranks below CR
+  -- 616.1c's copy bucket and above everything else.
+  --
+  -- The ordering is unexercised: the pool's only producer is daybound, and no
+  -- card in it races a daybound entry with another entry replacement in the same
+  -- iteration (#73 tracks the same absence for CR 616.1c).
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.EntersTransformed) -> ReplacementBucket.BackFaceOnEntry
   ReplacementEffect.DamageR {} -> ReplacementBucket.Other
   ReplacementEffect.DestructionR _ -> ReplacementBucket.Other
   ReplacementEffect.CounterR {} -> ReplacementBucket.Other
@@ -777,6 +837,10 @@ readsApplier re = case re of
   -- identical while their controllers are not, and applying one puts the
   -- permanent somewhere applying the other does not.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.UnderSourceControl) -> True
+  -- CR 712.13a / 702.145b: no chooser at all, and no payload -- the rewrite shows
+  -- the back face of the card the event already named, and which face that is
+  -- comes from the card. Two such rows are the same write twice, Tapped's answer.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.EntersTransformed) -> False
   -- The rewritten amount is the effect's (Galvanic Blast, Furnace of Rath), and
   -- a prevention prevents the same event whoever's row it is (Fog). CR 615.7's
   -- shield is no exception: what makes two shields differ is how much each has
