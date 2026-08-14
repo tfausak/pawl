@@ -4,10 +4,10 @@ module Pawl.Types.CounterKind where
 -- Its KIND is a closed-half classification, the same posture as Keyword: the
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
--- loyalty, rule 714 for lore, CR 702.63 for time and CR 702.32 for fade -- none of
--- which rule 122.1 lists at all, and CR 122.1c for shield. What rule 122.1 names and this
--- type does not are CR 122.1d's stun counter and CR 122.1h's finality counter;
--- 122.1f's poison and 122.1i's rad are a PLAYER's and live in
+-- loyalty, rule 714 for lore, CR 702.63 for time and CR 702.32 for fade -- none
+-- of which rule 122.1 lists at all, and CR 122.1c for shield. What rule 122.1
+-- names and this type does not are CR 122.1d's stun counter and CR 122.1h's
+-- finality counter; 122.1f's poison and 122.1i's rad are a PLAYER's and live in
 -- Pawl.Types.PlayerCounterKind.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 --
@@ -78,10 +78,10 @@ data CounterKind keyword
     -- exactly as rule 702.63 is Time's.
     --
     -- A KIND OF ITS OWN rather than reusing Time, even though both count a
-    -- permanent's remaining upkeeps: the rules name them apart, and a card reads
-    -- one and not the other -- Clockspinning names time counters, Jolting Merfolk
-    -- and Ancient Hydra pay fade counters as an activation cost. A permanent with
-    -- both keywords would count one pile twice if they shared a kind.
+    -- permanent's remaining upkeeps: the rules name them apart, and cards outside
+    -- this pool name one without the other -- Jolting Merfolk spends fade counters
+    -- as an activation cost, Clockspinning moves time counters. A permanent with
+    -- both keywords would also count one pile twice if they shared a kind.
     --
     -- Contributes nothing to the CR 613 layer system, so
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. Its

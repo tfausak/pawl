@@ -1150,8 +1150,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time n))))
   -- CR 702.32a's FIRST ability, vanishing's row in the fade counter: "this
   -- permanent enters with N fade counters on it". One row per instance for riot's
-  -- reason, so two instances would place two piles -- rule 702.32 states no
-  -- multiplicity clause of its own and no printing carries fading twice.
+  -- reason, so two instances would place two lots of N -- rule 702.32 states no
+  -- multiplicity clause of its own, and no printing carries fading twice.
   Keyword.Fading n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade n))))
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind:
   -- "this permanent enters with N +1/+1 counters on it". One row per instance
@@ -2967,11 +2967,12 @@ vanishingLastCounter =
 -- every one of its controller's upkeeps including the one where the pile is
 -- already empty; that firing is the whole of the rule's sacrifice.
 --
--- ONE ability with TWO clauses, not two abilities: rule 702.32a's "if you can't"
--- is a second sentence of the same ability, and splitting it would put two
--- objects on the stack that CR 603.4 would then re-check separately -- a fade
--- counter removed in response between trigger and resolution would leave the
--- removal half doing nothing and no sacrifice half to have triggered.
+-- ONE ability with TWO clauses, not two: rule 702.32a's "if you can't" is a
+-- second sentence of the same ability. The alternative -- two triggers under
+-- complementary intervening "if"s -- is not equivalent, since CR 603.4 re-checks
+-- each at resolution: a fade counter removed in response would leave the removal
+-- half doing nothing, with no sacrifice half to have triggered, and the permanent
+-- would survive an upkeep rule 702.32a takes it on.
 --
 -- THE CLAUSES ARE INVERTED against the printed order, and the printed order is
 -- unwritable: a gate is read as its clause is REACHED (Pawl.Engine.Resolve's
@@ -2979,9 +2980,9 @@ vanishingLastCounter =
 -- removal would read a pile the removal had already emptied and take the
 -- permanent on the very upkeep the rule keeps it. Asking "are there none?" first
 -- reads the count rule 702.32a's "can't" is about. Observably equivalent to the
--- printed order because nothing runs between two clauses of one resolution -- no
--- player gets priority (CR 117.3) and CR 603.3b holds the triggers until it
--- finishes -- so no board tells the two apart.
+-- printed order because nothing runs between two clauses of one resolution: no
+-- player gets priority until it finishes (CR 117.3b), and CR 704.3 hangs both the
+-- state-based actions and the waiting triggers off that same moment.
 --
 -- Both clauses Mandatory: rule 702.32a prints no "may" on either sentence.
 --
