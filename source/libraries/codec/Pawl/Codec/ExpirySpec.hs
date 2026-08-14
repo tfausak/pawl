@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
@@ -52,6 +53,19 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       Expiry.codec
       (Expiry.AtTurnOf (PlayerId.MkPlayerId 1))
       """ {"type":"AtTurnOf","value":1} """
+  -- CR 611.2a's other phrasing, which needs the turn as well as the player: the
+  -- effect ends at the end of the first turn of theirs numbered above it.
+  Spec.it s "AtEndOfTurnOf carries its player and turn" $
+    Common.assertCodec
+      s
+      Expiry.codec
+      ( Expiry.AtEndOfTurnOf
+          AfterTurn.MkAfterTurn
+            { AfterTurn.player = PlayerId.MkPlayerId 1,
+              AfterTurn.turn = 3
+            }
+      )
+      """ {"type":"AtEndOfTurnOf","value":{"player":1,"turn":3}} """
   -- CR 500.5, carrying the PhaseSelector window. Both grains -- a stepless
   -- phase and a step -- because Pawl.Engine.Expiry.dropAtEndOf tells them apart
   -- by EQUALITY, so a codec that collapsed them would let the end of a combat

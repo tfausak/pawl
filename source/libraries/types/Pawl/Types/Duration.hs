@@ -16,12 +16,12 @@ data Duration
   | -- | CR 611.2a: "until your next turn" (Hag of Inner Weakness). "Your" is
     -- resolved to a concrete player by Pawl.Engine.Expiry.arm (CR 109.5) -- it cannot
     -- be a PlayerId here, because a printed card does not know one.
-    --
-    -- Not implemented, recorded here because the card's JSON cannot carry a
-    -- comment: rule 611.2a's other phrasing, "until the END of your next turn"
-    -- (Soulfire Eruption), which ends a whole turn later.
-    -- data/cards/soulfire-eruption.json writes this arm in its place (#1477).
     UntilYourNextTurn
+  | -- | CR 611.2a: "until the end of your next turn" (Soulfire Eruption), which
+    -- ends a whole turn later than the arm above -- as that turn ENDS (CR
+    -- 514.2's moment) rather than as it begins. Both "your"s are resolved the
+    -- same way, by Pawl.Engine.Expiry.arm.
+    UntilEndOfYourNextTurn
   | -- | CR 611.2b: "for as long as ...". The duration has a BEGINNING as well as
     -- an end -- "if the 'for as long as' duration never starts, the effect does
     -- nothing" -- which is why Pawl.Engine.Expiry.arm returns a Maybe.

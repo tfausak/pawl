@@ -16,14 +16,17 @@ module Pawl.Engine.Expiry where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.AfterTurn as AfterTurn
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import Pawl.Types.Duration (Duration)
@@ -61,6 +64,14 @@ arm players controller source duration gs = case duration of
   Duration.UntilEndOfTurn -> Just Expiry.AtCleanup
   Duration.Indefinite -> Just Expiry.Never
   Duration.UntilYourNextTurn -> Just (Expiry.AtTurnOf controller)
+  -- CR 611.2a: "until the end of your next turn". Two samples, both taken here
+  -- and neither ever rewritten: the controller (CR 109.5's "you", as above) and
+  -- the turn this duration began on. dropAtCleanup ends it at the first turn of
+  -- the controller's numbered ABOVE that one -- so a duration that began during
+  -- their own turn survives that turn's cleanup, which is the whole difference
+  -- between this arm and the one above.
+  Duration.UntilEndOfYourNextTurn ->
+    Just (Expiry.AtEndOfTurnOf (AfterTurn.MkAfterTurn controller (GameState.turnNumber gs)))
   -- BAKED, and stored baked: the condition outlives the resolution that stored
   -- it, and sweepConditional below re-reads it off the effect's
   -- SOURCE, whose bindings never held the resolution's slots. An InSlot left
@@ -94,6 +105,15 @@ dropAtCleanup gs =
         Expiry.Never -> True
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
+        -- CR 611.2a: "until the end of your next turn" ends as that turn ends,
+        -- which is this same CR 514.2 moment -- so the sweep that ends an
+        -- until-end-of-turn effect is the one that ends this too, one named turn
+        -- later. The turn is named by the pair (see Pawl.Types.AfterTurn): this
+        -- cleanup belongs to that player, and its number is above the one the
+        -- duration began on, so it is not the duration's own turn.
+        Expiry.AtEndOfTurnOf afterTurn ->
+          AfterTurn.player afterTurn /= GameState.activePlayer gs
+            || GameState.turnNumber gs <= AfterTurn.turn afterTurn
         Expiry.AtEndOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
@@ -137,6 +157,7 @@ sweepConditional = do
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         Expiry.AtTurnOf _ -> True
+        Expiry.AtEndOfTurnOf _ -> True
         Expiry.AtEndOf _ -> True
       keepEffect eff = survives (ContinuousEffect.source eff) (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.source active) (ActiveReplacement.expiry active)
@@ -211,11 +232,20 @@ clearedPermissions survives gs =
 -- the difference. The first observation point is the upkeep step (CR 503.1).
 dropAtTurnOf :: PlayerId -> GameState -> GameState
 dropAtTurnOf pid gs =
-  let survives expiry = case expiry of
+  let -- CR 800.4m: "or until a specific point in that turn". A departed player's
+      -- turn never begins, so the cleanup sweep that would end an
+      -- until-the-END-of-their-next-turn effect never runs and the effect would
+      -- last for the rest of the game. The rule ends it here instead, at the
+      -- point that turn would have begun -- the same moment, and the same call,
+      -- as the arm above. For a player still in the game this is the beginning of
+      -- a turn their effect is meant to survive, so it is left alone.
+      departed = List.notElem pid (Game.stillPlaying gs)
+      survives expiry = case expiry of
         Expiry.AtTurnOf p -> p /= pid
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         Expiry.While {} -> True
+        Expiry.AtEndOfTurnOf afterTurn -> not (departed && AfterTurn.player afterTurn == pid)
         Expiry.AtEndOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
@@ -252,6 +282,7 @@ dropAtEndOf ending gs =
         Expiry.Never -> True
         Expiry.While {} -> True
         Expiry.AtTurnOf _ -> True
+        Expiry.AtEndOfTurnOf _ -> True
       keepEffect eff = survives (ContinuousEffect.expiry eff)
       keepReplacement active = survives (ActiveReplacement.expiry active)
       keepPlayerEffect active = survives (ActivePlayerEffect.expiry active)

@@ -13,6 +13,7 @@ codec =
     [ Arm.nullary "UntilEndOfTurn" Duration.UntilEndOfTurn,
       Arm.nullary "Indefinite" Duration.Indefinite,
       Arm.nullary "UntilYourNextTurn" Duration.UntilYourNextTurn,
+      Arm.nullary "UntilEndOfYourNextTurn" Duration.UntilEndOfYourNextTurn,
       Arm.payload "ForAsLongAs" Condition.codec Duration.ForAsLongAs (\x -> case x of Duration.ForAsLongAs y -> Just y; _ -> Nothing),
       Arm.nullary "UntilEndOfCombat" Duration.UntilEndOfCombat
     ]

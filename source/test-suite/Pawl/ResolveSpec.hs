@@ -9707,10 +9707,10 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
 -- and Oracle text checked against api.scryfall.com.) It is rule 608.2f's own
 -- second example.
 --
--- TWO DEPARTURES FROM THE PRINTED CARD, both stricter than printed and both
--- irrelevant to what is asserted here: "any number of target" is written as up
--- to three (#1476), and "until the end of your next turn" as "until your next
--- turn" (#1477).
+-- ONE DEPARTURE FROM THE PRINTED CARD, stricter than printed and irrelevant to
+-- what is asserted here: "any number of target" is written as up to three
+-- (#1476). The permission's duration is the printed one; how long it lasts is
+-- Pawl.ExpirySpec's question, not this group's.
 --
 -- alice casts it off nine Mountains at a THREE-seat board and the priority loop
 -- resolves it, which is what makes this gameplay-level rather than an
