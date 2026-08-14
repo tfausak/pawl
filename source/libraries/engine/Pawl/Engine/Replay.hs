@@ -61,6 +61,7 @@ encode p answer = case p of
   Prompt.ChooseRedistribution {} -> Response.ChoseRedistribution answer
   Prompt.ChooseRingBearer {} -> Response.ChoseRingBearer answer
   Prompt.ChooseBolster {} -> Response.ChoseBolster answer
+  Prompt.ChooseAmass {} -> Response.ChoseAmass answer
   Prompt.ChooseCardInGraveyard {} -> Response.ChoseCardInGraveyard answer
   Prompt.ChooseRoom {} -> Response.ChoseRoom answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
@@ -176,6 +177,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseBolster {} -> case response of
     Response.ChoseBolster oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseAmass {} -> case response of
+    Response.ChoseAmass oid -> Just oid
     _ -> Nothing
   Prompt.ChooseCardInGraveyard {} -> case response of
     Response.ChoseCardInGraveyard oid -> Just oid
@@ -403,6 +407,9 @@ defaultAnswer p = case p of
   -- CR 701.39a: the prompt is only raised with two or more creatures tied for the
   -- least toughness, and every one of them is a legal choice.
   Prompt.ChooseBolster _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 701.47a: the prompt is only raised with two or more Army creatures the
+  -- player controls, and every one of them is a legal choice.
+  Prompt.ChooseAmass _ _ _ candidates -> NonEmpty.head candidates
   -- CR 608.2d: the prompt is only raised with two or more matching cards in the
   -- named graveyards, and every one of them is a legal choice.
   Prompt.ChooseCardInGraveyard _ _ _ candidates -> NonEmpty.head candidates

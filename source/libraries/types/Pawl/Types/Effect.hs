@@ -1,6 +1,7 @@
 module Pawl.Types.Effect where
 
 import qualified Pawl.Types.AffectPlayers as AffectPlayers
+import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.ChangeText as ChangeText
@@ -1138,6 +1139,30 @@ data Effect card
     -- also the reason this is an opcode at all rather than card data: support
     -- (CR 701.41a) needed none because targeting already had the shape.
     Bolster Quantity.Quantity
+  | -- | CR 701.47a: "amass [subtype] N" -- if the resolving controller controls no
+    -- Army creature, create a 0\/0 black [subtype] Army creature token; then choose
+    -- an Army creature they control, put N +1\/+1 counters on it, and give it the
+    -- subtype in addition to its other types (CR 205.1b) if it does not have it.
+    --
+    -- CHOOSE, not target, Proliferate's and TemptWithTheRing's posture: rule
+    -- 701.47a says "choose", so no slot is declared (CR 601.2c), the Army is picked
+    -- on RESOLUTION via Prompt.ChooseAmass, and nothing is subject to CR 608.2b's
+    -- illegal-target check -- which is why this carries no SlotName.
+    --
+    -- ONE opcode rather than four composed effects, for TemptWithTheRing's reason:
+    -- rule 701.47a fixes the ORDER, the second instruction reads state the first
+    -- writes ("if you don't control an Army ... create" then "choose an Army you
+    -- control"), and the third and fourth act on the object the second chose, which
+    -- no card-data slot names. Composing them would also put the token's printed
+    -- characteristics into the open half, where CR 701.47a already has them.
+    --
+    -- The subtype is the card's word and the Army type is the rulebook's, which is
+    -- why Amass.subtype carries only the former.
+    --
+    -- Performed by Pawl.Engine.Amass.amass. CR 701.47b's "even if some or all of
+    -- those actions were impossible" is why that is one procedure rather than a
+    -- chain that can stop early.
+    Amass Amass.Amass
   | -- | CR 701.54a: the Ring tempts the resolving controller -- they get an emblem
     -- named The Ring if they have none (CR 701.54c), then choose a creature they
     -- control to become their Ring-bearer.

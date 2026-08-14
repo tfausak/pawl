@@ -88,6 +88,7 @@ library codec
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AlternativeCost
     Pawl.Codec.AlternativeCostSpec
+    Pawl.Codec.Amass
     Pawl.Codec.ArmDelayedTrigger
     Pawl.Codec.ArmDelayedTriggerSpec
     Pawl.Codec.AttachTarget
@@ -555,6 +556,7 @@ library engine
   exposed-modules:
     Pawl.Engine.Action
     Pawl.Engine.Activate
+    Pawl.Engine.Amass
     Pawl.Engine.Attach
     Pawl.Engine.AttackCost
     Pawl.Engine.AttackRequirement
@@ -834,6 +836,7 @@ library types
     Pawl.Types.AgainstSlot
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost
+    Pawl.Types.Amass
     Pawl.Types.ArmDelayedTrigger
     Pawl.Types.Asked
     Pawl.Types.AttachTarget

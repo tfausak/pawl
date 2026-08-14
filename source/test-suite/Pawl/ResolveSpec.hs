@@ -8876,6 +8876,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   multiTargetSpec s registry
   supportSpec s registry
   bolsterSpec s registry
+  amassSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
   soulfireEruptionSpec s registry
@@ -9032,6 +9033,185 @@ resolveOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectI
 resolveOne answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
+
+-- CR 701.47 amass, which is an opcode: Effect.Amass over a subtype and a Quantity,
+-- whose Army token, candidate pool and counter kind are rule 701.47a's rather than
+-- the card's.
+--
+-- Relentless Advance {3}{U} Sorcery (data/cards/relentless-advance.json): "Amass
+-- Zombies 3.", and nothing else -- so every token and every counter on these boards
+-- came from this keyword action.
+--
+-- Mordor Muster {1}{B} Sorcery (data/cards/mordor-muster.json): "You draw a card
+-- and you lose 1 life. Amass Orcs 1." A SECOND subtype is what makes rule 701.47a's
+-- last instruction observable at all: a card that only ever amasses its own subtype
+-- cannot tell the type addition from the token's printed types, because the token it
+-- would have created already has them.
+--
+-- Three and one are distinct from each other and from their sum, so a counter
+-- assertion cannot be satisfied by a coincidence: 3, 1, 4 and 6 each name exactly
+-- one history of amasses.
+amassSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+amassSpec s registry = Spec.describe s "Amass" $ do
+  Spec.it s "CR 701.47a amass with no Army creates the 0/0 black Army token the rule prints" $ do
+    (gs, advanceId, _) <- amassBoard s registry
+    let after = resolveOne S.identityAnswer gs advanceId
+    case S.tokensOf after of
+      [army] -> do
+        Spec.assertEqWith s "black, which is the rule's colour and not the card's" (Projection.colorsOf army after) (Set.singleton Color.Black)
+        -- CR 111.4: rule 701.47a names no token, so the name is its subtypes plus
+        -- the word "Token".
+        Spec.assertEqWith s "named for its subtypes" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Zombie Army Token") S.alice after) 1
+        Spec.assertEqWith s "a Zombie Army" (Projection.subtypesOf army after) (Set.fromList [Subtype.Zombie, Subtype.Army])
+        Spec.assertEqWith s "three +1/+1 counters" (plusCountersOn army after) (Just 3)
+        -- CR 704.3: state-based actions are not checked mid-resolution, so the 0/0
+        -- the rule prints lives to take its counters.
+        Spec.assertEqWith s "0/0 plus three counters" (S.powerToughnessOf army after) (Just (3, 3))
+      other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+  -- Rule 701.47a's first instruction taken the other way, and its last, on one
+  -- board: the second amass finds an Army and so creates nothing, and its subtype
+  -- lands on the Army that was already there.
+  Spec.it s "CR 701.47a a second amass creates no second token and adds its subtype to the Army" $ do
+    (gs, advanceId, musterId) <- amassBoard s registry
+    let after = resolveOne S.identityAnswer (resolveOne S.identityAnswer gs advanceId) musterId
+    case S.tokensOf after of
+      [army] -> do
+        Spec.assertEqWith s "three counters and then one more" (plusCountersOn army after) (Just 4)
+        -- CR 205.1b: "in addition to its other types", so the Zombie survives the
+        -- Orc rather than being replaced by it.
+        Spec.assertEqWith s "an Orc Zombie Army" (Projection.subtypesOf army after) (Set.fromList [Subtype.Orc, Subtype.Zombie, Subtype.Army])
+        Spec.assertEqWith s "0/0 plus four counters" (S.powerToughnessOf army after) (Just (4, 4))
+      other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+  -- CR 701.47a's "an Army creature YOU CONTROL", both times it appears: bob's Army
+  -- neither stops alice's token being created nor takes her counters.
+  Spec.it s "CR 701.47a an opponent's Army is not an Army you control" $ do
+    (gs, advanceId, musterId) <- opposedAmassBoard s registry
+    let after = resolveOne S.identityAnswer (resolveFor S.bob S.identityAnswer gs musterId) advanceId
+    case S.tokensOf after of
+      [bobArmy, aliceArmy] -> do
+        Spec.assertEqWith s "alice amassed her own Army" (plusCountersOn aliceArmy after) (Just 3)
+        Spec.assertEqWith s "a Zombie Army" (Projection.subtypesOf aliceArmy after) (Set.fromList [Subtype.Zombie, Subtype.Army])
+        Spec.assertEqWith s "bob's Army kept the one counter he amassed" (plusCountersOn bobArmy after) (Just 1)
+        Spec.assertEqWith s "and did not become a Zombie" (Projection.subtypesOf bobArmy after) (Set.fromList [Subtype.Orc, Subtype.Army])
+      other -> Spec.assertFailure s ("expected exactly two tokens, got " <> show (length other))
+  Spec.it s "CR 701.47a amass counters the Army its controller chose" $ do
+    (bobArmy, aliceArmy, gs, advanceId) <- stolenArmyBoard s registry
+    let after = resolveOne (amassing aliceArmy) gs advanceId
+    Spec.assertEqWith s "her own Army, whom she named, took three more" (plusCountersOn aliceArmy after) (Just 6)
+    Spec.assertEqWith s "the borrowed Army took none" (plusCountersOn bobArmy after) (Just 1)
+    Spec.assertEqWith s "and no third token was created" (length (S.tokensOf after)) 2
+  -- The same board and the same spell, differing only in the answer: the engine
+  -- makes no choice, so the other Army is equally reachable -- and the subtype
+  -- follows the choice, which is what makes rule 701.47a's last instruction act on
+  -- the CHOSEN Army rather than on the amassing player's Armies at large.
+  Spec.it s "CR 701.47a the same board answered the other way counters the other Army" $ do
+    (bobArmy, aliceArmy, gs, advanceId) <- stolenArmyBoard s registry
+    let after = resolveOne (amassing bobArmy) gs advanceId
+    Spec.assertEqWith s "the borrowed Army, whom she named, took three" (plusCountersOn bobArmy after) (Just 4)
+    Spec.assertEqWith s "and became a Zombie as well as an Orc" (Projection.subtypesOf bobArmy after) (Set.fromList [Subtype.Orc, Subtype.Zombie, Subtype.Army])
+    Spec.assertEqWith s "her own Army took none" (plusCountersOn aliceArmy after) (Just 3)
+    Spec.assertEqWith s "and stayed a plain Zombie Army" (Projection.subtypesOf aliceArmy after) (Set.fromList [Subtype.Zombie, Subtype.Army])
+  -- Where the rules leave nothing to ask, do not ask. The two boards differ in how
+  -- many Armies their controller has, which is the whole of what makes rule
+  -- 701.47a's choice a choice.
+  Spec.it s "CR 701.47a a lone Army raises no prompt" $ do
+    (alone, aloneSpell, _) <- amassBoard s registry
+    (_, _, two, twoSpell) <- stolenArmyBoard s registry
+    let countingAnswer :: Prompt.Prompt r -> State.State Int r
+        countingAnswer p = case p of
+          Prompt.ChooseAmass {} -> do
+            State.modify (+ 1)
+            pure (S.identityAnswer p)
+          _ -> pure (S.identityAnswer p)
+        asks g spellId =
+          State.execState (Engine.runGame countingAnswer g (S.cast S.alice spellId >> Stack.resolveTop)) 0
+    -- The first amass on the first board has no Army at all until it makes one, and
+    -- one Army is the whole of the candidate set.
+    Spec.assertEqWith s "one Army: nothing to ask" (asks alone aloneSpell) 0
+    Spec.assertEqWith s "two Armies: one real decision" (asks two twoSpell) 1
+
+-- alice has six Islands and six Swamps untapped, Relentless Advance and Mordor
+-- Muster in hand, and a card left in her library for the Muster's draw (CR 104.3c).
+-- Twelve lands rather than the six the two spells cost, so that whichever lands the
+-- first payment takes, the second is still payable.
+amassBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+amassBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  advance <- S.printingOf s registry "Relentless Advance"
+  muster <- S.printingOf s registry "Mordor Muster"
+  let g1 = S.landsFor swamp S.alice 6 (S.landsInPlay island 6)
+      (g2, advanceId) = S.handOne advance g1
+      (musterId, g3) = S.addHandCard muster S.alice g2
+      g4 = snd (S.addLibraryCard island S.alice g3)
+  pure (g4, advanceId, musterId)
+
+-- amassBoard with the Muster moved across the table: bob holds it, with his own
+-- lands and his own library card, so the two spells are cast from two seats. The
+-- same printings, the same counts and the same phase -- only the seat differs.
+opposedAmassBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+opposedAmassBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  advance <- S.printingOf s registry "Relentless Advance"
+  muster <- S.printingOf s registry "Mordor Muster"
+  let g1 = S.landsFor swamp S.bob 6 (S.landsInPlay island 6)
+      (g2, advanceId) = S.handOne advance g1
+      (musterId, g3) = S.addHandCard muster S.bob g2
+      g4 = snd (S.addLibraryCard island S.bob g3)
+  pure (g4, advanceId, musterId)
+
+-- Two Armies under one player's control, which is the only board on which rule
+-- 701.47a's choice is a choice. bob amasses Orcs, alice amasses Zombies, and alice
+-- then gains control of bob's Army (CR 613.1b's layer 2) -- so her second Relentless
+-- Advance sees two Armies, one of each subtype. Returns bob's Army, alice's own, the
+-- board and the spell still in her hand.
+--
+-- Ten Islands, since alice casts Relentless Advance twice: six leaves the second
+-- unpayable, and an uncast spell is a board that proves nothing.
+stolenArmyBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+stolenArmyBoard s registry = do
+  island <- S.printingOf s registry "Island"
+  swamp <- S.printingOf s registry "Swamp"
+  advance <- S.printingOf s registry "Relentless Advance"
+  muster <- S.printingOf s registry "Mordor Muster"
+  let g1 = S.landsFor swamp S.bob 6 (S.landsInPlay island 10)
+      (g2, firstId) = S.handOne advance g1
+      (secondId, g3) = S.addHandCard advance S.alice g2
+      (musterId, g4) = S.addHandCard muster S.bob g3
+      g5 = snd (S.addLibraryCard island S.bob g4)
+      amassed = resolveOne S.identityAnswer (resolveFor S.bob S.identityAnswer g5 musterId) firstId
+  case S.tokensOf amassed of
+    [bobArmy, aliceArmy] -> pure (bobArmy, aliceArmy, S.giveControl bobArmy S.alice amassed, secondId)
+    other -> do
+      Spec.assertFailure s ("expected exactly two tokens, got " <> show (length other))
+      pure (S.noSource, S.noSource, amassed, secondId)
+
+-- resolveOne for a seat other than alice's: bob casts and the spell resolves.
+resolveFor :: PlayerId.PlayerId -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+resolveFor pid answer gs spellId =
+  let cast = snd (Engine.runGamePure answer gs (S.cast pid spellId))
+   in snd (Engine.runGamePure answer cast Stack.resolveTop)
+
+-- Answers Prompt.ChooseAmass with a named Army, deferring everything else to
+-- S.identityAnswer. PINNED BY ID rather than picked by searching the candidates, so
+-- a mutation to the candidate sweep cannot quietly repair the answer.
+amassing :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+amassing oid p = case p of
+  Prompt.ChooseAmass {} -> oid
+  _ -> S.identityAnswer p
 
 -- CR 701.41 support, which is card DATA and no opcode: "support N" is written out
 -- as the counters it means, over a CR 601.2c slot of 0 to N.
