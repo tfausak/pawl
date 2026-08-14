@@ -40,9 +40,9 @@
       "keywords": [
         {
           "type": "Reinforce",
-          "value": [
-            1,
-            {
+          "value": {
+            "amount": 1,
+            "cost": {
               "mana": [
                 {
                   "type": "Generic",
@@ -59,7 +59,7 @@
                 }
               ]
             }
-          ]
+          }
         }
       ],
       "name": "Rustic Clachan",

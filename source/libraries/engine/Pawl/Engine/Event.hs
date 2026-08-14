@@ -2058,7 +2058,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
               -- so a CR 616.1 rewrite that redirects the move decides this too
               -- (CR 614.6: the modified event is what happens). Indistinguishable
               -- from gating on the request today, and not because of a claim
-              -- about Magic: no ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR in the) pool names
+              -- about Magic: no ReplacementEffect.ZoneChangeR in the pool names
               -- the battlefield as its destination (Leyline of the Void and Rest
               -- in Peace, the two that exist, both name exile).
               --

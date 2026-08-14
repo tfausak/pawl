@@ -10,8 +10,8 @@
         },
         {
           "type": "Morph",
-          "value": [
-            {
+          "value": {
+            "cost": {
               "mana": [
                 {
                   "type": "Generic",
@@ -28,10 +28,10 @@
                 }
               ]
             },
-            {
+            "variant": {
               "type": "Mega"
             }
-          ]
+          }
         }
       ],
       "manaCost": [

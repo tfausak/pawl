@@ -1,8 +1,10 @@
 module Pawl.Codec.CostComponent where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Codec.Filter as Filter
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.Codec.Sacrifice as Sacrifice
+import qualified Pawl.Codec.TapForTotalPower as TapForTotalPower
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
@@ -26,8 +28,8 @@ codec keywordCodec =
       Arm.nullary "SacrificeThis" CostComponent.SacrificeThis,
       Arm.payload "PayLife" Common.natural CostComponent.PayLife,
       Arm.nullary "PayLifeX" CostComponent.PayLifeX,
-      Arm.payload "Sacrifice" (Common.tuple Common.natural (Filter.codec keywordCodec)) (uncurry CostComponent.Sacrifice),
-      Arm.payload "TapForTotalPower" (Common.tuple Common.natural (Filter.codec keywordCodec)) (uncurry CostComponent.TapForTotalPower),
+      Arm.payload "Sacrifice" (Sacrifice.codec keywordCodec) CostComponent.Sacrifice,
+      Arm.payload "TapForTotalPower" (TapForTotalPower.codec keywordCodec) CostComponent.TapForTotalPower,
       Arm.payload "DiscardCards" Common.natural CostComponent.DiscardCards,
       Arm.nullary "DiscardThis" CostComponent.DiscardThis,
       Arm.payload "PayEnergy" Common.natural CostComponent.PayEnergy,
@@ -35,7 +37,7 @@ codec keywordCodec =
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis,
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis,
       Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
-      Arm.payload "ExileCardsFromGraveyard" (Common.tuple Common.natural (Filter.codec keywordCodec)) (uncurry CostComponent.ExileCardsFromGraveyard),
+      Arm.payload "ExileCardsFromGraveyard" (ExileCardsFromGraveyard.codec keywordCodec) CostComponent.ExileCardsFromGraveyard,
       Arm.payload "ExileTopFromGraveyard" (Filter.codec keywordCodec) CostComponent.ExileTopFromGraveyard
     ]
   where
@@ -45,8 +47,8 @@ codec keywordCodec =
       CostComponent.SacrificeThis -> Common.nullary "SacrificeThis"
       CostComponent.PayLife n -> Common.tagged "PayLife" . Just $ Common.encodeNatural n
       CostComponent.PayLifeX -> Common.nullary "PayLifeX"
-      CostComponent.Sacrifice n c_ -> Common.tagged "Sacrifice" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Filter.codec keywordCodec) c_]
-      CostComponent.TapForTotalPower n c_ -> Common.tagged "TapForTotalPower" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Filter.codec keywordCodec) c_]
+      CostComponent.Sacrifice x -> Common.tagged "Sacrifice" . Just $ Codec.encode (Sacrifice.codec keywordCodec) x
+      CostComponent.TapForTotalPower x -> Common.tagged "TapForTotalPower" . Just $ Codec.encode (TapForTotalPower.codec keywordCodec) x
       CostComponent.DiscardCards n -> Common.tagged "DiscardCards" . Just $ Common.encodeNatural n
       CostComponent.DiscardThis -> Common.nullary "DiscardThis"
       CostComponent.PayEnergy n -> Common.tagged "PayEnergy" . Just $ Common.encodeNatural n
@@ -54,5 +56,5 @@ codec keywordCodec =
       CostComponent.RemoveLoyaltyFromThis n -> Common.tagged "RemoveLoyaltyFromThis" . Just $ Common.encodeNatural n
       CostComponent.PutPlusOneCountersOnThis n -> Common.tagged "PutPlusOneCountersOnThis" . Just $ Common.encodeNatural n
       CostComponent.ExileThisFromGraveyard -> Common.nullary "ExileThisFromGraveyard"
-      CostComponent.ExileCardsFromGraveyard n c_ -> Common.tagged "ExileCardsFromGraveyard" . Just . Value.array $ [Common.encodeNatural n, Codec.encode (Filter.codec keywordCodec) c_]
+      CostComponent.ExileCardsFromGraveyard x -> Common.tagged "ExileCardsFromGraveyard" . Just $ Codec.encode (ExileCardsFromGraveyard.codec keywordCodec) x
       CostComponent.ExileTopFromGraveyard c_ -> Common.tagged "ExileTopFromGraveyard" . Just $ Codec.encode (Filter.codec keywordCodec) c_

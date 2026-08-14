@@ -10,6 +10,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Cycling as Cycling
 -- Aliased Filter.Type, not Type, because the evaluator module Pawl.Engine.Filter
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
@@ -612,8 +613,8 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertEqWith
         s
         "mountaincycling became islandcycling"
-        (Filter.rewrite [(Subtype.Mountain, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Mountain)))))
-        (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Island))))
+        (Filter.rewrite [(Subtype.Mountain, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Cycling (Cycling.MkCycling cost (Just (Filter.Type.HasSubtype Subtype.Mountain))))))
+        (Filter.Type.HasKeyword (Keyword.Cycling (Cycling.MkCycling cost (Just (Filter.Type.HasSubtype Subtype.Island)))))
 
     -- CR 702.11d's "[quality]" is rule 702's THIRD carrier of a word, and CR
     -- 612.2 reaches it on the same terms as the two above: the rule changes "a

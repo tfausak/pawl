@@ -69,6 +69,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -197,9 +198,9 @@ doorSpec s registry =
     Spec.it s "CR 118.3 a Sacrifice component counts matching permanents this player controls" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 2
-          two = CostComponent.Sacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain)
-          three = CostComponent.Sacrifice 3 (Filter.Type.HasSubtype Subtype.Mountain)
-          islands = CostComponent.Sacrifice 1 (Filter.Type.HasSubtype Subtype.Island)
+          two = CostComponent.Sacrifice (Sacrifice.MkSacrifice 2 (Filter.Type.HasSubtype Subtype.Mountain))
+          three = CostComponent.Sacrifice (Sacrifice.MkSacrifice 3 (Filter.Type.HasSubtype Subtype.Mountain))
+          islands = CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.Type.HasSubtype Subtype.Island))
       Spec.assertBool s (Cost.canPayComponent S.alice S.noSource two gs) "two Mountains pay for two"
       Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource three gs)) "but not for three"
       Spec.assertBool s (not (Cost.canPayComponent S.alice S.noSource islands gs)) "and not for an Island"

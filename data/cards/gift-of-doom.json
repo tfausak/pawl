@@ -11,14 +11,14 @@
       "keywords": [
         {
           "type": "Morph",
-          "value": [
-            {
+          "value": {
+            "cost": {
               "components": [
                 {
                   "type": "Sacrifice",
-                  "value": [
-                    1,
-                    {
+                  "value": {
+                    "count": 1,
+                    "whichPermanents": {
                       "type": "And",
                       "value": [
                         {
@@ -35,15 +35,15 @@
                         }
                       ]
                     }
-                  ]
+                  }
                 }
               ],
               "mana": []
             },
-            {
+            "variant": {
               "type": "Plain"
             }
-          ]
+          }
         }
       ],
       "manaCost": [

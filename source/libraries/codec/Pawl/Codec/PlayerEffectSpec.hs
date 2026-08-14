@@ -20,6 +20,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
+import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -97,8 +98,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken]) [CostComponent.Sacrifice 1 (Filter.HasCardType CardType.Land)]))
-      """ {"type":"AddActivationCost","value":{"whichAbilities":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Rebel"}},{"type":"Not","value":{"type":"IsToken"}}]},"components":[{"type":"Sacrifice","value":[1,{"type":"HasCardType","value":{"type":"Land"}}]}]}} """
+      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And [Filter.HasSubtype Subtype.Rebel, Filter.Not Filter.IsToken]) [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 (Filter.HasCardType CardType.Land))]))
+      """ {"type":"AddActivationCost","value":{"whichAbilities":{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Rebel"}},{"type":"Not","value":{"type":"IsToken"}}]},"components":[{"type":"Sacrifice","value":{"count":1,"whichPermanents":{"type":"HasCardType","value":{"type":"Land"}}}}]}} """
   -- TWO components, so a codec that read only the first would round-trip the one
   -- above and not this -- and an EMPTY list is a legal value the same way.
   Spec.it s "AddActivationCost, two components" $

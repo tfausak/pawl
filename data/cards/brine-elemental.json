@@ -4,8 +4,8 @@
       "keywords": [
         {
           "type": "Morph",
-          "value": [
-            {
+          "value": {
+            "cost": {
               "mana": [
                 {
                   "type": "Generic",
@@ -31,10 +31,10 @@
                 }
               ]
             },
-            {
+            "variant": {
               "type": "Plain"
             }
-          ]
+          }
         }
       ],
       "manaCost": [
