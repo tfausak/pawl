@@ -1,0 +1,134 @@
+{
+  "faces": [
+    {
+      "characteristicPT": {
+        "type": "Plus",
+        "value": {
+          "left": {
+            "type": "Count",
+            "value": {
+              "aggregation": {
+                "type": "Members"
+              },
+              "filter": {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Elf"
+                    }
+                  },
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                ]
+              },
+              "scope": {
+                "type": "InZone",
+                "value": {
+                  "player": {
+                    "type": "EachPlayer"
+                  },
+                  "zone": {
+                    "type": "Battlefield"
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "type": "Count",
+            "value": {
+              "aggregation": {
+                "type": "Members"
+              },
+              "filter": {
+                "type": "HasSubtype",
+                "value": {
+                  "type": "Elf"
+                }
+              },
+              "scope": {
+                "type": "InZone",
+                "value": {
+                  "player": {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  "zone": {
+                    "type": "Graveyard"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "keywords": [
+        {
+          "type": "Vigilance"
+        },
+        {
+          "type": "Menace"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Abomination of Llanowar",
+      "power": {
+        "type": "Star"
+      },
+      "toughness": {
+        "type": "Star"
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elf"
+          },
+          {
+            "type": "Horror"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

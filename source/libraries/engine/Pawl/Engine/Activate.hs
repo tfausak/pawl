@@ -66,7 +66,7 @@ sicknessOkGiven pcs pid srcId ability =
 -- On the battlefield: the PROJECTION's, so Humility (layer 6) strips them. In a
 -- hand: the ones rule 702 mints for the card's printed keywords, which is
 -- cycling (CR 702.29a) and reinforce (CR 702.77a) today, read off the PRINTED
--- card because pawl's projection does not reach a hand (#160); CR 113.6b is the rule
+-- card because no pool effect changes a card's abilities in a hand (#160); CR 113.6b is the rule
 -- that lets an ability name its own zone. In a graveyard: the PRINTED abilities
 -- whose own cost or effect names the graveyard, per CR 113.6m -- see
 -- graveyardAbilitiesOf. Anywhere else: nothing -- flashback and rule 702's other
@@ -132,8 +132,9 @@ abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) 
 -- so the GRANT functions in the graveyard too -- which is exactly this gate being
 -- asked of a card that is not on the battlefield.
 --
--- The PRINTED abilities, not the projection's: pawl's projection walks the
--- battlefield only (#160), the Face.castingPermissions precedent. Not a claim
+-- The PRINTED abilities, not the projection's: no pool effect changes the
+-- abilities of a card off the battlefield (#160), the Face.castingPermissions
+-- precedent. Not a claim
 -- about the rules -- CR 613.1f does reach a card outside the battlefield -- and
 -- observationally identical while nothing can rewrite a graveyard card's text.
 --

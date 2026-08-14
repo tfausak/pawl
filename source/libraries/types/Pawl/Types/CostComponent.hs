@@ -215,9 +215,10 @@ data CostComponent keyword
     -- does not reach a cost that moves cards other than the object it is on.
     --
     -- The Filter is matched against the PRINTED card and never a projection,
-    -- which is the difference from Sacrifice's note above: nothing off the
-    -- battlefield is projected (#160), so a graveyard candidate has only its
-    -- printed characteristics to be matched on.
+    -- which is the difference from Sacrifice's note above.
+    --
+    -- Not implemented: a graveyard candidate does have a projection, so a
+    -- continuous effect that changed what this Filter reads is missed (#160).
     --
     -- "YOUR graveyard", per CR 400.3 and CR 108.4: a graveyard is a per-player
     -- zone whose members are its OWNER's, so the candidates are the paying
