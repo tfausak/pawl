@@ -133,6 +133,34 @@ to agents as written. What it doesn't say:
   `expires:subsystem` and `expires:synthetic`. Priority labels are the owner's:
   prefer high-priority issues when picking, and never set one yourself.
 
+  `gap` and `rules-correctness` are orthogonal and often both apply: `gap` says
+  the capability does not exist, `rules-correctness` that behaviour observably
+  diverges. `elision` is the one that excludes `rules-correctness` --- an
+  elision is sound only while the options are indistinguishable, so once the
+  divergence is observable it is not an elision any more.
+
+  `expires:card-driven` does NOT mean "wait". It means the work includes adding
+  a card to the pool to exercise the behavior, which is ordinary work. What the
+  labels never say is which issues are ready: an issue carrying no `expires:*`
+  is one whose trigger already fired, usually because the producer is in
+  `data/cards/` transcribed a clause short.
+
+  An `area:*` label goes on where one genuinely fits; leave it off rather than
+  mislabel. Beyond the subsystem names there are `area:keywords` (CR 701/702),
+  `area:effects` (the effect DSL --- opcodes, filters, quantities, slots,
+  modes, durations), `area:cards` (card data, faces, layouts, schemas, lints),
+  `area:stack` (CR 601/602/608) and `area:variants` (CR 313/315, subgames,
+  Commander, the Ring, dungeons).
+
+- `_scratch/AllPrintings.json` is a dated MTGJSON dump, so it is sound for
+  FINDING a card and unsound for ruling one out --- it misses every set printed
+  after it was taken. Confirm an absence against Scryfall
+  (`curl -s 'https://api.scryfall.com/cards/named?fuzzy=<name>'`) before writing
+  "no such card exists"; Goblin Plate Mail is absent from the dump and real.
+  When grepping the dump, note there is no space after the colon (`"name":"Foo"`)
+  and that `rulings` sorts before `text`, so a hit near a name is usually
+  ruling boilerplate rather than oracle text.
+
 - When no printing can reach the rule, write a synthetic card as
   `data/cards/synthetic-*.json`. A real card wins whenever one exists, and "I
   could not find one" is not the test --- search first. All five sources are
@@ -155,13 +183,20 @@ to agents as written. What it doesn't say:
   dies in the commit that closes the issue. A comment citing the test that
   *proves* a behavior is a different genre and outlives the issue.
 
-  A BLOCKED issue records its blocker as a comment, never in the body:
-  `Blocked by #N --- <capability>. Derived against origin/main @ <sha>, <date>.`
-  One line, one blocker, fixed wording so it greps. A body edited to say it
-  drifts silently; a dated comment does not, and it lands in #N's own timeline.
-  The PR that lands a capability reads that timeline
-  (`gh api repos/tfausak/pawl/issues/N/timeline`) and says in its body which
-  issues it unblocked --- without that step the line is bookkeeping.
+  A BLOCKED issue records its blocker as a GitHub dependency, not as prose:
+
+  ```
+  gh api -X POST repos/tfausak/pawl/issues/<N>/dependencies/blocked_by \
+    -F issue_id="$(gh api repos/tfausak/pawl/issues/<BLOCKER> --jq .id)"
+  ```
+
+  The metadata is the whole record --- don't also write a `Blocked by #N`
+  comment. A closed blocker KEEPS its link and renders as satisfied, which is
+  how a reader sees an issue became workable; removing it destroys the signal.
+  A blocker with no issue of its own is an untracked deficiency: file it, then
+  link it. Read a capability's dependents
+  (`gh api repos/tfausak/pawl/issues/N/dependencies/blocking`) when it lands,
+  and say in the PR body which issues it unblocked.
 
 - A spec or plan is optional, not ceremony --- write one when the unit warrants
   it and commit it in the same PR. If you are following a plan, work its tasks
