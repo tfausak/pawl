@@ -565,10 +565,10 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
 -- game, in whatever zone -- CR 613.1 starts from the actual object and names no
 -- zone, so a card in a graveyard, a hand or a library is projected exactly as a
 -- permanent is. WHICH effects reach it is the affected set's question and not
--- this function's: Affected.MatchingAnywhere is the one arm that reaches a card
--- off the battlefield (Maskwood Nexus), and every other arm is battlefield-gated
--- inside `affects`, so the fold applies nothing there that a card did not aim
--- there.
+-- this function's: Affected.MatchingAnywhere is the arm a card uses to reach one
+-- (Maskwood Nexus), TheseObjects can name any id at all, being CR 611.2c's
+-- frozen set, and the other three are battlefield-gated inside `affects` -- so
+-- the fold applies nothing here that a card did not aim off the battlefield.
 --
 -- This is the reader that used to fall back to the PRINTED card off the
 -- battlefield while viewOfObject projected it, so a one-shot count and a count
@@ -599,10 +599,6 @@ viewUpTo bound cands gs oid =
 -- read from the printed face; the axes that only an OBJECT can have -- a
 -- controller, counters, an attacking flag -- are Nothing or empty, and each says
 -- so at its field.
---
--- Not implemented: the readers that take this view for a card that IS an object
--- -- a library search's candidates, a cost's criterion, a mill tally -- read it
--- as printed where the object has a projection of its own (#160).
 --
 -- A reader holding a game state wants viewOfCardIn below instead, which is this
 -- with CR 208.2a's characteristic-defining power filled in. This one survives
@@ -710,6 +706,10 @@ viewOfCard face =
 -- must read. The view a library search, a cost criterion and a mill tally take
 -- for an off-battlefield card; viewOfCard survives for the FACE-only callers,
 -- and as the blind inner view below.
+--
+-- Not implemented: those readers take this view for a card that IS an object, so
+-- they read it as printed where the object has a CR 613 projection of its own
+-- (#160). viewUpTo above is the reader that no longer does.
 --
 -- Only the power and toughness axes differ, CR 208.2a naming both.
 viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View

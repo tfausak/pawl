@@ -87,8 +87,8 @@ data Face card = MkFace
     --
     -- The closed half must read this through Pawl.Engine.Projection.keywordsOf, never
     -- directly, since layer 6 grants and removes abilities. The exception is a
-    -- keyword whose ability functions in a zone no pool effect changes a card's
-    -- keywords in (#160) -- a HAND, where flash is read here -- the same carve-out
+    -- keyword whose ability functions in a zone where no pool effect changes a
+    -- card's keywords (#160) -- a HAND, where flash is read here -- the same carve-out
     -- castingPermissions and additionalCosts take. A GRAVEYARD is no longer one
     -- of those zones: rule 702.34a's flashback is read there through the
     -- projection, so a granted one reaches the cost (Pawl.Engine.Cost.costsFor).
