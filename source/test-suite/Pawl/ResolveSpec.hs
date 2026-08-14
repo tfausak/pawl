@@ -3673,7 +3673,8 @@ castSpouts end arrangement board spell =
 -- arrangement of two or more cards reaching one end at once (#990). WotC's own
 -- 2014-07-18 ruling on the card states both halves.
 --
--- Nothing here bears on #379: CR 608.2f's secondary sentence is guarded by "if
+-- Nothing here bears on the order SoulfireEruption's group asks about: CR 608.2f's
+-- secondary sentence is guarded by "if
 -- the action can't be processed simultaneously", and CR 401.4 gives a library
 -- destination its own rule with its own decider -- so a correct Aetherspouts
 -- SCREENS the sweep order off rather than exposing it.

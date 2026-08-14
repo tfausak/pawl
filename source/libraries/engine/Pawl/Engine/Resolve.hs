@@ -1725,8 +1725,11 @@ playerRefPlayers legal controller gs ref = case ref of
 --
 -- ORDER: APNAP (CR 608.2f's "APNAP order is used to make the primary
 -- determination of the order of those actions"), then ascending ObjectId within
--- a controller. That second key is the engine's, not the resolving controller's
--- as CR 608.2f's secondary sentence would have it (#379). The no-controller
+-- a controller. That second key is the ENGINE's, and rule 608.2f's secondary
+-- sentence does not take it away: that sentence is guarded by "if the action
+-- can't be processed simultaneously", and every reader of this function hands its
+-- whole answer to a funnel as ONE simultaneous batch. `forEachOrder` is where the
+-- guard opens, and it asks rather than reading this order. The no-controller
 -- fallback is unreachable: Projection.controllerOf answers Nothing only for an
 -- object that does not exist, and every id here came out of the battlefield.
 objectRefObjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
@@ -1838,8 +1841,9 @@ graveyardCardsOf controller source gs pid filter_ =
 --
 -- APNAP and then ascending ObjectId, for the reasons the battlefield arm gives:
 -- the seat order is the fold over Game.apnapOrder, which also drops a player CR
--- 800.4 took out of the game, and the second key is the engine's rather than the
--- resolving controller's (#379). Not the graveyard's own pile order, which CR
+-- 800.4 took out of the game, and the second key is the engine's for the reason
+-- that arm gives -- these cards are returned as one simultaneous batch, so CR
+-- 608.2f's secondary sentence never engages. Not the graveyard's own pile order, which CR
 -- 404.2 fixes for other purposes and which no rule makes the order a batch is
 -- processed in.
 graveyardCards :: PlayerId -> ObjectId -> GameState -> PlayerScope.PlayerScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
@@ -1876,8 +1880,8 @@ graveyardCards controller source gs scope filter_ =
 -- it arranges the cards an effect PUTS into a library -- where re-asking after a
 -- cancellation would ask a question the rule does not.
 --
--- Nothing here discharges #379. That issue is CR 608.2f's resolving-controller
--- ordering for an action the CR gives no rule of its own; this is CR 401.4's
+-- Not CR 608.2f's secondary sentence, which `forEachOrder` asks about: that one
+-- orders an action the CR gives no rule of its own, where this is CR 401.4's
 -- library case, and it SCREENS the sweep order off rather than exposing it.
 settleArrivals :: Zone.Zone -> LibraryPlacement.LibraryPlacement -> [ObjectId] -> Game [(ObjectId, LibraryPosition.LibraryPosition)]
 settleArrivals zone placement targets = case zone of
@@ -1987,7 +1991,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
 -- transcript are deterministic. A recipient the board no longer holds has no
 -- controller and sorts last -- CR 608.2b already dropped an illegal TARGET, but a
 -- group binding names ids that may since have moved (CR 400.7), so the fallback
--- is reachable rather than defensive.
+-- is reachable rather than defensive. Two such recipients share that bucket and
+-- are offered as though they were one seat's, which asks a question the rule does
+-- not -- harmlessly, since a body finds nothing to do to either of them.
 forEachOrder :: ObjectId -> PlayerId -> [Recipient] -> Game [Recipient]
 forEachOrder resolving controller recipients = do
   gs <- State.get
@@ -2895,8 +2901,9 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
               -- (CR 115.10a), so CR 608.2b has nothing to re-validate. The batch
               -- is in mint order: CR 608.2f's APNAP primary key has nothing to
               -- separate, since one Create's tokens all enter under one player,
-              -- and its secondary sentence would have that player order them
-              -- (#379) where this takes the order they were made in.
+              -- and its secondary sentence is guarded by an action that can't be
+              -- processed simultaneously -- a whole group's zone change is one
+              -- batch, so the order they were made in stands.
               group <- State.gets (slotGroup slot resolving)
               case group of
                 Just objects -> pure (Foldable.toList objects)
