@@ -194,10 +194,11 @@ movesLibraryCard effect = case effect of
   Effect.ShuffleIntoLibrary {} -> True
   -- The draw half.
   Effect.ExileHandThenDraw -> True
-  -- CR 724.4: restarting the game shuffles every card into its owner's library.
+  -- CR 727.2 / 103.2: every card involved in the restarted game is in the new
+  -- game, which starts by shuffling each player's deck into their library.
   Effect.RestartGame -> True
-  -- CR 720.3: a subgame's decks ARE the libraries of the game that spawned it,
-  -- and the cards leave those libraries to become them.
+  -- CR 729.2: as a subgame starts, "each player takes all the cards in their
+  -- main-game library, moves them to their subgame library, and shuffles them".
   Effect.PlaySubgame _ -> True
   -- The one arm that has to read its payload, because the opcode is the general
   -- zone change and only its ZONES answer the question. Three ways to touch a
@@ -271,7 +272,7 @@ movesLibraryCard effect = case effect of
   Effect.GainControl (DurationRef.MkDurationRef _ _) -> False
   -- The armed ability is a SEPARATE ability (CR 603.7a), so what it later does
   -- is not this effect's doing. The monarch's draw below is a separate triggered
-  -- ability for the same reason (CR 720.5a).
+  -- ability for the same reason (CR 725.2).
   Effect.ArmDelayedTrigger {} -> False
   Effect.BecomeMonarch {} -> False
   -- Every Pawl.Types.PlayerEffect is a continuous modification of what a player

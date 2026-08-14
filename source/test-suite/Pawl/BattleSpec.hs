@@ -167,8 +167,8 @@ protectorSpec s registry = Spec.describe s "Protector" $ do
 -- The projections are the REAL card's, taken off the board a cast produced, so
 -- these cases cannot pass against a Siege pawl does not actually build. The
 -- no-battle-types half is that same projection with its subtypes stripped, which
--- has no printing to take it from: CR 310.12 makes every battle printed so far a
--- Siege.
+-- has no printing to take it from: every battle printed so far has the Siege
+-- subtype CR 310.12 describes.
 candidateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 candidateSpec s registry = Spec.describe s "Candidates" $ do
   Spec.it s "CR 310.12a a Siege offers its controller's opponents and not its controller" $ do

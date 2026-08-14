@@ -422,10 +422,10 @@ data Object = MkObject
     -- Nothing for the rest of the board.
     --
     -- Nothing is NOT "the controller by default". CR 310.9a's fallback to the
-    -- controller applies only to a battle with no battle types, and every printed
-    -- battle is a Siege (CR 310.12), whose protector CR 310.12a requires to be an
-    -- opponent. Reading Nothing as the controller would therefore invent the one
-    -- designation CR 704.5y exists to undo.
+    -- controller applies only to a battle with no battle types, and every battle
+    -- printed so far has the Siege subtype CR 310.12 describes, whose protector CR
+    -- 310.12a requires to be an opponent. Reading Nothing as the controller would
+    -- therefore invent the one designation CR 704.5y exists to undo.
     --
     -- NOT a copiable value: CR 707.2 lists characteristics, and CR 310.9g says a
     -- battle that becomes a copy of another battle keeps its own protector. Falls

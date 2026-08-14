@@ -267,12 +267,11 @@ stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
 -- the list for the same reason a planeswalker that stopped being one is, and CR
 -- 506.4's "leaves the battlefield" falls out of the list being battlefield-scoped.
 --
--- It is one clause WIDER than CR 506.4, because the list also asks who protects
--- the battle: a protector moved to a third player mid-combat (CR 310.9f) would read
--- here as removed from combat, where rule 506.4 lists no such clause. No effect in
--- the pool can move a designation (#853), and CR 310.9d is why the extra clause is
--- the conservative direction anyway -- the defending player would have moved with
--- it.
+-- The list also asks who protects the battle, so a protector moved to a third
+-- player mid-combat (CR 310.9f) reads here as removed from combat -- which is
+-- what rule 506.4 says, since the 2026-08-07 update named the protector beside
+-- the controller in its list. No effect in the pool can move a designation
+-- (#853), so nothing observes the agreement either way.
 stillAttackedBattle :: ObjectId -> GameState -> Bool
 stillAttackedBattle oid gs = case Combat.defender (GameState.combat gs) of
   Nothing -> False

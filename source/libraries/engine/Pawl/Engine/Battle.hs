@@ -120,19 +120,22 @@ isBeingAttacked oid gs =
 -- creature types too, and CR 310.9a asks only about the battle ones.
 --
 -- Siege is the whole list because CR 205.3q's list of battle types is ("that
--- battle type is Siege"); CR 310.12 says the different and weaker thing that every
--- battle currently existing HAS that subtype. A second battle type is a rulebook
--- change to 205.3q, and lands here.
+-- battle type is Siege"); CR 310.12 says only the weaker thing that SOME battles
+-- have that subtype. A second battle type is a rulebook change to 205.3q, and
+-- lands here.
 battleTypes :: PC.ProjectedCharacteristics -> Set.Set Subtype.Subtype
 battleTypes = Set.intersection (Set.singleton Subtype.Siege) . PC.subtypes
 
 -- CR 310.9a: which players may be chosen as this battle's protector, "determined
 -- by its battle type (see rule 310.12)".
 --
--- Two clauses, and the fallback is the rule's own: a battle with NO battle types
--- has its controller become its protector (CR 310.9a's last sentence), and a Siege
--- must take an opponent of its controller (CR 310.12a, "only an opponent of a
--- Siege's controller can be its protector").
+-- Two clauses, and the fallback is the rule's own: for a battle with NO battle
+-- types "only its controller can be its protector" (CR 310.9a's last sentence,
+-- which CR 704.5x restates as "its controller must be chosen"), and a Siege must
+-- take an opponent of its controller (CR 310.12a, "only an opponent of a Siege's
+-- controller can be its protector"). Both are stated as who MAY be chosen, which
+-- is what this function answers -- a one-candidate list rather than an
+-- assignment.
 --
 -- `playing` is the players still in the game, which the caller supplies as
 -- Game.stillPlaying -- CR 704.5x asks for "no player IN THE GAME designated as its
@@ -158,20 +161,19 @@ protectorCandidates pc controller playing
 --
 -- CR 310.11 states both as one sentence -- "if a battle that isn't being attacked
 -- has no player designated as its protector, OR ITS PROTECTOR IS A PLAYER WHO
--- CAN'T BE ITS PROTECTOR BASED ON ITS BATTLE TYPE, its controller chooses an
--- appropriate player to be its protector" -- and rule 704 splits them, which is
--- what forces the two arms below rather than one "the designated player is not
--- among protectorCandidates".
+-- CAN'T BE ITS PROTECTOR, its controller chooses an appropriate player to be its
+-- protector" -- and rule 704 splits them, which is what forces the two arms below
+-- rather than one "the designated player is not among protectorCandidates".
 --
 -- The split is the RIDER, and the two rules put it in different places. CR 704.5x
 -- says "no player IN THE GAME designated as its protector AND no attacking
--- creatures are currently attacking that battle"; CR 704.5y, the Siege whose
--- controller is its own protector, carries no rider at all. Rule 704 governs where
--- it disagrees with 310.11's shorter statement, since 310.11's own last sentence
--- defers to it ("This is a state-based action (see rule 704)"). The disagreement
--- is reachable: 704.5y needs a control-change effect that can name a battle, and
--- Zealous Conscripts is one -- Target.permanentRecipients is the whole
--- battlefield, so a battle is a legal recipient for its GainControl (#853).
+-- creatures are currently attacking that battle"; CR 704.5y, a protector who
+-- can't be one, carries no rider at all. Rule 704 governs where it disagrees with
+-- 310.11's shorter statement, since 310.11's own last sentence defers to it
+-- ("This is a state-based action (see rule 704)"). The disagreement is reachable:
+-- 704.5y needs a control-change effect that can name a battle, and Zealous
+-- Conscripts is one -- Target.permanentRecipients is the whole battlefield, so a
+-- battle is a legal recipient for its GainControl (#853).
 --
 -- `attacked` is Battle.isBeingAttacked at the call. The rider suspends the
 -- re-choice rather than cancelling it: Gatherer's ruling is that the controller
@@ -179,9 +181,10 @@ protectorCandidates pc controller playing
 -- the battle "continues to be attacked and can be dealt combat damage as normal".
 -- Suspension is exactly what a state-based action re-asked every check does.
 --
--- Between them CR 310.11 is still the wider condition, and that width lands in the
--- second arm: an illegal protector who is neither absent nor the controller is
--- named by neither 704 rule, and protectorCandidates answers it.
+-- The second arm is CR 704.5y's own condition and needs no widening: the
+-- 2026-08-07 update generalized that rule from the Siege whose controller is its
+-- own protector to any protector who can't be one, which is exactly what
+-- protectorCandidates answers.
 needsProtector ::
   PC.ProjectedCharacteristics ->
   PlayerId.PlayerId ->
@@ -360,6 +363,9 @@ awaitingAbility events gs oid =
 -- and not the source of an ability still owed a resolution. The state-based
 -- action's CLASSIFIER half, taking the pre-pass projection so Pawl.Engine.Sba can
 -- judge it against the same board as every other CR 704.5 clause (CR 704.3).
+--
+-- NOT IMPLEMENTED: CR 310.8 / 704.5w bury a NON-Siege battle at defense 0 with no
+-- exemption at all, where the exemption below is applied to every battle (#1518).
 --
 -- The card-type guard is load-bearing in Sba.zeroLoyalty's direction rather than in
 -- zeroToughness's: Object.counters is keyed by kind for EVERY permanent, so absent
