@@ -11,6 +11,7 @@ import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
+import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
 import qualified Pawl.Types.CardName as CardName
@@ -288,3 +289,13 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.VentureMarkerEntered (VentureMarkerEntered.MkVentureMarkerEntered (PlayerId.MkPlayerId 1) (ObjectId.MkObjectId 4) (RoomIndex.MkRoomIndex 2)))
       """ {"type":"VentureMarkerEntered","value":{"player":1,"dungeon":4,"room":2}} """
+  -- The targeted object, then the spell or ability that named it, then that
+  -- object's controller. Distinct ids prove the order: CR 702.21a counters the
+  -- SECOND field and offers the cost to the third, and a swap would counter the
+  -- warded permanent.
+  Spec.it s "BecameTarget" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (ObjectId.MkObjectId 9) (ObjectId.MkObjectId 10) (PlayerId.MkPlayerId 2)))
+      """ {"type":"BecameTarget","value":{"targeted":9,"source":10,"controller":2}} """

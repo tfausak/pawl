@@ -187,6 +187,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.Vigilance
       """ {"type":"Vigilance"} """
+  -- CR 702.21a's payload is a Cost, and must not share Flashback's or Plot's tag:
+  -- ward's is paid by an OPPONENT as the minted trigger resolves, where every
+  -- other cost-bearing keyword names a cost its own controller pays.
+  Spec.it s "Ward carries its cost, and is not Flashback" $ do
+    let ward n = Keyword.Ward (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+        flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertCodec
+      s
+      Keyword.codec
+      (ward 2)
+      """ {"type":"Ward","value":{"mana":[{"type":"Generic","value":2}]}} """
+    Spec.assertBool s (Codec.encode Keyword.codec (ward 2) /= Codec.encode Keyword.codec (flashbackOf 2)) "the same cost under two keywords encodes differently"
   -- CR 702.22: only the combat-damage-division halves are modeled; see the type.
   Spec.it s "Banding" $
     Common.assertCodec

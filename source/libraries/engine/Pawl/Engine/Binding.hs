@@ -257,6 +257,33 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 castSpell :: SlotName
 castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 
+-- CR 601.2c: the reserved slot under which the SPELL OR ABILITY THAT TARGETED the
+-- bearer is bound -- rule 702.21a's "that spell or ability", which ward counters
+-- and whose controller ward offers the cost to. Stamped by
+-- Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
+-- `castSpell` and the rest.
+--
+-- Distinct from `castSpell` even though both name a stack object: that one is the
+-- spell a CAST event named, and an activated ability targeting a warded permanent
+-- records no cast event at all. A payload naming the wrong one would still
+-- typecheck, so two slots make the mismatch a dead name instead.
+--
+-- Distinct from `triggerSource` (CR 113.7a) for `castSpell`'s reason: the bearer
+-- is a permanent watching the stack, and the targeting object belongs to an
+-- opponent by the time rule 702.21a cares.
+--
+-- ONE object, never a group: rule 601.2c makes each chosen target its own
+-- becoming, so a spell naming the bearer twice is two events and two abilities,
+-- each holding one id -- which is also what keeps two ward triggers from
+-- countering one spell twice (CR 701.6a's funnel no-ops on the second).
+--
+-- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
+-- "no card's targetSlots may name it" sweep as `castSpell`. A dead id is possible
+-- and is the payload's problem: the targeting spell can be countered by something
+-- else before the ward trigger resolves.
+targetingObject :: SlotName
+targetingObject = SlotName.MkSlotName (Text.pack "thatTargetingObject")
+
 -- CR 509.3d: the reserved slot under which the CREATURE THAT BLOCKED the bearer
 -- is bound -- rule 702.25a's "the blocking creature". Stamped by
 -- Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
@@ -426,6 +453,10 @@ setBecame oid = Map.insert became (toObject oid)
 -- Bind an object under the reserved castSpell slot (CR 601.2i).
 setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setCastSpell oid = Map.insert castSpell (toObject oid)
+
+-- Bind an object under the reserved targetingObject slot (CR 601.2c).
+setTargetingObject :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setTargetingObject oid = Map.insert targetingObject (toObject oid)
 
 -- Bind an object under the reserved blockingCreature slot (CR 509.3d).
 setBlockingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
