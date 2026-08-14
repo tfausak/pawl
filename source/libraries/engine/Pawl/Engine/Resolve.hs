@@ -1725,8 +1725,11 @@ playerRefPlayers legal controller gs ref = case ref of
 --
 -- ORDER: APNAP (CR 608.2f's "APNAP order is used to make the primary
 -- determination of the order of those actions"), then ascending ObjectId within
--- a controller. That second key is the engine's, not the resolving controller's
--- as CR 608.2f's secondary sentence would have it (#379). The no-controller
+-- a controller. That second key is the ENGINE's, and rule 608.2f's secondary
+-- sentence does not take it away: that sentence is guarded by "if the action
+-- can't be processed simultaneously", and every reader of this function hands its
+-- whole answer to a funnel as ONE simultaneous batch. `forEachOrder` is where the
+-- guard opens, and it asks rather than reading this order. The no-controller
 -- fallback is unreachable: Projection.controllerOf answers Nothing only for an
 -- object that does not exist, and every id here came out of the battlefield.
 objectRefObjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
@@ -1838,8 +1841,9 @@ graveyardCardsOf controller source gs pid filter_ =
 --
 -- APNAP and then ascending ObjectId, for the reasons the battlefield arm gives:
 -- the seat order is the fold over Game.apnapOrder, which also drops a player CR
--- 800.4 took out of the game, and the second key is the engine's rather than the
--- resolving controller's (#379). Not the graveyard's own pile order, which CR
+-- 800.4 took out of the game, and the second key is the engine's for the reason
+-- that arm gives -- these cards are returned as one simultaneous batch, so CR
+-- 608.2f's secondary sentence never engages. Not the graveyard's own pile order, which CR
 -- 404.2 fixes for other purposes and which no rule makes the order a batch is
 -- processed in.
 graveyardCards :: PlayerId -> ObjectId -> GameState -> PlayerScope.PlayerScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
@@ -1876,8 +1880,8 @@ graveyardCards controller source gs scope filter_ =
 -- it arranges the cards an effect PUTS into a library -- where re-asking after a
 -- cancellation would ask a question the rule does not.
 --
--- Nothing here discharges #379. That issue is CR 608.2f's resolving-controller
--- ordering for an action the CR gives no rule of its own; this is CR 401.4's
+-- Not CR 608.2f's secondary sentence, which `forEachOrder` asks about: that one
+-- orders an action the CR gives no rule of its own, where this is CR 401.4's
 -- library case, and it SCREENS the sweep order off rather than exposing it.
 settleArrivals :: Zone.Zone -> LibraryPlacement.LibraryPlacement -> [ObjectId] -> Game [(ObjectId, LibraryPosition.LibraryPosition)]
 settleArrivals zone placement targets = case zone of
@@ -1968,22 +1972,44 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
 -- hands its whole answer to a funnel as ONE simultaneous batch, so the order
 -- never showed; this loop is the first reader that takes them one at a time.
 --
--- The second key is the ObjectId, and it is the ENGINE's choice where CR
--- 608.2f's secondary sentence gives it to the resolving controller (#379) --
--- observable through this opcode for the first time, since a body drawing on a
--- depleting resource answers differently per position. A recipient the board no
--- longer holds has no controller and sorts last -- CR 608.2b already dropped an
--- illegal TARGET, but a group binding names ids that may since have moved (CR
--- 400.7), so the fallback is reachable rather than defensive.
-forEachOrder :: GameState -> [Recipient] -> [Recipient]
-forEachOrder gs recipients =
+-- The second key is CR 608.2f's secondary sentence, and it is the RESOLVING
+-- CONTROLLER's -- "the player who controls the resolving spell or ability chooses
+-- the relative order of those actions" -- so each seat's group is handed to them
+-- as a Prompt.OrderForEach rather than settled by ascending ObjectId. Observable
+-- through this opcode for the first time, since a body drawing on a depleting
+-- resource answers differently per position (Soulfire Eruption's exiled card).
+--
+-- Asked once per group, in APNAP order of the groups: the between-group order is
+-- the rule's primary determination and nobody's choice, and every question of one
+-- loop goes to the same player, whose own order for them CR 101.4c leaves open.
+-- A group of one is not asked -- there is no relative order to choose.
+--
+-- FILTERED, NOT TRUSTED, payComponents' posture: Game.permute keeps the engine's
+-- order for an answer that is not a permutation of the offered indices.
+--
+-- Ascending ObjectId is still what a group is OFFERED in, so the prompt and a
+-- transcript are deterministic. A recipient the board no longer holds has no
+-- controller and sorts last -- CR 608.2b already dropped an illegal TARGET, but a
+-- group binding names ids that may since have moved (CR 400.7), so the fallback
+-- is reachable rather than defensive. Two such recipients share that bucket and
+-- are offered as though they were one seat's, which asks a question the rule does
+-- not -- harmlessly, since a body finds nothing to do to either of them.
+forEachOrder :: ObjectId -> PlayerId -> [Recipient] -> Game [Recipient]
+forEachOrder resolving controller recipients = do
+  gs <- State.get
   let order = Game.apnapOrder gs
       last_ = length order
       playerOf recipient = case recipient of
         Recipient.ToPlayer pid -> Just pid
         _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
       seat recipient = maybe last_ (\pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)) (playerOf recipient)
-   in List.sortOn (\recipient -> (seat recipient, recipient)) recipients
+      groups = List.groupBy (\a b -> seat a == seat b) (List.sortOn (\recipient -> (seat recipient, recipient)) recipients)
+      pick group = case group of
+        _ : _ : _ -> do
+          answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor controller gs) controller resolving group)
+          pure (Game.permute group answer)
+        _ -> pure group
+  fmap concat (traverse pick groups)
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
 -- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
@@ -2875,8 +2901,9 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
               -- (CR 115.10a), so CR 608.2b has nothing to re-validate. The batch
               -- is in mint order: CR 608.2f's APNAP primary key has nothing to
               -- separate, since one Create's tokens all enter under one player,
-              -- and its secondary sentence would have that player order them
-              -- (#379) where this takes the order they were made in.
+              -- and its secondary sentence is guarded by an action that can't be
+              -- processed simultaneously -- a whole group's zone change is one
+              -- batch, so the order they were made in stands.
               group <- State.gets (slotGroup slot resolving)
               case group of
                 Just objects -> pure (Foldable.toList objects)
@@ -3104,8 +3131,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- Recipients rather than objects, DealDamage's ref reader: rule 608.2f's own
     -- sentence is about "players and/or objects", and Soulfire Eruption's
     -- targets are both.
-    let members = forEachOrder gs0 (objectRefRecipients legal resolving controller source gs0 ref)
-        -- The slots the BODY defines, computed off the instruction rather than
+    members <- forEachOrder resolving controller (objectRefRecipients legal resolving controller source gs0 ref)
+    let -- The slots the BODY defines, computed off the instruction rather than
         -- read off the board: a body effect binds into the RESOLVING object's
         -- live bindings (MoveToZone's CR 400.7 arrival), and the next effect of
         -- the same body has to see it. Restricted to those names so that a

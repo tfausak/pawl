@@ -3673,7 +3673,8 @@ castSpouts end arrangement board spell =
 -- arrangement of two or more cards reaching one end at once (#990). WotC's own
 -- 2014-07-18 ruling on the card states both halves.
 --
--- Nothing here bears on #379: CR 608.2f's secondary sentence is guarded by "if
+-- Nothing here bears on the order SoulfireEruption's group asks about: CR 608.2f's
+-- secondary sentence is guarded by "if
 -- the action can't be processed simultaneously", and CR 401.4 gives a library
 -- destination its own rule with its own decider -- so a correct Aetherspouts
 -- SCREENS the sweep order off rather than exposing it.
@@ -9761,6 +9762,29 @@ soulfireEruptionSpec s registry =
             (withSpell, spell) = S.handOne soulfireEruption g3
             afterCast = S.runPure (aimingAtEveryPlayer n) withSpell (S.cast S.alice spell)
         pure (S.runPure (aimingAtEveryPlayer n) afterCast Engine.priorityLoop)
+      -- The same spell off the same nine Mountains, but the victims are
+      -- PERMANENTS: bob controls Wall of Stone (0/8) and Nessian Asp (4/5), carol
+      -- controls Sandbar Crocodile (6/5), and `wanted` picks which two of the six
+      -- candidates the announcement takes. alice's library is Benalish Hero (1)
+      -- under Hill Giant (4), so the pair of numbers the loop hands out is 4 then
+      -- 1 and which victim gets which is the whole of what the order decides.
+      -- Every toughness exceeds 4, so both victims survive to be read.
+      victimBoard wanted order = do
+        mountain <- S.printingOf s registry "Mountain"
+        soulfireEruption <- S.printingOf s registry "Soulfire Eruption"
+        wallOfStone <- S.printingOf s registry "Wall of Stone"
+        nessianAsp <- S.printingOf s registry "Nessian Asp"
+        sandbarCrocodile <- S.printingOf s registry "Sandbar Crocodile"
+        stocked <- mapM (S.printingOf s registry) ["Benalish Hero", "Hill Giant"]
+        let g1 = S.landsFor mountain S.alice 9 S.threePlayerGame
+            g2 = List.foldl' (\g pr -> snd (S.addLibraryCard pr S.alice g)) g1 stocked
+            (wall, g3) = S.addCreature wallOfStone S.bob g2
+            (asp, g4) = S.addCreature nessianAsp S.bob g3
+            (crocodile, g5) = S.addCreature sandbarCrocodile S.carol g4
+            (withSpell, spell) = S.handOne soulfireEruption g5
+            ((_, after), transcript) = Replay.record (soulfireOrdering (wanted wall asp crocodile) order) withSpell (S.cast S.alice spell >> Engine.priorityLoop)
+        pure (S.damageOf wall after, S.damageOf asp after, S.damageOf crocodile after, transcript)
+      orderAnswersIn = Maybe.mapMaybe (\r -> case r of Response.OrderedForEach o -> Just o; _ -> Nothing)
       named = Just . CardName.MkCardName . Text.pack
       exiledNames pid = List.sort . namesIn Zone.Exile pid
       permissionsIn pid gs = fmap (Maybe.isJust . Object.playableFromExile) (Maybe.mapMaybe (\oid -> Game.lookupObject oid gs) (Game.zoneMembers Zone.Exile pid gs))
@@ -9851,6 +9875,60 @@ soulfireEruptionSpec s registry =
             "and the spell left the stack for its owner's graveyard"
             (namesIn Zone.Graveyard S.alice after)
             [named "Soulfire Eruption"]
+        -- CR 608.2f's SECONDARY sentence: two of the victims are objects ONE
+        -- player controls, so their relative order is the resolving controller's
+        -- -- alice's, though bob is the one who controls them, which is the whole
+        -- of what separates this from APNAP. The pair below differs in exactly one
+        -- thing, the answer alice gives, and the damage swaps with it. Pinned
+        -- rather than searched: soulfireOrdering returns the permutation it was
+        -- handed, so an engine that ignored the answer could not be repaired by
+        -- the answerer finding another legal one.
+        --
+        -- Wall of Stone is the lower ObjectId, so it heads the offered group and
+        -- [0, 1] is the engine's own former order. [1, 0] is therefore the half
+        -- that goes red if the answer is dropped.
+        Spec.it s "CR 608.2f the resolving controller orders one player's permanents: alice puts Wall of Stone first" $ do
+          (wall, asp, crocodile, transcript) <- victimBoard (\w a _ -> [Recipient.ToCreature w, Recipient.ToCreature a]) [0, 1]
+          Spec.assertEqWith
+            s
+            "Hill Giant (4) to the Wall, Benalish Hero (1) to the Asp, and carol's untargeted Crocodile untouched"
+            (wall, asp, crocodile)
+            (Just 4, Just 1, Just 0)
+          Spec.assertEqWith s "and alice was asked for the order" (orderAnswersIn transcript) [[0, 1]]
+        Spec.it s "CR 608.2f the resolving controller orders one player's permanents: alice puts Nessian Asp first" $ do
+          (wall, asp, crocodile, transcript) <- victimBoard (\w a _ -> [Recipient.ToCreature w, Recipient.ToCreature a]) [1, 0]
+          Spec.assertEqWith
+            s
+            "the same board and the same two victims, with the two mana values swapped by the answer alone"
+            (wall, asp, crocodile)
+            (Just 1, Just 4, Just 0)
+          Spec.assertEqWith s "and the answer alice gave is the one recorded" (orderAnswersIn transcript) [[1, 0]]
+        -- The elision, and the negative half of the pair above: two victims under
+        -- two different seats are two groups of one, so rule 608.2f's secondary
+        -- sentence has no relative order to give away and the primary
+        -- determination settles everything. bob precedes carol in APNAP order, so
+        -- the answer offered here is never asked for -- and would reverse the
+        -- damage if it were.
+        Spec.it s "CR 608.2f victims under different seats are ordered by APNAP alone, with nothing asked" $ do
+          (wall, asp, crocodile, transcript) <- victimBoard (\w _ c -> [Recipient.ToCreature w, Recipient.ToCreature c]) [1, 0]
+          Spec.assertEqWith
+            s
+            "Hill Giant (4) to bob's Wall and Benalish Hero (1) to carol's Crocodile; bob's untargeted Asp untouched"
+            (wall, asp, crocodile)
+            (Just 4, Just 0, Just 1)
+          Spec.assertEqWith s "and no order was asked for" (orderAnswersIn transcript) []
+
+-- Announces two targets, aims them at `wanted`, and answers CR 608.2f's
+-- intra-seat order with `order` VERBATIM. Pinned rather than searched for a
+-- legal permutation: an answerer that looked for one would find the engine's own
+-- again after a mutation, and the assertion would stay green while the choice was
+-- gone.
+soulfireOrdering :: [Recipient.Recipient] -> [Natural] -> Prompt.Prompt r -> r
+soulfireOrdering wanted order p = case p of
+  Prompt.AnnounceTargets {} -> announcingCount 2 p
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (`elem` wanted) sets
+  Prompt.OrderForEach {} -> order
+  _ -> S.identityAnswer p
 
 -- CR 601.2c: announce `n` targets per slot and aim them at the PLAYERS, which on
 -- these boards leaves bob's Ogre Sentry -- a legal candidate of the same
