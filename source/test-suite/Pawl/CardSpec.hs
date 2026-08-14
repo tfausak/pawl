@@ -65,6 +65,7 @@ import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
+import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
@@ -641,6 +642,9 @@ effectCounts effect = case effect of
   -- Bolster's N is a Quantity like the Search's above, so its Counts are
   -- reachable from here.
   Effect.Bolster quantity -> quantityCounts quantity
+  -- Amass's N is a Quantity like the Search's above, so its Counts are reachable
+  -- from here.
+  Effect.Amass (Amass.MkAmass quantity _) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -959,6 +963,7 @@ effectReplacements effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Bolster _ -> []
+  Effect.Amass _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -1489,6 +1494,9 @@ effectMintedFaces effect = case effect of
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
   Effect.Bolster _ -> []
+  -- The Army token is Pawl.Engine.Amass.armyToken's, minted from the rulebook
+  -- rather than embedded in card data, so this arm mints no face of the card's own.
+  Effect.Amass _ -> []
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -2514,6 +2522,9 @@ effectFilters effect = case effect of
   -- Only the count's Filters: rule 701.39a describes the candidate pool, so no
   -- Filter on the card names it.
   Effect.Bolster quantity -> unframed (quantityFilters quantity)
+  -- Only the count's Filters: rule 701.47a describes the candidate pool, so no
+  -- Filter on the card names it.
+  Effect.Amass (Amass.MkAmass quantity _) -> unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []

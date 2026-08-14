@@ -90,6 +90,13 @@ data Response
     -- offer different candidates -- every creature its chooser controls against
     -- only those tied for the least toughness.
     ChoseBolster ObjectId.ObjectId
+  | -- | CR 701.47a: the Army creature an amassing player chose to put the +1\/+1
+    -- counters on.
+    --
+    -- Its own constructor for ChoseBolster's reason, and the two are not one
+    -- constructor either: bolster offers the creatures tied for the least
+    -- toughness, amass offers the Armies its chooser controls.
+    ChoseAmass ObjectId.ObjectId
   | -- | CR 608.2d: the graveyard card a player chose for an
     -- Pawl.Types.ObjectRef.ChosenCardInGraveyard. One of these per chooser, so a
     -- transcript of Exhume resolving holds one for each stocked graveyard.

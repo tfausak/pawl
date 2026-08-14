@@ -18,6 +18,7 @@ import qualified Pawl.Types.AffectPlayers as AffectPlayers
 import qualified Pawl.Types.AffectedPlayers as AffectedPlayers
 import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -1115,6 +1116,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Bolster (Quantity.Literal 3))
       """ {"type":"Bolster","value":{"type":"Literal","value":3}} """
+  -- CR 701.47a: the subtype and the count, which are rule 701.47a's two printed
+  -- variables. The Army type and the token's other characteristics are the
+  -- rulebook's and appear nowhere in card data.
+  Spec.it s "Amass" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Amass (Amass.MkAmass (Quantity.Literal 3) Subtype.Zombie))
+      """ {"type":"Amass","value":{"quantity":{"type":"Literal","value":3},"subtype":{"type":"Zombie"}}} """
   -- CR 701.54a: nullary, because rule 701.54 fixes the chooser, the count and the
   -- qualification, leaving an author nothing to write.
   Spec.it s "TemptWithTheRing" $
