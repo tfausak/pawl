@@ -297,19 +297,20 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertBool s (ManaType.Colored Color.Red `elem` Mana.manaTypesOf towerId gs) "red available (CR 305.6, from the new Mountain type)"
     Spec.assertBool s (ManaType.Colorless `notElem` Mana.manaTypesOf towerId gs) "colorless gone (the printed {T}: Add {C} was stripped)"
 
-  -- CR 604.2's "as long as" clause on the STRIPPER, which CR 305.7's gate used to
-  -- ignore: an ability whose clause is currently false creates no continuous
-  -- effect, so it sets no subtype AND strips no rules text. Wired open, the two
-  -- halves disagreed -- the Tower kept its {C} out of the layer fold (gatherStatic
-  -- gated the ability) and lost it to CR 305.7 anyway (setLandSubtypeEffects did
-  -- not), so it produced no mana at all.
+  -- CR 604.2's "as long as" clause on the STRIPPER, end to end: the layer-4 set and
+  -- the CR 305.7 strip that follows it both switch on with the clause, so the Tower
+  -- taps for its printed {C} while the clause is false and for the new Mountain's
+  -- {R} once it holds. The pool is the pool a player would actually have floated.
   --
-  -- Synthetic, and the card file says why: Zhao, the Moon Slayer is the only
-  -- printed static ability pairing a clause with a land-subtype set, and its
-  -- clause counts a conqueror counter, which no card can name yet (#1386).
+  -- A REGRESSION FENCE for this half rather than a proof of it: gatherStatic
+  -- already gated the ability, so the fold was right before this pair existed and
+  -- neither case goes red when that gate is wired open. What the gate half's
+  -- divergence needed was a reader outside the fold, and Pawl.PlayerEffectSpec's
+  -- Waxing Moon pair is that -- it is the one this pair composes with.
   --
-  -- Tapped through Cost.tapForMana rather than read off Mana.manaTypesOf, so what
-  -- is asserted is the mana a player actually floated.
+  -- Synthetic Waxing Moon stands in for Zhao, the Moon Slayer, the only printed
+  -- static ability pairing a clause with a land-subtype set: Zhao's clause counts a
+  -- conqueror counter, which no card can name yet (#1386).
   Spec.it s "CR 604.2/305.7 with no Forest the Waxing Moon strips nothing, and the Tower still taps for {C}" $ do
     waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
     reliquaryTower <- S.printingOf s registry "Reliquary Tower"
