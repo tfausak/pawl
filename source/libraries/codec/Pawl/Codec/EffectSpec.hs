@@ -1106,6 +1106,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Proliferate
       """ {"type":"Proliferate"} """
+  -- CR 701.39a: the count alone, because rule 701.39a fixes the chooser, the kind
+  -- of counter and the candidate pool, leaving an author only N to write.
+  Spec.it s "Bolster" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Bolster (Quantity.Literal 3))
+      """ {"type":"Bolster","value":{"type":"Literal","value":3}} """
   -- CR 701.54a: nullary, because rule 701.54 fixes the chooser, the count and the
   -- qualification, leaving an author nothing to write.
   Spec.it s "TemptWithTheRing" $

@@ -761,6 +761,32 @@ combatReplaySpec s =
           -- replaying as the other.
           let p = Prompt.ChooseRingBearer decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))) Nothing
+        -- CR 701.39a: which creature a bolstering player put the counters on is a
+        -- decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseBolster round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseBolster decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "bolstering the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "bolstering the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a bolster choice does not decode as a Ring-bearer choice" $ do
+          -- Discriminating: fails if ChooseBolster reuses ChoseRingBearer rather
+          -- than getting its own ObjectId-shaped constructor. The two are the same
+          -- SHAPE -- one creature its chooser controls, out of a NonEmpty of them
+          -- -- so nothing but a distinct constructor keeps a transcript of one
+          -- from replaying as the other.
+          let p = Prompt.ChooseBolster decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseRingBearer (ObjectId.MkObjectId 7))) Nothing
+        Spec.it s "a short bolster transcript returns the first candidate offered" $
+          -- CR 701.39a: every offered creature is tied for the least toughness, so
+          -- the head is legal.
+          Spec.assertEqWith
+            s
+            "the head"
+            (Replay.defaultAnswer (Prompt.ChooseBolster decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
+            (ObjectId.MkObjectId 7)
         -- CR 608.2d: which card the resolving controller took out of a graveyard
         -- is a decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseCardInGraveyard round-trips through the transcript" $ do

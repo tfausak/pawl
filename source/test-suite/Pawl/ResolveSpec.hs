@@ -8864,6 +8864,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   upToOneTargetSpec s registry
   multiTargetSpec s registry
   supportSpec s registry
+  bolsterSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
   soulfireEruptionSpec s registry
@@ -9144,6 +9145,125 @@ leadBoard s registry extra = do
       g4 = List.foldl' (\g (p, pid) -> snd (S.addCreature p pid g)) g3 extras
       (gs, spellId) = S.handOne lead g4
   pure (pikerId, wallId, ratsId, gs, spellId)
+
+-- CR 701.39 bolster, which is an opcode: Effect.Bolster over a Quantity, whose
+-- candidate pool and counter kind are rule 701.39a's rather than the card's.
+--
+-- Cached Defenses {2}{G} Sorcery (data/cards/cached-defenses.json): "Bolster 3.",
+-- and nothing else -- so every counter that appears on these boards came from this
+-- keyword action and nothing else on the card can stand in for it.
+--
+-- Two readings of "the least toughness ... or tied for least" a careless board
+-- cannot tell apart -- the engine picking for the player, and the player picking
+-- -- so the two boards below differ in exactly one thing each. The tie is
+-- deliberate: a lone creature at the minimum is never asked about, and three
+-- creatures at 1, 1 and 8 make "which of the two" and "not the third" separate
+-- questions.
+--
+-- Three is bolster's own N, and it is distinct from every toughness on the board,
+-- so no assertion can be satisfied by a coincidence.
+bolsterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bolsterSpec s registry = Spec.describe s "Bolster" $ do
+  Spec.it s "CR 701.39a bolster 3 counters the creature its controller chose" $ do
+    (pikerId, ratsId, wallId, gs, spellId) <- bolsterBoard s registry
+    let after = resolveOne (bolstering ratsId) gs spellId
+    Spec.assertEqWith s "the Rats, whom their controller named, took three" (plusCountersOn ratsId after) (Just 3)
+    Spec.assertEqWith s "the Piker, tied with them, took none" (plusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "nor did the Wall" (plusCountersOn wallId after) (Just 0)
+  -- The same board and the same spell, differing only in the answer: the engine
+  -- makes no choice, so the other half of the tie is equally reachable.
+  Spec.it s "CR 701.39a the same tie answered the other way counters the other creature" $ do
+    (pikerId, ratsId, wallId, gs, spellId) <- bolsterBoard s registry
+    let after = resolveOne (bolstering pikerId) gs spellId
+    Spec.assertEqWith s "the Piker, whom their controller named, took three" (plusCountersOn pikerId after) (Just 3)
+    Spec.assertEqWith s "the Rats took none" (plusCountersOn ratsId after) (Just 0)
+    Spec.assertEqWith s "nor did the Wall" (plusCountersOn wallId after) (Just 0)
+  -- "With the least toughness" is a filter on the candidates rather than advice:
+  -- the Wall is named and still gets nothing, because it was never offered.
+  Spec.it s "CR 701.39a a creature that is not tied for least toughness cannot be chosen" $ do
+    (pikerId, ratsId, wallId, gs, spellId) <- bolsterBoard s registry
+    let after = resolveOne (bolstering wallId) gs spellId
+    Spec.assertEqWith s "the Wall, at toughness 8, took none" (plusCountersOn wallId after) (Just 0)
+    -- One of the tied pair took all three, and the fallback picks which; what is
+    -- under test is that the counters did not follow the answer.
+    Spec.assertEqWith
+      s
+      "the tie took them instead"
+      (fmap (+) (plusCountersOn pikerId after) <*> plusCountersOn ratsId after)
+      (Just 3)
+  -- CR 701.39a's "among creatures you control". The two smallest creatures on the
+  -- battlefield are bob's, and neither is a candidate: alice's own Wall is the
+  -- whole of her pool however large it is.
+  Spec.it s "CR 701.39a bolster looks only at creatures its controller controls" $ do
+    (pikerId, ratsId, wallId, gs, spellId) <- opposedBolsterBoard s registry
+    let after = resolveOne S.identityAnswer gs spellId
+    Spec.assertEqWith s "alice's Wall, her only creature, took three" (plusCountersOn wallId after) (Just 3)
+    Spec.assertEqWith s "bob's Piker, at toughness 1, took none" (plusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "nor did bob's Rats" (plusCountersOn ratsId after) (Just 0)
+  -- Where the rules leave nothing to ask, do not ask. The two boards differ in
+  -- whether the least toughness is TIED, which is the whole of what makes rule
+  -- 701.39a's choice a choice.
+  Spec.it s "CR 701.39a a lone creature at the least toughness raises no prompt" $ do
+    (_, _, _, tied, tiedSpell) <- bolsterBoard s registry
+    (_, _, _, alone, aloneSpell) <- opposedBolsterBoard s registry
+    let countingAnswer :: Prompt.Prompt r -> State.State Int r
+        countingAnswer p = case p of
+          Prompt.ChooseBolster {} -> do
+            State.modify (+ 1)
+            pure (S.identityAnswer p)
+          _ -> pure (S.identityAnswer p)
+        asks g spellId =
+          State.execState (Engine.runGame countingAnswer g (S.cast S.alice spellId >> Stack.resolveTop)) 0
+    Spec.assertEqWith s "one creature at the minimum: nothing to ask" (asks alone aloneSpell) 0
+    Spec.assertEqWith s "two tied for it: one real decision" (asks tied tiedSpell) 1
+
+-- Three Forests for Cached Defenses, and three of alice's creatures whose printed
+-- toughnesses are 1, 1 and 8 -- a TIE at the least, and a third creature well
+-- clear of it -- with the spell in her hand.
+bolsterBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+bolsterBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  defenses <- S.printingOf s registry "Cached Defenses"
+  let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay forest 3)
+      (ratsId, g2) = S.addCreature rats S.alice g1
+      (wallId, g3) = S.addCreature wall S.alice g2
+      (gs, spellId) = S.handOne defenses g3
+  pure (pikerId, ratsId, wallId, gs, spellId)
+
+-- bolsterBoard with the tied pair moved across the table: the two creatures at
+-- toughness 1 are BOB's, so alice's pool is her Wall alone. The same three
+-- printings, the same three lands and the same spell -- only the seats differ.
+opposedBolsterBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+opposedBolsterBoard s registry = do
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  defenses <- S.printingOf s registry "Cached Defenses"
+  let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay forest 3)
+      (ratsId, g2) = S.addCreature rats S.bob g1
+      (wallId, g3) = S.addCreature wall S.alice g2
+      (gs, spellId) = S.handOne defenses g3
+  pure (pikerId, ratsId, wallId, gs, spellId)
+
+-- Answers Prompt.ChooseBolster with a named creature, deferring everything else to
+-- S.identityAnswer. PINNED BY ID rather than picked by searching the candidates,
+-- so a mutation to the candidate sweep cannot quietly repair the answer.
+bolstering :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+bolstering oid p = case p of
+  Prompt.ChooseBolster {} -> oid
+  _ -> S.identityAnswer p
 
 -- CR 115.6: declines every optional slot, announcing zero targets. Everything
 -- else is S.identityAnswer's answer, which for ChooseTargets fills what it is

@@ -298,6 +298,7 @@ slotsOf effect = case effect of
     joinSlots [playerRefSlots searcher, playerRefSlots owner, quantitySlots quantity]
   Effect.ExileAllGraveyards -> Map.empty
   Effect.Proliferate -> Map.empty
+  Effect.Bolster quantity -> quantitySlots quantity
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
@@ -536,6 +537,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Search (Search.MkSearch _ _ quantity _ _) -> Quantity.slotsAreExhaustive quantity
   Effect.ExileAllGraveyards -> True
   Effect.Proliferate -> True
+  Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
   Effect.TemptWithTheRing -> True
   Effect.Venture -> True
   Effect.ExileHandThenDraw -> True
@@ -670,6 +672,7 @@ readsX = any effectReadsX
       Effect.Search (Search.MkSearch _ _ quantity _ _) -> Quantity.readsX quantity
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
+      Effect.Bolster quantity -> Quantity.readsX quantity
       Effect.TemptWithTheRing -> False
       Effect.Venture -> False
       Effect.ExileHandThenDraw -> False
@@ -747,6 +750,7 @@ searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
   Effect.Search {} -> True
   Effect.Proliferate -> False
+  Effect.Bolster _ -> False
   Effect.TemptWithTheRing -> False
   Effect.Venture -> False
   Effect.PlayerSacrifices {} -> False
@@ -915,6 +919,7 @@ boundSlots effect = case effect of
   Effect.Search {} -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
+  Effect.Bolster _ -> Set.empty
   Effect.TemptWithTheRing -> Set.empty
   Effect.Venture -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
@@ -4390,6 +4395,63 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       Monad.forM_ keptPlayers $ \pid ->
         Monad.forM_ (kindsFor pid) $ \kind ->
           Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
+  -- CR 701.39a: "bolster N" -- choose a creature you control with the least
+  -- toughness, or tied for least, among creatures you control, and put N +1/+1
+  -- counters on it.
+  --
+  -- Every clause is load-bearing. "Creatures you control" is the candidate pool,
+  -- so an opponent's smaller creature is never offered however low its toughness.
+  -- "The least toughness ... or tied for least" narrows that pool to the minimum
+  -- and everything equal to it, which is why the prompt is only raised for a TIE
+  -- -- one creature at the minimum leaves nothing to ask, and CR 101.3 ignores the
+  -- instruction when the pool is empty.
+  --
+  -- Toughness is the PROJECTED value (CR 613.1d), read after every layer, so an
+  -- Aura or a counter already on a creature moves it in and out of the tie. A
+  -- creature the projection gives no toughness at all cannot be compared and is
+  -- dropped from the pool rather than sorted as if it were zero.
+  --
+  -- The pool is swept and the minimum taken BEFORE the counters land, which is CR
+  -- 608.2h's posture: bolster places its counters on one creature, so nothing here
+  -- re-reads a toughness the placement itself changed.
+  --
+  -- Targetless: nothing was targeted, so unlike every slot-reading opcode here
+  -- there is no CR 608.2b legality to re-check.
+  Effect.Bolster quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = effectContext controller source legal
+        -- Ascending, so both the single-candidate shortcut and a transcript are
+        -- deterministic -- Ring.tempt's posture.
+        creatures = List.sort (filter (\oid -> Projection.isCreatureOf oid gs) (Projection.controls controller gs))
+        measured = Maybe.mapMaybe (\oid -> fmap ((,) oid) (Projection.toughnessOf oid gs)) creatures
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
+      Just n -> case measured of
+        -- CR 101.3: a player controlling no creature bolsters nothing.
+        [] -> pure ()
+        first : rest -> do
+          let least = minimum (fmap snd (first : rest))
+              tied = fmap fst (filter ((== least) . snd) (first : rest))
+          bolstered <- case tied of
+            [] -> pure Nothing -- unreachable: `least` came out of this very list
+            one : others -> case others of
+              -- One creature at the minimum is the whole of rule 701.39a's
+              -- candidate set, and the instruction is mandatory -- where the rules
+              -- leave nothing to ask, don't prompt.
+              [] -> pure (Just one)
+              second : more -> do
+                let offered = one NonEmpty.:| (second : more)
+                answer <- Game.choose (Prompt.ChooseBolster (Decide.deciderFor controller gs) controller resolving offered)
+                -- FILTERED, NOT TRUSTED, the ChooseRingBearer posture: an answer
+                -- naming something never offered falls back to the first
+                -- candidate, since the action is mandatory and must put its
+                -- counters on someone.
+                pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else one))
+          -- CR 122.6: through the single funnel, so CR 614's counter replacements
+          -- (Hardened Scales, Doubling Season) get their opportunity.
+          Monad.when (n > 0) . Monad.forM_ bolstered $ \target ->
+            Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne (Integer.toNaturalSaturating n)
   -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
   -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
   -- this arm knows only that some effect asked for it, exactly as the arms around
