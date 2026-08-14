@@ -80,8 +80,9 @@ up job` and never ran. Retry logic must handle `cancel` as well as `fail`.
 worktrees are for. Derive against `origin/main`, never the working checkout.
 
 **Blocked is a good outcome.** If a unit cannot land unattended, the agent
-should add the `blocked` label with a comment naming precisely what blocks it,
-and report that. A decomposition beats a half-landed unit.
+should add the `blocked` label, link the blocker as a GitHub dependency the way
+`CLAUDE.md` says --- not as a `Blocked by #N` comment --- and report that. A
+decomposition beats a half-landed unit.
 
 ---
 
