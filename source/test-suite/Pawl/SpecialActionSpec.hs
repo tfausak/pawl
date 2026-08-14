@@ -519,7 +519,7 @@ foretelling s registry = Spec.describe s "CR 116.2h Augury Raven" $ do
       (Just (Just (S.printingName raven)))
     Spec.assertEqWith s "the Traveler is still in hand" (S.handSize S.alice after) 1
     Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
-    -- CR 116.2h's own two words -- "and exile that card FACE DOWN", against CR
+    -- CR 116.2h's own words -- "and exile that card FACE DOWN", against CR
     -- 406.3's face-up default.
     Spec.assertEqWith
       s
