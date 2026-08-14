@@ -11,9 +11,7 @@
 -- 712.13a's replacement effect, Pawl.Types.EntryRewrite's EntersTransformed,
 -- minted by Pawl.Engine.Keyword.mintedReplacementsFor and applied by
 -- Pawl.Engine.Event's arm under CR 616.1d's bucket. See entrySpec, whose fixture
--- is Infestation Expert // Infested Werewolf -- the two faces' enters triggers
--- make a different number of Insects, which is what tells "entered transformed"
--- apart from "entered and was swept over a settle later".
+-- is Infestation Expert // Infested Werewolf.
 --
 -- Also CR 702.145b's third static ability and CR 702.145e's second -- "this
 -- permanent can't transform except due to its daybound/nightbound ability" --
@@ -205,22 +203,26 @@ entrySpec s registry = Spec.describe s "EntersTransformed" $ do
   -- Infestation Expert is cast with its front face up (CR 712.11) and reaches the
   -- battlefield showing its back face.
   --
-  -- THE TOKEN COUNT IS THE DISCRIMINATOR, and the face alone would not be. Three
-  -- readings put a permanent on this board showing Infested Werewolf, and two of
-  -- them are wrong:
+  -- THE FACE IS THE DISCRIMINATOR, and it is asserted at a moment that tells the
+  -- competing readings apart. Three of them put a permanent on this board showing
+  -- Infested Werewolf:
   --
-  --   * it entered transformed -- CR 712.13a, so the enters trigger is the BACK
-  --     face's and makes TWO Insects;
-  --   * it entered front face up and the CR 702.145c sweep turned it over a
-  --     settle later (Pawl.Engine.Daytime.turnDue, which is what this engine did
-  --     before) -- the FRONT face's trigger, ONE Insect;
+  --   * it entered transformed -- CR 712.13a, the rule;
+  --   * it entered front face up and the CR 702.145c sweep turned it over
+  --     (Pawl.Engine.Daytime.turnDue, which is what this engine did before);
   --   * it was never front face up at all, a back-face cast (CR 712.11a) -- which
   --     this board rules out by casting the card from hand, where CR 712.8a shows
   --     only the front face.
   --
-  -- The face is asserted BEFORE the trigger resolves, at a point the sweep could
-  -- not yet have reached, so the two engines disagree there too. One and two are
-  -- distinct numbers on purpose: the printed cards differ by exactly this.
+  -- The first two are separated by asserting on `entered`, the board the spell's
+  -- resolution leaves, which is BEFORE the settle the sweep runs in.
+  --
+  -- THE TOKEN COUNT IS A FENCE, NOT A PROOF, and the reason is worth stating: the
+  -- trigger scan reads the permanent's abilities off the live board at settle,
+  -- and Daytime.settle runs earlier in that same settle, so the swept engine
+  -- places the back face's trigger too (#1548). Two Insects here says the back
+  -- face's ability is the live one; it does not say the permanent entered that
+  -- way.
   Spec.it s "CR 712.13a/702.145b a daybound spell cast at night enters transformed" $ do
     tovolar <- S.printingOf s registry "Tovolar, Dire Overlord"
     forest <- S.printingOf s registry "Forest"

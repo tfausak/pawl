@@ -275,8 +275,7 @@ data EntryRewrite
     -- Applied by Pawl.Engine.Event's arm as a write to Object.face on the
     -- already-materialized incarnation, Tapped's footing exactly: runEntry runs
     -- before the Moved event is recorded, so no trigger scan and no state-based
-    -- action can see the interim front face, and the permanent's own
-    -- enters-the-battlefield triggers are the BACK face's.
+    -- action can see the interim front face.
     --
     -- Not implemented: CR 712.13a's second sentence, where a back face that is an
     -- instant or sorcery face sends the spell to its owner's graveyard instead of
