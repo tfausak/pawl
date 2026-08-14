@@ -1968,22 +1968,42 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
 -- hands its whole answer to a funnel as ONE simultaneous batch, so the order
 -- never showed; this loop is the first reader that takes them one at a time.
 --
--- The second key is the ObjectId, and it is the ENGINE's choice where CR
--- 608.2f's secondary sentence gives it to the resolving controller (#379) --
--- observable through this opcode for the first time, since a body drawing on a
--- depleting resource answers differently per position. A recipient the board no
--- longer holds has no controller and sorts last -- CR 608.2b already dropped an
--- illegal TARGET, but a group binding names ids that may since have moved (CR
--- 400.7), so the fallback is reachable rather than defensive.
-forEachOrder :: GameState -> [Recipient] -> [Recipient]
-forEachOrder gs recipients =
+-- The second key is CR 608.2f's secondary sentence, and it is the RESOLVING
+-- CONTROLLER's -- "the player who controls the resolving spell or ability chooses
+-- the relative order of those actions" -- so each seat's group is handed to them
+-- as a Prompt.OrderForEach rather than settled by ascending ObjectId. Observable
+-- through this opcode for the first time, since a body drawing on a depleting
+-- resource answers differently per position (Soulfire Eruption's exiled card).
+--
+-- Asked once per group, in APNAP order of the groups: the between-group order is
+-- the rule's primary determination and nobody's choice, and every question of one
+-- loop goes to the same player, whose own order for them CR 101.4c leaves open.
+-- A group of one is not asked -- there is no relative order to choose.
+--
+-- FILTERED, NOT TRUSTED, payComponents' posture: Game.permute keeps the engine's
+-- order for an answer that is not a permutation of the offered indices.
+--
+-- Ascending ObjectId is still what a group is OFFERED in, so the prompt and a
+-- transcript are deterministic. A recipient the board no longer holds has no
+-- controller and sorts last -- CR 608.2b already dropped an illegal TARGET, but a
+-- group binding names ids that may since have moved (CR 400.7), so the fallback
+-- is reachable rather than defensive.
+forEachOrder :: ObjectId -> PlayerId -> [Recipient] -> Game [Recipient]
+forEachOrder resolving controller recipients = do
+  gs <- State.get
   let order = Game.apnapOrder gs
       last_ = length order
       playerOf recipient = case recipient of
         Recipient.ToPlayer pid -> Just pid
         _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
       seat recipient = maybe last_ (\pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)) (playerOf recipient)
-   in List.sortOn (\recipient -> (seat recipient, recipient)) recipients
+      groups = List.groupBy (\a b -> seat a == seat b) (List.sortOn (\recipient -> (seat recipient, recipient)) recipients)
+      pick group = case group of
+        _ : _ : _ -> do
+          answer <- Game.choose (Prompt.OrderForEach (Decide.deciderFor controller gs) controller resolving group)
+          pure (Game.permute group answer)
+        _ -> pure group
+  fmap concat (traverse pick groups)
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
 -- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
@@ -3104,8 +3124,8 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     -- Recipients rather than objects, DealDamage's ref reader: rule 608.2f's own
     -- sentence is about "players and/or objects", and Soulfire Eruption's
     -- targets are both.
-    let members = forEachOrder gs0 (objectRefRecipients legal resolving controller source gs0 ref)
-        -- The slots the BODY defines, computed off the instruction rather than
+    members <- forEachOrder resolving controller (objectRefRecipients legal resolving controller source gs0 ref)
+    let -- The slots the BODY defines, computed off the instruction rather than
         -- read off the board: a body effect binds into the RESOLVING object's
         -- live bindings (MoveToZone's CR 400.7 arrival), and the next effect of
         -- the same body has to see it. Restricted to those names so that a

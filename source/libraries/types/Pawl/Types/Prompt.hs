@@ -1069,6 +1069,33 @@ data Prompt r where
   -- Pawl.Engine.Cost.orderObservable decides: two or more parts that touch
   -- objects, and not all of them equal.
   OrderCostComponents :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [CostComponent.CostComponent Keyword.Keyword] -> Prompt [Natural.Natural]
+  -- | CR 608.2f's secondary sentence: when a per-object body runs on a player and
+  -- an object they control, or on several objects one player controls, the player
+  -- who controls the RESOLVING spell or ability chooses their relative order. The
+  -- ObjectId is that spell or ability; the [Recipient] is ONE such group in the
+  -- engine's canonical order; the answer is a permutation of its indices.
+  --
+  -- The chooser is the resolving controller, who is generally NOT the player whose
+  -- permanents these are -- Soulfire Eruption aimed at two creatures an opponent
+  -- controls is the case, and rule 608.2f gives this key to the resolving
+  -- controller alone. That is the whole difference from OrderTriggers, where the
+  -- batch's own controller orders it.
+  --
+  -- Once per GROUP rather than once per loop, because rule 608.2f's primary
+  -- determination is APNAP (CR 101.4) and is nobody's choice: only the intra-seat
+  -- key is asked for. Every group of one loop is asked of the same player, and CR
+  -- 101.4c leaves the order of those questions to them -- pawl asks in APNAP order
+  -- of the groups.
+  --
+  -- Its own constructor rather than OrderTriggers or OrderCostComponents reused,
+  -- though all three answer a permutation: Pawl.Engine.Replay's transcript would
+  -- otherwise let a recorded trigger order satisfy a sweep.
+  --
+  -- Raised only for TWO OR MORE members, where there is an order to choose. No
+  -- further elision: the body runs per member with a binding fresh per iteration,
+  -- so two members are interchangeable only if nothing distinguishes the objects
+  -- themselves, and distinct objects are distinguishable by construction.
+  OrderForEach :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [Recipient.Recipient] -> Prompt [Natural.Natural]
   -- | CR 103.5: whether this player takes a mulligan. The MulliganOffer carries
   -- both halves of what a player at a table can see -- how many mulligans they
   -- have already taken, and how many cards taking another would bottom. Those

@@ -210,6 +210,12 @@ data Response
     -- above, though the payload has the same shape: replaying a transcript
     -- against the wrong one would reorder a trigger batch instead of a payment.
     OrderedCostComponents [Natural.Natural]
+  | -- | CR 608.2f: the relative order a resolving spell's controller chose for the
+    -- members of one APNAP group a per-object body walks, as a permutation of the
+    -- offered indices. A separate constructor from the three above for their
+    -- reason: replaying a transcript against the wrong one would reorder a sweep
+    -- instead of a trigger batch.
+    OrderedForEach [Natural.Natural]
   | -- | CR 616.1: the index of the replacement effect a player chose to apply
     -- next.
     ChoseReplacement Natural.Natural
