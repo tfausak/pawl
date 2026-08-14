@@ -9310,16 +9310,16 @@ soulfireEruptionSpec s registry =
           after <- board ["Sabretooth Tiger", "Bird Maiden", "Hill Giant", "Goblin Piker", "Benalish Hero"]
           Spec.assertEqWith
             s
-            "Benalish Hero (1) to alice, Goblin Piker (2) to bob, Hill Giant (4) to carol"
-            (lives after)
-            (Just 19, Just 18, Just 16)
-          Spec.assertEqWith
-            s
             "three DIFFERENT cards left the library, top first, and the two under them stayed in order"
             (exiledNames S.alice after, namesIn Zone.Library S.alice after)
             ( List.sort [named "Benalish Hero", named "Goblin Piker", named "Hill Giant"],
               [named "Bird Maiden", named "Sabretooth Tiger"]
             )
+          Spec.assertEqWith
+            s
+            "Benalish Hero (1) to alice, Goblin Piker (2) to bob, Hill Giant (4) to carol"
+            (lives after)
+            (Just 19, Just 18, Just 16)
           Spec.assertEqWith
             s
             "all three exiled cards carry the play permission, so the grant ran once per iteration"
