@@ -34,21 +34,18 @@ data Affected
     -- every other card in the pool depends on that gate, since Bad Moon's "black
     -- creatures get +1/+1" must not reach a creature card in a graveyard.
     --
-    -- The set the CR describes is every object in every zone. WHICH of those it
-    -- reaches depends on the reader, and the two readers disagree:
-    -- Projection.viewOfObject has no zone gate, so a card in a hand, library,
-    -- graveyard or exile IS matched against its projected view through every
-    -- caller that goes via it (cost criteria, targeting). Inside the CR 613 fold
-    -- Projection.viewUpTo instead falls back to viewOfCardIn off the battlefield,
-    -- so the same card is matched against its PRINTED characteristics -- bar CR
-    -- 208.2a's characteristic-defining power, which functions in all zones. That
-    -- split is the defect, not an under-reach on this arm's part (#160, #623).
+    -- The set the CR describes is every object in every zone, and both readers
+    -- now answer that way: Projection.viewOfObject has never had a zone gate, and
+    -- Projection.viewUpTo -- the reader inside the CR 613 fold -- projects a card
+    -- in a hand, library, graveyard or exile rather than falling back to its
+    -- printed characteristics. Pawl.ProjectionSpec's Maskwood Nexus pair is what
+    -- proves the second.
     --
     -- Not implemented, the symmetric OVER-reach, recorded here because the card's
     -- JSON cannot carry a comment: Painter's own filter is And [], which matches
     -- EVERY object, while the card scopes to three kinds of thing. So this also
     -- reaches an ability on the stack (CR 113.1c) and an emblem in the command
-    -- zone (CR 114.5). Neither is observable today (#623).
+    -- zone (CR 114.5). Neither is observable today (#1551).
     MatchingAnywhere (Filter.Filter Keyword.Keyword)
   | -- | CR 303.4m: the object this ability's SOURCE is attached to -- "enchanted
     -- creature". Neither a fixed id set nor a predicate over candidates:

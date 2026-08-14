@@ -2527,10 +2527,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
   Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ destination) ->
-    -- CR 701.23a: match each library card through the PRINTED-card view -- a card
-    -- in a library has no projection. Its power is CR 208.2a's exception, which
-    -- is why the view is Projection.viewOfCardIn: Imperial Recruiter's "creature
-    -- card with power 2 or less" sees a Tarmogoyf's real power. The context has
+    -- CR 701.23a: match each library card through the PRINTED-card view. Its
+    -- power is CR 208.2a's exception, which is why the view is
+    -- Projection.viewOfCardIn: Imperial Recruiter's "creature card with power 2
+    -- or less" sees a Tarmogoyf's real power.
+    --
+    -- Not implemented: a library card has a projection of its own, so a
+    -- continuous effect that changed what this filter reads is missed (#160).
+    -- The context has
     -- no perspective (CR 109.5): a search filter never references a player, so
     -- ControlledBy is vacuously False. No source in scope at this site.
     let searchContext = Filter.contextFor Nothing Nothing
@@ -5347,8 +5351,10 @@ fatesealOne source n pid = do
 -- question is put, there being no card to bin.
 --
 -- The land test reads the PRINTED face through Projection.viewOfCardIn, which is
--- what Effect.Mill's tally and Effect.Search's filter do and for their reason: a
--- card in a library has no projection to fold.
+-- what Effect.Mill's tally and Effect.Search's filter do.
+--
+-- Not implemented: those three readers all miss a continuous effect that changed
+-- the card they read, the projection reaching a library card too (#160).
 exploreOne :: ObjectId -> Game ()
 exploreOne oid = do
   gs <- State.get

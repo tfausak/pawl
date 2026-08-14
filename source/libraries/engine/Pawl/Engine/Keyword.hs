@@ -299,8 +299,8 @@ abilitiesFor keyword count = case keyword of
 --
 -- Printed keywords rather than a projection's post-layer ones, the same rules
 -- fact castingPermissionsOf records: CR 113.6b confines an ability to the zones
--- it states, and rules 702.29a and 702.77a state the hand -- which pawl's
--- projection does not reach (#160).
+-- it states, and rules 702.29a and 702.77a state the hand -- where no pool
+-- effect changes a card's abilities (#160).
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
@@ -723,7 +723,7 @@ outlast cost =
 -- WHICH keyword set is the caller's to choose, and the two callers choose
 -- differently: a card in a GRAVEYARD is read through the projection, so a
 -- granted flashback grants its permission too, while a card in a LIBRARY is read
--- as printed, that being a zone pawl's projection does not reach (#160).
+-- as printed, no pool effect changing a card's keywords there (#160).
 --
 -- The card types come along because rule 702.34a's permission is CONDITIONAL on
 -- them. They are the types of the one FACE being proposed, which is the caller's
@@ -876,6 +876,17 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Persist -> []
   Keyword.Undying -> []
 
+-- | CR 702.127a's SECOND static ability: "this half of this split card can't be
+-- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
+-- Pawl.Engine.Cast asks of the zone it is about to offer rather than anything
+-- minted here -- the counterweight to the CastFromGraveyard permission
+-- permissionsFor grants for the same keyword.
+--
+-- Membership rather than a count: rule 702.127a takes no parameter and a second
+-- instance would forbid nothing further.
+hasAftermath :: Set Keyword -> Bool
+hasAftermath = Set.member Keyword.Aftermath
+
 -- CR 702.8a: does this card's keyword set let it be played any time its
 -- controller could cast an instant? Its one reader is
 -- Pawl.Engine.Cast.instantSpeed, which turns it into the CR 302.1 / 307.1 window
@@ -896,44 +907,30 @@ permissionsFor cardTypes keyword = case keyword of
 -- say it is: CR 613.1 names no zone, and CR 122.1b's keyword counter reaches a
 -- card outside the battlefield explicitly. What makes the printed read safe is
 -- that it is INDISTINGUISHABLE from a projected one today, which is a claim about
--- what pawl CANNOT EXPRESS rather than about Magic. Nothing can put a
--- keyword-changing effect on a card in a hand, and that takes all four of
+-- pawl's pool rather than about Magic. That takes all five of
 -- Pawl.Types.Affected:
 --
 --   * Matching and AttachedPlayerControls are gated on battlefield membership,
 --     structurally, inside Projection.affects.
 --   * Attached names the object the SOURCE is attached to, which an Aura only
 --     ever has while both are on the battlefield.
---   * TheseObjects is the one that could in principle reach elsewhere -- it is
---     CR 611.2c's frozen set, and Magical Hack's ChangeText already stores one
---     naming a spell on the STACK. What stops it here is the pool: no
---     Pawl.Types.Pool arm names a card in a hand at all.
+--   * TheseObjects is CR 611.2c's frozen set, and Magical Hack's ChangeText
+--     already stores one naming a spell on the STACK. What stops it here is the
+--     pool: no Pawl.Types.Pool arm names a card in a hand at all.
+--   * MatchingAnywhere is gated nowhere, and both readers project a card off the
+--     battlefield -- Projection.viewOfObject always did, Projection.viewUpTo
+--     since #623 -- so a card in a hand is as reachable as a permanent. Only the
+--     pool stops it: Viral Spawning grants a keyword to a card in a GRAVEYARD
+--     already, and no effect in the pool grants or removes FLASH off the
+--     battlefield.
 --
--- So a card in a hand projects exactly its printed keywords, and nothing can
--- grant or remove flash there (#160). The same posture handAbilitiesOf above
--- takes (#567).
---
--- A GRAVEYARD is no longer covered by that argument: MatchingAnywhere reaches
--- one, and Viral Spawning grants a keyword to a card lying there. Still exact,
--- and now for a narrower reason -- no effect in the pool grants FLASH off the
--- battlefield, so the two reads agree on every board (#160). castingPermissionsOf
--- above is the read that has already parted, and this is the next.
+-- So the printed read and a projected one agree on every board pawl can build
+-- (#160). The same posture handAbilitiesOf above takes (#567), and
+-- castingPermissionsOf above is the read that has already parted.
 --
 -- A membership test rather than an exhaustive case: this asks about ONE named
 -- constructor rather than classifying every keyword, so a new arm has nothing to
 -- say here.
-
--- | CR 702.127a's SECOND static ability: "this half of this split card can't be
--- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
--- Pawl.Engine.Cast asks of the zone it is about to offer rather than anything
--- minted here -- the counterweight to the CastFromGraveyard permission
--- permissionsFor grants for the same keyword.
---
--- Membership rather than a count: rule 702.127a takes no parameter and a second
--- instance would forbid nothing further.
-hasAftermath :: Set Keyword -> Bool
-hasAftermath = Set.member Keyword.Aftermath
-
 hasFlash :: Set Keyword -> Bool
 hasFlash = Set.member Keyword.Flash
 
@@ -2971,7 +2968,7 @@ miracle cost =
 -- flashbackCost's shape exactly, including the wildcard -- this asks about ONE
 -- constructor rather than classifying every keyword -- and asked of the card's
 -- PRINTED keywords for that function's reason: rule 702.94a's abilities function
--- in the hand (CR 113.6b), which pawl's projection does not reach (#160).
+-- in the hand (CR 113.6b), where no pool effect changes a card's keywords (#160).
 --
 -- Nothing beyond the FIRST miracle cost is reachable, also for flashbackCost's
 -- reason. No printing carries miracle twice.

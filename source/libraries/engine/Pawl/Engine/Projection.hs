@@ -561,35 +561,44 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
   Nothing -> powerGiven pcs oid gs
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
--- candidates projected through the layers BEFORE that one. A candidate in a
--- library, hand, graveyard or exile falls back to the printed card and is
--- matched against its PRINTED characteristics (#160). A GRAVEYARD card is the
--- one of the four gather now reaches -- CR 113.6f, fromGraveyardCard -- so this
--- fallback is a bound rather than an absence there: the effects exist and a
--- clause read INSIDE the fold still does not see them. Unobservable, since no
--- clause in the pool reads a graveyard card's characteristics.
+-- candidates projected through the layers BEFORE that one. EVERY object in the
+-- game, in whatever zone -- CR 613.1 starts from the actual object and names no
+-- zone, so a card in a graveyard, a hand or a library is projected exactly as a
+-- permanent is. WHICH effects reach it is the affected set's question and not
+-- this function's: Affected.MatchingAnywhere is the arm a card uses to reach one
+-- (Maskwood Nexus), TheseObjects can name any id at all, being CR 611.2c's
+-- frozen set, and the other three are battlefield-gated inside `affects` -- so
+-- the fold applies nothing here that a card did not aim off the battlefield.
 --
--- POWER is the one axis a rule reaches into there: CR 208.2a makes a
--- characteristic-defining one function everywhere, which is why the fallback is
--- viewOfCardIn rather than viewOfCard.
+-- This is the reader that used to fall back to the PRINTED card off the
+-- battlefield while viewOfObject projected it, so a one-shot count and a count
+-- inside the CR 613 fold disagreed about the same graveyard card (#623). The
+-- axes that only an object has -- its controller (CR 108.4a's owner default off
+-- the battlefield), its counters, CR 702.33d's kicked flag -- come with the
+-- change, and the printed-card view survives for the callers that hold a FACE
+-- rather than an object.
 --
--- The STACK is projected, not fallen back on, and gatherGiven's CR 113.6 walk is
--- what makes that worth doing: a spell can carry a static ability of its own, so
--- a clause read against it must see the grant. It also brings this in line with
--- viewOfObject, which has never had a zone gate -- so a "target spell" filter
--- and an "as long as" clause now read one spell the same way. The axes that only
--- an object has (its controller, CR 702.33d's kicked flag) come with that, and
--- Molten Disaster's own clause is the reader of the second.
+-- Nothing for an id that names no object, which is the one answer the printed
+-- fallback gave that is kept: CR 400.7 makes a departed object a new one, and a
+-- caller handed a dead id wants the no-op an unevaluable quantity already gives,
+-- not a Just over an empty projection. fullView is the unbounded counterpart and
+-- answers Just there, which is why viewWithLastKnownAnywhere has to guard it.
+--
+-- A characteristic-defining P/T is applied at layer 7a like anywhere else, so a
+-- count taken BELOW that layer no longer sees CR 208.2a's number for an
+-- off-battlefield candidate the way viewOfCardIn did. That is CR 613.1's own
+-- order rather than a loss: the same count over a battlefield candidate has
+-- never seen it either.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
-  if Set.member oid (GameState.battlefield gs) || elem oid (GameState.stack gs)
+  if Map.member oid (GameState.objects gs)
     then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
-    else fmap (viewOfCardIn gs oid) (Game.faceOf oid gs)
+    else Nothing
 
--- The characteristics view of a printed card off the battlefield, from the FACE
--- alone. No projection exists there, so every axis is read from the printed
--- face; the axes that only an OBJECT can have -- a controller, counters, an
--- attacking flag -- are Nothing or empty, and each says so at its field.
+-- The characteristics view of a printed card, from the FACE alone. Every axis is
+-- read from the printed face; the axes that only an OBJECT can have -- a
+-- controller, counters, an attacking flag -- are Nothing or empty, and each says
+-- so at its field.
 --
 -- A reader holding a game state wants viewOfCardIn below instead, which is this
 -- with CR 208.2a's characteristic-defining power filled in. This one survives
@@ -600,17 +609,16 @@ viewOfCard face =
    in Filter.MkView
         { Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,
-          -- CR 604.3 / 702.114a: a CDA functions in all zones, and nothing off
-          -- the battlefield is projected (#160), so devoid is applied here
-          -- rather than inherited from a fold this object never enters.
+          -- CR 604.3 / 702.114a: a CDA functions in all zones, and this view is
+          -- built from a face rather than folded through CR 613, so devoid is
+          -- applied here rather than inherited from a fold it never enters.
           Filter.colors =
             if definesColorless (Face.keywords face)
               then Set.empty
               else printedColorsOf face,
           -- CR 604.3 / 702.73a, the line above's reason one layer down: rule
-          -- 702.73a says outright that changeling "works everywhere", and a
-          -- card in a graveyard is never projected (#160), so it is applied
-          -- here too.
+          -- 702.73a says outright that changeling "works everywhere", and this
+          -- view enters no fold either, so it is applied here too.
           Filter.subtypes =
             if definesEveryCreatureType (Face.keywords face)
               then Set.union Subtype.everyCreatureType (TypeLine.subtypes typeLine)
@@ -677,7 +685,7 @@ viewOfCard face =
           Filter.designations = Set.empty,
           Filter.kicked = False,
           -- CR 602.1 / 605.1a off the PRINTED face, the posture `keywords` above
-          -- takes: nothing off the battlefield is projected (#160).
+          -- takes: this view is built from a face rather than folded.
           --
           -- The card's printed abilities plus rule 702's HAND ones, which CR 702.29b
           -- and CR 702.77b keep in existence in every zone. NOT the battlefield ones
@@ -695,8 +703,13 @@ viewOfCard face =
 -- characteristic-defining power can be evaluated: CR 604.3 and CR 208.2a make a
 -- CDA function in all zones, so Tarmogoyf in a library has the power its count
 -- says, which is what Imperial Recruiter's "creature card with power 2 or less"
--- must read. The view every off-battlefield reader gets; viewOfCard survives for
--- the FACE-only callers, and as the blind inner view below.
+-- must read. The view a library search, a cost criterion and a mill tally take
+-- for an off-battlefield card; viewOfCard survives for the FACE-only callers,
+-- and as the blind inner view below.
+--
+-- Not implemented: those readers take this view for a card that IS an object, so
+-- they read it as printed where the object has a CR 613 projection of its own
+-- (#160). viewUpTo above is the reader that no longer does.
 --
 -- Only the power and toughness axes differ, CR 208.2a naming both.
 viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
@@ -726,11 +739,12 @@ viewOfCardIn gs oid face =
 -- a CDA that read a candidate's POWER recur without end. Nothing in the pool
 -- does -- swapping the injection leaves the suite green, since DistinctCardTypes
 -- forces only Filter.cardTypes -- so the bound is unobserved today and is here
--- for the CDA that would observe it. Blind is also the posture viewUpTo already
--- takes for an off-battlefield candidate (#160).
+-- for the CDA that would observe it.
 --
--- Not implemented: a BATTLEFIELD candidate that a CDA evaluated here sweeps is
--- read as a printed card rather than through its CR 613 projection (#1080).
+-- Not implemented: every candidate a CDA evaluated here sweeps is read as a
+-- printed card rather than through its CR 613 projection, on the battlefield
+-- (#1080) and off it (#160) alike. viewUpTo, the reader inside the fold, no
+-- longer has that bound.
 characteristicPowerIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
 characteristicPowerIn gs oid face = case seedCharacteristicPT face of
   Nothing -> printedPower face
@@ -3308,11 +3322,12 @@ projectDeciding admits cands = forObject
                         -- partials are already built. What made a bound necessary
                         -- was a count RE-PROJECTING its candidates; this reads them.
                         --
-                        -- An object with no entry falls back to the bounded view. A
-                        -- card in a zone gather does not walk has no continuous
-                        -- effect on it to miss (#160). Not implemented: a SPELL is
-                        -- projected but not scanned here, so a count reading a
-                        -- same-layer effect on one still gets the bound (#1332).
+                        -- An object with no entry falls back to the bounded view:
+                        -- the running board holds the battlefield plus the object
+                        -- being projected, so a spell and a card in a hidden zone
+                        -- both land there. Not implemented: each is projected but
+                        -- not scanned here, so a count reading a same-layer effect
+                        -- on one still gets the bound (#1332).
                         --
                         -- noncreaturePT is CR 208.3, applied for the reason
                         -- projectDeciding applies it to its own result: the card types
