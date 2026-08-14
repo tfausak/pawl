@@ -4,4 +4,4 @@ data BeginningStep
   = Untap
   | Upkeep
   | DrawStep
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

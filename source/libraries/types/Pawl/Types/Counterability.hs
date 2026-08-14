@@ -44,4 +44,4 @@ module Pawl.Types.Counterability where
 data Counterability
   = Counterable
   | CantBeCountered
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

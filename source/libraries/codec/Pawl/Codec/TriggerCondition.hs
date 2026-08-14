@@ -101,7 +101,7 @@ codec =
       TriggerCondition.SelfAttacksPlayerWithMostLife -> Common.nullary "SelfAttacksPlayerWithMostLife"
       TriggerCondition.SelfBlocks -> Common.nullary "SelfBlocks"
       TriggerCondition.SelfBlocksCreature -> Common.nullary "SelfBlocksCreature"
-      TriggerCondition.SelfBlocksAtLeast n -> tag "SelfBlocksAtLeast" $ Common.encodeNatural n
+      TriggerCondition.SelfBlocksAtLeast n -> tag "SelfBlocksAtLeast" $ Codec.encode Common.natural n
       TriggerCondition.SelfBlocksOneOrMore f -> tag "SelfBlocksOneOrMore" $ Codec.encode filterCodec f
       TriggerCondition.SelfBecomesBlocked -> Common.nullary "SelfBecomesBlocked"
       TriggerCondition.SelfBecomesBlockedBy f -> tag "SelfBecomesBlockedBy" $ Codec.encode filterCodec f

@@ -128,14 +128,14 @@ codec =
       Keyword.TrampleOverPlaneswalkers -> Common.nullary "TrampleOverPlaneswalkers"
       Keyword.Vigilance -> Common.nullary "Vigilance"
       Keyword.Banding -> Common.nullary "Banding"
-      Keyword.Rampage n -> Common.tagged "Rampage" . Just $ Common.encodeNatural n
+      Keyword.Rampage n -> Common.tagged "Rampage" . Just $ Codec.encode Common.natural n
       Keyword.Flanking -> Common.nullary "Flanking"
       Keyword.Phasing -> Common.nullary "Phasing"
       Keyword.Shadow -> Common.nullary "Shadow"
       Keyword.Horsemanship -> Common.nullary "Horsemanship"
       Keyword.Aftermath -> Common.nullary "Aftermath"
       Keyword.JumpStart -> Common.nullary "JumpStart"
-      Keyword.Afflict n -> Common.tagged "Afflict" . Just $ Common.encodeNatural n
+      Keyword.Afflict n -> Common.tagged "Afflict" . Just $ Codec.encode Common.natural n
       Keyword.Cycling x -> Common.tagged "Cycling" . Just $ Codec.encode (Cycling.codec codec) x
       Keyword.Kicker cost -> Common.tagged "Kicker" . Just $ Codec.encode (Cost.codec codec) cost
       Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Codec.encode (Cost.codec codec) cost
@@ -145,14 +145,14 @@ codec =
       -- keyword with a second field rather than a tag of its own.
       Keyword.Morph x -> Common.tagged "Morph" . Just $ Codec.encode (Morph.codec codec) x
       Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Codec.encode (Cost.codec codec) cost
-      Keyword.Modular n -> Common.tagged "Modular" . Just $ Common.encodeNatural n
-      Keyword.Bushido n -> Common.tagged "Bushido" . Just $ Common.encodeNatural n
-      Keyword.Soulshift n -> Common.tagged "Soulshift" . Just $ Common.encodeNatural n
+      Keyword.Modular n -> Common.tagged "Modular" . Just $ Codec.encode Common.natural n
+      Keyword.Bushido n -> Common.tagged "Bushido" . Just $ Codec.encode Common.natural n
+      Keyword.Soulshift n -> Common.tagged "Soulshift" . Just $ Codec.encode Common.natural n
       Keyword.Haunt -> Common.nullary "Haunt"
       Keyword.SplitSecond -> Common.nullary "SplitSecond"
-      Keyword.Vanishing n -> Common.tagged "Vanishing" . Just $ Common.encodeNatural n
-      Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
-      Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Common.encodeNatural n
+      Keyword.Vanishing n -> Common.tagged "Vanishing" . Just $ Codec.encode Common.natural n
+      Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Codec.encode Common.natural n
+      Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Codec.encode Common.natural n
       -- An ARRAY, as Cycling's and Morph's are: CR 702.77a writes both an N and a
       -- cost.
       Keyword.Reinforce x -> Common.tagged "Reinforce" . Just $ Codec.encode (Reinforce.codec codec) x
@@ -161,7 +161,7 @@ codec =
       Keyword.Wither -> Common.nullary "Wither"
       Keyword.Exalted -> Common.nullary "Exalted"
       Keyword.Mentor -> Common.nullary "Mentor"
-      Keyword.Afterlife n -> Common.tagged "Afterlife" . Just $ Common.encodeNatural n
+      Keyword.Afterlife n -> Common.tagged "Afterlife" . Just $ Codec.encode Common.natural n
       Keyword.Provoke -> Common.nullary "Provoke"
       Keyword.BattleCry -> Common.nullary "BattleCry"
       Keyword.Undying -> Common.nullary "Undying"
@@ -170,14 +170,14 @@ codec =
       Keyword.Outlast cost -> Common.tagged "Outlast" . Just $ Codec.encode (Cost.codec codec) cost
       Keyword.Prowess -> Common.nullary "Prowess"
       Keyword.Menace -> Common.nullary "Menace"
-      Keyword.Renown n -> Common.tagged "Renown" . Just $ Common.encodeNatural n
+      Keyword.Renown n -> Common.tagged "Renown" . Just $ Codec.encode Common.natural n
       Keyword.Changeling -> Common.nullary "Changeling"
       Keyword.Devoid -> Common.nullary "Devoid"
       Keyword.Ingest -> Common.nullary "Ingest"
       Keyword.Skulk -> Common.nullary "Skulk"
       Keyword.Melee -> Common.nullary "Melee"
-      Keyword.Crew n -> Common.tagged "Crew" . Just $ Common.encodeNatural n
-      Keyword.Fabricate n -> Common.tagged "Fabricate" . Just $ Common.encodeNatural n
+      Keyword.Crew n -> Common.tagged "Crew" . Just $ Codec.encode Common.natural n
+      Keyword.Fabricate n -> Common.tagged "Fabricate" . Just $ Codec.encode Common.natural n
       Keyword.Riot -> Common.nullary "Riot"
       Keyword.Unleash -> Common.nullary "Unleash"
       Keyword.Daybound -> Common.nullary "Daybound"
@@ -185,6 +185,6 @@ codec =
       Keyword.Decayed -> Common.nullary "Decayed"
       Keyword.Training -> Common.nullary "Training"
       Keyword.Miracle cost -> Common.tagged "Miracle" . Just $ Codec.encode (Cost.codec codec) cost
-      Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Common.encodeNatural n
+      Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Codec.encode Common.natural n
       Keyword.Plot cost -> Common.tagged "Plot" . Just $ Codec.encode (Cost.codec codec) cost
       Keyword.StartYourEngines -> Common.nullary "StartYourEngines"

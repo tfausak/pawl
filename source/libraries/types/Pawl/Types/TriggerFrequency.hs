@@ -15,4 +15,4 @@ data TriggerFrequency
     EveryTime
   | -- | Only the first occurrence in a turn.
     FirstTimeEachTurn
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

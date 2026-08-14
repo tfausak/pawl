@@ -20,4 +20,4 @@ module Pawl.Types.Regenerability where
 data Regenerability
   = Regenerable
   | CantBeRegenerated
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

@@ -60,7 +60,7 @@ codec =
       Modification.ChangeSubtypeWord x -> Common.tagged "ChangeSubtypeWord" . Just $ Codec.encode ChangeSubtypeWord.codec x
       Modification.SetController p -> Common.tagged "SetController" . Just $ Codec.encode PlayerId.codec p
       Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
-      Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Common.encodeSet (Codec.encode Color.codec) cs
-      Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Common.encodeSet (Codec.encode Color.codec) cs
+      Modification.SetColor cs -> Common.tagged "SetColor" . Just $ Codec.encode (Common.set Color.codec) cs
+      Modification.AddColor cs -> Common.tagged "AddColor" . Just $ Codec.encode (Common.set Color.codec) cs
       Modification.AddChosenColor -> Common.nullary "AddChosenColor"
       Modification.SwitchPowerToughness -> Common.nullary "SwitchPowerToughness"

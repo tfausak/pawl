@@ -22,6 +22,6 @@ codec =
     ]
   where
     encode m = case m of
-      ModeSelection.ChooseExactly n -> Common.tagged "ChooseExactly" . Just $ Common.encodeNatural n
-      ModeSelection.ChooseExactlyWithRepeats n -> Common.tagged "ChooseExactlyWithRepeats" . Just $ Common.encodeNatural n
+      ModeSelection.ChooseExactly n -> Common.tagged "ChooseExactly" . Just $ Codec.encode Common.natural n
+      ModeSelection.ChooseExactlyWithRepeats n -> Common.tagged "ChooseExactlyWithRepeats" . Just $ Codec.encode Common.natural n
       ModeSelection.ChooseBetween cb -> Common.tagged "ChooseBetween" . Just $ Codec.encode ChooseBetween.codec cb

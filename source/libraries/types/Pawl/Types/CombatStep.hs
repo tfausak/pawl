@@ -6,4 +6,4 @@ data CombatStep
   | DeclareBlockers
   | CombatDamage
   | EndOfCombat
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

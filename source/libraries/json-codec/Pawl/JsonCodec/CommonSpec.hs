@@ -99,7 +99,7 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "hands a present null to the decoder" $
       Spec.assertEq
         s
-        (Common.defaultedField "k" (Just (1 :: Integer)) (Common.decodeMaybe Common.asInteger) [Value.pair "k" Value.null])
+        (Common.defaultedField "k" (Just (1 :: Integer)) (Codec.decode (Common.maybe Common.integer)) [Value.pair "k" Value.null])
         (Right Nothing)
   Spec.describe s "defaultedField accepts the verbose form" $ do
     -- The key is PRESENT, so 'defaultedField' hands the value straight to the
@@ -108,13 +108,13 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "an explicit null decodes to Nothing via decodeMaybe, not via the default" $
       Spec.assertEq
         s
-        (Common.defaultedField "k" Nothing (Common.decodeMaybe Common.asInteger) [Value.pair "k" Value.null])
+        (Common.defaultedField "k" Nothing (Codec.decode (Common.maybe Common.integer)) [Value.pair "k" Value.null])
         (Right (Nothing :: Maybe Integer))
     -- Same shape: 'decodeList' on an explicit empty array, not the default.
     Spec.it s "an explicit empty array decodes to [] via decodeList, not via the default" $
       Spec.assertEq
         s
-        (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Value.pair "k" (Value.array [])])
+        (Common.defaultedField "k" [] (Codec.decode (Common.list Common.integer)) [Value.pair "k" (Value.array [])])
         (Right ([] :: [Integer]))
     -- An explicit null on a NON-Maybe defaulted field is an error, not the
     -- default: `defaultedField` reads absence directly, so a file that says
@@ -122,7 +122,7 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "an explicit null on a non-Maybe defaulted field is an error" $
       Spec.assertBool
         s
-        (Either.isLeft (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Value.pair "k" Value.null]))
+        (Either.isLeft (Common.defaultedField "k" [] (Codec.decode (Common.list Common.integer)) [Value.pair "k" Value.null]))
         "expected a decode failure"
 
   Spec.describe s "tuple" $ do
@@ -221,17 +221,17 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "encodes in ascending key order" $
       Spec.assertEq
         s
-        (Common.render (Common.encodeTextMap id Value.integer (Map.fromList [(Text.pack "z", 1), (Text.pack "a", 2)])))
+        (Common.render (Codec.encode (Common.textMap id id Common.integer) (Map.fromList [(Text.pack "z", 1), (Text.pack "a", 2)])))
         (Text.pack "{\"a\":2,\"z\":1}")
     Spec.it s "round trips" $
       Spec.assertEq
         s
-        (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "{\"a\":2,\"z\":1}"))
+        (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "{\"a\":2,\"z\":1}"))
         (Right (Map.fromList [(Text.pack "a", 2), (Text.pack "z", 1)]))
     Spec.it s "decodes the empty object" $
       Spec.assertEq
         s
-        (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "{}"))
+        (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "{}"))
         (Right Map.empty :: Either Text.Text (Map.Map Text.Text Integer))
     -- Pawl.Json.Object does not dedupe, so a repeated key genuinely reaches the
     -- decoder. Rejected rather than letting the first win, which is decodeSet's
@@ -239,12 +239,12 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     Spec.it s "rejects a repeated key" $
       Spec.assertBool
         s
-        (Either.isLeft (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "{\"a\":1,\"a\":2}")))
+        (Either.isLeft (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "{\"a\":1,\"a\":2}")))
         "expected a decode failure"
     Spec.it s "rejects an array" $
       Spec.assertBool
         s
-        (Either.isLeft (Common.decodeTextMap id Common.asInteger =<< Common.parse (Text.pack "[]")))
+        (Either.isLeft (Codec.decode (Common.textMap id id Common.integer) =<< Common.parse (Text.pack "[]")))
         "expected a decode failure"
     -- The bundle carries the pair's behaviour plus a Schema.mapOf schema, which
     -- is the half the loose pair could not supply.

@@ -18,4 +18,4 @@ module Pawl.Types.ReplacementOrigin where
 data ReplacementOrigin
   = SelfReplacement -- CR 614.15
   | Other -- CR 614.15's "other replacement effects"
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

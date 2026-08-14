@@ -41,4 +41,4 @@ data Designation
   | -- | CR 701.60b: suspected, which CR 701.60a's suspect instruction sets and,
     -- unlike the two above, which a spell or ability can take away again.
     Suspected
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

@@ -18,4 +18,4 @@ data DiscardCause
     -- cost. Recorded by Pawl.Engine.Cost's DiscardThis component -- see that arm
     -- for what it cannot see.
     ToPayCyclingCost
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

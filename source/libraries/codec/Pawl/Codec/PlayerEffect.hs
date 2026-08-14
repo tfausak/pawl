@@ -46,16 +46,16 @@ codec =
     filterCodec = Filter.codec Keyword.codec
     encode e = case e of
       PlayerEffect.CantCastSpells -> Common.nullary "CantCastSpells"
-      PlayerEffect.CantCastMoreThan n -> Common.tagged "CantCastMoreThan" . Just $ Common.encodeNatural n
+      PlayerEffect.CantCastMoreThan n -> Common.tagged "CantCastMoreThan" . Just $ Codec.encode Common.natural n
       PlayerEffect.CantCastChosenName -> Common.nullary "CantCastChosenName"
       PlayerEffect.CantPlayLandChosenName -> Common.nullary "CantPlayLandChosenName"
       PlayerEffect.IncreaseSpellCost x -> Common.tagged "IncreaseSpellCost" . Just $ Codec.encode IncreaseSpellCost.codec x
       PlayerEffect.ReduceSpellCost x -> Common.tagged "ReduceSpellCost" . Just $ Codec.encode ReduceSpellCost.codec x
       PlayerEffect.ReduceActivationCost x -> Common.tagged "ReduceActivationCost" . Just $ Codec.encode ReduceActivationCost.codec x
       PlayerEffect.AddActivationCost x -> Common.tagged "AddActivationCost" . Just $ Codec.encode AddActivationCost.codec x
-      PlayerEffect.PlayAdditionalLands n -> Common.tagged "PlayAdditionalLands" . Just $ Common.encodeNatural n
+      PlayerEffect.PlayAdditionalLands n -> Common.tagged "PlayAdditionalLands" . Just $ Codec.encode Common.natural n
       PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
-      PlayerEffect.SetMaximumHandSize n -> Common.tagged "SetMaximumHandSize" . Just $ Common.encodeNatural n
+      PlayerEffect.SetMaximumHandSize n -> Common.tagged "SetMaximumHandSize" . Just $ Codec.encode Common.natural n
       PlayerEffect.DontLoseUnspentMana f -> Common.tagged "DontLoseUnspentMana" . Just $ Codec.encode ManaFilter.codec f
       PlayerEffect.CantBeTargetedBy sc -> Common.tagged "CantBeTargetedBy" . Just $ Codec.encode PlayerScope.codec sc
       PlayerEffect.CastAsThoughItHadFlash c -> Common.tagged "CastAsThoughItHadFlash" . Just $ Codec.encode filterCodec c

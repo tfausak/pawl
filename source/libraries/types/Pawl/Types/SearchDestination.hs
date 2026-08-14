@@ -23,4 +23,4 @@ data SearchDestination
     -- reveal, so the two are not the same act and this arm is not RevealThenHand
     -- pointed at another zone.
     Exile
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

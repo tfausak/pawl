@@ -26,4 +26,4 @@ data TurnScope
     -- CR 102.3's teams are the one arrangement where the two readings part, and
     -- pawl has no team format (#175).
     OpponentsTurn
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

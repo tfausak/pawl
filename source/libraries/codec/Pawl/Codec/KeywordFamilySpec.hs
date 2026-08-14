@@ -190,5 +190,9 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       (Codec.encode KeywordFamily.codec KeywordFamily.Toxic /= Common.tagged "Toxic" (Just (Value.integer 2)))
       "the toxic family is not toxic 2"
 
+  -- Exhaustive where the literals above are representative: Arm.enum derives
+  -- the arm list from the type, so this is what would catch a constructor the
+  -- derivation missed or two that encode alike.
+  Spec.it s "round trips every constructor" $ Common.assertEnumCodec s KeywordFamily.codec
   Spec.it s "has a schema" $
     Common.assertHasSchema s KeywordFamily.codec

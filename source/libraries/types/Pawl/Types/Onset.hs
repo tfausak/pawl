@@ -46,4 +46,4 @@ data Onset
     -- silently narrowed to the controller's turn. Card data must say what the
     -- card says instead of leaning on the engine to mean it.
     FromYourNextTurn
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

@@ -3,4 +3,4 @@ module Pawl.Types.EndingStep where
 data EndingStep
   = EndStep
   | Cleanup
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

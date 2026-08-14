@@ -22,4 +22,4 @@ module Pawl.Types.MorphVariant where
 data MorphVariant
   = Plain
   | Mega
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

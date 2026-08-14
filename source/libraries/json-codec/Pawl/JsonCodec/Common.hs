@@ -153,7 +153,7 @@ withValue mv f = case mv of
 
 -- | Reads a field that may be absent, supplying the default the writer
 -- omits. A key that is present but null goes to the decoder rather than
--- short-circuiting, so composing with 'decodeMaybe' accepts an absent key, an
+-- short-circuiting, so composing with 'maybe' accepts an absent key, an
 -- explicit null, and a value alike.
 defaultedField ::
   String ->
@@ -164,119 +164,6 @@ defaultedField ::
 defaultedField k d f ps = case lookupPair k ps of
   Nothing -> Right d
   Just v -> f v
-
--- Combinators ----------------------------------------------------------------
---
--- Generic over the element codec, which is taken as an argument.
-
-decodeNullary :: String -> [(String, a)] -> Value.Value -> Either Text.Text a
-decodeNullary tyName table value = do
-  (t, _) <- asTagged value
-  case lookup t table of
-    Just x -> Right x
-    Nothing -> Left . Text.pack $ "unknown " <> tyName <> ": " <> t
-
--- The pairs below (encodeList/decodeList and its siblings) are the last
--- function-shaped combinators; each is waiting to collapse into its
--- Codec-shaped replacement below ('list' and its siblings) during the full
--- pawl:codec conversion (#1263).
-
-encodeList :: (a -> Value.Value) -> [a] -> Value.Value
-encodeList f = Value.array . fmap f
-
-decodeList :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text [a]
-decodeList f value = asArray value >>= traverse f
-
-encodeNonEmpty :: (a -> Value.Value) -> NonEmpty.NonEmpty a -> Value.Value
-encodeNonEmpty f = encodeList f . NonEmpty.toList
-
--- | An empty array is a decode failure, not a value that does nothing.
-decodeNonEmpty :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (NonEmpty.NonEmpty a)
-decodeNonEmpty f value = do
-  xs <- decodeList f value
-  case NonEmpty.nonEmpty xs of
-    Nothing -> Left $ Text.pack "expected a non-empty array"
-    Just ne -> pure ne
-
-encodeSeq :: (a -> Value.Value) -> Seq.Seq a -> Value.Value
-encodeSeq f = encodeList f . Foldable.toList
-
-decodeSeq :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Seq.Seq a)
-decodeSeq f value = Seq.fromList <$> decodeList f value
-
-encodeSet :: (a -> Value.Value) -> Set.Set a -> Value.Value
-encodeSet f = encodeList f . Set.toAscList
-
--- | Rejects a repeated element rather than silently collapsing it: a
--- duplicate in a hand-written card file is plausibly a typo, not a value
--- worth accepting, and 'set''s schema says 'Schema.uniqueArray' -- so the
--- decoder has to guarantee what the schema claims.
-decodeSet :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Set.Set a)
-decodeSet f value = do
-  xs <- decodeList f value
-  let s = Set.fromList xs
-  if Set.size s == length xs
-    then Right s
-    else Left $ Text.pack "expected an array with no repeated elements"
-
--- A count-per-key multiset, on the wire as a plain array WITH REPEATS rather
--- than as key/count pairs, ascending by key so it is canonical. decodeMultiset
--- recounts, so a hand-written file may repeat a key in any order and a zero
--- count is unsayable.
-encodeMultiset :: (a -> Value.Value) -> Map.Map a Natural.Natural -> Value.Value
-encodeMultiset f = encodeList f . concatMap (\(k, n) -> List.genericReplicate n k) . Map.toAscList
-
-decodeMultiset :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Map.Map a Natural.Natural)
-decodeMultiset f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> decodeList f value
-
--- A name-keyed map, on the wire as a JSON OBJECT keyed by the name. Ascending
--- by key, which is canonical and byte-stable for the reason an entry array was
--- once reached for and did not need to be: 'Object.Object' is a LIST OF PAIRS
--- rather than a map, so the order written is the order rendered (#1303).
---
--- The key is a JSON string rather than a 'Value.Value', so these take the key's
--- own wrap and unwrap rather than a codec for it.
-encodeTextMap :: (k -> Text.Text) -> (v -> Value.Value) -> Map.Map k v -> Value.Value
-encodeTextMap key f =
-  Value.object
-    . fmap (\(k, v) -> Pair.MkPair (String.MkString (key k)) (f v))
-    . Map.toAscList
-
--- | Rejects a repeated key rather than letting the first win, which is
--- 'decodeSet''s reason: a duplicate in a hand-written card file is plausibly a
--- typo rather than a value worth accepting. A JSON object genuinely can carry
--- one here, since 'Object.Object' does not dedupe.
-decodeTextMap ::
-  (Ord k) =>
-  (Text.Text -> k) ->
-  (Value.Value -> Either Text.Text v) ->
-  Value.Value ->
-  Either Text.Text (Map.Map k v)
-decodeTextMap key f value = do
-  ps <- asObject value
-  entries <- traverse (\p -> fmap ((,) (key (String.unwrap (Pair.name p)))) (f (Pair.value p))) ps
-  let m = Map.fromList entries
-  if Map.size m == length entries
-    then Right m
-    else Left $ Text.pack "expected an object with no repeated keys"
-
-encodeMaybe :: (a -> Value.Value) -> Maybe a -> Value.Value
-encodeMaybe = Maybe.maybe Value.null
-
-decodeMaybe :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Maybe a)
-decodeMaybe f value = case value of
-  Value.Null _ -> Right Nothing
-  _ -> Just <$> f value
-
-encodeNatural :: Natural.Natural -> Value.Value
-encodeNatural = Value.integer . toInteger
-
-decodeNatural :: Value.Value -> Either Text.Text Natural.Natural
-decodeNatural value = do
-  n <- asInteger value
-  case Integer.toNatural n of
-    Just x -> Right x
-    Nothing -> Left . Text.pack $ "expected natural but got " <> show n
 
 -- Assertions -----------------------------------------------------------------
 
@@ -338,9 +225,9 @@ assertJson s j = case parse (Text.pack j) of
 -- GOVERNING PRINCIPLE: a codec's schema should be as expressive as the
 -- constraint it names, and the decoder is tightened to guarantee what the
 -- schema claims rather than the other way around. 'set' and 'nonEmpty' below
--- both hold to it: 'decodeSet' rejects a repeated element so its
--- 'Schema.uniqueArray' schema is honest, and 'decodeNonEmpty' rejects an
--- empty array so its 'Schema.nonEmptyArray' schema is too.
+-- both hold to it: 'set' rejects a repeated element so its
+-- 'Schema.uniqueArray' schema is honest, and 'nonEmpty' rejects an empty array
+-- so its 'Schema.nonEmptyArray' schema is too.
 
 -- | The JSON scalars a wrapper is wrapped around. None of them is filed in
 -- @$defs@: a definition is named for a Pawl type, and @Integer@ is not one.
@@ -348,7 +235,16 @@ integer :: Codec.Codec Integer
 integer = scalar Schema.integer Value.integer asInteger
 
 natural :: Codec.Codec Natural.Natural
-natural = scalar Schema.natural encodeNatural decodeNatural
+natural =
+  scalar
+    Schema.natural
+    (Value.integer . toInteger)
+    ( \value -> do
+        n <- asInteger value
+        case Integer.toNatural n of
+          Just x -> Right x
+          Nothing -> Left . Text.pack $ "expected natural but got " <> show n
+    )
 
 boolean :: Codec.Codec Bool
 boolean = scalar Schema.boolean Value.boolean asBoolean
@@ -384,16 +280,18 @@ wrapper c inject project =
 maybe :: Codec.Codec a -> Codec.Codec (Maybe a)
 maybe c =
   Codec.MkCodec
-    { Codec.encode = encodeMaybe (Codec.encode c),
-      Codec.decode = decodeMaybe (Codec.decode c),
+    { Codec.encode = Maybe.maybe Value.null (Codec.encode c),
+      Codec.decode = \value -> case value of
+        Value.Null _ -> Right Nothing
+        _ -> Just <$> Codec.decode c value,
       Codec.schema = fmap Schema.nullable (Codec.schema c)
     }
 
--- The Codec-shaped siblings of encodeList/decodeList and the rest above.
--- 'list', 'set', 'seq', 'nonEmpty' and 'multiset' each wrap their existing
--- function-shaped pair rather than reimplementing it; 'tuple' has no such
--- pair to wrap (see its own Haddock). Each coexists with its function-shaped
--- half until #1263 converts the last caller and deletes it.
+-- The element-generic combinators. Each is ONE bidirectional definition rather
+-- than a codec wrapping a separate encode/decode pair: the function-shaped
+-- halves this module used to export are gone, their last callers converted
+-- (#1263). 'set', 'seq', 'nonEmpty' and 'multiset' are written in terms of
+-- 'list', which is where the array itself is read and written.
 
 -- | Encodes to a two-element array and rejects any other length on decode.
 -- There is no existing encodeTuple/decodeTuple pair to wrap.
@@ -416,53 +314,74 @@ tuple ca cb =
 list :: Codec.Codec a -> Codec.Codec [a]
 list c =
   Codec.MkCodec
-    { Codec.encode = encodeList (Codec.encode c),
-      Codec.decode = decodeList (Codec.decode c),
+    { Codec.encode = Value.array . fmap (Codec.encode c),
+      Codec.decode = \value -> asArray value >>= traverse (Codec.decode c),
       Codec.schema = Schema.array <$> Codec.schema c
     }
 
--- | 'Schema.uniqueArray': both 'Set' on the wire (via 'encodeSet') and
--- 'decodeSet' below reject a repeated element, so the schema saying
--- @uniqueItems@ is a claim the decoder actually guarantees.
+-- | 'Schema.uniqueArray', and the decoder guarantees what that claims: a
+-- repeated element is REJECTED rather than silently collapsed, because a
+-- duplicate in a hand-written card file is plausibly a typo rather than a value
+-- worth accepting. Encoding is ascending by element, so the wire form is
+-- canonical.
 set :: (Ord a) => Codec.Codec a -> Codec.Codec (Set.Set a)
 set c =
   Codec.MkCodec
-    { Codec.encode = encodeSet (Codec.encode c),
-      Codec.decode = decodeSet (Codec.decode c),
+    { Codec.encode = Codec.encode (list c) . Set.toAscList,
+      Codec.decode = \value -> do
+        xs <- Codec.decode (list c) value
+        let s = Set.fromList xs
+        if Set.size s == length xs
+          then Right s
+          else Left $ Text.pack "expected an array with no repeated elements",
       Codec.schema = Schema.uniqueArray <$> Codec.schema c
     }
 
 seq :: Codec.Codec a -> Codec.Codec (Seq.Seq a)
 seq c =
   Codec.MkCodec
-    { Codec.encode = encodeSeq (Codec.encode c),
-      Codec.decode = decodeSeq (Codec.decode c),
+    { Codec.encode = Codec.encode (list c) . Foldable.toList,
+      Codec.decode = fmap Seq.fromList . Codec.decode (list c),
       Codec.schema = Schema.array <$> Codec.schema c
     }
 
--- | 'Schema.nonEmptyArray', not 'Schema.array': 'decodeNonEmpty' below rejects
--- an empty array outright, so the schema says the same thing.
+-- | 'Schema.nonEmptyArray', not 'Schema.array', and the decoder says the same
+-- thing: an empty array is a decode failure rather than a value that does
+-- nothing.
 nonEmpty :: Codec.Codec a -> Codec.Codec (NonEmpty.NonEmpty a)
 nonEmpty c =
   Codec.MkCodec
-    { Codec.encode = encodeNonEmpty (Codec.encode c),
-      Codec.decode = decodeNonEmpty (Codec.decode c),
+    { Codec.encode = Codec.encode (list c) . NonEmpty.toList,
+      Codec.decode = \value -> do
+        xs <- Codec.decode (list c) value
+        case NonEmpty.nonEmpty xs of
+          Nothing -> Left $ Text.pack "expected a non-empty array"
+          Just ne -> pure ne,
       Codec.schema = Schema.nonEmptyArray <$> Codec.schema c
     }
 
+-- | A count-per-key multiset, on the wire as a plain array WITH REPEATS rather
+-- than as key/count pairs, ascending by key so it is canonical. Decoding
+-- recounts, so a hand-written file may repeat a key in any order and a zero
+-- count is unsayable.
 multiset :: (Ord a) => Codec.Codec a -> Codec.Codec (Map.Map a Natural.Natural)
 multiset c =
   Codec.MkCodec
-    { Codec.encode = encodeMultiset (Codec.encode c),
-      Codec.decode = decodeMultiset (Codec.decode c),
+    { Codec.encode = Codec.encode (list c) . concatMap (\(k, n) -> List.genericReplicate n k) . Map.toAscList,
+      Codec.decode = fmap (Map.fromListWith (+) . fmap (\k -> (k, 1))) . Codec.decode (list c),
       Codec.schema = Schema.array <$> Codec.schema c
     }
 
--- | A name-keyed map as a JSON object, 'encodeTextMap'\/'decodeTextMap' bundled
--- with 'Schema.mapOf'. The key's unwrap and wrap are passed rather than a
--- @Codec k@, because a JSON object's key is a string rather than a
--- 'Value.Value'; this module cannot name the key type either, since
--- @pawl:json-codec@ does not depend on @pawl:types@.
+-- | A name-keyed map, on the wire as a JSON OBJECT keyed by the name, ascending
+-- by key -- which is canonical and byte-stable because 'Object.Object' is a LIST
+-- OF PAIRS rather than a map, so the order written is the order rendered
+-- (#1303). A repeated key is REJECTED rather than letting the first win, which
+-- is 'set''s reason; a JSON object genuinely can carry one, since
+-- 'Object.Object' does not dedupe.
+--
+-- The key's unwrap and wrap are passed rather than a @Codec k@, because a JSON
+-- object's key is a string rather than a 'Value.Value'; this module cannot name
+-- the key type either, since @pawl:json-codec@ does not depend on @pawl:types@.
 --
 -- The wrap is total. Both key types in the corpus are unvalidated @Text@
 -- newtypes, and 'Schema.mapOf' constrains no key, so a fallible wrap would
@@ -475,8 +394,17 @@ textMap ::
   Codec.Codec (Map.Map k v)
 textMap unwrapKey wrapKey c =
   Codec.MkCodec
-    { Codec.encode = encodeTextMap unwrapKey (Codec.encode c),
-      Codec.decode = decodeTextMap wrapKey (Codec.decode c),
+    { Codec.encode =
+        Value.object
+          . fmap (\(k, v) -> Pair.MkPair (String.MkString (unwrapKey k)) (Codec.encode c v))
+          . Map.toAscList,
+      Codec.decode = \value -> do
+        ps <- asObject value
+        entries <- traverse (\p -> fmap ((,) (wrapKey (String.unwrap (Pair.name p)))) (Codec.decode c (Pair.value p))) ps
+        let m = Map.fromList entries
+        if Map.size m == length entries
+          then Right m
+          else Left $ Text.pack "expected an object with no repeated keys",
       Codec.schema = Schema.mapOf <$> Codec.schema c
     }
 
@@ -489,6 +417,27 @@ assertCodec ::
   String ->
   m ()
 assertCodec s c = assertJsonCodec s (Codec.encode c) (Codec.decode c)
+
+-- | Round-trips EVERY constructor of an all-nullary type through its codec, and
+-- asserts that no two of them encode alike.
+--
+-- The exhaustive counterpart to the hand-written literal assertions beside it,
+-- which are representative rather than complete -- Pawl.Codec.SubtypeSpec covers
+-- a fraction of its type. What it pins is the property 'Pawl.JsonCodec.Arm.enum'
+-- actually rests on: every constructor survives the trip, and the derived tags
+-- are distinct. It cannot pin the tag STRINGS without restating 'show', which is
+-- what the literal assertions are for.
+assertEnumCodec ::
+  forall m n a.
+  (Stack.HasCallStack, Monad m, Bounded a, Enum a, Eq a, Show a) =>
+  Spec.Spec m n ->
+  Codec.Codec a ->
+  m ()
+assertEnumCodec s c = do
+  let values = [minBound .. maxBound] :: [a]
+      encoded = fmap (render . Codec.encode c) values
+  Spec.assertEq s (traverse (Codec.decode c . Codec.encode c) values) (Right values)
+  Spec.assertEq s (length (Set.fromList encoded)) (length encoded)
 
 -- | Forces a codec's schema and checks only that it is an object. It asserts
 -- nothing about the content, so editing a schema never edits a test -- but a

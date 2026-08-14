@@ -14,4 +14,4 @@ module Pawl.Types.DamageKind where
 data DamageKind
   = Combat
   | Noncombat
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

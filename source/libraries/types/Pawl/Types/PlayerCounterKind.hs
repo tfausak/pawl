@@ -33,4 +33,4 @@ data PlayerCounterKind
     --
     -- LAST rather than sorted into place, having no rule number to sort by.
     Experience
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)

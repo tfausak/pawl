@@ -13,4 +13,4 @@ data ExtraPhase
     ExtraCombat
   | -- | CR 505.1a: an added main phase is a POSTCOMBAT main phase.
     ExtraMain
-  deriving (Eq, Ord, Show)
+  deriving (Bounded, Enum, Eq, Ord, Show)
