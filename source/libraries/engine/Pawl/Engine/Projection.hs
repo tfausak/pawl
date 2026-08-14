@@ -1862,6 +1862,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfCycled -> condition
   TriggerCondition.SelfRevealedForMiracle -> condition
   TriggerCondition.SelfCast -> condition
+  TriggerCondition.SelfBecomesTargeted _ -> condition
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerDrawsNthCard {} -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition

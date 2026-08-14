@@ -909,6 +909,15 @@ placeBorne srcId pending = do
       -- slot under the name a Create bound its minted tokens to would keep only
       -- the target and lose the group. Per-field, both survive.
       State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
+      -- CR 601.2c through CR 603.3d: each chosen object became a target of this
+      -- ability, which is what CR 702.21a's ward watches. The ability object is
+      -- what rule 702.21a would counter (CR 113.7a) and `controller` is CR 603.3a's
+      -- player, the one it offers the cost to.
+      --
+      -- Nothing here can reject the placement afterwards -- CR 603.3d's own
+      -- removal is the `selectionPossible` branch above -- so this is the last
+      -- line rather than a payment's successor as in Cast and Activate.
+      Event.becameTarget abilId controller chosen
 
 -- CR 101.4 / 603.3b: the players who control a pending trigger, active player
 -- first and then the rest in turn order. Grouped by controller because the

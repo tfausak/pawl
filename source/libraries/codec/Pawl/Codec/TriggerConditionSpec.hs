@@ -357,6 +357,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       """ {"type":"SpellCast","value":{"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"OpponentsTurn"}}} """
   -- CR 601.2i read off the spell itself, Desolation Twin's "when you cast this
   -- spell": nullary, since "this spell" needs neither Filter nor TurnScope.
+  -- CR 702.21a's relation is on the TARGETING side -- the opponent whose spell
+  -- named the bearer -- so the payload is the same PlayerRelation
+  -- SpellOrAbilityCounters carries and never a Filter over the bearer.
+  Spec.it s "SelfBecomesTargeted" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      (TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent)
+      """ {"type":"SelfBecomesTargeted","value":{"type":"Opponent"}} """
   Spec.it s "SelfCast" $
     Common.assertCodec
       s
