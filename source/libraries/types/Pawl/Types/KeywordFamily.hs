@@ -93,4 +93,6 @@ data KeywordFamily
     Toxic
   | -- | CR 702.170a: plot [cost].
     Plot
+  | -- | CR 702.143a: foretell [cost].
+    Foretell
   deriving (Bounded, Enum, Eq, Ord, Show)

@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Dungeon as Dungeon
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
+import qualified Pawl.Engine.Foretell as Foretell
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.Mana as Mana
@@ -859,6 +860,7 @@ placeBorne srcId pending = do
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,
@@ -1351,6 +1353,13 @@ priorityLoop = do
                               -- window to respond to the payment or the exile.
                               Action.Type.Plot oid -> do
                                 Plot.plot p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              -- CR 116.2h / 702.143b: a special action too, so the
+                              -- Plot arm's shape above applies unchanged.
+                              Action.Type.Foretell oid -> do
+                                Foretell.foretell p oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

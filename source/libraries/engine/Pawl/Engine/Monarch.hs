@@ -186,6 +186,7 @@ placeInherent pending = do
             Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.plotted = Nothing,
+            Object.foretold = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.ventureRoom = Nothing,

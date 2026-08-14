@@ -392,12 +392,13 @@ castableZones pid oid face gs =
         _ -> False
    in filter permitted castZones
 
--- CR 601.3: may this player cast this half of this exiled card? TWO INDEPENDENT
--- PERMISSIONS, either of which suffices, because the rules state two. The first
--- is Object.playableFromExile's, whose two conjuncts are below and whose second
--- is why the Adventure half of an exiled adventurer card is not offered while the
--- same card in a hand offers both; the second is CR 702.170d's plotted card,
--- which permitsCastPlotted answers.
+-- CR 601.3: may this player cast this half of this exiled card? THREE
+-- INDEPENDENT PERMISSIONS, any of which suffices, because the rules state three.
+-- The first is Object.playableFromExile's, whose two conjuncts are below and
+-- whose second is why the Adventure half of an exiled adventurer card is not
+-- offered while the same card in a hand offers both; the second is CR 702.170d's
+-- plotted card, which permitsCastPlotted answers; the third is CR 702.143a's
+-- foretold card, which permitsCastForetold answers.
 --
 --   * Object.playableFromExile names a player -- which is what keeps a
 --     permission from being an offer to the table. Written either by CR 715.3d's
@@ -417,6 +418,7 @@ permitsCastFromExile :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Game
 permitsCastFromExile pid oid face gs =
   (fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid && not (Card.isAdventure face))
     || permitsCastPlotted pid oid gs
+    || permitsCastForetold pid oid gs
 
 -- CR 702.170d: may this player cast this PLOTTED card? Three conjuncts, and the
 -- rule states each of them:
@@ -441,6 +443,35 @@ permitsCastPlotted :: PlayerId -> ObjectId -> GameState -> Bool
 permitsCastPlotted pid oid gs = Maybe.fromMaybe False $ do
   obj <- Game.lookupObject oid gs
   turn <- Object.plotted obj
+  pure (Object.owner obj == pid && GameState.turnNumber gs > turn)
+
+-- CR 702.143a: may this player cast this FORETOLD card? permitsCastPlotted's
+-- three conjuncts one rule over, and the rule states each of them:
+--
+--   * the card is foretold, which is the Object.foretold stamp
+--     Pawl.Engine.Foretell wrote;
+--   * this player is its OWNER. Rule 702.143a says "THAT PLAYER may cast that
+--     card", meaning the one who took the special action -- who is the owner,
+--     because CR 400.1 makes a hand a per-player zone and the action exiles the
+--     card from the actor's own hand. The two words are the same player here and
+--     the owner is the one that survives CR 400.7's new incarnation.
+--   * the turn is a LATER one, "after the current turn has ended". A strict
+--     comparison on GameState.turnNumber, plotted's clause exactly.
+--
+-- The rule fixes no window beyond that, unlike CR 702.170d's main phase: a
+-- foretold card is cast whenever its own card type could be, so nothing here
+-- narrows Cast.timingOk.
+--
+-- Not implemented: CR 601.3f -- "a player may begin to cast such a spell only if
+-- they can look at the face-down card in exile". The foretold card IS face down
+-- (CR 702.143a), and pawl grants nobody permission to look, so the gate would
+-- refuse the cast this rule permits; it is unwritten rather than written wrong
+-- (#1480). No player but the owner reaches the card in the first place, which is
+-- the conjunct above.
+permitsCastForetold :: PlayerId -> ObjectId -> GameState -> Bool
+permitsCastForetold pid oid gs = Maybe.fromMaybe False $ do
+  obj <- Game.lookupObject oid gs
+  turn <- Object.foretold obj
   pure (Object.owner obj == pid && GameState.turnNumber gs > turn)
 
 -- The objects in a castable zone that this player might cast, BEFORE any

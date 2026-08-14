@@ -46,6 +46,13 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Plot
       """ {"type":"Plot"} """
 
+  Spec.it s "Foretell" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Foretell
+      """ {"type":"Foretell"} """
+
   Spec.it s "Miracle" $
     Common.assertCodec
       s

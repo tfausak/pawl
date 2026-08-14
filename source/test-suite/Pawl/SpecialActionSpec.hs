@@ -9,6 +9,11 @@
 -- ONCE for the whole family (#875); the CR 116.2b, CR 116.2d and CR 116.2m arms
 -- retain priority the same way and are not separately re-asserted.
 --
+-- CR 116.2k's plot (Djinn of Fool's Fall) and CR 116.2h's foretell (Augury
+-- Raven) are covered here too, each with its own board: the three windows rule
+-- 116.2 states -- any priority, the owner's own turn, and sorcery speed -- are
+-- what the groups' offer cases tell apart.
+--
 -- Circling Vultures (WTH 64) is the fixture and the only producer there can be:
 -- CR 116.2e names it, so the row is closed at one card. Its upkeep ability is
 -- not here -- that clause is CR 406.2's cost component, whose gate-card cases
@@ -59,6 +64,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- bob's turn with a spell on the stack, alice holding the Vultures, a Doomed
@@ -96,6 +102,7 @@ isPlay action = case action of
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -189,6 +196,7 @@ playing wanted action = case action of
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -203,6 +211,7 @@ casting wanted action = case action of
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
   Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
   Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
 
@@ -419,12 +428,173 @@ plotting s registry = Spec.describe s "CR 116.2k Djinn of Fool's Fall" $ do
         1
       Spec.assertEqWith s "and exile is empty" (length (GameState.exile resolved)) 0
 
+-- Augury Raven (KHM 44) on alice's own precombat main, holding four Islands, the
+-- Raven and a Doomed Traveler.
+--
+-- FOUR Islands, and each pair is spent by a different rule: CR 116.2h's {2} takes
+-- two, and the Raven's foretell cost of {1}{U} takes the other two on the later
+-- turn. That is what makes the cast assertions discriminating -- the two Islands
+-- left standing are exactly the foretell cost, so a cast priced at the printed
+-- {3}{U} cannot be paid and a cast priced at nothing leaves them untapped.
+--
+-- The Traveler is the negative control -- a hand card with no foretell, so an
+-- implementation that offered the action for every hand card fails.
+foretellBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+foretellBoard island raven traveler =
+  let (ravenId, gs1) = S.addHandCard raven S.alice (S.landsInPlay island 4)
+      (travelerId, gs2) = S.addHandCard traveler S.alice gs1
+   in ( ravenId,
+        travelerId,
+        gs2
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Tap one of alice's untapped permanents, and nothing else -- the one difference
+-- between the two boards the cast's price is read off.
+tapOne :: GameState.GameState -> GameState.GameState
+tapOne gs =
+  let untapped oid = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
+   in case filter untapped (Game.zoneMembers Zone.Battlefield S.alice gs) of
+        oid : _ -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
+        [] -> gs
+
+foretelling :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+foretelling s registry = Spec.describe s "CR 116.2h Augury Raven" $ do
+  -- CR 116.2h's window is a THIRD one: "any time a player has priority DURING
+  -- THEIR TURN" -- wider than CR 116.2k's plot, which also wants a main phase and
+  -- an empty stack, and narrower than CR 116.2b's, which wants only priority. The
+  -- positive board carries a spell on the stack, so an implementation that reused
+  -- Turn.sorcerySpeedWindow fails it; the opponent's-turn board moves the one
+  -- remaining conjunct and nothing else.
+  Spec.it s "the action is offered only for a card with foretell, and only on its owner's turn" $ do
+    island <- S.printingOf s registry "Island"
+    raven <- S.printingOf s registry "Augury Raven"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (ravenId, travelerId, gs) = foretellBoard island raven traveler
+        stackBusy = snd (S.spellOnStack bolt S.alice gs)
+        opponentsTurn = stackBusy {GameState.activePlayer = S.bob}
+    Spec.assertBool s (List.elem (Action.Type.Foretell ravenId) (Action.legalActions S.alice stackBusy)) "the Raven may be foretold, with a spell on the stack"
+    Spec.assertBool s (List.notElem (Action.Type.Foretell travelerId) (Action.legalActions S.alice stackBusy)) "the Doomed Traveler may not"
+    Spec.assertBool s (List.notElem (Action.Type.Foretell ravenId) (Action.legalActions S.alice opponentsTurn)) "and not on an opponent's turn"
+  -- CR 116.2h's "may pay {2}": an action whose cost cannot be paid is not
+  -- offered. The pair differs in the mana available and in nothing else -- one
+  -- Island against the two the rule asks for.
+  Spec.it s "the action is not offered when the {2} cannot be paid" $ do
+    island <- S.printingOf s registry "Island"
+    raven <- S.printingOf s registry "Augury Raven"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (ravenId, _, gs) = foretellBoard island raven traveler
+        (poorId, poor) = case S.addHandCard raven S.alice (S.landsInPlay island 1) of
+          (oid, g) -> (oid, g {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice})
+    Spec.assertBool s (List.elem (Action.Type.Foretell ravenId) (Action.legalActions S.alice gs)) "two Islands pay {2}"
+    Spec.assertBool s (List.notElem (Action.Type.Foretell poorId) (Action.legalActions S.alice poor)) "one does not"
+  -- CR 702.143b: the action does not use the stack. The prompt log proves it the
+  -- way the plot group's does -- alice acts and is asked again before bob is
+  -- asked anything. CR 116.3's retained priority is that same sequence read the
+  -- other way, and is asserted once for the whole family in the Vultures group.
+  Spec.it s "CR 702.143b taking it exiles the card face down without using the stack" $ do
+    island <- S.printingOf s registry "Island"
+    raven <- S.printingOf s registry "Augury Raven"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (ravenId, _, gs) = foretellBoard island raven traveler
+        (asked, after) = case State.runState (Engine.runGame (takeThenPass (Action.Type.Foretell ravenId)) gs Engine.priorityLoop) [] of
+          ((_, g), log') -> (log', g)
+    Spec.assertEqWith
+      s
+      "alice acts, alice is asked again, and only then is bob asked"
+      asked
+      [S.alice, S.alice, S.bob]
+    Spec.assertEqWith
+      s
+      "the Raven is in exile"
+      (fmap (\oid -> fmap S.nameOf (Game.cardOf oid after)) (soleExile after))
+      (Just (Just (S.printingName raven)))
+    Spec.assertEqWith s "the Traveler is still in hand" (S.handSize S.alice after) 1
+    Spec.assertEqWith s "and the stack is empty" (GameState.stack after) []
+    -- CR 116.2h's own two words -- "and exile that card FACE DOWN", against CR
+    -- 406.3's face-up default.
+    Spec.assertEqWith
+      s
+      "the exiled card is face down"
+      (soleExile after >>= \oid -> fmap Object.exiledFaceDown (Game.lookupObject oid after))
+      (Just True)
+    -- CR 702.143a's foretold card, which is what the later cast is read off: an
+    -- arm that exiled the card and stamped nothing passes every assertion above.
+    Spec.assertEqWith
+      s
+      "the exiled card is foretold, stamped with this turn"
+      (soleExile after >>= \oid -> fmap Object.foretold (Game.lookupObject oid after))
+      (Just (Just (GameState.turnNumber after)))
+    -- CR 116.2h's {2}, observed rather than inferred: two of the four Islands
+    -- paid for it and two are still standing.
+    Spec.assertEqWith s "two Islands paid the {2}" (S.tappedCount S.alice after) 2
+  -- CR 702.143a: "they may cast that card AFTER THE CURRENT TURN HAS ENDED by
+  -- paying any foretell cost it has". Every board below is the state the special
+  -- action left behind, with one thing moved: the turn number, the caster, the
+  -- stamp, or one land.
+  Spec.it s "CR 702.143a the foretold card is castable only by its owner, only later, and only for the foretell cost" $ do
+    island <- S.printingOf s registry "Island"
+    raven <- S.printingOf s registry "Augury Raven"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (ravenId, _, gs) = foretellBoard island raven traveler
+        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell ravenId)) gs Engine.priorityLoop) [])
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+        unforetold = later {GameState.objects = Map.map (\o -> o {Object.foretold = Nothing}) (GameState.objects later)}
+        -- CR 307.5's window belongs to whoever's turn it is, so bob's case is
+        -- asked on bob's turn or it fails for the timing rather than for the
+        -- ownership -- the plot group's argument unchanged. bob gets two Islands
+        -- of his own on the SAME board for the same reason one rule further on:
+        -- rule 702.143a's cast is not free, so a bob with no mana would be
+        -- refused for the price rather than for the ownership. Both of bob's
+        -- boards carry them, so the pair below still differs in the owner alone.
+        bobsTurn = S.landsFor island S.bob 2 (later {GameState.activePlayer = S.bob})
+        bobOwns oid = bobsTurn {GameState.objects = Map.adjust (\o -> o {Object.owner = S.bob}) oid (GameState.objects bobsTurn)}
+    Spec.assertBool s (Maybe.isJust (soleExile after)) "the card was exiled, so the cases below are about a card in exile"
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      Spec.assertBool s (not (S.castable S.alice exiledId after)) "not on the turn it was foretold"
+      Spec.assertBool s (S.castable S.alice exiledId later) "on the next turn it is castable, off the two Islands the {2} left standing"
+      Spec.assertBool s (not (S.castable S.bob exiledId bobsTurn)) "and not by a player who does not own it"
+      Spec.assertBool s (S.castable S.bob exiledId (bobOwns exiledId)) "the control: bob's own turn and bob's own foretold card is castable, so the refusal above was the ownership"
+      Spec.assertBool s (not (S.castable S.alice exiledId unforetold)) "the control: the same card in the same exile, not foretold, is castable by nobody"
+      -- The price, from both sides. Two Islands are enough, which the printed
+      -- {3}{U} would not be; ONE is not enough, which a cast charging nothing
+      -- would be. The pair differs in a single tapped land.
+      Spec.assertBool s (not (S.castable S.alice exiledId (tapOne later))) "one Island does not pay {1}{U}, so the cast is not free"
+  -- The offer taken rather than merely asked about: the Raven reaches the
+  -- battlefield and the last two Islands go down with it, which is CR 702.143a's
+  -- "paying any foretell cost it has" observed.
+  Spec.it s "CR 702.143a casting it costs the foretell cost" $ do
+    island <- S.printingOf s registry "Island"
+    raven <- S.printingOf s registry "Augury Raven"
+    traveler <- S.printingOf s registry "Doomed Traveler"
+    let (ravenId, _, gs) = foretellBoard island raven traveler
+        after = snd (State.evalState (Engine.runGame (takeThenPass (Action.Type.Foretell ravenId)) gs Engine.priorityLoop) [])
+        later = after {GameState.turnNumber = GameState.turnNumber after + 1}
+    Monad.forM_ (soleExile after) $ \exiledId -> do
+      let resolved = S.runPure S.castAnswer later (S.cast S.alice exiledId >> Stack.resolveTop)
+      Spec.assertEqWith
+        s
+        "the Raven is on the battlefield"
+        (S.countOnBattlefieldByName (S.printingName raven) S.alice resolved)
+        1
+      Spec.assertEqWith s "exile is empty" (length (GameState.exile resolved)) 0
+      Spec.assertEqWith s "and all four Islands are tapped: {2} for the action, {1}{U} for the cast" (S.tappedCount S.alice resolved) 4
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = do
   circlingVultures s registry
   dampingEngine s registry
   leoninArbiter s registry
   plotting s registry
+  foretelling s registry
 
 -- CR 116.2d again, on the two axes Leonin Arbiter cannot reach: WHO the action is
 -- offered to (its own scope is EachPlayer, so every seat is offered it) and what
