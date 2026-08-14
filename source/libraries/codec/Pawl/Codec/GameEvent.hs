@@ -32,70 +32,37 @@ import qualified Pawl.Codec.StepBegan as StepBegan
 import qualified Pawl.Codec.VentureMarkerEntered as VentureMarkerEntered
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
-import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.GameEvent as GameEvent
 
 codec :: Codec.Codec GameEvent.GameEvent
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "Moved" Moved.codec GameEvent.Moved,
-      Arm.payload "DamageDealt" DamageEvent.codec GameEvent.DamageDealt,
-      Arm.payload "DamagePrevented" DamagePrevented.codec GameEvent.DamagePrevented,
-      Arm.payload "StepBegan" StepBegan.codec GameEvent.StepBegan,
-      Arm.payload "SpellCast" SpellWasCast.codec GameEvent.SpellCast,
-      Arm.payload "BecameMonarch" PlayerId.codec GameEvent.BecameMonarch,
-      Arm.payload "Discarded" Discarded.codec GameEvent.Discarded,
-      Arm.payload "Drew" Drew.codec GameEvent.Drew,
-      Arm.payload "AttackerDeclared" AttackerDeclared.codec GameEvent.AttackerDeclared,
-      Arm.payload "BlockerDeclared" BlockerDeclared.codec GameEvent.BlockerDeclared,
-      Arm.payload "AttackerBlocked" AttackerBlocked.codec GameEvent.AttackerBlocked,
-      Arm.payload "BlocksDeclared" BlocksDeclared.codec GameEvent.BlocksDeclared,
-      Arm.payload "Revealed" Revealed.codec GameEvent.Revealed,
-      Arm.payload "SpellCountered" Countering.codec GameEvent.SpellCountered,
-      Arm.payload "LifeLost" LifeChange.codec GameEvent.LifeLost,
-      Arm.payload "LifeGained" LifeChange.codec GameEvent.LifeGained,
-      Arm.payload "LoyaltyAbilityActivated" ObjectId.codec GameEvent.LoyaltyAbilityActivated,
-      Arm.payload "CountersPut" CounterChange.codec GameEvent.CountersPut,
-      Arm.payload "CountersRemoved" CounterChange.codec GameEvent.CountersRemoved,
-      Arm.payload "HalfUnlocked" HalfUnlocked.codec GameEvent.HalfUnlocked,
-      Arm.payload "TurnedFaceUp" ObjectId.codec GameEvent.TurnedFaceUp,
-      Arm.payload "BecameDesignated" BecameDesignated.codec GameEvent.BecameDesignated,
-      Arm.payload "Evolved" ObjectId.codec GameEvent.Evolved,
-      Arm.payload "Mentored" Mentored.codec GameEvent.Mentored,
-      Arm.payload "PermanentSacrificed" PermanentSacrificed.codec GameEvent.PermanentSacrificed,
-      Arm.payload "AbilityTriggered" AbilityTriggered.codec GameEvent.AbilityTriggered,
-      Arm.payload "ControlChanged" ControlChanged.codec GameEvent.ControlChanged,
-      Arm.payload "VentureMarkerEntered" VentureMarkerEntered.codec GameEvent.VentureMarkerEntered
+    [ Arm.payload "Moved" Moved.codec GameEvent.Moved (\x -> case x of GameEvent.Moved y -> Just y; _ -> Nothing),
+      Arm.payload "DamageDealt" DamageEvent.codec GameEvent.DamageDealt (\x -> case x of GameEvent.DamageDealt y -> Just y; _ -> Nothing),
+      Arm.payload "DamagePrevented" DamagePrevented.codec GameEvent.DamagePrevented (\x -> case x of GameEvent.DamagePrevented y -> Just y; _ -> Nothing),
+      Arm.payload "StepBegan" StepBegan.codec GameEvent.StepBegan (\x -> case x of GameEvent.StepBegan y -> Just y; _ -> Nothing),
+      Arm.payload "SpellCast" SpellWasCast.codec GameEvent.SpellCast (\x -> case x of GameEvent.SpellCast y -> Just y; _ -> Nothing),
+      Arm.payload "BecameMonarch" PlayerId.codec GameEvent.BecameMonarch (\x -> case x of GameEvent.BecameMonarch y -> Just y; _ -> Nothing),
+      Arm.payload "Discarded" Discarded.codec GameEvent.Discarded (\x -> case x of GameEvent.Discarded y -> Just y; _ -> Nothing),
+      Arm.payload "Drew" Drew.codec GameEvent.Drew (\x -> case x of GameEvent.Drew y -> Just y; _ -> Nothing),
+      Arm.payload "AttackerDeclared" AttackerDeclared.codec GameEvent.AttackerDeclared (\x -> case x of GameEvent.AttackerDeclared y -> Just y; _ -> Nothing),
+      Arm.payload "BlockerDeclared" BlockerDeclared.codec GameEvent.BlockerDeclared (\x -> case x of GameEvent.BlockerDeclared y -> Just y; _ -> Nothing),
+      Arm.payload "AttackerBlocked" AttackerBlocked.codec GameEvent.AttackerBlocked (\x -> case x of GameEvent.AttackerBlocked y -> Just y; _ -> Nothing),
+      Arm.payload "BlocksDeclared" BlocksDeclared.codec GameEvent.BlocksDeclared (\x -> case x of GameEvent.BlocksDeclared y -> Just y; _ -> Nothing),
+      Arm.payload "Revealed" Revealed.codec GameEvent.Revealed (\x -> case x of GameEvent.Revealed y -> Just y; _ -> Nothing),
+      Arm.payload "SpellCountered" Countering.codec GameEvent.SpellCountered (\x -> case x of GameEvent.SpellCountered y -> Just y; _ -> Nothing),
+      Arm.payload "LifeLost" LifeChange.codec GameEvent.LifeLost (\x -> case x of GameEvent.LifeLost y -> Just y; _ -> Nothing),
+      Arm.payload "LifeGained" LifeChange.codec GameEvent.LifeGained (\x -> case x of GameEvent.LifeGained y -> Just y; _ -> Nothing),
+      Arm.payload "LoyaltyAbilityActivated" ObjectId.codec GameEvent.LoyaltyAbilityActivated (\x -> case x of GameEvent.LoyaltyAbilityActivated y -> Just y; _ -> Nothing),
+      Arm.payload "CountersPut" CounterChange.codec GameEvent.CountersPut (\x -> case x of GameEvent.CountersPut y -> Just y; _ -> Nothing),
+      Arm.payload "CountersRemoved" CounterChange.codec GameEvent.CountersRemoved (\x -> case x of GameEvent.CountersRemoved y -> Just y; _ -> Nothing),
+      Arm.payload "HalfUnlocked" HalfUnlocked.codec GameEvent.HalfUnlocked (\x -> case x of GameEvent.HalfUnlocked y -> Just y; _ -> Nothing),
+      Arm.payload "TurnedFaceUp" ObjectId.codec GameEvent.TurnedFaceUp (\x -> case x of GameEvent.TurnedFaceUp y -> Just y; _ -> Nothing),
+      Arm.payload "BecameDesignated" BecameDesignated.codec GameEvent.BecameDesignated (\x -> case x of GameEvent.BecameDesignated y -> Just y; _ -> Nothing),
+      Arm.payload "Evolved" ObjectId.codec GameEvent.Evolved (\x -> case x of GameEvent.Evolved y -> Just y; _ -> Nothing),
+      Arm.payload "Mentored" Mentored.codec GameEvent.Mentored (\x -> case x of GameEvent.Mentored y -> Just y; _ -> Nothing),
+      Arm.payload "PermanentSacrificed" PermanentSacrificed.codec GameEvent.PermanentSacrificed (\x -> case x of GameEvent.PermanentSacrificed y -> Just y; _ -> Nothing),
+      Arm.payload "AbilityTriggered" AbilityTriggered.codec GameEvent.AbilityTriggered (\x -> case x of GameEvent.AbilityTriggered y -> Just y; _ -> Nothing),
+      Arm.payload "ControlChanged" ControlChanged.codec GameEvent.ControlChanged (\x -> case x of GameEvent.ControlChanged y -> Just y; _ -> Nothing),
+      Arm.payload "VentureMarkerEntered" VentureMarkerEntered.codec GameEvent.VentureMarkerEntered (\x -> case x of GameEvent.VentureMarkerEntered y -> Just y; _ -> Nothing)
     ]
-  where
-    tag t = Common.tagged t . Just
-    encode e = case e of
-      GameEvent.Moved x -> tag "Moved" $ Codec.encode Moved.codec x
-      GameEvent.DamageDealt x -> tag "DamageDealt" $ Codec.encode DamageEvent.codec x
-      GameEvent.DamagePrevented x -> tag "DamagePrevented" $ Codec.encode DamagePrevented.codec x
-      GameEvent.StepBegan x -> tag "StepBegan" $ Codec.encode StepBegan.codec x
-      GameEvent.SpellCast x -> tag "SpellCast" $ Codec.encode SpellWasCast.codec x
-      GameEvent.BecameMonarch x -> tag "BecameMonarch" $ Codec.encode PlayerId.codec x
-      GameEvent.Discarded x -> tag "Discarded" $ Codec.encode Discarded.codec x
-      GameEvent.Drew x -> tag "Drew" $ Codec.encode Drew.codec x
-      GameEvent.AttackerDeclared x -> tag "AttackerDeclared" $ Codec.encode AttackerDeclared.codec x
-      GameEvent.BlockerDeclared x -> tag "BlockerDeclared" $ Codec.encode BlockerDeclared.codec x
-      GameEvent.AttackerBlocked x -> tag "AttackerBlocked" $ Codec.encode AttackerBlocked.codec x
-      GameEvent.BlocksDeclared x -> tag "BlocksDeclared" $ Codec.encode BlocksDeclared.codec x
-      GameEvent.Revealed x -> tag "Revealed" $ Codec.encode Revealed.codec x
-      GameEvent.SpellCountered x -> tag "SpellCountered" $ Codec.encode Countering.codec x
-      GameEvent.LifeLost x -> tag "LifeLost" $ Codec.encode LifeChange.codec x
-      GameEvent.LifeGained x -> tag "LifeGained" $ Codec.encode LifeChange.codec x
-      GameEvent.LoyaltyAbilityActivated x -> tag "LoyaltyAbilityActivated" $ Codec.encode ObjectId.codec x
-      GameEvent.CountersPut x -> tag "CountersPut" $ Codec.encode CounterChange.codec x
-      GameEvent.CountersRemoved x -> tag "CountersRemoved" $ Codec.encode CounterChange.codec x
-      GameEvent.HalfUnlocked x -> tag "HalfUnlocked" $ Codec.encode HalfUnlocked.codec x
-      GameEvent.TurnedFaceUp x -> tag "TurnedFaceUp" $ Codec.encode ObjectId.codec x
-      GameEvent.BecameDesignated x -> tag "BecameDesignated" $ Codec.encode BecameDesignated.codec x
-      GameEvent.Evolved x -> tag "Evolved" $ Codec.encode ObjectId.codec x
-      GameEvent.Mentored x -> tag "Mentored" $ Codec.encode Mentored.codec x
-      GameEvent.PermanentSacrificed x -> tag "PermanentSacrificed" $ Codec.encode PermanentSacrificed.codec x
-      GameEvent.AbilityTriggered x -> tag "AbilityTriggered" $ Codec.encode AbilityTriggered.codec x
-      GameEvent.ControlChanged x -> tag "ControlChanged" $ Codec.encode ControlChanged.codec x
-      GameEvent.VentureMarkerEntered x -> tag "VentureMarkerEntered" $ Codec.encode VentureMarkerEntered.codec x

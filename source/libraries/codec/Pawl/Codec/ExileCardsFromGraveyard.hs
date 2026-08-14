@@ -12,7 +12,7 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 -- | A bare object keyed by the record's field names, replacing the two-element
 -- array this payload used to be (#1464). The keyword codec is a PARAMETER; see
 -- Pawl.Codec.Filter's header.
-codec :: (Typeable.Typeable keyword) => Codec.Codec keyword -> Codec.Codec (ExileCardsFromGraveyard.ExileCardsFromGraveyard keyword)
+codec :: (Typeable.Typeable keyword, Eq keyword) => Codec.Codec keyword -> Codec.Codec (ExileCardsFromGraveyard.ExileCardsFromGraveyard keyword)
 codec keywordCodec = Fields.object $ do
   count <- Fields.required "count" Common.natural ExileCardsFromGraveyard.count
   whichCards <- Fields.required "whichCards" (Filter.codec keywordCodec) ExileCardsFromGraveyard.whichCards

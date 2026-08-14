@@ -11,19 +11,10 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 codec :: Codec.Codec DamageRewrite.DamageRewrite
 codec =
   Arm.tagged
-    encode
     [ Arm.nullary "PreventAll" DamageRewrite.PreventAll,
       Arm.nullary "PreventRemovingShieldCounter" DamageRewrite.PreventRemovingShieldCounter,
-      Arm.payload "PreventNext" Common.natural DamageRewrite.PreventNext,
-      Arm.payload "SetAmount" Common.natural DamageRewrite.SetAmount,
-      Arm.payload "Scale" Scaling.codec DamageRewrite.Scale,
-      Arm.payload "Redirect" Recipient.codec DamageRewrite.Redirect
+      Arm.payload "PreventNext" Common.natural DamageRewrite.PreventNext (\x -> case x of DamageRewrite.PreventNext y -> Just y; _ -> Nothing),
+      Arm.payload "SetAmount" Common.natural DamageRewrite.SetAmount (\x -> case x of DamageRewrite.SetAmount y -> Just y; _ -> Nothing),
+      Arm.payload "Scale" Scaling.codec DamageRewrite.Scale (\x -> case x of DamageRewrite.Scale y -> Just y; _ -> Nothing),
+      Arm.payload "Redirect" Recipient.codec DamageRewrite.Redirect (\x -> case x of DamageRewrite.Redirect y -> Just y; _ -> Nothing)
     ]
-  where
-    encode r = case r of
-      DamageRewrite.PreventAll -> Common.nullary "PreventAll"
-      DamageRewrite.PreventRemovingShieldCounter -> Common.nullary "PreventRemovingShieldCounter"
-      DamageRewrite.PreventNext n -> Common.tagged "PreventNext" . Just $ Codec.encode Common.natural n
-      DamageRewrite.SetAmount n -> Common.tagged "SetAmount" . Just $ Codec.encode Common.natural n
-      DamageRewrite.Scale s -> Common.tagged "Scale" . Just $ Codec.encode Scaling.codec s
-      DamageRewrite.Redirect recipient -> Common.tagged "Redirect" . Just $ Codec.encode Recipient.codec recipient

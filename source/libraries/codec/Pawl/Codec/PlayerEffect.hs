@@ -19,50 +19,27 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect
 codec :: Codec.Codec PlayerEffect.PlayerEffect
 codec =
   Arm.tagged
-    encode
     [ Arm.nullary "CantCastSpells" PlayerEffect.CantCastSpells,
-      Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan,
+      Arm.payload "CantCastMoreThan" Common.natural PlayerEffect.CantCastMoreThan (\x -> case x of PlayerEffect.CantCastMoreThan y -> Just y; _ -> Nothing),
       Arm.nullary "CantCastChosenName" PlayerEffect.CantCastChosenName,
       Arm.nullary "CantPlayLandChosenName" PlayerEffect.CantPlayLandChosenName,
-      Arm.payload "IncreaseSpellCost" IncreaseSpellCost.codec PlayerEffect.IncreaseSpellCost,
-      Arm.payload "ReduceSpellCost" ReduceSpellCost.codec PlayerEffect.ReduceSpellCost,
-      Arm.payload "ReduceActivationCost" ReduceActivationCost.codec PlayerEffect.ReduceActivationCost,
-      Arm.payload "AddActivationCost" AddActivationCost.codec PlayerEffect.AddActivationCost,
-      Arm.payload "PlayAdditionalLands" Common.natural PlayerEffect.PlayAdditionalLands,
+      Arm.payload "IncreaseSpellCost" IncreaseSpellCost.codec PlayerEffect.IncreaseSpellCost (\x -> case x of PlayerEffect.IncreaseSpellCost y -> Just y; _ -> Nothing),
+      Arm.payload "ReduceSpellCost" ReduceSpellCost.codec PlayerEffect.ReduceSpellCost (\x -> case x of PlayerEffect.ReduceSpellCost y -> Just y; _ -> Nothing),
+      Arm.payload "ReduceActivationCost" ReduceActivationCost.codec PlayerEffect.ReduceActivationCost (\x -> case x of PlayerEffect.ReduceActivationCost y -> Just y; _ -> Nothing),
+      Arm.payload "AddActivationCost" AddActivationCost.codec PlayerEffect.AddActivationCost (\x -> case x of PlayerEffect.AddActivationCost y -> Just y; _ -> Nothing),
+      Arm.payload "PlayAdditionalLands" Common.natural PlayerEffect.PlayAdditionalLands (\x -> case x of PlayerEffect.PlayAdditionalLands y -> Just y; _ -> Nothing),
       Arm.nullary "NoMaximumHandSize" PlayerEffect.NoMaximumHandSize,
-      Arm.payload "SetMaximumHandSize" Common.natural PlayerEffect.SetMaximumHandSize,
-      Arm.payload "DontLoseUnspentMana" ManaFilter.codec PlayerEffect.DontLoseUnspentMana,
-      Arm.payload "CantBeTargetedBy" PlayerScope.codec PlayerEffect.CantBeTargetedBy,
-      Arm.payload "CastAsThoughItHadFlash" filterCodec PlayerEffect.CastAsThoughItHadFlash,
-      Arm.payload "CantBeCountered" filterCodec PlayerEffect.CantBeCountered,
-      Arm.payload "DamageCantBePrevented" DamagePattern.codec PlayerEffect.DamageCantBePrevented,
+      Arm.payload "SetMaximumHandSize" Common.natural PlayerEffect.SetMaximumHandSize (\x -> case x of PlayerEffect.SetMaximumHandSize y -> Just y; _ -> Nothing),
+      Arm.payload "DontLoseUnspentMana" ManaFilter.codec PlayerEffect.DontLoseUnspentMana (\x -> case x of PlayerEffect.DontLoseUnspentMana y -> Just y; _ -> Nothing),
+      Arm.payload "CantBeTargetedBy" PlayerScope.codec PlayerEffect.CantBeTargetedBy (\x -> case x of PlayerEffect.CantBeTargetedBy y -> Just y; _ -> Nothing),
+      Arm.payload "CastAsThoughItHadFlash" filterCodec PlayerEffect.CastAsThoughItHadFlash (\x -> case x of PlayerEffect.CastAsThoughItHadFlash y -> Just y; _ -> Nothing),
+      Arm.payload "CantBeCountered" filterCodec PlayerEffect.CantBeCountered (\x -> case x of PlayerEffect.CantBeCountered y -> Just y; _ -> Nothing),
+      Arm.payload "DamageCantBePrevented" DamagePattern.codec PlayerEffect.DamageCantBePrevented (\x -> case x of PlayerEffect.DamageCantBePrevented y -> Just y; _ -> Nothing),
       Arm.nullary "CantSearchLibraries" PlayerEffect.CantSearchLibraries,
       Arm.nullary "CantBecomeMonarch" PlayerEffect.CantBecomeMonarch,
-      Arm.payload "CantCastMatching" filterCodec PlayerEffect.CantCastMatching,
+      Arm.payload "CantCastMatching" filterCodec PlayerEffect.CantCastMatching (\x -> case x of PlayerEffect.CantCastMatching y -> Just y; _ -> Nothing),
       Arm.nullary "CantPlayLands" PlayerEffect.CantPlayLands,
-      Arm.payload "CastFromGraveyard" filterCodec PlayerEffect.CastFromGraveyard
+      Arm.payload "CastFromGraveyard" filterCodec PlayerEffect.CastFromGraveyard (\x -> case x of PlayerEffect.CastFromGraveyard y -> Just y; _ -> Nothing)
     ]
   where
     filterCodec = Filter.codec Keyword.codec
-    encode e = case e of
-      PlayerEffect.CantCastSpells -> Common.nullary "CantCastSpells"
-      PlayerEffect.CantCastMoreThan n -> Common.tagged "CantCastMoreThan" . Just $ Codec.encode Common.natural n
-      PlayerEffect.CantCastChosenName -> Common.nullary "CantCastChosenName"
-      PlayerEffect.CantPlayLandChosenName -> Common.nullary "CantPlayLandChosenName"
-      PlayerEffect.IncreaseSpellCost x -> Common.tagged "IncreaseSpellCost" . Just $ Codec.encode IncreaseSpellCost.codec x
-      PlayerEffect.ReduceSpellCost x -> Common.tagged "ReduceSpellCost" . Just $ Codec.encode ReduceSpellCost.codec x
-      PlayerEffect.ReduceActivationCost x -> Common.tagged "ReduceActivationCost" . Just $ Codec.encode ReduceActivationCost.codec x
-      PlayerEffect.AddActivationCost x -> Common.tagged "AddActivationCost" . Just $ Codec.encode AddActivationCost.codec x
-      PlayerEffect.PlayAdditionalLands n -> Common.tagged "PlayAdditionalLands" . Just $ Codec.encode Common.natural n
-      PlayerEffect.NoMaximumHandSize -> Common.nullary "NoMaximumHandSize"
-      PlayerEffect.SetMaximumHandSize n -> Common.tagged "SetMaximumHandSize" . Just $ Codec.encode Common.natural n
-      PlayerEffect.DontLoseUnspentMana f -> Common.tagged "DontLoseUnspentMana" . Just $ Codec.encode ManaFilter.codec f
-      PlayerEffect.CantBeTargetedBy sc -> Common.tagged "CantBeTargetedBy" . Just $ Codec.encode PlayerScope.codec sc
-      PlayerEffect.CastAsThoughItHadFlash c -> Common.tagged "CastAsThoughItHadFlash" . Just $ Codec.encode filterCodec c
-      PlayerEffect.CantBeCountered c -> Common.tagged "CantBeCountered" . Just $ Codec.encode filterCodec c
-      PlayerEffect.DamageCantBePrevented p -> Common.tagged "DamageCantBePrevented" . Just $ Codec.encode DamagePattern.codec p
-      PlayerEffect.CantSearchLibraries -> Common.nullary "CantSearchLibraries"
-      PlayerEffect.CantBecomeMonarch -> Common.nullary "CantBecomeMonarch"
-      PlayerEffect.CantCastMatching c -> Common.tagged "CantCastMatching" . Just $ Codec.encode filterCodec c
-      PlayerEffect.CantPlayLands -> Common.nullary "CantPlayLands"
-      PlayerEffect.CastFromGraveyard c -> Common.tagged "CastFromGraveyard" . Just $ Codec.encode filterCodec c

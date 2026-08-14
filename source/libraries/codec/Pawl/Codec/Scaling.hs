@@ -8,13 +8,7 @@ import qualified Pawl.Types.Scaling as Scaling
 codec :: Codec.Codec Scaling.Scaling
 codec =
   Arm.tagged
-    encode
-    [ Arm.payload "Multiply" Common.natural Scaling.Multiply,
-      Arm.payload "AddMore" Common.natural Scaling.AddMore,
+    [ Arm.payload "Multiply" Common.natural Scaling.Multiply (\x -> case x of Scaling.Multiply y -> Just y; _ -> Nothing),
+      Arm.payload "AddMore" Common.natural Scaling.AddMore (\x -> case x of Scaling.AddMore y -> Just y; _ -> Nothing),
       Arm.nullary "Halve" Scaling.Halve
     ]
-  where
-    encode s = case s of
-      Scaling.Multiply n -> Common.tagged "Multiply" . Just $ Codec.encode Common.natural n
-      Scaling.AddMore n -> Common.tagged "AddMore" . Just $ Codec.encode Common.natural n
-      Scaling.Halve -> Common.nullary "Halve"
