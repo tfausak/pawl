@@ -11,6 +11,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Codec.Subtype as Subtype
@@ -2012,6 +2013,9 @@ objectRefFilters ref = case ref of
   -- PlayerScope names players rather than characteristics, so the Filter is the
   -- whole of what there is to lint.
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard _ f) -> [f]
+  -- Ignorant Bliss' "all cards from your hand" holds none either: CR 400.2
+  -- makes a hand hidden, so the arm carries no Filter to lint.
+  ObjectRef.EachCardInYourHand -> []
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it holds
@@ -3793,9 +3797,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- So the shape a card must not author is a singular read of a slot a move that
   -- may take SEVERAL cards bound: it would silently name nothing rather than
-  -- fail. The two singular readers are Effect.OfferCast and a MoveToZone whose
-  -- own ref is an InSlot; every other reader goes through
-  -- Resolve.objectRefObjects, which reads the group.
+  -- fail. Effect.OfferCast is the ONE singular reader -- Resolve.offerCast asks
+  -- slotOne and nothing else. A MoveToZone whose own ref is an InSlot is not
+  -- one, despite reading the slot by hand rather than through
+  -- Resolve.objectRefObjects: its branch asks slotGroup FIRST and moves every
+  -- member, which is Feral Lightning's "exile them" and Ignorant Bliss' "return
+  -- those cards to your hand".
   Spec.it s "no card reads a slot a plural move bound with a singular reader" $ do
     ps <- S.allPrintings s
     let -- The refs that move at most ONE object, and so bind the singular shape
@@ -3807,6 +3814,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.InSlot _ -> True
           ObjectRef.EachMatching _ -> False
           ObjectRef.EachCardInGraveyard {} -> False
+          ObjectRef.EachCardInYourHand -> False
           ObjectRef.EachPlayer -> False
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
             depth <= 1 && case player of
@@ -3838,7 +3846,6 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> []
         readSingly effect = case effect of
           Effect.OfferCast (OfferCast.MkOfferCast slot _) -> [slot]
-          Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.InSlot slot) _ _ _ _ _) -> [slot]
           _ -> []
         clashes effects =
           not
@@ -3850,11 +3857,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         binds effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) -> Maybe.isJust mSlot && not (movesAtMostOne ref)
           _ -> False
-    -- Both halves of the rejected shape are in the pool separately, so the sweep
-    -- is not vacuous: Act on Impulse binds a group, and Befriending the Moths
-    -- offers a cast from a slot its own move bound.
+        exiledSlot = SlotName.MkSlotName (Text.pack "exiled")
+    -- Half the rejected shape is in the pool: Act on Impulse binds a group. The
+    -- OTHER half is not, and cannot be -- no card prints an OfferCast at all,
+    -- since the only writer of that opcode is Pawl.Engine.Battle's CR 310.11b
+    -- offer, which the engine bakes. So the REJECTING direction is proven here
+    -- against a hand-built pair rather than by a corpus sweep, the posture the
+    -- phase-skip lint below takes against Eon Hub, and the sweep is a fence
+    -- against a future card authoring the shape.
     Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what a plural move minted"
-    Spec.assertBool s (any (anyFace (not . all (null . readSingly) . cardResolutionEffects) . Printing.card) ps) "and a card reading a bound slot singly"
+    Spec.assertBool
+      s
+      ( clashes
+          [ Effect.MoveToZone (MoveToZone.MkMoveToZone (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature)) Zone.Exile EntryRiders.defaultValue (Just exiledSlot) Nothing LibraryPlacement.defaultValue),
+            Effect.OfferCast (OfferCast.MkOfferCast exiledSlot CastOffer.defaultValue)
+          ]
+      )
+      "a singular read of a plurally bound slot is caught"
     Spec.assertEqWith s "a group binding is invisible to a singular reader" (fmap (S.nameOf . Printing.card) offenders) []
   -- OwnerChooses asks a player which END of a library a card arrives at (CR
   -- 401.2), and only a library HAS ends -- so on any other destination it would
@@ -3874,6 +3893,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- would pass whatever a card said. Aetherspouts is the card that prints one.
     Spec.assertBool s (any (anyFace (any asks . cardResolutionEffects) . Printing.card) ps) "the pool has a card leaving the end to each owner"
     Spec.assertEqWith s "only a library has ends" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 406.3's rider is a rule about the EXILE ZONE, so on any other destination
+  -- it is inert card data, and on a Create it is inert twice over -- a token
+  -- created into exile ceases to exist (CR 111.7). Event.changeZoneAttaching
+  -- gates on the destination, so this lints an authoring mistake rather than
+  -- guarding the engine.
+  Spec.it s "no effect exiles face down anywhere but exile" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> EntryRiders.exiledFaceDown riders && zone /= Zone.Exile
+          Effect.Create (Create.MkCreate _ _ riders _) -> EntryRiders.exiledFaceDown riders
+          _ -> False
+        hides effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.exiledFaceDown riders
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no face-down exile in the pool at all
+    -- this would pass whatever a card said. Ignorant Bliss is the card that
+    -- prints one.
+    Spec.assertBool s (any (anyFace (any hides . cardResolutionEffects) . Printing.card) ps) "the pool has a card exiling face down"
+    Spec.assertEqWith s "only exile keeps a card face down (CR 406.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
   -- the codec accepts. See phasePatternOffends for why a card cannot name a
   -- player, and for why this is a lint rather than a type split (#437).

@@ -58,6 +58,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
     ObjectRef.EachMatching _ -> Nothing
     ObjectRef.EachCardInGraveyard {} -> Nothing
+    ObjectRef.EachCardInYourHand -> Nothing
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing

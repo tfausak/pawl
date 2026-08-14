@@ -710,8 +710,8 @@ data Keyword
     -- FACE UP, because rule 702.115a says only "exiles": CR 406.3 makes an exiled
     -- card face up unless the effect says otherwise, and this one does not.
     -- Culling Drone's printed reminder text is rule 702.115a verbatim and says
-    -- nothing about face down either, so pawl's lack of a face-down exile (#557)
-    -- is not in this keyword's way.
+    -- nothing about face down either, so the mint carries EntryRiders' default
+    -- rather than the exiledFaceDown rider Ignorant Bliss sets.
     --
     -- Payload-free, because rule 702.115a takes no parameter, so no
     -- Pawl.Types.KeywordFamily constructor is owed. CR 702.115b says each instance

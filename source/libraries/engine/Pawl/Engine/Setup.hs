@@ -160,6 +160,7 @@ createCard pid printing = do
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
+            Object.exiledFaceDown = False,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,

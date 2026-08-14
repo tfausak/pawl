@@ -256,6 +256,7 @@ import qualified Pawl.DepartureSpec
 import qualified Pawl.DungeonSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EventSpec
+import qualified Pawl.ExileSpec
 import qualified Pawl.ExpirySpec
 import qualified Pawl.Extra.BuilderSpec
 import qualified Pawl.Extra.EitherSpec
@@ -628,6 +629,7 @@ spec s registry = do
   Pawl.DecimalSpec.spec s
   Pawl.DepartureSpec.spec s registry
   Pawl.EventSpec.spec s registry
+  Pawl.ExileSpec.spec s registry
   Pawl.ExpirySpec.spec s registry
   Pawl.Extra.BuilderSpec.spec s
   Pawl.Extra.EitherSpec.spec s

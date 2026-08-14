@@ -1189,6 +1189,7 @@ test-suite pawl-test-suite
     Pawl.DungeonSpec
     Pawl.EngineSpec
     Pawl.EventSpec
+    Pawl.ExileSpec
     Pawl.ExpirySpec
     Pawl.FaceDownSpec
     Pawl.FilterSpec

@@ -16,8 +16,12 @@ import qualified Pawl.Types.TapState as TapState
 -- with the same text can enter differently, and one printed card can be returned
 -- tapped by one effect and untapped by another.
 --
--- Meaningful only for a BATTLEFIELD entry (CR 110.5d, CR 712.14a); a MoveToZone
--- naming any other zone carries the default and no rider is applied to it.
+-- Each rider is meaningful only in the zone its own rule scopes it to, and every
+-- other destination carries the default: `tapped`, `attacking`, `transformed`
+-- `counters`, `transformed` and `underOwner` are battlefield-only (CR 110.5d, CR
+-- 508.4, CR 122.6a, CR 712.14a, CR 110.2a) and `exiledFaceDown` is exile-only
+-- (CR 406.3). A card stating one on the wrong
+-- zone states something nothing reads, which Pawl.CardSpec lints.
 --
 -- Independent riders, not one flag, because the rules make them independent.
 -- Tapped is CR 110.5's status category, defaulted by CR 110.5b.
@@ -94,11 +98,20 @@ import qualified Pawl.Types.TapState as TapState
 -- the funnel already knows; a card cannot write a PlayerId anyway. Inert under a
 -- Create, and correctly so: CR 111.2 makes a token's owner the player who created
 -- it, which is who CR 110.2a hands it to regardless.
+-- `exiledFaceDown` is CR 406.3's "cards 'exiled face down'", said by the EFFECT
+-- that does the exiling -- Ignorant Bliss' "exile all cards from your hand face
+-- down" -- against that rule's face-up default. A rider and not a second write
+-- afterwards for `tapped`'s reason: the card must never sit face up in exile for
+-- an instant, where the Moved event and any CR 616.1 watcher would read it.
+--
+-- A rider on the MOVE and not a status on the card, because CR 110.5d denies an
+-- exiled card status at all; Object.exiledFaceDown says what it is instead.
 data EntryRiders = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Bool,
     transformed :: Bool,
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural,
-    underOwner :: Bool
+    underOwner :: Bool,
+    exiledFaceDown :: Bool
   }
   deriving (Eq, Ord, Show)
