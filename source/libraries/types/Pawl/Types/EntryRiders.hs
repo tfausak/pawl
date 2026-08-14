@@ -20,7 +20,8 @@ import qualified Pawl.Types.TapState as TapState
 -- Each rider is meaningful only in the zone its own rule scopes it to, and every
 -- other destination carries the default: `tapped`, `attacking`, `counters`,
 -- `transformed` and `underOwner` are battlefield-only (CR 110.5d, CR 508.4, CR
--- 122.6a, CR 712.14a, CR 110.2a), and `exiledFaceDown` is exile-only (CR 406.3).
+-- 122.6a, CR 712.14a, CR 110.2a), `exiledFaceDown` is exile-only (CR 406.3),
+-- and `faceDown` is battlefield-only (CR 708.3).
 -- A card stating one on the wrong zone states something nothing reads, which
 -- Pawl.CardSpec lints.
 --
@@ -107,12 +108,46 @@ import qualified Pawl.Types.TapState as TapState
 --
 -- A rider on the MOVE and not a status on the card, because CR 110.5d denies an
 -- exiled card status at all; Object.exiledFaceDown says what it is instead.
+--
+-- `faceDown` is CR 708.3's "objects that are put onto the battlefield face
+-- down", said by the EFFECT that does the putting -- Soul Summons' "manifest the
+-- top card of your library" (CR 701.40a) -- against CR 110.5b's face-up default.
+-- A rider and not a write after the move for `exiledFaceDown`'s reason and one
+-- of its own: CR 708.3 says the object is turned face down BEFORE it enters, so
+-- the CR 614.1c entry loop, the CR 603.2g Moved event and every trigger scanning
+-- it must all see a permanent that already has CR 708.2a's characteristics. A
+-- permanent turned face down after arriving would have fired its own
+-- enters-the-battlefield trigger on the way in, which is the one thing the rule
+-- exists to forbid.
+--
+-- The OPPOSITE POLARITY to `exiledFaceDown`, one field over, and the two are not
+-- one flag: CR 110.5d says an exiled card's face-downness "has no correlation to
+-- the face-down status of a permanent". This one writes Object.facing, which CR
+-- 708.2a spends on a wholesale substitution of characteristics; that one writes
+-- Object.exiledFaceDown, which is about who may look. An effect that set both
+-- would be saying two unrelated things, and no zone reads both.
+--
+-- Applied by Pawl.Engine.Event.changeZoneEntering, which is also where the
+-- battlefield gate lives -- a card stating it on a move anywhere else says
+-- something no rule reads, which Pawl.CardSpec lints.
+--
+-- Read by MoveToZone alone, like `transformed`: a token is created face up and
+-- no rule puts one onto the battlefield face down, so Pawl.Engine.Resolve's
+-- Create arm does not read it and the same CardSpec lint holds that no Create in
+-- the pool sets it.
+--
+-- Not implemented: manifested-ness as state (CR 701.40a's "that permanent is a
+-- manifested permanent"), so a permanent put onto the battlefield face down by
+-- this rider cannot be turned face up for its mana cost (#1540). A Bool and not
+-- a choice of listed characteristics, which is what CR 701.58a's cloak would
+-- need -- a 2/2 with ward {2} -- and that second face is #922.
 data EntryRiders = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Bool,
     transformed :: Bool,
     counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural,
     underOwner :: Bool,
-    exiledFaceDown :: Bool
+    exiledFaceDown :: Bool,
+    faceDown :: Bool
   }
   deriving (Eq, Ord, Show)

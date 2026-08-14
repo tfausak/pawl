@@ -286,7 +286,7 @@ siegeDefeat =
         ( MoveToZone.MkMoveToZone
             (ObjectRef.InSlot Binding.triggerSource)
             Zone.Exile
-            EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False}
+            EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
             (Just Binding.became)
             Nothing
             LibraryPlacement.defaultValue

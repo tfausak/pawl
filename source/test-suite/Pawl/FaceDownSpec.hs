@@ -74,6 +74,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -89,11 +90,13 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
@@ -107,6 +110,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "FaceDown" $ do
@@ -115,6 +119,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnFaceUpSpec s registry
   turnUpAttachSpec s registry
   turnFaceDownSpec s registry
+  manifestSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
 --
@@ -951,6 +956,103 @@ giftDestinationFilter printing =
   case Face.replacementEffects (S.combinedFace printing) of
     [ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo f))] -> Just f
     _ -> Nothing
+
+-- CR 701.40a / 708.3: a permanent PUT onto the battlefield face down, which is
+-- the other half of rule 708 from the morph cast above -- the object never
+-- passes through the stack, so nothing in castSpec's route touches it.
+manifestSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+manifestSpec s registry = Spec.describe s "Manifest" $ do
+  -- THE PROVING TEST, gameplay level: alice casts Soul Summons off two Plains
+  -- and the top card of her library is on the battlefield as CR 708.2a's 2/2.
+  -- The POSITIVE facts are pinned first and deliberately -- a permanent on the
+  -- battlefield, the library one card shorter -- because the CR 708.3 assertion
+  -- below is an ABSENCE, and an absence passes for free on a board where the
+  -- manifest never happened at all.
+  Spec.it s "CR 701.40a manifest puts the top card of the library onto the battlefield as a 2/2" $ do
+    (before, after, topId) <- summonsBoard s registry
+    case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before)) of
+      [permanent] -> do
+        Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 5/3" (S.powerToughnessOf permanent after) (Just (2, 2))
+        Spec.assertEqWith s "CR 708.2a no name, not Thragtusk" (Projection.namesOf permanent after) noNames
+        Spec.assertEqWith s "CR 708.2a no subtypes, not Beast" (Projection.subtypesOf permanent after) Set.empty
+        Spec.assertEqWith s "CR 110.5 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceDown)
+        -- CR 400.7: the card that left the library is gone, and the permanent is
+        -- a new incarnation of it rather than the same object relabelled.
+        Spec.assertBool s (permanent /= topId) "the permanent is a new incarnation (CR 400.7)"
+      permanents -> Spec.assertFailure s ("expected exactly one new permanent, got " <> show (length permanents))
+    Spec.assertEqWith s "one card left the library" (length (Game.zoneMembers Zone.Library S.alice after)) (length (Game.zoneMembers Zone.Library S.alice before) - 1)
+    Spec.assertBool s (notElem topId (Game.zoneMembers Zone.Library S.alice after)) "and it was the top one"
+
+  -- CR 708.3, the rule this unit exists for: "objects that are put onto the
+  -- battlefield face down are turned face down before they enter the
+  -- battlefield, so the permanent's enters-the-battlefield abilities won't
+  -- trigger". Thragtusk's is "when this creature enters, you gain 5 life", so
+  -- the rule is a life total that did not move.
+  --
+  -- Read through the whole priority loop, so a trigger that had been placed
+  -- would have resolved by now rather than sitting unresolved on a stack this
+  -- assertion does not look at.
+  Spec.it s "CR 708.3 the manifested card's enters-the-battlefield ability does not trigger" $ do
+    (_, after, _) <- summonsBoard s registry
+    Spec.assertEqWith s "alice gained no life" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and nothing is waiting on the stack" (length (GameState.stack after)) 0
+
+  -- THE PAIR. The same board, the same card, the same door -- everything held
+  -- fixed but the one rider -- driven through Event.changeZoneEntering rather
+  -- than through a cast, because that is the narrowest path the rule is visible
+  -- on. Face up, Thragtusk enters as itself and the trigger pays 5 life; face
+  -- down, it is a nameless 2/2 and nothing happens. A board with no permanent on
+  -- it could not pass either half.
+  Spec.it s "CR 110.5b the same card entering FACE UP is a 5/3 Beast whose trigger does fire" $ do
+    (before, _, topId) <- summonsBoard s registry
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    let (up, upId) = putOntoBattlefield False topId before
+        (down, downId) = putOntoBattlefield True topId before
+    case (upId, downId) of
+      (Just faceUp, Just faceDown) -> do
+        Spec.assertEqWith s "the printed 5/3" (S.powerToughnessOf faceUp up) (Just (5, 3))
+        Spec.assertEqWith s "the printed name" (Projection.namesOf faceUp up) (Set.singleton (S.printingName thragtusk))
+        Spec.assertEqWith s "the printed subtype" (Projection.subtypesOf faceUp up) (Set.singleton Subtype.Beast)
+        Spec.assertEqWith s "face up" (fmap Object.facing (Game.lookupObject faceUp up)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "and the enters trigger paid 5 life" (S.lifeOf S.alice up) (Just 25)
+        Spec.assertEqWith s "CR 708.2a the 2/2 on the other board" (S.powerToughnessOf faceDown down) (Just (2, 2))
+        Spec.assertEqWith s "CR 708.3 whose trigger paid nothing" (S.lifeOf S.alice down) (Just 20)
+      _ -> Spec.assertFailure s "the card did not reach the battlefield"
+
+-- alice with two Plains and Soul Summons in hand, her library holding Thragtusk
+-- on top of a Goblin Piker, returned as (the board before the cast, the board
+-- after it has fully resolved, the library card that was on top).
+--
+-- Thragtusk is the card underneath and every one of its printed values is
+-- chosen against CR 708.2a's: a 5/3 where the rule says 2/2, a Beast where it
+-- says no subtypes, a name where it says none, and an enters-the-battlefield
+-- trigger paying 5 life where CR 708.3 says silence. A 2/2 with no trigger could
+-- not tell the rule from the fixture.
+--
+-- The Piker underneath it keeps CR 104.3c off the board and gives the library a
+-- second member, so "one card left the library" is a delta rather than an
+-- emptying.
+summonsBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+summonsBoard s registry = do
+  summons <- S.printingOf s registry "Soul Summons"
+  plains <- S.printingOf s registry "Plains"
+  thragtusk <- S.printingOf s registry "Thragtusk"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let (g1, summonsId) = S.handOne summons (S.landsInPlay plains 2)
+      (_, g2) = S.addLibraryCard piker S.alice g1
+      (topId, before) = S.addLibraryCard thragtusk S.alice g2
+      cast = S.runPure S.identityAnswer before (S.cast S.alice summonsId)
+  pure (before, S.runPure S.identityAnswer cast Engine.priorityLoop, topId)
+
+-- One card from a library onto the battlefield through the door an
+-- Effect.MoveToZone takes, with CR 708.3's rider set or not and nothing else
+-- differing -- then settled and run to a stable board so any enters trigger has
+-- resolved. Nothing if the move did not land.
+putOntoBattlefield :: Bool -> ObjectId.ObjectId -> GameState.GameState -> (GameState.GameState, Maybe ObjectId.ObjectId)
+putOntoBattlefield faceDown oid gs =
+  let riders = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = faceDown}
+      (entered, moved) = Engine.runGamePure S.identityAnswer gs (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just S.alice))
+   in (S.runPure S.identityAnswer moved Engine.priorityLoop, entered)
 
 -- A resolved face-down permanent of a morph printing on a board of `n` lands,
 -- three of which CR 702.37a's {3} has tapped. Nothing if the cast did not land.
