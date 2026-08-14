@@ -376,6 +376,11 @@ departureSpec s registry = Spec.describe s "Departure" $ do
   -- Game.removeFromZones the object is gone from GameState.objects while its id
   -- still sits in `phasedOut`, keyed to a player who will never have another
   -- untap step.
+  --
+  -- Rule 702.26k's SECOND sentence -- that this causes no zone-change ability to
+  -- trigger -- is asserted in Pawl.DepartureSpec, where it is the paired
+  -- negative for CR 603.6c's phased-in half; the Crocodile prints no ability to
+  -- observe it with.
   Spec.it s "CR 702.26k a phased-out permanent leaves the game with its owner" $ do
     crocodile <- S.printingOf s registry "Sandbar Crocodile"
     let (crocId, board) = S.addCreature crocodile S.alice (Setup.emptyGame S.threePlayers)

@@ -5,8 +5,9 @@
 -- (concede) is IMMEDIATE and Pawl.Engine.Engine reaches it directly.
 --
 -- The QUERY half -- Game.stillPlaying / Game.stillPlayingInOrder -- lives in
--- Pawl.Engine.Game instead. This module imports Pawl.Engine.Monarch (CR 725.4
--- reassignment happens inside `depart`) and Monarch imports Pawl.Engine.Event,
+-- Pawl.Engine.Game instead. This module imports Pawl.Engine.Event, both directly
+-- (CR 800.4a records events and files last known information of its own) and
+-- through Pawl.Engine.Monarch (CR 725.4 reassignment happens inside `depart`),
 -- so the event pipeline cannot reach the question through here.
 module Pawl.Engine.Departure where
 
@@ -115,7 +116,7 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- deleted PLANESWALKER as its target (CR 306.6) is left alone and read the same
 -- way -- Combat.stillAttacked asks the battlefield (CR 506.4).
 --
--- Three more things it deliberately does NOT touch, each because CR 800.4a
+-- More things it deliberately does NOT touch, each because CR 800.4a
 -- does not reach them:
 --
 --   * GameState.continuousEffects, GameState.replacements and
