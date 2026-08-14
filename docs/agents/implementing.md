@@ -38,8 +38,9 @@ Never pipe `cabal test` or `cabal build` output --- it stalls a ~30s suite for
 minutes. One build at a time. No `cabal clean`; the incremental build under
 `pedantic` is sufficient.
 
-Adding or deleting a module needs `cabal-gild pawl.cabal` run directly, since
-`hooky fix` acts only on staged files.
+Adding or deleting a module means staging `pawl.cabal` along with the module,
+so that `hooky fix` regenerates its `exposed-modules`; an unstaged `.cabal` is
+skipped.
 
 ## Enumerate the edit sites in one pass
 
@@ -159,6 +160,17 @@ pawl's card **stricter** or **weaker** than printed. Weaker in the controller's
 favour is the dishonest direction and disqualifies the card --- find another
 producer or stop. Stricter is admissible with an issue and an inline `(#N)`.
 
+## Prompts
+
+Do not mint a bespoke resolution-time choice. `Pawl.Types.Prompt`'s
+`ChooseRingBearer`, `ChooseBolster`, `ChooseAmass`, `ChooseBlight` and
+`ChooseCopyTarget` all share one posture --- choose, not target; filter the
+candidates rather than trusting the answer; raise the prompt only when two or
+more candidates make it a real choice. Read those constructors and their
+comments first, and follow them unless the rule you are implementing says
+otherwise, in which case say so in the PR. Four units in one run each had to be
+told this separately.
+
 ## Git and the PR
 
 - Branch off latest `origin/main`, named `issue-slug`. Never commit to `main`.
@@ -172,6 +184,11 @@ producer or stop. Stricter is admissible with an issue and an inline `(#N)`.
 - **Never force-push after opening.** `origin/main` moves; `git merge
   origin/main` and keep the merge commit. A rebase discards it.
 - Resolve conflicts by taking **both** sides, then re-run the mutations.
+- **Landing a capability a census tracks means editing the census in the same
+  PR.** The censuses are #875 (CR 116 special actions), #876 (CR 701 keyword
+  actions) and #877 (CR 702 keyword abilities). PR #1485 landed amass and closed
+  its issue but left #876's row under "not implemented"; nothing catches that
+  but you.
 
 `Closes #N` must be bare plain text in the PR body --- backticks break the
 link. **Never write close, fix or resolve next to an issue number you do not
@@ -180,13 +197,21 @@ close #797" and closed #797. Write "related to #N" or "advances #N". This
 applies to commit messages too: a keyword in any branch commit survives the
 squash.
 
-Before pushing, run what CI runs:
+Before pushing, STAGE your files and run `hooky fix`. One command, about a
+second, and it runs every check CI runs (ormolu, hlint, cabal-gild, `cabal
+check`, nixfmt) plus two CI does not: the JSON formatter and the citation
+check. Do not run the tools one at a time, and do not reach for `--all` unless
+you suspect something landed unstaged --- it sweeps the tree for two minutes to
+say the same thing. Stage again afterwards; `hooky fix` rewrites in place.
 
-    ormolu --mode check $(git ls-files '*.hs')
-    hlint .
-    script/format-json.sh check data/cards/*.json
+Two of the hooks bite differently when you run them by hand:
 
-That script takes `MODE FILE...`. Run bare it iterates over nothing and passes
-vacuously, so always give it the corpus.
+- `script/format-json.sh` takes `MODE FILE...`. Run bare it iterates over
+  nothing and passes vacuously, so give it the corpus.
+- `script/check-citations.sh` checks every `CR <number>` against
+  `docs/rules.txt` and defaults to the whole tree. Run it bare after taking a
+  CR update, since a renumbering breaks citations in files you never touched.
+  It found eight wrong citations on one branch, two of them rule numbers that
+  never existed --- write CR numbers from `docs/rules.txt`, never from memory.
 
 Then stop. Do not wait on CI, and do not start another unit.
