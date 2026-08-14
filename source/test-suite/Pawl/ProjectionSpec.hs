@@ -366,6 +366,29 @@ limbBloodMoon bayou shroofus limb bloodMoon limbFirst =
           else snd (S.addCreature limb S.alice (snd (S.addCreature bloodMoon S.alice g)))
    in (bayouId, shroofusId, place g2)
 
+-- alice has four Forests, an Abomination of Llanowar on the battlefield, two
+-- cards of `stocked` already in her graveyard and Maskwood Nexus in hand. Cast
+-- the Nexus, and read the Abomination's power BEFORE and AFTER it resolves.
+--
+-- The pair is the two readings of one board: the graveyard is stocked before
+-- the Nexus is cast and nothing moves between them, so the only difference is
+-- that the Nexus's continuous effect exists in the second.
+abominationAcrossNexus ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (Maybe Integer, Maybe Integer)
+abominationAcrossNexus forest abomination nexus stocked =
+  let base = S.landsInPlay forest 4
+      (_, g1) = S.addGraveyardCard stocked S.alice base
+      (_, g2) = S.addGraveyardCard stocked S.alice g1
+      (abominationId, g3) = S.addCreature abomination S.alice g2
+      (g4, nexusId) = S.handOne nexus g3
+      cast = snd (Engine.runGamePure S.identityAnswer g4 (S.cast S.alice nexusId))
+      resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+   in (Projection.powerOf abominationId cast, Projection.powerOf abominationId resolved)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "layer classification matches CR 613.1" $ do
@@ -2470,6 +2493,43 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         libraryPower = Game.faceOf inLibrary gs3 >>= Filter.power . Projection.viewOfCardIn gs3 inLibrary
     Spec.assertEqWith s "on the battlefield" (Projection.powerOf onBattlefield gs3) (Just 2)
     Spec.assertEqWith s "in the library" libraryPower (Just 2)
+
+  -- CR 613.1 over a card in a GRAVEYARD, read from inside the fold. Maskwood
+  -- Nexus's third clause ("creature cards you own that aren't on the
+  -- battlefield") is an Affected.MatchingAnywhere set, and Abomination of
+  -- Llanowar's CR 208.2a characteristic-defining P/T counts "Elf cards in your
+  -- graveyard" -- a count evaluated while layer 7a is being applied, so it reads
+  -- Projection.viewUpTo rather than fullView. That reader used to match every
+  -- off-battlefield candidate as a PRINTED card (#623), which read 1 here.
+  --
+  -- Three readings the pair separates. The two graveyard cards are printed
+  -- Goblin Warriors, so "the cards were always Elves" reads 3 before the Nexus
+  -- resolves as well as after. They are in the graveyard before the Nexus is
+  -- cast, so "the effect applied to them as they arrived" reads 1 in both. Only
+  -- a continuous effect applying to a card sitting in a graveyard reads 1 then
+  -- 3. The battlefield half of the count is the Abomination itself, a printed
+  -- Elf, in both halves -- so the change is not that half moving.
+  Spec.it s "CR 613.1 Maskwood Nexus makes the creature cards in a graveyard Elves, and a CDA counts them there" $ do
+    forest <- S.printingOf s registry "Forest"
+    abomination <- S.printingOf s registry "Abomination of Llanowar"
+    nexus <- S.printingOf s registry "Maskwood Nexus"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (before, after) = abominationAcrossNexus forest abomination nexus piker
+    Spec.assertEqWith s "the Abomination alone, while the Nexus is still a spell" before (Just 1)
+    Spec.assertEqWith s "the Abomination plus the two Goblins the Nexus made Elves" after (Just 3)
+
+  -- The negative half of the pair above, differing in exactly one thing: what is
+  -- in the graveyard. Maskwood Nexus's set is CREATURE cards, so two Lightning
+  -- Bolts there are outside it and the count stays at the Abomination itself --
+  -- which is what rules out "the Nexus resolving adds two to the count".
+  Spec.it s "CR 613.1 the Nexus leaves the instants in that graveyard alone" $ do
+    forest <- S.printingOf s registry "Forest"
+    abomination <- S.printingOf s registry "Abomination of Llanowar"
+    nexus <- S.printingOf s registry "Maskwood Nexus"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (before, after) = abominationAcrossNexus forest abomination nexus bolt
+    Spec.assertEqWith s "the Abomination alone, before" before (Just 1)
+    Spec.assertEqWith s "the Abomination alone, after" after (Just 1)
 
   Spec.it s "CR 114.4 an emblem's anthem buffs the controller's creatures from the command zone" $ do
     piker <- S.printingOf s registry "Goblin Piker"
