@@ -95,17 +95,17 @@
               },
               "measured": {
                 "type": "PlayerCounters",
-                "value": [
-                  {
+                "value": {
+                  "kind": {
+                    "type": "Poison"
+                  },
+                  "player": {
                     "type": "Relative",
                     "value": {
                       "type": "Opponent"
                     }
-                  },
-                  {
-                    "type": "Poison"
                   }
-                ]
+                }
               },
               "threshold": {
                 "type": "Literal",

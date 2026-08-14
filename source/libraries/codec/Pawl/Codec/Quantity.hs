@@ -1,13 +1,15 @@
 module Pawl.Codec.Quantity where
 
+import qualified Pawl.Codec.AgainstSlot as AgainstSlot
 import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Designation as Designation
+import qualified Pawl.Codec.Halved as Halved
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaCount as ManaCount
-import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Codec.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Codec.PlayerRef as PlayerRef
-import qualified Pawl.Codec.Rounding as Rounding
+import qualified Pawl.Codec.Plus as Plus
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Arm as Arm
@@ -19,9 +21,10 @@ import qualified Pawl.Types.Quantity as Quantity
 -- writes a bare object, so the tag that picks this arm has to come from the
 -- dispatching type, which is this one.
 --
--- RECURSIVE, and directly so: @Plus@, @Negate@, @AgainstSlot@ and the @Count@
--- arm all name 'codec' itself, where the loose pair named its own 'toJson'. That
--- ties the same knot Pawl.Codec.Filter already ties at the value level, and
+-- RECURSIVE, and directly so: @Negate@ names 'codec' itself, and @Plus@,
+-- @Halved@, @AgainstSlot@ and @Count@ each pass it to a payload codec that is
+-- parametric in the quantity for exactly that reason. That ties the same knot
+-- Pawl.Codec.Filter already ties at the value level, and
 -- Pawl.JsonSchema.Define.define breaks it at the schema level by registering the
 -- name before running the body -- so the schema emits a @$ref@ on re-entry rather
 -- than diverging.
@@ -39,10 +42,10 @@ codec =
       Arm.nullary "Toughness" Quantity.Toughness,
       Arm.payload "InSlot" SlotName.codec Quantity.InSlot,
       Arm.nullary "Star" Quantity.Star,
-      Arm.payload "Plus" pairCodec (uncurry Quantity.Plus),
+      Arm.payload "Plus" (Plus.codec codec) Quantity.Plus,
       -- CR 107.1a's rounding first, then what is halved: the direction is the
       -- card's word and the payload is the value it applies to.
-      Arm.payload "Halved" (Common.tuple Rounding.codec codec) (uncurry Quantity.Halved),
+      Arm.payload "Halved" (Halved.codec codec) Quantity.Halved,
       -- CR 107.1b's negative game value: one whole Quantity on the wire, since a
       -- minus sign carries nothing of its own.
       Arm.payload "Negate" codec Quantity.Negate,
@@ -54,7 +57,7 @@ codec =
       -- a 0/1 rather than a stored number, so there is nothing beside the
       -- reference.
       Arm.payload "IsMonarch" PlayerRef.codec Quantity.IsMonarch,
-      Arm.payload "PlayerCounters" (Common.tuple PlayerRef.codec PlayerCounterKind.codec) (uncurry Quantity.PlayerCounters),
+      Arm.payload "PlayerCounters" PlayerCounterTally.codec Quantity.PlayerCounters,
       -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
       -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
       Arm.payload "ObjectCounters" (CounterKind.codec Keyword.codec) Quantity.ObjectCounters,
@@ -76,7 +79,7 @@ codec =
       Arm.nullary "BlockersBeyondFirst" Quantity.BlockersBeyondFirst,
       -- A slot and a whole Quantity, in that order: which object to aim at, then
       -- what to read off it.
-      Arm.payload "AgainstSlot" (Common.tuple SlotName.codec codec) (uncurry Quantity.AgainstSlot)
+      Arm.payload "AgainstSlot" (AgainstSlot.codec codec) Quantity.AgainstSlot
     ]
   where
     encode q = case q of
@@ -86,33 +89,19 @@ codec =
       Quantity.Toughness -> Common.nullary "Toughness"
       Quantity.InSlot s -> Common.tagged "InSlot" . Just $ Codec.encode SlotName.codec s
       Quantity.Star -> Common.nullary "Star"
-      Quantity.Plus a b -> Common.tagged "Plus" . Just . Value.array $ [encode a, encode b]
-      Quantity.Halved rounding q_ ->
-        Common.tagged "Halved" . Just . Value.array $
-          [Codec.encode Rounding.codec rounding, encode q_]
+      Quantity.Plus x -> Common.tagged "Plus" . Just $ Codec.encode (Plus.codec codec) x
+      Quantity.Halved x -> Common.tagged "Halved" . Just $ Codec.encode (Halved.codec codec) x
       Quantity.Negate a -> Common.tagged "Negate" . Just $ encode a
       Quantity.Count c -> Common.tagged "Count" . Just $ Codec.encode (Count.codec codec) c
       Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ Codec.encode ManaCount.codec c
       Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ Codec.encode PlayerRef.codec p
       Quantity.Speed p -> Common.tagged "Speed" . Just $ Codec.encode PlayerRef.codec p
       Quantity.IsMonarch p -> Common.tagged "IsMonarch" . Just $ Codec.encode PlayerRef.codec p
-      Quantity.PlayerCounters p k ->
-        Common.tagged "PlayerCounters" . Just . Value.array $
-          [Codec.encode PlayerRef.codec p, Codec.encode PlayerCounterKind.codec k]
+      Quantity.PlayerCounters x -> Common.tagged "PlayerCounters" . Just $ Codec.encode PlayerCounterTally.codec x
       Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ Codec.encode (CounterKind.codec Keyword.codec) k
       Quantity.HasDesignation d -> Common.tagged "HasDesignation" . Just $ Codec.encode Designation.codec d
       Quantity.WasKicked -> Common.nullary "WasKicked"
       Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ Codec.encode PlayerRef.codec p
       Quantity.CardsDiscardedThisTurn p -> Common.tagged "CardsDiscardedThisTurn" . Just $ Codec.encode PlayerRef.codec p
       Quantity.BlockersBeyondFirst -> Common.nullary "BlockersBeyondFirst"
-      Quantity.AgainstSlot s q_ ->
-        Common.tagged "AgainstSlot" . Just . Value.array $
-          [Codec.encode SlotName.codec s, encode q_]
-
--- | CR 208.2's characteristic-defining [power, toughness] pair, which
--- Pawl.Codec.ProjectedCharacteristics stores.
--- | The @[a, b]@ payload 'Quantity.Plus' writes. Under the #1305 decision this
--- arm owes a record like every other multi-payload one; it is the last reader of
--- this helper now that ProjectedCharacteristics' CDA pair has one (#1464).
-pairCodec :: Codec.Codec (Quantity.Quantity, Quantity.Quantity)
-pairCodec = Common.tuple codec codec
+      Quantity.AgainstSlot x -> Common.tagged "AgainstSlot" . Just $ Codec.encode (AgainstSlot.codec codec) x

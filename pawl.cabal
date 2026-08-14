@@ -82,6 +82,8 @@ library codec
     Pawl.Codec.AffectedUnlessSpec
     Pawl.Codec.AffectPlayers
     Pawl.Codec.AffectPlayersSpec
+    Pawl.Codec.AgainstSlot
+    Pawl.Codec.AgainstSlotSpec
     Pawl.Codec.Aggregation
     Pawl.Codec.AggregationSpec
     Pawl.Codec.AlternativeCost
@@ -264,6 +266,8 @@ library codec
     Pawl.Codec.GraveyardScopeSpec
     Pawl.Codec.HalfUnlocked
     Pawl.Codec.HalfUnlockedSpec
+    Pawl.Codec.Halved
+    Pawl.Codec.HalvedSpec
     Pawl.Codec.Hybrid
     Pawl.Codec.HybridSpec
     Pawl.Codec.IncreaseSpellCost
@@ -354,6 +358,8 @@ library codec
     Pawl.Codec.PlayerCounterKindSpec
     Pawl.Codec.PlayerCounters
     Pawl.Codec.PlayerCountersSpec
+    Pawl.Codec.PlayerCounterTally
+    Pawl.Codec.PlayerCounterTallySpec
     Pawl.Codec.PlayerDrawsNthCard
     Pawl.Codec.PlayerDrawsNthCardSpec
     Pawl.Codec.PlayerEffect
@@ -372,6 +378,8 @@ library codec
     Pawl.Codec.PlayerScopeSpec
     Pawl.Codec.PlayerStaticAbility
     Pawl.Codec.PlayerStaticAbilitySpec
+    Pawl.Codec.Plus
+    Pawl.Codec.PlusSpec
     Pawl.Codec.Pool
     Pawl.Codec.PoolSpec
     Pawl.Codec.Power
@@ -820,6 +828,7 @@ library types
     Pawl.Types.AffectedPlayers
     Pawl.Types.AffectedUnless
     Pawl.Types.AffectPlayers
+    Pawl.Types.AgainstSlot
     Pawl.Types.Aggregation
     Pawl.Types.AlternativeCost
     Pawl.Types.ArmDelayedTrigger
@@ -934,6 +943,7 @@ library types
     Pawl.Types.GameState
     Pawl.Types.GraveyardScope
     Pawl.Types.HalfUnlocked
+    Pawl.Types.Halved
     Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
     Pawl.Types.Hybrid
@@ -1001,6 +1011,7 @@ library types
     Pawl.Types.Player
     Pawl.Types.PlayerCounterKind
     Pawl.Types.PlayerCounters
+    Pawl.Types.PlayerCounterTally
     Pawl.Types.PlayerDrawsNthCard
     Pawl.Types.PlayerEffect
     Pawl.Types.PlayerId
@@ -1010,6 +1021,7 @@ library types
     Pawl.Types.PlayerSacrifices
     Pawl.Types.PlayerScope
     Pawl.Types.PlayerStaticAbility
+    Pawl.Types.Plus
     Pawl.Types.Pool
     Pawl.Types.Power
     Pawl.Types.Prevention

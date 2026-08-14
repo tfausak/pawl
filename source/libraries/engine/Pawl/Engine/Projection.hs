@@ -22,6 +22,7 @@ import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AgainstSlot as AgainstSlot
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
@@ -61,6 +62,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.Hybrid as Hybrid
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -86,6 +88,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
+import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
@@ -1920,10 +1923,10 @@ rewriteQuantity pairs quantity = case quantity of
         { Count.Type.filter = Filter.rewrite pairs (Count.Type.filter c),
           Count.Type.aggregation = rewriteAggregation pairs (Count.Type.aggregation c)
         }
-  Quantity.Type.Plus x y -> Quantity.Type.Plus (rewriteQuantity pairs x) (rewriteQuantity pairs y)
+  Quantity.Type.Plus (Plus.MkPlus x y) -> Quantity.Type.Plus (Plus.MkPlus (rewriteQuantity pairs x) (rewriteQuantity pairs y))
   -- Plus' descent: the rounding is no word CR 612.1 could swap, and the payload
   -- may hide a Count whose Filter names one.
-  Quantity.Type.Halved rounding inner -> Quantity.Type.Halved rounding (rewriteQuantity pairs inner)
+  Quantity.Type.Halved (Halved.MkHalved rounding inner) -> Quantity.Type.Halved (Halved.MkHalved rounding (rewriteQuantity pairs inner))
   -- Plus's descent through one child rather than two: a minus sign hides no
   -- subtype word of its own, but its payload may.
   Quantity.Type.Negate x -> Quantity.Type.Negate (rewriteQuantity pairs x)
@@ -1939,7 +1942,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.IsMonarch _ -> quantity
   Quantity.Type.HasDesignation _ -> quantity
   Quantity.Type.WasKicked -> quantity
-  Quantity.Type.PlayerCounters _ _ -> quantity
+  Quantity.Type.PlayerCounters {} -> quantity
   -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
   -- name no subtype word, not even the CR 122.1b keyword one.
   Quantity.Type.ObjectCounters _ -> quantity
@@ -1954,7 +1957,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.BlockersBeyondFirst -> quantity
   -- Not a leaf: the slot names no word CR 612.1 could swap, but the payload is a
   -- whole Quantity and may hide a Count whose Filter does.
-  Quantity.Type.AgainstSlot slot inner -> Quantity.Type.AgainstSlot slot (rewriteQuantity pairs inner)
+  Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot slot (rewriteQuantity pairs inner))
 
 -- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
 -- Quantity, and the set it aggregates over is the Count's own Filter.
@@ -2892,11 +2895,11 @@ quantityReads q = case q of
   Quantity.Type.Count c -> filterReads (Count.Type.filter c) <> aggregationReads (Count.Type.aggregation c)
   Quantity.Type.Power -> Set.singleton PowerA
   Quantity.Type.Toughness -> Set.singleton PowerA
-  Quantity.Type.Plus a b -> quantityReads a <> quantityReads b
+  Quantity.Type.Plus (Plus.MkPlus a b) -> quantityReads a <> quantityReads b
   -- Composition, as Plus is: halving reads nothing of its own.
-  Quantity.Type.Halved _ a -> quantityReads a
+  Quantity.Type.Halved (Halved.MkHalved _ a) -> quantityReads a
   Quantity.Type.Negate a -> quantityReads a
-  Quantity.Type.AgainstSlot _ a -> quantityReads a
+  Quantity.Type.AgainstSlot (AgainstSlot.MkAgainstSlot _ a) -> quantityReads a
   Quantity.Type.Literal _ -> Set.empty
   Quantity.Type.ManaValue -> Set.empty
   Quantity.Type.InSlot _ -> Set.empty
@@ -2905,7 +2908,7 @@ quantityReads q = case q of
   Quantity.Type.LifeTotal _ -> Set.empty
   Quantity.Type.Speed _ -> Set.empty
   Quantity.Type.IsMonarch _ -> Set.empty
-  Quantity.Type.PlayerCounters _ _ -> Set.empty
+  Quantity.Type.PlayerCounters {} -> Set.empty
   Quantity.Type.ObjectCounters _ -> Set.empty
   Quantity.Type.HasDesignation _ -> Set.empty
   Quantity.Type.WasKicked -> Set.empty

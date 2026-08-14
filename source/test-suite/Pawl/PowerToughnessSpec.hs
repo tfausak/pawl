@@ -45,6 +45,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
@@ -54,6 +55,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -96,7 +98,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
       s
       "the CDA pair"
       (PC.characteristicPT (Projection.baseCharacteristics goyfId gs))
-      (Just (CharacteristicPT.MkCharacteristicPT count (Quantity.Type.Plus (Quantity.Type.Literal 1) count)))
+      (Just (CharacteristicPT.MkCharacteristicPT count (Quantity.Type.Plus (Plus.MkPlus (Quantity.Type.Literal 1) count))))
   Spec.it s "CR 613.4a no P/T value exists before layer 7a applies one" $ do
     -- The seed evaluates the printed Star, which is deliberately Nothing.
     tarmogoyf <- S.printingOf s registry "Tarmogoyf"
@@ -1346,12 +1348,14 @@ malignusSpec s registry = Spec.describe s "Malignus" $ do
     let (malignusId, gs) = malignusBoard malignus
         halfTheHighest =
           Quantity.Type.Halved
-            Rounding.Up
-            ( Quantity.Type.Count
-                ( Count.Type.MkCount
-                    (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
-                    (Filter.Type.And [])
-                    (Aggregation.Greatest (Quantity.Type.LifeTotal PlayerRef.Candidate))
+            ( Halved.MkHalved
+                Rounding.Up
+                ( Quantity.Type.Count
+                    ( Count.Type.MkCount
+                        (Scope.OverPlayers (PlayerRef.Relative PlayerRelation.Opponent))
+                        (Filter.Type.And [])
+                        (Aggregation.Greatest (Quantity.Type.LifeTotal PlayerRef.Candidate))
+                    )
                 )
             )
     Spec.assertEqWith s "both boxes are the same quantity" (PC.characteristicPT (Projection.baseCharacteristics malignusId gs)) (Just (CharacteristicPT.MkCharacteristicPT halfTheHighest halfTheHighest))

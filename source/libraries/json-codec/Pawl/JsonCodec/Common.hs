@@ -396,8 +396,11 @@ maybe c =
 -- half until #1263 converts the last caller and deletes it.
 
 -- | Encodes to a two-element array and rejects any other length on decode.
--- There is no existing encodeTuple/decodeTuple pair to wrap, unlike its
--- siblings below.
+-- There is no existing encodeTuple/decodeTuple pair to wrap.
+--
+-- No caller left in pawl: #1464 gave every positional payload a record. Kept as
+-- the worked example of a codec that is not a bare object, which is why it is
+-- not deleted along with the three-element version (#1467).
 tuple :: Codec.Codec a -> Codec.Codec b -> Codec.Codec (a, b)
 tuple ca cb =
   Codec.MkCodec
@@ -408,21 +411,6 @@ tuple ca cb =
           [av, bv] -> (,) <$> Codec.decode ca av <*> Codec.decode cb bv
           _ -> Left . Text.pack $ "expected a 2-element array but got " <> show value,
       Codec.schema = (\a b -> Schema.tupleOf [a, b]) <$> Codec.schema ca <*> Codec.schema cb
-    }
-
--- | 'tuple' with a third element. Its own function rather than a nesting of
--- 'tuple', so a three-payload arm stays one flat array on the wire and in the
--- schema instead of an array holding an array.
-tuple3 :: Codec.Codec a -> Codec.Codec b -> Codec.Codec c -> Codec.Codec (a, b, c)
-tuple3 ca cb cc =
-  Codec.MkCodec
-    { Codec.encode = \(a, b, c) -> Value.array [Codec.encode ca a, Codec.encode cb b, Codec.encode cc c],
-      Codec.decode = \value -> do
-        xs <- asArray value
-        case xs of
-          [av, bv, cv] -> (,,) <$> Codec.decode ca av <*> Codec.decode cb bv <*> Codec.decode cc cv
-          _ -> Left . Text.pack $ "expected a 3-element array but got " <> show value,
-      Codec.schema = (\a b c -> Schema.tupleOf [a, b, c]) <$> Codec.schema ca <*> Codec.schema cb <*> Codec.schema cc
     }
 
 list :: Codec.Codec a -> Codec.Codec [a]

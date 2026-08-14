@@ -66,8 +66,8 @@
                         },
                         "threshold": {
                           "type": "Plus",
-                          "value": [
-                            {
+                          "value": {
+                            "left": {
                               "type": "Count",
                               "value": {
                                 "aggregation": {
@@ -94,11 +94,11 @@
                                 }
                               }
                             },
-                            {
+                            "right": {
                               "type": "Literal",
                               "value": 1
                             }
-                          ]
+                          }
                         }
                       }
                     },

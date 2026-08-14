@@ -34,12 +34,12 @@
                       },
                       "quantity": {
                         "type": "AgainstSlot",
-                        "value": [
-                          "creature",
-                          {
+                        "value": {
+                          "quantity": {
                             "type": "Power"
-                          }
-                        ]
+                          },
+                          "slot": "creature"
+                        }
                       }
                     }
                   }

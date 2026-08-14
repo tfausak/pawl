@@ -127,15 +127,15 @@
                           },
                           "quantity": {
                             "type": "AgainstSlot",
-                            "value": [
-                              "thatDamager",
-                              {
+                            "value": {
+                              "quantity": {
                                 "type": "ObjectCounters",
                                 "value": {
                                   "type": "PlusOnePlusOne"
                                 }
-                              }
-                            ]
+                              },
+                              "slot": "thatDamager"
+                            }
                           },
                           "ref": {
                             "type": "InSlot",

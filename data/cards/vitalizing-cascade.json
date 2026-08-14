@@ -42,16 +42,16 @@
                       },
                       "quantity": {
                         "type": "Plus",
-                        "value": [
-                          {
+                        "value": {
+                          "left": {
                             "type": "InSlot",
                             "value": "X"
                           },
-                          {
+                          "right": {
                             "type": "Literal",
                             "value": 3
                           }
-                        ]
+                        }
                       }
                     }
                   }

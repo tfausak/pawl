@@ -3,11 +3,8 @@
     {
       "characteristicPT": {
         "type": "Halved",
-        "value": [
-          {
-            "type": "Up"
-          },
-          {
+        "value": {
+          "quantity": {
             "type": "Count",
             "value": {
               "aggregation": {
@@ -33,8 +30,11 @@
                 }
               }
             }
+          },
+          "rounding": {
+            "type": "Up"
           }
-        ]
+        }
       },
       "manaCost": [
         {

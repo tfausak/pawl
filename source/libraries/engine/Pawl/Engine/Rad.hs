@@ -54,6 +54,7 @@ import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerCounterTally as PlayerCounterTally
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerQuantity as PlayerQuantity
@@ -104,7 +105,7 @@ hasRadCounters :: Condition.Condition
 hasRadCounters =
   Condition.Compares
     ( Compares.MkCompares
-        (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
+        (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad))
         Comparison.AtLeast
         (Quantity.Literal 1)
     )
@@ -148,7 +149,7 @@ ability =
                         Effect.Mill
                           ( Mill.MkMill
                               (PlayerRef.Relative PlayerRelation.You)
-                              (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
+                              (Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad))
                               (Just (MillTally.MkMillTally {MillTally.slot = milledSlot, MillTally.filter = nonland}))
                           ),
                         -- "for each nonland card milled this way, that player
