@@ -88,6 +88,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -562,6 +563,27 @@ wardenOut :: GameState.GameState -> Int
 wardenOut gs =
   let wardenName = CardName.MkCardName (Text.pack "Soul Warden")
    in length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName wardenName o gs]
+
+-- razorgrassBoard's sibling for Sea Gate, Reborn, parameterized by alice's life
+-- total: the modal double-faced card and the {U} creature in hand, and NOTHING
+-- else in the game. The life total is the ONLY axis, so a pair of boards built
+-- here differ in it and in nothing else.
+seaGateBoard :: Printing.Printing -> Printing.Printing -> Integer -> GameState.GameState
+seaGateBoard seaGate warrior life =
+  let (_, withGate) = S.addHandCard seaGate S.alice (Setup.emptyGame S.bothPlayers)
+      (_, filled) = S.addHandCard warrior S.alice withGate
+   in filled
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice,
+          GameState.players = Map.adjust (\p -> p {Player.life = life}) S.alice (GameState.players filled)
+        }
+
+-- How many Tidal Warriors made it to the battlefield.
+warriorOut :: GameState.GameState -> Int
+warriorOut gs =
+  let warriorName = CardName.MkCardName (Text.pack "Tidal Warrior")
+   in length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName warriorName o gs]
 
 -- Whether a life loss of exactly this size, by this player, was RECORDED -- the
 -- channel a card that watches for life loss reads, and the half of CR 119.4 a
@@ -2181,6 +2203,89 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
           "and the untapped land pays for the {W} creature"
           (wardenOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
           1
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  -- The same CR 614.1c sentence on the second card in the pool that prints it:
+  -- Sea Gate, Reborn, the land face of Sea Gate Restoration // Sea Gate, Reborn
+  -- ("As this land enters, you may pay 3 life. If you don't, it enters tapped." --
+  -- oracle checked on Scryfall). Razorgrass Field's pair above proves the rewrite;
+  -- this pair proves the CARD reaches it, which it did not while the face was
+  -- transcribed as a bare EntryRewrite.Tapped.
+  --
+  -- Tidal Warrior, a {U} creature with no enters trigger, plays Soul Warden's part
+  -- above: the land's "{T}: Add {U}" is the only mana in the game, so what the
+  -- 3 life buys is read off whether the Warrior gets cast.
+  Spec.it s "CR 614.1c Sea Gate, Reborn DECLINED enters tapped and costs no life" $ do
+    seaGate <- S.printingOf s registry "Sea Gate Restoration"
+    warrior <- S.printingOf s registry "Tidal Warrior"
+    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Declines) (seaGateBoard seaGate warrior 20) Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and cost nothing" (S.lifeOf S.alice played) (Just 20)
+        Spec.assertBool s (not (lostLife S.alice 3 played)) "no life loss was recorded"
+        Spec.assertEqWith
+          s
+          "so the {U} creature in hand stays there -- no mana to cast it with"
+          (warriorOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          0
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  Spec.it s "CR 614.1c Sea Gate, Reborn PAID FOR enters untapped, for exactly 3 life" $ do
+    seaGate <- S.printingOf s registry "Sea Gate Restoration"
+    warrior <- S.printingOf s registry "Tidal Warrior"
+    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Exercises) (seaGateBoard seaGate warrior 20) Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "the land entered untapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Untapped)
+        Spec.assertEqWith s "20 - 3" (S.lifeOf S.alice played) (Just 17)
+        Spec.assertBool s (lostLife S.alice 3 played) "the payment was recorded as a life loss (CR 119.4)"
+        Spec.assertEqWith
+          s
+          "and the untapped land pays for the {U} creature"
+          (warriorOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          1
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  -- CR 119.4: a player may pay an amount of life greater than 0 only if their
+  -- life total is at least that amount. So a tapped Sea Gate, Reborn has TWO
+  -- causes -- the controller declined, or the controller could not pay -- and the
+  -- pair below is what tells them apart.
+  --
+  -- The answerer is pinned to Exercises in BOTH cases, so the ANSWER is held
+  -- fixed and the only difference between the two boards is alice's life total:
+  -- 4, where paying 3 is legal, against 2, where it is not. The engine's own
+  -- CR 119.4 gate is therefore the only thing that can move the outcome. Were
+  -- the gate dropped, the 2-life board would pay anyway and land alice on -1;
+  -- were the prompt never raised at all, the 4-life board would enter tapped.
+  --
+  -- 4 and 2 rather than 3 and 2, because paying 3 at 3 life leaves 0 and CR
+  -- 704.5a ends the game before the assertions run.
+  Spec.it s "CR 119.4 at 4 life the payment is legal, so Sea Gate, Reborn enters untapped" $ do
+    seaGate <- S.printingOf s registry "Sea Gate Restoration"
+    warrior <- S.printingOf s registry "Tidal Warrior"
+    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Exercises) (seaGateBoard seaGate warrior 4) Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "untapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Untapped)
+        Spec.assertEqWith s "4 - 3" (S.lifeOf S.alice played) (Just 1)
+        Spec.assertEqWith
+          s
+          "and the untapped land pays for the {U} creature"
+          (warriorOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          1
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  Spec.it s "CR 119.4 at 2 life the payment is ILLEGAL, so it enters tapped with no life paid" $ do
+    seaGate <- S.printingOf s registry "Sea Gate Restoration"
+    warrior <- S.printingOf s registry "Tidal Warrior"
+    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Exercises) (seaGateBoard seaGate warrior 2) Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "tapped, though the answerer said pay" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and the 2 life is untouched" (S.lifeOf S.alice played) (Just 2)
+        Spec.assertBool s (not (lostLife S.alice 3 played)) "no life loss was recorded"
+        Spec.assertEqWith
+          s
+          "so the {U} creature in hand stays there"
+          (warriorOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          0
       other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
   Spec.it s "CR 707.5 declining the copy leaves a 0/0 that dies (CR 704.5f)" $ do
     island <- S.printingOf s registry "Island"
