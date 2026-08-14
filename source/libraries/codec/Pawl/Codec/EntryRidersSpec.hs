@@ -60,6 +60,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       EntryRiders.codec
       EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = True, EntryRiders.faceDown = False}
       """ {"exiledFaceDown":true} """
+  -- CR 708.3's rider, and the one above it are two different keys because they
+  -- are two different rules (CR 110.5d): Soul Summons manifests and says nothing
+  -- else, so `exiledFaceDown` stays absent alongside it.
+  Spec.it s "MkEntryRiders, faceDown alone" $
+    Common.assertCodec
+      s
+      EntryRiders.codec
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = True}
+      """ {"faceDown":true} """
   Spec.describe s "defaultValue" $ do
     Spec.it s "is untapped, not attacking and not transformed" $
       Spec.assertEq s EntryRiders.defaultValue EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}

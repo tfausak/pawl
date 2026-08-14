@@ -5,14 +5,16 @@
 -- Effect.TurnFaceDown arm of Pawl.Engine.Resolve, and the face-down arms
 -- threaded through Pawl.Engine.Game.faceOf, Pawl.Engine.Cast,
 -- Pawl.Engine.Cost.costsFor, Pawl.Engine.Event.changeZoneFaceDown and
--- Pawl.Engine.Stack -- rule 708 as far as morph reaches it. Also
--- Pawl.Engine.Attach.turnUpHosts, since CR 303.4k's attachment choice is made
--- WHILE a permanent is being turned face up (CR 708.11) and nowhere else.
+-- Pawl.Engine.Stack -- rule 708 as far as morph reaches it, plus CR 708.3's
+-- other producer, the EntryRiders.faceDown rider Event.changeZoneEntering reads.
+-- Also Pawl.Engine.Attach.turnUpHosts, since CR 303.4k's attachment choice is
+-- made WHILE a permanent is being turned face up (CR 708.11) and nowhere else.
 --
 -- FOUR morph cards carry the CAST and TURN-FACE-UP halves of rule 708, one per
--- part of them this file reaches, a fifth card carries the TURN-FACE-DOWN
--- half, and a sixth -- Aven Farseer, which has no morph ability at all -- is the
--- WATCHER of rule 708.7's other written form.
+-- part of them this file reaches, another carries the TURN-FACE-DOWN half,
+-- Aven Farseer -- which has no morph ability at all -- is the WATCHER of rule
+-- 708.7's other written form, and Soul Summons is the one card here that reaches
+-- rule 708 without a cast at all.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable
@@ -65,6 +67,17 @@
 -- targeting side, which is what Goblin Piker (2/1, no keywords) is on the board
 -- to prove: it is a creature in the same pool and only the family filter keeps
 -- Backslide off it.
+--
+-- Soul Summons is MANIFEST's card, and the only one here whose permanent never
+-- passes through the stack. {1}{W} Sorcery, "Manifest the top card of your
+-- library" (CR 701.40a) -- one clause, transcribed whole, and preferred over
+-- Write into Being, whose look-at-two-and-choose prompt is beside CR 708.3.
+-- Thragtusk is the card underneath it; summonsBoard says why that one.
+--
+-- Not implemented, and it leaves pawl's Soul Summons STRICTER than printed
+-- rather than weaker: CR 701.40b's special action turning a manifested permanent
+-- face up for its mana cost, which is the card's reminder text and an engine
+-- capability rather than a clause of the card (#1540).
 module Pawl.FaceDownSpec where
 
 import qualified Data.List as List
