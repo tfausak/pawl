@@ -31,8 +31,23 @@ spec s = Spec.describe s "Pawl.Codec.TargetCount" $ do
     Common.assertCodec
       s
       TargetCount.codec
-      TargetCount.MkTargetCount {TargetCount.least = 1, TargetCount.most = 2}
+      TargetCount.MkTargetCount {TargetCount.least = 1, TargetCount.most = Just 2}
       """ {"least":1,"most":2} """
+  -- CR 601.2c's "any number of target ..." (Soulfire Eruption): no printed
+  -- maximum, so the key is absent both ways.
+  Spec.it s "any number" $
+    Common.assertCodec
+      s
+      TargetCount.codec
+      TargetCount.anyNumber
+      """ {"least":0} """
+  -- An explicit null says the same thing, and re-encodes as the absent key.
+  Spec.it s "reads a null maximum as any number" $
+    Spec.assertEqWith
+      s
+      "null most decodes as unbounded"
+      (Common.parse (Text.pack """ {"least":0,"most":null} """) >>= Codec.decode TargetCount.codec)
+      (Right TargetCount.anyNumber)
   -- The two invariants the type states and the decoder keeps.
   Spec.it s "rejects a slot that takes no target" $
     Spec.assertBool

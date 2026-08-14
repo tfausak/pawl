@@ -13,14 +13,20 @@ import qualified Pawl.Types.TargetCount as TargetCount
 -- not a target slot, and one whose minimum exceeds its maximum names no legal
 -- number for CR 601.2c to announce. They read the assembled record rather than
 -- either field alone, which is what 'Fields.objectWith' is for.
+--
+-- Neither can be broken by an absent maximum -- CR 601.2c's "any number" allows
+-- every number from `least` up -- so both tests pass an unbounded count.
 isRange :: TargetCount.TargetCount -> Either Text.Text TargetCount.TargetCount
 isRange c
-  | TargetCount.most c < 1 = Left (Text.pack "TargetCount: most must be at least 1")
-  | TargetCount.least c > TargetCount.most c = Left (Text.pack "TargetCount: least must not exceed most")
+  | TargetCount.most c == Just 0 = Left (Text.pack "TargetCount: most must be at least 1")
+  | maybe False (TargetCount.least c >) (TargetCount.most c) = Left (Text.pack "TargetCount: least must not exceed most")
   | otherwise = Right c
 
+-- An ABSENT "most" is CR 601.2c's "any number of target ...", the one phrasing
+-- with no printed maximum; a null one reads the same. 'Fields.defaulted' writes
+-- neither, so an unbounded count round trips as @{"least":0}@.
 codec :: Codec.Codec TargetCount.TargetCount
 codec = Fields.objectWith isRange $ do
   least <- Fields.required "least" Common.natural TargetCount.least
-  most <- Fields.required "most" Common.natural TargetCount.most
+  most <- Fields.defaulted "most" Nothing (Common.maybe Common.natural) TargetCount.most
   pure TargetCount.MkTargetCount {TargetCount.least = least, TargetCount.most = most}

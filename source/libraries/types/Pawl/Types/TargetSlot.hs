@@ -18,7 +18,8 @@ import qualified Pawl.Types.TargetCount as TargetCount
 -- produces, so "another target creature" did not exclude itself.
 --
 -- HOW MANY the slot takes is the `count` field (CR 601.2c), which covers CR
--- 115.6's "up to one" and every larger count with one range. On the slot and not
+-- 115.6's "up to one", every larger count, and "any number of target ..." with
+-- one range -- the last by naming no maximum. On the slot and not
 -- on the mode, because a card makes the call per slot -- Explosive Entry's
 -- artifact and creature slots are separately optional.
 --
@@ -40,3 +41,8 @@ required p f = MkTargetSlot p f TargetCount.one
 -- times up to N, the empty answer included.
 upTo :: Natural.Natural -> Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
 upTo n p f = MkTargetSlot p f (TargetCount.upTo n)
+
+-- CR 601.2c's "any number of target ...": the same slot with no printed ceiling,
+-- so the board's candidates are the only bound.
+anyNumber :: Pool.Pool -> Maybe (Filter.Filter Keyword.Keyword) -> TargetSlot
+anyNumber p f = MkTargetSlot p f TargetCount.anyNumber

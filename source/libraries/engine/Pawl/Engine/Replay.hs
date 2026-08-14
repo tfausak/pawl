@@ -460,7 +460,7 @@ defaultAnswer p = case p of
   -- CR 601.2c: announce as MANY as the board allows, matching the arm above --
   -- announcing fewer is equally legal, and a default that declined would leave
   -- every "up to N" card's effect unexercised by the specs that take this answer.
-  Prompt.AnnounceTargets _ _ _ offers -> fmap (\(count, rs) -> min (TargetCount.most count) (Natural.length rs)) offers
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (\(count, rs) -> TargetCount.ceilingOn (Natural.length rs) count) offers
   -- A canonical identity swap: Mountain -> Mountain changes nothing.
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   -- The same identity for CR 612.2's creature-type half. Frog is a creature
