@@ -332,7 +332,7 @@ attackerAssignment gs contested (attacker, target) = case Projection.powerOf att
             -- player conceding mid-combat (CR 800.4e), and an attacked
             -- planeswalker burned off the battlefield (CR 506.4).
             attacked = combatRecipient gs attacker target
-            -- CR 508.5 / CR 310.8d, shared with the landwalk reading in
+            -- CR 508.5 / CR 310.9d, shared with the landwalk reading in
             -- Defender.playerOf so the two cannot drift. Read once, for CR
             -- 702.19c's third recipient below and for CR 702.22j's chooser.
             defending = Defender.playerOf target gs
@@ -923,7 +923,7 @@ applyDamage events = do
       lifeGainedBy ev = case DamageEvent.dealtByLifelink ev of
         Just pid | DamageEvent.amount ev > 0 -> [GameEvent.LifeGained (LifeChange.MkLifeChange pid (DamageEvent.amount ev))]
         _ -> []
-      -- CR 310.6's counter removal, recorded so CR 310.11b's "when the last
+      -- CR 310.6's counter removal, recorded so CR 310.12b's "when the last
       -- defense counter is removed" has an event to fire off.
       --
       -- ONE record per BATTLE and not one per damage event, which is CR 510.2's

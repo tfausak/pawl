@@ -4,7 +4,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
 
 -- | What an effect says about a cast IT offers, beyond what casting the card
--- would ordinarily mean -- CR 310.11b's "you may cast it transformed without
+-- would ordinarily mean -- CR 310.12b's "you may cast it transformed without
 -- paying its mana cost", whose two riders are these two fields.
 --
 -- Carried by the OPCODE (OfferCast) and not by the card, for

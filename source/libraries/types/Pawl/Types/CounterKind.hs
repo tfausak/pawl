@@ -59,7 +59,7 @@ data CounterKind keyword
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind.
     --
     -- Three readers, and unlike Loyalty's they are the whole of the count's story:
-    -- CR 310.6 / 120.3h takes counters off in Pawl.Engine.Damage, CR 310.11b's
+    -- CR 310.6 / 120.3h takes counters off in Pawl.Engine.Damage, CR 310.12b's
     -- intrinsic Siege ability fires when the last one goes, and CR 704.5v buries a
     -- battle sitting at 0 that owes no ability. All three count Object.counters
     -- directly, as loyalty's and lore's readers do.

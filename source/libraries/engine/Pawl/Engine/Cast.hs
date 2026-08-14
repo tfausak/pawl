@@ -828,7 +828,7 @@ castableWhileSearching pid gs =
 --     the cast IS the permission, and it names the object rather than a zone, so
 --     inCastableZone has nothing to ask. Each caller keeps its own gate for the
 --     half of rule 601.3 that is about the card -- Panglacial's printed
---     permission above, and CR 310.11b's "it" being where the exile left it.
+--     permission above, and CR 310.12b's "it" being where the exile left it.
 --
 -- Everything else stays, and CR 601.3's own second half is why: that rule is one
 -- sentence with two limbs, and neither producer excepts the PROHIBIT one. A Rule
@@ -941,7 +941,7 @@ castSpell = castSpellWith Nothing
 -- candidates, which is every cast the rules themselves offer.
 --
 -- REPLACES rather than joins, and CR 118.9b is why: "an effect that allows you to
--- cast a spell may require a certain alternative cost to be paid". CR 310.11b's
+-- cast a spell may require a certain alternative cost to be paid". CR 310.12b's
 -- offer is one of those -- a player casting a defeated Siege does not get to pay
 -- {2}{W} instead -- and CR 118.9a's "only one alternative cost can be applied to
 -- any one spell" is what keeps the printed alternatives from joining it.

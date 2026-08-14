@@ -139,7 +139,7 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 --
 -- A SECOND writer, and the same notion of "it" from the other side: an ability
 -- whose own effect performs the move binds the arrival here too, through
--- Effect.MoveToZone's CR 400.7 slot. Rule 310.11b's "exile it, then you may cast
+-- Effect.MoveToZone's CR 400.7 slot. Rule 310.12b's "exile it, then you may cast
 -- it" is that shape (Pawl.Engine.Battle.siegeDefeat), and the two writers cannot
 -- collide -- eventBindings stamps this slot only for the zone-change conditions
 -- listed in Event.eventBindingSlots, and a counter-removal condition is not one.

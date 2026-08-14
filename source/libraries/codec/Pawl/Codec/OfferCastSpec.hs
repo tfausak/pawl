@@ -25,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.OfferCast" $ do
           }
       )
       """ {"slot":"exiled"} """
-  -- CR 310.11b's two riders, which is what stops the offer being elided.
+  -- CR 310.12b's two riders, which is what stops the offer being elided.
   Spec.it s "MkOfferCast, offer written" $
     Common.assertCodec
       s

@@ -330,7 +330,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfCountersReached (SelfCountersReached.MkSelfCountersReached CounterKind.Lore 3))
       """ {"type":"SelfCountersReached","value":{"kind":{"type":"Lore"},"amount":3}} """
-  -- CR 310.11b. The payload is the counter kind alone: "the last" needs no number.
+  -- CR 310.12b. The payload is the counter kind alone: "the last" needs no number.
   Spec.it s "SelfLastCounterRemoved round-trips its kind" $
     Common.assertCodec
       s
