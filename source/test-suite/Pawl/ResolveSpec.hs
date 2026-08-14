@@ -9741,9 +9741,8 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTarget" $ do
 --
 -- The FOUR-SEAT case is CR 601.2c's "any number" proper: the card prints no
 -- maximum, so four is announceable on a board that offers five candidates, and
--- nothing but the board bounds it. The ZERO case is the other end of the same
--- range, and CR 608.2b does not fizzle a spell that chose no targets at all
--- (CR 115.6).
+-- nothing but the board bounds it. The ZERO case is the other end of that same
+-- range.
 soulfireEruptionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulfireEruptionSpec s registry =
   let -- alice casts off nine Mountains at `seats`, announcing `n` targets and
@@ -9806,12 +9805,11 @@ soulfireEruptionSpec s registry =
             (List.sort [named "Benalish Hero", named "Goblin Piker"], [])
           Spec.assertEqWith s "the game has no result: an empty library is not itself a loss" (GameState.result after) Nothing
         -- CR 601.2c's "any number of target ...", which is what the card prints
-        -- and what data/cards/soulfire-eruption.json now says: no printed
-        -- maximum, so the ceiling is the candidate count and nothing else. FOUR
-        -- seats and bob's Ogre Sentry make five candidates, four are announced,
-        -- and four is MORE than any literal cap the file used to carry -- so this
-        -- case goes red against a bounded count and is the proof the unbounded
-        -- arm carries.
+        -- and what data/cards/soulfire-eruption.json says: no printed maximum, so
+        -- the ceiling is the candidate count and nothing else. FOUR seats and
+        -- bob's Ogre Sentry make five candidates and four are announced -- more
+        -- than the three the other cases take, so any reading that puts a literal
+        -- cap back on the slot fails HERE and nowhere else.
         --
         -- The four cards exiled have mana values 1, 2, 4 and 8: pairwise distinct
         -- and pairwise-sum distinct, so no two readings of the loop land on one

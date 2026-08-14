@@ -18,7 +18,8 @@ import qualified Pawl.Types.TargetCount as TargetCount
 -- produces, so "another target creature" did not exclude itself.
 --
 -- HOW MANY the slot takes is the `count` field (CR 601.2c), which covers CR
--- 115.6's "up to one" and every larger count with one range. On the slot and not
+-- 115.6's "up to one", every larger count, and "any number of target ..." with
+-- one range -- the last by naming no maximum. On the slot and not
 -- on the mode, because a card makes the call per slot -- Explosive Entry's
 -- artifact and creature slots are separately optional.
 --
