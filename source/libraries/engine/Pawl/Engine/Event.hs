@@ -1799,8 +1799,8 @@ changeZone :: ObjectId -> Zone -> Game ()
 changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
 
 -- changeZoneReturning for a move whose effect says how the object ENTERS -- CR
--- 110.5b's tap state, CR 712.14a's transformed face, and CR 110.2a's controller
--- -- rather than taking the rules' defaults.
+-- 110.5b's tap state, CR 712.14a's transformed face, CR 708.3's face-down entry
+-- and CR 110.2a's controller -- rather than taking the rules' defaults.
 --
 -- A separate door rather than a fifth parameter on changeZone, as changeZoneInBatch
 -- is: the ~30 callers moving under the default have no tap state to name. Handed
@@ -1863,9 +1863,27 @@ changeZoneEntering oid requestedDest position riders under = do
       -- `Nothing` means to the funnel -- takes over. Undying and persist are what
       -- print it (CR 702.93a, CR 702.79a).
       under' = if EntryRiders.underOwner riders then Nothing else under
+      -- CR 708.3: "objects that are put onto the battlefield face down are
+      -- turned face down BEFORE they enter the battlefield". Handed to the
+      -- funnel rather than written after it for the tap state's reason, and the
+      -- rule's whole content is that ordering -- the funnel writes the status in
+      -- mkObj, so the CR 614.1c entry loop, the CR 603.2g Moved event and every
+      -- trigger scanning it see CR 708.2a's 2/2 with no abilities, and "the
+      -- permanent's enters-the-battlefield abilities won't trigger (if
+      -- triggered) or have any effect (if static)" needs no branch of its own.
+      -- Manifest (CR 701.40a) is what prints it; Pawl.FaceDownSpec's Soul
+      -- Summons group is the proof, with Thragtusk's "you gain 5 life" enters
+      -- trigger as the card underneath.
+      --
+      -- BATTLEFIELD-ONLY, which is CR 110.5d's scope for the status and this
+      -- door's own responsibility: mkObj's `facing` write serves the stack too
+      -- (CR 708.4, changeZoneCasting), so the gate cannot live there. A card
+      -- stating the rider on a move anywhere else says something no rule reads,
+      -- which Pawl.CardSpec lints.
+      facing = if onto && EntryRiders.faceDown riders then Facing.FaceDown else Facing.FaceUp
   if refused
     then pure Nothing
-    else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown Facing.FaceUp (EntryRiders.exiledFaceDown riders)
+    else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders)
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being
@@ -1910,8 +1928,9 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requ
 -- and not a stamp applied to what it hands back, exactly as CR 709.3a's chosen
 -- half is. And that rule's last sentence, "the permanent the spell becomes will
 -- be a face-down permanent", which is the stack-to-battlefield move
--- Pawl.Engine.Stack makes. CR 708.3 is the same door for a permanent PUT onto
--- the battlefield face down, which nothing in the pool does yet (#919).
+-- Pawl.Engine.Stack makes. CR 708.3's permanent PUT onto the battlefield face
+-- down does NOT come through here: it is a move whose effect says how the object
+-- enters, riders and all, so it is changeZoneEntering's faceDown rider.
 --
 -- A separate door rather than an eighth parameter on changeZoneShowing, as
 -- changeZoneEntering is: the ordinary move leaves CR 110.5b's default standing
@@ -1982,7 +2001,9 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- and CR 108.4a leaves the owner answering. `shown` is CR 709.3's chosen
 -- half or CR 712.13's carried face, Nothing for every door but
 -- changeZoneShowing. `facing` is CR 110.5's face-up/face-down status, FaceUp for
--- every door but changeZoneFaceDown (CR 110.5b). `position` is CR 401.2's end of
+-- every door but changeZoneFaceDown (CR 708.4) and a changeZoneEntering whose
+-- riders say otherwise (CR 708.3), which is CR 110.5b's default standing
+-- everywhere else. `position` is CR 401.2's end of
 -- a library, the default for every door but changeZoneEntering. `concealed` is
 -- CR 406.3's "exiled face down", False for every door but changeZoneEntering and
 -- inert for every destination but exile.

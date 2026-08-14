@@ -165,7 +165,8 @@ riders =
       EntryRiders.transformed = False,
       EntryRiders.counters = Map.empty,
       EntryRiders.underOwner = False,
-      EntryRiders.exiledFaceDown = True
+      EntryRiders.exiledFaceDown = True,
+      EntryRiders.faceDown = False
     }
 
 -- CR 702.143a's foretold card, stamped with the turn the action was taken on --
