@@ -87,7 +87,9 @@
 -- 702.63 vanishing, the first keyword whose rule text spans
 -- BOTH mints -- one CR 614.1c entry replacement and two triggers, one of them
 -- watching the counter removal the other performs -- with Waning Wurm --
--- `vanishingSpec`. CR 702.43 modular, whose rule text spans both mints too and
+-- `vanishingSpec`. CR 702.32 fading, that rule's neighbour with one ability fewer
+-- and no intervening "if", so the sacrifice lands an upkeep later, with Skyshroud
+-- Ridgeback -- `fadingSpec`. CR 702.43 modular, whose rule text spans both mints too and
 -- whose trigger PAYLOAD counts the dead permanent's own +1/+1 counters out of
 -- CR 608.2h last known information, with Arcbound Hybrid and Arcbound Worker --
 -- `modularSpec`. CR
@@ -5463,6 +5465,117 @@ vanishingSpec s registry =
             "and two entry rewrites of two time counters each, which is what makes them add up"
             (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing 2) 2)
             (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Time 2)))))
+
+-- CR 702.32 fading, vanishing's neighbour and the reason the two are separate
+-- keywords rather than one with a counter kind on it. Rule 702.32a states TWO
+-- abilities where rule 702.63a states three, and it hangs the sacrifice on an
+-- upkeep where no counter can come off rather than on the removal of the last
+-- one -- so a fading N permanent sees N+1 of its controller's upkeeps and a
+-- vanishing N permanent sees N.
+--
+-- That off-by-one is what the board below is built to read, and it is the whole
+-- reason the second upkeep gets an assertion of its own: a fading 2 creature that
+-- reached zero counters is still on the battlefield, which is exactly where a
+-- vanishing 2 creature is not.
+--
+-- Skyshroud Ridgeback {G} Creature -- Beast 2/3 is the card, and it is nothing
+-- but the keyword: no second ability can put a fade counter on it, take one off
+-- or keep it alive, so every number below is fading's own. Fading 2 for
+-- vanishing's reason -- two is the smallest N that puts a counted-down upkeep
+-- between the entry and the sacrifice.
+fadingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fadingSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- vanishingSpec's, and the same reasons: one upkeep for `pid`, run to the
+      -- end of the priority loop so the trigger is gathered (CR 603.3) and
+      -- resolved.
+      upkeepOf pid gs =
+        let began = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan upkeep pid)) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+            settled = snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
+         in (settled, snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop))
+      after pid gs = snd (upkeepOf pid gs)
+      fades = S.counterOf CounterKind.Fade
+      -- CAST rather than placed, for vanishingSpec's reason: rule 702.32a's first
+      -- ability is a replacement on the entry, and S.addCreature reaches no CR
+      -- 616.1 loop.
+      castRidgeback = do
+        forest <- S.printingOf s registry "Forest"
+        ridgeback <- S.printingOf s registry "Skyshroud Ridgeback"
+        let base = S.landsInPlay forest 4
+            (held, gs0) = S.addHandCard ridgeback S.alice base
+            gs =
+              gs0
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
+        pure (ridgebackOn entered, entered)
+      ridgebackOn gs =
+        let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Skyshroud Ridgeback"))
+         in List.find named (Set.toList (GameState.battlefield gs))
+   in Spec.describe s "Fading" $ do
+        -- The proving test, and both of rule 702.32a's abilities in one board.
+        Spec.it s "CR 702.32a whole card: the Ridgeback enters with two fade counters and outlives them by an upkeep" $ do
+          (found, entered) <- castRidgeback
+          case found of
+            Nothing -> Spec.assertFailure s "Skyshroud Ridgeback did not reach the battlefield"
+            Just ridgeback -> do
+              Spec.assertEqWith s "two fade counters on the entry" (fades ridgeback entered) 2
+              let first = after S.alice entered
+              Spec.assertEqWith s "one after the first upkeep" (fades ridgeback first) 1
+              Spec.assertBool s (S.onBattlefield ridgeback first) "and it is still on the battlefield"
+              let second = after S.alice first
+              Spec.assertEqWith s "none after the second" (fades ridgeback second) 0
+              -- Rule 702.32a rather than rule 702.63a: the removal that empties
+              -- the pile sacrifices nothing, because the rule's "if you can't" is
+              -- about a removal that did not happen.
+              Spec.assertBool s (S.onBattlefield ridgeback second) "and STILL on it, which a vanishing 2 creature would not be"
+              let third = after S.alice second
+              Spec.assertBool s (not (S.onBattlefield ridgeback third)) "the third upkeep could remove none, so it was sacrificed"
+              -- CR 701.21a: a sacrifice is a move to the OWNER's graveyard and not
+              -- a destruction.
+              Spec.assertEqWith s "in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice third)) 1
+              Spec.assertEqWith s "and the pile it was counting is still empty" (fades ridgeback third) 0
+        -- Rule 702.32a says "YOUR upkeep", which is TurnScope.ControllersTurn: an
+        -- arm reading EachTurn would count the Ridgeback down twice as fast.
+        Spec.it s "CR 702.32a bob's upkeep removes nothing" $ do
+          (found, entered) <- castRidgeback
+          case found of
+            Nothing -> Spec.assertFailure s "Skyshroud Ridgeback did not reach the battlefield"
+            Just ridgeback -> do
+              let (settled, resolved) = upkeepOf S.bob entered
+              Spec.assertEqWith s "nothing was even put on the stack" (GameState.stack settled) []
+              Spec.assertEqWith s "so both counters are still there" (fades ridgeback resolved) 2
+              Spec.assertBool s (S.onBattlefield ridgeback resolved) "and the Ridgeback is untouched"
+        -- Rule 702.32a states NO intervening "if", which is the other half of the
+        -- difference from rule 702.63a: the ability triggers on an upkeep where
+        -- the pile is already empty, and that firing IS the sacrifice.
+        -- S.addCreature is what reaches this board -- it places the Ridgeback
+        -- without running the entry replacement, the position a card that lost its
+        -- counters some other way would be in.
+        Spec.it s "CR 702.32a a Ridgeback with no fade counters triggers and is sacrificed at once" $ do
+          ridgeback <- S.printingOf s registry "Skyshroud Ridgeback"
+          let (oid, gs) = S.addCreature ridgeback S.alice (Setup.emptyGame S.bothPlayers)
+              (settled, resolved) = upkeepOf S.alice gs
+          Spec.assertEqWith s "it really has none" (fades oid gs) 0
+          Spec.assertEqWith s "and the ability still reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertBool s (not (S.onBattlefield oid resolved)) "so its own first upkeep took it"
+        -- The mint, spelled out for vanishingSpec's reason: an assertion written
+        -- against Keyword.fading itself would say only that one copy is one copy.
+        -- Rule 702.32 states no multiplicity clause, so each instance is its own
+        -- pair.
+        Spec.it s "CR 702.32a each instance is its own two abilities" $ do
+          Spec.assertEqWith
+            s
+            "fading 2 held twice mints two upkeep triggers"
+            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Fading 2) 2)))
+            (replicate 2 (TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn)))
+          Spec.assertEqWith
+            s
+            "and two entry rewrites of two FADE counters each, never rule 702.63a's time counters"
+            (Keyword.mintedReplacementsFor (Keyword.Type.Fading 2) 2)
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade 2)))))
 
 -- CR 702.43 modular, whose rule text also spans BOTH of
 -- Pawl.Engine.Keyword's mints -- one CR 614.1c entry replacement and one death
@@ -10849,6 +10962,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   renownSpec s registry
   arborColossusSpec s registry
   vanishingSpec s registry
+  fadingSpec s registry
   modularSpec s registry
   tovolarSpec s registry
   aragornSpec s registry

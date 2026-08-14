@@ -45,6 +45,8 @@ data KeywordFamily
     Rampage
   | -- | CR 702.29a: cycling [cost], and CR 702.29e's typecycling.
     Cycling
+  | -- | CR 702.32a: fading N.
+    Fading
   | -- | CR 702.33a: kicker [cost], which CR 702.33c's multikicker is a variant of
     -- ("a multikicker cost is a kicker cost"), so one family covers both.
     Kicker

@@ -20,5 +20,6 @@ codec keywordCodec =
       Arm.nullary "Lore" CounterKind.Lore,
       Arm.nullary "Defense" CounterKind.Defense,
       Arm.nullary "Time" CounterKind.Time,
+      Arm.nullary "Fade" CounterKind.Fade,
       Arm.nullary "Shield" CounterKind.Shield
     ]
