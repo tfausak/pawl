@@ -1127,8 +1127,10 @@ data Effect card
     -- author could vary: the chooser is "you", the counter is a +1\/+1 counter,
     -- the count of creatures is one, and the candidate set is "creatures you
     -- control with the least toughness". Only N varies, and it is a Quantity
-    -- rather than a Natural for PutCounters' reason -- the count is an expression
-    -- the card writes, and every printed bolster is a literal today.
+    -- rather than a Natural because the pool prints it as an expression:
+    -- Dragonscale General's "bolster X, where X is the number of tapped creatures
+    -- you control" and Sunbringer's Touch's "where X is the number of cards in
+    -- your hand" are counts over game state rather than literals.
     --
     -- NOT a PutCounters over some cleverer ObjectRef. An ObjectRef DESCRIBES a set
     -- and the whole set is counted (CR 115.10a); rule 701.39a describes a set and

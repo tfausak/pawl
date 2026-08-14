@@ -4406,10 +4406,10 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
   -- -- one creature at the minimum leaves nothing to ask, and CR 101.3 ignores the
   -- instruction when the pool is empty.
   --
-  -- Toughness is the PROJECTED value (CR 613.1d), read after every layer, so an
-  -- Aura or a counter already on a creature moves it in and out of the tie. A
-  -- creature the projection gives no toughness at all cannot be compared and is
-  -- dropped from the pool rather than sorted as if it were zero.
+  -- Toughness is the PROJECTED value (CR 613.1g's layer 7), so an Aura or a
+  -- counter already on a creature moves it in and out of the tie. A creature the
+  -- projection gives no toughness at all cannot be compared and is dropped from
+  -- the pool rather than sorted as if it were zero.
   --
   -- The pool is swept and the minimum taken BEFORE the counters land, which is CR
   -- 608.2h's posture: bolster places its counters on one creature, so nothing here
@@ -4434,12 +4434,15 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
           let least = minimum (fmap snd (first : rest))
               tied = fmap fst (filter ((== least) . snd) (first : rest))
           bolstered <- case tied of
-            [] -> pure Nothing -- unreachable: `least` came out of this very list
+            -- Unreachable by construction, since `least` is the minimum OF this
+            -- very list: the first creature measured keeps the mandatory action
+            -- mandatory rather than turning an impossible case into a no-op.
+            [] -> pure (fst first)
             one : others -> case others of
               -- One creature at the minimum is the whole of rule 701.39a's
               -- candidate set, and the instruction is mandatory -- where the rules
               -- leave nothing to ask, don't prompt.
-              [] -> pure (Just one)
+              [] -> pure one
               second : more -> do
                 let offered = one NonEmpty.:| (second : more)
                 answer <- Game.choose (Prompt.ChooseBolster (Decide.deciderFor controller gs) controller resolving offered)
@@ -4447,11 +4450,11 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                 -- naming something never offered falls back to the first
                 -- candidate, since the action is mandatory and must put its
                 -- counters on someone.
-                pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else one))
-          -- CR 122.6: through the single funnel, so CR 614's counter replacements
-          -- (Hardened Scales, Doubling Season) get their opportunity.
-          Monad.when (n > 0) . Monad.forM_ bolstered $ \target ->
-            Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne (Integer.toNaturalSaturating n)
+                pure (if List.elem answer (NonEmpty.toList offered) then answer else one)
+          -- CR 122.6: through the single funnel, so CR 614.16's counter
+          -- replacements (Hardened Scales, Doubling Season) get their opportunity.
+          Monad.when (n > 0) . Monad.void $
+            Event.putCounters (CounterCause.ByEffect controller) bolstered CounterKind.PlusOnePlusOne (Integer.toNaturalSaturating n)
   -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
   -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
   -- this arm knows only that some effect asked for it, exactly as the arms around
