@@ -31,8 +31,8 @@ module Pawl.Types.KeywordFamily where
 --
 -- THE CONSTRUCTORS BELOW are this pool's, not Magic's. Rule 702 runs to 702.194,
 -- roughly a third of those keywords written with a cost or an N; the ones here are
--- those of them Pawl.Types.Keyword models. The set grows with that type -- ward N
--- and the remaining cost-bearing keywords all land here eventually -- so a
+-- those of them Pawl.Types.Keyword models. The set grows with that type -- the
+-- remaining cost-bearing keywords all land here eventually -- so a
 -- constructor is owed whenever a payload-carrying Keyword constructor is added,
 -- not whenever a card first asks for one. Pawl.Engine.Keyword.familyOf is
 -- exhaustive and takes no wildcard, so the compiler asks for the decision.
@@ -41,6 +41,10 @@ data KeywordFamily
     Hexproof
   | -- | CR 702.14a: "[type]walk".
     Landwalk
+  | -- | CR 702.21a: ward [cost]. The family a card writing "a creature with
+    -- ward" names, as against ward {2}; no card in the pool asks yet, and it is
+    -- owed at the keyword rather than at the first asker.
+    Ward
   | -- | CR 702.23a: rampage N.
     Rampage
   | -- | CR 702.29a: cycling [cost], and CR 702.29e's typecycling.

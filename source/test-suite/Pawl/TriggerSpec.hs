@@ -235,6 +235,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.BecameDesignated as BecameDesignated
+import qualified Pawl.Types.BecameTarget as BecameTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.BlockerDeclared as BlockerDeclared
 import qualified Pawl.Types.BlocksDeclared as BlocksDeclared
@@ -248,6 +249,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControlChanged as ControlChanged
+import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -277,6 +279,8 @@ import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Modal as Modal
@@ -8116,6 +8120,11 @@ representativeEvents cond =
         -- The same event, and the only one this condition admits either. It binds
         -- nothing whichever ids the event names, since the spell IS the bearer.
         TriggerCondition.SelfCast -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics))
+        -- CR 601.2c's event, with the bearer as the targeted object and alice as
+        -- the targeting object's controller -- an event BOTH relations admit,
+        -- since matchesTrigger reads `you` from the bearer's side and this list
+        -- pins the binding rather than the match.
+        TriggerCondition.SelfBecomesTargeted _ -> one (GameEvent.BecameTarget (BecameTarget.MkBecameTarget departed arrived S.alice))
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
@@ -8230,6 +8239,11 @@ everyTriggerCondition =
     TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn),
     TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.OpponentsTurn),
     TriggerCondition.SelfCast,
+    -- BOTH relations, for the SpellCast pair's reason just above: the arm cases
+    -- on the relation, and one that stamped nothing under the other half would go
+    -- unseen if only rule 702.21a's own Opponent were listed.
+    TriggerCondition.SelfBecomesTargeted PlayerRelation.Opponent,
+    TriggerCondition.SelfBecomesTargeted PlayerRelation.You,
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
     -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds
@@ -8967,6 +8981,99 @@ fabricateSpec s registry =
           Spec.assertEqWith s "fabricate 1 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Fabricate 1) 2)) [Keyword.fabricate 1, Keyword.fabricate 1]
           Spec.assertEqWith s "and fabricate 2 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Fabricate 2) 1)) [Keyword.fabricate 2]
           Spec.assertBool s (Keyword.fabricate 1 /= Keyword.fabricate 2) "and the N reaches the minted ability"
+
+-- CR 702.21a ward [cost]: "Whenever this permanent becomes the target of a spell
+-- or ability an opponent controls, counter that spell or ability unless that
+-- player pays [cost]." A TRIGGER and not a targeting restriction, which is what
+-- the first case proves: the spell is announced and paid for normally, and the
+-- ability goes on the stack over it.
+--
+-- Tomakul Honor Guard, {1}{G} Creature -- Human Soldier 3/1, whose entire text
+-- box is "Ward {2}", and Giant Growth as the thing that targets it: +3/+3 makes
+-- the two outcomes 6/4 and 3/1, and a stack that never resolved reads 3/1 too --
+-- which is why every case asserts the stack's height as well.
+--
+-- THREE SEATS. carol is neither the ward's controller nor the caster, so "an
+-- opponent controls it" and "bob controls it" are different sentences.
+--
+-- THE PAIR: bob's Giant Growth and alice's are on the SAME board, aimed at the
+-- SAME permanent, off the same three Forests each. The only difference is who
+-- casts, which is the whole of rule 702.21a's "an opponent controls" -- and both
+-- casters can afford the ward cost afterwards, so a spell that survives did so
+-- because the ability never fired rather than because nobody could have paid.
+--
+-- `paysFor S.bob` throughout, which is what makes the payer assertion real:
+-- alice is never paid for, so an engine that offered rule 702.21a's cost to the
+-- ward's own controller falls through to Declines and counters the spell.
+wardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wardSpec s registry =
+  let board forest guard growth =
+        let withLands = S.landsFor forest S.bob 3 (S.landsFor forest S.alice 3 S.threePlayerGame)
+            (guardId, withGuard) = S.addCreature guard S.alice withLands
+            (bobsGrowth, withBobs) = S.addHandCard growth S.bob withGuard
+            (alicesGrowth, gs) = S.addHandCard growth S.alice withBobs
+         in ( guardId,
+              bobsGrowth,
+              alicesGrowth,
+              gs
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      -- The Honor Guard is the board's only creature, so identityAnswer's
+      -- lowest-id choice of target is the only choice there is -- nothing here
+      -- searches for a permanent that makes the assertion pass.
+      castAndSettle caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.settleForPriority
+      boardOf = do
+        forest <- S.printingOf s registry "Forest"
+        guard <- S.printingOf s registry "Tomakul Honor Guard"
+        growth <- S.printingOf s registry "Giant Growth"
+        pure (board forest guard growth)
+   in Spec.describe s "CR 702.21 ward" $ do
+        Spec.it s "CR 702.21a an opponent's spell fires ward, and declining counters it" $ do
+          (guardId, bobsGrowth, _, gs) <- boardOf
+          let onStack = castAndSettle S.bob bobsGrowth gs
+              ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+          -- The controls: the spell really was cast -- rule 702.21a is not a CR
+          -- 115 targeting restriction -- and the ability really reached the
+          -- stack over it.
+          Spec.assertEqWith s "the Growth and the ward trigger are both on the stack" (length (GameState.stack onStack)) 2
+          Spec.assertEqWith s "the Guard is still a 3/1 with the Growth unresolved" (S.powerToughnessOf guardId onStack) (Just (3, 1))
+          -- alice is the one paid for, and she is never asked: the offer went to
+          -- bob, who declined through the identity fallback.
+          Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+          Spec.assertEqWith s "CR 701.6a: the Growth was countered, so the stack is empty" (length (GameState.stack after)) 0
+          Spec.assertEqWith s "and it is in bob's graveyard" (Seq.length (Map.findWithDefault Seq.empty S.bob (GameState.graveyard after))) 1
+          Spec.assertEqWith s "so the Guard is still a 3/1" (S.powerToughnessOf guardId after) (Just (3, 1))
+        -- The same board and the same cast as the case above, differing in
+        -- NOTHING but bob's answer.
+        Spec.it s "CR 702.21a paying the ward cost leaves the spell to resolve" $ do
+          (guardId, bobsGrowth, _, gs) <- boardOf
+          let onStack = castAndSettle S.bob bobsGrowth gs
+              ((_, after), transcript) = Replay.record (paysFor S.bob) onStack (Stack.resolveTop >> Engine.settleForPriority >> Stack.resolveTop)
+          Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+          Spec.assertEqWith s "nothing was countered, so the Growth resolved" (S.powerToughnessOf guardId after) (Just (6, 4))
+          Spec.assertEqWith s "and bob's graveyard holds the spent Growth" (Seq.length (Map.findWithDefault Seq.empty S.bob (GameState.graveyard after))) 1
+        -- The relation, moved on its own: alice casts her OWN Giant Growth at
+        -- her own warded creature, off her own three Forests. Rule 702.21a's
+        -- condition is "a spell or ability AN OPPONENT controls", so nothing
+        -- triggers -- and `paysFor S.bob` would leave a Declines in the
+        -- transcript if the ability had fired and offered alice the cost.
+        Spec.it s "CR 702.21a the ward controller's OWN spell fires nothing" $ do
+          (guardId, _, alicesGrowth, gs) <- boardOf
+          let onStack = castAndSettle S.alice alicesGrowth gs
+              ((_, after), transcript) = Replay.record (paysFor S.bob) onStack Stack.resolveTop
+          Spec.assertEqWith s "only the Growth is on the stack" (length (GameState.stack onStack)) 1
+          Spec.assertEqWith s "nobody was offered a ward cost" (payResponses transcript) []
+          Spec.assertEqWith s "and the Growth resolved" (S.powerToughnessOf guardId after) (Just (6, 4))
+        -- Rule 702.21 states no "each instance" sentence, so two instances are
+        -- two abilities for CR 603.2's general reason. Asserted of the MINT, as
+        -- fabricate's multiplicity is: no printing carries ward twice.
+        Spec.it s "CR 603.2 each instance of ward is its own ability" $ do
+          let cost n = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []
+          Spec.assertEqWith s "ward {2} held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Ward (cost 2)) 2)) [Keyword.ward (cost 2), Keyword.ward (cost 2)]
+          Spec.assertBool s (Keyword.ward (cost 2) /= Keyword.ward (cost 3)) "and the cost reaches the minted ability"
 
 -- Blind Hunter, a Creature -- Bat: "Flying / Haunt (When this creature dies,
 -- exile it haunting target creature.) / When this creature enters or the
@@ -10986,6 +11093,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   undyingSpec s registry
   afterlifeSpec s registry
   fabricateSpec s registry
+  wardSpec s registry
   soulshiftSpec s registry
   hauntSpec s registry
   strippedTriggerSpec s registry

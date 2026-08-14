@@ -659,8 +659,21 @@ activateAbility pid srcId ability = do
                 -- (see loyaltyOk above). Every path that rejects the activation
                 -- restores `before`, and the log lives in that state, so no rejected
                 -- activation can leave a record behind.
-                Payment.Paid ->
+                Payment.Paid -> do
                   Monad.when
                     (Cost.isLoyaltyCost (ActivatedAbility.cost ability))
                     (State.modify' (Event.recordEvent (GameEvent.LoyaltyAbilityActivated srcId)))
+                  -- CR 601.2c through CR 602.2b: each chosen object became a
+                  -- target of this ability, which is what CR 702.21a's ward
+                  -- watches -- and an activated ability is the half
+                  -- GameEvent.SpellCast could never carry.
+                  --
+                  -- The ABILITY object and not its source permanent: rule 702.21a
+                  -- counters "that spell or ability", and CR 113.7a makes the
+                  -- ability the thing on the stack. Its controller is `pid` (CR
+                  -- 113.8), the player rule 702.21a offers the cost to.
+                  --
+                  -- After the payment for Cast.castSpell's reason: everything
+                  -- above can still restore `before` and unwind the activation.
+                  Event.becameTarget abilId pid chosen
                 Payment.Unpaid -> State.put before

@@ -1255,6 +1255,14 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
                           -- the effects that modify the spell as it is cast, so
                           -- this records what became cast.
                           State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g))) g)
+                          -- CR 601.2c: each chosen object became a target of this
+                          -- spell, which is what CR 702.21a's ward watches. Here
+                          -- rather than beside `chosen` above for CR 601.2i's
+                          -- reason one line up -- everything between the two can
+                          -- still reject the cast and rewind, and rule 601.2c
+                          -- holds the trigger off the stack "until the spell has
+                          -- finished being cast" anyway.
+                          Event.becameTarget sid pid chosen
                           -- Stamped on `sid` itself, the incarnation CR 601.2a
                           -- put on the stack, rather than on whatever is on top
                           -- of it now.
