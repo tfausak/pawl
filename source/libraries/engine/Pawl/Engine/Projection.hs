@@ -1236,10 +1236,33 @@ quantitiesOf m = case m of
 
 -- Every SetLandSubtype and SetLandSubtypeToChosen effect in the game, each with
 -- its source and affected set (from stored effects and battlefield permanents'
--- static abilities). This is a legitimate case-on-Modification -- Projection is
--- its sole home.
+-- static abilities), for a reader OUTSIDE the layer fold. This is a legitimate
+-- case-on-Modification -- Projection is its sole home.
+--
+-- CR 604.2's "as long as" gate is answered here, against the same seed list gather
+-- feeds its own gates: a static ability whose clause is currently false generates
+-- no continuous effect, so it strips nothing under CR 305.7 either. Wired open,
+-- the two halves of one rule disagreed -- gatherStatic dropped the ability, so the
+-- land's type did not change, while this kept it, so the land's rules text went
+-- away regardless.
+--
+-- The seed costs a whole extra walk, so it is spent only on a board that has a
+-- conditional static ability at all -- abilityRemoval's posture for its own gate,
+-- and anyConditional is the same cheap structural test gather uses.
 setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
+  let functioning =
+        if anyConditional gs
+          then conditionHolds (gatherGiven (const False) alwaysFunctioning gs) gs
+          else alwaysFunctioning
+   in setLandSubtypeEffectsGiven functioning gs
+
+-- setLandSubtypeEffects with the CR 604.2 gate left open, for a caller INSIDE the
+-- layer fold. gatherGiven passes its own pass's gate -- open on the seed pass,
+-- answered on the second -- which is what keeps this off the fixpoint: the gated
+-- reader above is never called from anywhere the projection can reach.
+setLandSubtypeEffectsGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [(ObjectId, Affected.Affected)]
+setLandSubtypeEffectsGiven functioning gs =
   let isSet m = case m of
         Modification.SetLandSubtype _ -> True
         -- CR 305.7 does not care where the type came from: a type chosen as the
@@ -1296,8 +1319,12 @@ setLandSubtypeEffects gs =
         Nothing -> []
         Just face ->
           let changes = textChangesAffecting permId gs
+              -- CR 604.2's clause, asked exactly as gatherStatic asks it: same
+              -- rewrite, same CR 613.6 decision point. Free for an unconditional
+              -- ability, since staticLives answers before the layer is forced.
+              lives sa = staticLives (functioning permId) changes (minimum (fmap layer (staticParts changes sa))) sa
            in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
-                filter (any isSet . StaticAbility.modifications) (Face.staticAbilities face)
+                filter (\sa -> any isSet (StaticAbility.modifications sa) && lives sa) (Face.staticAbilities face)
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
@@ -2034,9 +2061,9 @@ gather gs =
 -- condition is judged against, never leave gather to re-enter itself.
 --
 -- Not implemented: the CR 613.1f removal question the seed answers is therefore
--- asked of a conditional ability whose clause is false, as is abilityRemoval's,
--- and setLandSubtypeEffects and controlGrants read the printed list without the
--- gate at all (#727).
+-- asked of a conditional ability whose clause is false, as is abilityRemoval's
+-- (#1528), and controlGrants reads the printed list without the gate at all
+-- (#1529).
 alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
 alwaysFunctioning _ _ _ = True
 
@@ -2098,7 +2125,7 @@ conditionHolds cands gs src lowest =
 -- with the real answers.
 gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered]
 gatherGiven stripped functioning gs =
-  let setEffs = setLandSubtypeEffects gs
+  let setEffs = setLandSubtypeEffectsGiven functioning gs
       -- A stored effect carries exactly one modification, so CR 613.6 has nothing
       -- to hold together -- and every stored effect's set is CR 611.2c's
       -- TheseObjects, locked when the effect began: at resolution for the ones a
@@ -2282,7 +2309,10 @@ frozenStaticParts src gs =
   let cands = gather gs
       -- gather's own seed list, and the same one it feeds its two gates.
       ungated = gatherGiven (const False) alwaysFunctioning gs
-      parts = permanentParts (abilitiesRemoved ungated gs) (conditionHolds ungated gs) (setLandSubtypeEffects gs) gs src
+      -- gather's CR 604.2 gate, shared by the two readers that must agree on it:
+      -- which abilities are gathered, and which of them CR 305.7 strips.
+      functioning = conditionHolds ungated gs
+      parts = permanentParts (abilitiesRemoved ungated gs) functioning (setLandSubtypeEffectsGiven functioning gs) gs src
       applies c oid =
         let lyr = gLowest c
             partial = projectUpTo lyr cands oid gs
@@ -2510,10 +2540,7 @@ grantedDefiningParts m = case m of
 -- the effect start to apply at all.
 gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
 gatherStatic functioning src ts changes stripped n sa =
-  let -- CR 612 rewrites each printed modification, and grantedDefiningParts then
-      -- expands what the rewrite produced -- in that order, since the expansion
-      -- emits an engine-minted part that is not card text for CR 612 to reach.
-      ms = StaticAbility.modifications sa >>= grantedDefiningParts . rewriteModification changes
+  let ms = staticParts changes sa
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
         _ -> Nothing
@@ -2541,20 +2568,38 @@ gatherStatic functioning src ts changes stripped n sa =
             gModification = m'
           }
       parts = fmap one (NonEmpty.toList ms)
-      -- Free for an unconditional ability, which is all but Kird Ape's: the Maybe
-      -- answers before `functioning` -- and so before conditionHolds' projection --
-      -- is ever forced.
-      --
-      -- CR 612.1: the CR 604.2 "as long as" clause is printed in the text box
-      -- just as the affected clause beside it is, so the same word swap reaches
-      -- it (#765). Short-circuited on `null changes` for the same reason
-      -- `affected` is -- Filter.rewrite walks the whole tree either way -- but
-      -- kept inside the maybe, since an unconditional ability has no clause to
-      -- rewrite at all.
-      lives = maybe True (\c -> functioning lowest (if null changes then c else rewriteCondition changes c)) (StaticAbility.condition sa)
+      -- CR 604.2's clause, shared with setLandSubtypeEffects -- see staticLives.
+      lives = staticLives functioning changes lowest sa
    in -- The cheap structural test first, so `stripped`'s projection is forced only
       -- for an ability the rest of the rule could reach.
       if (lowest > Layer.Ability && stripped) || not lives then [] else parts
+
+-- The parts one printed static ability contributes. CR 612 rewrites each printed
+-- modification, and grantedDefiningParts then expands what the rewrite produced --
+-- in that order, since the expansion emits an engine-minted part that is not card
+-- text for CR 612 to reach.
+staticParts :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> StaticAbility.StaticAbility -> NonEmpty.NonEmpty Modification
+staticParts changes sa = StaticAbility.modifications sa >>= grantedDefiningParts . rewriteModification changes
+
+-- CR 604.2's "as long as" gate for ONE printed static ability, asked at `lowest` --
+-- CR 613.6's decision point, which is the minimum layer over the ability's parts.
+--
+-- Shared rather than restated, since the two readers must agree: gatherStatic
+-- decides whether the ability's effect applies at all, and setLandSubtypeEffects
+-- whose rules text CR 305.7 strips because it did.
+--
+-- Free for an unconditional ability, which is all but a handful: the Maybe answers
+-- before `functioning` -- and so before conditionHolds' projection -- or `lowest`
+-- is ever forced.
+--
+-- CR 612.1: the clause is printed in the text box just as the affected clause
+-- beside it is, so the same word swap reaches it (#765). Short-circuited on
+-- `null changes` for the reason gatherStatic's `affected` is -- Filter.rewrite
+-- walks the whole tree either way -- but kept inside the maybe, since an
+-- unconditional ability has no clause to rewrite at all.
+staticLives :: (Layer -> Condition.Type.Condition -> Bool) -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Layer -> StaticAbility.StaticAbility -> Bool
+staticLives functioning changes lowest sa =
+  maybe True (\c -> functioning lowest (if null changes then c else rewriteCondition changes c)) (StaticAbility.condition sa)
 
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c. Each
 -- object's counters are emitted as ONE synthetic 7c ModifyPowerToughness carrying
@@ -3999,6 +4044,9 @@ data ControlGrant = MkControlGrant
 -- via Pawl.ProjectionSpec's two Celestial Dawn cases. Pawl.ProjectionSpec's "a
 -- layer-6 strip on the Aura does not undo its layer-2 grant" pins the same
 -- direction for layer 6.
+--
+-- Not implemented: CR 604.2's "as long as" gate, which setLandSubtypeEffects does
+-- ask -- the same mutual recursion rules it out here (#1529).
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let grantsOf permId = case Game.lookupObject permId gs of
