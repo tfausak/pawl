@@ -5,8 +5,9 @@
 -- (concede) is IMMEDIATE and Pawl.Engine.Engine reaches it directly.
 --
 -- The QUERY half -- Game.stillPlaying / Game.stillPlayingInOrder -- lives in
--- Pawl.Engine.Game instead. This module imports Pawl.Engine.Monarch (CR 725.4
--- reassignment happens inside `depart`) and Monarch imports Pawl.Engine.Event,
+-- Pawl.Engine.Game instead. This module imports Pawl.Engine.Event, both directly
+-- (CR 800.4a records events and files last known information of its own) and
+-- through Pawl.Engine.Monarch (CR 725.4 reassignment happens inside `depart`),
 -- so the event pipeline cannot reach the question through here.
 module Pawl.Engine.Departure where
 
@@ -14,7 +15,9 @@ import Control.Applicative ((<|>))
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Projection as Projection
@@ -22,8 +25,10 @@ import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Decider as Decider
 import Pawl.Types.Departure (Departure)
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -84,8 +89,12 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- parts of the combat record that stop meaning anything once the id is gone.
 --
 -- Leaving the game is not a zone change, so this does not funnel through
--- Pawl.Engine.Event: no Moved event, no CR 616 replacement, no trigger --
+-- Event.changeZoneAttaching: no Moved event and no CR 616 replacement --
 -- Pawl.Engine.Sba's CR 704.5d token cease is the same shape for the same reason.
+-- What it DOES borrow from that funnel is what CR 800.4a shares with a move: the
+-- object ceases, so its CR 608.2h last known information is filed as it goes, and
+-- a permanent's departure is recorded as a GameEvent.LeftTheGame so CR 603.6c's
+-- second trigger event can be matched. Both are below.
 --
 -- Combat.blockers is DELIBERATELY left untouched. Above all the KEY must stay:
 -- it is the record of blocked-ness (Combat.isBlocked), and CR 509.1h keeps a
@@ -107,7 +116,7 @@ continuesAfterDeparture gs = length (GameState.turnOrder gs) > 2
 -- deleted PLANESWALKER as its target (CR 306.6) is left alone and read the same
 -- way -- Combat.stillAttacked asks the battlefield (CR 506.4).
 --
--- Three more things it deliberately does NOT touch, each because CR 800.4a
+-- More things it deliberately does NOT touch, each because CR 800.4a
 -- does not reach them:
 --
 --   * GameState.continuousEffects, GameState.replacements and
@@ -165,7 +174,62 @@ objectsLeaveWith pid gs =
                 GameState.haunting = Map.delete oid (GameState.haunting g1),
                 GameState.exiledWith = Map.delete oid (GameState.exiledWith g1)
               }
-   in List.foldl' leave gs owned
+      -- CR 608.2h: each object ceases here, so this is the last moment its
+      -- information is known -- the same five-part record
+      -- Event.changeZoneAttaching files at the same point of a zone change, read
+      -- from the same board and filed under the id the object had while it
+      -- existed. Nothing mints a new incarnation for a departure, so that id is
+      -- the only route back to what the object was.
+      --
+      -- Taken against `gs`, the board BEFORE any of them left, rather than
+      -- against the fold's running state: rule 800.4a's first clause is one
+      -- event, so a permanent's record must not read a board its siblings have
+      -- already been removed from. Event.changeZoneInBatch's `asOf` is the same
+      -- reading for the same reason.
+      --
+      -- Filed for every object the player owned, in every zone, exactly as the
+      -- zone-change funnel files for every move -- the reader decides which ones
+      -- it has a question about.
+      filed oid = case Map.lookup oid (GameState.objects gs) of
+        -- Unreachable: `owned` is drawn from GameState.objects itself.
+        Nothing -> Nothing
+        Just obj ->
+          Just
+            ( oid,
+              LastKnown.MkLastKnown
+                (Projection.project oid gs)
+                -- CR 613.1b, and the reason this record is what a departure's
+                -- trigger is read from: a permanent this player OWNED could
+                -- have been controlled by somebody still in the game right up
+                -- to the moment it left, and CR 603.3a hands that player its
+                -- ability. The Object.owner fallback is unreachable for the
+                -- reason Event.changeZoneAttaching gives at its own call.
+                (Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs))
+                (Object.source obj)
+                (Object.counters obj)
+                (Event.copiedSnapshot oid gs)
+            )
+      -- CR 603.6c's second trigger event: "when a phased-in permanent leaves the
+      -- game because its owner leaves the game". Only those, which is CR 702.26k
+      -- saying the phased-out ones cause no zone-change ability to trigger --
+      -- and membership of GameState.battlefield is exactly that distinction,
+      -- since Pawl.Engine.Phasing takes a phased-out permanent out of that set
+      -- and leaves its Object.zone alone.
+      --
+      -- Not a GameEvent.Moved: leaving the game reaches no zone (see
+      -- Pawl.Types.GameEvent.LeftTheGame). Nothing else is recorded -- a card
+      -- that was in a hand, a library, a graveyard, exile or on the stack leaves
+      -- with its owner too, and no rule watches for that.
+      --
+      -- ONE event group for the batch (CR 800.4a is a single instant), so a
+      -- look-back condition reads them as simultaneous rather than as a
+      -- sequence.
+      permanents = filter (\oid -> Set.member oid (GameState.battlefield gs)) owned
+      removed = List.foldl' leave gs owned
+      recorded = removed {GameState.lastKnown = Map.fromList (Maybe.mapMaybe filed owned) <> GameState.lastKnown removed}
+   in Event.simultaneouslyPure
+        (\g -> List.foldl' (\g1 oid -> Event.recordEvent (GameEvent.LeftTheGame oid) g1) g permanents)
+        recorded
 
 -- CR 800.4a, second clause: any effects which give that player control of
 -- objects or players end.

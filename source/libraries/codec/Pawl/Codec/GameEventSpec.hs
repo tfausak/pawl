@@ -299,3 +299,11 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.BecameTarget (BecameTarget.MkBecameTarget (ObjectId.MkObjectId 9) (ObjectId.MkObjectId 10) (PlayerId.MkPlayerId 2)))
       """ {"type":"BecameTarget","value":{"targeted":9,"source":10,"controller":2}} """
+  -- CR 800.4a. One id, TurnedFaceUp's payload again: the object left the game, so
+  -- there is no destination zone to carry and no new incarnation to name.
+  Spec.it s "LeftTheGame" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.LeftTheGame (ObjectId.MkObjectId 7))
+      """ {"type":"LeftTheGame","value":7} """

@@ -654,4 +654,23 @@ data GameEvent
     -- targets, an ACTIVATED ability records no cast event at all, and this is one
     -- event per target rather than one per announcement.
     BecameTarget BecameTarget.BecameTarget
+  | -- | CR 800.4a: a permanent left the GAME, rather than the battlefield,
+    -- because its owner left the game. The ObjectId is the id it had while it
+    -- existed -- the key Pawl.Engine.Departure files its CR 608.2h last known
+    -- information under, and the only route back to what it was, since leaving
+    -- the game mints no new incarnation for it to become.
+    --
+    -- Not a GameEvent.Moved, and the difference is the rules': CR 800.4a takes
+    -- the object out of the game entirely, so there is no destination zone to
+    -- name and CR 400.7 never runs. A Moved carrying an invented destination
+    -- would answer "did it go to a graveyard" -- which is what CR 700.4's
+    -- "dies" asks -- and the answer would be a fiction.
+    --
+    -- Emitted for a PHASED-IN BATTLEFIELD permanent and for nothing else, which
+    -- is exactly the set CR 603.6c's second trigger event ranges over: rule
+    -- 702.26k says a phased-out permanent leaving this way causes no zone-change
+    -- ability to trigger, and no rule reads the departure of a card that was in
+    -- a hand, a library, a graveyard, exile or on the stack. Those still file
+    -- last known information; what they do not do is enter this log.
+    LeftTheGame ObjectId.ObjectId
   deriving (Eq, Ord, Show)

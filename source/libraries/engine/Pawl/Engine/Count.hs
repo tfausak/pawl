@@ -442,6 +442,7 @@ snapshotView gs shape event = case event of
   -- CR 601.2c's targeting names two objects by id and snapshots no
   -- characteristics, so no EventShape names it either.
   GameEvent.BecameTarget {} -> Nothing
+  GameEvent.LeftTheGame _ -> Nothing
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a
