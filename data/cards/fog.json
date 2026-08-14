@@ -27,16 +27,16 @@
                       },
                       "effect": {
                         "type": "DamageR",
-                        "value": [
-                          {
+                        "value": {
+                          "matching": {
                             "whichKind": {
                               "type": "Combat"
                             }
                           },
-                          {
+                          "rewrite": {
                             "type": "PreventAll"
                           }
-                        ]
+                        }
                       },
                       "origin": {
                         "type": "Other"

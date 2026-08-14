@@ -26,8 +26,9 @@
         {
           "effect": {
             "type": "IncreaseSpellCost",
-            "value": [
-              {
+            "value": {
+              "amount": 1,
+              "whichSpells": {
                 "type": "Not",
                 "value": {
                   "type": "HasCardType",
@@ -35,9 +36,8 @@
                     "type": "Creature"
                   }
                 }
-              },
-              1
-            ]
+              }
+            }
           },
           "scope": {
             "type": "EachPlayer"

@@ -32,8 +32,8 @@
           "modifications": [
             {
               "type": "ModifyPowerToughness",
-              "value": [
-                {
+              "value": {
+                "power": {
                   "type": "Halved",
                   "value": [
                     {
@@ -77,7 +77,7 @@
                     }
                   ]
                 },
-                {
+                "toughness": {
                   "type": "Halved",
                   "value": [
                     {
@@ -121,7 +121,7 @@
                     }
                   ]
                 }
-              ]
+              }
             }
           ]
         }

@@ -21,8 +21,14 @@
         {
           "effect": {
             "type": "ReduceSpellCost",
-            "value": [
-              {
+            "value": {
+              "reduction": [
+                {
+                  "type": "Generic",
+                  "value": 1
+                }
+              ],
+              "whichSpells": {
                 "type": "Or",
                 "value": [
                   {
@@ -38,14 +44,8 @@
                     }
                   }
                 ]
-              },
-              [
-                {
-                  "type": "Generic",
-                  "value": 1
-                }
-              ]
-            ]
+              }
+            }
           },
           "scope": {
             "type": "You"

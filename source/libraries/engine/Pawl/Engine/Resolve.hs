@@ -54,6 +54,7 @@ import qualified Pawl.Types.BecameDesignated as BecameDesignated
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.Chooser as Chooser
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -70,6 +71,7 @@ import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Decider as Decider
@@ -2050,26 +2052,28 @@ installDamageRow players controller source duration kind rewrite rider g recipie
           ActiveReplacement.MkActiveReplacement
             { ActiveReplacement.effect =
                 ReplacementEffect.DamageR
-                  DamagePattern.MkDamagePattern
-                    { -- PRINTED, not assumed. Both prevention producers say
-                      -- "damage that would be dealt", naming no kind, and pass
-                      -- Nothing so the shield takes combat and noncombat alike;
-                      -- Turn the Tables says "all COMBAT damage" and passes
-                      -- Just Combat.
-                      DamagePattern.whichKind = kind,
-                      -- Nor does either name a source, which is CR 615.7's own
-                      -- "the number of events or sources dealing it doesn't
-                      -- matter" -- so the trivial predicate, admitting every
-                      -- source.
-                      --
-                      -- Not implemented: CR 615.9's shield against a source of a
-                      -- player's CHOICE, which CR 609.7a has chosen when the
-                      -- effect is created and which this arm would have to bake
-                      -- the way it bakes the recipient (#1327).
-                      DamagePattern.whatSource = Filter.Type.And [],
-                      DamagePattern.whichRecipient = Just recipient
-                    }
-                  rewrite,
+                  ( DamageR.MkDamageR
+                      DamagePattern.MkDamagePattern
+                        { -- PRINTED, not assumed. Both prevention producers say
+                          -- "damage that would be dealt", naming no kind, and pass
+                          -- Nothing so the shield takes combat and noncombat alike;
+                          -- Turn the Tables says "all COMBAT damage" and passes
+                          -- Just Combat.
+                          DamagePattern.whichKind = kind,
+                          -- Nor does either name a source, which is CR 615.7's own
+                          -- "the number of events or sources dealing it doesn't
+                          -- matter" -- so the trivial predicate, admitting every
+                          -- source.
+                          --
+                          -- Not implemented: CR 615.9's shield against a source of a
+                          -- player's CHOICE, which CR 609.7a has chosen when the
+                          -- effect is created and which this arm would have to bake
+                          -- the way it bakes the recipient (#1327).
+                          DamagePattern.whatSource = Filter.Type.And [],
+                          DamagePattern.whichRecipient = Just recipient
+                        }
+                      rewrite
+                  ),
               ActiveReplacement.source = source,
               -- CR 109.5, baked as Replace's is: nothing reads it on one of
               -- these rows today (the pattern names its recipient outright and
@@ -2277,7 +2281,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
                       { ContinuousEffect.source = source,
                         ContinuousEffect.timestamp = ts,
                         ContinuousEffect.expiry = expiry,
-                        ContinuousEffect.modification = Modification.ChangeSubtypeWord from to,
+                        ContinuousEffect.modification = Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to),
                         ContinuousEffect.affected = Affected.TheseObjects (Set.singleton target)
                       }
                in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}

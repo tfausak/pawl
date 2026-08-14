@@ -36,22 +36,22 @@
                       },
                       "modification": {
                         "type": "ModifyPowerToughness",
-                        "value": [
-                          {
+                        "value": {
+                          "power": {
                             "type": "Negate",
                             "value": {
                               "type": "InSlot",
                               "value": "X"
                             }
                           },
-                          {
+                          "toughness": {
                             "type": "Negate",
                             "value": {
                               "type": "InSlot",
                               "value": "X"
                             }
                           }
-                        ]
+                        }
                       },
                       "ref": {
                         "type": "EachMatching",

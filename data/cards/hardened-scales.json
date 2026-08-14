@@ -16,8 +16,8 @@
       "replacementEffects": [
         {
           "type": "CounterR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "onWhat": {
                 "type": "HasCardType",
                 "value": {
@@ -31,11 +31,11 @@
                 "type": "Yours"
               }
             },
-            {
+            "scaling": {
               "type": "AddMore",
               "value": 1
             }
-          ]
+          }
         }
       ],
       "typeLine": {

@@ -33,6 +33,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
@@ -209,7 +210,7 @@ populatedFace =
     { Face.keywords = Set.singleton Keyword.Deathtouch,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
       Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing],
-      Face.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.AsCopy [])],
+      Face.replacementEffects = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy []))],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       Face.loyalty = Just (Loyalty.MkLoyalty 3),
@@ -244,7 +245,7 @@ populatedFaceJson =
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
     <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[]},"
     <> "\"modal\":{\"modes\":[{}]}}],"
-    <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":[{\"type\":\"IsSource\"},{\"type\":\"AsCopy\"}]}],"
+    <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"AsCopy\"}}}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"

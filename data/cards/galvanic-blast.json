@@ -75,17 +75,17 @@
                       },
                       "effect": {
                         "type": "DamageR",
-                        "value": [
-                          {
+                        "value": {
+                          "matching": {
                             "whatSource": {
                               "type": "IsSource"
                             }
                           },
-                          {
+                          "rewrite": {
                             "type": "SetAmount",
                             "value": 4
                           }
-                        ]
+                        }
                       },
                       "origin": {
                         "type": "SelfReplacement"

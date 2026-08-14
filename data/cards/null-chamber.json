@@ -38,11 +38,11 @@
       "replacementEffects": [
         {
           "type": "EntryR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "type": "IsSource"
             },
-            {
+            "rewrite": {
               "type": "ChooseCardNames",
               "value": {
                 "type": "Not",
@@ -65,7 +65,7 @@
                 }
               }
             }
-          ]
+          }
         }
       ],
       "typeLine": {

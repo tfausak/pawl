@@ -20,22 +20,22 @@
       "replacementEffects": [
         {
           "type": "TokenR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "whose": {
                 "type": "Yours"
               }
             },
-            {
+            "scaling": {
               "type": "Multiply",
               "value": 2
             }
-          ]
+          }
         },
         {
           "type": "CounterR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "onWhat": {
                 "type": "And",
                 "value": []
@@ -44,11 +44,11 @@
                 "type": "Yours"
               }
             },
-            {
+            "scaling": {
               "type": "Multiply",
               "value": 2
             }
-          ]
+          }
         }
       ],
       "typeLine": {

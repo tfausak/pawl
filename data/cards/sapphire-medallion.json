@@ -12,20 +12,20 @@
         {
           "effect": {
             "type": "ReduceSpellCost",
-            "value": [
-              {
-                "type": "HasColor",
-                "value": {
-                  "type": "Blue"
-                }
-              },
-              [
+            "value": {
+              "reduction": [
                 {
                   "type": "Generic",
                   "value": 1
                 }
-              ]
-            ]
+              ],
+              "whichSpells": {
+                "type": "HasColor",
+                "value": {
+                  "type": "Blue"
+                }
+              }
+            }
           },
           "scope": {
             "type": "You"

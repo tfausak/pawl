@@ -2,10 +2,12 @@ module Pawl.Types.Modification where
 
 import qualified Data.Set as Set
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.PlayerId as PlayerId
-import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -15,14 +17,14 @@ import qualified Pawl.Types.Supertype as Supertype
 -- constructor -- the same standing Pawl.Engine.Resolve has over Effect.
 -- Pawl.CardSpec's lints also case on it, legitimately: a test-suite lint that
 -- walks the card pool is not rules core. GainKeyword carries a Keyword, a
--- closed-half CITATION, so casing on it is not an invariant violation. P/T
--- constructors carry signed Quantity. The layer-4 arms below reach card types,
+-- closed-half CITATION, so casing on it is not an invariant violation. The P/T
+-- arms carry records of signed Quantity. The layer-4 arms below reach card types,
 -- subtypes and supertypes, which CR 205.4b keeps independent of one another.
 data Modification
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
   | LoseAllAbilities -- layer 6 (Humility)
-  | SetBasePowerToughness Quantity.Quantity Quantity.Quantity -- layer 7b (Humility 1/1; Opalescence mana value)
-  | ModifyPowerToughness Quantity.Quantity Quantity.Quantity -- layer 7c (Giant Growth +3/+3)
+  | SetBasePowerToughness SetBasePowerToughness.SetBasePowerToughness -- layer 7b (Humility 1/1; Opalescence mana value)
+  | ModifyPowerToughness ModifyPowerToughness.ModifyPowerToughness -- layer 7c (Giant Growth +3/+3)
   | SetLandSubtype Subtype.Subtype -- layer 4, CR 305.7 set (Blood Moon -> Mountain)
   | -- | layer 4, CR 613.1d / 305.7: set this object's land subtype to the basic
     -- land type chosen for THIS effect's SOURCE as that source entered
@@ -88,7 +90,7 @@ data Modification
     -- grant above, and the same rule governs it: the object's OTHER supertypes
     -- survive, and neither its card types nor its subtypes move.
     RemoveSupertype Supertype.Supertype
-  | ChangeSubtypeWord Subtype.Subtype Subtype.Subtype -- layer 3, CR 612 (Magical Hack, Artificial Evolution: from -> to)
+  | ChangeSubtypeWord ChangeSubtypeWord.ChangeSubtypeWord -- layer 3, CR 612 (Magical Hack, Artificial Evolution: from -> to)
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect (GainControl) -- it is
     -- the effect's source's controller, never chosen. Applied only by

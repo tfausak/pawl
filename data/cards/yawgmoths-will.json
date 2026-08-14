@@ -52,8 +52,11 @@
                       },
                       "effect": {
                         "type": "ZoneChangeR",
-                        "value": [
-                          {
+                        "value": {
+                          "destination": {
+                            "type": "Exile"
+                          },
+                          "matching": {
                             "whatObject": {
                               "type": "Not",
                               "value": {
@@ -66,11 +69,8 @@
                             "whoseObject": {
                               "type": "Yours"
                             }
-                          },
-                          {
-                            "type": "Exile"
                           }
-                        ]
+                        }
                       },
                       "origin": {
                         "type": "Other"

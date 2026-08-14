@@ -20,8 +20,11 @@
       "replacementEffects": [
         {
           "type": "ZoneChangeR",
-          "value": [
-            {
+          "value": {
+            "destination": {
+              "type": "Exile"
+            },
+            "matching": {
               "whatObject": {
                 "type": "HasColor",
                 "value": {
@@ -31,11 +34,8 @@
               "whenDestination": {
                 "type": "Stack"
               }
-            },
-            {
-              "type": "Exile"
             }
-          ]
+          }
         }
       ],
       "typeLine": {

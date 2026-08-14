@@ -47,6 +47,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
@@ -321,7 +322,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, board) = S.addCreature piker S.alice gs0
         switched = S.withEffect pikerId Modification.SwitchPowerToughness board
-        gs = S.withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0)) switched
+        gs = S.withEffect pikerId (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 0))) switched
     Spec.assertEqWith s "power is the pumped toughness" (Projection.powerOf pikerId gs) (Just 1)
     Spec.assertEqWith s "toughness is the pumped power" (Projection.toughnessOf pikerId gs) (Just 4)
   Spec.it s "CR 613.4d 2021-03-19 two switches return the object to normal" $ do

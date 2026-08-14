@@ -33,6 +33,7 @@ import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DealDamage as DealDamage
@@ -598,10 +599,10 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               Replace.uses = Uses.Once,
               Replace.origin = ReplacementOrigin.SelfReplacement,
               Replace.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3))),
-              Replace.effect = ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing) (DamageRewrite.SetAmount 4)
+              Replace.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing) (DamageRewrite.SetAmount 4))
             }
       )
-      """ {"type":"Replace","value":{"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"SelfReplacement"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},"effect":{"type":"DamageR","value":[{"whatSource":{"type":"IsSource"}},{"type":"SetAmount","value":4}]}}} """
+      """ {"type":"Replace","value":{"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"SelfReplacement"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},"effect":{"type":"DamageR","value":{"matching":{"whatSource":{"type":"IsSource"}},"rewrite":{"type":"SetAmount","value":4}}}}} """
   -- CR 614.10a: a slot read, plus the whole-phase selector -- the arm a Phase
   -- alone cannot spell (CR 500.1).
   Spec.it s "SkipNextPhase" $ do

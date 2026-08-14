@@ -78,6 +78,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -1396,7 +1397,7 @@ anthemEmblemCard piker =
                     StaticAbility.condition = Nothing,
                     StaticAbility.lingers = Nothing,
                     StaticAbility.modifications =
-                      NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))
+                      NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)))
                   }
               ]
           }

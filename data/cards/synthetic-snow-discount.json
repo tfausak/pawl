@@ -12,19 +12,19 @@
         {
           "effect": {
             "type": "ReduceSpellCost",
-            "value": [
-              {
+            "value": {
+              "reduction": [
+                {
+                  "type": "Snow"
+                }
+              ],
+              "whichSpells": {
                 "type": "HasColor",
                 "value": {
                   "type": "Green"
                 }
-              },
-              [
-                {
-                  "type": "Snow"
-                }
-              ]
-            ]
+              }
+            }
           },
           "scope": {
             "type": "You"

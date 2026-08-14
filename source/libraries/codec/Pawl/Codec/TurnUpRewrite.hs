@@ -1,21 +1,12 @@
 module Pawl.Codec.TurnUpRewrite where
 
-import qualified Numeric.Natural as Natural
-import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.WithCounters as WithCounters
 import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
-import qualified Pawl.Types.CounterKind as CounterKind
-import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
-
--- | The kind-and-count pair, named once so both directions read the same order
--- out of the two-element array.
-counters :: Codec.Codec (CounterKind.CounterKind Keyword.Keyword, Natural.Natural)
-counters = Common.tuple (CounterKind.codec Keyword.codec) Common.natural
 
 codec :: Codec.Codec TurnUpRewrite.TurnUpRewrite
 codec =

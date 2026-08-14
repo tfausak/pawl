@@ -28,6 +28,7 @@ import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.ChangeText as ChangeText
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
@@ -42,6 +43,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DealDamage as DealDamage
 import qualified Pawl.Types.Defense as Defense
@@ -52,6 +54,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -74,6 +77,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.Modification (Modification)
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.Object as Object
@@ -92,6 +96,7 @@ import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.RequireBlock as RequireBlock
 import qualified Pawl.Types.Search as Search
+import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.ShuffleIntoLibrary as ShuffleIntoLibrary
 import qualified Pawl.Types.SpellCast as SpellCast
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -113,8 +118,8 @@ layer :: Modification -> Layer
 layer m = case m of
   Modification.GainKeyword _ -> Layer.Ability
   Modification.LoseAllAbilities -> Layer.Ability
-  Modification.SetBasePowerToughness _ _ -> Layer.SetPT
-  Modification.ModifyPowerToughness _ _ -> Layer.ModifyPT
+  Modification.SetBasePowerToughness {} -> Layer.SetPT
+  Modification.ModifyPowerToughness {} -> Layer.ModifyPT
   Modification.SetLandSubtype _ -> Layer.Type
   Modification.SetLandSubtypeToChosen -> Layer.Type
   Modification.AddLandSubtype _ -> Layer.Type
@@ -124,7 +129,7 @@ layer m = case m of
   Modification.AddCardType _ -> Layer.Type
   Modification.AddSupertype _ -> Layer.Type
   Modification.RemoveSupertype _ -> Layer.Type
-  Modification.ChangeSubtypeWord _ _ -> Layer.Text
+  Modification.ChangeSubtypeWord {} -> Layer.Text
   Modification.SetController _ -> Layer.Control
   Modification.SetControllerToSource -> Layer.Control
   Modification.SetColor _ -> Layer.Color
@@ -171,12 +176,12 @@ applyModification viewOf src gs oid m pc =
               PC.replacementEffects = [],
               PC.triggeredAbilities = []
             }
-        Modification.SetBasePowerToughness p t ->
+        Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) ->
           pc
             { PC.power = setPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
               PC.toughness = setPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
             }
-        Modification.ModifyPowerToughness p t ->
+        Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) ->
           pc
             { PC.power = addPT (PC.power pc) (Quantity.evaluate viewOf context gs oid p),
               PC.toughness = addPT (PC.toughness pc) (Quantity.evaluate viewOf context gs oid t)
@@ -261,7 +266,7 @@ applyModification viewOf src gs oid m pc =
         --
         -- Not implemented: the swap does not reach PC.replacementEffects, a
         -- mode's targetSlots, or an activated ability's cost (#635).
-        Modification.ChangeSubtypeWord from to ->
+        Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           let pairs = [(from, to)]
               pc' =
                 pc
@@ -1175,8 +1180,8 @@ freezeQuantities gs oid you m =
       context = Filter.contextFor you (Just oid)
       freeze q = fmap Quantity.Type.Literal (Quantity.evaluate viewOf context gs oid q)
    in case m of
-        Modification.SetBasePowerToughness p t -> Modification.SetBasePowerToughness <$> freeze p <*> freeze t
-        Modification.ModifyPowerToughness p t -> Modification.ModifyPowerToughness <$> freeze p <*> freeze t
+        Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> fmap Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness <$> freeze p <*> freeze t)
+        Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> fmap Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness <$> freeze p <*> freeze t)
         -- Every other modification carries no quantity to freeze, so it stores as
         -- written; named explicitly per Modification's exhaustiveness discipline.
         Modification.GainKeyword _ -> Just m
@@ -1190,7 +1195,7 @@ freezeQuantities gs oid you m =
         Modification.AddCardType _ -> Just m
         Modification.AddSupertype _ -> Just m
         Modification.RemoveSupertype _ -> Just m
-        Modification.ChangeSubtypeWord _ _ -> Just m
+        Modification.ChangeSubtypeWord {} -> Just m
         Modification.SetController _ -> Just m
         Modification.SetControllerToSource -> Just m
         Modification.SetColor _ -> Just m
@@ -1203,8 +1208,8 @@ freezeQuantities gs oid you m =
 -- forces the arm to exist, not to be right.
 quantitiesOf :: Modification -> [Quantity.Type.Quantity]
 quantitiesOf m = case m of
-  Modification.SetBasePowerToughness p t -> [p, t]
-  Modification.ModifyPowerToughness p t -> [p, t]
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> [p, t]
+  Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> [p, t]
   Modification.GainKeyword _ -> []
   Modification.LoseAllAbilities -> []
   Modification.SetLandSubtype _ -> []
@@ -1216,7 +1221,7 @@ quantitiesOf m = case m of
   Modification.AddCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
-  Modification.ChangeSubtypeWord _ _ -> []
+  Modification.ChangeSubtypeWord {} -> []
   Modification.SetController _ -> []
   Modification.SetControllerToSource -> []
   Modification.SetColor _ -> []
@@ -1413,7 +1418,7 @@ appliedSetEffects setEffs gs =
 textChangesAffecting :: ObjectId -> GameState -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)]
 textChangesAffecting oid gs =
   let pairOf eff = case ContinuousEffect.modification eff of
-        Modification.ChangeSubtypeWord from to ->
+        Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           if affects (ContinuousEffect.source eff) oid (ContinuousEffect.affected eff) (baseCharacteristics oid gs) gs
             then Just (from, to)
             else Nothing
@@ -1478,8 +1483,8 @@ rewriteModification pairs m =
         -- Not implemented: a Quantity.Count carries a Filter, and it is left
         -- unrewritten, so a "+1/+1 for each Swamp you control" would keep
         -- counting Swamps after a swap (#711).
-        Modification.SetBasePowerToughness _ _ -> acc
-        Modification.ModifyPowerToughness _ _ -> acc
+        Modification.SetBasePowerToughness {} -> acc
+        Modification.ModifyPowerToughness {} -> acc
         -- CR 205.2a's card types are a different list from CR 205.3's subtypes,
         -- so this position holds no word a subtype pair could name. CR 205.4a's
         -- supertypes are a third list, and the two arms below hold one of those.
@@ -1490,7 +1495,7 @@ rewriteModification pairs m =
         -- resolution announced (CR 608.2d), not words printed on the object this
         -- rewrite walks. A text changer's PRINTED clause is reached instead, by
         -- rewriteEffect's ChangeText arm.
-        Modification.ChangeSubtypeWord _ _ -> acc
+        Modification.ChangeSubtypeWord {} -> acc
         -- CR 612.2 names colour words as a family a text change can swap, but
         -- pawl's only text changer swaps subtypes (Modification.ChangeSubtypeWord),
         -- so no pair reaching here holds a colour word to write.
@@ -2330,11 +2335,11 @@ removesAbilities m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
-  Modification.SetBasePowerToughness _ _ -> False
-  Modification.ModifyPowerToughness _ _ -> False
+  Modification.SetBasePowerToughness {} -> False
+  Modification.ModifyPowerToughness {} -> False
   Modification.SwitchPowerToughness -> False
   Modification.AddLandSubtype _ -> False
-  Modification.ChangeSubtypeWord _ _ -> False
+  Modification.ChangeSubtypeWord {} -> False
   Modification.AddCardType _ -> False
   -- CR 205.4b changes a supertype and says nothing about abilities. CR 305.7's
   -- strip is the land arms' alone, and a permanent that becomes legendary or
@@ -2554,7 +2559,7 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
             minus = toInteger (Map.findWithDefault 0 CounterKind.MinusOneMinusOne cs)
             d = plus - minus
             pt =
-              [ at Layer.ModifyPT (Modification.ModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d))
+              [ at Layer.ModifyPT (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal d) (Quantity.Type.Literal d)))
               | d /= 0
               ]
             grantOf (kind, n) = case kind of
@@ -2810,8 +2815,8 @@ modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.singleton Keywords
   Modification.LoseAllAbilities -> Set.singleton Keywords
-  Modification.SetBasePowerToughness _ _ -> Set.singleton PowerA
-  Modification.ModifyPowerToughness _ _ -> Set.singleton PowerA
+  Modification.SetBasePowerToughness {} -> Set.singleton PowerA
+  Modification.ModifyPowerToughness {} -> Set.singleton PowerA
   Modification.SwitchPowerToughness -> Set.singleton PowerA
   Modification.SetLandSubtype _ -> Set.fromList [Subtypes, Keywords]
   Modification.SetLandSubtypeToChosen -> Set.fromList [Subtypes, Keywords]
@@ -2819,7 +2824,7 @@ modificationWrites m = case m of
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
   Modification.AddEveryCreatureSubtype -> Set.singleton Subtypes
-  Modification.ChangeSubtypeWord _ _ -> Set.fromList [Subtypes, Keywords]
+  Modification.ChangeSubtypeWord {} -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
   Modification.AddSupertype _ -> Set.singleton Supertypes
   Modification.RemoveSupertype _ -> Set.singleton Supertypes
@@ -2841,8 +2846,8 @@ modificationWrites m = case m of
 -- classified here, or the dependency would silently stop being seen.
 modificationReads :: Modification -> Set Aspect
 modificationReads m = case m of
-  Modification.SetBasePowerToughness p t -> quantityReads p <> quantityReads t
-  Modification.ModifyPowerToughness p t -> quantityReads p <> quantityReads t
+  Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityReads p <> quantityReads t
+  Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityReads p <> quantityReads t
   Modification.GainKeyword _ -> Set.empty
   Modification.LoseAllAbilities -> Set.empty
   Modification.SwitchPowerToughness -> Set.empty
@@ -2852,7 +2857,7 @@ modificationReads m = case m of
   Modification.SetCreatureSubtype _ -> Set.empty
   Modification.AddCreatureSubtype _ -> Set.empty
   Modification.AddEveryCreatureSubtype -> Set.empty
-  Modification.ChangeSubtypeWord _ _ -> Set.empty
+  Modification.ChangeSubtypeWord {} -> Set.empty
   Modification.AddCardType _ -> Set.empty
   Modification.AddSupertype _ -> Set.empty
   Modification.RemoveSupertype _ -> Set.empty
@@ -3640,12 +3645,14 @@ shieldOf oid gs =
     else
       [ ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter,
         ReplacementEffect.DamageR
-          DamagePattern.MkDamagePattern
-            { DamagePattern.whichKind = Nothing,
-              DamagePattern.whatSource = Filter.Type.And [],
-              DamagePattern.whichRecipient = Nothing
-            }
-          DamageRewrite.PreventRemovingShieldCounter
+          ( DamageR.MkDamageR
+              DamagePattern.MkDamagePattern
+                { DamagePattern.whichKind = Nothing,
+                  DamagePattern.whatSource = Filter.Type.And [],
+                  DamagePattern.whichRecipient = Nothing
+                }
+              DamageRewrite.PreventRemovingShieldCounter
+          )
       ]
 
 -- CR 122.1c: how many shield counters this object has, which is how many more
@@ -3704,7 +3711,7 @@ intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
 intrinsicReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
   -- is Filter.IsSource.
-  ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty n))
+  ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty n)))
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
   ]
@@ -3712,7 +3719,7 @@ intrinsicReplacementsOf pc =
     -- counters on it equal to its printed defense number" -- CR 306.5b's clause
     -- one rule number over, keyed on the projected card type and reading the
     -- projected defense for the same three reasons.
-    <> [ ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Defense n))
+    <> [ ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Defense n)))
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]
@@ -3794,8 +3801,8 @@ grantsKeywordWhere :: (Keyword -> Bool) -> Modification.Modification -> Bool
 grantsKeywordWhere p m = case m of
   Modification.GainKeyword k -> p k
   Modification.LoseAllAbilities -> False
-  Modification.SetBasePowerToughness _ _ -> False
-  Modification.ModifyPowerToughness _ _ -> False
+  Modification.SetBasePowerToughness {} -> False
+  Modification.ModifyPowerToughness {} -> False
   Modification.SetLandSubtype _ -> False
   Modification.SetLandSubtypeToChosen -> False
   Modification.AddLandSubtype _ -> False
@@ -3805,7 +3812,7 @@ grantsKeywordWhere p m = case m of
   Modification.AddCardType _ -> False
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False
-  Modification.ChangeSubtypeWord _ _ -> False
+  Modification.ChangeSubtypeWord {} -> False
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
   Modification.SetColor _ -> False

@@ -159,14 +159,14 @@
       "replacementEffects": [
         {
           "type": "EntryR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "type": "IsSource"
             },
-            {
+            "rewrite": {
               "type": "Tapped"
             }
-          ]
+          }
         }
       ],
       "typeLine": {

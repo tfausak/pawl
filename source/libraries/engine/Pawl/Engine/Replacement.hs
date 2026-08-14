@@ -51,12 +51,15 @@ import qualified Pawl.Types.CopyException as CopyException
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
+import qualified Pawl.Types.CounterR as CounterR
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Expiry as Expiry
 import Pawl.Types.ExtraTurn (ExtraTurn)
@@ -92,11 +95,14 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SetPowerToughness as SetPowerToughness
 import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.TokenR as TokenR
+import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
 import Pawl.Types.ZoneChange (ZoneChange)
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 asZoneChange :: ProposedEvent -> Maybe ZoneChange
 asZoneChange event = case event of
@@ -291,14 +297,14 @@ applies gs event candidate =
         -- CR 614.1a: which zone changes this redirect intercepts -- the
         -- destination, the moving object's OWNER, and (Anafenza, the Foremost's
         -- "a nontoken creature") what the moving object IS.
-        (ReplacementEffect.ZoneChangeR pat _, ProposedEvent.WouldChangeZone zc) ->
+        (ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR pat _), ProposedEvent.WouldChangeZone zc) ->
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
             && matchesZoneOwner gs (ReplacementCandidate.controller candidate) (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
         -- plus the one fact about the ROW rather than the event -- a shield
         -- spent to nothing is no longer a prevention effect.
-        (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) ->
+        (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite), ProposedEvent.WouldDealDamage de) ->
           matchesDamagePattern gs (candidateContext candidate) pat de && unspent rewrite && admitsRecipient src rewrite de
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only. CR
@@ -307,7 +313,7 @@ applies gs event candidate =
         -- DestructionR carries no pattern because both producers are self-scoped.
         (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid regenerability cause) ->
           src == oid && admits regenerability cause rewrite
-        (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutCounters cause oid kind _) ->
+        (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldPutCounters cause oid kind _) ->
           -- Our own encoding convention, not a rule: `whichKind = Nothing` means
           -- any kind, never no kind.
           maybe True (== kind) (CounterPattern.whichKind pat)
@@ -319,13 +325,13 @@ applies gs event candidate =
         -- kinds, and a player can hold no counter of one (see
         -- Pawl.Types.CounterPattern), so Hardened Scales stays off a poison
         -- counter without saying so.
-        (ReplacementEffect.CounterR pat _, ProposedEvent.WouldPutPlayerCounters cause pid _ _) ->
+        (ReplacementEffect.CounterR (CounterR.MkCounterR pat _), ProposedEvent.WouldPutPlayerCounters cause pid _ _) ->
           Maybe.isNothing (CounterPattern.whichKind pat)
             && matchesPutter gs src (CounterPattern.byWhom pat) cause
             && maybe False (\rel -> matchesPlayer gs src rel pid) (CounterPattern.onWho pat)
         -- CR 109.5: "under YOUR control" -- the tokens' controller against the
         -- effect source's controller. CR 102.2's Opponents has no producer today.
-        (ReplacementEffect.TokenR pat _, ProposedEvent.WouldCreateTokens pid _ _) ->
+        (ReplacementEffect.TokenR (TokenR.MkTokenR pat _), ProposedEvent.WouldCreateTokens pid _ _) ->
           matchesPlayer gs src (TokenPattern.whose pat) pid
         -- CR 614.1b / 500.11: a skip intercepts a step or phase BEGINNING, and
         -- names exactly which one -- and, for a player-scoped skip, whose.
@@ -349,7 +355,7 @@ applies gs event candidate =
         -- Filter over the entering object (see Pawl.Types.ReplacementEffect).
         -- 614.1c's self-scope is Filter.IsSource; 614.1d's is a characteristic
         -- filter.
-        (ReplacementEffect.EntryR pat _, ProposedEvent.WouldEnter oid) -> matchesFiltered gs candidate pat oid
+        (ReplacementEffect.EntryR (EntryR.MkEntryR pat _), ProposedEvent.WouldEnter oid) -> matchesFiltered gs candidate pat oid
         -- CR 614.1e: which permanents turning face up this replacement watches.
         -- The same Filter language the entry arm above uses, and every producer
         -- writes Filter.IsSource -- CR 614.1e's printed wording is always "as
@@ -360,18 +366,18 @@ applies gs event candidate =
         -- written Facing.FaceUp when it raises the event, so CR 708.11's "would
         -- have ... after it's turned face up" is answered by asking about the
         -- board rather than by a counterfactual.
-        (ReplacementEffect.TurnUpR pat _, ProposedEvent.WouldTurnFaceUp oid) -> matchesFiltered gs candidate pat oid
+        (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR pat _), ProposedEvent.WouldTurnFaceUp oid) -> matchesFiltered gs candidate pat oid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
         -- stand-in for "not yet implemented".
-        (ReplacementEffect.ZoneChangeR _ _, _) -> False
-        (ReplacementEffect.EntryR _ _, _) -> False
-        (ReplacementEffect.DamageR _ _, _) -> False
+        (ReplacementEffect.ZoneChangeR {}, _) -> False
+        (ReplacementEffect.EntryR {}, _) -> False
+        (ReplacementEffect.DamageR {}, _) -> False
         (ReplacementEffect.DestructionR _, _) -> False
-        (ReplacementEffect.CounterR _ _, _) -> False
-        (ReplacementEffect.TokenR _ _, _) -> False
-        (ReplacementEffect.TurnUpR _ _, _) -> False
+        (ReplacementEffect.CounterR {}, _) -> False
+        (ReplacementEffect.TokenR {}, _) -> False
+        (ReplacementEffect.TurnUpR {}, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
 -- CR 614.16 versus CR 614.1: does this placement's PROVENANCE satisfy the
@@ -642,7 +648,7 @@ bucketOf candidate = case ReplacementCandidate.origin candidate of
 -- CR 616.1b-e: which bucket an effect that is NOT CR 614.15's falls in.
 bucketOfEffect :: ReplacementEffect -> ReplacementBucket
 bucketOfEffect re = case re of
-  ReplacementEffect.ZoneChangeR _ _ -> ReplacementBucket.Other
+  ReplacementEffect.ZoneChangeR {} -> ReplacementBucket.Other
   -- CR 616.1c: entering as a copy is its own, HIGHER bucket. The split only
   -- becomes observable where an AsCopy races another entry replacement of NO
   -- HIGHER bucket in the SAME iteration, which no card in the pool produces, so
@@ -656,42 +662,42 @@ bucketOfEffect re = case re of
   -- exercises that arm instead.
   -- CR 707.9's exceptions do not move the bucket: rule 616.1c asks whether the
   -- object is entering as a copy, which an excepted copy still is.
-  ReplacementEffect.EntryR _ (EntryRewrite.AsCopy _) -> ReplacementBucket.CopyOnEntry
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy _)) -> ReplacementBucket.CopyOnEntry
   -- CR 616.1a-d name self-replacement, entering under a control effect, entering
   -- as a copy and entering with the back face up. None of the next four arms is
   -- any of those, so CR 616.1e is what applies to each.
-  ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> ReplacementBucket.Other
-  ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> ReplacementBucket.Other
-  ReplacementEffect.EntryR _ EntryRewrite.ChooseBasicLandType -> ReplacementBucket.Other
-  ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> ReplacementBucket.Other
-  ReplacementEffect.EntryR _ (EntryRewrite.WithCounters {}) -> ReplacementBucket.Other
-  ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber {}) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChoiceOf _)) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseColor) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseBasicLandType) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChooseCardNames _)) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters {})) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> ReplacementBucket.Other
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
-  ReplacementEffect.EntryR _ EntryRewrite.Riot -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Riot) -> ReplacementBucket.Other
   -- CR 702.98a is none of CR 616.1a-d for riot's reason, one keyword over.
-  ReplacementEffect.EntryR _ EntryRewrite.Unleash -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Unleash) -> ReplacementBucket.Other
   -- CR 614.1d is none of CR 616.1a-d either: a tap-state rewrite changes the
   -- STATUS the permanent enters with (CR 110.5b), never whose it is, what it
   -- copies or which face is up. So CR 616.1e.
-  ReplacementEffect.EntryR _ EntryRewrite.Tapped -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Tapped) -> ReplacementBucket.Other
   -- CR 614.1c's paid variant of the same rewrite is none of CR 616.1a-d either,
   -- and paying life does not make it one: what the rewrite changes is still the
   -- STATUS the permanent enters with (CR 110.5b). So CR 616.1e.
-  ReplacementEffect.EntryR _ (EntryRewrite.PayLifeOrTapped _) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.PayLifeOrTapped _)) -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
   -- choice to the NEW controller, and taking the copy first hands it to the old
   -- one.
-  ReplacementEffect.EntryR _ EntryRewrite.UnderSourceControl -> ReplacementBucket.ControlOnEntry
-  ReplacementEffect.DamageR _ _ -> ReplacementBucket.Other
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.UnderSourceControl) -> ReplacementBucket.ControlOnEntry
+  ReplacementEffect.DamageR {} -> ReplacementBucket.Other
   ReplacementEffect.DestructionR _ -> ReplacementBucket.Other
-  ReplacementEffect.CounterR _ _ -> ReplacementBucket.Other
-  ReplacementEffect.TokenR _ _ -> ReplacementBucket.Other
+  ReplacementEffect.CounterR {} -> ReplacementBucket.Other
+  ReplacementEffect.TokenR {} -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entering the battlefield and copying; turning face
   -- up is neither, so CR 616.1e.
-  ReplacementEffect.TurnUpR _ _ -> ReplacementBucket.Other
+  ReplacementEffect.TurnUpR {} -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entries and copies; a skip is none of those, so it
   -- falls to CR 616.1e.
   ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
@@ -717,87 +723,87 @@ readsApplier :: ReplacementEffect -> Bool
 readsApplier re = case re of
   -- The destination zone is the effect's own second field, and the pattern is
   -- matched before Event.apply runs (Rest in Peace, Leyline of the Void).
-  ReplacementEffect.ZoneChangeR _ _ -> False
+  ReplacementEffect.ZoneChangeR {} -> False
   -- CR 707.5 / 109.5: Clone's "you" is the ENTERING object's controller, read
   -- live off the board at CR 614.12a's moment, not the candidate's -- so two
   -- such rows offer the same player the same legal set. CR 707.9's exceptions
   -- ride the effect, so two rows carrying the same ones are still the same offer.
-  ReplacementEffect.EntryR _ (EntryRewrite.AsCopy _) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy _)) -> False
   -- Same chooser, and the options ride the effect: CR 614.1c's "enters as"
   -- (Primal Plasma).
-  ReplacementEffect.EntryR _ (EntryRewrite.ChoiceOf _) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChoiceOf _)) -> False
   -- Same chooser again, with no payload at all: CR 105.1's five colours are the
   -- whole offer whoever's row is applying (Painter's Servant).
-  ReplacementEffect.EntryR _ EntryRewrite.ChooseColor -> False
-  ReplacementEffect.EntryR _ EntryRewrite.ChooseBasicLandType -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseColor) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.ChooseBasicLandType) -> False
   -- Two choosers rather than one, and neither is the candidate's: the entering
   -- object's controller is read live off the board for ChooseColor's reason, and
   -- CR 102.2's opponent is derived from that same player. The restriction rides
   -- the effect (CR 201.4a).
-  ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.ChooseCardNames _)) -> False
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's loyalty included).
-  ReplacementEffect.EntryR _ (EntryRewrite.WithCounters {}) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.WithCounters {})) -> False
   -- CR 614.1c again, and NO despite performing a sacrifice: the sacrificing
   -- player is the ENTERING object's controller, read live off the board at CR
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
   -- the effect. Two such rows would offer the same player the same permanents.
-  ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber {}) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.SacrificeAnyNumber {})) -> False
   -- CR 702.136a: riot's chooser is the ENTERING object's controller, read live
   -- off the board for AsCopy's reason, and the rewrite carries no payload at all
   -- -- rule 702.136a fixes both halves. Two riot rows are always on the SAME
   -- object, since CR 614.1c's ability is the entering permanent's own, and they
   -- offer that permanent's controller the same two outcomes -- so which applies
   -- first is not a board difference.
-  ReplacementEffect.EntryR _ EntryRewrite.Riot -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Riot) -> False
   -- CR 702.98a: riot's answer, and every word of its reasoning holds -- the
   -- chooser is the entering object's controller and the rewrite carries no
   -- payload, so two unleash rows offer that player the same counter twice.
-  ReplacementEffect.EntryR _ EntryRewrite.Unleash -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Unleash) -> False
   -- CR 614.1d: no chooser at all, and no payload -- the rewrite sets one status on
   -- the object the event already named (CR 110.5b), so it applies the same way
   -- whoever's row is applying it. Two such rows are the same write twice.
-  ReplacementEffect.EntryR _ EntryRewrite.Tapped -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Tapped) -> False
   -- CR 614.1c: NO despite spending a resource, for SacrificeAnyNumber's reason.
   -- The payer is the ENTERING object's controller -- "you" in an "as this
   -- permanent enters" ability the permanent prints about itself -- read live off
   -- the board at CR 614.12a's moment rather than off the candidate, and the
   -- amount rides the effect. Two such rows are always on the same object and
   -- would offer that object's controller the same price.
-  ReplacementEffect.EntryR _ (EntryRewrite.PayLifeOrTapped _) -> False
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.PayLifeOrTapped _)) -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are
   -- identical while their controllers are not, and applying one puts the
   -- permanent somewhere applying the other does not.
-  ReplacementEffect.EntryR _ EntryRewrite.UnderSourceControl -> True
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.UnderSourceControl) -> True
   -- The rewritten amount is the effect's (Galvanic Blast, Furnace of Rath), and
   -- a prevention prevents the same event whoever's row it is (Fog). CR 615.7's
   -- shield is no exception: what makes two shields differ is how much each has
   -- LEFT, which rides the effect value and so is already inside `choose`'s
   -- comparison rather than needing the applier to be read.
-  ReplacementEffect.DamageR _ _ -> False
+  ReplacementEffect.DamageR {} -> False
   -- CR 701.19a acts on the creature being destroyed and names no player.
   ReplacementEffect.DestructionR _ -> False
   -- The scaling is the effect's, and it rewrites the count on the object the
   -- event already named (Hardened Scales, Doubling Season).
-  ReplacementEffect.CounterR _ _ -> False
+  ReplacementEffect.CounterR {} -> False
   -- CR 614.16, the same shape one event class over: the player the tokens are
   -- created FOR rides the EVENT, not the candidate, so Doubling Season doubles
   -- the same player's tokens whoever's row applies.
-  ReplacementEffect.TokenR _ _ -> False
+  ReplacementEffect.TokenR {} -> False
   -- CR 702.37b via CR 614.1e: the counter kind and count are the effect's own
   -- fields and they land on the object the event already named, which is
   -- WithCounters' answer one event class over. The inner sum is cased so a
   -- second TurnUpRewrite -- CR 208.2b's power-and-toughness setter -- has to be
   -- decided here rather than inheriting this answer.
-  ReplacementEffect.TurnUpR _ (TurnUpRewrite.WithCounters {}) -> False
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.WithCounters {})) -> False
   -- CR 303.4k: "the AURA's controller" makes the choice, and the Aura is the
   -- object the event already named -- so the player asked is read off the event
   -- rather than off whose row is applying, and two identical rows would put the
   -- same question to the same player. The destination Filter is the effect's own
   -- field, inside `choose`'s comparison already.
-  ReplacementEffect.TurnUpR _ (TurnUpRewrite.MayAttachTo _) -> False
+  ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo _)) -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
@@ -1035,7 +1041,7 @@ setShield identity_ pat left = case identity_ of
           rewrite active
             | not (mine active) = Just active
             | left == 0 = Nothing
-            | otherwise = Just active {ActiveReplacement.effect = ReplacementEffect.DamageR pat (DamageRewrite.PreventNext left)}
+            | otherwise = Just active {ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.PreventNext left))}
        in gs {GameState.replacements = Maybe.mapMaybe rewrite (GameState.replacements gs)}
 
 -- CR 615.1a: is this damage rewrite a PREVENTION effect, rather than one of CR
@@ -1159,7 +1165,7 @@ preventable gs de =
 -- `prevents`, which this delegates to.
 inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Bool
 inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate, event) of
-  (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage de) ->
+  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite), ProposedEvent.WouldDealDamage de) ->
     prevents rewrite && not (preventable gs de)
   _ -> False
 
@@ -1175,7 +1181,7 @@ inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate
 -- module carries is discharged by `prevents` above, which the guard delegates to.
 preventionBy :: ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
 preventionBy candidate before after = case (ReplacementCandidate.effect candidate, before) of
-  (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage de)
+  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite), ProposedEvent.WouldDealDamage de)
     | prevents rewrite ->
         let was = DamageEvent.amount de
             -- The event that did not happen prevented all of it (CR 615.6).
@@ -1386,7 +1392,7 @@ contested gs events =
 -- build here rather than silently going unasked about.
 contestedResource :: GameState -> ReplacementCandidate -> Maybe (Natural, [DamageEvent.DamageEvent] -> Natural)
 contestedResource gs candidate = case ReplacementCandidate.effect candidate of
-  ReplacementEffect.DamageR _ rewrite -> case rewrite of
+  ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite) -> case rewrite of
     DamageRewrite.PreventNext remaining -> Just (remaining, sum . fmap DamageEvent.amount)
     -- CR 122.1c: one counter per application, so a batch of n events demands n
     -- of them, and the permanent's counters are the supply.
@@ -1398,12 +1404,12 @@ contestedResource gs candidate = case ReplacementCandidate.effect candidate of
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
     DamageRewrite.Redirect _ -> Nothing
-  ReplacementEffect.ZoneChangeR _ _ -> Nothing
-  ReplacementEffect.EntryR _ _ -> Nothing
+  ReplacementEffect.ZoneChangeR {} -> Nothing
+  ReplacementEffect.EntryR {} -> Nothing
   ReplacementEffect.DestructionR _ -> Nothing
-  ReplacementEffect.CounterR _ _ -> Nothing
-  ReplacementEffect.TokenR _ _ -> Nothing
-  ReplacementEffect.TurnUpR _ _ -> Nothing
+  ReplacementEffect.CounterR {} -> Nothing
+  ReplacementEffect.TokenR {} -> Nothing
+  ReplacementEffect.TurnUpR {} -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent

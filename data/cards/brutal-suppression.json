@@ -17,8 +17,22 @@
         {
           "effect": {
             "type": "AddActivationCost",
-            "value": [
-              {
+            "value": {
+              "components": [
+                {
+                  "type": "Sacrifice",
+                  "value": [
+                    1,
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Land"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "whichAbilities": {
                 "type": "And",
                 "value": [
                   {
@@ -34,22 +48,8 @@
                     }
                   }
                 ]
-              },
-              [
-                {
-                  "type": "Sacrifice",
-                  "value": [
-                    1,
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Land"
-                      }
-                    }
-                  ]
-                }
-              ]
-            ]
+              }
+            }
           },
           "scope": {
             "type": "EachPlayer"

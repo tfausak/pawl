@@ -27,8 +27,8 @@
                       },
                       "effect": {
                         "type": "DamageR",
-                        "value": [
-                          {
+                        "value": {
+                          "matching": {
                             "whatSource": {
                               "type": "Or",
                               "value": [
@@ -47,10 +47,10 @@
                               ]
                             }
                           },
-                          {
+                          "rewrite": {
                             "type": "PreventAll"
                           }
-                        ]
+                        }
                       },
                       "origin": {
                         "type": "Other"

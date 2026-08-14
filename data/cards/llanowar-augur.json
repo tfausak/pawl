@@ -25,16 +25,16 @@
                           },
                           "modification": {
                             "type": "ModifyPowerToughness",
-                            "value": [
-                              {
+                            "value": {
+                              "power": {
                                 "type": "Literal",
                                 "value": 3
                               },
-                              {
+                              "toughness": {
                                 "type": "Literal",
                                 "value": 3
                               }
-                            ]
+                            }
                           },
                           "ref": {
                             "type": "InSlot",

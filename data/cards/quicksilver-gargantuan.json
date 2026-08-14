@@ -33,11 +33,11 @@
       "replacementEffects": [
         {
           "type": "EntryR",
-          "value": [
-            {
+          "value": {
+            "matching": {
               "type": "IsSource"
             },
-            {
+            "rewrite": {
               "type": "AsCopy",
               "value": [
                 {
@@ -49,7 +49,7 @@
                 }
               ]
             }
-          ]
+          }
         }
       ],
       "toughness": {

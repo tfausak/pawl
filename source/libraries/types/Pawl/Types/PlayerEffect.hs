@@ -1,14 +1,15 @@
 module Pawl.Types.PlayerEffect where
 
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.AddActivationCost as AddActivationCost
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
+import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
 
 -- | CR 611.1's third clause: a continuous effect affecting players or the rules
 -- of the game rather than the characteristics of an object. The player analogue
@@ -58,7 +59,7 @@ data PlayerEffect
     CantPlayLandChosenName
   | -- | CR 613.11 / 601.2f / Thalia: matching spells cost this much more generic
     -- mana to cast.
-    IncreaseSpellCost (Filter.Filter Keyword.Keyword) Natural.Natural
+    IncreaseSpellCost IncreaseSpellCost.IncreaseSpellCost
   | -- | CR 613.11 / 601.2f / Sapphire Medallion, Edgewalker: matching spells cost
     -- this much less to cast.
     --
@@ -76,7 +77,7 @@ data PlayerEffect
     -- An EXCESS typed symbol is dropped rather than spilling onto the generic
     -- component, which is Edgewalker's "This effect reduces only the amount of
     -- colored mana you pay" and not CR 118.7b-d (#309).
-    ReduceSpellCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost
+    ReduceSpellCost ReduceSpellCost.ReduceSpellCost
   | -- | CR 613.11 / 601.2f / Heartstone, Training Grounds: the activated abilities
     -- of matching permanents cost this much less to activate, and this effect may
     -- not reduce the mana left in such a cost below the Natural.
@@ -145,7 +146,7 @@ data PlayerEffect
     -- adjusted -- Drought's "for each black mana symbol in their activation
     -- costs" -- which needs the components to be a function of the cost rather
     -- than a fixed list (#1417).
-    AddActivationCost (Filter.Filter Keyword.Keyword) [CostComponent.CostComponent Keyword.Keyword]
+    AddActivationCost AddActivationCost.AddActivationCost
   | -- | CR 305.2 / Exploration, Azusa Lost but Seeking: this player may play this
     -- many lands each turn OVER the one CR 305.2 normally allows.
     --

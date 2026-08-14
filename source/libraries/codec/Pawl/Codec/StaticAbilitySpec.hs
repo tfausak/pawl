@@ -22,6 +22,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.SetBasePowerToughness as SetBasePowerToughness
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
@@ -44,9 +45,9 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           Affected.Attached
           Nothing
           Nothing
-          (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
+          (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1))])
       )
-      """ {"affected":{"type":"Attached"},"modifications":[{"type":"LoseAllAbilities"},{"type":"SetBasePowerToughness","value":[{"type":"Literal","value":1},{"type":"Literal","value":1}]}]} """
+      """ {"affected":{"type":"Attached"},"modifications":[{"type":"LoseAllAbilities"},{"type":"SetBasePowerToughness","value":{"power":{"type":"Literal","value":1},"toughness":{"type":"Literal","value":1}}}]} """
   -- CR 604.2's "as long as" gate, Kird Ape's shape: the same ability plus a
   -- condition, so the key is present exactly when the clause is. The two cases
   -- above pin the absent half -- an encoder that always emitted the key would

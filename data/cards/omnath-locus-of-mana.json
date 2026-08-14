@@ -51,8 +51,8 @@
           "modifications": [
             {
               "type": "ModifyPowerToughness",
-              "value": [
-                {
+              "value": {
+                "power": {
                   "type": "ManaCount",
                   "value": {
                     "filter": {
@@ -72,7 +72,7 @@
                     }
                   }
                 },
-                {
+                "toughness": {
                   "type": "ManaCount",
                   "value": {
                     "filter": {
@@ -92,7 +92,7 @@
                     }
                   }
                 }
-              ]
+              }
             }
           ]
         }

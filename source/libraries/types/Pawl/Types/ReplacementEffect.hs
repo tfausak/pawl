@@ -1,18 +1,13 @@
 module Pawl.Types.ReplacementEffect where
 
-import qualified Pawl.Types.CounterPattern as CounterPattern
-import qualified Pawl.Types.DamagePattern as DamagePattern
-import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.CounterR as CounterR
+import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
-import qualified Pawl.Types.EntryRewrite as EntryRewrite
-import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.PhasePattern as PhasePattern
-import qualified Pawl.Types.Scaling as Scaling
-import qualified Pawl.Types.TokenPattern as TokenPattern
-import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
-import qualified Pawl.Types.Zone as Zone
-import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.TokenR as TokenR
+import qualified Pawl.Types.TurnUpR as TurnUpR
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- | CR 614.1a: a replacement effect, classified by the EVENT CLASS it intercepts
 -- and the REWRITE SHAPE it applies. One arm per replaceable event class -- the
@@ -58,12 +53,12 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- The sole rules-casing site is Pawl.Engine.Replacement (CR 616.1's loop).
 -- Pawl.Codec also cases on every constructor, but only as the JSON data boundary.
 data ReplacementEffect
-  = ZoneChangeR ZoneChangePattern.ZoneChangePattern Zone.Zone
-  | EntryR (Filter.Filter Keyword.Keyword) EntryRewrite.EntryRewrite
-  | DamageR DamagePattern.DamagePattern DamageRewrite.DamageRewrite
+  = ZoneChangeR ZoneChangeR.ZoneChangeR
+  | EntryR EntryR.EntryR
+  | DamageR DamageR.DamageR
   | DestructionR DestructionRewrite.DestructionRewrite
-  | CounterR CounterPattern.CounterPattern Scaling.Scaling
-  | TokenR TokenPattern.TokenPattern Scaling.Scaling
+  | CounterR CounterR.CounterR
+  | TokenR TokenR.TokenR
   | -- | CR 614.1e: "As [this permanent] is turned face up . . ." A separate arm
     -- from EntryR and not a widening of it, because CR 614.1c's event class and
     -- this one are different events -- a permanent that turns face up does not
@@ -81,6 +76,6 @@ data ReplacementEffect
     -- while that permanent is being turned face up, not afterward" --
     -- Pawl.Engine.FaceDown.turnFaceUp raises the event between the status write
     -- and the CR 708.7 record.
-    TurnUpR (Filter.Filter Keyword.Keyword) TurnUpRewrite.TurnUpRewrite
+    TurnUpR TurnUpR.TurnUpR
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

@@ -59,12 +59,14 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DamageR as DamageR
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryOption as EntryOption
+import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
@@ -103,6 +105,7 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
+import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- Every answer the engine asked for, in order -- so a test can assert that a
 -- prompt WAS raised (the engine did not decide) or was NOT (the choice was
@@ -177,7 +180,7 @@ aimObject oid p = case p of
 shieldsLeft :: GameState.GameState -> [Natural.Natural]
 shieldsLeft gs =
   let remaining re = case re of
-        ReplacementEffect.DamageR _ (DamageRewrite.PreventNext n) -> Just n
+        ReplacementEffect.DamageR (DamageR.MkDamageR _ (DamageRewrite.PreventNext n)) -> Just n
         _ -> Nothing
    in Maybe.mapMaybe (remaining . ActiveReplacement.effect) (GameState.replacements gs)
 
@@ -246,9 +249,7 @@ leylineShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.Ac
 leylineShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
-        ReplacementEffect.ZoneChangeR
-          (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents (Filter.Type.And []))
-          Zone.Exile,
+        ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents (Filter.Type.And [])) Zone.Exile),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,
@@ -1519,7 +1520,7 @@ redirectRows :: GameState.GameState -> [(Maybe DamageKind.DamageKind, Maybe Reci
 redirectRows gs =
   [ (DamagePattern.whichKind pat, DamagePattern.whichRecipient pat, dest)
   | active <- GameState.replacements gs,
-    ReplacementEffect.DamageR pat (DamageRewrite.Redirect dest) <- [ActiveReplacement.effect active]
+    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect dest)) <- [ActiveReplacement.effect active]
   ]
 
 -- CR 614.9: "Some effects replace damage dealt to one battle, creature,
@@ -2321,7 +2322,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         onlyOption = EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}
         active =
           ActiveReplacement.MkActiveReplacement
-            { ActiveReplacement.effect = ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.ChoiceOf [onlyOption]),
+            { ActiveReplacement.effect = ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.ChoiceOf [onlyOption])),
               ActiveReplacement.source = piker,
               ActiveReplacement.controller = S.alice,
               ActiveReplacement.timestamp = ts,
@@ -2886,9 +2887,7 @@ blastShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.Acti
 blastShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
-        ReplacementEffect.DamageR
-          (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing)
-          (DamageRewrite.SetAmount 4),
+        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing) (DamageRewrite.SetAmount 4)),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,
@@ -3850,7 +3849,7 @@ castColdsteel mountain coldsteel pick =
 -- first the way the engine's own out-of-range handling does.
 pickRewrite :: EntryRewrite.EntryRewrite -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
 pickRewrite rewrite entries =
-  let wanted e = ReplacementEntry.effect e == ReplacementEffect.EntryR Filter.Type.IsSource rewrite
+  let wanted e = ReplacementEntry.effect e == ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource rewrite)
    in maybe 0 Int.toNaturalSaturating (List.findIndex wanted entries)
 
 -- CR 616.1 with CR 614.1c and CR 614.1d. Coldsteel Heart ({2} Snow Artifact,
