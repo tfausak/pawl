@@ -66,7 +66,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing
-  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> Nothing
+  Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
   Effect.AddMana _ -> Nothing

@@ -2,10 +2,42 @@ module Pawl.Types.DealDamage where
 
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.SlotName as SlotName
 
--- | CR 119.3: deal this much damage to the objects or players the ObjectRef names.
+-- | CR 120.1: deal this much damage to the objects or players the ObjectRef names.
 data DealDamage = MkDealDamage
   { ref :: ObjectRef.ObjectRef,
-    quantity :: Quantity.Quantity
+    quantity :: Quantity.Quantity,
+    -- | WHICH OBJECT DEALS IT -- CR 120.1's "an object that deals damage is the
+    -- source of that damage", which CR 120.2b lets a spell or ability name for
+    -- itself: "the spell or ability will specify which object deals that
+    -- damage."
+    --
+    -- Nothing is CR 113.7's default and what every other damage-dealing card in
+    -- the pool wants: Lightning Bolt's damage comes from Lightning Bolt, and the
+    -- resolving object's source is the source. Just names a slot instead --
+    -- Rabid Bite's "target creature you control deals damage equal to its power
+    -- to target creature you don't control", where the DEALER is a targeted
+    -- permanent and the sorcery is only the instruction.
+    --
+    -- The difference is observable and not bookkeeping: every rule that asks
+    -- about a damage source asks about the dealer. CR 120.3f pays the dealer's
+    -- lifelink to the DEALER's controller, CR 702.2b destroys on the dealer's
+    -- deathtouch, and CR 120.3b/120.3d/120.3g read the dealer's infect, wither
+    -- and toxic. Pawl.Engine.Damage.damageEvent reads all of them off the one
+    -- ObjectId Pawl.Engine.Resolve hands it, so naming a different object here
+    -- redirects every one of them at once.
+    --
+    -- A SlotName rather than an ObjectRef, where `ref` above is the wider type:
+    -- a damage event has exactly ONE source (CR 120.1), and every dealer in the
+    -- pool is a single object named before the effect runs -- CR 115.10a's
+    -- distinction, which is exactly the InSlot arm's. A swept SET of dealers
+    -- would be a different sentence and no card in the pool writes one.
+    --
+    -- An empty slot deals nothing. The dealer of a printed card is a TARGET, so
+    -- one that has become illegal (CR 608.2b) leaves the instruction with no
+    -- source and it does as much as it can, which is nothing -- not damage from
+    -- the resolving object instead.
+    dealer :: Maybe SlotName.SlotName
   }
   deriving (Eq, Ord, Show)

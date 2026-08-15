@@ -70,6 +70,10 @@ data Effect card
     --
     -- A one-shot under CR 608.2c/608.2f: nothing is stored, so unlike
     -- ModifyTarget and GainControl it owes CR 611.2c no frozen set.
+    --
+    -- WHO deals it is the payload's `dealer`, CR 120.2b's "the spell or ability
+    -- will specify which object deals that damage" -- absent for Lightning Bolt,
+    -- where CR 113.7's resolving source is it, and present for Rabid Bite.
     DealDamage DealDamage.DealDamage
   | -- | CR 611: create a continuous effect on the objects the ObjectRef names,
     -- for a duration. Giant Growth and Serpent's Gift are this one opcode,

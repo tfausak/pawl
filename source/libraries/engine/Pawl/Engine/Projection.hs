@@ -1638,7 +1638,8 @@ rewriteEffect :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Effect.Effect
 rewriteEffect pairs effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration (rewriteModification pairs modification) (rewriteObjectRef pairs ref))
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> Effect.DealDamage (DealDamage.MkDealDamage (rewriteObjectRef pairs ref) quantity)
+  -- The dealer is a SlotName and holds no printed word for a swap to reach.
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer) -> Effect.DealDamage (DealDamage.MkDealDamage (rewriteObjectRef pairs ref) quantity dealer)
   -- A text-changer's own restriction clause is text like any other (CR 612.1), so
   -- an Artificial Evolution aimed at another on the stack leaves a spell that
   -- forbids the NEW word instead. The CR 612.2 family gate is read off the

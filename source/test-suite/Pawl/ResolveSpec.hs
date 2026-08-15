@@ -587,7 +587,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
-    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1)))) Nothing
+    Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1) Nothing))) Nothing
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do
     -- Boil ("Destroy all Islands") is the first card whose effect selects by
     -- a BASIC LAND TYPE, so it is the first that can tell whether CR 612.1's
@@ -1341,7 +1341,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3))]))) Map.empty))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3) Nothing)]))) Map.empty))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -1431,7 +1431,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3))]))) Map.empty))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3) Nothing)]))) Map.empty))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
