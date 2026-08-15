@@ -142,8 +142,10 @@ data Quantity
     -- a second way to write numbers Plus already writes; -1 is the only
     -- coefficient no composition of Plus can reach, so it is the only one that
     -- earns an arm. NOT a Minus either: Negate composes with Plus into the
-    -- subtraction a card might one day print, where a Minus arm would leave the
-    -- negation of a single value spelled as a subtraction from zero.
+    -- subtraction a card prints, where a Minus arm would leave the negation of a
+    -- single value spelled as a subtraction from zero. The Ten Rings' "draw cards
+    -- equal to the difference" is that composition -- Plus of Literal 10 and a
+    -- negated hand count.
     --
     -- Not a leaf: the payload is a whole Quantity, so every fold recurses through
     -- it as it does through Plus, and it terminates for Plus's reason -- the

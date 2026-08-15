@@ -1931,7 +1931,7 @@ ringsAndRestoration ringsFirst plains island tenRings restoration =
         else let (ringsId, withRings) = rings (resolve (cast ready)) in (withRings, ringsId)
 
 -- The Ten Rings, a Legendary Artifact: "Your maximum hand size is ten." Its
--- end-step draw-to-ten ability is not implemented (#1239).
+-- other line, the end-step draw to ten, is Pawl.TriggerSpec's.
 --
 -- Sea Gate Restoration, the front face of a modal double-faced card: "Draw cards
 -- equal to the number of cards in your hand plus one. You have no maximum hand

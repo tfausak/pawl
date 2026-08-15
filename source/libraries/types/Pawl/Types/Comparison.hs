@@ -7,9 +7,11 @@ module Pawl.Types.Comparison where
 -- AtLeast's producer is Galvanic Blast's metalcraft clause -- "if you control
 -- three or more artifacts", the pool's first nonzero threshold.
 --
--- AtMost's only producer is minted by the rules core rather than printed on a
+-- AtMost's first producer was minted by the rules core rather than printed on a
 -- card: CR 702.179d's "if your speed is less than 4", which Pawl.Engine.Speed
--- states as AtMost 3. No CARD in the pool bounds a count from above (#158).
+-- states as AtMost 3. The Ten Rings is the printed one -- CR 603.4's "if you
+-- have fewer than ten cards in hand", stated as AtMost 9, a strict inequality
+-- over a count being the bound one below it.
 data Comparison
   = Exactly
   | AtLeast
