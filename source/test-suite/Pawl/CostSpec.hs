@@ -39,15 +39,19 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
+import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
@@ -71,6 +75,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sacrifice as Sacrifice
+import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.StepBegan as StepBegan
@@ -1454,6 +1459,141 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   asmorSpec s registry
   crossCheckSpec s registry
   longtuskCubSpec s registry
+  thrastaSpec s registry
+
+-- alice holds Thrasta, Tempest's Roar ({10}{G}{G}) and `elves` copies of
+-- Glistener Elf ({G}), with `forests` untapped Forests and priority in her own
+-- precombat main phase. bob is the second seat every fixture in this file has.
+--
+-- ONE land type, so the mana a case leaves for Thrasta is a subtraction and not
+-- a colour puzzle: each Elf taps one Forest, and what is left is what CR 601.2f's
+-- total is measured against. The Elf is a vanilla 1/1 with one keyword and no
+-- targets, so casting and resolving it changes nothing but the count.
+thrastaBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+thrastaBoard forest glistenerElf thrastaPrinting forests elves =
+  let base = S.landsInPlay forest forests
+      (thrasta, gs1) = S.addHandCard thrastaPrinting S.alice base
+      addElf (oids, gs) _ = let (oid, gs') = S.addHandCard glistenerElf S.alice gs in (oid : oids, gs')
+      (elfIds, gs2) = List.foldl' addElf ([], gs1) [1 .. elves]
+   in ( thrasta,
+        reverse elfIds,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Cast each of those Elves and resolve it, so that CR 601.2i has filed one
+-- GameEvent.SpellCast per Elf by the time Thrasta is priced.
+castElves :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
+castElves elfIds gs0 =
+  let one gs oid = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast S.alice oid)) Stack.resolveTop
+   in List.foldl' one gs0 elfIds
+
+-- CR 601.2f's cost reduction where the AMOUNT scales with a count. Thrasta,
+-- Tempest's Roar is {10}{G}{G} and reads "This spell costs {3} less to cast for
+-- each other spell cast this turn", so its mana total steps 12, 9, 6, 3, 2, 2 ...
+-- as the count climbs.
+--
+-- Every leg reads that total off S.tappedCount and not off castability alone: the
+-- Forests the payment taps are what tells "reduced once" from "reduced twice",
+-- from "not reduced at all", and from a count that swept Thrasta into its own
+-- tally. Those four readings give four different numbers on each board below,
+-- which is what the Forest counts were chosen for.
+--
+-- "OTHER" is a clause pawl writes nowhere: CR 601.2i files the cast event after
+-- CR 601.2f has totalled, so the spell being priced is never in its own count.
+-- The self-counting reading is what would show up if it were.
+thrastaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+thrastaSpec s registry =
+  Spec.describe s "Thrasta, Tempest's Roar" $ do
+    Spec.it s "Thrasta is a {10}{G}{G} that reduces its own cost by {3} for each spell cast" $ do
+      thrastaPrinting <- S.printingOf s registry "Thrasta, Tempest's Roar"
+      let face = S.combinedFace thrastaPrinting
+      Spec.assertEqWith
+        s
+        "the printed mana cost"
+        (Face.manaCost face)
+        (Just (ManaCost.MkManaCost (ManaSymbol.Generic 10 : replicate 2 (ManaSymbol.OfType (ManaType.Colored Color.Green)))))
+      Spec.assertEqWith
+        s
+        "one self-reduction of {3} per spell cast this turn"
+        (Face.costReductions face)
+        [ CostReduction.MkCostReduction
+            (ManaCost.MkManaCost [ManaSymbol.Generic 3])
+            (Quantity.Type.Count (Count.Type.MkCount (Scope.InHistory EventShape.SpellCast) (Filter.Type.And []) Aggregation.Members))
+        ]
+    -- Nine Forests. Two Elves tap two of them and leave seven, so an UNREDUCED
+    -- Thrasta (twelve) is out of reach and a once-reduced one ({4}{G}{G}, six) is
+    -- not -- and the nine were chosen so that one Forest is left over, which is
+    -- what an over-tapping payment could not produce. The tapped count separates
+    -- every reading: 2+6 here, 2+2 for a reduction applied twice, 2+3 for a count
+    -- that swept Thrasta in as a third spell.
+    Spec.it s "CR 601.2f two other spells this turn take {6} off, and the total is what pays" $ do
+      forest <- S.printingOf s registry "Forest"
+      glistenerElf <- S.printingOf s registry "Glistener Elf"
+      thrastaPrinting <- S.printingOf s registry "Thrasta, Tempest's Roar"
+      let (thrasta, elfIds, gs) = thrastaBoard forest glistenerElf thrastaPrinting 9 2
+          after = castElves elfIds gs
+          cast = S.runPure S.identityAnswer after (S.cast S.alice thrasta)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertBool s (not (S.castable S.alice thrasta gs)) "before either Elf, the unreduced {10}{G}{G} is out of reach"
+      Spec.assertEqWith s "two Elves cost two Forests" (S.tappedCount S.alice after) 2
+      Spec.assertBool s (S.castable S.alice thrasta after) "after them, Thrasta is offered"
+      Spec.assertEqWith s "and six more Forests paid for it, leaving one" (S.tappedCount S.alice resolved) 8
+      Spec.assertEqWith
+        s
+        "Thrasta resolved onto the battlefield"
+        (namesIn Zone.Battlefield resolved)
+        (fmap (CardName.MkCardName . Text.pack) (replicate 9 "Forest" <> replicate 2 "Glistener Elf" <> ["Thrasta, Tempest's Roar"]))
+    -- The negative, and the SAME board with one thing changed: one Elf instead of
+    -- two. The same nine Forests, the same seats, phase and priority -- so the
+    -- refusal is the {3} the second spell would have taken off and nothing else.
+    -- One reduction leaves {7}{G}{G}, nine, against the eight Forests a single
+    -- Elf leaves untapped.
+    Spec.it s "CR 601.2f one other spell takes only {3} off, and that does not pay" $ do
+      forest <- S.printingOf s registry "Forest"
+      glistenerElf <- S.printingOf s registry "Glistener Elf"
+      thrastaPrinting <- S.printingOf s registry "Thrasta, Tempest's Roar"
+      let (thrasta, elfIds, gs) = thrastaBoard forest glistenerElf thrastaPrinting 9 1
+          after = castElves elfIds gs
+      Spec.assertEqWith s "one Elf cost one Forest" (S.tappedCount S.alice after) 1
+      Spec.assertBool s (not (S.castable S.alice thrasta after)) "Thrasta is refused"
+      Spec.assertEqWith s "and not offered" (filter (S.isCastOf thrasta) (Action.legalActions S.alice after)) []
+    -- CR 601.2f's floor. Four Elves is a {12} reduction against a {10} generic
+    -- component, so the generic part bottoms out at {0} and the two green symbols
+    -- are untouched: Thrasta costs {G}{G}. Two more Forests pay it, for 4+2 --
+    -- where a reduction that carried its surplus onto the coloured symbols would
+    -- leave {0} and stop at 4.
+    Spec.it s "CR 601.2f a reduction larger than the generic component floors at {0}" $ do
+      forest <- S.printingOf s registry "Forest"
+      glistenerElf <- S.printingOf s registry "Glistener Elf"
+      thrastaPrinting <- S.printingOf s registry "Thrasta, Tempest's Roar"
+      let (thrasta, elfIds, gs) = thrastaBoard forest glistenerElf thrastaPrinting 9 4
+          after = castElves elfIds gs
+          cast = S.runPure S.identityAnswer after (S.cast S.alice thrasta)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertEqWith s "four Elves cost four Forests" (S.tappedCount S.alice after) 4
+      Spec.assertBool s (S.castable S.alice thrasta after) "Thrasta is offered"
+      Spec.assertEqWith s "and exactly two more Forests paid the {G}{G}" (S.tappedCount S.alice resolved) 6
+    -- The colour half of that floor, as a pair of boards differing in ONE Forest:
+    -- four Elves either way, so the reduction is the same {12}. Five Forests
+    -- leaves one green source for a {G}{G} and refuses; six leaves two and pays.
+    -- A reduction that had spilled onto the green symbols would make the first
+    -- board castable, since a {0} Thrasta needs no green at all.
+    Spec.it s "CR 601.2f the reduction leaves the coloured requirement alone" $ do
+      forest <- S.printingOf s registry "Forest"
+      glistenerElf <- S.printingOf s registry "Glistener Elf"
+      thrastaPrinting <- S.printingOf s registry "Thrasta, Tempest's Roar"
+      let board forests =
+            let (thrasta, elfIds, gs) = thrastaBoard forest glistenerElf thrastaPrinting forests 4
+             in (thrasta, castElves elfIds gs)
+          (fiveThrasta, five) = board 5
+          (sixThrasta, six) = board 6
+      Spec.assertBool s (not (S.castable S.alice fiveThrasta five)) "one green source left is not two"
+      Spec.assertEqWith s "and Thrasta is not offered" (filter (S.isCastOf fiveThrasta) (Action.legalActions S.alice five)) []
+      Spec.assertBool s (S.castable S.alice sixThrasta six) "the sixth Forest is the whole difference"
 
 -- alice controls a Safehold Sentry and three Plains, all settled. `tapped` says
 -- whether the Sentry itself starts tapped -- which for a {Q} cost is the payable

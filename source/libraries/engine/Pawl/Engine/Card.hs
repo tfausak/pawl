@@ -118,6 +118,7 @@ faceDownFace =
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
+      Face.costReductions = [],
       Face.playerAbilities = [],
       Face.blockRequirements = [],
       Face.blockPermissions = [],
@@ -270,6 +271,13 @@ merge2 l r =
       Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
       Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
       Face.alternativeCosts = Face.alternativeCosts l <> Face.alternativeCosts r,
+      -- CR 709.4c again: a cost reduction a half prints about itself is an
+      -- ability in that half's text box, so the combined view has both. Never
+      -- exercised -- CR 709.3b puts ONE half on the stack and
+      -- Pawl.Engine.Cost.costsFor prices that half's own face -- but written
+      -- for its neighbours' reason: a record UPDATE would otherwise keep the
+      -- left half's silently.
+      Face.costReductions = Face.costReductions l <> Face.costReductions r,
       Face.playerAbilities = Face.playerAbilities l <> Face.playerAbilities r,
       Face.blockRequirements = Face.blockRequirements l <> Face.blockRequirements r,
       Face.blockPermissions = Face.blockPermissions l <> Face.blockPermissions r,
@@ -852,6 +860,7 @@ subtractHalf face =
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
+      Face.costReductions = [],
       Face.playerAbilities = [],
       Face.blockRequirements = [],
       Face.blockPermissions = [],

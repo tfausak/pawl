@@ -4401,10 +4401,11 @@ pinnedAssignments base answers p = case p of
 -- that player's planeswalker (CR 508.1b), so the two are the same player on every
 -- board pawl can build.
 --
--- Thrasta's cost reduction is not implemented (#1090), and cannot reach these
--- boards -- nothing is cast on them.
+-- Thrasta's cost reduction is implemented and dormant here: nothing is cast on
+-- these boards, so CR 601.2f is never reached. Pawl.CostSpec is where it is
+-- proved.
 --
--- Its hexproof clause is implemented and dormant here for a different reason:
+-- Its hexproof clause is dormant for a different reason:
 -- S.combatBoardOf puts Thrasta onto the battlefield without a zone change, so
 -- Quantity.EnteredThisTurn reads 0 and the CR 604.2 gate is shut. Pawl.ConditionSpec
 -- is where the clause is proved.
