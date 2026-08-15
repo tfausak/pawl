@@ -424,9 +424,27 @@ castableZones pid oid face gs =
 -- offers fewer casts than the rules allow, never more.
 permitsCastFromExile :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromExile pid oid face gs =
-  (fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid && not (Card.isAdventure face))
+  (permitsPlayFromExile pid oid gs && not (Card.isAdventure face))
     || permitsCastPlotted pid oid gs
     || permitsCastForetold pid oid gs
+
+-- CR 715.3d's permission on its own, with neither of permitsCastFromExile's
+-- other two disjuncts and without its Adventure conjunct: does the exiled
+-- object's stored permission name THIS player?
+--
+-- The rule says PLAY, so this is the conjunct the land side shares --
+-- Pawl.Engine.Action.playableLands asks it of an exiled land, where playing is
+-- CR 305.1's special action rather than a cast. Neither of the other two
+-- disjuncts may be shared: CR 702.170d ("a plotted card's owner may cast it")
+-- and CR 702.143a ("that player may cast it") each permit a CAST and nothing
+-- else, and no land can be plotted or foretold anyway.
+--
+-- The Adventure conjunct stays with the cast side for the same reason: CR
+-- 715.3d's "it can't be cast as an Adventure this way" is about a cast, and no
+-- Adventure half is a land.
+permitsPlayFromExile :: PlayerId -> ObjectId -> GameState -> Bool
+permitsPlayFromExile pid oid gs =
+  fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid
 
 -- CR 118.14: how may this player spend mana toward casting THIS object, as the
 -- object lies right now? Dire Fleet Daredevil's "and mana of any type can be

@@ -31,8 +31,25 @@ import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.Zone as Zone
 
 -- The land plays this player may make right now: CR 305.1's land cards in their
--- hand, minus the ones an effect prohibits, each paired with CR 712.12's chosen
--- face (Nothing where no face is chosen -- see Pawl.Engine.Card.landFaces).
+-- hand plus the ones an effect lets them play from elsewhere, minus the ones an
+-- effect prohibits, each paired with CR 712.12's chosen face (Nothing where no
+-- face is chosen -- see Pawl.Engine.Card.landFaces).
+--
+-- THREE SOURCES, because CR 305.1's "from their hand" is the rule's own
+-- allowance and CR 101.1 lets a card widen it. The hand needs no permission; the
+-- graveyard is a CR 613.11 player-axis grant (Crucible of Worlds, Yawgmoth's
+-- Will), and exile is the object-borne permission CR 715.3d and
+-- Effect.GrantPlayFromExile write. That split is the same one
+-- Pawl.Engine.Cast.castableZones draws for the cast side, and the exile source
+-- is read through that module's own zoneCandidates so the two can never disagree
+-- about where to look -- CR 601.3's permission names a PLAYER, and exile is
+-- filed by owner, so a land somebody else owns has to be reachable.
+--
+-- Reading the OBJECT-BORNE permission with Cast.permitsPlayFromExile and not
+-- Cast.permitsCastFromExile is the whole of what makes this the PLAY side: the
+-- plotted and foretold permissions that one also folds in each say "may cast it"
+-- (CR 702.170d, CR 702.143a), and CR 601.1 is the rule that "play" once meant
+-- casting and no longer does.
 --
 -- ONE CARD MAY APPEAR TWICE, in principle: CR 712.12 has the player choose among
 -- "its faces that's a land", so a modal double-faced card with two land faces
@@ -44,11 +61,11 @@ import qualified Pawl.Types.Zone as Zone
 -- the player and settle the whole list at once, while Null Chamber's is about
 -- the land's name and stops one card while leaving the rest playable.
 --
--- Asked against the name of the CARD IN THE HAND, which is where the special
--- action is taken from, and not against the face chosen to be played: CR 712.8a
--- gives a double-faced card in a hand "only the characteristics of its front
--- face", so the land a player is playing is named by that face while they play
--- it. CR 712.19 does let the chooser name the OTHER face -- "the player may
+-- Asked against the name of the CARD IN THE ZONE it is played from, and not
+-- against the face chosen to be played: CR 712.8a gives a double-faced card
+-- "only the characteristics of its front face" while it is anywhere but the
+-- battlefield or the stack -- which is every zone this list draws from -- so the
+-- land a player is playing is named by that face while they play it. CR 712.19 does let the chooser name the OTHER face -- "the player may
 -- choose the name of either face of a double-faced card but not both" -- and
 -- naming it prohibits nothing here, which is the same reading from the other
 -- side rather than a second decision. A land with SEVERAL names is asked as a
@@ -56,7 +73,7 @@ import qualified Pawl.Types.Zone as Zone
 -- prohibition is a membership test rather than a comparison all the same.
 playableLands :: PlayerId -> GameState -> [(ObjectId, Maybe CardName.CardName)]
 playableLands pid gs =
-  let cardOfHandCard oid = case Game.lookupObject oid gs of
+  let cardOfCandidate oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
           Source.OfCard printing -> Just (Printing.card printing)
           Source.OfToken card -> Just card
@@ -65,13 +82,26 @@ playableLands pid gs =
           Source.OfEmblem _ -> Nothing
           Source.OfInherentTrigger _ _ -> Nothing
         Nothing -> Nothing
-      playable oid = case cardOfHandCard oid of
+      playable oid = case cardOfCandidate oid of
         Nothing -> []
         Just card ->
           if PlayerEffect.prohibitsPlayingLand pid (Card.combinedNames card) gs
             then []
             else fmap (\(mName, _) -> (oid, mName)) (Card.landFaces card)
-   in concatMap playable (Game.zoneMembers Zone.Hand pid gs)
+      -- CR 305.1's own zone, which needs no permission.
+      fromHand = Game.zoneMembers Zone.Hand pid gs
+      -- The whole pile or none of it: the grant narrows no land (see
+      -- Pawl.Types.PlayerEffect.PlayLandsFromGraveyard), so it is asked once
+      -- rather than per card, and CR 400.1's per-player zone is the "your
+      -- graveyard" both printings say.
+      fromGraveyard =
+        if PlayerEffect.mayPlayLandsFromGraveyard pid gs
+          then Game.zoneMembers Zone.Graveyard pid gs
+          else []
+      -- Per card instead, because CR 715.3d's permission is state on ONE exiled
+      -- incarnation naming ONE player.
+      fromExile = filter (\oid -> Cast.permitsPlayFromExile pid oid gs) (Cast.zoneCandidates Zone.Exile pid gs)
+   in concatMap playable (fromHand <> fromGraveyard <> fromExile)
 
 -- The cards in this player's hand whose own text grants CR 116.2e's special
 -- action: Circling Vultures' "you may discard this card any time you could cast
