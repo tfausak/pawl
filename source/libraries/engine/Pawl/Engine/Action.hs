@@ -48,8 +48,8 @@ import qualified Pawl.Types.Zone as Zone
 -- Reading the OBJECT-BORNE permission with Cast.permitsPlayFromExile and not
 -- Cast.permitsCastFromExile is the whole of what makes this the PLAY side: the
 -- plotted and foretold permissions that one also folds in each say "may cast it"
--- (CR 702.170d, CR 702.143a), and CR 601.1 is the rule that "play" once meant
--- casting and no longer does.
+-- (CR 702.170d, CR 702.143a), where CR 601.1a makes playing a card either
+-- playing it as a land or casting it -- and this is the first of those.
 --
 -- ONE CARD MAY APPEAR TWICE, in principle: CR 712.12 has the player choose among
 -- "its faces that's a land", so a modal double-faced card with two land faces

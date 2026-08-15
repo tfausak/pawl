@@ -460,8 +460,8 @@ data PlayerEffect
   | -- | CR 305.1 / Crucible of Worlds: this player may play lands from their
     -- graveyard.
     --
-    -- The PLAY half of the zone-widening pair CastFromGraveyard above is the
-    -- cast half of, and a separate arm for the reason CantPlayLandChosenName is
+    -- The same zone widening CastFromGraveyard above states for a cast, stated
+    -- for a PLAY, and a separate arm for the reason CantPlayLandChosenName is
     -- separate from CantCastChosenName: CR 305.1 makes playing a land a special
     -- action that never uses the stack, so the two are read by two different
     -- gates (Pawl.Engine.Action.playableLands, Pawl.Engine.Cast.castableZones).
@@ -472,9 +472,10 @@ data PlayerEffect
     -- NOT a widening of PlayAdditionalLands either. That arm is CR 305.2's COUNT
     -- and names no zone; this one names a zone and no count. They compose in
     -- Pawl.Engine.Action.legalActions without either knowing of the other -- the
-    -- count settles the whole list at once, the zone is asked per candidate --
-    -- so Crucible of Worlds still allows one land play a turn and Exploration
-    -- still only reaches a hand.
+    -- count settles how many plays the whole list allows, this one says which
+    -- piles the list is drawn from -- so Crucible of Worlds alone still allows
+    -- only one land play a turn, and Exploration beside it makes the second
+    -- play available out of either zone.
     --
     -- NULLARY, where CastFromGraveyard carries a Filter. A land play has already
     -- fixed the card type (CR 305.1's "land card"), and no printed sentence

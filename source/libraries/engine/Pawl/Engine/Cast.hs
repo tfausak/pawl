@@ -436,12 +436,15 @@ permitsCastFromExile pid oid face gs =
 -- Pawl.Engine.Action.playableLands asks it of an exiled land, where playing is
 -- CR 305.1's special action rather than a cast. Neither of the other two
 -- disjuncts may be shared: CR 702.170d ("a plotted card's owner may cast it")
--- and CR 702.143a ("that player may cast it") each permit a CAST and nothing
--- else, and no land can be plotted or foretold anyway.
+-- and CR 702.143a ("they may cast that card") each permit a CAST and nothing
+-- else, so a land carrying either keyword would still get no land play out of
+-- it.
 --
 -- The Adventure conjunct stays with the cast side for the same reason: CR
--- 715.3d's "it can't be cast as an Adventure this way" is about a cast, and no
--- Adventure half is a land.
+-- 715.3d's "it can't be cast as an Adventure this way" is about a cast, and CR
+-- 715.3 has the player choose between playing the card normally and casting it
+-- as an Adventure -- so refusing the Adventure half says nothing about the
+-- normal one, which is the half a land play would take.
 permitsPlayFromExile :: PlayerId -> ObjectId -> GameState -> Bool
 permitsPlayFromExile pid oid gs =
   fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid
