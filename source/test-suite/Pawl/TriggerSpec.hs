@@ -4276,8 +4276,10 @@ selfAttacksUnblockedSpec s registry =
 -- own power would say 6 where the rule says 4, and one reading the granting
 -- permanent's would say 4/2.
 --
--- THREE SEATS, for afflictSpec's reason: at two players the defending player and
--- the attacker's one opponent collapse.
+-- THREE SEATS. Rule 702.68a names no defending player, so what the third seat
+-- buys here is narrower than afflictSpec's: at two players "the player attacked"
+-- and "the attacker's opponent" collapse, and a bonus wrongly scoped to the seat
+-- count rather than to the attack would read the same either way.
 --
 -- Giant Spider 2/4 is the blocker, so the BLOCKED leg carries an observable of
 -- its own rather than only an absence: 3 damage leaves it alive where the 4 a
@@ -4378,9 +4380,10 @@ frenzySpec s registry =
                 (Just (2, 1), Just (3, 3))
               Spec.assertEqWith s "bob took 2 and 3" (S.lifeOf S.bob (S.runCombat (plan S.bob [sliver, giant]) gs)) (Just 15)
             _ -> Spec.assertFailure s "fixture should give alice a Frenzy Sliver and a Hill Giant"
-        -- CR 508.5's third seat. The only difference from the first leg is which
-        -- opponent was attacked: bob keeps his Spider and cannot block for carol,
-        -- and the bonus follows the attack rather than the seat.
+        -- The third seat, which CR 508.1b's announcement is what changes: bob
+        -- keeps his Spider and cannot block for carol, so the bonus follows the
+        -- attack rather than the seat. Rule 702.68a names no defending player,
+        -- and that is the point of asserting both life totals.
         Spec.it s "CR 509.1h the bonus follows the attack rather than the seat count" $ do
           (gs, mine, _, _) <- board ["Frenzy Sliver", "Venser's Sliver"] ["Giant Spider"]
           case mine of

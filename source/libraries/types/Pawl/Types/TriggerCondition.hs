@@ -384,7 +384,8 @@ data TriggerCondition
     -- for every condition in this family.
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | "Whenever this creature attacks and isn't blocked" -- Eternal of Harsh
-    -- Truths'. The glossary entry for that phrase sends it to CR 509.1h: the
+    -- Truths', and CR 702.68a's frenzy, which Pawl.Engine.Keyword.frenzy mints
+    -- with this condition. The glossary entry for that phrase sends it to CR 509.1h: the
     -- ability triggers when the creature becomes an unblocked attacking
     -- creature, which is one branch of the same turn-based action
     -- SelfBecomesBlocked reads the other branch of. Self-scoped like it.
