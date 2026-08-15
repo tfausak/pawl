@@ -164,6 +164,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked (ObjectId.MkObjectId 8) (PlayerId.MkPlayerId 2)))
       """ {"type":"AttackerBlocked","value":{"attacker":8,"defender":2}} """
+  -- CR 509.1h's other branch: a bare object, carrying neither the blockers there
+  -- were none of nor a defending player no reader in the pool asks for.
+  Spec.it s "AttackerUnblocked" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.AttackerUnblocked (ObjectId.MkObjectId 8))
+      """ {"type":"AttackerUnblocked","value":8} """
   Spec.it s "SpellCountered" $
     Common.assertCodec
       s

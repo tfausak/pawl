@@ -224,6 +224,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       (TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.HasColor Color.Black))
       """ {"type":"SelfBecomesBlockedByOneOrMore","value":{"type":"HasColor","value":{"type":"Black"}}} """
+  -- CR 509.1h's unblocked branch, nullary like the blocked one: "attacks and
+  -- isn't blocked" has no per-blocker reading to carry a Filter for.
+  Spec.it s "SelfAttacksUnblocked" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfAttacksUnblocked
+      """ {"type":"SelfAttacksUnblocked"} """
   -- CR 113.6k's condition, which names a zone pair rather than the battlefield.
   Spec.it s "SelfPutIntoGraveyardFromLibrary" $
     Common.assertCodec

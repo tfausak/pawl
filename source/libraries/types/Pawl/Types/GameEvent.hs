@@ -270,6 +270,30 @@ data GameEvent
     -- AttackerDeclared's reason: Pawl.Engine.Event.eventBindings takes no game
     -- state, and the planeswalker and battle forms of CR 508.5 need the board.
     AttackerBlocked AttackerBlocked.AttackerBlocked
+  | -- | CR 509.1h's other half: an attacking creature became an UNBLOCKED
+    -- creature -- one event per attacker the CR 509.1 declaration gave no
+    -- blockers, appended by Pawl.Engine.Combat.declareBlockers alone. The
+    -- glossary's "attacks and isn't blocked" entry points at rule 509.1h for
+    -- exactly this.
+    --
+    -- Recorded once, as the turn-based action finishes, and never again. That is
+    -- rule 509.1h's own timing, and its last sentence is why nothing may sample
+    -- Combat.blockers for the status later: a creature remains blocked even when
+    -- every creature blocking it is removed from combat, so an entry that has
+    -- emptied out is not this event.
+    --
+    -- The declaration is the only producer, and that is not a shortfall against
+    -- rule 509.1h's "an effect says that it becomes blocked or unblocked": the
+    -- blocked half of that clause is Pawl.Engine.Combat.becomeBlocked (Curtain
+    -- of Light), and no printing states the unblocked half at all -- Scryfall
+    -- has no card whose text makes a creature become unblocked. Nothing to
+    -- observe, so nothing is elided.
+    --
+    -- No defending player rides it, unlike AttackerBlocked: the pool's reader
+    -- (Eternal of Harsh Truths) names nobody but its controller. The printed
+    -- forms that do say "defending player" -- Crypt Cobra's poison counter -- are
+    -- not transcribed, and adding the field is the job of the card that reads it.
+    AttackerUnblocked ObjectId.ObjectId
   | -- | CR 509.1i: a creature was declared BLOCKING -- one event per blocking
     -- creature the CR 509.1 declaration named, appended by
     -- Pawl.Engine.Combat.declareBlockers alone.
