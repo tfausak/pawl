@@ -269,4 +269,11 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       (PlayerEffect.CastFromGraveyard (Filter.HasCardType CardType.Creature))
       """ {"type":"CastFromGraveyard","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+  -- CR 305.1 / Crucible of Worlds, whose sentence narrows no land.
+  Spec.it s "PlayLandsFromGraveyard" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      PlayerEffect.PlayLandsFromGraveyard
+      """ {"type":"PlayLandsFromGraveyard"} """
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerEffect.codec

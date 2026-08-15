@@ -88,8 +88,12 @@ largeBoard = 256
 --     remaining conjunct, including the two that ask about OTHER objects. That
 --     path is the one the absolute Sorcerer ceiling below reads.
 --
--- The hand is empty, so Cast.castableSpells and playableLands are constant work
--- here and the battlefield loop is the only thing that varies with `n`.
+-- The hand, the graveyard and exile are all empty, so Cast.castableSpells and
+-- playableLands have no candidates to walk here -- both scan all three zones --
+-- and the battlefield loop is the only thing that varies with `n`. The zone
+-- permissions playableLands consults fold over the battlefield, but
+-- Action.legalActions already folds it once for CR 305.2's allowance, so that is
+-- a constant factor on a loop the board had anyway.
 boardOf :: Printing.Printing -> Int -> GameState.GameState
 boardOf printing n =
   let addOne gs _ = snd (S.addCreature printing S.alice gs)
