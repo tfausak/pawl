@@ -720,6 +720,135 @@ headlessSkaabSpec s registry =
         (Just TapState.Tapped)
       Spec.assertEqWith s "and it is 3/6" (entered >>= \oid -> S.powerToughnessOf oid resolved) (Just (3, 6))
 
+-- Synthetic Frail Exhumation {1}{B} Creature -- Zombie 2/2: "As an additional
+-- cost to cast this spell, exile a creature card with power 2 or less from your
+-- graveyard."
+--
+-- alice holds it with a Nightmare in her graveyard, with priority in her own
+-- precombat main phase. `battlefield` is the only thing a case varies, and every
+-- board pays the same {1}{B} off the same basic Swamp and Mountain -- so a
+-- negative castability assertion cannot pass on unaffordable mana. bob's two
+-- Swamps are on every board, so "Swamps you control" and "Swamps anyone
+-- controls" never agree on a number.
+frailExhumationBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState -> GameState.GameState) ->
+  [Printing.Printing] ->
+  (ObjectId.ObjectId, GameState.GameState)
+frailExhumationBoard swamp nightmare exhumation battlefield buried =
+  let base = battlefield (S.landsFor swamp S.bob 2 (Setup.emptyGame S.bothPlayers))
+      (_, gs0) = S.addGraveyardCard nightmare S.alice base
+      seeded = List.foldl' (\gs printing -> snd (S.addGraveyardCard printing S.alice gs)) gs0 buried
+      (oid, gs1) = S.addHandCard exhumation S.alice seeded
+   in ( oid,
+        gs1
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Synthetic Frail Exhumation, the observer for CR 613.1 over the CANDIDATES a
+-- characteristic-defining ability sweeps from OFF the battlefield. Nightmare's CR
+-- 208.2a power counts "Swamps you control" -- battlefield objects -- and
+-- Cost.exileCandidates reads that power for a Nightmare in a graveyard, so each
+-- land has to be described by its CR 613 projection rather than by its printed
+-- face.
+--
+-- Why the card is synthetic: no printing exiles a graveyard card qualified by
+-- POWER as a cost, and Cost.exileCandidates and the mill tally are the only two
+-- readers left that could ask about a power through the printed-card view
+-- (Projection.viewOfCardIn). Every printed power criterion over a graveyard --
+-- Alesha's and Reveillark's "target creature card with power 2 or less" -- is a
+-- TARGET, admitted off the full projection, and Imperial Recruiter's search reads
+-- one too. Nothing in the CR forbids the card: CR 601.2f admits any additional
+-- cost, CR 406.2 lets one move a card out of a graveyard, and Headless Skaab
+-- above is the same component with the qualifier dropped.
+frailExhumationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+frailExhumationSpec s registry =
+  Spec.describe s "Synthetic Frail Exhumation" $ do
+    -- CR 613.1d layer 4: Urborg makes each of alice's four lands a Swamp, so the
+    -- Nightmare in her graveyard is a 4/4 and the criterion refuses it. Read as
+    -- printed the count reads 0 instead -- a printed-card candidate has no
+    -- controller for "you control" to match either -- and the cost was payable.
+    Spec.it s "CR 613.1 Urborg makes the graveyard Nightmare too big to exile" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      mountain <- S.printingOf s registry "Mountain"
+      urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+      nightmare <- S.printingOf s registry "Nightmare"
+      exhumation <- S.printingOf s registry "Synthetic Frail Exhumation"
+      let onBoard board = snd (S.addCreature urborg S.alice (S.landsFor mountain S.alice 2 (S.landsFor swamp S.alice 1 board)))
+          (spell, gs) = frailExhumationBoard swamp nightmare exhumation onBoard []
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+      Spec.assertBool s (not (S.castable S.alice spell gs)) "not castable"
+      Spec.assertEqWith s "and not offered" (filter (S.isCastOf spell) (Action.legalActions S.alice gs)) []
+      Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
+      Spec.assertEqWith s "and the Nightmare is still in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 1
+    -- The pair's other half, differing in exactly one permanent: a fourth Mountain
+    -- where Urborg stood. Same land count, same mana, same graveyard -- the
+    -- Nightmare is a 1/1 and pays the cost.
+    Spec.it s "CR 208.2a without Urborg the same Nightmare is a 1/1 and pays it" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      mountain <- S.printingOf s registry "Mountain"
+      nightmare <- S.printingOf s registry "Nightmare"
+      exhumation <- S.printingOf s registry "Synthetic Frail Exhumation"
+      let onBoard = S.landsFor mountain S.alice 3 . S.landsFor swamp S.alice 1
+          (spell, gs) = frailExhumationBoard swamp nightmare exhumation onBoard []
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+      Spec.assertBool s (S.castable S.alice spell gs) "castable"
+      Spec.assertEqWith s "CR 406.2 the Nightmare is in exile" (length (Game.zoneMembers Zone.Exile S.alice cast)) 1
+      Spec.assertEqWith s "and the graveyard no longer holds it" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 0
+    -- The control for the Urborg leg: the same board with a Goblin Piker also
+    -- buried is castable, so the refusal above is about the Nightmare's power and
+    -- not about the mana, the phase or the component.
+    Spec.it s "CR 601.2f the Urborg board still pays with a Goblin Piker buried" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      mountain <- S.printingOf s registry "Mountain"
+      urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+      nightmare <- S.printingOf s registry "Nightmare"
+      piker <- S.printingOf s registry "Goblin Piker"
+      exhumation <- S.printingOf s registry "Synthetic Frail Exhumation"
+      let onBoard board = snd (S.addCreature urborg S.alice (S.landsFor mountain S.alice 2 (S.landsFor swamp S.alice 1 board)))
+          (spell, gs) = frailExhumationBoard swamp nightmare exhumation onBoard [piker]
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+      Spec.assertBool s (S.castable S.alice spell gs) "castable"
+      Spec.assertEqWith s "one card exiled" (length (Game.zoneMembers Zone.Exile S.alice cast)) 1
+      Spec.assertEqWith s "and the Nightmare stayed behind" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 1
+    -- The divergence the other way (CR 613.1d again): Blood Moon takes the Swamp
+    -- subtype OFF three Bayous, so the Nightmare drops from a 4/4 to a 1/1 and
+    -- becomes exilable. Read as printed, the Bayous are Swamps on both boards.
+    Spec.it s "CR 613.1 Blood Moon shrinks the graveyard Nightmare to a 1/1" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      mountain <- S.printingOf s registry "Mountain"
+      bayou <- S.printingOf s registry "Bayou"
+      bloodMoon <- S.printingOf s registry "Blood Moon"
+      nightmare <- S.printingOf s registry "Nightmare"
+      exhumation <- S.printingOf s registry "Synthetic Frail Exhumation"
+      let lands = S.landsFor bayou S.alice 3 . S.landsFor mountain S.alice 1 . S.landsFor swamp S.alice 1
+          onBoard board = snd (S.addCreature bloodMoon S.alice (lands board))
+          (spell, gs) = frailExhumationBoard swamp nightmare exhumation onBoard []
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+      Spec.assertBool s (S.castable S.alice spell gs) "castable"
+      Spec.assertEqWith s "CR 406.2 the Nightmare is in exile" (length (Game.zoneMembers Zone.Exile S.alice cast)) 1
+      Spec.assertEqWith s "and the graveyard no longer holds it" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 0
+    -- That pair's other half, differing in exactly one permanent: no Blood Moon.
+    -- The three Bayous are Swamps again and the Nightmare is a 4/4.
+    Spec.it s "CR 208.2a without Blood Moon the Bayous are Swamps and the cost is unpayable" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      mountain <- S.printingOf s registry "Mountain"
+      bayou <- S.printingOf s registry "Bayou"
+      nightmare <- S.printingOf s registry "Nightmare"
+      exhumation <- S.printingOf s registry "Synthetic Frail Exhumation"
+      let onBoard = S.landsFor bayou S.alice 3 . S.landsFor mountain S.alice 1 . S.landsFor swamp S.alice 1
+          (spell, gs) = frailExhumationBoard swamp nightmare exhumation onBoard []
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice spell)
+      Spec.assertBool s (not (S.castable S.alice spell gs)) "not castable"
+      Spec.assertEqWith s "and not offered" (filter (S.isCastOf spell) (Action.legalActions S.alice gs)) []
+      Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
+      Spec.assertEqWith s "and the Nightmare is still in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 1
+
 -- alice controls `n` Mountains (all tapped when `tap` is True) and holds one
 -- Fireblast, with priority in her own precombat main phase. Loaded fresh
 -- inside each case that needs it -- equivalent because loading is
@@ -1318,6 +1447,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   villageRitesSpec s registry
   altarsReapSpec s registry
   headlessSkaabSpec s registry
+  frailExhumationSpec s registry
   catharticReunionSpec s registry
   safeholdSentrySpec s registry
   fireblastSpec s registry
