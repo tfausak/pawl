@@ -459,6 +459,9 @@ quantityCounts quantity = case quantity of
   -- CR 701.9a's tally of logged discards: a PlayerRef and nothing else, so no
   -- Count and no Filter here either.
   Quantity.Type.CardsDiscardedThisTurn _ -> []
+  -- CR 120.1's tally of logged damage: a PlayerRef and nothing else, so no Count
+  -- and no Filter here either.
+  Quantity.Type.PlayersDealtDamageThisTurn _ -> []
   -- CR 400.7's logged entry, read against the object the quantity is aimed at: no
   -- reference at all, so no Count and no Filter here either.
   Quantity.Type.EnteredThisTurn -> []

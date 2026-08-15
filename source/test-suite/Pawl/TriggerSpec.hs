@@ -12,7 +12,9 @@
 -- triggers -- `stateTriggerSpec`, and CR 612.1's basic-land-type word swap
 -- reaching one of those, with Magical Hack aimed at Barbarian Outcast --
 -- `textChangedTriggerSpec`. CR 608.2i turn history (Khabál Ghoul's
--- "died this turn") -- `historySpec`. CR 603.7 delayed triggered abilities
+-- "died this turn") -- `historySpec`, and the same window read over CR 120.1's
+-- damage to a PLAYER rather than over a zone change, with Furious Spinesplitter at
+-- three seats -- `spinesplitterSpec`. CR 603.7 delayed triggered abilities
 -- -- `delayedSpec`, and the plural of its object binding -- a Create whose slot
 -- holds every token it minted, so a card can say "those tokens", with Thatcher
 -- Revolt -- `tokenSetSpec`, and that group read back through ObjectRef.InSlot by
@@ -1080,6 +1082,91 @@ historySpec s registry =
                 Nothing -> False
           Spec.assertEqWith s "nothing before the step began" (GameState.stack quiet) []
           Spec.assertEqWith s "one trigger once it did" (length (filter isTrigger (GameState.stack fired))) 1
+
+-- Furious Spinesplitter {2}{R/G}{R/G} Creature -- Ogre Warrior 3/3 with trample:
+-- "At the beginning of your end step, put a +1/+1 counter on this creature for
+-- each opponent who was dealt damage this turn." Khabál Ghoul's window over CR
+-- 120.1's damage instead of over CR 700.4's death -- and the two measurements are
+-- built differently on purpose. The Ghoul's is a Scope.InHistory fold over the
+-- objects a Filter kept; this is Quantity.PlayersDealtDamageThisTurn, because CR
+-- 120.3a's recipient is a PLAYER, who has no Filter view, and because what the
+-- card counts is players rather than events.
+--
+-- ONE BOARD throughout -- three seats, alice's Spinesplitter, an Ogre Sentry of
+-- bob's -- and every case below differs from the others in nothing but what was
+-- dealt to whom before the end step. Three seats because a two-player board
+-- collapses "an opponent" onto the only other player, so a reading that counted
+-- every damaged player could not be told from one that counted opponents.
+--
+-- Every amount is distinct (1, 3, 4, 5, 6, 7) so that no sum coincides with a count
+-- of players: the two-opponent case is 2 against a damage sum of 7, and the
+-- twice-at-one-opponent case is 1 against a sum of 8 and an event count of 2.
+--
+-- The damage goes in through Damage.applyDamage rather than off a spell. That is
+-- the funnel which records the event, and it is the level Khabál Ghoul's group
+-- reaches for Event.destroy at. Everything downstream of the record -- the trigger,
+-- the quantity, the counters -- is the card's own, driven through the real scan and
+-- the real resolution.
+spinesplitterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spinesplitterSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      -- The ACTIVE player's end step, so that after the handoffs below this is the
+      -- step the turn actually reached rather than alice's forced back onto it.
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep (GameState.activePlayer gs))) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      countersOn oid gs = maybe 0 (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- Settled FIRST, so the damage is scanned past before the end step's trigger
+      -- exists -- the drained-queue falsifier Khabál Ghoul's group opens with.
+      atEnd gs = resolveAll (settle (beginEndStep (settle gs)))
+      hit src target amount gs =
+        S.runPure
+          S.identityAnswer
+          gs
+          (Damage.applyDamage [DamageEvent.MkDamageEvent src target amount False False False 0 Nothing DamageKind.Noncombat])
+   in Spec.describe s "Furious Spinesplitter" $ do
+        Spec.it s "CR 120.1 a counter for each OPPONENT dealt damage, not for each damage event" $ do
+          spinesplitter <- S.printingOf s registry "Furious Spinesplitter"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (spine, gs0) = S.addCreature spinesplitter S.alice S.threePlayerGame
+              (bobsSentry, base) = S.addCreature sentry S.bob gs0
+              quiet = atEnd base
+              atBob = atEnd (hit spine (Recipient.ToPlayer S.bob) 3 base)
+              atBoth = atEnd (hit spine (Recipient.ToPlayer S.carol) 4 (hit spine (Recipient.ToPlayer S.bob) 3 base))
+              atBobTwice = atEnd (hit spine (Recipient.ToPlayer S.bob) 5 (hit spine (Recipient.ToPlayer S.bob) 3 base))
+              atAlice = atEnd (hit spine (Recipient.ToPlayer S.alice) 7 base)
+              atBobsSentry = atEnd (hit spine (Recipient.ToCreature bobsSentry) 1 base)
+              bobPaid = atEnd (Event.payLife S.bob 6 base)
+          Spec.assertEqWith s "CR 702.19: the printed trample is there" (Map.member Keyword.Type.Trample (Projection.keywordsOf spine base)) True
+          Spec.assertEqWith s "nobody was dealt damage, so no counter" (countersOn spine quiet) 0
+          Spec.assertEqWith s "one opponent was, so one" (countersOn spine atBob) 1
+          Spec.assertEqWith s "both opponents were, so two" (countersOn spine atBoth) 2
+          Spec.assertEqWith s "one opponent hit twice is still one opponent" (countersOn spine atBobTwice) 1
+          -- CR 102.2 / 109.5: "your opponents" is every player but you, so the
+          -- ability's own controller is never among them.
+          Spec.assertEqWith s "damage to alice herself is not damage to an opponent" (countersOn spine atAlice) 0
+          -- CR 120.3a names the PLAYER recipient; a creature bob controls is not bob.
+          Spec.assertEqWith s "damage to an opponent's creature is not damage to them" (countersOn spine atBobsSentry) 0
+          Spec.assertEqWith s "and the 3/3 Sentry survived the 1 damage, so the board is otherwise the same" (Set.member bobsSentry (GameState.battlefield atBobsSentry)) True
+          -- CR 119.4's life loss is not CR 120.1's damage, and the log records the
+          -- two separately. Without this the reader could be looking at
+          -- GameEvent.LifeLost and pass every assertion above, since CR 120.3a's
+          -- damage to a player files one of those too.
+          Spec.assertEqWith s "CR 119.4 life lost without damage is not damage" (countersOn spine bobPaid) 0
+        -- CR 608.2i: the window is THIS turn. Without this, a lifetime tally passes
+        -- every assertion above. The turn goes all the way round to alice again, so
+        -- the only difference from the two-opponent case is which turn it is.
+        Spec.it s "CR 608.2i the damage is THIS turn's: it resets at the handoff" $ do
+          spinesplitter <- S.printingOf s registry "Furious Spinesplitter"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (spine, gs0) = S.addCreature spinesplitter S.alice S.threePlayerGame
+              (_, base) = S.addCreature sentry S.bob gs0
+              damaged = hit spine (Recipient.ToPlayer S.carol) 4 (hit spine (Recipient.ToPlayer S.bob) 3 base)
+              handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
+              roundAgain = handoff (handoff (handoff damaged))
+          Spec.assertEqWith s "the turn came back to alice" (GameState.activePlayer roundAgain) S.alice
+          Spec.assertEqWith s "on the turn it happened, two" (countersOn spine (atEnd damaged)) 2
+          Spec.assertEqWith s "a turn cycle later, none" (countersOn spine (atEnd roundAgain)) 0
 
 -- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
 -- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
@@ -11319,6 +11406,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   stateTriggerSpec s registry
   textChangedTriggerSpec s registry
   historySpec s registry
+  spinesplitterSpec s registry
   delayedSpec s registry
   tokenSetSpec s registry
   tokenGroupReadSpec s registry

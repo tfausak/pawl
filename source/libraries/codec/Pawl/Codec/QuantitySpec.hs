@@ -251,6 +251,20 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.CardsDiscardedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"CardsDiscardedThisTurn","value":{"type":"InSlot","value":"target"}} """
+  -- CR 120.1, on CardsDiscardedThisTurn's terms: a PlayerRef and nothing else,
+  -- with the same recursive-decoder pair. Furious Spinesplitter's is the Relative
+  -- arm, over Opponent rather than You.
+  Spec.it s "PlayersDealtDamageThisTurn, relative and from a slot" $ do
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.PlayersDealtDamageThisTurn (PlayerRef.Relative PlayerRelation.Opponent))
+      """ {"type":"PlayersDealtDamageThisTurn","value":{"type":"Relative","value":{"type":"Opponent"}}} """
+    Common.assertCodec
+      s
+      Quantity.codec
+      (Quantity.PlayersDealtDamageThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"PlayersDealtDamageThisTurn","value":{"type":"InSlot","value":"target"}} """
   -- CR 400.7 with NOTHING on the wire either: the object is the one the quantity
   -- is evaluated against, and "this turn" is the event log's own extent.
   Spec.it s "EnteredThisTurn is nullary" $
