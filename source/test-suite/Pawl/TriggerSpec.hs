@@ -7801,8 +7801,8 @@ youngPyromancerSpec s registry =
 -- Desolation Twin, {10} Creature -- Eldrazi 10/10: "When you cast this spell,
 -- create a 10/10 colorless Eldrazi creature token." Chosen from the cast-trigger
 -- family because it is the one member whose WHOLE printed text pawl can write:
--- every other printing in that family wants CR 707.10's copy-a-spell or CR
--- 118.12's positive half (#701). Nothing of this card is omitted.
+-- every other printing in that family wants CR 707.10's copy-a-spell. Nothing of
+-- this card is omitted.
 --
 -- The bearer is the SPELL, which is what makes this a zone test rather than
 -- another SpellCast case: at CR 601.2i the Twin is on nobody's battlefield and in
@@ -9008,7 +9008,7 @@ isPayResponse response = case response of
 -- CR 702.123 fabricate N: "When this permanent enters, you may put N +1/+1
 -- counters on it. If you don't, create N 1/1 colorless Servo artifact creature
 -- tokens." Rule 702.123a prints CR 118.12a's rewriting already done, so the
--- minted clause is one UnlessPaid over
+-- minted clause is one PayGate over
 -- CostComponent.PutPlusOneCountersOnThis and the tokens are its "if you don't"
 -- branch -- afterlife's mint with a gate on it, and the first minted keyword
 -- ability that offers a COST at resolution. (Soulshift's and provoke's clauses

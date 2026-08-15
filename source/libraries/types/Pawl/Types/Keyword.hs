@@ -819,7 +819,7 @@ data Keyword
     -- Pawl.Engine.Keyword.fabricate, as rule 702.135a's afterlife is.
     --
     -- Rule 702.123a prints CR 118.12a's rewriting already done, which is why the
-    -- minted clause is an ordinary Pawl.Types.UnlessPaid over
+    -- minted clause is an ordinary Pawl.Types.PayGate over
     -- Pawl.Types.CostComponent.PutPlusOneCountersOnThis and needs no branching
     -- opcode: the counters are the cost, the tokens the "if you don't" branch.
     --

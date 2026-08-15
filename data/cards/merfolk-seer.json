@@ -4,19 +4,19 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1
+          "value": 2
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Black"
+              "type": "Blue"
             }
           }
         }
       ],
-      "name": "Whipstitched Zombie",
+      "name": "Merfolk Seer",
       "power": {
         "type": "Literal",
         "value": 2
@@ -28,18 +28,7 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "StepBegins",
-            "value": {
-              "phase": {
-                "type": "Beginning",
-                "value": {
-                  "type": "Upkeep"
-                }
-              },
-              "scope": {
-                "type": "ControllersTurn"
-              }
-            }
+            "type": "SelfDies"
           },
           "modal": {
             "modes": [
@@ -48,22 +37,37 @@
                   {
                     "effects": [
                       {
-                        "type": "Sacrifice",
-                        "value": "self"
+                        "type": "Draw",
+                        "value": {
+                          "player": {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "quantity": {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        }
                       }
                     ],
                     "payGate": {
                       "branch": {
-                        "type": "IfNotPaid"
+                        "type": "IfPaid"
                       },
                       "cost": {
                         "mana": [
+                          {
+                            "type": "Generic",
+                            "value": 1
+                          },
                           {
                             "type": "OfType",
                             "value": {
                               "type": "Colored",
                               "value": {
-                                "type": "Black"
+                                "type": "Blue"
                               }
                             }
                           }
@@ -81,7 +85,10 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Zombie"
+            "type": "Merfolk"
+          },
+          {
+            "type": "Wizard"
           }
         ],
         "types": [

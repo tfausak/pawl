@@ -1847,6 +1847,12 @@ rewriteModal pairs modal =
           { Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c),
             -- CR 701.46a's clause gate is a Condition, so its Filters are
             -- printed words a text change must reach too.
+            --
+            -- Not implemented: the clause's CR 118.12 pay gate. Its Cost can
+            -- name a subtype -- "unless you sacrifice a Goblin" -- and that word
+            -- is left as printed here, so the resolution-time offer asks the
+            -- pre-hack question (#635). No card in the pool states one, which is
+            -- why this is a record update rather than a Filter.rewriteCost call.
             Clause.condition = fmap (rewriteCondition pairs) (Clause.condition c)
           }
       rewriteTargetSlot slot = slot {TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot)}

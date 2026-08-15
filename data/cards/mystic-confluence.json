@@ -37,7 +37,10 @@
                     "value": "spell"
                   }
                 ],
-                "unlessPaid": {
+                "payGate": {
+                  "branch": {
+                    "type": "IfNotPaid"
+                  },
                   "cost": {
                     "mana": [
                       {
