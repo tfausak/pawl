@@ -28,6 +28,7 @@ import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.Moved as Moved
 import Pawl.Types.Object (Object)
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -44,6 +45,7 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- Ask a player a question and wait for the answer. The ONE way the engine
 -- suspends: every prompt in the codebase goes through here, including the ones
@@ -713,6 +715,53 @@ discardOf event = case event of
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.Moved {} -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Revealed {} -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
+  GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing
+  GameEvent.LeftTheGame _ -> Nothing
+  GameEvent.Milled {} -> Nothing
+
+-- The permanent an event describes ENTERING THE BATTLEFIELD, if it is one. CR
+-- 400.7's zone change with a destination of Zone.Battlefield, which is what the
+-- glossary's "enters the battlefield" is and what a bare "enters" on a card
+-- abbreviates.
+--
+-- The id is ZoneChange.object and not ZoneChange.departed: CR 400.7 makes the
+-- entrant a NEW object, and the caller asks about the permanent that is on the
+-- battlefield now. The same choice Pawl.Engine.Event's PermanentEnters arm makes
+-- for CR 603.6a, so a trigger and this reader agree on what entered.
+--
+-- castOf's and discardOf's sibling, and here for their import-graph reason: the
+-- caller is Pawl.Engine.Quantity's EnteredThisTurn arm.
+enteredBattlefield :: GameEvent -> Maybe ObjectId
+enteredBattlefield event = case event of
+  GameEvent.Moved (Moved.MkMoved change _) ->
+    if ZoneChange.to change == Zone.Battlefield then Just (ZoneChange.object change) else Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew {} -> Nothing
+  GameEvent.SpellCast {} -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
+  GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented {} -> Nothing
   GameEvent.StepBegan {} -> Nothing

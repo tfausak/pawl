@@ -71,6 +71,10 @@ codec =
       -- rather than from anything the card names, and the turn is the log's
       -- extent rather than a window a card could state.
       Arm.payload "CardsDiscardedThisTurn" PlayerRef.codec Quantity.CardsDiscardedThisTurn (\x -> case x of Quantity.CardsDiscardedThisTurn y -> Just y; _ -> Nothing),
+      -- CR 400.7's entry read against the object the quantity is aimed at, so
+      -- there is nothing on the wire: the turn is the log's extent rather than a
+      -- window a card could state, as for CardsDiscardedThisTurn above.
+      Arm.nullary "EnteredThisTurn" Quantity.EnteredThisTurn,
       -- CR 509.1h's declaration read against the object the quantity is aimed at,
       -- so there is nothing on the wire at all -- Power's shape rather than
       -- ObjectCounters'.

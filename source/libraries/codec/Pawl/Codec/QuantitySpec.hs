@@ -251,6 +251,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.codec
       (Quantity.CardsDiscardedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"CardsDiscardedThisTurn","value":{"type":"InSlot","value":"target"}} """
+  -- CR 400.7 with NOTHING on the wire either: the object is the one the quantity
+  -- is evaluated against, and "this turn" is the event log's own extent.
+  Spec.it s "EnteredThisTurn is nullary" $
+    Common.assertCodec
+      s
+      Quantity.codec
+      Quantity.EnteredThisTurn
+      """ {"type":"EnteredThisTurn"} """
   -- CR 509.1h with NOTHING on the wire: the object is the one the quantity is
   -- evaluated against, so this is a bare tag like Power and ManaValue.
   Spec.it s "BlockersBeyondFirst is nullary" $

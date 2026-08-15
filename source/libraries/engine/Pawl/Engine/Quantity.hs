@@ -332,6 +332,32 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.CardsDiscardedThisTurn ref -> case playersOf ref of
     Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . snd) (Foldable.toList (GameState.events gs)))))
     _ -> Nothing
+  -- CR 400.7 / 608.2i read as a 0/1: did the object this evaluation is aimed at
+  -- enter the battlefield this turn?
+  --
+  -- BlockersBeyondFirst's arm in shape -- read LIVE off game state rather than
+  -- through the injected view, an entry being an event and not a characteristic --
+  -- and CardsDiscardedThisTurn's in extent: Engine.beginTurnOf clears the log at
+  -- the turn handoff, so "this turn" is the log's own reach and nothing here names
+  -- a window. LIVE matters for CR 604.2 -- Projection.conditionHolds re-asks this
+  -- every time the projection is taken, so the hexproof goes away at the handoff
+  -- rather than at whatever moment a snapshot had been captured.
+  --
+  -- Game.enteredBattlefield and not a Scope.InHistory count: that arm matches a
+  -- Filter against the event's characteristic snapshot, where this asks whether one
+  -- particular id is the entrant.
+  --
+  -- An object that entered TWICE this turn (blinked and returned) is still 1 rather
+  -- than a tally: CR 400.7 makes the second arrival a new object with a new id, so
+  -- only the current incarnation's own entry can match.
+  --
+  -- Nothing only for an evaluation aimed at no object -- a member of an
+  -- Aggregation.Greatest over Scope.InHistory. A permanent that did not enter this
+  -- turn is 0, which is a number and not a failure.
+  Quantity.EnteredThisTurn ->
+    fmap
+      (\oid -> if any ((== Just oid) . Game.enteredBattlefield . snd) (GameState.events gs) then 1 else 0)
+      mOid
   -- CR 509.1h's declaration, counted beyond the first: how many creatures are
   -- blocking the object this evaluation is aimed at, less one, floored at 0 for
   -- rule 702.23a's "beyond the first".
@@ -463,6 +489,7 @@ substituteStar star quantity = case quantity of
   Quantity.WasKicked -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
+  Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
   -- ability with no resolution and so no slots, and Pawl.CardSpec's
@@ -530,6 +557,9 @@ slots quantity = case quantity of
   Quantity.OpponentsAttacked _ -> Set.empty
   -- And an eighth, CR 701.9a's tally having nothing beside its PlayerRef either.
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
+  -- And a nullary arm, which names nothing at all: CR 400.7's entry is read
+  -- against the object the evaluation is aimed at, as ObjectCounters is.
+  Quantity.EnteredThisTurn -> Set.empty
   -- And a nullary arm, which names nothing at all: CR 509.1h's declaration is
   -- read against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.BlockersBeyondFirst -> Set.empty
@@ -577,6 +607,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.WasKicked -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
+  Quantity.EnteredThisTurn -> True
   Quantity.BlockersBeyondFirst -> True
   -- True because `slots` above DOES report this arm's slot, unlike the nested
   -- PlayerRefs -- so the reported set is the whole of what evaluating it reads.
@@ -648,6 +679,7 @@ bakeBound players quantity = case quantity of
   Quantity.ObjectCounters _ -> quantity
   Quantity.HasDesignation _ -> quantity
   Quantity.WasKicked -> quantity
+  Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
 
 -- One reference, baked. The whole of the substitution: every arm above funnels
@@ -739,6 +771,7 @@ readsX quantity = case quantity of
   Quantity.WasKicked -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
+  Quantity.EnteredThisTurn -> False
   Quantity.BlockersBeyondFirst -> False
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion
   -- Plus above needs. Its own SlotName names a target rather than an amount, and X
