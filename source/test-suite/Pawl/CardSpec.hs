@@ -2387,8 +2387,10 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
 -- cannot name an ObjectId or a PlayerId. Whippoorwill's "damage that would be
 -- dealt to THAT CREATURE" does name a recipient, but the creature is the one its
 -- resolution chose, so the pattern is the engine's to bake and never the card
--- file's to write. `whichKind` and `whatSource` are both authorable here and
--- are exactly what Frenzied Baloth and Excruciator print.
+-- file's to write. `whichKind`, `whatSource` and `whatRecipient` are all
+-- authorable here; the first two are exactly what Frenzied Baloth and
+-- Excruciator print, and the third describes a recipient rather than naming
+-- one, so no card in the pool writes it on THIS carrier.
 --
 -- Not implemented: no resolution bakes a recipient into THIS pattern, the way
 -- Resolve's prevention arms bake one into a shield's, so the field has no

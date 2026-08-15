@@ -51,7 +51,7 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- constructor.
 --
 -- Parametric in the EFFECT, which is CR 615.5's additional effect reaching the
--- one arm that can carry one (DamageR's riders, #1105) without a module cycle:
+-- one arm that can carry one (DamageR's riders) without a module cycle:
 -- Pawl.Types.Effect holds this type and this type holds effects. See
 -- Pawl.Types.DamageR. Every other arm ignores the parameter, so a card writing a
 -- rider onto anything but a prevention is a lint's job rather than the type's.
