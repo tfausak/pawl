@@ -267,20 +267,24 @@ manaOptionsOfGiven pcs oid gs =
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
 -- adds will carry. THE one place they are decided; manaOptionsOfGiven just above
--- is the one place they are stamped onto a unit. They are captured rather than
--- looked up later because the mana outlives the source (Pawl.Types.ManaUnit).
+-- is where the payment path stamps them onto a unit, and Pawl.Engine.Resolve's
+-- Effect.AddMana arm is where a resolving ability's own producer does (CR
+-- 605.1b). They are captured rather than looked up later because the mana
+-- outlives the source (Pawl.Types.ManaUnit).
 --
 -- CR 106.3 is what makes reading the SOURCE the right question: mana produced by
--- an ability has that ability's source (CR 113.7) -- for everything here, the
--- permanent being tapped. CR 107.4h then asks whether that source is a snow one,
--- and the rules define no separate term for it: a snow source is a source that
--- is snow, which for a permanent is CR 205.4g's supertype and nothing else.
+-- an ability has that ability's source (CR 113.7) -- the permanent being tapped
+-- on the payment path, and the object a resolving ability came from on the other.
+-- CR 107.4h then asks whether that source is a snow one, and the rules define no
+-- separate term for it: a snow source is a source that is snow, which for a
+-- permanent is CR 205.4g's supertype and nothing else.
 --
 -- CR 205.4g is PERMANENT-scoped and CR 106.3's first clause is wider, so this
 -- read would be too narrow for a source that is not a permanent. Nothing reaches
--- it with one: the two engine paths in are Pawl.Engine.Cost.tapForMana and
--- payableResolutions, and both take their oid from manaSourcesGiven, which
--- filters the battlefield.
+-- it with one. Pawl.Engine.Cost.tapForMana and payableResolutions take their oid
+-- from manaSourcesGiven, which filters the battlefield; Pawl.Engine.Resolve's
+-- Effect.AddMana arm takes the resolving ability's source, which is a permanent
+-- for every producer in the pool and need not be one in general.
 productionTagsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Set.Set ProductionTag.ProductionTag
 productionTagsGiven pcs oid gs =
   if Set.member Supertype.Snow (Projection.supertypesGiven pcs oid gs)

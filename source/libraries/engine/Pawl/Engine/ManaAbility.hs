@@ -61,6 +61,12 @@ import qualified Pawl.Types.Zone as Zone
 -- Pawl.Types.CostComponent moves a card to or from a library, so there is
 -- nothing to ask (#1517).
 --
+-- ACTIVATED abilities only, which is CR 605.1a's own scope. Not implemented: CR
+-- 605.1b's triggered mana ability. No Pawl.Types.TriggerCondition watches mana
+-- being added or a mana ability being activated, so no triggered ability can meet
+-- the rule, and every one that adds mana resolves off the stack instead --
+-- Pawl.Engine.Resolve's Effect.AddMana arm (#1572).
+--
 -- CR 605.1a's closing sentence -- do not take replacement effects other than
 -- self-replacement effects into account -- holds by construction rather than by
 -- a guard. Every clause here reads an ActivatedAbility's PRINTED effects out of

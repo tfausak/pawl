@@ -2096,6 +2096,76 @@ offersCast printing board =
   let (withSpell, oid) = S.handOne printing board
    in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
 
+-- CR 605.1b: a TRIGGERED ability is a mana ability only when it triggers from a
+-- mana ability's activation or resolution, or from mana being added to a pool.
+-- Burning-Tree Emissary ({R/G}{R/G} 2/2 Human Shaman, "When this creature
+-- enters, add {R}{G}") triggers off neither, so its ability is no mana ability:
+-- CR 603.3 puts it on the stack and its mana is added when it RESOLVES, through
+-- Pawl.Engine.Resolve's Effect.AddMana arm rather than Cost.tapForMana.
+--
+-- Here rather than in ResolveSpec for the reason the mana window is: the
+-- subsystem is mana, and this is the second of the two places mana reaches a
+-- pool.
+burningTreeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+burningTreeSpec s registry = Spec.describe s "Burning-Tree Emissary" $ do
+  Spec.it s "CR 605.1b the enters trigger resolves off the stack and adds {R}{G}" $ do
+    bte <- S.printingOf s registry "Burning-Tree Emissary"
+    let (_, after) = burningTreeResolved bte S.alice
+    Spec.assertEqWith s "alice's pool is {R} then {G}, in printed order (CR 608.2c)" (poolUnits after) [plainRed, plainGreen]
+    Spec.assertEqWith s "the stack is empty again" (length (GameState.stack after)) 0
+
+  -- CR 109.5: "add {R}{G}" says "you", which for a triggered ability is the
+  -- controller of the object when it triggered -- not the same seat as the active
+  -- player. alice is active and holds priority on both boards, and the Emissary's
+  -- controller is the only difference between them.
+  Spec.it s "CR 109.5 the mana goes to the ability's controller, not the active player" $ do
+    bte <- S.printingOf s registry "Burning-Tree Emissary"
+    let (_, alices) = burningTreeResolved bte S.alice
+        (_, bobs) = burningTreeResolved bte S.bob
+    Spec.assertEqWith s "alice's Emissary pays alice" (poolSize S.alice alices, poolSize S.bob alices) (2, 0)
+    Spec.assertEqWith s "bob's Emissary pays bob" (poolSize S.alice bobs, poolSize S.bob bobs) (0, 2)
+
+  -- Gameplay level: the floating {R}{G} is ordinary mana, so it pays for a second
+  -- Emissary ({R/G}{R/G}) off a board holding no land and no other mana source.
+  -- The negative board differs in ONE thing -- the Emissary was arranged onto the
+  -- battlefield rather than entering -- so no trigger fired, nothing was added,
+  -- and the cast is not offered.
+  Spec.it s "CR 106.4 the added mana pays for a second Emissary, and without it the cast is not offered" $ do
+    bte <- S.printingOf s registry "Burning-Tree Emissary"
+    let (handId, after) = burningTreeResolved bte S.alice
+        (noTriggerHandId, noTrigger) = burningTreeArranged bte S.alice
+        cast = snd (Engine.runGamePure S.identityAnswer after (S.cast S.alice handId))
+    Spec.assertBool s (any (S.isCastOf handId) (Action.legalActions S.alice after)) "the second Emissary is castable off the trigger's mana"
+    Spec.assertBool s (not (any (S.isCastOf noTriggerHandId) (Action.legalActions S.alice noTrigger))) "and is not castable when no trigger added any"
+    Spec.assertEqWith s "the cast spent the whole pool" (poolSize S.alice cast) 0
+    Spec.assertEqWith s "and the second Emissary is on the stack" (length (GameState.stack cast)) 1
+
+-- One Burning-Tree Emissary entering under `pid` with its CR 603.6a enters event,
+-- that trigger placed and resolved, plus a second copy in alice's hand -- alice
+-- being active with priority in her precombat main phase (S.handOne). No land and
+-- no other mana source is on the board, so the only mana anywhere is what the
+-- trigger added.
+burningTreeResolved :: Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
+burningTreeResolved bte pid =
+  let (base, handId) = S.handOne bte (Setup.emptyGame S.bothPlayers)
+      (_, entered) = S.entersWithTrigger bte pid base
+      placed = snd (Engine.runGamePure S.identityAnswer entered Engine.placePendingTriggers)
+   in (handId, snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop))
+
+-- The same board with the Emissary ARRANGED onto the battlefield instead of
+-- entering (S.addCreature emits no event), so nothing triggers and no mana is
+-- added. Everything else -- seats, phase, priority, the copy in hand, the empty
+-- stack -- is burningTreeResolved's.
+burningTreeArranged :: Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
+burningTreeArranged bte pid =
+  let (base, handId) = S.handOne bte (Setup.emptyGame S.bothPlayers)
+   in (handId, snd (S.addCreature bte pid base))
+
+-- One green mana with no production tags, plainRed's twin: what the Emissary's
+-- trigger adds alongside it.
+plainGreen :: ManaUnit.ManaUnit
+plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty}
+
 -- These printings on the battlefield under alice's control, untapped and settled.
 alicePermanents :: [Printing.Printing] -> GameState.GameState
 alicePermanents = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers)
@@ -2148,6 +2218,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   sharedVictimSpec s registry
   villageRitesSpec s registry
   chromaticSpec s registry
+  burningTreeSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against

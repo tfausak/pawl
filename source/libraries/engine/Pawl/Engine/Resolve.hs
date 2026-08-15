@@ -29,6 +29,7 @@ import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -109,6 +110,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
@@ -2528,10 +2530,49 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- whose only target is this slot: with it illegal, CR 608.2b's fizzle stops
     -- the resolution before any effect is applied.
     _ -> pure ()
-  -- CR 605.3b: a mana ability never resolves on the stack. AddMana is applied by
-  -- Cost.tapForMana at payment, never here. Reaching this arm means a mana ability
-  -- was wrongly put on the stack -- an isManaAbility classification bug.
-  Effect.AddMana _ -> pure ()
+  -- The SECOND place mana reaches a pool, and the one CR 106.3 names outright:
+  -- mana "may also be produced by ... the effects of abilities that aren't mana
+  -- abilities". A mana ability is applied by Cost.tapForMana at payment and never
+  -- resolves (CR 605.3b), but an ability that adds mana is not automatically one
+  -- -- CR 605.1a classifies only ACTIVATED abilities, and CR 605.1b makes a
+  -- triggered ability a mana ability only where it triggered from a mana ability's
+  -- activation or resolution or from mana being added. Burning-Tree Emissary's
+  -- enters trigger is neither, so it uses the stack (CR 603.3) and adds its {R}{G}
+  -- here; Pawl.ManaSpec's Burning-Tree Emissary group is the proof. No trigger
+  -- pawl can express meets CR 605.1b at all, so every triggered producer arrives
+  -- here; see #1572.
+  --
+  -- CR 106.4 / 109.5: into the pool of the player the effect's unnamed "you" is,
+  -- which for a triggered ability is its controller -- `controller` here, and not
+  -- the active player. The type is decided by Mana.producedTypes and the CR 106.3
+  -- tags by Mana.productionTagsGiven off this ability's SOURCE, both of them the
+  -- payment path's own readers, so the two routes put identical units in a pool.
+  Effect.AddMana production -> do
+    gs0 <- State.get
+    case Mana.producedTypes source gs0 production of
+      -- One settled type is one mana. A clause adding two writes two of these
+      -- effects, which CR 608.2c runs in printed order.
+      [manaType] ->
+        State.modify'
+          ( Mana.addMana
+              controller
+              [ ManaUnit.MkManaUnit
+                  { ManaUnit.manaType = manaType,
+                    ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0
+                  }
+              ]
+          )
+      -- No type at all, which is CR 607.2d's "the chosen color" with nothing
+      -- chosen: producedTypes offers none rather than inventing one, and adding
+      -- nothing is the honest answer here for the same reason.
+      [] -> pure ()
+      -- Not implemented: a resolving ability adding mana whose type is the
+      -- player's own choice (CR 105.4's five colours). Picking one would be the
+      -- engine making that choice, and the existing prompt -- Cost.chooseManaYield
+      -- -- asks about an activation's cost and yield together, which a resolution
+      -- has neither of. No triggered ability in the pool adds mana of any colour
+      -- (#1571).
+      _ : _ : _ -> pure ()
   Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ destination) ->
     -- CR 701.23a: match each library card against "the given description",
     -- through the card's own CR 613 projection. Rule 613.1 starts from the actual
