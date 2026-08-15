@@ -2325,11 +2325,13 @@ damageSourceSpec s registry = Spec.describe s "DamageSource" $ do
     childOfNight <- S.printingOf s registry "Child of Night"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (vampire, wall, after) = biteBoard forest rabidBite childOfNight wallOfStone
-    Spec.assertEqWith s "the Vampire dealt it, not the sorcery" (fmap DamageEvent.source (S.damageEventsOf after)) [vampire]
-    Spec.assertEqWith s "two damage marked on the Wall" (S.damageOf wall after) (Just 2)
-    Spec.assertEqWith s "and alice gained two off ITS lifelink" (S.lifeOf S.alice after) (Just 22)
+    -- The OBSERVER first, deliberately: a mutation that credits the sorcery has
+    -- to be caught by a rule reading the source, not only by the field itself.
+    Spec.assertEqWith s "alice gained two off ITS lifelink" (S.lifeOf S.alice after) (Just 22)
     Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "two damage marked on the Wall" (S.damageOf wall after) (Just 2)
     Spec.assertBool s (S.onBattlefield wall (S.settleSba after)) "the 0/8 Wall survives two damage"
+    Spec.assertEqWith s "and the Vampire dealt it, not the sorcery" (fmap DamageEvent.source (S.damageEventsOf after)) [vampire]
   -- The paired control: same seats, same mana, same 2 power, same recipient. A
   -- reading that gained life for the sorcery's own damage would gain it here too.
   Spec.it s "CR 120.3f a Goblin Piker dealing the same two gains nobody anything" $ do
@@ -2352,10 +2354,11 @@ damageSourceSpec s registry = Spec.describe s "DamageSource" $ do
     rats <- S.printingOf s registry "Typhoid Rats"
     wallOfStone <- S.printingOf s registry "Wall of Stone"
     let (ratId, wall, after) = biteBoard forest rabidBite rats wallOfStone
-    Spec.assertEqWith s "the Rat dealt it" (fmap DamageEvent.source (S.damageEventsOf after)) [ratId]
+    -- The observer first, for the reason the lifelink case above puts it first.
+    Spec.assertBool s (not (S.onBattlefield wall (S.settleSba after))) "CR 704.5h destroyed the Wall"
     Spec.assertEqWith s "one damage, not two" (S.damageOf wall after) (Just 1)
     Spec.assertEqWith s "the deal-time rider read the Rat" (fmap DamageEvent.dealtByDeathtouch (S.damageEventsOf after)) [True]
-    Spec.assertBool s (not (S.onBattlefield wall (S.settleSba after))) "CR 704.5h destroyed the Wall"
+    Spec.assertEqWith s "and the Rat dealt it" (fmap DamageEvent.source (S.damageEventsOf after)) [ratId]
   -- The paired control for that one: another 1/1, so the same one damage, and
   -- the only difference is the keyword.
   Spec.it s "CR 702.2b Llanowar Elves' one damage leaves the Wall standing" $ do
