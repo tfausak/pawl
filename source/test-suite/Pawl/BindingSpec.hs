@@ -35,7 +35,8 @@ sampleSnapshot =
       PC.subtypes = Set.empty,
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
-      PC.triggeredAbilities = []
+      PC.triggeredAbilities = [],
+      PC.subtypeWordChanges = []
     }
 
 spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()

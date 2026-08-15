@@ -11,6 +11,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -47,7 +48,8 @@ testCharacteristics =
       PC.subtypes = Set.singleton Subtype.Human,
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
-      PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility]
+      PC.triggeredAbilities = [FaceSpec.minimalTriggeredAbility],
+      PC.subtypeWordChanges = [ChangeSubtypeWord.MkChangeSubtypeWord Subtype.Spirit Subtype.Elf]
     }
 
 testCharacteristicsJson :: String
@@ -56,7 +58,8 @@ testCharacteristicsJson =
     <> "\"colors\":[{\"type\":\"Blue\"}],\"manaValue\":3,\"power\":1,\"toughness\":2,"
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
-    <> "\"modal\":{\"modes\":[{}]}}]}"
+    <> "\"modal\":{\"modes\":[{}]}}],"
+    <> "\"subtypeWordChanges\":[{\"from\":{\"type\":\"Spirit\"},\"to\":{\"type\":\"Elf\"}}]}"
 
 -- | Every field but the two required ones at its default.
 minimalCharacteristics :: PC.ProjectedCharacteristics
@@ -76,7 +79,8 @@ minimalCharacteristics =
       PC.subtypes = Set.empty,
       PC.activatedAbilities = [],
       PC.replacementEffects = [],
-      PC.triggeredAbilities = []
+      PC.triggeredAbilities = [],
+      PC.subtypeWordChanges = []
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()

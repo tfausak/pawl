@@ -285,6 +285,14 @@ applyModification viewOf src gs oid m pc =
         -- these two points, so the count that finally runs sees them, and this
         -- layer writes no PC.power of its own for 7a to overwrite.
         --
+        -- The MINTED half is recorded rather than applied: rule 702's own
+        -- abilities (CR 702.135a's afterlife, CR 702.123a's fabricate, CR 702.46a's
+        -- soulshift) are built from the FINISHED keyword counts, after this fold,
+        -- so there is nothing here yet to rewrite. Appending the pair to
+        -- PC.subtypeWordChanges is what lets mintedTriggeredAbilitiesOf apply it at
+        -- the mint. Appended rather than prepended: the fold walks CR 613.1's
+        -- timestamp order, and two swaps compose in it.
+        --
         -- Not implemented: the swap does not reach PC.replacementEffects (#635).
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           let pairs = [(from, to)]
@@ -293,7 +301,8 @@ applyModification viewOf src gs oid m pc =
                   { PC.keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc),
                     PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
                     PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc),
-                    PC.characteristicPT = fmap (rewriteCharacteristicPT pairs) (PC.characteristicPT pc)
+                    PC.characteristicPT = fmap (rewriteCharacteristicPT pairs) (PC.characteristicPT pc),
+                    PC.subtypeWordChanges = PC.subtypeWordChanges pc <> [ChangeSubtypeWord.MkChangeSubtypeWord from to]
                   }
            in if Set.member from (PC.subtypes pc')
                 then pc' {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc'))}
@@ -1046,7 +1055,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.subtypes = Set.empty,
         PC.activatedAbilities = [],
         PC.replacementEffects = [],
-        PC.triggeredAbilities = []
+        PC.triggeredAbilities = [],
+        PC.subtypeWordChanges = []
       }
   Just face ->
     -- The seed predates every layer, so a Count reached from here gets a viewOf
@@ -1102,7 +1112,9 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             PC.subtypes = TypeLine.subtypes (Face.typeLine face),
             PC.activatedAbilities = Face.activatedAbilities face,
             PC.replacementEffects = Face.replacementEffects face,
-            PC.triggeredAbilities = Face.triggeredAbilities face
+            PC.triggeredAbilities = Face.triggeredAbilities face,
+            -- The seed is CR 613.1's starting point, before layer 3 has run.
+            PC.subtypeWordChanges = []
           }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
@@ -4031,13 +4043,39 @@ grantsKeywordWhere p m = case m of
 -- the layer system. A Humility'd creature has none.
 --
 -- Not the whole list: rule 702.70's poisonous is a triggered ability the RULES give
--- an object for holding a keyword, and Keyword.triggeredAbilitiesOf mints those
+-- an object for holding a keyword, and mintedTriggeredAbilitiesOf below mints those
 -- from PC.keywords instead. A reader wanting every triggered ability must add
 -- them, as Event's scan does. Not folded into PC.triggeredAbilities because that
 -- field is built DURING the fold while the mint needs the finished keyword counts
 -- -- which is also what makes Humility free.
 triggeredAbilitiesOf :: ObjectId -> GameState -> [TriggeredAbility Card.Type.Card]
 triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
+
+-- The other half of that list: the triggered abilities rule 702 MINTS from a
+-- finished projection's keyword counts, with the object's CR 612 text changes
+-- applied to them.
+--
+-- Why the rewrite happens here rather than at layer 3: a keyword's rules text is
+-- the rule's, not the card's ("afterlife N" MEANS rule 702.135a's sentence), so
+-- the words a text change reaches do not exist until the mint runs -- and the
+-- mint reads the POST-LAYER counts, which is what makes Humility and a layer-6
+-- grant free. Three minted abilities hold a subtype word today: rule 702.135a's
+-- afterlife and rule 702.123a's fabricate name the type their TOKEN is, which is
+-- CR 612.2a's licensed case, and rule 702.46a's soulshift asks for a "target
+-- Spirit card", which is CR 612.1's ordinary one.
+--
+-- Over-reaches by CR 612.3 in one position nothing in the pool occupies: a
+-- keyword GRANTED at layer 6 arrives after the layer-3 swap and its minted
+-- ability should keep the printed word, where this applies the pair to every
+-- minted ability alike. No card grants afterlife, fabricate or soulshift
+-- (gap #1600).
+--
+-- This lives in Projection rather than in Pawl.Engine.Keyword because the rewrite
+-- is the layer system's, and casing on an effect's structure is this module's job.
+mintedTriggeredAbilitiesOf :: ProjectedCharacteristics -> [TriggeredAbility Card.Type.Card]
+mintedTriggeredAbilitiesOf pc =
+  let pairs = fmap (\c -> (ChangeSubtypeWord.from c, ChangeSubtypeWord.to c)) (PC.subtypeWordChanges pc)
+   in fmap (rewriteTriggeredAbility pairs) (Keyword.triggeredAbilitiesOf (PC.keywords pc))
 
 subtypesOf :: ObjectId -> GameState -> Set Subtype.Type.Subtype
 subtypesOf = subtypesGiven Map.empty

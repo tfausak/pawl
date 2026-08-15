@@ -7,6 +7,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Defense as Defense
@@ -127,6 +128,21 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     replacementEffects :: [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card)],
     -- | CR 603 layer 6: the object's triggered abilities after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two.
-    triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card]
+    triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card],
+    -- | CR 612.1 layer 3: the subtype word swaps applied to this object, in the
+    -- order they were applied. A RECORD of what layer 3 did, where every field
+    -- above is the RESULT of it -- kept because rule 702's abilities are minted
+    -- from the finished keyword counts, after the fold, so the mint has no other
+    -- way to learn that the words it is about to write were changed (CR 612.2a,
+    -- Pawl.Engine.Projection.mintedTriggeredAbilitiesOf).
+    --
+    -- A list rather than a set or a map: two swaps compose in order (Faerie ->
+    -- Elf then Elf -> Goblin is not the same pair of effects as the reverse),
+    -- which is CR 613.1's timestamp order the fold already walks in.
+    --
+    -- Not copiable, and structurally so: CR 707.2's list of copiable values holds
+    -- no text change, and this is written by the layer fold rather than by the
+    -- seed, so copiableCharacteristics never carries one.
+    subtypeWordChanges :: [ChangeSubtypeWord.ChangeSubtypeWord]
   }
   deriving (Eq, Ord, Show)
