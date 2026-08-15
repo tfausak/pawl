@@ -313,6 +313,8 @@ library codec
     Pawl.Codec.Mentored
     Pawl.Codec.MentoredSpec
     Pawl.Codec.Mill
+    Pawl.Codec.Milled
+    Pawl.Codec.MilledSpec
     Pawl.Codec.MillSpec
     Pawl.Codec.MillTally
     Pawl.Codec.MillTallySpec
@@ -990,6 +992,7 @@ library types
     Pawl.Types.ManaUnit
     Pawl.Types.Mentored
     Pawl.Types.Mill
+    Pawl.Types.Milled
     Pawl.Types.MillTally
     Pawl.Types.Modal
     Pawl.Types.Mode

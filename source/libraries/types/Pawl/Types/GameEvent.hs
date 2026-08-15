@@ -17,6 +17,7 @@ import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mentored as Mentored
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -135,6 +136,21 @@ data GameEvent
     -- a hidden zone instead has still been discarded, so a reader matching the
     -- hand-to-graveyard zone pair would lose the case Rest in Peace creates.
     Discarded Discarded.Discarded
+  | -- | CR 701.17a: a player MILLED cards. Emitted by Pawl.Engine.Resolve's Mill
+    -- arm, the one place in the engine that mills, alongside the Moved event
+    -- each of those moves records.
+    --
+    -- Distinct from those Moved events for the reason the Discarded arm above is
+    -- distinct from its own, and the card's own ruling says so outright: a card
+    -- put into a graveyard from a library without the word "mill" is not a legal
+    -- target for The Master, Transcendent's ability. Surveil (CR 701.25a) and
+    -- explore (CR 701.44a) both move a card from the top of a library into a
+    -- graveyard without milling it, and a Moved entry records only the zone
+    -- pair, so a reader folding those would admit all three.
+    --
+    -- ONE event per instruction per player, holding every card that player
+    -- milled at once (CR 701.17a).
+    Milled Milled.Milled
   | -- | CR 121.1: a player DREW a card, and which of that player's draws this
     -- turn it was -- 1 for the first, counting up. Emitted by
     -- Pawl.Engine.Event.drawCard, the one funnel every draw goes through.

@@ -392,6 +392,24 @@ data Filter keyword
     -- 508.4 says a creature put onto the battlefield attacking never attacked, and
     -- only Combat.declareAttackers appends GameEvent.AttackerDeclared.
     AttackedThisTurn
+  | -- | CR 701.17a: the candidate is a card that was MILLED earlier this turn --
+    -- The Master, Transcendent's "target creature card in a graveyard that was
+    -- milled this turn". AttackedThisTurn's look-back read of the turn-scoped
+    -- GameEvent log, one event arm over (GameEvent.Milled), and uncharacteristic
+    -- for IsAttacking's reason: how a card reached the zone it is in is a rules
+    -- record the closed half owns, not a characteristic of the card (CR 109.3).
+    --
+    -- NOT expressible as "moved from a library to a graveyard this turn", which
+    -- is the reading the Moved entries would give: The Master's own ruling says a
+    -- card put into a graveyard from a library without the word "mill" -- Rowan's
+    -- Grim Search -- is not a legal target, and surveil (CR 701.25a) and explore
+    -- (CR 701.44a) each bin a card off the top of a library without milling it.
+    --
+    -- Matches the incarnation the mill LEFT the card as (CR 400.7, CR 701.17c),
+    -- so a milled card that has since moved again is no longer one this admits --
+    -- the card in the graveyard is a different object from the one that came back
+    -- to it.
+    MilledThisTurn
   | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to a creature, which is what
     -- Crown of the Ages' "target Aura attached to a creature" narrows by.
     -- Uncharacteristic for IsAttacking's reason -- attachment is a rules concept

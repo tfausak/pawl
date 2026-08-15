@@ -119,6 +119,10 @@ data View = MkView
     -- actually contains AttackedThisTurn. That is a cost argument rather than
     -- the recursion hazard the next field records.
     attackedThisTurn :: Bool,
+    -- CR 701.17a: was this candidate MILLED earlier this turn? A look-back read
+    -- of the same log `attackedThisTurn` above reads, and LAZY for that field's
+    -- reason -- nothing forces it unless a Filter contains MilledThisTurn.
+    milledThisTurn :: Bool,
     -- CR 701.3a: is this candidate attached to a CREATURE right now? Not a
     -- characteristic either (CR 109.3), so it is read from Object.attachedTo plus
     -- the HOST's projected card types rather than from the candidate's own
@@ -285,6 +289,8 @@ playerView pid =
       blocked = False,
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
+      -- CR 701.17a mills CARDS, and a player is not one.
+      milledThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything, because Object.attachedTo is
       -- a field of the ATTACHED permanent, and a player is not one.
@@ -570,6 +576,11 @@ matches context view predicate = case predicate of
   -- creature removed from combat (CR 506.4) still attacked, which is what
   -- Relentless Assault's "creatures that attacked this turn" means.
   Filter.AttackedThisTurn -> attackedThisTurn view
+  -- CR 701.17a: the same look-back, over the mills rather than the attacks. Like
+  -- the atom above it cannot stop being true within a turn, and unlike it the
+  -- candidate can stop EXISTING -- CR 400.7 mints a new object the moment the
+  -- milled card moves again, and the new one was not milled.
+  Filter.MilledThisTurn -> milledThisTurn view
   -- CR 701.3a: a live read of Object.attachedTo and the host's projected types,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
@@ -701,6 +712,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
+  Filter.MilledThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
   Filter.IsAttachedToPermanent -> predicate
   Filter.IsAttachedToSource -> predicate
@@ -1003,6 +1015,7 @@ bakeBound players predicate = case predicate of
   Filter.IsBlocking -> predicate
   Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
+  Filter.MilledThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
   Filter.IsAttachedToPermanent -> predicate
   Filter.IsAttachedToSource -> predicate
@@ -1070,6 +1083,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsBlocking -> []
   Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
+  Filter.MilledThisTurn -> []
   Filter.IsAttachedToCreature -> []
   Filter.IsAttachedToPermanent -> []
   Filter.IsAttachedToSource -> []
@@ -1140,6 +1154,7 @@ statesAQuality predicate = case predicate of
   Filter.IsBlocking -> True
   Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True
+  Filter.MilledThisTurn -> True
   Filter.IsAttachedToCreature -> True
   Filter.IsAttachedToPermanent -> True
   Filter.IsAttachedToSource -> True

@@ -1,5 +1,6 @@
 module Pawl.Engine.Projection where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -78,6 +79,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.Modification (Modification)
@@ -657,6 +659,10 @@ viewOfCard face =
           Filter.blocking = False,
           Filter.blocked = False,
           Filter.attackedThisTurn = False,
+          -- CR 701.17a mills an OBJECT out of a library, and this builder
+          -- describes a printed FACE -- viewOfCardIn below is the one that holds
+          -- an id and can answer.
+          Filter.milledThisTurn = False,
           Filter.attachedToCreature = False,
           Filter.attachedToPermanent = False,
           Filter.attachedTo = Nothing,
@@ -808,6 +814,14 @@ printedToughness face = case Face.characteristicPT face of
 -- Only Combat.declareAttackers appends one, which is what keeps CR 508.4's
 -- creature put onto the battlefield attacking -- one that "never attacked" --
 -- out of the answer.
+-- CR 701.17a: does this event record THIS object being one of the cards a mill
+-- milled? Only Pawl.Engine.Resolve's Mill arm appends one, which is what keeps a
+-- surveil's or an explore's bin -- neither of them a mill -- out of the answer.
+milledIt :: ObjectId -> GameEvent.GameEvent -> Bool
+milledIt oid event = case event of
+  GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
+  _ -> False
+
 declaredIt :: ObjectId -> GameEvent.GameEvent -> Bool
 declaredIt oid event = case event of
   GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _) -> declared == oid
@@ -875,6 +889,10 @@ viewOfCharacteristics oid pc controller counters gs =
       -- CR 608.2i: read from the turn's event log, not the combat record, which
       -- CR 511.3 clears at end of combat. The log spans the turn.
       Filter.attackedThisTurn = any (declaredIt oid . snd) (GameState.events gs),
+      -- CR 701.17a / 608.2i: the same log, read for the mills. CR 400.7 is what
+      -- makes an id enough to ask with -- the event names the incarnation the
+      -- mill left the card as, and a later move would have minted another.
+      Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs),
       -- CR 701.3a: also not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's creature-ness is projected (layer 4
       -- can make a land a creature), so it goes through isCreatureOf. That is why
@@ -2855,6 +2873,8 @@ filterReads f = case f of
   -- Reads nothing: no Modification writes GameState.events, so no CR 613 layer can
   -- move a set this atom selects.
   Filter.Type.AttackedThisTurn -> Set.empty
+  -- Reads nothing, for AttackedThisTurn's reason and off the same log.
+  Filter.Type.MilledThisTurn -> Set.empty
   -- Declared as reading Types even though the types are the HOST's. Aspect names
   -- an aspect of ONE object's projection, so there is no way to say "another
   -- object's card types"; over-declaring is the conservative direction. Nothing in

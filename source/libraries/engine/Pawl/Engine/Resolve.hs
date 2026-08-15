@@ -112,6 +112,7 @@ import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
 import Pawl.Types.ModeInstance (ModeInstance)
@@ -3373,11 +3374,26 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 701.17/701.17b: top min(n, library) of each miller's library. A
         -- short library mills what there is, which is why the tally below counts
         -- THESE cards rather than the number the quantity asked for.
-        milled = case Quantity.evaluateFor viewOf context gs resolving source quantity of
-          Just n | n > 0 -> concatMap (\pid -> List.genericTake n (Game.zoneMembers Zone.Library pid gs)) millers
+        milledBy = case Quantity.evaluateFor viewOf context gs resolving source quantity of
+          Just n | n > 0 -> fmap (\pid -> (pid, List.genericTake n (Game.zoneMembers Zone.Library pid gs))) millers
           _ -> []
-    -- Funnelled so each move mints a new incarnation.
-    Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) milled
+        milled = concatMap snd milledBy
+    -- Funnelled so each move mints a new incarnation, and then recorded as the
+    -- mill it was (CR 701.17a). The GameEvent.Milled entry is what a later
+    -- effect's Filter.MilledThisTurn reads, and it carries the ids the funnel
+    -- ANSWERED rather than the ones the cards had in the library: CR 400.7 has
+    -- minted new ones, and CR 701.17c is the rule that sends a reader after the
+    -- card in the zone it moved to. A move the CR 616.1 loop cancelled answers
+    -- Nothing and is no card milled.
+    --
+    -- ONE entry per miller, holding that player's whole batch, because rule
+    -- 701.17a mills them at once -- so a reader cannot mistake one instruction
+    -- for several. Recorded even for a card a replacement diverted to another
+    -- zone, which is that rule's own reading: the card was milled wherever it
+    -- ended up.
+    Monad.forM_ milledBy $ \(pid, cards) -> do
+      arrived <- Maybe.catMaybes <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
+      Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
     -- The tally, counted off the PRINTED card the way Effect.Search's filter is
     -- (CR 701.23a's reason: a card in a library has no projection), and read
     -- from the pre-move state because CR 400.7 has since minted new ids. Rule
