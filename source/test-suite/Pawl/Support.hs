@@ -344,7 +344,15 @@ playLandAnswer p = case p of
 addCreature :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addCreature printing pid gs =
   let (printingId, gsP) = Game.intern printing gs
-      (oid, gs1) = Game.freshObjectId gsP
+   in addCreatureOf printingId pid gsP
+
+-- addCreature for a printing ALREADY in the table, so a caller adding many
+-- copies of one printing interns once -- the discipline Setup.createDeck and
+-- Event's token minting both keep, and which addCreature cannot keep on its own
+-- because one call is one object.
+addCreatureOf :: PrintingId.PrintingId -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addCreatureOf printingId pid gs =
+  let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject

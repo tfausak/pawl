@@ -114,6 +114,19 @@ intern printing gs =
 printingOf :: PrintingId.PrintingId -> GameState -> Maybe Printing.Printing
 printingOf pid gs = Map.lookup pid (GameState.printings gs)
 
+-- The PRINTING behind an object, which is `cardOf` one unwrap earlier.
+--
+-- It exists because the difference is an allocation on the layer fold's hot
+-- path: this hands back the Maybe the table lookup already built, where cardOf
+-- fmaps Printing.card into a SECOND one. A caller that goes straight on to read
+-- a field of the card wants this and pays for the unwrap in nothing.
+printingOfObject :: ObjectId -> GameState -> Maybe Printing.Printing
+printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
+  Just (Source.OfCard pid) -> printingOf pid gs
+  Just (Source.OfToken pid) -> printingOf pid gs
+  Just (Source.OfEmblem pid) -> printingOf pid gs
+  _ -> Nothing
+
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
 -- offered indices is honoured. Anything else -- a short answer, a duplicate, an
 -- out-of-range index -- leaves the canonical order standing rather than dropping
@@ -453,7 +466,7 @@ faceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 namesOf :: ObjectId -> GameState -> Set.Set CardName.CardName
 namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just Facing.FaceDown -> Set.empty
-  _ -> maybe Set.empty (namesFor (lookupObject oid gs)) (cardOf oid gs)
+  _ -> maybe Set.empty (namesFor (lookupObject oid gs) . Printing.card) (printingOfObject oid gs)
 
 -- `faceOf` IGNORING CR 708.2's substitution: what the object's own card shows,
 -- whichever way up the object is -- CR 709.3b's chosen half, CR 709.4's combined
@@ -470,8 +483,8 @@ namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- wants to know what an object IS wants faceOf.
 faceUpFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceUpFaceOf oid gs = do
-  card <- cardOf oid gs
-  Just (resolveFaceFor (lookupObject oid gs) card)
+  printing <- printingOfObject oid gs
+  Just (resolveFaceFor (lookupObject oid gs) (Printing.card printing))
 
 -- `faceOf`, narrowed to the one characteristic that is not always read off the
 -- live face: CR 712.8e calculates a nonmodal double-faced permanent's mana value
@@ -492,7 +505,8 @@ manaCostFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just Facing.FaceDown -> Just Card.faceDownFace
   _ -> do
-    card <- cardOf oid gs
+    printing <- printingOfObject oid gs
+    let card = Printing.card printing
     Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
