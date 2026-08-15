@@ -51,7 +51,9 @@ exec awk '
     next
   }
   {
-    # A wrap cannot span two files.
+    # A wrap cannot span two files. `FNR` restarts on the first record of each
+    # file, and an empty file in the list contributes no record at all, so this
+    # fires for every file that could carry a wrap in.
     if (FNR == 1) pending = 0
 
     # The previous line ended in a bare `CR`, so the number opens this one,
