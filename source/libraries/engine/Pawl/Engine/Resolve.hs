@@ -294,7 +294,12 @@ exchangeSidesSlots sides = case sides of
 -- X's own half of the contract.
 slotsOf :: Effect Card.Type.Card -> Map.Map SlotName SlotArity
 slotsOf effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
+  -- The dealer is a slot READ like any other (CR 120.2b), and one object rather
+  -- than a set: a damage event has one source (CR 120.1).
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer) ->
+    joinTwo
+      (joinTwo (objectRefSlots ref) (quantitySlots quantity))
+      (maybe Map.empty oneSlot dealer)
   -- The modification's own quantities read slots too, through
   -- Projection.quantitiesOf. No card in the pool reads a slot there, but a
   -- dangling one would otherwise slip past the lint entirely.
@@ -545,7 +550,7 @@ conditionSlots condition = case condition of
 -- those is the one change this case will not force.
 slotsAreExhaustive :: Effect Card.Type.Card -> Bool
 slotsAreExhaustive effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage _ quantity) -> Quantity.slotsAreExhaustive quantity
+  Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) ->
     durationSlotsAreExhaustive duration
       && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
@@ -685,7 +690,7 @@ readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
-      Effect.DealDamage (DealDamage.MkDealDamage _ quantity) -> Quantity.readsX quantity
+      Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> Quantity.readsX quantity
       -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
       -- inside the Modification, reached through Projection.quantitiesOf.
       Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> any Quantity.readsX (Projection.quantitiesOf modification)
@@ -782,7 +787,7 @@ searchesLibrary effect = case effect of
   Effect.TemptWithTheRing -> False
   Effect.Venture -> False
   Effect.PlayerSacrifices {} -> False
-  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> False
+  Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
   Effect.ModifyTarget {} -> False
   Effect.ChangeText {} -> False
   Effect.AddMana _ -> False
@@ -2384,7 +2389,8 @@ recordExiledWith source before gs =
 -- itself, or the ABILITY object -- and is where every slot this fold DEFINES is
 -- bound and where ArmDelayedTrigger reads CR 603.7c's captured environment back
 -- out. NOT `source`: for an ability the two differ (CR 113.7a keeps `source` on
--- the source permanent, which is what a DealDamage must come from), and that
+-- the source permanent, which is where a DealDamage's damage comes from unless
+-- its own `dealer` slot names another object under CR 120.2b), and that
 -- permanent can be gone before a later effect of the same list runs. The stack
 -- object outlives its own effect list by construction (CR 608.2n).
 --
@@ -2394,7 +2400,7 @@ recordExiledWith source before gs =
 -- source to pay leaves the announced value only on the ability object (#544).
 applyOneEffect :: Game Result -> ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName (Set Recipient) -> Map.Map SlotName (Set Recipient) -> Effect Card.Type.Card -> Game ()
 applyOneEffect runSubgame resolving source controller legal chosen effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> do
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity dealer) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
@@ -2415,10 +2421,35 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- A player recipient survives it untouched: CR 115.4's "any target"
         -- includes one and CR 120.3a is what damage to it does.
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legal resolving controller source gs ref)
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+        -- WHO DEALS IT (CR 120.1). `source` is CR 113.7's default -- the object
+        -- the resolving spell or ability came from -- and a `dealer` slot is CR
+        -- 120.2b's exception, a sentence naming some other object as the source:
+        -- Rabid Bite's "target creature you control deals damage equal to its
+        -- power".
+        --
+        -- Resolved HERE, as the effect applies, and then carried on the
+        -- DamageEvent rather than beside it. DamageEvent.source is the one field
+        -- every later reader of "what dealt this" already asks -- the CR 704.5h
+        -- deathtouch SBA, CR 120.3f's lifelink payee, Replacement's CR 615.1
+        -- damage patterns, and the damage triggers' bindings -- and
+        -- Damage.damageEvent reads the dealer's own riders off it, so a
+        -- redirected source reaches all of them without any of them learning
+        -- about redirection.
+        --
+        -- Through the same InSlot sweep every other slot read takes, so CR
+        -- 608.2b applies to a dealer exactly as it does to a recipient: a dealer
+        -- whose target went illegal names no object, and the instruction then
+        -- has no source and deals nothing. Not damage from `source` instead,
+        -- which would be a different card.
+        dealerId = case dealer of
+          Nothing -> Just source
+          Just slot -> Maybe.listToMaybe (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot))
+    case (dealerId, Quantity.evaluateFor viewOf context gs resolving source quantity) of
+      -- No source, no damage: CR 608.2b's illegal dealer, above.
+      (Nothing, _) -> pure ()
       -- An unevaluable quantity is a no-op, the powerOf posture.
-      Nothing -> pure ()
-      Just n ->
+      (_, Nothing) -> pure ()
+      (Just dealt, Just n) ->
         Monad.when (n > 0) $ do
           -- The applied effect IS the event (the M3a spec, section 4):
           -- constructing these DamageEvents and funneling them is the whole
@@ -2428,7 +2459,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- is processed simultaneously" is what Corrosive Gale's "each creature
           -- with flying" needs, and applyDamage is the funnel that keeps it (its
           -- haddock carries the CR 615/616 reading of a batch).
-          Damage.applyDamage (fmap (\recipient -> Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)) recipients)
+          Damage.applyDamage (fmap (\recipient -> Damage.damageEvent gs DamageKind.Noncombat dealt recipient (Integer.toNaturalSaturating n)) recipients)
           -- CR 615.5's "immediately afterward", for damage a resolution deals:
           -- a shield this damage spent runs its additional effect here, inside
           -- the same resolution, rather than waiting for the next SBA check.

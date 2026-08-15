@@ -645,7 +645,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
 -- card (the same nesting Pawl.Codec's round trip walks).
 effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 effectCounts effect = case effect of
-  Effect.DealDamage (DealDamage.MkDealDamage _ quantity) -> quantityCounts quantity
+  Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> quantityCounts quantity
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
@@ -999,7 +999,7 @@ effectReplacements effect = case effect of
   Effect.Create (Create.MkCreate _ token _ _) -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
-  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> []
+  Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
   Effect.Search {} -> []
@@ -1572,7 +1572,7 @@ effectMintedFaces effect = case effect of
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> fmap ((,) MintedEmblem) (NonEmpty.toList (Card.Type.faces emblem))
   Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> concatMap effectMintedFaces (replacementEffectRiders replacement)
-  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> []
+  Effect.DealDamage (DealDamage.MkDealDamage {}) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
   Effect.Search {} -> []
@@ -2638,7 +2638,8 @@ effectFilters effect = case effect of
   -- can't be attached to an object or player it couldn't enchant, equip, or
   -- fortify, respectively." Aura Graft's "another permanent it can enchant".
   Effect.AttachTarget (AttachTarget.MkAttachTarget _ f) -> [(True, f)]
-  Effect.DealDamage (DealDamage.MkDealDamage ref quantity) -> unframed (objectRefFilters ref <> quantityFilters quantity)
+  -- The dealer is a SlotName and carries no Filter.
+  Effect.DealDamage (DealDamage.MkDealDamage ref quantity _) -> unframed (objectRefFilters ref <> quantityFilters quantity)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     unframed (durationFilters duration <> modificationFilters modification <> objectRefFilters ref)
   Effect.ChangeText {} -> []
@@ -3127,8 +3128,18 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       )
       stems
   Spec.it s "the lint itself catches a dangling reference" $
-    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3))))
+    let bad = Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ghost"))) (Quantity.Type.Literal 3) Nothing)))
      in Spec.assertBool s (bad /= Map.keysSet (Map.empty :: Map.Map SlotName.SlotName TargetSlot.TargetSlot)) "misauthored card detected"
+  -- CR 120.2b's dealer is a slot READ like any other, so the same lint has to
+  -- reach it. The effect below references no other slot, so the answer is the
+  -- dealer's alone.
+  Spec.it s "the lint reaches a dangling DEALER reference" $
+    let ghost = SlotName.MkSlotName (Text.pack "ghost")
+     in Spec.assertEqWith
+          s
+          "the dealer slot is read"
+          (Map.keysSet (Resolve.slotsOf (Effect.DealDamage (DealDamage.MkDealDamage ObjectRef.EachPlayer (Quantity.Type.Literal 3) (Just ghost)))))
+          (Set.singleton ghost)
   -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
   -- announced against the card's own cost -- mana cost, additional costs and
   -- alternative costs together (`spellCostsOf`), since CR 107.3a names all of them.

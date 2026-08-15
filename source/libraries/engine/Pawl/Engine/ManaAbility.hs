@@ -90,7 +90,7 @@ isManaAbility ab =
 manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
   Effect.AddMana production -> Just production
-  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> Nothing
+  Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
   Effect.Search {} -> Nothing
@@ -227,7 +227,7 @@ movesLibraryCard effect = case effect of
       ObjectRef.EachPlayer -> False
       ObjectRef.ChosenCardInGraveyard {} -> False
   Effect.AddMana _ -> False
-  Effect.DealDamage (DealDamage.MkDealDamage _ _) -> False
+  Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
   Effect.ModifyTarget {} -> False
   Effect.ChangeText {} -> False
   Effect.ExileAllGraveyards -> False
