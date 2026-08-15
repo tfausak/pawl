@@ -4127,7 +4127,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- Its own opcode rather than an Effect.Replace carrying a DamageR, for the
     -- reason Effect.PreventNextDamage's own comment gives: the pattern has to
-    -- name the shielded permanent or player, which card data cannot. Everything
+    -- name the shielded permanent or player by id, which card data cannot. Everything
     -- ELSE about the row is Replace's -- Resolve bakes the source (CR 113.7),
     -- CR 109.5's controller and a fresh timestamp the same way.
     --

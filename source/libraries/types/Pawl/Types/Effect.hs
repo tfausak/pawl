@@ -725,9 +725,10 @@ data Effect card
     -- card.
     --
     -- NOT a Replace carrying a DamageR, for PreventNextDamage's reason: the
-    -- pattern must name the shielded permanent or player, which card data cannot
-    -- write. Fog IS such a Replace precisely because it shields nobody in
-    -- particular.
+    -- pattern must name the shielded permanent or player BY ID, which card data
+    -- cannot write -- DamagePattern.whatRecipient describes a recipient and
+    -- cannot pick out the one this resolution chose. Fog IS such a Replace
+    -- precisely because it shields nobody in particular.
     PreventAllDamage DurationRef.DurationRef
   | -- | CR 614.9: install a floating REDIRECTION effect -- Turn the Tables' "all
     -- combat damage that would be dealt to you this turn is dealt to target
