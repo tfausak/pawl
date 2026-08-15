@@ -2533,20 +2533,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
   Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ destination) ->
-    -- CR 701.23a: match each library card through the PRINTED-card view. Its
-    -- power is CR 208.2a's exception, which is why the view is
-    -- Projection.viewOfCardIn: Imperial Recruiter's "creature card with power 2
-    -- or less" sees a Tarmogoyf's real power.
+    -- CR 701.23a: match each library card against "the given description",
+    -- through the card's own CR 613 projection. Rule 613.1 starts from the actual
+    -- object and names no zone, so a library card is folded exactly as a permanent
+    -- is: Maskwood Nexus makes every creature card its controller owns every
+    -- creature type (CR 613.1d), and Goblin Matron's "a Goblin card" then finds
+    -- one printed as something else. CR 208.2a's characteristic-defining power
+    -- rides along at layer 7a, so Imperial Recruiter's "creature card with power 2
+    -- or less" still sees a Tarmogoyf's real power -- Pawl.ProjectionSpec proves
+    -- both readings through this same site.
     --
-    -- Not implemented: a library card has a projection of its own, so a
-    -- continuous effect that changed what this filter reads is missed (#160).
-    -- The context has
-    -- no perspective (CR 109.5): a search filter never references a player, so
-    -- ControlledBy is vacuously False. No source in scope at this site.
+    -- The context has no perspective (CR 109.5): a search filter never references
+    -- a player, so ControlledBy is vacuously False. No source in scope at this
+    -- site.
     let searchContext = Filter.contextFor Nothing Nothing
-        matches1 g oid = case Game.faceOf oid g of
-          Nothing -> False
-          Just face -> Filter.matches searchContext (Projection.viewOfCardIn g oid face) filter_
+        matches1 g oid = Filter.matches searchContext (Projection.viewOfObject oid g) filter_
      in do
           gs0 <- State.get
           -- Whoever Search.searcher names searches -- the controller for
