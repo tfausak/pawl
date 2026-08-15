@@ -733,6 +733,31 @@ data Prompt r where
   -- printing "you may pay 0 life" would be offering a real choice, since paying
   -- is what keeps the permanent untapped.
   ChoosePayLifeOnEntry :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 614.1c with CR 701.20a: as a permanent whose text reads "As [this
+  -- permanent] enters, you may reveal a [matching] card from your hand. If you
+  -- don't, it enters tapped" enters, its controller chooses which card to show
+  -- (Rustic Clachan). The first ObjectId is the entering object; the NonEmpty is
+  -- the cards in that player's hand the printed filter admits, pre-filtered by
+  -- the engine; Nothing is the card's own "may" decline, after which the
+  -- permanent enters tapped.
+  --
+  -- A Maybe ObjectId and not ChoosePayLifeOnEntry's OptionalDecision, though both
+  -- are as-enters "may"s that end in the same tap: this one picks a CARD, and
+  -- which card was shown is public (CR 701.20a) -- so the answer has to name it.
+  -- ChooseManaSource's shape, and distinct from every other prompt for
+  -- ChooseUnleash's reason: a transcript that answered one as-enters "may" must
+  -- not silently answer a different one.
+  --
+  -- CANDIDATES, NOT TRUSTED: the engine honours an answer only if it is in this
+  -- list, ChooseCopyTarget's posture, so an answer naming an unmatching card in
+  -- hand declines instead.
+  --
+  -- Raised whenever there is at least one candidate, single ones included --
+  -- revealing and declining leave different boards, so one candidate is still a
+  -- real choice. With NO candidate the only legal answer is to decline, a forced
+  -- selection rather than an elision, and Pawl.Engine.Event never asks; that is
+  -- what the NonEmpty records.
+  ChooseRevealOnEntry :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
   -- | CR 614.1c: as an object enters, its controller chooses a colour
   -- ("As this creature enters, choose a color" -- Painter's Servant). The
   -- ObjectId is the entering object.

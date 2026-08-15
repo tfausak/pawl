@@ -101,6 +101,7 @@ import qualified Pawl.Types.TokenR as TokenR
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
+import qualified Pawl.Types.Zone as Zone
 import Pawl.Types.ZoneChange (ZoneChange)
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -412,6 +413,7 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.Unleash -> True
   EntryRewrite.Tapped -> True
   EntryRewrite.PayLifeOrTapped _ -> True
+  EntryRewrite.RevealOrTapped _ -> True
   -- CR 702.145b's own two conditions, both of them the ability's rather than the
   -- pattern's: "IF IT IS NIGHT and this permanent is REPRESENTED BY A
   -- DOUBLE-FACED CARD, it enters transformed."
@@ -736,6 +738,10 @@ bucketOfEffect re = case re of
   -- and paying life does not make it one: what the rewrite changes is still the
   -- STATUS the permanent enters with (CR 110.5b). So CR 616.1e.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.PayLifeOrTapped _)) -> ReplacementBucket.Other
+  -- CR 614.1c's revealed variant, PayLifeOrTapped's answer for its reason: what
+  -- the rewrite changes is the STATUS the permanent enters with (CR 110.5b), and
+  -- CR 701.20b makes the reveal itself change nothing at all. So CR 616.1e.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RevealOrTapped _)) -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
@@ -831,6 +837,13 @@ readsApplier re = case re of
   -- amount rides the effect. Two such rows are always on the same object and
   -- would offer that object's controller the same price.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.PayLifeOrTapped _)) -> False
+  -- CR 614.1c: NO, and PayLifeOrTapped's reasoning holds word for word. The
+  -- revealer is the ENTERING object's controller -- "your hand" in an ability the
+  -- permanent prints about itself -- read live off the board at CR 614.12a's
+  -- moment rather than off the candidate, and the criterion rides the effect. Two
+  -- such rows are always on the same object and would offer that object's
+  -- controller the same cards.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RevealOrTapped _)) -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are
@@ -1062,6 +1075,26 @@ legalCopyTargets :: Set ObjectId -> ObjectId -> GameState -> [ObjectId]
 legalCopyTargets batch self gs =
   let eligible oid = oid /= self && not (Set.member oid batch) && Projection.isCreatureOf oid gs
    in filter eligible (Set.toAscList (GameState.battlefield gs))
+
+-- CR 614.1c / 701.20a: the cards a player may reveal from their hand to satisfy
+-- an "as this enters, you may reveal a [matching] card from your hand" ability
+-- (Rustic Clachan). Beside legalCopyTargets for its reason: an entry rewrite's
+-- offer is classification, and this module is what Pawl.Engine.Event calls down
+-- into for it.
+--
+-- Matched through each card's own CR 613 projection, the reading Effect.Search's
+-- CR 701.23a filter takes one zone over: rule 613.1 starts from the actual object
+-- and names no zone, so a continuous effect that made a card a Kithkin card
+-- reaches it in a hand.
+--
+-- No perspective and no source in the context (CR 109.5): the printed filter
+-- states a quality of the card ("a Kithkin card") and names no player, so
+-- ControlledBy and IsSource are vacuously False. Whose hand is asked by the zone
+-- lookup instead, which is the whole of the "from your hand" in the sentence.
+revealableFromHand :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+revealableFromHand pid filter_ gs =
+  let matching oid = Filter.matches (Filter.contextFor Nothing Nothing) (Projection.viewOfObject oid gs) filter_
+   in filter matching (Game.zoneMembers Zone.Hand pid gs)
 
 -- CR 614.3: a floating replacement whose `uses` is Once is spent by being
 -- applied. A permanent's STATIC replacement ability has no use count at all --

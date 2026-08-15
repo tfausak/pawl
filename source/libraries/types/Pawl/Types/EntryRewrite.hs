@@ -16,7 +16,7 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
 -- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
 -- Bloodbog and Headless Skaab (CR 614.1d); PayLifeOrTapped is Razorgrass Field
--- (CR 614.1c).
+-- (CR 614.1c); RevealOrTapped is Rustic Clachan (CR 614.1c).
 --
 -- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
 -- makes CR 707.2 fall out with no further machinery -- and CR 707.9b puts
@@ -240,6 +240,35 @@ data EntryRewrite
     -- sentence, and CR 614.12a settles the choice before the permanent enters, so
     -- there is no board for a variable amount to be measured against yet.
     PayLifeOrTapped Natural.Natural
+  | -- | CR 614.1c: "As [this permanent] enters, you may reveal a [matching] card
+    -- from your hand. If you don't, [this permanent] enters tapped" (Rustic
+    -- Clachan, and the rest of the Lorwyn tribal-land cycle). PayLifeOrTapped one
+    -- price over: the same rewrite, avoided by showing a card instead of by
+    -- spending life.
+    --
+    -- ITS OWN ARM rather than PayLifeOrTapped generalized to a price, though the
+    -- tail is shared (Pawl.Engine.Event.enterTapped). The two prices are not one
+    -- parameter: paying life is a yes/no with an amount, while revealing is a
+    -- choice OF A CARD from a hidden zone, so the prompts differ in arity and
+    -- Pawl.Engine.Event would case on the price anyway. What a shared arm would
+    -- share is one function call.
+    --
+    -- The Filter is which card in the hand may be shown -- "a Kithkin card" --
+    -- read off the printed sentence, and matched against the card's own CR 613
+    -- projection (Pawl.Engine.Replacement.revealableFromHand), the reading CR
+    -- 613.1 requires in every zone.
+    --
+    -- THE HAND is not carried, unlike the filter: every printing of this sentence
+    -- reveals from the revealer's own hand, and CR 614.12a's "before the permanent
+    -- enters" leaves the entering object's controller as the only "you" there is.
+    -- A card that read some other zone would want its own arm, as this one wanted
+    -- one beside PayLifeOrTapped.
+    --
+    -- NOT A COST, so nothing here goes through Pawl.Engine.Cost: CR 701.20a's
+    -- reveal changes no zone and no characteristic (CR 701.20b), which is why the
+    -- paying half is Pawl.Engine.Event.reveal alone and why declining is free.
+    -- The declining half is Tapped's write verbatim, PayLifeOrTapped's position.
+    RevealOrTapped (Filter.Filter Keyword.Keyword)
   | -- | CR 712.13a via CR 614.1d: the ability that makes a double-faced spell
     -- with its FRONT face up on the stack enter the battlefield transformed. CR
     -- 616.1d ranks it a bucket of its own

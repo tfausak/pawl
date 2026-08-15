@@ -23,9 +23,10 @@
 -- an activated ability that is not a mana ability, so it untaps and the "each
 -- land" conjunct is proved rather than assumed.
 --
--- Not implemented: Rustic Clachan's "As this land enters, you may reveal a
--- Kithkin card from your hand. If you don't, this land enters tapped" -- pawl's
--- card enters tapped unconditionally, which is STRICTER than printed (#1282).
+-- Rustic Clachan's CR 614.1c "you may reveal a Kithkin card from your hand" plays
+-- no part here: every board in this file starts the land already on the
+-- battlefield, so no entry replacement runs. Pawl.ReplacementSpec is where that
+-- sentence is proved.
 module Pawl.UntapRestrictionSpec where
 
 import qualified Pawl.Engine.Action as Action

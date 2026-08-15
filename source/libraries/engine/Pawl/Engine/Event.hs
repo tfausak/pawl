@@ -1196,6 +1196,51 @@ apply batch candidate event =
               OptionalDecision.Exercises -> State.modify' (payLife controller n)
               OptionalDecision.Declines -> enterTapped oid
             pure (Just event)
+      -- CR 614.1c with CR 701.20a: "As this land enters, you may reveal a Kithkin
+      -- card from your hand. If you don't, this land enters tapped" (Rustic
+      -- Clachan). The arm above with a different price -- showing a card instead
+      -- of spending life -- and the same declining half, down to the same stamp.
+      --
+      -- Through `reveal`, CR 701.20a's own funnel, so the shown card reaches the
+      -- public log with the projection a player at the table would see. Nothing
+      -- moves and nothing changes (CR 701.20b), which is why the paying half is
+      -- the reveal alone: this is not a cost, so no CR 118 payment and no
+      -- rollback is involved.
+      --
+      -- NEVER ELIDED where a matching card is held. Showing a card nobody could
+      -- have made you show, against a land that comes in tapped, is a real fork on
+      -- any board -- it is why the cycle is printed.
+      EntryRewrite.RevealOrTapped filter_ -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arm above's reason: the object is
+          -- materialized on the battlefield before this loop runs, so controllerOf
+          -- falls back to its owner. Tapped rather than untapped, because with
+          -- nobody to ask nobody revealed -- the card's own stated default.
+          Nothing -> do
+            enterTapped oid
+            pure (Just event)
+          Just controller -> do
+            -- The hand is read HERE, at CR 614.12a's moment, and not off any
+            -- earlier snapshot: an entry replacement applied before this one can
+            -- have moved a card (CR 614.13a), and the offer must be what the
+            -- player actually holds as the choice is made.
+            let candidates = Replacement.revealableFromHand controller filter_ gs
+            answer <- case NonEmpty.nonEmpty candidates of
+              -- Holding nothing that matches, declining is the only legal answer
+              -- -- a forced selection rather than an elision of options a player
+              -- could tell apart -- so the prompt is skipped rather than asked and
+              -- overruled.
+              Nothing -> pure Nothing
+              Just offered -> Game.choose (Prompt.ChooseRevealOnEntry (Decide.deciderFor controller gs) controller oid offered)
+            -- FILTERED, NOT TRUSTED, AsCopy's posture above: this list is the only
+            -- thing enforcing the printed criterion, so honouring an unoffered
+            -- answer would let any card in hand keep the land untapped.
+            case answer of
+              Just shown | List.elem shown candidates -> reveal RevealCause.Ordinary controller shown
+              _ -> enterTapped oid
+            pure (Just event)
       -- CR 712.13a via CR 702.145b's first static ability: "if it is night and
       -- this permanent is represented by a double-faced card, it enters
       -- transformed." The one producer CR 616.1d's bucket has.

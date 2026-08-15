@@ -585,6 +585,48 @@ warriorOut gs =
   let warriorName = CardName.MkCardName (Text.pack "Tidal Warrior")
    in length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName warriorName o gs]
 
+-- payLifeOnEntryAnswer's sibling for the CR 614.1c REVEAL cases: play the land,
+-- and answer its "you may reveal a Kithkin card from your hand" with this card.
+-- PINNED, never a search of the offered list: an answerer that picked whatever
+-- the engine offered would find a legal card again after a mutation widened the
+-- offer, and the case would stay green while the engine's own filter was broken.
+revealOnEntryAnswer :: Maybe ObjectId.ObjectId -> Prompt.Prompt r -> r
+revealOnEntryAnswer shown p = case p of
+  Prompt.ChooseRevealOnEntry {} -> shown
+  _ -> S.playLandAnswer p
+
+-- How many times the as-enters reveal was put to a player.
+revealAsks :: [Response.Response] -> Int
+revealAsks responses =
+  let isReveal r = case r of
+        Response.ChoseRevealOnEntry _ -> True
+        _ -> False
+   in length (filter isReveal responses)
+
+-- alice's precombat main phase with the stack empty, Rustic Clachan and ONE {W}
+-- creature in hand, and NOTHING else in the game: the land's "{T}: Add {W}" is
+-- the only mana there will be, so the creature's fate reads the land's tap state
+-- as Soul Warden's does for razorgrassBoard above. The creature is the only axis
+-- a pair of boards from here differ on -- Mosquito Guard and Benalish Hero are
+-- both {W} 1/1 Soldiers, and one is a Kithkin.
+clachanBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+clachanBoard clachan creature =
+  let (_, withLand) = S.addHandCard clachan S.alice (Setup.emptyGame S.bothPlayers)
+      (creatureId, filled) = S.addHandCard creature S.alice withLand
+   in ( creatureId,
+        filled
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- How many permanents with this name made it to the battlefield.
+namedOut :: String -> GameState.GameState -> Int
+namedOut name gs =
+  let cardName = CardName.MkCardName (Text.pack name)
+   in length [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName cardName o gs]
+
 -- Whether a life loss of exactly this size, by this player, was RECORDED -- the
 -- channel a card that watches for life loss reads, and the half of CR 119.4 a
 -- bare subtraction from the life total would not satisfy.
@@ -2289,6 +2331,86 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
           s
           "so the {U} creature in hand stays there"
           (warriorOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          0
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  -- CR 614.1c's other price: Rustic Clachan, "As this land enters, you may reveal
+  -- a Kithkin card from your hand. If you don't, this land enters tapped" (oracle
+  -- checked on Scryfall). The three cases below are one fixture in three states,
+  -- and they differ pairwise in exactly one thing each: the first two share a
+  -- board and differ only in the ANSWER, the first and third share an answer that
+  -- names the held creature and differ only in whether that creature is a Kithkin.
+  --
+  -- The land enters in all three, so "entered untapped" is told apart from
+  -- "entered" -- each case reads the tap state of the one permanent on the board.
+  --
+  -- Mosquito Guard ({W} 1/1 Kithkin Soldier) and Benalish Hero ({W} 1/1 Human
+  -- Soldier) are the pair. Neither has an enters trigger, and the Clachan's
+  -- "{T}: Add {W}" is the only mana in the game, so what the reveal buys is read
+  -- off whether the creature gets cast -- Activate.activatable is deliberately not
+  -- asked, since CR 605.3b keeps a mana ability off the stack.
+  --
+  -- The reveal is asserted through S.revealsOf, CR 701.20a's public log, and not
+  -- through the tap state alone: showing a card is the whole of what the player
+  -- did, and a rewrite that left the land untapped without revealing anything
+  -- would pass the tap assertion.
+  Spec.it s "CR 614.1c Rustic Clachan REVEALING a Kithkin card enters untapped" $ do
+    clachan <- S.printingOf s registry "Rustic Clachan"
+    guard_ <- S.printingOf s registry "Mosquito Guard"
+    let (guardId, board) = clachanBoard clachan guard_
+        played = S.runPure (revealOnEntryAnswer (Just guardId)) board Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "the land entered untapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Untapped)
+        Spec.assertEqWith
+          s
+          "and alice showed the Kithkin card to do it (CR 701.20a)"
+          (S.revealsOf played)
+          [(S.alice, Set.singleton (CardName.MkCardName (Text.pack "Mosquito Guard")))]
+        Spec.assertEqWith s "one ChooseRevealOnEntry was raised" (revealAsks (answersFor (revealOnEntryAnswer (Just guardId)) board Engine.priorityLoop)) 1
+        Spec.assertEqWith
+          s
+          "and the untapped land pays for the {W} creature"
+          (namedOut "Mosquito Guard" (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          1
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  -- The "may" half. CR 614.1c states the reveal as optional, so holding the
+  -- Kithkin card is not being made to show it -- and this is the case that proves
+  -- the answer is the player's rather than the engine's, since the board is the
+  -- one above's exactly.
+  Spec.it s "CR 614.1c DECLINING with a Kithkin card in hand still enters tapped" $ do
+    clachan <- S.printingOf s registry "Rustic Clachan"
+    guard_ <- S.printingOf s registry "Mosquito Guard"
+    let (_, board) = clachanBoard clachan guard_
+        played = S.runPure (revealOnEntryAnswer Nothing) board Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and nothing was shown" (S.revealsOf played) []
+        Spec.assertEqWith
+          s
+          "so the {W} creature in hand stays there -- no mana to cast it with"
+          (namedOut "Mosquito Guard" (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          0
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  -- The negative, and the case the printed filter is for. The answerer is pinned
+  -- to the held creature in BOTH this case and the first, so the only difference
+  -- between the two boards is whether that creature is a Kithkin: the engine's own
+  -- filter is the only thing that can move the outcome. Were the offer unfiltered,
+  -- the Hero would be shown and the land would enter untapped.
+  Spec.it s "CR 614.1c with NO Kithkin card in hand it enters tapped, unasked" $ do
+    clachan <- S.printingOf s registry "Rustic Clachan"
+    hero <- S.printingOf s registry "Benalish Hero"
+    let (heroId, board) = clachanBoard clachan hero
+        played = S.runPure (revealOnEntryAnswer (Just heroId)) board Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and the non-Kithkin card was not shown" (S.revealsOf played) []
+        Spec.assertEqWith s "no ChooseRevealOnEntry was raised (CR 614.12a: nothing to choose)" (revealAsks (answersFor (revealOnEntryAnswer (Just heroId)) board Engine.priorityLoop)) 0
+        Spec.assertEqWith
+          s
+          "so the {W} creature in hand stays there"
+          (namedOut "Benalish Hero" (S.runPure castOrPassAnswer played Engine.priorityLoop))
           0
       other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
   Spec.it s "CR 707.5 declining the copy leaves a 0/0 that dies (CR 704.5f)" $ do
