@@ -696,7 +696,7 @@ effectCounts effect = case effect of
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity _) -> quantityCounts quantity
   -- The Condition is Galvanic Blast's "if you control three or more
   -- artifacts", and its Counts are as much card data as a Duration's.
-  Effect.Replace (Replace.MkReplace duration _ _ condition _) -> durationCounts duration <> foldMap conditionCounts condition
+  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> durationCounts duration <> foldMap conditionCounts condition <> concatMap effectCounts (replacementEffectRiders replacement)
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- CR 615.5's rider is an effect list a card authors, so its Counts are this
@@ -844,6 +844,12 @@ cardResolutionEffects card =
     -- CR 309.4c: a room ability's effects, which no other limb above reaches --
     -- Pawl.Types.Face.rooms is the fifth carrier.
     <> concatMap (Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
+    -- CR 615.5: the additional effect a printed prevention carries
+    -- (DamageR.riders), the sixth carrier. Not a resolution's effect at all --
+    -- it runs from Resolve.runPreventionRiders when the shield applies -- but
+    -- it is a card-authored effect list, which is what every lint downstream of
+    -- this function is about.
+    <> concatMap replacementEffectRiders (Face.replacementEffects card)
 
 cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
@@ -956,10 +962,24 @@ modalCountsOffend modal =
 -- them come out of card JSON, which is the whole of what the lint below is
 -- about; a replacement the ENGINE bakes reaches GameState without passing
 -- through a Card and is not swept here.
-cardReplacementEffects :: Face.Face Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
+cardReplacementEffects :: Face.Face Card.Type.Card -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card)]
 cardReplacementEffects card =
   Face.replacementEffects card
     <> concatMap effectReplacements (cardResolutionEffects card)
+
+-- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
+-- nothing else, since no other arm has a field to carry one. The card-authored
+-- twin of Effect.PreventNextDamage's `riders`, and swept everywhere that one is.
+replacementEffectRiders :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
+replacementEffectRiders replacement = case replacement of
+  ReplacementEffect.DamageR (DamageR.MkDamageR _ _ riders) -> Foldable.toList riders
+  ReplacementEffect.CounterR {} -> []
+  ReplacementEffect.ZoneChangeR {} -> []
+  ReplacementEffect.EntryR {} -> []
+  ReplacementEffect.DestructionR _ -> []
+  ReplacementEffect.TokenR {} -> []
+  ReplacementEffect.TurnUpR {} -> []
+  ReplacementEffect.PhaseR _ -> []
 
 -- Every ReplacementEffect one effect authors: the one an Effect.Replace installs
 -- directly, plus everything a minted token (CR 111) or emblem (CR 114.2) prints,
@@ -970,9 +990,9 @@ cardReplacementEffects card =
 -- Exhaustive and hand-maintained, with effectCounts' caveat: a NEW effect
 -- carrying a ReplacementEffect or embedding a Card must be added here too, and
 -- the build breaks until it is.
-effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect]
+effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card)]
 effectReplacements effect = case effect of
-  Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> [replacement]
+  Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementEffectRiders replacement)
   Effect.Create (Create.MkCreate _ token _ _) -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
@@ -1082,7 +1102,7 @@ effectReplacements effect = case effect of
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- pattern-carrying replacement must break this build rather than silently pass.
-phasePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
+phasePatternOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
 phasePatternOffends replacement = case replacement of
   ReplacementEffect.PhaseR phasePattern -> Maybe.isJust (PhasePattern.whosePhase phasePattern)
   ReplacementEffect.CounterR {} -> False
@@ -1102,9 +1122,12 @@ phasePatternOffends replacement = case replacement of
 -- printing either half would be claiming an ability no rule gives it.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
-engineOnlyOffends :: ReplacementEffect.ReplacementEffect -> Bool
+engineOnlyOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
 engineOnlyOffends replacement = case replacement of
-  ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite) ->
+  -- `whatRecipient` beside it is the PRINTED half and is not swept: a card may
+  -- describe the recipient it shields (Stormwild Capridor), it just may not name
+  -- one by id.
+  ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite _) ->
     Maybe.isJust (DamagePattern.whichRecipient damagePattern) || engineMintedDamage rewrite
   -- CR 122.1c's destruction half is engine-minted for the same reason its damage
   -- half is, so the sweep reaches it through this arm rather than through a lint
@@ -1147,13 +1170,13 @@ engineMintedDestruction rewrite = case rewrite of
 -- The non-vacuity half of the same lint: is this the replacement that carries a
 -- PhasePattern at all? A wildcard is right here, where it is not above -- this
 -- asks "did the sweep have anything to look at", not "is it well-formed".
-isPhaseR :: ReplacementEffect.ReplacementEffect -> Bool
+isPhaseR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
 isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
   _ -> False
 
 -- The non-vacuity half of engineOnlyOffends' lint, isPhaseR's shape.
-isDamageR :: ReplacementEffect.ReplacementEffect -> Bool
+isDamageR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
 isDamageR replacement = case replacement of
   ReplacementEffect.DamageR {} -> True
   _ -> False
@@ -1510,7 +1533,7 @@ effectMintedFaces effect = case effect of
   -- Mints no face of its own: the token's text is the copied permanent's.
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> fmap ((,) MintedEmblem) (NonEmpty.toList (Card.Type.faces emblem))
-  Effect.Replace {} -> []
+  Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> concatMap effectMintedFaces (replacementEffectRiders replacement)
   Effect.DealDamage (DealDamage.MkDealDamage _ _) -> []
   Effect.ModifyTarget {} -> []
   Effect.AddMana _ -> []
@@ -2411,6 +2434,7 @@ anyDamage =
   DamagePattern.MkDamagePattern
     { DamagePattern.whichKind = Nothing,
       DamagePattern.whatSource = Filter.Type.And [],
+      DamagePattern.whatRecipient = Nothing,
       DamagePattern.whichRecipient = Nothing
     }
 
@@ -2500,15 +2524,18 @@ turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
 -- turnUpRewriteFilters above say which cards a name choice inside it may name,
 -- which permanents an as-enters sacrifice may take, and where CR 303.4k's
 -- attachment may land.
-replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
+replacementEffectFilters :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR (CounterR.MkCounterR counterPattern _) -> [CounterPattern.onWhat counterPattern]
   ReplacementEffect.ZoneChangeR (ZoneChangeR.MkZoneChangeR zoneChangePattern _) -> [ZoneChangePattern.whatObject zoneChangePattern]
   ReplacementEffect.EntryR (EntryR.MkEntryR entryPattern entryRewrite) -> entryPattern : entryRewriteFilters entryRewrite
   -- CR 615.1's shields narrow by their source, which is a Filter over the object
   -- dealing the damage (Luminesce's "black sources and red sources", Galvanic
-  -- Blast's `IsSource`). The kind and recipient beside it are not Filters.
-  ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _) -> [DamagePattern.whatSource damagePattern]
+  -- Blast's `IsSource`), and by their printed RECIPIENT, which is a second
+  -- Filter over the object being dealt to (Stormwild Capridor's `IsSource`). The
+  -- kind and the baked recipient beside them are not Filters.
+  ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ _) ->
+    DamagePattern.whatSource damagePattern : Maybe.maybeToList (DamagePattern.whatRecipient damagePattern)
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR {} -> []
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
@@ -2624,7 +2651,7 @@ effectFilters effect = case effect of
   -- An EachMatching ref's Filter is card text like RequireBlock's below, and the
   -- count's Filters are as much card text as Create's.
   Effect.CreateCopy (CreateCopy.MkCreateCopy quantity ref) -> unframed (quantityFilters quantity <> objectRefFilters ref)
-  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
+  Effect.Replace (Replace.MkReplace duration _ _ condition replacement) -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement) <> concatMap effectFilters (replacementEffectRiders replacement)
   Effect.SkipNextPhase (SkipNextPhase.MkSkipNextPhase _ _) -> []
   -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
   -- landwalk's payload once, so a nested effect list is exactly what it must not
@@ -4115,14 +4142,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- which is the sweep's own input either way.
     let printed = cardReplacementEffects (S.combinedFace fog)
         bakeRecipient replacement = case replacement of
-          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite) ->
-            ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern {DamagePattern.whichRecipient = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 1))} rewrite)
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern rewrite riders) ->
+            ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern {DamagePattern.whichRecipient = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 1))} rewrite riders)
           other -> other
         bakeShield replacement = case replacement of
-          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern (DamageRewrite.PreventNext 4))
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern (DamageRewrite.PreventNext 4) riders)
           other -> other
         bakeCounterShield replacement = case replacement of
-          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern DamageRewrite.PreventRemovingShieldCounter)
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern DamageRewrite.PreventRemovingShieldCounter riders)
           other -> other
     Spec.assertBool s (any isDamageR printed) "setup: Fog prints a damage replacement to bake"
     Spec.assertBool s (not (any engineOnlyOffends printed)) "the real Fog names no recipient and counts nothing"

@@ -651,7 +651,7 @@ data Effect card
     -- NOT Pawl.Types.Clause.condition: that one gates whether a clause's
     -- instructions run at all, while this one gates only whether this opcode
     -- installs its row.
-    Replace Replace.Replace
+    Replace (Replace.Replace (Effect card))
   | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue names a step; Stonehorn Dignitary names a whole
     -- phase (CR 500.1).

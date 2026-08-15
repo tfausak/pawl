@@ -1,6 +1,8 @@
 module Pawl.Types.ReplacementCandidate where
 
 import qualified Pawl.Types.CandidateId as CandidateId
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -22,7 +24,7 @@ import qualified Pawl.Types.Uses as Uses
 -- bucketOf answer CR 616.1a without the rules core asking what an effect IS.
 data ReplacementCandidate = MkReplacementCandidate
   { identity :: CandidateId.CandidateId,
-    effect :: ReplacementEffect.ReplacementEffect,
+    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card),
     source :: ObjectId.ObjectId,
     -- | CR 109.5's "you" for this instance, from whichever of the two segments
     -- can answer it: a permanent's static ability derives it from `source`'s
@@ -50,10 +52,12 @@ data ReplacementCandidate = MkReplacementCandidate
     -- "the other will remain until another occurrence can be skipped").
     lifetime :: Maybe (Expiry.Expiry, Uses.Uses),
     origin :: ReplacementOrigin.ReplacementOrigin,
-    -- | CR 615.5's additional effect, copied off a FLOATING row. Nothing for a
-    -- permanent's static replacement ability, which has no field to carry one
-    -- (#1105) -- not a missing value, since no such ability in the pool has an
-    -- additional effect the engine could run.
+    -- | CR 615.5's additional effect, from whichever of the two segments carries
+    -- one: copied off a FLOATING row, or built by
+    -- Pawl.Engine.Replacement.collect from a permanent's DamageR.riders, whose
+    -- environment is the live board rather than a snapshot. Nothing wherever the
+    -- effect has no rider, which is every replacement but a prevention that
+    -- prints one.
     rider :: Maybe PreventionRider.PreventionRider
   }
   deriving (Eq, Ord, Show)

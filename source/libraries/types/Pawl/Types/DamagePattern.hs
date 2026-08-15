@@ -7,9 +7,10 @@ import qualified Pawl.Types.Recipient as Recipient
 
 -- | CR 614.1a / 615.1: which damage events a replacement or prevention
 -- intercepts -- both, since this type is shared. Fog's prevention is
--- (Just Combat, And [], Nothing); Furnace of Rath's replacement is
--- (Nothing, And [], Nothing); Mending Hands' shield is
--- (Nothing, And [], Just the chosen recipient). Nothing means any kind.
+-- (Just Combat, And [], Nothing, Nothing); Furnace of Rath's replacement is
+-- (Nothing, And [], Nothing, Nothing); Mending Hands' shield is
+-- (Nothing, And [], Nothing, Just the chosen recipient); Stormwild Capridor's is
+-- (Just Noncombat, And [], Just IsSource, Nothing). Nothing means any kind.
 --
 -- `whatSource` says WHAT the damage's source is (CR 120.1), as a Filter over its
 -- characteristics: Luminesce's "black sources and red sources" is
@@ -38,12 +39,24 @@ import qualified Pawl.Types.Recipient as Recipient
 -- `installDamageRow`. RedirectDamage is also the one that names a KIND -- Turn
 -- the Tables' "all combat damage" -- where the two prevention arms name none.
 --
--- Not implemented: a CARD-PRINTED recipient condition, which is what a static
--- redirection ability needs -- "all damage that would be dealt to you is dealt
--- to this creature instead" (Palisade Giant, Pariah) (#1054).
+-- `whatRecipient` is the CARD-PRINTED half of that same question, and the two
+-- are not one field: `whichRecipient` names an id the engine baked, where this
+-- one describes the recipient by characteristic -- Stormwild Capridor's "dealt
+-- to this creature" is `Just Filter.IsSource`, read against the candidate's own
+-- source the way `whatSource` reads CR 614.15's "this way". Nothing admits EVERY
+-- recipient, players included; `Just` admits only an OBJECT recipient matching
+-- the filter, since a Filter describes objects and CR 120.3a's player is not one.
+-- A Maybe rather than `And []`, for exactly that reason: the trivial filter would
+-- otherwise have to mean "any object OR any player", which is not what any other
+-- Filter position means.
+--
+-- Not implemented: a printed recipient condition naming a PLAYER, which is what
+-- a static redirection ability needs -- "all damage that would be dealt to you
+-- is dealt to this creature instead" (Palisade Giant, Pariah) (#1054).
 data DamagePattern = MkDamagePattern
   { whichKind :: Maybe DamageKind.DamageKind,
     whatSource :: Filter.Filter Keyword.Keyword,
+    whatRecipient :: Maybe (Filter.Filter Keyword.Keyword),
     whichRecipient :: Maybe Recipient.Recipient
   }
   deriving (Eq, Ord, Show)

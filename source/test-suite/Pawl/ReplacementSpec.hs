@@ -182,7 +182,7 @@ aimObject oid p = case p of
 shieldsLeft :: GameState.GameState -> [Natural.Natural]
 shieldsLeft gs =
   let remaining re = case re of
-        ReplacementEffect.DamageR (DamageR.MkDamageR _ (DamageRewrite.PreventNext n)) -> Just n
+        ReplacementEffect.DamageR (DamageR.MkDamageR _ (DamageRewrite.PreventNext n) _) -> Just n
         _ -> Nothing
    in Maybe.mapMaybe (remaining . ActiveReplacement.effect) (GameState.replacements gs)
 
@@ -1585,7 +1585,7 @@ redirectRows :: GameState.GameState -> [(Maybe DamageKind.DamageKind, Maybe Reci
 redirectRows gs =
   [ (DamagePattern.whichKind pat, DamagePattern.whichRecipient pat, dest)
   | active <- GameState.replacements gs,
-    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect dest)) <- [ActiveReplacement.effect active]
+    ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.Redirect dest) _) <- [ActiveReplacement.effect active]
   ]
 
 -- CR 614.9: "Some effects replace damage dealt to one battle, creature,
@@ -3120,7 +3120,7 @@ blastShape :: ObjectId.ObjectId -> Timestamp.Timestamp -> ActiveReplacement.Acti
 blastShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
-        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing) (DamageRewrite.SetAmount 4)),
+        ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.Type.IsSource Nothing Nothing) (DamageRewrite.SetAmount 4) Seq.empty),
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
       ActiveReplacement.timestamp = ts,

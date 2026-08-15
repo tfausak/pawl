@@ -2,7 +2,10 @@
 
 module Pawl.Codec.ReplacementEffectSpec where
 
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -44,7 +47,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "ZoneChangeR (Rest in Peace, Anyones)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       ( ReplacementEffect.ZoneChangeR
           ( ZoneChangeR.MkZoneChangeR
               ZoneChangePattern.MkZoneChangePattern
@@ -61,7 +64,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "ZoneChangeR (Leyline of the Void, Opponents)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       ( ReplacementEffect.ZoneChangeR
           ( ZoneChangeR.MkZoneChangeR
               ZoneChangePattern.MkZoneChangePattern
@@ -78,14 +81,14 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "EntryR (Clone, IsSource + AsCopy)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) []))))
       """ {"type":"EntryR","value":{"matching":{"type":"IsSource"},"rewrite":{"type":"AsCopy","value":{"eligible":{"type":"HasCardType","value":{"type":"Creature"}}}}}} """
   -- CR 208.2b: Primal Plasma's ChoiceOf, carrying P/T and keywords.
   Spec.it s "EntryR (Primal Plasma, ChoiceOf)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       ( ReplacementEffect.EntryR
           ( EntryR.MkEntryR
               Filter.IsSource
@@ -102,42 +105,42 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "EntryR (Gather Specimens, an opponent's creature + UnderSourceControl)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       (ReplacementEffect.EntryR (EntryR.MkEntryR (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.Opponent]) EntryRewrite.UnderSourceControl))
       """ {"type":"EntryR","value":{"matching":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"ControlledBy","value":{"type":"Opponent"}}]},"rewrite":{"type":"UnderSourceControl"}}} """
   -- Pattern and rewrite are both DATA, so both have to survive the trip.
   Spec.it s "DamageR (combat damage, prevented)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
-      (ReplacementEffect.DamageR (DamageR.MkDamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat, DamagePattern.whatSource = Filter.And [], DamagePattern.whichRecipient = Nothing} DamageRewrite.PreventAll))
+      codec
+      (ReplacementEffect.DamageR (DamageR.MkDamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Just DamageKind.Combat, DamagePattern.whatSource = Filter.And [], DamagePattern.whatRecipient = Nothing, DamagePattern.whichRecipient = Nothing} DamageRewrite.PreventAll Seq.empty))
       """ {"type":"DamageR","value":{"matching":{"whichKind":{"type":"Combat"}},"rewrite":{"type":"PreventAll"}}} """
   -- CR 614.15 / 614.1a: source-scoped, any kind, and a flat instead-amount
   -- rather than a prevention.
   Spec.it s "DamageR (this source's damage, set to a flat amount)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
-      (ReplacementEffect.DamageR (DamageR.MkDamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whatSource = Filter.IsSource, DamagePattern.whichRecipient = Nothing} (DamageRewrite.SetAmount 4)))
+      codec
+      (ReplacementEffect.DamageR (DamageR.MkDamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whatSource = Filter.IsSource, DamagePattern.whatRecipient = Nothing, DamagePattern.whichRecipient = Nothing} (DamageRewrite.SetAmount 4) Seq.empty))
       """ {"type":"DamageR","value":{"matching":{"whatSource":{"type":"IsSource"}},"rewrite":{"type":"SetAmount","value":4}}} """
   Spec.it s "DamageR (any source's damage, doubled)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
-      (ReplacementEffect.DamageR (DamageR.MkDamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whatSource = Filter.And [], DamagePattern.whichRecipient = Nothing} (DamageRewrite.Scale (Scaling.Multiply 2))))
+      codec
+      (ReplacementEffect.DamageR (DamageR.MkDamageR DamagePattern.MkDamagePattern {DamagePattern.whichKind = Nothing, DamagePattern.whatSource = Filter.And [], DamagePattern.whatRecipient = Nothing, DamagePattern.whichRecipient = Nothing} (DamageRewrite.Scale (Scaling.Multiply 2)) Seq.empty))
       """ {"type":"DamageR","value":{"matching":{},"rewrite":{"type":"Scale","value":{"type":"Multiply","value":2}}}} """
   -- CR 614.8: regeneration, DestructionR's sole producer today.
   Spec.it s "DestructionR (regenerate)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       (ReplacementEffect.DestructionR DestructionRewrite.Regenerate)
       """ {"type":"DestructionR","value":{"type":"Regenerate"}} """
   -- A fixed kind, a real filter, and CR 614.16's AddMore.
   Spec.it s "CounterR (Hardened Scales)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       ( ReplacementEffect.CounterR
           ( CounterR.MkCounterR
               CounterPattern.MkCounterPattern
@@ -157,7 +160,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "CounterR (Doubling Season, whichKind omitted)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       ( ReplacementEffect.CounterR
           ( CounterR.MkCounterR
               CounterPattern.MkCounterPattern
@@ -175,7 +178,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "TokenR (Doubling Season, tokens)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       (ReplacementEffect.TokenR (TokenR.MkTokenR TokenPattern.MkTokenPattern {TokenPattern.whose = ControllerRelation.Yours} (Scaling.Multiply 2)))
       """ {"type":"TokenR","value":{"matching":{"whose":{"type":"Yours"}},"scaling":{"type":"Multiply","value":2}}} """
   -- CR 614.1b: a skip carries a pattern and no rewrite, so the payload is the
@@ -184,7 +187,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "PhaseR (Eon Hub, symmetric skip)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       (ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.Upkeep), PhasePattern.whosePhase = Nothing})
       """ {"type":"PhaseR","value":{"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"Upkeep"}}}}} """
   -- The baked player-scoped whosePhase = Just, which only Resolve's
@@ -193,7 +196,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "PhaseR (Fatigue, player-scoped skip)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       (ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep), PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)})
       """ {"type":"PhaseR","value":{"whichPhase":{"type":"Step","value":{"type":"Beginning","value":{"type":"DrawStep"}}},"whosePhase":1}} """
   -- The whole-phase selector, once Resolve has baked the player its resolution
@@ -201,7 +204,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "PhaseR (Stonehorn Dignitary, whole-phase skip)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       (ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.CombatPhase, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)})
       """ {"type":"PhaseR","value":{"whichPhase":{"type":"CombatPhase"},"whosePhase":1}} """
   -- CR 614.1e / 702.37b: megamorph's "as this permanent is turned face up, put a
@@ -210,7 +213,11 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
   Spec.it s "TurnUpR (megamorph, CR 702.37b)" $
     Common.assertCodec
       s
-      ReplacementEffect.codec
+      codec
       (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR Filter.IsSource (TurnUpRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1))))
       """ {"type":"TurnUpR","value":{"matching":{"type":"IsSource"},"rewrite":{"type":"WithCounters","value":{"kind":{"type":"PlusOnePlusOne"},"amount":1}}}} """
-  Spec.it s "has a schema" $ Common.assertHasSchema s ReplacementEffect.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s codec
+  where
+    -- CR 615.5: the DamageR arm carries riders, so the codec takes the effect
+    -- codec the card boundary would pass it.
+    codec = ReplacementEffect.codec (Effect.codec Card.codec)

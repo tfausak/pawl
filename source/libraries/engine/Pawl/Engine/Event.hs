@@ -1323,7 +1323,7 @@ apply batch candidate event =
             pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR {}, _) -> pure (Just event)
-    (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite), ProposedEvent.WouldDealDamage de) -> case rewrite of
+    (ReplacementEffect.DamageR damageR@(DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de) -> case rewrite of
       -- CR 615.6: a prevented event never happens -- it is not marked, not
       -- drained, and never recorded, so no deathtouch bit exists for the CR
       -- 704.5h SBA to read.
@@ -1366,7 +1366,7 @@ apply batch candidate event =
             -- Both subtractions below are total on Natural: `prevented` is a min
             -- of the two operands, so it is no greater than either.
             prevented = min remaining amount
-        Replacement.setShield (ReplacementCandidate.identity candidate) pat (remaining - prevented)
+        Replacement.setShield (ReplacementCandidate.identity candidate) damageR (remaining - prevented)
         if prevented >= amount
           then pure Nothing
           else pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = amount - prevented}))

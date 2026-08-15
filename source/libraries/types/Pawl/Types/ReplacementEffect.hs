@@ -50,12 +50,18 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 -- unbounded skip (Eon Hub) and a resolution's single-occurrence one share one
 -- constructor.
 --
+-- Parametric in the EFFECT, which is CR 615.5's additional effect reaching the
+-- one arm that can carry one (DamageR's riders, #1105) without a module cycle:
+-- Pawl.Types.Effect holds this type and this type holds effects. See
+-- Pawl.Types.DamageR. Every other arm ignores the parameter, so a card writing a
+-- rider onto anything but a prevention is a lint's job rather than the type's.
+--
 -- The sole rules-casing site is Pawl.Engine.Replacement (CR 616.1's loop).
 -- Pawl.Codec also cases on every constructor, but only as the JSON data boundary.
-data ReplacementEffect
+data ReplacementEffect effect
   = ZoneChangeR ZoneChangeR.ZoneChangeR
   | EntryR EntryR.EntryR
-  | DamageR DamageR.DamageR
+  | DamageR (DamageR.DamageR effect)
   | DestructionR DestructionRewrite.DestructionRewrite
   | CounterR CounterR.CounterR
   | TokenR TokenR.TokenR

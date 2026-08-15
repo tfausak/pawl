@@ -1,9 +1,9 @@
 -- | Where the effect knot is tied. The card codec is a PARAMETER, so this module
 -- names no concrete card type; Pawl.Codec.Card passes its own codec in.
 --
--- RECURSIVE three times over: PreventNextDamage's CR 615.5 rider and ForEach's
--- CR 608.2f body both hold effects, and CreateEmblem's payload is a whole card
--- whose faces hold effects. Each names 'codec' inside its own definition, which
+-- RECURSIVE four times over: PreventNextDamage's CR 615.5 rider, the same rule's
+-- rider on a Replace's DamageR, and ForEach's CR 608.2f body all hold effects,
+-- and CreateEmblem's payload is a whole card whose faces hold effects. Each names 'codec' inside its own definition, which
 -- terminates for Pawl.Codec.TriggerCondition's
 -- reason -- 'Arm.tagged' reaches WHNF without forcing its arm list, and
 -- 'Define.define' registers the type's name before running the schema body.
@@ -102,7 +102,7 @@ codec cardCodec =
       Arm.payload "DecreaseSpeed" SpeedDecrease.codec Effect.DecreaseSpeed (\x -> case x of Effect.DecreaseSpeed y -> Just y; _ -> Nothing),
       Arm.payload "Create" createCodec Effect.Create (\x -> case x of Effect.Create y -> Just y; _ -> Nothing),
       Arm.payload "CreateCopy" CreateCopy.codec Effect.CreateCopy (\x -> case x of Effect.CreateCopy y -> Just y; _ -> Nothing),
-      Arm.payload "Replace" Replace.codec Effect.Replace (\x -> case x of Effect.Replace y -> Just y; _ -> Nothing),
+      Arm.payload "Replace" replaceCodec Effect.Replace (\x -> case x of Effect.Replace y -> Just y; _ -> Nothing),
       Arm.payload "SkipNextPhase" SkipNextPhase.codec Effect.SkipNextPhase (\x -> case x of Effect.SkipNextPhase y -> Just y; _ -> Nothing),
       Arm.payload "PreventNextDamage" preventCodec Effect.PreventNextDamage (\x -> case x of Effect.PreventNextDamage y -> Just y; _ -> Nothing),
       Arm.payload "PreventAllDamage" DurationRef.codec Effect.PreventAllDamage (\x -> case x of Effect.PreventAllDamage y -> Just y; _ -> Nothing),
@@ -140,5 +140,6 @@ codec cardCodec =
     ]
   where
     createCodec = Create.codec cardCodec
+    replaceCodec = Replace.codec (codec cardCodec)
     preventCodec = PreventNextDamage.codec (codec cardCodec)
     forEachCodec = ForEach.codec (codec cardCodec)
