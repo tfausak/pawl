@@ -66,6 +66,7 @@ codec keywordCodec =
       Arm.nullary "IsBlocking" Filter.IsBlocking,
       Arm.nullary "IsBlocked" Filter.IsBlocked,
       Arm.nullary "AttackedThisTurn" Filter.AttackedThisTurn,
+      Arm.nullary "MilledThisTurn" Filter.MilledThisTurn,
       Arm.nullary "IsAttachedToCreature" Filter.IsAttachedToCreature,
       Arm.nullary "IsAttachedToPermanent" Filter.IsAttachedToPermanent,
       Arm.nullary "IsAttachedToSource" Filter.IsAttachedToSource,

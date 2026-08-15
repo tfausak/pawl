@@ -203,6 +203,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsBlocking -> predicate
   Filter.Type.IsBlocked -> predicate
   Filter.Type.AttackedThisTurn -> predicate
+  Filter.Type.MilledThisTurn -> predicate
   Filter.Type.IsAttachedToCreature -> predicate
   Filter.Type.IsAttachedToPermanent -> predicate
   Filter.Type.IsAttachedToSource -> predicate
@@ -443,6 +444,8 @@ snapshotView gs shape event = case event of
   -- CR 601.2c's targeting names two objects by id and snapshots no
   -- characteristics, so no EventShape names it either.
   GameEvent.BecameTarget {} -> Nothing
+  -- CR 701.17a names its cards by id and snapshots no characteristics.
+  GameEvent.Milled {} -> Nothing
   GameEvent.LeftTheGame _ -> Nothing
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
@@ -482,6 +485,9 @@ viewOfSnapshot mController isToken snapshot =
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
+      -- CR 701.17a mills a CARD, and this view describes a snapshot rather than
+      -- an object -- there is no id here for the turn's mills to have named.
+      Filter.milledThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
       Filter.attachedTo = Nothing,

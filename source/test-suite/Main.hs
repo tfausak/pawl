@@ -133,6 +133,7 @@ import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.MentoredSpec
 import qualified Pawl.Codec.MillSpec
 import qualified Pawl.Codec.MillTallySpec
+import qualified Pawl.Codec.MilledSpec
 import qualified Pawl.Codec.ModalSpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
@@ -511,6 +512,7 @@ spec s registry = do
   Pawl.Codec.MentoredSpec.spec s
   Pawl.Codec.MillSpec.spec s
   Pawl.Codec.MillTallySpec.spec s
+  Pawl.Codec.MilledSpec.spec s
   Pawl.Codec.ModalSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s

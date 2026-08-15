@@ -1,5 +1,6 @@
 module Pawl.Engine.Projection where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -78,6 +79,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.Modification (Modification)
@@ -657,6 +659,10 @@ viewOfCard face =
           Filter.blocking = False,
           Filter.blocked = False,
           Filter.attackedThisTurn = False,
+          -- CR 701.17a mills an OBJECT out of a library, and this builder
+          -- describes a printed FACE, which the turn's mills name nothing of.
+          -- viewOfCardIn below is the caller that holds an id and answers.
+          Filter.milledThisTurn = False,
           Filter.attachedToCreature = False,
           Filter.attachedToPermanent = False,
           Filter.attachedTo = Nothing,
@@ -712,12 +718,16 @@ viewOfCard face =
 -- they read it as printed where the object has a CR 613 projection of its own
 -- (#160). viewUpTo above is the reader that no longer does.
 --
--- Only the power and toughness axes differ, CR 208.2a naming both.
+-- The power and toughness axes differ, CR 208.2a naming both, and so does the
+-- one axis that is not a characteristic at all: having an id is what lets CR
+-- 701.17a's mills be looked up (CR 608.2i), where the printed face this is built
+-- on cannot answer.
 viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
 viewOfCardIn gs oid face =
   (viewOfCard face)
     { Filter.power = characteristicPowerIn gs oid face,
-      Filter.toughness = characteristicToughnessIn gs oid face
+      Filter.toughness = characteristicToughnessIn gs oid face,
+      Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs)
     }
 
 -- CR 208.2a's power for a face whose CDA sets it, and printedPower's answer for
@@ -813,6 +823,15 @@ declaredIt oid event = case event of
   GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _) -> declared == oid
   _ -> False
 
+-- CR 701.17a: does this event record THIS object being one of the cards a mill
+-- milled? declaredIt's twin over the other look-back entry. Only
+-- Pawl.Engine.Resolve's Mill arm appends one, which is what keeps a surveil's or
+-- an explore's bin -- neither of them a mill -- out of the answer.
+milledIt :: ObjectId -> GameEvent.GameEvent -> Bool
+milledIt oid event = case event of
+  GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
+  _ -> False
+
 -- Shared assembly: fill a View from a projection's characteristics, a supplied
 -- controller and supplied counters.
 --
@@ -875,6 +894,10 @@ viewOfCharacteristics oid pc controller counters gs =
       -- CR 608.2i: read from the turn's event log, not the combat record, which
       -- CR 511.3 clears at end of combat. The log spans the turn.
       Filter.attackedThisTurn = any (declaredIt oid . snd) (GameState.events gs),
+      -- CR 701.17a / 608.2i: the same log, read for the mills. CR 400.7 is what
+      -- makes an id enough to ask with -- the event names the incarnation the
+      -- mill left the card as, and a later move would have minted another.
+      Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs),
       -- CR 701.3a: also not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's creature-ness is projected (layer 4
       -- can make a land a creature), so it goes through isCreatureOf. That is why
@@ -2855,6 +2878,8 @@ filterReads f = case f of
   -- Reads nothing: no Modification writes GameState.events, so no CR 613 layer can
   -- move a set this atom selects.
   Filter.Type.AttackedThisTurn -> Set.empty
+  -- Reads nothing, for AttackedThisTurn's reason and off the same log.
+  Filter.Type.MilledThisTurn -> Set.empty
   -- Declared as reading Types even though the types are the HOST's. Aspect names
   -- an aspect of ONE object's projection, so there is no way to say "another
   -- object's card types"; over-declaring is the conservative direction. Nothing in

@@ -49,6 +49,7 @@ blackCreature =
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
+      Filter.milledThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
       Filter.attachedTo = Nothing,
@@ -84,6 +85,7 @@ devoidBigCreature =
       Filter.blocking = False,
       Filter.blocked = False,
       Filter.attackedThisTurn = False,
+      Filter.milledThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
       Filter.attachedTo = Nothing,
@@ -673,6 +675,22 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- player is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.AttackedThisTurn)) "player"
+
+  Spec.describe s "MilledThisTurn" $ do
+    Spec.it s "matches a view whose history says so" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.milledThisTurn = True}) Filter.Type.MilledThisTurn) "milled"
+
+    Spec.it s "does not match a card that reached the graveyard another way" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.MilledThisTurn)) "not milled"
+
+    -- Independent of the OTHER look-back atom, which reads the same log for a
+    -- different entry: a milled card was never declared as an attacker.
+    Spec.it s "is not implied by having attacked" $ do
+      Spec.assertBool s (not (Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.MilledThisTurn)) "attacked does not imply milled"
+
+    -- CR 701.17a mills CARDS, and a player is not one.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.MilledThisTurn)) "player"
 
   Spec.describe s "IsAttachedToCreature" $ do
     Spec.it s "matches a view whose attachment says so" $ do

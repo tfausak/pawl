@@ -2,6 +2,7 @@
 
 module Pawl.Codec.GameEventSpec where
 
+import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
@@ -31,6 +32,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mentored as Mentored
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -307,3 +309,10 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.LeftTheGame (ObjectId.MkObjectId 7))
       """ {"type":"LeftTheGame","value":7} """
+  -- CR 701.17a. Two cards in one entry, that rule milling them at once.
+  Spec.it s "Milled" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Milled (Milled.MkMilled (PlayerId.MkPlayerId 1) (Seq.fromList [ObjectId.MkObjectId 3, ObjectId.MkObjectId 4])))
+      """ {"type":"Milled","value":{"player":1,"cards":[3,4]}} """

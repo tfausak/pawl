@@ -23,6 +23,7 @@ import qualified Pawl.Codec.Drew as Drew
 import qualified Pawl.Codec.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Codec.LifeChange as LifeChange
 import qualified Pawl.Codec.Mentored as Mentored
+import qualified Pawl.Codec.Milled as Milled
 import qualified Pawl.Codec.Moved as Moved
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PermanentSacrificed as PermanentSacrificed
@@ -45,6 +46,7 @@ codec =
       Arm.payload "SpellCast" SpellWasCast.codec GameEvent.SpellCast (\x -> case x of GameEvent.SpellCast y -> Just y; _ -> Nothing),
       Arm.payload "BecameMonarch" PlayerId.codec GameEvent.BecameMonarch (\x -> case x of GameEvent.BecameMonarch y -> Just y; _ -> Nothing),
       Arm.payload "Discarded" Discarded.codec GameEvent.Discarded (\x -> case x of GameEvent.Discarded y -> Just y; _ -> Nothing),
+      Arm.payload "Milled" Milled.codec GameEvent.Milled (\x -> case x of GameEvent.Milled y -> Just y; _ -> Nothing),
       Arm.payload "Drew" Drew.codec GameEvent.Drew (\x -> case x of GameEvent.Drew y -> Just y; _ -> Nothing),
       Arm.payload "AttackerDeclared" AttackerDeclared.codec GameEvent.AttackerDeclared (\x -> case x of GameEvent.AttackerDeclared y -> Just y; _ -> Nothing),
       Arm.payload "BlockerDeclared" BlockerDeclared.codec GameEvent.BlockerDeclared (\x -> case x of GameEvent.BlockerDeclared y -> Just y; _ -> Nothing),
