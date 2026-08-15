@@ -137,6 +137,13 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Soulshift
       """ {"type":"Soulshift"} """
 
+  Spec.it s "Bloodthirst" $
+    Common.assertCodec
+      s
+      KeywordFamily.codec
+      KeywordFamily.Bloodthirst
+      """ {"type":"Bloodthirst"} """
+
   Spec.it s "Reinforce" $
     Common.assertCodec
       s

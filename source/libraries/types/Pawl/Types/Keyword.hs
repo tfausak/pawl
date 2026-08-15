@@ -452,6 +452,19 @@ data Keyword
     -- reader takes the per-keyword COUNT rather than membership -- Forked-Branch
     -- Garami prints "soulshift 4, soulshift 4" and returns two cards.
     Soulshift Natural.Natural
+  | -- | 702.54a: bloodthirst N, a STATIC ability meaning "If an opponent was
+    -- dealt damage this turn, this permanent enters with N +1/+1 counters on
+    -- it." Minted by Pawl.Engine.Keyword.mintedReplacementsFor as a CR 614.1c
+    -- entry replacement, vanishing's position -- with a condition of its own,
+    -- which Pawl.Engine.Replacement.admitsEntry asks as it asks rule 702.145b's.
+    --
+    -- N rides the constructor, as Vanishing's does, and CR 702.54c makes each
+    -- instance apply separately -- so its reader takes the per-keyword COUNT and
+    -- a permanent with bloodthirst twice enters with both lots of counters.
+    --
+    -- Not implemented: CR 702.54b's "Bloodthirst X", where X is the TOTAL DAMAGE
+    -- an opponent was dealt rather than a printed number (#1588).
+    Bloodthirst Natural.Natural
   | -- | 702.55a: haunt, a TRIGGERED ability. On a permanent it means "When this
     -- permanent is put into a graveyard from the battlefield, exile it haunting
     -- target creature" -- soulshift's CR 700.4 dies event again, so the condition

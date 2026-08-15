@@ -1919,6 +1919,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.46a names no quality either: "Spirit card with mana value N or less"
   -- is written into the ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Soulshift _ -> []
+  -- CR 702.54a names no quality either: "an opponent" is a player and the +1/+1
+  -- counters are the rule's own noun, so neither reaches a Filter.
+  Keyword.Bloodthirst _ -> []
   -- CR 702.55a names no quality either: its minted ability's bare "target
   -- creature" pool carries no Filter at all.
   Keyword.Haunt -> []
@@ -2465,6 +2468,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Unleash -> []
+  EntryRewrite.Bloodthirst _ -> []
   EntryRewrite.Tapped -> []
   EntryRewrite.PayLifeOrTapped _ -> []
   EntryRewrite.EntersTransformed -> []

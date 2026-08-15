@@ -107,6 +107,19 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.Unleash
       """ {"type":"Unleash"} """
     Spec.assertBool s (Codec.encode EntryRewrite.codec EntryRewrite.Unleash /= Codec.encode EntryRewrite.codec EntryRewrite.Riot) "unleash and riot encode differently"
+  -- CR 702.54a: bloodthirst's rewrite, which DOES carry its N -- the printed
+  -- number varies by card, where rule 702.136a fixes riot's. Encoded distinctly
+  -- from WithCounters, whose payload names a counter kind rule 702.54a fixes.
+  Spec.it s "Bloodthirst (Bloodrage Vampire)" $ do
+    Common.assertCodec
+      s
+      EntryRewrite.codec
+      (EntryRewrite.Bloodthirst 1)
+      """ {"type":"Bloodthirst","value":1} """
+    Spec.assertBool
+      s
+      (Codec.encode EntryRewrite.codec (EntryRewrite.Bloodthirst 1) /= Codec.encode EntryRewrite.codec (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.PlusOnePlusOne 1)))
+      "bloodthirst 1 is not an unconditional +1/+1 counter"
   -- CR 614.1d: the tap-state rewrite a permanent's own text prints, payload-free
   -- because rule 614.1d and CR 110.5b fix both halves.
   Spec.it s "Tapped (Zof Bloodbog)" $

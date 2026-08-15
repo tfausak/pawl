@@ -347,7 +347,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- IsMonarch's in arity: the question is asked of each named player separately, so
   -- a reference naming several is answered by counting them rather than by asking
   -- "whose?". Furious Spinesplitter's "for each opponent who" is that count, and
-  -- rule 702.54a's bloodthirst is the same count compared against 1.
+  -- rule 702.54a's bloodthirst is the same count compared against 1, which
+  -- Pawl.Engine.Replacement.admitsEntry's Bloodthirst arm now asks.
   --
   -- The PLAYERS are counted and not the events, which is why this filters the
   -- player list rather than the log: two bolts at one opponent is one opponent.

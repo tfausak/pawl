@@ -189,6 +189,7 @@ abilitiesFor keyword count = case keyword of
   -- CR 702.46b says each instance triggers separately, so a permanent with
   -- soulshift twice dies with two abilities and each chooses its own target.
   Keyword.Soulshift n -> List.genericReplicate count (soulshift n)
+  Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> List.genericReplicate count haunt
   Keyword.SplitSecond -> []
   -- Another: rule 702.63a states three abilities, and the first of
@@ -351,6 +352,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
@@ -557,6 +559,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
@@ -825,6 +828,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
@@ -1262,6 +1266,17 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  -- CR 702.54a's ONE static ability, vanishing's row with rule 702.54a's
+  -- condition on it: "if an opponent was dealt damage this turn, this permanent
+  -- enters with N +1/+1 counters on it". Filter.IsSource for riot's reason, and
+  -- the condition is Pawl.Engine.Replacement.admitsEntry's rather than this
+  -- function's -- nothing knowable from a keyword and a count can answer it.
+  --
+  -- ONE ROW PER INSTANCE, and CR 702.54c says so outright ("if an object has
+  -- multiple instances of bloodthirst, each applies separately"), so two
+  -- instances place two lots of N -- both admitted or neither, since the two rows
+  -- ask one condition of one board.
+  Keyword.Bloodthirst n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.Bloodthirst n)))
   Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
@@ -1423,6 +1438,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
   Keyword.Soulshift _ -> []
+  Keyword.Bloodthirst _ -> []
   Keyword.Haunt -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
@@ -1494,6 +1510,7 @@ familyOf keyword = case keyword of
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
   Keyword.Soulshift _ -> Just KeywordFamily.Soulshift
+  Keyword.Bloodthirst _ -> Just KeywordFamily.Bloodthirst
   Keyword.Reinforce {} -> Just KeywordFamily.Reinforce
   Keyword.Modular _ -> Just KeywordFamily.Modular
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
