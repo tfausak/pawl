@@ -179,139 +179,137 @@ costsFor name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj | Object.facing obj == Facing.FaceDown -> [faceDownCost]
   Just obj -> case Object.source obj of
-    Source.OfCard printingId
-      | Just card <- Game.cardOfPrinting printingId gs ->
-          let face = Game.resolveFace (Just name) card
-              printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
-              -- CR 118.9d: an alternative replaces only the MANA cost; every
-              -- additional cost still applies. The increases and reductions are
-              -- Pawl.Engine.Cost.total's job, called on whichever candidate is
-              -- chosen. CR 702.34a's own last sentence sends flashback through the
-              -- same rules, so its cost is wrapped identically.
-              withAdditional alternative =
-                alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
-              -- CR 604.2: an alternative cost whose "as long as" clause does not hold
-              -- is not offered at all -- Asmoranomardicadaistinaculdacar is uncastable
-              -- until its controller has discarded a card this turn, and its printed
-              -- cost is unpayable (CR 118.6), so the whole card is.
+    Source.OfCard printingId -> case Game.cardOfPrinting printingId gs of
+      -- Unreachable: a PrintingId is minted only by Game.intern, which inserts.
+      Nothing -> []
+      Just card ->
+        let face = Game.resolveFace (Just name) card
+            printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
+            -- CR 118.9d: an alternative replaces only the MANA cost; every
+            -- additional cost still applies. The increases and reductions are
+            -- Pawl.Engine.Cost.total's job, called on whichever candidate is
+            -- chosen. CR 702.34a's own last sentence sends flashback through the
+            -- same rules, so its cost is wrapped identically.
+            withAdditional alternative =
+              alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
+            -- CR 604.2: an alternative cost whose "as long as" clause does not hold
+            -- is not offered at all -- Asmoranomardicadaistinaculdacar is uncastable
+            -- until its controller has discarded a card this turn, and its printed
+            -- cost is unpayable (CR 118.6), so the whole card is.
+            --
+            -- CR 109.5's "you" is the OWNER, as Activate.graveyardAbilitiesOf reads it
+            -- for a condition on a card outside the battlefield: pawl has no way to
+            -- cast a card from another player's HAND or GRAVEYARD -- CR 400.1 files
+            -- both by player and Cast.zoneCandidates hands out only the caster's own
+            -- -- so the owner and the caster are the same player wherever this is
+            -- asked. That holds for the CR 601.3 permission read in the graveyard arm
+            -- below as well, which is the other reader of the owner here. Exile is
+            -- the one zone whose candidates are not filed by owner, and no permission
+            -- in the pool aims a player at a card there that somebody else owns.
+            --
+            -- Projection.fullView for that function's reason too -- nothing here is
+            -- inside the layer fold, so there is no circularity to bound against --
+            -- and CR 604.7 is satisfied by construction: the card is in a zone, so
+            -- there is no last known information to fall back on.
+            available alternative = case AlternativeCost.condition alternative of
+              Nothing -> True
+              Just cond ->
+                Condition.holds
+                  (Projection.fullView gs)
+                  (Filter.contextFor (Just (Object.owner obj)) (Just oid))
+                  gs
+                  oid
+                  cond
+            alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
+         in case Object.zone obj of
+              -- Rule 702.34a's "if the resulting spell is an instant or sorcery
+              -- spell" is NOT re-asked here. It gates the PERMISSION
+              -- (Pawl.Engine.Keyword.permissionsFor), and Pawl.Engine.Cast.castable
+              -- demands that permission alongside an affordable candidate from this
+              -- list, so a candidate offered here can never carry a graveyard cast
+              -- on its own.
+              -- CR 702.127a pays the PRINTED cost, which is the whole difference
+              -- between aftermath and flashback: rule 702.34a supplies an
+              -- alternative cost and this supplies none, so the half is cast from a
+              -- graveyard for exactly what it says. `printed` and not
+              -- `withAdditional printed` -- that wrapper exists to bolt the face's
+              -- additional costs onto an ALTERNATIVE, and `printed` already carries
+              -- them.
               --
-              -- CR 109.5's "you" is the OWNER, as Activate.graveyardAbilitiesOf reads it
-              -- for a condition on a card outside the battlefield: pawl has no way to
-              -- cast a card from another player's HAND or GRAVEYARD -- CR 400.1 files
-              -- both by player and Cast.zoneCandidates hands out only the caster's own
-              -- -- so the owner and the caster are the same player wherever this is
-              -- asked. That holds for the CR 601.3 permission read in the graveyard arm
-              -- below as well, which is the other reader of the owner here. Exile is
-              -- the one zone whose candidates are not filed by owner, and no permission
-              -- in the pool aims a player at a card there that somebody else owns.
+              -- CR 702.133a pays the PRINTED cost plus a discard, which is the
+              -- third of the three shapes this arm offers: flashback replaces the
+              -- mana cost, aftermath replaces nothing, and jump-start ADDS to it
+              -- ("by discarding a card as an additional cost to cast it", CR
+              -- 601.2b/601.2f-h). So the component is appended to `printed`, which
+              -- already carries the face's own additional costs -- and not through
+              -- `withAdditional`, which exists to bolt those onto an ALTERNATIVE.
               --
-              -- Projection.fullView for that function's reason too -- nothing here is
-              -- inside the layer fold, so there is no circularity to bound against --
-              -- and CR 604.7 is satisfied by construction: the card is in a zone, so
-              -- there is no last known information to fall back on.
-              available alternative = case AlternativeCost.condition alternative of
-                Nothing -> True
-                Just cond ->
-                  Condition.holds
-                    (Projection.fullView gs)
-                    (Filter.contextFor (Just (Object.owner obj)) (Just oid))
-                    gs
-                    oid
-                    cond
-              alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
-           in case Object.zone obj of
-                -- Rule 702.34a's "if the resulting spell is an instant or sorcery
-                -- spell" is NOT re-asked here. It gates the PERMISSION
-                -- (Pawl.Engine.Keyword.permissionsFor), and Pawl.Engine.Cast.castable
-                -- demands that permission alongside an affordable candidate from this
-                -- list, so a candidate offered here can never carry a graveyard cast
-                -- on its own.
-                -- CR 702.127a pays the PRINTED cost, which is the whole difference
-                -- between aftermath and flashback: rule 702.34a supplies an
-                -- alternative cost and this supplies none, so the half is cast from a
-                -- graveyard for exactly what it says. `printed` and not
-                -- `withAdditional printed` -- that wrapper exists to bolt the face's
-                -- additional costs onto an ALTERNATIVE, and `printed` already carries
-                -- them.
-                --
-                -- CR 702.133a pays the PRINTED cost plus a discard, which is the
-                -- third of the three shapes this arm offers: flashback replaces the
-                -- mana cost, aftermath replaces nothing, and jump-start ADDS to it
-                -- ("by discarding a card as an additional cost to cast it", CR
-                -- 601.2b/601.2f-h). So the component is appended to `printed`, which
-                -- already carries the face's own additional costs -- and not through
-                -- `withAdditional`, which exists to bolt those onto an ALTERNATIVE.
-                --
-                -- One discard however many jump-start abilities the card has: see
-                -- Pawl.Engine.Keyword.hasJumpStart.
-                --
-                -- CR 601.3 / Yawgmoth's Will is the fourth shape, and the one that
-                -- is not a keyword: an EFFECT that permits the cast supplies no cost
-                -- with it, so what the card asks for is what it asks for anywhere --
-                -- the printed cost and the card's own alternatives, exactly the
-                -- hand's list. Offered BESIDE the three above rather than instead of
-                -- them, which is the rules answer for a flashback card in a
-                -- graveyard under such an effect: both costs are available and CR
-                -- 601.2b picks one.
-                Zone.Graveyard ->
-                  let -- CR 613.1: the keywords the card HAS in the graveyard, not
-                      -- the ones it prints. Rule 702.34a's cost is stated by the
-                      -- ability, and an ability granted to a card in a graveyard
-                      -- (Viral Spawning's own, CR 113.6f) states it as much as a
-                      -- printed one does -- so a projected read is what makes the
-                      -- granted cost reachable at all (#1385).
-                      --
-                      -- Off the OBJECT rather than the face, so the caller's CR
-                      -- 709.3a half is the one measured: every caller stamps the
-                      -- proposal through Pawl.Engine.Cast.asProposed first, and the
-                      -- projection resolves that same stamp.
-                      keywords = Map.keysSet (Projection.keywordsOf oid gs)
-                   in fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost keywords))
-                        <> [printed | Keyword.hasAftermath keywords]
-                        <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
-                           | Keyword.hasJumpStart keywords
-                           ]
-                        <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
-                -- CR 702.170d: a PLOTTED card is cast "without paying its mana
-                -- cost", which is CR 118.9's alternative cost and so
-                -- withoutPayingManaCost above -- the card's own additional costs
-                -- ride along with it, since that function carries them.
-                --
-                -- INSTEAD of the printed cost and not beside it, which is the whole
-                -- difference from the graveyard arm's Yawgmoth's Will case: rule
-                -- 702.170d is the only thing permitting this cast (nothing else in
-                -- the pool casts a card from exile for its mana cost), so offering
-                -- `printed` here would price a cast no rule allows.
-                --
-                -- The OTHER permission this zone can carry -- CR 715.3d's Adventure
-                -- exile, and Effect.GrantPlayFromExile -- states no cost, so what the
-                -- card asks for is what it asks for anywhere. That is the `_` arm's
-                -- list, and this arm falls back to it for an exiled card that is not
-                -- plotted.
-                Zone.Exile
-                  | Maybe.isJust (Object.plotted obj) -> [withoutPayingManaCost face]
-                -- CR 702.143a: a FORETOLD card is cast "by paying any foretell cost
-                -- it has rather than paying that spell's mana cost", which is CR
-                -- 118.9's alternative cost -- so the keyword's payload is wrapped by
-                -- withAdditional exactly as flashback's is, and the card's own
-                -- additional costs ride along.
-                --
-                -- INSTEAD of the printed cost, the plotted arm's argument above:
-                -- rule 702.143a is the only thing permitting this cast.
-                --
-                -- A card foretold with NO foretell cost yields no candidate at all,
-                -- so CR 601.3's default prohibition arrives through the affordability
-                -- gate. That is unreachable from this module's own writer -- CR
-                -- 116.2h exiles only a card WITH foretell -- and is CR 702.143d's
-                -- shape, which pawl cannot state (#1486).
-                Zone.Exile
-                  | Maybe.isJust (Object.foretold obj) ->
-                      fmap withAdditional (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
-                _ -> printed : alternatives
-    -- Unreachable, and here for totality: a PrintingId is minted only by
-    -- Game.intern, which inserts, so every OfCard names an entry. Costs nothing
-    -- and says the same thing the other arms do -- no card, no cost.
-    Source.OfCard _ -> []
+              -- One discard however many jump-start abilities the card has: see
+              -- Pawl.Engine.Keyword.hasJumpStart.
+              --
+              -- CR 601.3 / Yawgmoth's Will is the fourth shape, and the one that
+              -- is not a keyword: an EFFECT that permits the cast supplies no cost
+              -- with it, so what the card asks for is what it asks for anywhere --
+              -- the printed cost and the card's own alternatives, exactly the
+              -- hand's list. Offered BESIDE the three above rather than instead of
+              -- them, which is the rules answer for a flashback card in a
+              -- graveyard under such an effect: both costs are available and CR
+              -- 601.2b picks one.
+              Zone.Graveyard ->
+                let -- CR 613.1: the keywords the card HAS in the graveyard, not
+                    -- the ones it prints. Rule 702.34a's cost is stated by the
+                    -- ability, and an ability granted to a card in a graveyard
+                    -- (Viral Spawning's own, CR 113.6f) states it as much as a
+                    -- printed one does -- so a projected read is what makes the
+                    -- granted cost reachable at all (#1385).
+                    --
+                    -- Off the OBJECT rather than the face, so the caller's CR
+                    -- 709.3a half is the one measured: every caller stamps the
+                    -- proposal through Pawl.Engine.Cast.asProposed first, and the
+                    -- projection resolves that same stamp.
+                    keywords = Map.keysSet (Projection.keywordsOf oid gs)
+                 in fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost keywords))
+                      <> [printed | Keyword.hasAftermath keywords]
+                      <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
+                         | Keyword.hasJumpStart keywords
+                         ]
+                      <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
+              -- CR 702.170d: a PLOTTED card is cast "without paying its mana
+              -- cost", which is CR 118.9's alternative cost and so
+              -- withoutPayingManaCost above -- the card's own additional costs
+              -- ride along with it, since that function carries them.
+              --
+              -- INSTEAD of the printed cost and not beside it, which is the whole
+              -- difference from the graveyard arm's Yawgmoth's Will case: rule
+              -- 702.170d is the only thing permitting this cast (nothing else in
+              -- the pool casts a card from exile for its mana cost), so offering
+              -- `printed` here would price a cast no rule allows.
+              --
+              -- The OTHER permission this zone can carry -- CR 715.3d's Adventure
+              -- exile, and Effect.GrantPlayFromExile -- states no cost, so what the
+              -- card asks for is what it asks for anywhere. That is the `_` arm's
+              -- list, and this arm falls back to it for an exiled card that is not
+              -- plotted.
+              Zone.Exile
+                | Maybe.isJust (Object.plotted obj) -> [withoutPayingManaCost face]
+              -- CR 702.143a: a FORETOLD card is cast "by paying any foretell cost
+              -- it has rather than paying that spell's mana cost", which is CR
+              -- 118.9's alternative cost -- so the keyword's payload is wrapped by
+              -- withAdditional exactly as flashback's is, and the card's own
+              -- additional costs ride along.
+              --
+              -- INSTEAD of the printed cost, the plotted arm's argument above:
+              -- rule 702.143a is the only thing permitting this cast.
+              --
+              -- A card foretold with NO foretell cost yields no candidate at all,
+              -- so CR 601.3's default prohibition arrives through the affordability
+              -- gate. That is unreachable from this module's own writer -- CR
+              -- 116.2h exiles only a card WITH foretell -- and is CR 702.143d's
+              -- shape, which pawl cannot state (#1486).
+              Zone.Exile
+                | Maybe.isJust (Object.foretold obj) ->
+                    fmap withAdditional (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
+              _ -> printed : alternatives
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []

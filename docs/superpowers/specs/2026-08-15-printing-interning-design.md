@@ -54,8 +54,10 @@ carry a physical token's metadata. With the table that comment goes away:
 
 Two ids naming the same card is a benign state, not a bug to guard against. The
 engine's identity questions are name-keyed -- CR 100.2a's deck limit is by
-English name, CR 201.2 matches by name -- and CR 108.2 puts the illustration and
-set symbol outside a card's characteristics.
+English name, CR 201.2 matches by name -- and CR 109.3 lists what an object's
+characteristics are, closing with "any other information about an object isn't a
+characteristic". That is where the illustration (CR 203.1) and the expansion
+symbol (CR 206.1) sit; both are stated to have no effect on game play.
 
 ## The table
 
@@ -98,11 +100,19 @@ Two call sites, both of which already intern once and create many:
   objects from one card. One intern per token-creation event. `Event.hs:522`
   does the same for an emblem.
 
-So no content-keyed dedup and no reverse `Map Printing PrintingId` index. A
-4-of interns once because the deck already groups it, not because the intern
-function checks. This is deliberate: a reverse index would pay the deep
-`Ord Card` this change exists to avoid, at every intern, to save entries the
-call sites do not generate.
+`Game.intern` therefore does no content-keyed dedup and keeps no reverse
+`Map Printing PrintingId` index: a global one would pay the deep `Ord Card` this
+change exists to avoid, at every intern, to save entries the engine's call sites
+do not generate.
+
+**Deviation, deliberate: `Setup.internDeck` does dedup, deck-locally.** A deck's
+distinct printings are interned once into a `Map Printing PrintingId` that
+`createDeck` then looks ids out of. `Pawl.Engine.Commander.isCommander` forces
+it: that function compares `Player.commander` against the commander object's own
+printing, and id equality is stricter than the value equality it replaced --
+`Deck.commander` interned separately from `Deck.cards` would no longer match.
+The deep `Ord Printing` is paid once per deck at setup and never again, which is
+the trade `Game.intern` declines to make globally.
 
 **Deck is unchanged.** `Deck.cards :: Map Printing Natural` stays as it is. A
 deck is a pre-game input, constructed before any `GameState` exists, so it
@@ -131,18 +141,38 @@ The headline is representational: the state stops passing whole card
 definitions around by value, and `Source`'s three card-shaped constructors
 become one payload type carrying three rules meanings.
 
-The measurable part is comparison cost. `Eq`/`Ord` on `Object` and `Source`
-become `O(1)` in the card, where today they walk the whole definition; `Object`
-comparison is the hot one, since objects are `Map` values and are read by every
-projection.
+`Eq`/`Ord` on `Object` and `Source` become `O(1)` in the card, where they used
+to walk the whole definition. `Eq`/`Ord` on `GameState` does NOT improve -- it
+now contains the table and still walks every printing in it -- and the memory win
+was already there without this change, since `Setup` passed one `printing` value
+to `createCard` for all four copies of a 4-of and GHC's sharing interned them.
 
-What it does **not** speed up: `Eq`/`Ord` on `GameState` itself, which now
-contains the table and still walks every printing in it. And the memory win is
-likely already there without this change -- `Setup` passes the same `printing`
-value to `createCard` for all four copies of a 4-of, so GHC's sharing already
-interns them. Neither is a reason to do this; the representation is. Any
-performance claim gets measured against the existing benchmark and reported
-once, per `docs/design.md` on correctness over performance.
+**It costs allocation, and the measurement is the point of this section.**
+`PerformanceSpec`'s Prodigal Sorcerer board (256 permanents, the targeting path)
+went from 99,317 to 167,512 bytes per permanent -- a 69% regression against a
+committed 130,000 ceiling. The cause is one extra `Maybe` per card read:
+`Pawl.Engine.Projection.baseCharacteristics` reaches `Game.cardOf` through
+`Game.faceOf`, the layer fold runs it per object per candidate, and the
+enumeration's quadratic shape multiplies it.
+
+`Game.printingOfObject` recovers most of it by handing back the `Maybe` the
+table lookup already built, where `cardOf` fmapped `Printing.card` into a second
+one; `faceOf`, `namesOf` and `manaCostFaceOf` unwrap the field themselves. That
+is 167,512 -> 130,376, and it improved the Llanowar Elves board too (10,803 ->
+10,531, against 10,241 before the change).
+
+What is left -- 130,376 against 99,317, about +31% -- is irreducible. A total
+lookup into a `Map` allocates a `Maybe`; the field read it replaced did not.
+
+Four other attempts measured WORSE or made no difference, and are recorded so
+they are not retried: sharing `mObj`/`mCard` through a `let` in
+`baseCharacteristics` (198,528 -- `PC.names` and `PC.manaValue` are lazy fields
+that usually go unforced, so the binding bought a thunk and saved nothing);
+routing the three readers through shared given-forms (198,552 -- builds a
+`cardOf` thunk even when face-down, where they used to short-circuit); binding
+the object by `case` in `faceOf` and passing `Just obj` (155,136 -- GHC's CSE
+already shared the lookup, and this allocated a fresh `Maybe`); and `fmap` vs
+explicit `case` plus `INLINE` pragmas (byte-identical -- GHC already did both).
 
 ## Tests
 

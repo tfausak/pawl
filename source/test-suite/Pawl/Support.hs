@@ -1126,15 +1126,7 @@ lifeOf pid gs = fmap Player.life (Map.lookup pid (GameState.players gs))
 
 creaturesInPlay :: PlayerId.PlayerId -> GameState.GameState -> Int
 creaturesInPlay pid gs =
-  let isCreatureObject oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printingId -> maybe False (Card.isCreature . Card.combined) (Game.cardOfPrinting printingId gs)
-          Source.OfToken printingId -> maybe False (Card.isCreature . Card.combined) (Game.cardOfPrinting printingId gs)
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+  let isCreatureObject oid = maybe False (Card.isCreature . Card.combined) (Game.cardOf oid gs)
    in length (filter isCreatureObject (Game.zoneMembers Zone.Battlefield pid gs))
 
 -- The name on a card's combined face, which for every card in this pool is its
@@ -1159,15 +1151,7 @@ combinedFace = Card.combined . Printing.card
 
 countByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countByName wanted pid gs =
-  let named oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printingId -> fmap nameOf (Game.cardOfPrinting printingId gs) == Just wanted
-          Source.OfToken printingId -> fmap nameOf (Game.cardOfPrinting printingId gs) == Just wanted
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+  let named oid = fmap nameOf (Game.cardOf oid gs) == Just wanted
       inLibrary = filter named (Game.zoneMembers Zone.Library pid gs)
       inHand = filter named (Game.zoneMembers Zone.Hand pid gs)
    in length inLibrary + length inHand
@@ -1175,15 +1159,7 @@ countByName wanted pid gs =
 -- How many of pid's battlefield objects are copies of a card with this name.
 countOnBattlefieldByName :: CardName.CardName -> PlayerId.PlayerId -> GameState.GameState -> Int
 countOnBattlefieldByName wanted pid gs =
-  let named oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printingId -> fmap nameOf (Game.cardOfPrinting printingId gs) == Just wanted
-          Source.OfToken printingId -> fmap nameOf (Game.cardOfPrinting printingId gs) == Just wanted
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+  let named oid = fmap nameOf (Game.cardOf oid gs) == Just wanted
    in length (filter named (Game.zoneMembers Zone.Battlefield pid gs))
 
 damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
@@ -1459,11 +1435,17 @@ m2aKeywords =
     ("Goblin Chariot", Keyword.Haste)
   ]
 
+-- The printing id oneMountainState below interns its Mountain as. Named rather
+-- than spelled in both places, so a spec asserting on that object's source does
+-- not restate the fixture's first-id assumption.
+oneMountainPrintingId :: PrintingId.PrintingId
+oneMountainPrintingId = PrintingId.MkPrintingId 0
+
 -- A GameState with a single Mountain in alice's hand, in a chosen phase.
 oneMountainState :: Printing.Printing -> Phase.Phase -> GameState.GameState
 oneMountainState mountain ph =
   let oid = ObjectId.MkObjectId 0
-      printingId = PrintingId.MkPrintingId 0
+      printingId = oneMountainPrintingId
       obj =
         Object.MkObject
           { Object.owner = alice,

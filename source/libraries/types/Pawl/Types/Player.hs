@@ -64,11 +64,12 @@ data Player = MkPlayer
     -- A PRINTING and not an ObjectId, because CR 400.7 mints a fresh id on every
     -- zone change and a commander crosses zones constantly -- command zone to
     -- stack to battlefield to command zone again. An object id would name a dead
-    -- object after the first cast. A printing survives, and CR 903.5's singleton
+    -- object after the first cast. A printing survives, and CR 903.5b's singleton
     -- deck construction is what makes it unambiguous: a Commander deck holds at
-    -- most one card with a given name, so "the object whose printing is this one"
-    -- picks out exactly the commander. Pawl does not ENFORCE rule 903.5 (#940),
-    -- so a malformed deck with two copies would make both answer to it.
+    -- most one card with a given English name, so "the object whose printing is
+    -- this one" picks out exactly the commander. Pawl does not ENFORCE rule
+    -- 903.5b (#940), so a malformed deck with two copies would make both answer
+    -- to it.
     --
     -- The printing is named by its id (#1592), which is stable for the whole
     -- game: Pawl.Engine.Setup.internDeck interns each of a deck's distinct

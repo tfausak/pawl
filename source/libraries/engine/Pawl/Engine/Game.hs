@@ -120,12 +120,21 @@ printingOf pid gs = Map.lookup pid (GameState.printings gs)
 -- path: this hands back the Maybe the table lookup already built, where cardOf
 -- fmaps Printing.card into a SECOND one. A caller that goes straight on to read
 -- a field of the card wants this and pays for the unwrap in nothing.
+-- Enumerated rather than delegated to printingOfSource below, and the duplication
+-- is deliberate: routing this through it measured 130376 -> 167528 bytes per
+-- permanent on Pawl.PerformanceSpec's Sorcerer board, which is the whole
+-- optimisation. No wildcard arm, so -Werror still reports both sites when a
+-- card-shaped Source constructor is added -- the silent-absorption hazard is the
+-- `_`, not the second enumeration.
 printingOfObject :: ObjectId -> GameState -> Maybe Printing.Printing
 printingOfObject oid gs = case fmap Object.source (lookupObject oid gs) of
+  Nothing -> Nothing
   Just (Source.OfCard pid) -> printingOf pid gs
   Just (Source.OfToken pid) -> printingOf pid gs
+  Just (Source.OfAbility _ _) -> Nothing
+  Just (Source.OfTrigger _ _) -> Nothing
   Just (Source.OfEmblem pid) -> printingOf pid gs
-  _ -> Nothing
+  Just (Source.OfInherentTrigger _ _) -> Nothing
 
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
 -- offered indices is honoured. Anything else -- a short answer, a duplicate, an

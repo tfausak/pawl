@@ -160,9 +160,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              -- S.oneMountainState interns the Mountain as the game's first
-              -- printing, so this is the id that fixture minted.
-              Object.source = Source.OfCard (PrintingId.MkPrintingId 0),
+              Object.source = Source.OfCard S.oneMountainPrintingId,
               Object.zone = Zone.Battlefield,
               Object.tapped = TapState.Untapped,
               Object.facing = Facing.FaceUp,
