@@ -164,7 +164,7 @@ became = SlotName.MkSlotName (Text.pack "became")
 -- ONE slot for every event that supplies a number, the way `became` is one slot
 -- for both directions of a zone change, and for the same reason: the printed word
 -- is the same word, and which rule produced the number is a fact about the
--- CONDITION rather than about the slot. Three conditions stamp it today:
+-- CONDITION rather than about the slot. The conditions that stamp it today:
 --
 --   * CR 615.13's prevention -- "put that many +1/+1 counters" on Selfless
 --     Squire, "you gain that much life" on the same family's other cards.
@@ -172,6 +172,8 @@ became = SlotName.MkSlotName (Text.pack "became")
 --     life".
 --   * Its mirror, a player losing life -- Exquisite Blood's "you gain that much
 --     life".
+--   * CR 510.2's combat damage to a player -- Shroofus Sproutsire's "create that
+--     many 1/1 green Saproling creature tokens".
 --
 -- No ability bears two conditions, so they can never collide on one object, and
 -- Pawl.Engine.Event.eventBindingSlots is what tells the card lint which of them
