@@ -1248,15 +1248,19 @@ data Prompt r where
   -- countered Mana Leak never asks -- observably different from an announcement
   -- at CR 601.2f-h, where the cost of a spell being cast is paid.
   --
-  -- NEVER elided for a payable cost: CR 118.12a's rewriting makes the cost a
-  -- "may", and both answers reach different boards. The one case not asked is
-  -- where the rules leave nothing to ask -- CR 118.3's "a player can't pay a cost
-  -- without having the necessary resources to pay it fully", which leaves
-  -- declining as the only possible answer. CR 118.12's clause covers that case in
-  -- as many words ("does, doesn't, or CAN'T"). Its Standstill example is NOT this
-  -- one: that cost is mandatory ("sacrifice this enchantment. If you do"), so its
-  -- "can't" is 118.12's "started to pay a mandatory cost" limb, which is the
-  -- positive shape pawl cannot represent at all (#701).
+  -- NEVER elided for a payable cost: the cost is a "may" -- CR 118.12a's
+  -- rewriting makes the negative branch's one, and the positive branch's is
+  -- printed as one (Merfolk Seer's "you may pay {1}{U}") -- and both answers
+  -- reach different boards. The one case not asked is where the rules leave
+  -- nothing to ask -- CR 118.3's "a player can't pay a cost without having the
+  -- necessary resources to pay it fully", which leaves declining as the only
+  -- possible answer. CR 118.12's clause covers that case in as many words
+  -- ("does, doesn't, or CAN'T").
+  --
+  -- Not implemented: CR 118.12's MANDATORY limb, "started to pay a mandatory
+  -- cost" -- Standstill's "sacrifice this enchantment. If you do". Every
+  -- resolution cost is offered here, so a mandatory one would be declinable
+  -- (#1554).
   ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: the player announces whether they intend to pay 2 life or a
   -- coloured mana cost for each Phyrexian symbol. CR 118.13a puts the choice HERE

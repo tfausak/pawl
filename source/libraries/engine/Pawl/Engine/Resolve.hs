@@ -129,6 +129,8 @@ import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PayBranch as PayBranch
+import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhasePattern as PhasePattern
@@ -178,7 +180,6 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
-import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -482,10 +483,10 @@ modeSlots mode =
     filterSlots =
       maybe Map.empty (Map.fromSet (const SlotArity.One) . Filter.boundSlots)
         . TargetSlot.filter
-    -- Every clause's payer, not just one: CR 118.12a scopes an "unless" to the
-    -- clause it is printed on, so a mode may state more than one and each names
-    -- a slot the card owes a declaration for.
-    payerSlot = maybe Map.empty (oneSlot . UnlessPaid.payer) . Clause.unlessPaid
+    -- Every clause's payer, not just one: CR 118.12 scopes a resolution cost to
+    -- the clause it is printed on, so a mode may state more than one and each
+    -- names a slot the card owes a declaration for.
+    payerSlot = maybe Map.empty (oneSlot . PayGate.payer) . Clause.payGate
 
 -- The slot a target pool draws its candidates from, if it draws them from one
 -- (CR 400.1's per-player graveyard). SlotArity.One: "their graveyard" is one
@@ -1236,26 +1237,26 @@ resolveSpellWith runSubgame oid = do
                     gated <- gateHolds effectController oid (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Binding.targetsOf gateBindings)) clause
                     -- CR 603.5 / 608.2d: then the printed "may".
                     taken <- if gated then exercises oid effectController idx cIdx clause else pure False
-                    -- CR 118.12a: and then this clause's "unless [a player]
-                    -- pays", offered only for a clause that is happening at all.
+                    -- CR 118.12: and then this clause's cost paid on resolution,
+                    -- offered only for a clause that is happening at all.
                     -- The legal targets are the START-of-resolution ones,
                     -- matching CR 608.2b's single re-validation; the
                     -- per-effect re-read above adds only slots this resolution
-                    -- DEFINES, and an "unless" is offered before any of THIS
+                    -- DEFINES, and the cost is offered before any of THIS
                     -- clause's effects have run. A later clause's gate is asked
                     -- after an earlier clause's effects, which no card reaches:
-                    -- the pool's unlessPaid cards are all one-clause.
+                    -- the pool's payGate cards are all one-clause.
                     --
                     -- Both maps are projected into THIS instance's view (CR 700.2d):
                     -- the legality is decided against the instance-named slot, then
                     -- renamed to the printed one the mode's own text reads. Deciding
                     -- it after the rename would look every slot up in `slots` and
                     -- miss, and CR 608.2b's re-validation would silently pass.
-                    gatePaid <-
+                    admitted <-
                       if taken
                         then
                           let chosenAtStart = Binding.targetsOf (Object.bindings obj)
-                           in paid
+                           in payGateAdmits
                                 oid
                                 oid
                                 idx
@@ -1263,7 +1264,7 @@ resolveSpellWith runSubgame oid = do
                                 (Modal.instanceView modeOwnedSlots mi (Mode.targetSlots mode) (Map.mapWithKey legalSlot chosenAtStart))
                                 clause
                         else pure False
-                    Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Clause.effects clause))
+                    Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
                 finishSpell oid face effectController
 
 -- CR 608.2n / 715.3d: where the spell goes as the last part of its resolution.
@@ -1413,12 +1414,12 @@ resolveModes stackId srcId modes = do
                   -- CR 603.5 / 608.2d: then the printed "may", answered as this
                   -- clause's instructions are applied.
                   taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
-                  -- CR 118.12a: then the "unless [a player] pays", against the
+                  -- CR 118.12: then the cost paid on resolution, against the
                   -- START-of-resolution slots -- the spell path's own note says
                   -- why it follows the "may", and why the gate is asked before
                   -- this clause's effects have defined anything.
-                  gatePaid <- if taken then paid stackId srcId idx cIdx (instanceView legal) clause else pure False
-                  Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Clause.effects clause))
+                  admitted <- if taken then payGateAdmits stackId srcId idx cIdx (instanceView legal) clause else pure False
+                  Monad.when admitted (Monad.mapM_ applyOne (Clause.effects clause))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
@@ -1485,13 +1486,14 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
       OptionalDecision.Exercises -> True
       OptionalDecision.Declines -> False
 
--- CR 118.12a: does this clause's instruction list happen, given the "unless [a
--- player] pays" it may state? A clause stating none always does. One that states
+-- CR 118.12: does this clause's instruction list happen, given the cost paid on
+-- resolution it may state? A clause stating none always does. One that states
 -- one offers the cost to the player its `payer` slot names, and the instructions
--- are the OTHER branch -- that rule reads "'[Do something] unless [a player does
+-- are whichever branch PayGate.branch says: Mana Leak's counter is IfNotPaid,
+-- reached through CR 118.12a's rewriting ("'[Do something] unless [a player does
 -- something else]' ... means the same thing as '[A player may do something
--- else]. If [that player doesn't], [do something]'", so a refusal is not a
--- failure and the resolution continues either way.
+-- else]. If [that player doesn't], [do something]'"), and Merfolk Seer's draw is
+-- IfPaid. Either way a refusal is not a failure and the resolution continues.
 --
 -- The branch is keyed on the ANSWER and never on the board afterwards, which is
 -- CR 118.12 in as many words: the clause "checks whether the player chose to pay
@@ -1501,28 +1503,27 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 -- the branch still ran. Nothing here looks at the target, at the payer's board or
 -- at the mana that moved; it reads Prompt.ChooseToPay's answer.
 --
--- FIVE outcomes. Exactly one skips the instructions -- the payer chose to pay
--- and the payment went through -- and the other four run them:
+-- FOUR ways the answer comes out, of which exactly one is "paid":
 --
 --   * no payer. The slot is unfilled, has become an illegal target (CR 608.2b),
 --     or names an object that is gone, so there is nobody to offer the cost to
 --     and nobody has paid. Unreachable for Mana Leak, whose single target slot
 --     sends the whole spell through CR 608.2b's fizzle before this is asked.
---   * the payer CANNOT pay. CR 118.12a has made this cost a "may", and CR 118.3
---     says "a player can't pay a cost without having the necessary resources to
---     pay it fully" -- so declining is the only possible answer and there is
---     nothing to ask. Not asked; see Prompt.ChooseToPay.
+--   * the payer CANNOT pay. The cost is a "may" -- CR 118.12a's rewriting makes
+--     it one, and CR 118.12's other half prints it -- and CR 118.3 says "a
+--     player can't pay a cost without having the necessary resources to pay it
+--     fully", so declining is the only possible answer and there is nothing to
+--     ask. Not asked; see Prompt.ChooseToPay.
 --   * the payer declines.
---   * the payer chose to pay and the payment did not go through.
---
--- A payment that was chosen and then did not go through is read as not paid,
--- which is the branch that leaves the game where it started: Pawl.Engine.Cost.pay
--- restores the entry state, so an Unpaid result is a complete no-op and no cost
--- was paid to read a choice off. Nothing in the pool reaches it, and the reason
--- is Mana Leak's cost specifically: {3} is GENERIC, so every tap pays it. A
--- coloured resolution cost would reach it the way Pawl.Engine.Cost.payMana's own
--- haddock describes -- failure there is reachable, because a player who taps
--- their only Birds of Paradise for green cannot then pay {B} (#417, #56).
+--   * the payer chose to pay. Whether the payment then went THROUGH is the one
+--     place the answer is not the raw choice, and it is the reading that leaves
+--     the game where it started: Pawl.Engine.Cost.pay restores the entry state,
+--     so an Unpaid result is a complete no-op and no cost was paid to read a
+--     choice off. Nothing in the pool reaches it -- Mana Leak's {3} is GENERIC,
+--     so every tap pays it, and Merfolk Seer's {1}{U} is asked of a player who
+--     has just been found able to pay it. A cost reachable that way is the one
+--     Pawl.Engine.Cost.payMana's own haddock describes: a player who taps their
+--     only Birds of Paradise for green cannot then pay {B} (#417, #56).
 --
 -- The cost is paid AGAINST `source` rather than the resolving stack object: CR
 -- 113.7a keeps the source on the permanent, which is what a component naming
@@ -1530,24 +1531,37 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 --
 -- CR 118.13b's announcement -- how a symbol payable in multiple ways is being
 -- paid, chosen immediately before this payment -- is not made (#702).
-paid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
-paid resolving source idx cIdx legal clause = case Clause.unlessPaid clause of
-  Nothing -> pure False
-  Just gate -> do
-    gs <- State.get
-    let cost = UnlessPaid.cost gate
-    case payerOf (UnlessPaid.payer gate) legal gs of
-      Nothing -> pure False
-      Just payer ->
-        if not (Cost.canPay payer source cost gs)
-          then pure False
-          else do
-            decision <- Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
-            case decision of
-              PaymentDecision.Declines -> pure False
-              PaymentDecision.Pays -> do
-                outcome <- Cost.pay payer source cost
-                pure (outcome == Payment.Paid)
+payGateAdmits :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> Clause.Clause Card.Type.Card -> Game Bool
+payGateAdmits resolving source idx cIdx legal clause = case Clause.payGate clause of
+  Nothing -> pure True
+  Just gate -> fmap (branchTaken (PayGate.branch gate)) (payGatePaid resolving source idx cIdx legal gate)
+
+-- Which branch of CR 118.12 a payment outcome selects. The whole of the rule's
+-- polarity, in one comparison and off the classification a card states -- never
+-- off what the payment DID.
+branchTaken :: PayBranch.PayBranch -> Bool -> Bool
+branchTaken branch wasPaid = case branch of
+  PayBranch.IfPaid -> wasPaid
+  PayBranch.IfNotPaid -> not wasPaid
+
+-- The offer itself: was this gate's cost paid? The four outcomes payGateAdmits
+-- above lists, with the branch left to it.
+payGatePaid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName (Set Recipient) -> PayGate.PayGate -> Game Bool
+payGatePaid resolving source idx cIdx legal gate = do
+  gs <- State.get
+  let cost = PayGate.cost gate
+  case payerOf (PayGate.payer gate) legal gs of
+    Nothing -> pure False
+    Just payer ->
+      if not (Cost.canPay payer source cost gs)
+        then pure False
+        else do
+          decision <- Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
+          case decision of
+            PaymentDecision.Declines -> pure False
+            PaymentDecision.Pays -> do
+              outcome <- Cost.pay payer source cost
+              pure (outcome == Payment.Paid)
 
 -- Which player a resolution cost is offered to. ONE slot read answering in two
 -- ways, since a slot may hold either kind of recipient: a slot bound to a PLAYER

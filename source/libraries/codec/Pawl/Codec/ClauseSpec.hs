@@ -19,9 +19,10 @@ import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PayBranch as PayBranch
+import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
-import qualified Pawl.Types.UnlessPaid as UnlessPaid
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout, for
 -- 'Pawl.Codec.ModeSpec''s reason: the codec reaches it only through the supplied
@@ -39,7 +40,7 @@ fromJson :: Value.Value -> Either Text.Text (Clause.Clause Text.Text)
 fromJson = Codec.decode codec
 
 -- One constructor, so five cases: a populated clause, CR 603.5's `optionality`
--- flag when present, CR 118.12a's `unlessPaid` clause when present, CR 701.46a's
+-- flag when present, CR 118.12's `payGate` when present, CR 701.46a's
 -- `condition` gate when present, and every field defaulted at once.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Clause" $ do
@@ -60,8 +61,8 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       (Clause.MkClause Nothing Optionality.Optional Nothing Seq.empty)
       """ {"optionality":{"type":"Optional"}} """
   -- CR 118.12a: Mana Leak's "unless its controller pays {3}" is what the
-  -- unlessPaid key encodes, and it is emitted only when there is one.
-  Spec.it s "a clause carrying an unless-paid cost writes the key" $
+  -- payGate key encodes, and it is emitted only when there is one.
+  Spec.it s "a clause carrying a resolution cost writes the key" $
     Common.assertJsonCodec
       s
       toJson
@@ -70,14 +71,15 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
           Nothing
           Optionality.Mandatory
           ( Just
-              UnlessPaid.MkUnlessPaid
-                { UnlessPaid.payer = SlotName.MkSlotName (Text.pack "spell"),
-                  UnlessPaid.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []}
+              PayGate.MkPayGate
+                { PayGate.payer = SlotName.MkSlotName (Text.pack "spell"),
+                  PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
+                  PayGate.branch = PayBranch.IfNotPaid
                 }
           )
           (Seq.singleton (Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))))
       )
-      """ {"effects":[{"type":"Counter","value":"spell"}],"unlessPaid":{"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]}}} """
+      """ {"effects":[{"type":"Counter","value":"spell"}],"payGate":{"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfNotPaid"}}} """
   -- CR 701.46a: adapt's "if this permanent has no +1/+1 counters on it".
   Spec.it s "a clause carrying a condition writes the key" $
     Common.assertJsonCodec
