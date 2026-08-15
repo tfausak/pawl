@@ -2674,9 +2674,11 @@ returns kind =
 -- since rule 702.135a says "white and black" and a token has no mana cost to
 -- read a colour off (CR 105.2).
 --
--- Not implemented: CR 612.2a lets a text-changing effect swap the "Spirit" a
--- token-creating ability names, but the CR 613 layer fold rewrites PC.keywords
--- before this mint runs, so the swap never reaches the minted token (#1197).
+-- CR 612.2a's text change reaches the Spirit written here, even though the mint
+-- runs after the CR 613 layer fold: layer 3 records its pairs on the projection
+-- and Pawl.Engine.Projection.mintedTriggeredAbilitiesOf applies them to whatever
+-- this returns. Proven by Pawl.ResolveSpec's "CR 612.2a whole card: an evolved
+-- Ministrant of Obligation leaves Elves".
 --
 -- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
 -- is placed -- rule 702.135a leaves nothing to choose.
@@ -2782,9 +2784,9 @@ spiritToken =
 -- the tokens.
 --
 -- THE TOKEN IS MINTED HERE for afterlife's reason: rule 702.123a prints its
--- characteristics, so they are the rulebook's rather than the card's. #1197
--- reaches this token too -- a CR 612.2a text change of the word "Servo" never
--- arrives.
+-- characteristics, so they are the rulebook's rather than the card's. A CR 612.2a
+-- text change of the word "Servo" reaches it for afterlife's reason, through the
+-- same mintedTriggeredAbilitiesOf.
 --
 -- Single mode, no targets, ChooseExactly 1: pay or not is the only choice.
 fabricate :: Natural -> TriggeredAbility Card

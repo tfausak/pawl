@@ -8,6 +8,7 @@ import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
+import qualified Pawl.Codec.ChangeSubtypeWord as ChangeSubtypeWord
 import qualified Pawl.Codec.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Defense as Defense
@@ -42,6 +43,7 @@ codec = Fields.object $ do
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec Card.codec)) PC.activatedAbilities
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (ReplacementEffect.codec (Effect.codec Card.codec))) PC.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec Card.codec)) PC.triggeredAbilities
+  subtypeWordChanges <- Fields.defaulted "subtypeWordChanges" [] (Common.list ChangeSubtypeWord.codec) PC.subtypeWordChanges
   pure
     PC.MkProjectedCharacteristics
       { PC.names = names,
@@ -58,5 +60,6 @@ codec = Fields.object $ do
         PC.subtypes = subtypes,
         PC.activatedAbilities = activatedAbilities,
         PC.replacementEffects = replacementEffects,
-        PC.triggeredAbilities = triggeredAbilities
+        PC.triggeredAbilities = triggeredAbilities,
+        PC.subtypeWordChanges = subtypeWordChanges
       }
