@@ -2983,10 +2983,11 @@ filterReads f = case f of
 -- a different clause that lives in liveGiven.
 --
 -- ChangeSubtypeWord also rewrites PC.characteristicPT, and that is deliberately
--- not PowerA here: this asks what a modification writes IN ITS OWN LAYER, which is
--- the only comparison CR 613.8a clause (b) makes (writesByLayer). The rewritten
--- CDA is still an unevaluated pair at layer 3; the power it becomes is written at
--- 7a by applyCharacteristicPT, which is no gathered candidate at all.
+-- not PowerA here. This asks what a modification writes IN ITS OWN LAYER, which
+-- is the only comparison writesByLayer makes -- and the rewritten CDA is still an
+-- unevaluated pair at layer 3, its power written at 7a by applyCharacteristicPT,
+-- which is no gathered candidate at all. CR 613.8a clause (c) says the same thing
+-- from the rule's side: a CDA and a non-CDA effect are never dependent.
 modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.singleton Keywords

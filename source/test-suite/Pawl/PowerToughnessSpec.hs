@@ -516,9 +516,10 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   -- The two halves run in different layers, which is the whole of the ordering
   -- argument. ChangeSubtypeWord is layer 3 (CR 613.1c) and rewrites the
   -- UNEVALUATED quantity; applyCharacteristicPT determines it at layer 7a (CR
-  -- 613.4a). The last assertion is what shows the pair really is that way round:
-  -- an Island entering AFTER the Hack resolved still moves the P/T, which a swap
-  -- that had baked a number in at layer 3 could not do.
+  -- 613.4a). The third assertion is the ordering one: an Island entering AFTER
+  -- the Hack resolved still moves the P/T, which a swap that had baked a number
+  -- in at layer 3 could not do. A fence rather than a proof -- the rewrite
+  -- produces a Quantity and not a number, so no mutation of it can freeze one.
   --
   -- NO TWO READINGS OF THE CDA AGREE ON THIS BOARD. alice has 4 Swamps and 1
   -- Island, bob has 1 Swamp and 2 Islands, so "Swamps you control" is 4, "Islands
