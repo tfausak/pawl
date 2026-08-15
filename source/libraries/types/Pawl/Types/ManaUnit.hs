@@ -18,8 +18,11 @@ import qualified Pawl.Types.ProductionTag as ProductionTag
 -- Deliberately no source ObjectId. Snow cares about a PROPERTY of the source, not
 -- its identity, and a reference would dangle by construction: mana outlives its
 -- source, and CR 400.7 mints a fresh id on every zone change. Properties are
--- stamped at production time by Pawl.Engine.Mana.manaOptionsOfGiven, the one place
--- that knows both the source and the mana.
+-- stamped at production time, by whichever of the two producers is adding the
+-- mana: Pawl.Engine.Mana.manaOptionsOfGiven for a mana ability paid inline (CR
+-- 605.3b), and Pawl.Engine.Resolve's Effect.AddMana arm for an ability that
+-- resolves off the stack (CR 605.1b). Both read them from the same decider,
+-- Pawl.Engine.Mana.productionTagsGiven.
 data ManaUnit = MkManaUnit
   { manaType :: ManaType.ManaType,
     tags :: Set.Set ProductionTag.ProductionTag
