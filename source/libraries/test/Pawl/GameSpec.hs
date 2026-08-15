@@ -1882,11 +1882,23 @@ printingSpec s registry = Spec.describe s "PrintingTable" $ do
     let (pid, gs) = Game.intern mountain (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "printingOf" (Game.printingOf pid gs) (Just mountain)
 
-  Spec.it s "intern mints a distinct id per call" $ do
+  -- The property Pawl.Engine.Commander.isCommander rests on: a designation and
+  -- an object naming one printing name one id, however many times either was
+  -- interned.
+  Spec.it s "intern is idempotent for a printing already in the table" $ do
     mountain <- S.printingOf s registry "Mountain"
     let (a, gs1) = Game.intern mountain (Setup.emptyGame S.bothPlayers)
-        (b, _) = Game.intern mountain gs1
+        (b, gs2) = Game.intern mountain gs1
+    Spec.assertEqWith s "same id" a b
+    Spec.assertEqWith s "and no second entry" (Map.size (GameState.printings gs2)) 1
+
+  Spec.it s "intern mints a distinct id for a distinct printing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (a, gs1) = Game.intern mountain (Setup.emptyGame S.bothPlayers)
+        (b, gs2) = Game.intern piker gs1
     Spec.assertBool s (a /= b) "ids differ"
+    Spec.assertEqWith s "two entries" (Map.size (GameState.printings gs2)) 2
 
   Spec.it s "an unminted id names nothing" $
     Spec.assertEqWith
