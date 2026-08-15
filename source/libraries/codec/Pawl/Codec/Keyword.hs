@@ -66,6 +66,7 @@ codec =
       Arm.payload "Modular" Common.natural Keyword.Modular (\x -> case x of Keyword.Modular y -> Just y; _ -> Nothing),
       Arm.payload "Bushido" Common.natural Keyword.Bushido (\x -> case x of Keyword.Bushido y -> Just y; _ -> Nothing),
       Arm.payload "Soulshift" Common.natural Keyword.Soulshift (\x -> case x of Keyword.Soulshift y -> Just y; _ -> Nothing),
+      Arm.payload "Bloodthirst" Common.natural Keyword.Bloodthirst (\x -> case x of Keyword.Bloodthirst y -> Just y; _ -> Nothing),
       Arm.nullary "Haunt" Keyword.Haunt,
       Arm.nullary "SplitSecond" Keyword.SplitSecond,
       Arm.payload "Vanishing" Common.natural Keyword.Vanishing (\x -> case x of Keyword.Vanishing y -> Just y; _ -> Nothing),
