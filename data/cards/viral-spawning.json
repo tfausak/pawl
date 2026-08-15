@@ -94,15 +94,33 @@
                 "type": "AtLeast"
               },
               "measured": {
-                "type": "PlayerCounters",
+                "type": "Count",
                 "value": {
-                  "kind": {
-                    "type": "Poison"
-                  },
-                  "player": {
-                    "type": "Relative",
+                  "aggregation": {
+                    "type": "Greatest",
                     "value": {
-                      "type": "Opponent"
+                      "type": "PlayerCounters",
+                      "value": {
+                        "kind": {
+                          "type": "Poison"
+                        },
+                        "player": {
+                          "type": "Candidate"
+                        }
+                      }
+                    }
+                  },
+                  "filter": {
+                    "type": "And",
+                    "value": []
+                  },
+                  "scope": {
+                    "type": "OverPlayers",
+                    "value": {
+                      "type": "Relative",
+                      "value": {
+                        "type": "Opponent"
+                      }
                     }
                   }
                 }
