@@ -323,9 +323,10 @@ payLife pid n gs =
       }
 
 -- CR 110.5b: stamp the tapped status onto an entering permanent, the write shared
--- by EntryRewrite.Tapped (CR 614.1d) and by EntryRewrite.PayLifeOrTapped's
--- declining half (CR 614.1c) -- which is why it is one function: the two
--- sentences differ in what they charge and not in what they leave on the board.
+-- by EntryRewrite.Tapped (CR 614.1d) and by the declining half of both
+-- EntryRewrite.PayLifeOrTapped and EntryRewrite.RevealOrTapped (CR 614.1c) --
+-- which is why it is one function: those sentences differ in what they charge and
+-- not in what they leave on the board.
 --
 -- ENTERS TAPPED, not "enters, then is tapped". The status goes straight onto the
 -- object rather than through the tap funnel, so the permanent never transitions
@@ -1224,7 +1225,7 @@ apply batch candidate event =
           Just controller -> do
             -- The hand is read HERE, at CR 614.12a's moment, and not off any
             -- earlier snapshot: an entry replacement applied before this one can
-            -- have moved a card (CR 614.13a), and the offer must be what the
+            -- have moved a card (CR 614.13), and the offer must be what the
             -- player actually holds as the choice is made.
             let candidates = Replacement.revealableFromHand controller filter_ gs
             answer <- case NonEmpty.nonEmpty candidates of
@@ -1236,7 +1237,10 @@ apply batch candidate event =
               Just offered -> Game.choose (Prompt.ChooseRevealOnEntry (Decide.deciderFor controller gs) controller oid offered)
             -- FILTERED, NOT TRUSTED, AsCopy's posture above: this list is the only
             -- thing enforcing the printed criterion, so honouring an unoffered
-            -- answer would let any card in hand keep the land untapped.
+            -- answer would let any card in hand keep the land untapped. A
+            -- REGRESSION FENCE rather than proven behaviour -- the offer is the
+            -- only thing an ordinary game answers from, so it takes a transcript
+            -- naming a card that was never offered to reach the refusal.
             case answer of
               Just shown | List.elem shown candidates -> reveal RevealCause.Ordinary controller shown
               _ -> enterTapped oid
@@ -3391,11 +3395,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- WAY", and CR 603.11 is what makes the two halves one ability.
   --
   -- The Ordinary arm is a REGRESSION FENCE rather than proven behaviour, and so
-  -- is `revealedInHand`'s: no printing reveals a card in a HAND for any other
-  -- reason -- an activation cost paid from a hidden zone is the pool's only
-  -- ordinary hand reveal, and no card carries both miracle and such an ability --
-  -- so no board tells the two readings apart, and neither gate can be broken on
-  -- its own while the other stands. Written because the rule says it.
+  -- is `revealedInHand`'s: the pool's ordinary hand reveals -- an activation cost
+  -- paid from a hidden zone, and CR 614.1c's as-enters reveal (Rustic Clachan) --
+  -- are on cards that carry no miracle, so no board tells the two readings apart
+  -- and neither gate can be broken on its own while the other stands. Written
+  -- because the rule says it.
   --
   -- The id in the event is the incarnation that reached the hand, which is the
   -- object the hand source offers as the bearer -- no CR 400.7 step separates

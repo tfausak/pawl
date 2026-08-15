@@ -440,8 +440,11 @@ affects source oid a partial gs = case a of
             && Filter.matches (Filter.contextFor (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller (countersOf oid gs) gs) f
     _ -> False
 
--- The characteristics view of a battlefield/stack object: its CR 613 projection
--- and its projected controller (CR 613.1b; Nothing when the id is unknown).
+-- The characteristics view of an object: its CR 613 projection and its projected
+-- controller (CR 613.1b; Nothing when the id is unknown). Battlefield and stack
+-- objects are most of the callers, but rule 613.1 names no zone -- Resolve's CR
+-- 701.23a library search and Replacement.revealableFromHand's CR 614.1c hand
+-- offer read a card in a hidden zone through this same view.
 viewOfObject :: ObjectId -> GameState -> Filter.View
 viewOfObject oid gs = viewOfObjectGiven Map.empty (controlGrants gs) oid gs
 

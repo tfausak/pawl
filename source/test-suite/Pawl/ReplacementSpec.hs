@@ -2406,7 +2406,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
       [permId] -> do
         Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
         Spec.assertEqWith s "and the non-Kithkin card was not shown" (S.revealsOf played) []
-        Spec.assertEqWith s "no ChooseRevealOnEntry was raised (CR 614.12a: nothing to choose)" (revealAsks (answersFor (revealOnEntryAnswer (Just heroId)) board Engine.priorityLoop)) 0
+        Spec.assertEqWith s "and no ChooseRevealOnEntry was raised -- nothing in hand to show" (revealAsks (answersFor (revealOnEntryAnswer (Just heroId)) board Engine.priorityLoop)) 0
         Spec.assertEqWith
           s
           "so the {W} creature in hand stays there"
