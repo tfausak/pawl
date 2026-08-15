@@ -7,6 +7,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -3804,7 +3805,7 @@ abilitiesFromCharacteristics pc oid gs =
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none --
 -- except the shield pair, which no layer can reach; see shieldOf.
-replacementsOf :: ObjectId -> GameState -> [ReplacementEffect]
+replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
 replacementsOf oid gs =
   let pc = project oid gs
    in PC.replacementEffects pc <> intrinsicReplacementsOf pc <> shieldOf oid gs
@@ -3835,7 +3836,7 @@ replacementsOf oid gs =
 -- Pawl.Types.Recipient TAG -- which says how the damage reached the permanent (CR
 -- 510.1b), not which permanent it reached, so a shield baked as ToCreature would
 -- miss the damage an attacker assigns to the same permanent as a planeswalker.
-shieldOf :: ObjectId -> GameState -> [ReplacementEffect]
+shieldOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
 shieldOf oid gs =
   if shieldCounters oid gs == 0
     then []
@@ -3846,9 +3847,17 @@ shieldOf oid gs =
               DamagePattern.MkDamagePattern
                 { DamagePattern.whichKind = Nothing,
                   DamagePattern.whatSource = Filter.Type.And [],
+                  -- Rule 122.1c's own recipient is the permanent the pair was
+                  -- minted onto, which the CR 616.1 loop already scopes by
+                  -- source -- so neither recipient field says anything.
+                  DamagePattern.whatRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing
                 }
               DamageRewrite.PreventRemovingShieldCounter
+              -- CR 615.5: rule 122.1c's counter removal is part of the REWRITE
+              -- (DamageRewrite.PreventRemovingShieldCounter), not an additional
+              -- effect a card wrote, so this minted row carries no riders.
+              Seq.empty
           )
       ]
 
@@ -3904,7 +3913,7 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- TURNED-FACE-UP row through the same call. It needs no gathering of its own,
 -- because the CR 616.1 loop matches every gathered row against the event it is
 -- offered -- so a row of one class simply never applies to an event of another.
-intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
+intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
 intrinsicReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
   -- is Filter.IsSource.
@@ -3949,7 +3958,7 @@ intrinsicReplacementsOf pc =
 -- Past the short-circuit this projects per permanent rather than threading one
 -- board, so a board holding any replacement effect pays a fresh gather per
 -- permanent (#435).
-replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect)]
+replacementsAffecting :: GameState -> [(ObjectId, ReplacementEffect (Effect.Effect Card.Type.Card))]
 replacementsAffecting gs =
   let onBattlefield = Set.toList (GameState.battlefield gs)
       -- CR 122.1c's pair is minted from the permanent's COUNTERS, so it is on no

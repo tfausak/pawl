@@ -122,7 +122,7 @@ data Face card = MkFace
     -- | CR 614: this face's replacement effects, active while it is on the
     -- battlefield. Read through Pawl.Engine.Projection.replacementsOf (never
     -- directly) so layer 6 LoseAllAbilities strips them uniformly.
-    replacementEffects :: [ReplacementEffect.ReplacementEffect],
+    replacementEffects :: [ReplacementEffect.ReplacementEffect (Effect.Effect card)],
     -- | CR 603: this face's triggered abilities, read through
     -- Pawl.Engine.Projection.triggeredAbilitiesOf.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility card],

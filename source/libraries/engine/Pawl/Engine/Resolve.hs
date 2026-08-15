@@ -2265,9 +2265,19 @@ installDamageRow players controller source duration kind rewrite rider g recipie
                           -- effect is created and which this arm would have to bake
                           -- the way it bakes the recipient (#1327).
                           DamagePattern.whatSource = Filter.Type.And [],
+                          -- The recipient is BAKED as an id below rather than
+                          -- described: this row is installed by a resolution
+                          -- that has already chosen the permanent or player it
+                          -- shields, so there is nothing for a filter to say.
+                          DamagePattern.whatRecipient = Nothing,
                           DamagePattern.whichRecipient = Just recipient
                         }
                       rewrite
+                      -- CR 615.5's rider on THIS carrier is the snapshotted one
+                      -- on the row below, since the installing spell's targets
+                      -- and its "you" cannot be re-derived later; the authored
+                      -- field here stays empty.
+                      Seq.empty
                   ),
               ActiveReplacement.source = source,
               -- CR 109.5, baked as Replace's is: nothing reads it on one of
@@ -4117,7 +4127,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     --
     -- Its own opcode rather than an Effect.Replace carrying a DamageR, for the
     -- reason Effect.PreventNextDamage's own comment gives: the pattern has to
-    -- name the shielded permanent or player, which card data cannot. Everything
+    -- name the shielded permanent or player by id, which card data cannot. Everything
     -- ELSE about the row is Replace's -- Resolve bakes the source (CR 113.7),
     -- CR 109.5's controller and a fresh timestamp the same way.
     --

@@ -83,7 +83,7 @@ codec cardCodec = Fields.object $ do
   spell <- Fields.defaulted "spell" Face.defaultSpell (Modal.codec cardCodec) Face.spell
   staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list StaticAbility.codec) Face.staticAbilities
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec cardCodec)) Face.activatedAbilities
-  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list ReplacementEffect.codec) Face.replacementEffects
+  replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (ReplacementEffect.codec (Effect.codec cardCodec))) Face.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec cardCodec)) Face.triggeredAbilities
   delayedAbilities <- Fields.defaulted "delayedAbilities" Map.empty (TriggeredAbility.codecDelayed cardCodec) Face.delayedAbilities
   -- CR 309.4: the rooms of a dungeon card, topmost first.

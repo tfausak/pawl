@@ -56,9 +56,9 @@ data DamageRewrite
     -- rider, because the counter removal is not an additional EFFECT: rule 122.1c
     -- is one sentence of the rulebook, so what it removes is fixed and needs
     -- neither Pawl.Types.PreventionRider's snapshotted targets nor its
-    -- controller. That also keeps it clear of #1105 -- this pair is minted, not
-    -- printed as a static ability, so it never needed a field on
-    -- Pawl.Types.ReplacementEffect to carry a program in.
+    -- controller. So it needs none of DamageR.riders either: this pair is
+    -- minted rather than printed, and a rule's own removal is not a card's
+    -- additional effect.
     --
     -- Prevents the WHOLE event for one counter, whatever its amount: unlike CR
     -- 615.7's PreventNext below, rule 122.1c counts events rather than damage, so

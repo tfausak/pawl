@@ -1,5 +1,6 @@
 module Pawl.Codec.ReplacementEffect where
 
+import qualified Data.Typeable as Typeable
 import qualified Pawl.Codec.CounterR as CounterR
 import qualified Pawl.Codec.DamageR as DamageR
 import qualified Pawl.Codec.DestructionRewrite as DestructionRewrite
@@ -14,12 +15,18 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 
 -- | The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
-codec :: Codec.Codec ReplacementEffect.ReplacementEffect
-codec =
+--
+-- The effect codec is a PARAMETER rather than an import, for the reason
+-- Pawl.Types.DamageR gives: the DamageR arm carries CR 615.5's riders.
+codec ::
+  (Typeable.Typeable effect, Eq effect) =>
+  Codec.Codec effect ->
+  Codec.Codec (ReplacementEffect.ReplacementEffect effect)
+codec effectCodec =
   Arm.tagged
     [ Arm.payload "ZoneChangeR" ZoneChangeR.codec ReplacementEffect.ZoneChangeR (\x -> case x of ReplacementEffect.ZoneChangeR y -> Just y; _ -> Nothing),
       Arm.payload "EntryR" EntryR.codec ReplacementEffect.EntryR (\x -> case x of ReplacementEffect.EntryR y -> Just y; _ -> Nothing),
-      Arm.payload "DamageR" DamageR.codec ReplacementEffect.DamageR (\x -> case x of ReplacementEffect.DamageR y -> Just y; _ -> Nothing),
+      Arm.payload "DamageR" (DamageR.codec effectCodec) ReplacementEffect.DamageR (\x -> case x of ReplacementEffect.DamageR y -> Just y; _ -> Nothing),
       Arm.payload "DestructionR" DestructionRewrite.codec ReplacementEffect.DestructionR (\x -> case x of ReplacementEffect.DestructionR y -> Just y; _ -> Nothing),
       Arm.payload "CounterR" CounterR.codec ReplacementEffect.CounterR (\x -> case x of ReplacementEffect.CounterR y -> Just y; _ -> Nothing),
       Arm.payload "TokenR" TokenR.codec ReplacementEffect.TokenR (\x -> case x of ReplacementEffect.TokenR y -> Just y; _ -> Nothing),
