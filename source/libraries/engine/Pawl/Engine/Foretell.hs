@@ -34,6 +34,7 @@ import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -146,7 +147,7 @@ foretell pid oid = do
   if not (canForetell pid oid before)
     then pure ()
     else do
-      payment <- Cost.pay pid oid actionCost
+      payment <- Cost.pay ManaSpending.AsProduced pid oid actionCost
       case payment of
         Payment.Unpaid -> State.put before
         Payment.Paid -> do

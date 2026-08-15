@@ -117,6 +117,7 @@ import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
@@ -736,7 +737,7 @@ effectCounts effect = case effect of
   -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
   -- "for as long as you control this creature" is a Count, and dropping it here
   -- would take its Filters out of the lint with it.
-  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration _) -> durationCounts duration
+  Effect.GrantPlayFromExile grant -> durationCounts (GrantPlayFromExile.duration grant)
   -- CR 608.2f's body is an effect list a card authors, so its Counts are this
   -- card's -- the rider's recursion one opcode over.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectCounts body
@@ -2657,7 +2658,7 @@ effectFilters effect = case effect of
   -- Both, as GainControl's arm does: the Duration's Condition carries Victor
   -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
   -- take them out of the lint without failing anything.
-  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> unframed (durationFilters duration <> objectRefFilters ref)
+  Effect.GrantPlayFromExile grant -> unframed (durationFilters (GrantPlayFromExile.duration grant) <> objectRefFilters (GrantPlayFromExile.ref grant))
   -- The swept ref's Filters AND the body's, the rider's shape: a nested effect
   -- list is exactly what this traversal must not stop at.
   Effect.ForEach (ForEach.MkForEach ref _ body) -> unframed (objectRefFilters ref) <> concatMap effectFilters body

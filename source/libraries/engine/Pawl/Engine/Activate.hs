@@ -35,6 +35,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
@@ -349,14 +350,14 @@ payableCostGiven sources pcs = payableCostAtGiven sources pcs 0
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x pid srcId gs cost =
   let adjustments = Cost.activationAdjustments pid srcId gs
-   in Cost.canPaySomeCompletion pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+   in Cost.canPaySomeCompletion ManaSpending.AsProduced pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAtGiven sources pcs x pid srcId gs cost =
   let adjustments = Cost.activationAdjustments pid srcId gs
-   in Cost.canPaySomeCompletionGiven sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
+   in Cost.canPaySomeCompletionGiven ManaSpending.AsProduced sources pcs pid srcId (Cost.totalManas adjustments) (Cost.plusComponents adjustments (Cost.substituteX x cost)) gs
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
 -- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,
@@ -605,7 +606,7 @@ activateAbility pid srcId ability = do
           -- so a Phyrexian symbol offered without the added "Sacrifice a land"
           -- in view would be offered against a board that has one land too many.
           let gathered = Cost.activationAdjustments pid srcId gs
-          announcedCost <- Cost.announce pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
+          announcedCost <- Cost.announce ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
           let slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
               sets = Target.legalSets (Just pid) srcId slots gs
           chosen <- Target.chooseTargets decider pid abilId slots sets
@@ -653,7 +654,7 @@ activateAbility pid srcId ability = do
               -- mis-tapped colour is a choice the engine must honour (Cost.payMana).
               -- Reject-not-repair restores the whole activation, including the
               -- ability object this function put on the stack.
-              payment <- Cost.pay pid srcId paidCost
+              payment <- Cost.pay ManaSpending.AsProduced pid srcId paidCost
               case payment of
                 -- CR 606.3: record that a loyalty ability of THIS PERMANENT was
                 -- activated, which is the whole of the once-per-turn limit's storage

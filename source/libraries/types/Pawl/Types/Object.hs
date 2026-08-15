@@ -299,7 +299,8 @@ data Object = MkObject
     -- is bounced and replayed has been world only since it returned.
     worldSince :: Maybe Timestamp.Timestamp,
     -- | CR 601.3: the standing permission to play this card, as the player who
-    -- holds it and the duration it lasts. Nothing for every object nothing has
+    -- holds it, the duration it lasts and how they may spend mana for it (CR
+    -- 118.14). Nothing for every object nothing has
     -- permitted, which is almost all of them -- and for an adventurer card that
     -- reached exile some other way, which is what CR 715.3d's own ruling ("if an
     -- adventurer card ends up in exile for any other reason") means.

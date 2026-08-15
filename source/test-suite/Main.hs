@@ -109,6 +109,7 @@ import qualified Pawl.Codec.FaceSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.ForEachSpec
 import qualified Pawl.Codec.GameEventSpec
+import qualified Pawl.Codec.GrantPlayFromExileSpec
 import qualified Pawl.Codec.GraveyardScopeSpec
 import qualified Pawl.Codec.HalfUnlockedSpec
 import qualified Pawl.Codec.HalvedSpec
@@ -128,6 +129,7 @@ import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaCountSpec
 import qualified Pawl.Codec.ManaFilterSpec
 import qualified Pawl.Codec.ManaProductionSpec
+import qualified Pawl.Codec.ManaSpendingSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.MentoredSpec
@@ -488,6 +490,7 @@ spec s registry = do
   Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
   Pawl.Codec.GameEventSpec.spec s
+  Pawl.Codec.GrantPlayFromExileSpec.spec s
   Pawl.Codec.GraveyardScopeSpec.spec s
   Pawl.Codec.HalfUnlockedSpec.spec s
   Pawl.Codec.HalvedSpec.spec s
@@ -507,6 +510,7 @@ spec s registry = do
   Pawl.Codec.ManaCountSpec.spec s
   Pawl.Codec.ManaFilterSpec.spec s
   Pawl.Codec.ManaProductionSpec.spec s
+  Pawl.Codec.ManaSpendingSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
   Pawl.Codec.MentoredSpec.spec s

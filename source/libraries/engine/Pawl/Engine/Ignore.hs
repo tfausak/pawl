@@ -24,6 +24,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
@@ -99,7 +100,7 @@ ignore pid oid = do
   case ignoreCostOf oid before of
     Nothing -> pure ()
     Just cost -> do
-      payment <- Cost.pay pid oid cost
+      payment <- Cost.pay ManaSpending.AsProduced pid oid cost
       case payment of
         Payment.Unpaid -> State.put before
         Payment.Paid ->

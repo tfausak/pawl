@@ -1,6 +1,7 @@
 module Pawl.Types.ExilePlayPermission where
 
 import qualified Pawl.Types.Expiry as Expiry
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
@@ -36,12 +37,23 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- 715.3d's Adventure permission takes it, and CR 400.7 rather than a sweep is
 -- what ends that one.
 --
+-- `spending` is CR 118.14's "mana of any type can be spent to cast that spell",
+-- which Dire Fleet Daredevil prints in the same sentence as the permission --
+-- and that rule puts it here rather than on the player: "if that effect also
+-- gives a player permission to cast spells, this applies only to mana that
+-- player spends to cast spells that way". One permission, one card, one player,
+-- so the rider expires exactly when the permission does and needs no sweep of
+-- its own. CR 609.4b is the limit on what it may do -- it changes neither the
+-- cost nor what mana was actually spent -- and Pawl.Engine.Mana.relax is the one
+-- place that reads it.
+--
 -- Runtime-only: no codec. A permission is written by a resolution and never
 -- printed on a card, and Object -- the only thing that holds one -- has no codec
 -- either.
 data ExilePlayPermission = MkExilePlayPermission
   { player :: PlayerId.PlayerId,
     source :: ObjectId.ObjectId,
-    expiry :: Expiry.Expiry
+    expiry :: Expiry.Expiry,
+    spending :: ManaSpending.ManaSpending
   }
   deriving (Eq, Ord, Show)

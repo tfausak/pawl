@@ -31,6 +31,7 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -123,7 +124,7 @@ plot pid oid = do
   if not (canPlot pid oid before)
     then pure ()
     else do
-      payment <- Cost.pay pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
+      payment <- Cost.pay ManaSpending.AsProduced pid oid (Maybe.fromMaybe Cost.unpayable (plotCostOf oid before))
       case payment of
         Payment.Unpaid -> State.put before
         Payment.Paid -> do
