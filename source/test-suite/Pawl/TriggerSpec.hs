@@ -164,7 +164,10 @@
 -- BYSTANDER -- "whenever another creature you control dies", where the bearer
 -- watches a permanent other than itself leave the battlefield -- with Meren of
 -- Clan Nel Toth, which is also the pool's producer for CR 122.1's experience
--- counters -- `permanentDiesSpec`, and the pool's first READER of that same
+-- counters -- `permanentDiesSpec`. That card's OTHER ability, a CR 603.2b step
+-- trigger on CR 513's end step whose destination depends on a comparison, and
+-- so the pool's first two-clause "if ... otherwise" -- `merenEndStepSpec`, and
+-- the pool's first READER of that same
 -- counter kind, whose two triggers are CR 603.6a's entry form narrowed by a
 -- power floor and a CR 603.2b step trigger whose Quantity counts a player's
 -- counters, with Ezuri, Claw of Progress -- `ezuriExperienceSpec`. CR 119.9's life-gain trigger, from both
@@ -7168,10 +7171,9 @@ diesTriggerSpec s registry =
 -- credited back to the player who no longer had it. The Control Magic case at
 -- the end is that falsifier.
 --
--- Meren's SECOND ability -- "At the beginning of your end step, choose target
--- creature card in your graveyard. If that card's mana value is less than or
--- equal to the number of experience counters you have, return it to the
--- battlefield. Otherwise, put it into your hand." -- is not transcribed (#614).
+-- Meren's SECOND ability -- the end-step reanimation -- is `merenEndStepSpec`
+-- below; the last assertion in this group is what keeps the two from drifting
+-- onto different cards.
 --
 -- Two cases here kill the bearer and another creature in one batch, and they are
 -- a PAIR: CR 704.3 makes Day of Judgment's deaths one event, so Meren sees the
@@ -7374,14 +7376,160 @@ permanentDiesSpec s registry =
           Spec.assertEqWith s "alice controlled it as it died" (Projection.controllerOf pikerId stolen) (Just S.alice)
           Spec.assertEqWith s "so her Meren triggered" (sourcesOf died) [TriggerSource.OfObject merenId]
         -- The condition is the card's, not this spec's: the printed Filter is
-        -- what the matcher is asked about everywhere above.
+        -- what the matcher is asked about everywhere above. The second entry is
+        -- the end-step ability merenEndStepSpec below plays out, and it is
+        -- asserted here so the two groups cannot drift onto different cards.
         Spec.it s "Meren's printed condition is PermanentDies over another creature you control" $ do
           meren <- S.printingOf s registry "Meren of Clan Nel Toth"
           Spec.assertEqWith
             s
-            "one triggered ability, with that condition"
+            "two triggered abilities, the first with that condition"
             (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.combinedFace meren)))
-            [TriggerCondition.PermanentDies anotherCreatureYouControl]
+            [ TriggerCondition.PermanentDies anotherCreatureYouControl,
+              TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
+            ]
+
+-- Meren of Clan Nel Toth's SECOND ability, the half permanentDiesSpec above does
+-- not cover: "At the beginning of your end step, choose target
+-- creature card in your graveyard. If that card's mana value is less than or
+-- equal to the number of experience counters you have, return it to the
+-- battlefield. Otherwise, put it into your hand."
+--
+-- A CR 603.2b step trigger on CR 513's end step, a CR 115.2 clause (a) target in
+-- a graveyard (Raise Dead's pool), and a destination that depends on a
+-- comparison. That last part is the reason this card sat half-transcribed: the
+-- ISA has no branch, and #614 proposed a purpose-built two-destination opcode
+-- for it. It needs no such opcode. CR 608.2e's clause is already the unit a condition
+-- rides (Pawl.Types.Clause.condition), so the printed sentence is TWO clauses of
+-- one mode sharing one target slot, each gated by one half of the comparison --
+-- and Resolve.gateHolds reads each gate as its own clause is applied (CR
+-- 608.2c's written order), never once up front.
+--
+-- The two gates are exclusive by ARITHMETIC rather than by negation: CR 202.3's
+-- mana value and a counter tally are whole numbers, so "greater than n" is
+-- "at least n + 1", which is how Pawl.Engine.Keyword.evolve spells rule 702.100a's
+-- own strict comparison. Pawl.Types.Condition has no Not, and wanting one here
+-- would be the wrong instinct anyway: Condition.holds reads an unanswerable
+-- quantity as False, so a negated gate would fire on the very board where the
+-- first clause had already moved the card out from under it.
+--
+-- That same ordering makes the "+ 1" itself UNOBSERVABLE, and no case below
+-- proves it: on the one board where strict and non-strict differ -- an equal
+-- mana value and count -- the first clause has already moved the card, so the
+-- second clause's slot names an id CR 400.7 retired and the move is a no-op
+-- either way. Dropping the "+ 1" leaves this whole group green. It is written
+-- strictly because that is what the card says, not because a case fences it.
+--
+-- The cases below vary ONE thing, the experience-counter count -- 3, then 1, then
+-- 2 -- over one board and one target of mana value 2, and the branches land the
+-- card in different ZONES, so no arithmetic slip can make one read as the other.
+-- On the count-of-3 board every other number differs from it: Meren's own mana
+-- value is 4, the Thragtusk beside the target in the graveyard is 5, the Bonded
+-- Construct on the battlefield is 1, and alice controls 2 creatures -- so a gate
+-- reading the SOURCE's mana value, the wrong slot's, or the board's population
+-- rather than the counters lands in a zone that case does not accept. The
+-- count-of-1 board is the otherwise branch and the count-of-2 board the printed
+-- boundary.
+merenEndStepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+merenEndStepSpec s registry =
+  let experienceOf = S.playerCounterOf PlayerCounterKind.Experience
+      pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      -- alice's end step, staged directly as ezuriExperienceSpec stages its
+      -- beginning of combat: Engine.runStep is what writes the CR 603.2b
+      -- StepBegan record this trigger matches.
+      atEndStep pid gs =
+        gs
+          { GameState.phase = Phase.Ending EndingStep.EndStep,
+            GameState.activePlayer = pid,
+            GameState.priority = Just pid
+          }
+      -- alice's Meren and a Bonded Construct on the battlefield, her Goblin Piker
+      -- (mana value 2) and Thragtusk (mana value 5) in her graveyard, her hand
+      -- empty. Everything is ARRANGED rather than cast, so no entry gives out an
+      -- experience counter of its own and every counter is one a case put there.
+      board = do
+        meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+        construct <- S.printingOf s registry "Bonded Construct"
+        piker <- S.printingOf s registry "Goblin Piker"
+        thragtusk <- S.printingOf s registry "Thragtusk"
+        let (_, withMeren) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+            (_, withConstruct) = S.addCreature construct S.alice withMeren
+            (pikerId, withPiker) = S.addGraveyardCard piker S.alice withConstruct
+            (thragtuskId, gs) = S.addGraveyardCard thragtusk S.alice withPiker
+        pure (pikerId, thragtuskId, gs)
+      -- The Piker by id rather than by S.identityAnswer's least Recipient, which
+      -- would take whichever graveyard card sorts first.
+      aimAt oid p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+        _ -> S.identityAnswer p
+      -- The one knob: how many experience counters alice has as her end step
+      -- begins. Everything else about the two boards is the same object graph.
+      withExperience n = do
+        (pikerId, thragtuskId, base) <- board
+        let gs = S.addPlayerCounter PlayerCounterKind.Experience n S.alice base
+        pure (pikerId, thragtuskId, gs, S.runPure (aimAt pikerId) (atEndStep S.alice gs) (Engine.runStep >> Engine.priorityLoop))
+   in Spec.describe s "Meren of Clan Nel Toth's end step" $ do
+        -- The mana value is AT MOST the count, so the first clause's gate holds
+        -- and the card is reanimated. The second clause's gate -- 2 at least 4 --
+        -- is then false, and the hand stays empty. That assertion is about the
+        -- BOARD rather than about the gate: per the note above, a second gate that
+        -- held would no-op anyway on the id the first clause retired.
+        Spec.it s "CR 603.2b mana value 2 against three experience counters returns the card to the battlefield" $ do
+          (pikerId, thragtuskId, before, after) <- withExperience 3
+          Spec.assertEqWith s "alice has three experience counters as the step begins" (experienceOf S.alice before) 3
+          Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard (CR 400.7)"
+          Spec.assertEqWith s "and a Goblin Piker is on the battlefield under her control" (S.countOnBattlefieldByName pikerName S.alice after) 1
+          Spec.assertEqWith s "her hand is still empty, so the otherwise clause did not also fire" (S.handSize S.alice after) 0
+          Spec.assertBool s (elem thragtuskId (Game.zoneMembers Zone.Graveyard S.alice after)) "the untargeted Thragtusk stayed in the graveyard"
+          Spec.assertEqWith s "and reading the counters did not spend them" (experienceOf S.alice after) 3
+        -- The other branch, one counter instead of three: 2 is not at most 1, so
+        -- the first gate fails and the second -- 2 is at least 1 + 1 -- carries
+        -- the card to the hand instead. The battlefield assertion is what makes
+        -- this the OTHER branch rather than a trigger that did nothing.
+        Spec.it s "CR 603.2b the same card against one experience counter goes to the hand instead" $ do
+          (pikerId, thragtuskId, before, after) <- withExperience 1
+          Spec.assertEqWith s "alice has one experience counter as the step begins" (experienceOf S.alice before) 1
+          Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard"
+          Spec.assertEqWith s "no Goblin Piker reached the battlefield" (S.countOnBattlefieldByName pikerName S.alice after) 0
+          Spec.assertEqWith s "alice's hand holds exactly one card" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "and it is the Piker" (S.countByName pikerName S.alice after) 1
+          Spec.assertBool s (elem thragtuskId (Game.zoneMembers Zone.Graveyard S.alice after)) "the untargeted Thragtusk stayed in the graveyard"
+        -- The BOUNDARY the printed "less than or equal to" names, which neither
+        -- case above sits on: the count equals the mana value, and the card is
+        -- reanimated rather than bounced. This case alone does not discriminate a
+        -- gate that counted the board -- 2 is also alice's creature count, and
+        -- deliberately so, since the boundary is what fixes the number -- which is
+        -- what the two cases above are for.
+        Spec.it s "CR 603.2b an equal mana value and count take the battlefield branch, not the otherwise one" $ do
+          (pikerId, _, _, after) <- withExperience 2
+          Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard"
+          Spec.assertEqWith s "a Goblin Piker is on the battlefield" (S.countOnBattlefieldByName pikerName S.alice after) 1
+          Spec.assertEqWith s "and her hand is empty" (S.handSize S.alice after) 0
+        -- CR 115.2 clause (a) and CR 603.3d, which hands a triggered ability's
+        -- targeting to CR 601.2c: the choice is a real one. Both
+        -- creature cards in alice's own graveyard are offered and nothing else
+        -- is, so the cases above are answered by the pinned target rather than by
+        -- a pool with one member the engine could not get wrong.
+        Spec.it s "CR 115.2 both creature cards in her graveyard are offered, and neither of bob's" $ do
+          (pikerId, thragtuskId, base) <- board
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, withBolt) = S.addGraveyardCard bolt S.alice base
+              (theirs, gs) = S.addGraveyardCard piker S.bob withBolt
+              recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Natural, Set.Set Recipient.Recipient)] r
+              recordTargets p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> do
+                  State.modify' (<> [sets])
+                  pure (aimAt pikerId p)
+                _ -> pure (aimAt pikerId p)
+              (_, offered) =
+                State.runState (Engine.runGame recordTargets (atEndStep S.alice gs) (Engine.runStep >> Engine.priorityLoop)) []
+          Spec.assertEqWith
+            s
+            "one target slot, offering exactly the two creature cards in alice's graveyard"
+            (fmap (fmap snd . Map.elems) offered)
+            [[Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject thragtuskId]]]
+          Spec.assertBool s (elem theirs (Game.zoneMembers Zone.Graveyard S.bob gs)) "bob's identical Piker was in his graveyard to be excluded (CR 400.1)"
 
 -- CR 603.6c's FIRST written form, and the whole of its first clause:
 -- "Leaves-the-battlefield abilities trigger when a permanent moves from the
@@ -11090,6 +11238,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   serraAvatarSpec s registry
   diesTriggerSpec s registry
   permanentDiesSpec s registry
+  merenEndStepSpec s registry
   leavesBattlefieldSpec s registry
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry
