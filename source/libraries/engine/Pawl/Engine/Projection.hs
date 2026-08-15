@@ -2553,7 +2553,22 @@ removesAbilities m = case m of
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False
 
--- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6 finished?
+-- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6 finished,
+-- by ANY remover on the board? abilitiesRemovedBy below is where the question is
+-- answered and argued; this is that function with every remover kept.
+abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
+abilitiesRemoved = abilitiesRemovedBy (const True)
+
+-- CR 613.1f / 613.1g: were `oid`'s abilities removed by the time layer 6 finished,
+-- counting only the removers `keep` admits? abilityRemovalAfter is the caller that
+-- narrows them, to the ones later than a timestamp; abilitiesRemoved above keeps
+-- every one.
+--
+-- `keep` narrows the REMOVERS alone and never the candidate list, which is why the
+-- parameter is here rather than at the call site: `cands` is also what the object
+-- is projected THROUGH, so filtering it would answer the question against a board
+-- the game does not have.
+--
 -- Layer 6 is applied before layer 7, so an ability removed there generates no
 -- layer-7 effect, and CR 613.6's rescue cannot reach one whose only parts are in
 -- layer 7 -- it never started to apply in an earlier layer. gatherStatic draws
@@ -2602,16 +2617,6 @@ removesAbilities m = case m of
 -- timestamp. CR 305.7's gate asks a related question one level up and settles it
 -- by CR 613.8 instead -- see appliedSetEffects -- because there the strip decides
 -- whether the effect EXISTS rather than merely when it lands.
-abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
-abilitiesRemoved = abilitiesRemovedBy (const True)
-
--- abilitiesRemoved over a SUBSET of the removers, `keep` naming which -- the shape
--- abilityRemovalAfter needs to ask about the removers later than a timestamp.
---
--- `keep` narrows the removers alone and never the candidate list, which is the
--- whole reason the parameter is here rather than at the call site: `cands` is also
--- what the object is projected THROUGH, so filtering it would answer the question
--- against a board the game does not have.
 abilitiesRemovedBy :: (Gathered -> Bool) -> [Gathered] -> GameState -> ObjectId -> Bool
 abilitiesRemovedBy keep cands gs oid =
   let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c), keep c]
