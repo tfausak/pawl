@@ -83,11 +83,14 @@ data Filter keyword
     -- of them. Both arms answer False for an absent power, so neither is
     -- reachable from the other, and Pawl.FilterSpec pins that pair apart.
     --
-    -- Answered off the PROJECTION on the battlefield and off the printed power
-    -- box everywhere else, except that CR 208.2a's characteristic-defining power
-    -- is evaluated in every zone (Projection.characteristicPowerIn) -- which is
-    -- what Imperial Recruiter's "creature card with power 2 or less" reads as it
-    -- searches a library, Tarmogoyf included.
+    -- Answered off the PROJECTION wherever the reader supplies one, which is
+    -- every zone: Imperial Recruiter's "creature card with power 2 or less" reads
+    -- a library card's full CR 613 projection, Tarmogoyf's CR 208.2a power
+    -- included. The two readers that still take the printed card
+    -- (Projection.viewOfCardIn -- a cost criterion, a mill tally) read the printed
+    -- power box, except that CR 208.2a's characteristic-defining power is
+    -- evaluated for them too (Projection.characteristicPowerIn), since CR 604.3
+    -- makes it function in every zone.
     PowerAtMost Integer
   | -- | CR 208.1 compared against the SOURCE rather than a literal: the object's
     -- power is less than the power of the object the evaluation comes from. CR
