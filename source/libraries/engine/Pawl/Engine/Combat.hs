@@ -1176,6 +1176,11 @@ isBlocked oid gs = Map.member oid (Combat.blockers (GameState.combat gs))
 -- the attacking creature was an unblocked creature at that time" -- without it
 -- the event below would fire a "becomes blocked" trigger a second time.
 --
+-- Both guards are regression fences rather than proved behaviour: the pool's one
+-- producer targets `And [IsAttacking, Not IsBlocked]`, and CR 608.2b re-checks
+-- that as the spell resolves, so nothing reaches this function with either
+-- condition false. Neutralizing either one leaves the suite green.
+--
 -- The event is declareBlockers' AttackerBlocked, and deliberately the same one:
 -- CR 509.3c says a "becomes blocked" ability triggers on the effect exactly as it
 -- does on the declaration. What is NOT recorded is BlockerDeclared -- CR 509.3d's

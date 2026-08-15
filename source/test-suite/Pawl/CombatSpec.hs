@@ -5463,6 +5463,13 @@ declineBlocks p = case p of
   Prompt.DeclareBlockers {} -> Map.empty
   _ -> S.aggressiveAnswer p
 
+-- CR 509.1i's blocker-side event, which CR 509.3d's "becomes blocked by a
+-- creature" reads: recorded by the declaration and by nothing else.
+blockerWasDeclared :: GameEvent.GameEvent -> Bool
+blockerWasDeclared e = case e of
+  GameEvent.BlockerDeclared _ -> True
+  _ -> False
+
 -- CR 509.1h's escape clause: "an effect says that it becomes blocked". Curtain
 -- of Light is the pool's producer -- {1}{W} INSTANT, "Cast this spell only
 -- during combat after blockers are declared. Target unblocked attacking creature
@@ -5509,6 +5516,11 @@ becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
         Spec.assertEqWith s "CR 509.3c: the Prey's becomes-blocked trigger fired" (S.lifeOf S.alice cast) (Just 21)
         Spec.assertBool s (S.onBattlefield attacker cast && S.onBattlefield blocker cast) "nothing was dealt damage either way"
         Spec.assertEqWith s "and bob drew the card the spell says to draw" (length (Game.zoneMembers Zone.Library S.bob cast)) 0
+        -- CR 509.3d: "it won't trigger if the creature becomes blocked by an
+        -- effect rather than a creature". The event that condition reads is the
+        -- one the declaration leg below does record, so this pair is what says
+        -- the effect records the attacking side and only that.
+        Spec.assertBool s (not (any (blockerWasDeclared . snd) (GameState.events cast))) "no blocker was declared for it"
         -- Never blocked: the trigger is silent and the Prey connects.
         Spec.assertBool s (not (Combat.isBlocked attacker uncast)) "control: with no spell the attacker is unblocked"
         Spec.assertEqWith s "control: so bob takes the Prey's 1" (S.lifeOf S.bob uncast) (Just 19)
@@ -5520,6 +5532,7 @@ becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
         Spec.assertEqWith s "declaration leg: but the Piker is what is blocking it" (Combat.blockersOf attacker declared) (Set.singleton blocker)
         Spec.assertEqWith s "declaration leg: the same trigger fires" (S.lifeOf S.alice declared) (Just 21)
         Spec.assertBool s (not (S.onBattlefield attacker declared) && not (S.onBattlefield blocker declared)) "declaration leg: and the two creatures trade"
+        Spec.assertBool s (any (blockerWasDeclared . snd) (GameState.events declared)) "declaration leg: and CR 509.3d's event IS recorded there"
       _ -> Spec.assertFailure s "fixture should have one attacker and one blocker"
   Spec.it s "CR 509.1h a creature already blocked is not a legal target" $ do
     -- CR 509.1h again, read through the card's own committed target slot:
