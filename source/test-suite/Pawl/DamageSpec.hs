@@ -1,8 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, its deal-time riders
--- (deathtouch, infect, wither, toxic, lifelink), trample, and state-based actions.
+-- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, who the
+-- funnel credits as a damage event's source, its deal-time riders (deathtouch,
+-- infect, wither, toxic, lifelink), trample, and state-based actions.
 module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad

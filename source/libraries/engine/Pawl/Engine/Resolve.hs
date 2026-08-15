@@ -2445,8 +2445,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Nothing -> Just source
           Just slot -> Maybe.listToMaybe (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot))
     case (dealerId, Quantity.evaluateFor viewOf context gs resolving source quantity) of
-      -- An unevaluable quantity is a no-op, the powerOf posture.
+      -- No source, no damage: CR 608.2b's illegal dealer, above.
       (Nothing, _) -> pure ()
+      -- An unevaluable quantity is a no-op, the powerOf posture.
       (_, Nothing) -> pure ()
       (Just dealt, Just n) ->
         Monad.when (n > 0) $ do
