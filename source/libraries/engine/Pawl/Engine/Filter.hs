@@ -831,7 +831,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Bushido _ -> keyword
   -- CR 702.46a's N is a number and not a word, so CR 612.2 has nothing to swap
   -- HERE. "Spirit" is a word CR 612.2a does reach, but it is in the ability
-  -- Pawl.Engine.Keyword.soulshift mints rather than in this value (#1197).
+  -- Pawl.Engine.Keyword.soulshift mints rather than in this value, so the swap
+  -- arrives there instead (Pawl.Engine.Projection.mintedTriggeredAbilitiesOf).
   Keyword.Type.Soulshift _ -> keyword
   -- CR 702.54a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "+1/+1 counter" is the rule's own noun and no card prints it.
@@ -866,7 +867,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Mentor -> keyword
   -- CR 702.135a's N is a number and not a word, so CR 612.2 has nothing to swap
   -- HERE. "Spirit" is a word CR 612.2a does reach, but it is in the ability
-  -- Pawl.Engine.Keyword.afterlife mints rather than in this value (#1197).
+  -- Pawl.Engine.Keyword.afterlife mints rather than in this value, so the swap
+  -- arrives there instead (Pawl.Engine.Projection.mintedTriggeredAbilitiesOf).
   Keyword.Type.Afterlife _ -> keyword
   Keyword.Type.Provoke -> keyword
   Keyword.Type.Training -> keyword

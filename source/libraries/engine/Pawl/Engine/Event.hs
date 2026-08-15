@@ -6439,7 +6439,12 @@ eventTriggers events gs =
       -- CR 310.12b's Siege ability is minted the same way and for the same reason,
       -- off the same finished projection: rule 310 gives it, no card prints it, and
       -- the scan below never learns which rule produced any of these.
-      abilitiesOf pc = PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc) <> Battle.triggeredAbilitiesOf pc
+      --
+      -- Through Projection.mintedTriggeredAbilitiesOf rather than
+      -- Keyword.triggeredAbilitiesOf directly, so CR 612.2a's text change reaches
+      -- the words rule 702 writes -- the Spirit an afterlife trigger creates. Rule
+      -- 310.12b's Siege ability names no subtype word, so it needs no such wrapper.
+      abilitiesOf pc = PC.triggeredAbilities pc <> Projection.mintedTriggeredAbilitiesOf pc <> Battle.triggeredAbilitiesOf pc
       -- CR 113.6m's "functions ONLY in that zone", asked of a permanent read AS
       -- BEING ON THE BATTLEFIELD: a Squee, Goblin Nabob standing there does not
       -- see its own upkeep, because the ability that watches for it functions in
