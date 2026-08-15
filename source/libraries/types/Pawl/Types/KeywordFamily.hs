@@ -70,8 +70,14 @@ data KeywordFamily
     Bushido
   | -- | CR 702.46a: soulshift N.
     Soulshift
+  | -- | CR 702.54a: bloodthirst N, and CR 702.54b's bloodthirst X with it -- the
+    -- family is what "a creature with bloodthirst" names, which is the shape a
+    -- card would ask in.
+    Bloodthirst
   | -- | CR 702.63a: vanishing N.
     Vanishing
+  | -- | CR 702.68a: frenzy N.
+    Frenzy
   | -- | CR 702.70a: poisonous N.
     Poisonous
   | -- | CR 702.77a: reinforce N-[cost].

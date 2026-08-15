@@ -26,6 +26,7 @@ codec =
       Arm.nullary "UnderSourceControl" EntryRewrite.UnderSourceControl,
       Arm.nullary "Riot" EntryRewrite.Riot,
       Arm.nullary "Unleash" EntryRewrite.Unleash,
+      Arm.payload "Bloodthirst" Common.natural EntryRewrite.Bloodthirst (\x -> case x of EntryRewrite.Bloodthirst y -> Just y; _ -> Nothing),
       Arm.nullary "Tapped" EntryRewrite.Tapped,
       Arm.nullary "EntersTransformed" EntryRewrite.EntersTransformed,
       Arm.payload "PayLifeOrTapped" Common.natural EntryRewrite.PayLifeOrTapped (\x -> case x of EntryRewrite.PayLifeOrTapped y -> Just y; _ -> Nothing),

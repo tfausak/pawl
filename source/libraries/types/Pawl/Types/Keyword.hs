@@ -452,6 +452,19 @@ data Keyword
     -- reader takes the per-keyword COUNT rather than membership -- Forked-Branch
     -- Garami prints "soulshift 4, soulshift 4" and returns two cards.
     Soulshift Natural.Natural
+  | -- | 702.54a: bloodthirst N, a STATIC ability meaning "If an opponent was
+    -- dealt damage this turn, this permanent enters with N +1/+1 counters on
+    -- it." Minted by Pawl.Engine.Keyword.mintedReplacementsFor as a CR 614.1c
+    -- entry replacement, vanishing's position -- with a condition of its own,
+    -- which Pawl.Engine.Replacement.admitsEntry asks as it asks rule 702.145b's.
+    --
+    -- N rides the constructor, as Vanishing's does, and CR 702.54c makes each
+    -- instance apply separately -- so its reader takes the per-keyword COUNT and
+    -- a permanent with bloodthirst twice enters with both lots of counters.
+    --
+    -- Not implemented: CR 702.54b's "Bloodthirst X", where X is the TOTAL DAMAGE
+    -- an opponent was dealt rather than a printed number (#1588).
+    Bloodthirst Natural.Natural
   | -- | 702.55a: haunt, a TRIGGERED ability. On a permanent it means "When this
     -- permanent is put into a graveyard from the battlefield, exile it haunting
     -- target creature" -- soulshift's CR 700.4 dies event again, so the condition
@@ -502,6 +515,16 @@ data Keyword
     -- last two abilities and no entry rewrite -- the payload would have to be a
     -- Maybe (#1186).
     Vanishing Natural.Natural
+  | -- | 702.68a: frenzy N, "whenever this creature attacks and isn't blocked,
+    -- it gets +N/+0 until end of turn". A TRIGGERED ability, which
+    -- Pawl.Engine.Keyword.frenzy mints in bushido's position: its condition is
+    -- CR 509.1h's unblocked half and its payload is bushido's, with the
+    -- toughness term at zero.
+    --
+    -- N rides the constructor, as Bushido's does, and CR 702.68b says each
+    -- instance triggers separately -- so its reader takes the per-keyword
+    -- COUNT, and a creature with frenzy twice gets both bonuses.
+    Frenzy Natural.Natural
   | -- | 702.70a: whenever this creature deals combat damage to a player, that
     -- player gets N poison counters. N rides the constructor, as Toxic's does.
     -- Unlike toxic, the N values are NOT summed: CR 702.70b says each instance

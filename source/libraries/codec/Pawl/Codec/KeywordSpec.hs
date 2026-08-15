@@ -439,6 +439,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.SplitSecond
       """ {"type":"SplitSecond"} """
+  -- CR 702.68a's N rides the constructor as CR 702.45a's does, and the tag is
+  -- what keeps `Frenzy 2` off bushido's wire form.
+  Spec.it s "Frenzy carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Frenzy 1)
+      """ {"type":"Frenzy","value":1} """
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Frenzy 2) /= Codec.encode Keyword.codec (Keyword.Bushido 2))
+      "frenzy 2 is not bushido 2"
   -- CR 702.70a's N rides the constructor the same way, and the two payloaded
   -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do
@@ -487,6 +499,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Codec.encode Keyword.codec (Keyword.Soulshift 3) /= Codec.encode Keyword.codec (Keyword.Bushido 3))
       "soulshift 3 is not bushido 3"
+  -- CR 702.54a's N is a count of +1/+1 counters, so a collision with a
+  -- same-numbered keyword would be a real misread here too.
+  Spec.it s "Bloodthirst carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Bloodthirst 1)
+      """ {"type":"Bloodthirst","value":1} """
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Bloodthirst 1) /= Codec.encode Keyword.codec (Keyword.Modular 1))
+      "bloodthirst 1 is not modular 1"
   -- CR 702.55a's haunt writes no payload at all -- the haunted object is board
   -- state (GameState.haunting), not a field of the keyword.
   Spec.it s "Haunt" $
