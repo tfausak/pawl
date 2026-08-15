@@ -850,6 +850,9 @@ rewriteKeyword pairs keyword = case keyword of
   -- "fade counter" is in the replacement and the ability Pawl.Engine.Keyword mints
   -- rather than in this value.
   Keyword.Type.Fading _ -> keyword
+  -- CR 702.68a's N is a number and not a word, so CR 612.2 has nothing to swap;
+  -- the bonus is in the ability Pawl.Engine.Keyword.frenzy mints.
+  Keyword.Type.Frenzy _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
   Keyword.Type.Renown _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.

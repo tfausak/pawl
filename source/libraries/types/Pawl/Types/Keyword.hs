@@ -502,6 +502,16 @@ data Keyword
     -- last two abilities and no entry rewrite -- the payload would have to be a
     -- Maybe (#1186).
     Vanishing Natural.Natural
+  | -- | 702.68a: frenzy N, "whenever this creature attacks and isn't blocked,
+    -- it gets +N/+0 until end of turn". A TRIGGERED ability, which
+    -- Pawl.Engine.Keyword.frenzy mints in bushido's position: its condition is
+    -- CR 509.1h's unblocked half and its payload is bushido's, with the
+    -- toughness term at zero.
+    --
+    -- N rides the constructor, as Bushido's does, and CR 702.68b says each
+    -- instance triggers separately -- so its reader takes the per-keyword
+    -- COUNT, and a creature with frenzy twice gets both bonuses.
+    Frenzy Natural.Natural
   | -- | 702.70a: whenever this creature deals combat damage to a player, that
     -- player gets N poison counters. N rides the constructor, as Toxic's does.
     -- Unlike toxic, the N values are NOT summed: CR 702.70b says each instance

@@ -439,6 +439,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.codec
       Keyword.SplitSecond
       """ {"type":"SplitSecond"} """
+  -- CR 702.68a's N rides the constructor as CR 702.45a's does, and the tag is
+  -- what keeps `Frenzy 2` off bushido's wire form.
+  Spec.it s "Frenzy carries its N" $ do
+    Common.assertCodec
+      s
+      Keyword.codec
+      (Keyword.Frenzy 1)
+      """ {"type":"Frenzy","value":1} """
+    Spec.assertBool
+      s
+      (Codec.encode Keyword.codec (Keyword.Frenzy 2) /= Codec.encode Keyword.codec (Keyword.Bushido 2))
+      "frenzy 2 is not bushido 2"
   -- CR 702.70a's N rides the constructor the same way, and the two payloaded
   -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do
