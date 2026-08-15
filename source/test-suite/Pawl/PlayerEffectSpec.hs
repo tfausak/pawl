@@ -3771,10 +3771,10 @@ yawgmothsWillSpec s registry =
 -- alice's precombat main phase and nobody has played a land yet.
 --
 -- The Mountain in hand is what keeps every negative below from passing
--- vacuously: each seat is offered exactly one land play on its own turn whatever
--- the Crucible does, so an assertion that the graveyard Swamp is absent is read
--- off a list that is never empty. Two different basic land types, so the two
--- offers can never be mistaken for each other.
+-- vacuously: on its own turn each seat is offered that Mountain whatever the
+-- Crucible does, so an assertion that the graveyard Swamp is absent is read off
+-- a list that is never empty for want of a window. Two different basic land
+-- types, so the two offers can never be mistaken for each other.
 --
 -- Prodigal Sorcerer sits in alice's graveyard as the nonland control: the
 -- Crucible's sentence is about lands, and a permission read as "play anything
@@ -3870,7 +3870,7 @@ crucibleSpec s registry =
         -- their OWN main phase, so CR 305.1's window is open and the refusal is
         -- about the scope.
         Spec.it s "CR 109.5 the You scope reaches neither opponent's graveyard" $ do
-          (_, his, theirs, _, hisMountain, _, with) <- board True
+          (hers, his, theirs, _, hisMountain, _, with) <- board True
           let bobsTurn = with {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
               carolsTurn = with {GameState.activePlayer = S.carol, GameState.priority = Just S.carol}
           Spec.assertBool s (PlayerEffect.mayPlayLandsFromGraveyard S.alice with) "alice has the permission"
@@ -3879,10 +3879,11 @@ crucibleSpec s registry =
           Spec.assertEqWith s "bob is offered his hand and nothing else" (filter isPlay (Action.legalActions S.bob bobsTurn)) [Action.Type.Play hisMountain Nothing]
           Spec.assertBool s (notElem (Action.Type.Play his Nothing) (Action.legalActions S.bob bobsTurn)) "not bob's own graveyard Swamp"
           Spec.assertBool s (notElem (Action.Type.Play theirs Nothing) (Action.legalActions S.carol carolsTurn)) "nor carol's"
-          -- And alice's own Swamp is not offered to them either, which is the
-          -- other way a zone permission could leak: exile is shared, a graveyard
-          -- is not (CR 400.1), and neither seat may reach hers.
-          Spec.assertBool s (notElem (Action.Type.Play his Nothing) (Action.legalActions S.carol carolsTurn)) "and no seat reaches another's graveyard"
+          -- And the GRANTED player's own Swamp is not offered to them either,
+          -- which is the other way a zone permission could leak: exile is
+          -- shared, a graveyard is not (CR 400.1), so carol may not play out of
+          -- alice's even though alice may.
+          Spec.assertBool s (notElem (Action.Type.Play hers Nothing) (Action.legalActions S.carol carolsTurn)) "and carol cannot reach alice's graveyard"
 
         -- CR 305.2a: the count is applied ABOVE this in
         -- Pawl.Engine.Action.legalActions and the grant does not touch it. One
