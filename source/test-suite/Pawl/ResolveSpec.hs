@@ -1364,6 +1364,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.specialActions = [],
               Face.additionalCosts = [],
               Face.alternativeCosts = [],
+              Face.costReductions = [],
               Face.enchant = [],
               Face.counterability = Counterability.Counterable
             }
@@ -1453,6 +1454,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.specialActions = [],
               Face.additionalCosts = [],
               Face.alternativeCosts = [],
+              Face.costReductions = [],
               Face.enchant = [],
               Face.counterability = Counterability.Counterable
             }

@@ -27,6 +27,7 @@ import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
@@ -240,6 +241,20 @@ data Face card = MkFace
     -- condition over game state, so it rides its keyword and
     -- Pawl.Engine.Cost.costsFor offers it by zone.
     alternativeCosts :: [AlternativeCost.AlternativeCost],
+    -- | CR 601.2f / 113.6d: this face's printed reductions of ITS OWN cost to
+    -- cast -- Thrasta, Tempest's Roar's "This spell costs {3} less to cast for
+    -- each other spell cast this turn". Pawl.Types.CostReduction argues why
+    -- playerAbilities below cannot hold one.
+    --
+    -- The self-scoped member of the castingRestrictions family, and read the
+    -- same way: straight off the card, never through the projection (#160).
+    -- Pawl.Engine.Cost.spellAdjustments is the one reader, and it folds these in
+    -- alongside the CR 613.11 reductions other permanents generate, so CR
+    -- 601.2f's "minus all cost reductions" is applied once over both.
+    --
+    -- A LIST because nothing in CR 601.2f caps how many such lines a face may
+    -- print; every one of them applies (Edgewalker's ruling, one type over).
+    costReductions :: [CostReduction.CostReduction],
     -- | CR 604.1/604.2 / 611.1: this face's printed PLAYER and RULES-modifying
     -- static abilities (Rule of Law, Thalia, Sapphire Medallion, Reliquary Tower).
     -- The sibling of staticAbilities on the axis CR 613.10/613.11 put OUTSIDE the

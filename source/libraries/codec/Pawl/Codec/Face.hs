@@ -27,6 +27,7 @@ import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
 import qualified Pawl.Codec.CostComponent as CostComponent
+import qualified Pawl.Codec.CostReduction as CostReduction
 import qualified Pawl.Codec.Counterability as Counterability
 import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.DungeonRoom as DungeonRoom
@@ -99,6 +100,9 @@ codec cardCodec = Fields.object $ do
   attackCosts <- Fields.defaulted "attackCosts" [] (Common.list AttackCost.codec) Face.attackCosts
   additionalCosts <- Fields.defaulted "additionalCosts" [] (Common.list (CostComponent.codec Keyword.codec)) Face.additionalCosts
   alternativeCosts <- Fields.defaulted "alternativeCosts" [] (Common.list AlternativeCost.codec) Face.alternativeCosts
+  -- CR 601.2f: the reductions this face applies to its own cost to cast
+  -- (Pawl.Types.CostReduction).
+  costReductions <- Fields.defaulted "costReductions" [] (Common.list CostReduction.codec) Face.costReductions
   -- CR 103.5b / CR 103.6: an array of ACTIONS, each an array of effects, so a
   -- face granting two of them is writable (Pawl.Types.Face).
   mulliganActions <- Fields.defaulted "mulliganActions" [] (Common.list (Common.list (Effect.codec cardCodec))) Face.mulliganActions
@@ -140,6 +144,7 @@ codec cardCodec = Fields.object $ do
         Face.attackCosts = attackCosts,
         Face.additionalCosts = additionalCosts,
         Face.alternativeCosts = alternativeCosts,
+        Face.costReductions = costReductions,
         Face.mulliganActions = mulliganActions,
         Face.openingHandActions = openingHandActions,
         Face.specialActions = specialActions,

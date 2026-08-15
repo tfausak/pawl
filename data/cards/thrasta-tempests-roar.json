@@ -1,6 +1,34 @@
 {
   "faces": [
     {
+      "costReductions": [
+        {
+          "amount": [
+            {
+              "type": "Generic",
+              "value": 3
+            }
+          ],
+          "perEach": {
+            "type": "Count",
+            "value": {
+              "aggregation": {
+                "type": "Members"
+              },
+              "filter": {
+                "type": "And",
+                "value": []
+              },
+              "scope": {
+                "type": "InHistory",
+                "value": {
+                  "type": "SpellCast"
+                }
+              }
+            }
+          }
+        }
+      ],
       "keywords": [
         {
           "type": "Haste"
