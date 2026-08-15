@@ -2057,6 +2057,9 @@ rewriteQuantity pairs quantity = case quantity of
   -- And a leaf: CR 701.9a's tally holds logged events, which name players and
   -- object ids rather than any word CR 612.1 could swap.
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity
+  -- And a leaf: CR 400.7's entry is a logged zone change, which names object ids
+  -- and zones rather than any word CR 612.1 could swap.
+  Quantity.Type.EnteredThisTurn -> quantity
   -- And a leaf: CR 509.1h's declaration names object ids, not a word CR 612.1
   -- could swap.
   Quantity.Type.BlockersBeyondFirst -> quantity
@@ -3020,8 +3023,8 @@ modificationReads m = case m of
 -- sibling filter atom gives: ManaValue is computed from the printed mana cost
 -- (CR 202.3), ObjectCounters and PlayerCounters read counter stores that CR
 -- 109.3 keeps out of the characteristics, and the rest are facts about a player,
--- a binding, a mana pool or the combat record. A Star is notation and evaluates
--- to nothing at all.
+-- a binding, a mana pool, the combat record or the event log. A Star is notation
+-- and evaluates to nothing at all.
 --
 -- Over-declaring is the safe direction: this is only a SCREEN, and the
 -- dependency itself is settled by re-evaluating the modification (see
@@ -3050,6 +3053,7 @@ quantityReads q = case q of
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
+  Quantity.Type.EnteredThisTurn -> Set.empty
   Quantity.Type.BlockersBeyondFirst -> Set.empty
 
 -- What an Aggregation reads off each member the Filter kept. DistinctCardTypes is

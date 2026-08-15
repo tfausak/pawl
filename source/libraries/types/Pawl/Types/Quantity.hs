@@ -370,6 +370,43 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and OpponentsAttacked: it holds no Quantity.
     CardsDiscardedThisTurn PlayerRef.PlayerRef
+  | -- | CR 400.7 / 608.2i: did the object this quantity is evaluated against ENTER
+    -- THE BATTLEFIELD this turn? 1 if so and 0 if not -- Thrasta, Tempest's Roar's
+    -- "Thrasta has hexproof as long as it entered this turn", a CR 604.1 static
+    -- ability's CR 604.2 clause rather than a trigger. The battlefield and no other
+    -- zone, because that is what a bare "enters" abbreviates (CR glossary, "enters
+    -- the battlefield").
+    --
+    -- BlockersBeyondFirst's shape rather than CardsDiscardedThisTurn's: it names no
+    -- object and takes the one the evaluation is aimed at, so a card that wants
+    -- another permanent's answer reaches it through AgainstSlot. Read LIVE off
+    -- GameState.events rather than through the injected view -- an entry is an event
+    -- and not a characteristic, so no projection can answer it.
+    --
+    -- "This turn" is the LOG'S OWN EXTENT and not a window named here, exactly as
+    -- CardsDiscardedThisTurn has it: Engine.beginTurnOf clears the log at the turn
+    -- handoff, so an entry still in it is an entry this turn.
+    --
+    -- Matched against the same GameEvent.Moved-to-the-battlefield test CR 603.6a's
+    -- PermanentEnters trigger uses, keyed on ZoneChange.object -- the RESULTING
+    -- incarnation's id, which is the id the permanent now has. CR 400.7 is what
+    -- makes that the whole of the question: a permanent that left and came back is
+    -- a new object, and it entered when the new object did.
+    --
+    -- NOT a Designation and NOT a stored flag on the object. An entry is already
+    -- recorded, and a flag would be a second writer of the same fact -- the stale-read
+    -- shape a derived condition with a stored consumer keeps producing here.
+    --
+    -- Nor is it summoning sickness (CR 302.6), which asks a DIFFERENT question:
+    -- "under that player's control since their most recent turn began" survives a
+    -- turn handoff on an opponent's turn, where this does not.
+    --
+    -- An EMPTY log answers 0 rather than Nothing, as CardsDiscardedThisTurn's does:
+    -- a permanent that did not enter this turn is an answered question. Nothing
+    -- survives only for an evaluation aimed at no object at all.
+    --
+    -- A LEAF: it holds no Quantity.
+    EnteredThisTurn
   | -- | CR 509.1h / 702.23a: how many creatures are blocking the object this
     -- quantity is evaluated against, BEYOND THE FIRST -- rampage's "for each
     -- creature blocking it beyond the first".

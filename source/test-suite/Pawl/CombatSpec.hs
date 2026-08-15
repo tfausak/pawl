@@ -4401,8 +4401,13 @@ pinnedAssignments base answers p = case p of
 -- that player's planeswalker (CR 508.1b), so the two are the same player on every
 -- board pawl can build.
 --
--- Thrasta's other two printed clauses are omitted (#1090, #1091). Neither
--- can reach these boards: nothing is cast and nothing targets Thrasta.
+-- Thrasta's cost reduction is not implemented (#1090), and cannot reach these
+-- boards -- nothing is cast on them.
+--
+-- Its hexproof clause is implemented and dormant here for a different reason:
+-- S.combatBoardOf puts Thrasta onto the battlefield without a zone change, so
+-- Quantity.EnteredThisTurn reads 0 and the CR 604.2 gate is shut. Pawl.ConditionSpec
+-- is where the clause is proved.
 trampleOverPlaneswalkersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 trampleOverPlaneswalkersSpec s registry = Spec.describe s "TrampleOverPlaneswalkers" $ do
   Spec.it s "CR 702.19c an unblocked 7/7 pays Jace's 3 loyalty and sends the other 4 at bob" $ do
