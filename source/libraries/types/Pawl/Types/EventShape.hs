@@ -10,6 +10,15 @@ import qualified Pawl.Types.MovedBetween as MovedBetween
 -- Only MovedBetween and SpellCast exist: every other GameEvent constructor is
 -- recorded in the log with no EventShape arm, so a count cannot fold over any of
 -- them (#162).
+--
+-- That is not the same as the log being unreadable for those events, and the
+-- readers that exist do not come through here. A fold is the wrong instrument
+-- whenever the question is about a PLAYER or about ONE named object rather than
+-- about a population of objects, since a member of this fold is a Filter view of
+-- an object and the unit counted is an EVENT. Those questions are
+-- Pawl.Types.Quantity arms instead -- CardsDiscardedThisTurn,
+-- PlayersDealtDamageThisTurn and EnteredThisTurn -- each of which reads
+-- GameState.events directly through a Pawl.Engine.Game accessor.
 data EventShape
   = -- | CR 700.4: "dies" is MovedBetween Battlefield Graveyard.
     MovedBetween MovedBetween.MovedBetween

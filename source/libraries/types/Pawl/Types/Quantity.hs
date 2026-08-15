@@ -370,6 +370,42 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and OpponentsAttacked: it holds no Quantity.
     CardsDiscardedThisTurn PlayerRef.PlayerRef
+  | -- | CR 120.1 / 608.2i: how many of the players this reference names WERE DEALT
+    -- DAMAGE this turn -- Furious Spinesplitter's "for each opponent who was dealt
+    -- damage this turn", and the measurement rule 702.54a's bloodthirst compares
+    -- against 1.
+    --
+    -- CardsDiscardedThisTurn's sibling in footing and IsMonarch's in ARITY. It is a
+    -- look-back read of the turn-scoped GameEvent log that CR 608.2i sanctions, with
+    -- "this turn" the log's own extent rather than a window named here; but unlike
+    -- the discard tally it answers for a reference naming ANY number of players,
+    -- because the question is asked of each of them separately and the card wants
+    -- how many said yes. So "an opponent was dealt damage" and "each opponent who
+    -- was dealt damage" are one measurement read at two thresholds.
+    --
+    -- PLAYERS and not EVENTS. Two Lightning Bolts at one opponent is one opponent,
+    -- which is what "for each opponent who" counts; a tally of DamageDealt events
+    -- would say two. Damage to a planeswalker or a battle that player controls is
+    -- not damage to the player either (CR 120.3a names the player recipient alone),
+    -- and neither is damage to their creatures.
+    --
+    -- NOT a Scope.InHistory count over an EventShape arm for damage, which is what
+    -- this measurement was expected to need; see #1511. Two things rule that out
+    -- and neither is incidental: an InHistory fold's members are Filter views of an
+    -- OBJECT, and CR 120.3a's recipient here is a player, who has no view; and the
+    -- fold counts EVENTS, which is the wrong unit per the paragraph above.
+    --
+    -- An EMPTY log answers 0 rather than Nothing, as CardsDiscardedThisTurn's does:
+    -- nobody having been dealt damage is a number. Nothing is reserved for a
+    -- reference that could not be resolved at all.
+    --
+    -- Rule 702.54b's variant asks a DIFFERENT question -- "the total damage your
+    -- opponents have been dealt this turn", which sums amounts where this counts
+    -- players -- and no quantity is implemented for it; the keyword it belongs to
+    -- is not either (#877).
+    --
+    -- A LEAF, like LifeTotal, Speed and CardsDiscardedThisTurn: it holds no Quantity.
+    PlayersDealtDamageThisTurn PlayerRef.PlayerRef
   | -- | CR 400.7 / 608.2i: did the object this quantity is evaluated against ENTER
     -- THE BATTLEFIELD this turn? 1 if so and 0 if not -- Thrasta, Tempest's Roar's
     -- "Thrasta has hexproof as long as it entered this turn", a CR 604.1 static
