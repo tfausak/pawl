@@ -1790,6 +1790,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsBlocking -> 0
   Filter.Type.IsBlocked -> 0
   Filter.Type.AttackedThisTurn -> 0
+  Filter.Type.MilledThisTurn -> 0
   Filter.Type.IsAttachedToCreature -> 0
   Filter.Type.IsAttachedToPermanent -> 0
   Filter.Type.IsAttachedToSource -> 0
