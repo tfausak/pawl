@@ -11,6 +11,11 @@
 #
 # `there is no CR X` is the fixed wording for a deliberate statement that the
 # rule does not exist, and is skipped. Nothing else is exempt.
+#
+# What counts as a defined rule is `script/cr.hs`'s answer, not one this script
+# re-derives: it is the same question the lookup script asks, so a revision
+# that reshapes the document must not be able to move one answer without the
+# other. This script only decides what a citation looks like.
 
 set -o errexit
 set -o nounset
@@ -22,17 +27,21 @@ if [ "$#" -eq 0 ]; then
   set -- $(git ls-files | grep -v -e '^docs/progress\.md$' -e '^docs/superpowers/')
 fi
 
-exec awk '
-  FNR == NR {
-    # A section and a numbered rule lead with `100.` or `605.1.`; a subrule
-    # leads with `605.1a`, no trailing period.
-    if ($1 ~ /^[0-9]+(\.[0-9]+[a-z]*)?\.?$/) {
-      rule = $1
-      sub(/\.$/, "", rule)
-      defined[rule] = 1
-    }
-    next
-  }
+defined=$(mktemp)
+trap 'rm -f "$defined"' EXIT
+script/cr.hs --list > "$defined"
+
+# An empty list would report every citation in the tree, which reads as a
+# thousand bad citations rather than as one broken parse.
+if [ ! -s "$defined" ]; then
+  echo 'script/cr.hs --list defined no rules at all' >&2
+  exit 1
+fi
+
+# Not `exec`: that would replace this shell before the trap can remove the
+# temporary file.
+awk '
+  FNR == NR { defined[$0] = 1; next }
   {
     rest = $0
     while (match(rest, /CR [0-9]+(\.[0-9]+[a-z]*)?/)) {
@@ -46,4 +55,4 @@ exec awk '
     }
   }
   END { exit status }
-' docs/rules.txt "$@"
+' "$defined" "$@"

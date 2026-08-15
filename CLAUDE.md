@@ -39,7 +39,11 @@ first question.
 - Rules ground truth:
   `docs/rules.txt`, grepped by rule number --- never memory, and never a rule
   number quoted in an issue or a brief. `script/cr.hs --number 702.21a` prints
-  one rule; it errors rather than guessing when the number does not exist.
+  one rule; it errors rather than guessing when the number does not exist. It
+  also decides, for the whole repository, which lines of that file define a
+  rule --- `--list` is that answer, and `script/check-citations.sh` consumes it
+  rather than parsing the document a second way. A script that needs to know
+  what the file means asks `cr.hs`.
 
 - Prior-art evidence:
   `docs/prior-art-lessons.md`

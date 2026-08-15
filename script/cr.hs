@@ -40,41 +40,50 @@ main = do
     putStr $ GetOpt.usageInfo name optDescrs
     Exit.exitSuccess
 
-  let number = Maybe.fromMaybe defaultNumber $ configNumber cfg
   rules <- readFile . Maybe.fromMaybe "docs/rules.txt" $ configRules cfg
+  let defined = definedRules rules
 
-  let prefix =
-        runShowS $
-          numberS number
-            . maybe (showChar '.') (const id) (numberTertiary number)
-            . showChar ' '
-  let matches =
-        filter (List.isPrefixOf prefix)
-          . takeWhile (/= "Glossary")
-          . dropWhile (/= "Credits")
-          $ lines rules
-  match <- case matches of
-    [x] -> pure x
-    [] -> Exception.throwM $ MkNoResults number
-    _ -> Exception.throwM $ MkTooManyResults number
+  if configList cfg
+    then mapM_ (putStrLn . runShowS . numberS . fst) defined
+    else do
+      let number = Maybe.fromMaybe defaultNumber $ configNumber cfg
+      case fmap snd $ filter ((== number) . fst) defined of
+        [x] -> putStrLn x
+        [] -> Exception.throwM $ MkNoResults number
+        _ -> Exception.throwM $ MkTooManyResults number
 
-  putStrLn match
+-- | Every rule the document defines, in document order, paired with the line
+-- that defines it. This is the one place that decides what @docs/rules.txt@
+-- means: a rule is a line of the numbered-rules body --- which runs from the
+-- @Credits@ heading that ends the table of contents to the @Glossary@ heading
+-- that follows it --- leading with its own number. Both @--number@ and
+-- @--list@ read it, and @script/check-citations.sh@ consumes the @--list@
+-- rendering rather than re-deriving any of this.
+definedRules :: String -> [(Number, String)]
+definedRules =
+  Maybe.mapMaybe (\l -> fmap (\n -> (n, l)) $ runReadP ruleLineP l)
+    . takeWhile (/= "Glossary")
+    . dropWhile (/= "Credits")
+    . lines
 
 optDescrs :: [GetOpt.OptDescr Flag]
 optDescrs =
   [ GetOpt.Option ['h'] ["help"] (GetOpt.NoArg FlagHelp) "Shows this help message, then exits.",
+    GetOpt.Option ['l'] ["list"] (GetOpt.NoArg FlagList) "Lists every rule number the document defines, one per line, instead of looking one up.",
     GetOpt.Option ['n'] ["number"] (GetOpt.ReqArg FlagNumber "NUMBER") "The rule number to look up. Defaults to '1'.",
     GetOpt.Option ['r'] ["rules"] (GetOpt.ReqArg FlagRules "FILE") "The comprehensive rules plain text document to use. Defaults to 'docs/rules.txt'."
   ]
 
 data Flag
   = FlagHelp
+  | FlagList
   | FlagNumber String
   | FlagRules String
   deriving (Eq, Show)
 
 data Config = MkConfig
   { configHelp :: Bool,
+    configList :: Bool,
     configNumber :: Maybe Number,
     configRules :: Maybe FilePath
   }
@@ -84,6 +93,7 @@ defaultConfig :: Config
 defaultConfig =
   MkConfig
     { configHelp = False,
+      configList = False,
       configNumber = Nothing,
       configRules = Nothing
     }
@@ -91,6 +101,7 @@ defaultConfig =
 applyFlag :: (Exception.MonadThrow m) => Config -> Flag -> m Config
 applyFlag cfg flg = case flg of
   FlagHelp -> pure cfg {configHelp = True}
+  FlagList -> pure cfg {configList = True}
   FlagNumber s -> case runReadP numberP s of
     Nothing -> Exception.throwM $ MkInvalidNumber s
     Just n -> pure cfg {configNumber = Just n}
@@ -133,6 +144,21 @@ numberP = do
         numberSecondary = secondary,
         numberTertiary = tertiary
       }
+
+-- | Parses the rule number off the front of a line that defines a rule, like
+-- @702.21a Ward is ...@ or @100.1. These Magic rules ...@, then a space.
+--
+-- The trailing period is optional in both directions, because the document is
+-- not consistent about it: the convention is a period on a section or a
+-- numbered rule and none on a subrule, but this revision writes @119.1d.@ with
+-- one and @606.5@ without. Requiring the convention silently loses those two.
+ruleLineP :: P.ReadP Number
+ruleLineP = do
+  number <- numberP
+  Monad.void . P.option '.' $ P.char '.'
+  Monad.void $ P.char ' '
+  Monad.void . P.munch $ const True
+  pure number
 
 runShowS :: ShowS -> String
 runShowS = ($ "")
