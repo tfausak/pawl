@@ -6193,14 +6193,16 @@ looksBack condition = case condition of
 -- offered from the command zone under CR 114.4. The rest of the command zone is
 -- unscanned (#1411).
 --
--- A permanent that left the battlefield WITHIN its own group is missing from that
--- group's sample all the same, the sample being taken as the last of the group's
--- members is recorded and CR 704.3's whole destruction batch being one group. So is
--- one whose group the sample does not name at all.
+-- Two holes are left in that reading, and last known information fills both. A
+-- permanent that left WITHIN its own group is missing from that group's sample, the
+-- sample being taken as the last of the group's members is recorded and CR 704.3's
+-- whole destruction batch being one group; and a group nothing sampled has no
+-- reading but the live board, which the departed are not on either.
 --
--- So each event contributes the permanents that left the battlefield at a LATER
--- EVENT GROUP in the same batch, read from CR 608.2h last known information --
--- `laterGroups` below. Four things make that exact rather than approximate:
+-- So each event ALSO contributes the permanents that left the battlefield at a
+-- LATER EVENT GROUP in the same batch, read from CR 608.2h last known information
+-- -- `laterGroups` below, which the sample outranks wherever both hold the same id.
+-- Four things make that exact rather than approximate:
 --
 --   * The same reading, one event later. A permanent removed by a later event
 --     existed immediately after this one, which is what the rule asks. It reaches
@@ -6722,8 +6724,9 @@ eventTriggers events gs =
       forOne event (oid, (ctrl, abilities)) =
         let -- The bearer's own slot environment, so a condition naming a slot
             -- (TriggerCondition.LoseControlOfBound) is read the same way here as it
-            -- is for a CR 603.7 delayed entry. Empty for a bearer read out of last
-            -- known information, which has no object left to ask.
+            -- is for a CR 603.7 delayed entry. Empty for a bearer that has since
+            -- left, there being no object to ask -- whether it arrived here out of
+            -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)

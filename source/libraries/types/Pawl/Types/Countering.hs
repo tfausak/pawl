@@ -58,7 +58,7 @@ data Countering = MkCountering
     --
     -- Even for a source that is still there, re-deriving would read control at
     -- the scan boundary rather than at the event -- the divergence
-    -- GameState.battlefieldWhenTriggered closes for the objects the scan
+    -- GameState.battlefieldWhenTriggered exists to close for the objects the scan
     -- walks, and which this field does not have.
     controller :: PlayerId.PlayerId
   }
