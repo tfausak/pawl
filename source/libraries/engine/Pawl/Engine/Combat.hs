@@ -1797,8 +1797,9 @@ declareBlockers = do
           -- 509.3c on the attacking side: an attacker whose only blocker was put
           -- onto the battlefield blocking really does become blocked -- CR 509.4
           -- denies that creature having "blocked", not the attacker -- and this
-          -- misses it. So does the effect-blocks-it case. Neither has a producer
-          -- in the pool (#1146).
+          -- misses it. No producer in the pool puts a creature onto the
+          -- battlefield blocking (#1387). The rule's effect-says-so case is not
+          -- this function's: becomeBlocked above records the same event for it.
           --
           -- The defending player rides the event as it rides AttackerDeclared,
           -- computed the same way and for the same reason: CR 508.5 resolves the
