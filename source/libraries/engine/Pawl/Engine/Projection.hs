@@ -781,24 +781,23 @@ characteristicToughnessIn gs oid face = case seedCharacteristicPT face of
 
 -- What a CDA evaluated OFF the battlefield sees of the candidates its count
 -- sweeps: CR 613.1's projection for a candidate on the battlefield, and the
--- printed card for one anywhere else. CR 613.1 names no zone, so the split is not
--- the rule -- it is where the descent is bounded, and the off-battlefield half is
--- read as printed for that reason alone (gap #160).
+-- printed card for one anywhere else.
 --
--- The bound holds, and it holds without the printed half doing the work:
+-- WHICH projected view is the whole of the termination argument, and it is the
+-- battlefield half that carries it. fullView descends into the CR 613 fold, and
+-- the fold never comes back here: every count it evaluates reads viewUpTo, whose
+-- layer bound strictly decreases (see projectDeciding), and the only door into
+-- this function is viewOfCardIn, whose three callers -- a cost criterion, a mill
+-- tally, a land test -- all sit outside the fold. So the descent is one hop deep
+-- whatever the board holds. Injecting viewOfCardIn instead would not be: a CDA
+-- reading a candidate's POWER would re-enter this function on each candidate, and
+-- Tarmogoyf's sweep of every graveyard makes a Tarmogoyf in a graveyard one of
+-- its own candidates.
 --
---   * a BATTLEFIELD candidate enters the CR 613 fold, and the fold never comes
---     back here. Every count it evaluates reads viewUpTo, whose layer bound
---     strictly decreases (see projectDeciding), and the only door into this
---     function is viewOfCardIn, whose three callers -- a cost criterion, a mill
---     tally, a land test -- all sit outside the fold.
---
---   * an OFF-battlefield candidate is a printed face, which evaluates no count at
---     all. That is what stops Tarmogoyf's own sweep of every graveyard from
---     re-entering the Tarmogoyf in a graveyard that is one of its candidates.
---
--- So the descent is one hop deep whatever the board holds, where injecting
--- viewOfCardIn itself would not be.
+-- The off-battlefield half is therefore NOT a bound: projecting there terminates
+-- for the same reason, and doing it leaves the suite green. It stays printed
+-- because that is the posture of the readers this view serves, which is one gap
+-- (gap #160) rather than this one.
 candidateView :: GameState -> Count.ViewOf
 candidateView gs candidate =
   if Set.member candidate (GameState.battlefield gs)
