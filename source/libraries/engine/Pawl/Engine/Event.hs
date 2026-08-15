@@ -3814,7 +3814,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
               let lifeOf pid = fmap Player.life (Map.lookup pid (GameState.players gs))
                in case lifeOf attacked of
                     Nothing -> False
-                    Just theirs -> all (\pid -> maybe True (<= theirs) (lifeOf pid)) (Game.stillPlaying gs)
+                    Just theirs -> all (maybe True (<= theirs) . lifeOf) (Game.stillPlaying gs)
             _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared {} -> False
@@ -6616,7 +6616,7 @@ eventTriggers events gs =
       -- `bystanderZoneSpec` -- which reaches the same answer through the sample
       -- above, that being the reading that wins. The filter is kept identical here
       -- so the two cannot disagree on the fallback path.
-      laterGroups = drop 1 (List.scanr (\block acc -> Map.union (departuresIn block) acc) Map.empty groups)
+      laterGroups = drop 1 (List.scanr (Map.union . departuresIn) Map.empty groups)
       -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
       -- board that matters is "the appearance of objects immediately prior to the
       -- event", on which every permanent this same event removed was still

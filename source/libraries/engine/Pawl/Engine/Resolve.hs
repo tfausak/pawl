@@ -5105,7 +5105,7 @@ runPreventionRiders = do
 runPreventionRider :: Prevention.Prevention -> Game ()
 runPreventionRider prevention = case (Prevention.rider prevention, Recipient.objectOf (Prevention.recipient prevention)) of
   (Just rider, Just oid) -> do
-    was <- State.gets (\gs -> Map.lookup Binding.eventAmount (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))
+    was <- State.gets (Map.lookup Binding.eventAmount . maybe Map.empty Object.bindings . Game.lookupObject oid)
     State.modify' (bindAmountSlot oid Binding.eventAmount (Prevention.amount prevention))
     let targets = PreventionRider.targets rider
     Foldable.traverse_
