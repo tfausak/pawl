@@ -2530,25 +2530,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- whose only target is this slot: with it illegal, CR 608.2b's fizzle stops
     -- the resolution before any effect is applied.
     _ -> pure ()
-  -- The SECOND place mana reaches a pool, and the one CR 605.3b leaves over: a
-  -- mana ability is applied by Cost.tapForMana at payment and never resolves, but
-  -- an ability that adds mana is not automatically one. CR 605.1a classifies only
-  -- ACTIVATED abilities, and CR 605.1b makes a triggered ability a mana ability
-  -- only where it triggered from a mana ability's activation or resolution or
-  -- from mana being added -- so Burning-Tree Emissary's enters trigger uses the
-  -- stack (CR 603.3) and adds its {R}{G} here. Pawl.ManaSpec's Burning-Tree
-  -- Emissary group is the proof.
+  -- The SECOND place mana reaches a pool, and the one CR 106.3 names outright:
+  -- mana "may also be produced by ... the effects of abilities that aren't mana
+  -- abilities". A mana ability is applied by Cost.tapForMana at payment and never
+  -- resolves (CR 605.3b), but an ability that adds mana is not automatically one
+  -- -- CR 605.1a classifies only ACTIVATED abilities, and CR 605.1b makes a
+  -- triggered ability a mana ability only where it triggered from a mana ability's
+  -- activation or resolution or from mana being added. Burning-Tree Emissary's
+  -- enters trigger is neither, so it uses the stack (CR 603.3) and adds its {R}{G}
+  -- here; Pawl.ManaSpec's Burning-Tree Emissary group is the proof. No trigger
+  -- pawl can express meets CR 605.1b at all, so every triggered producer arrives
+  -- here; see #1572.
   --
-  -- CR 106.4 / 109.4a: into the ABILITY CONTROLLER's pool, which is what
-  -- `controller` holds and is not the active player. The type is decided by
-  -- Mana.producedTypes and the CR 106.3 tags by Mana.productionTagsGiven off this
-  -- ability's SOURCE, both of them the payment path's own readers, so the two
-  -- routes put identical units in a pool.
+  -- CR 106.4 / 109.5: into the pool of the player the effect's unnamed "you" is,
+  -- which for a triggered ability is its controller -- `controller` here, and not
+  -- the active player. The type is decided by Mana.producedTypes and the CR 106.3
+  -- tags by Mana.productionTagsGiven off this ability's SOURCE, both of them the
+  -- payment path's own readers, so the two routes put identical units in a pool.
   Effect.AddMana production -> do
     gs0 <- State.get
     case Mana.producedTypes source gs0 production of
-      -- CR 106.1: one mana. A mode adding two writes two of these effects, which
-      -- CR 608.2c runs in printed order.
+      -- One settled type is one mana. A clause adding two writes two of these
+      -- effects, which CR 608.2c runs in printed order.
       [manaType] ->
         State.modify'
           ( Mana.addMana

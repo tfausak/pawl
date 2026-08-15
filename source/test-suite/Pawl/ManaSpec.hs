@@ -2114,10 +2114,11 @@ burningTreeSpec s registry = Spec.describe s "Burning-Tree Emissary" $ do
     Spec.assertEqWith s "alice's pool is {R} then {G}, in printed order (CR 608.2c)" (poolUnits after) [plainRed, plainGreen]
     Spec.assertEqWith s "the stack is empty again" (length (GameState.stack after)) 0
 
-  -- CR 109.4a/113.7: the mana is the ABILITY CONTROLLER's, which is not the same
-  -- seat as the active player -- alice is active and holds priority on both
-  -- boards, and the Emissary's controller is the only difference between them.
-  Spec.it s "CR 109.4a the mana goes to the ability's controller, not the active player" $ do
+  -- CR 109.5: "add {R}{G}" says "you", which for a triggered ability is the
+  -- controller of the object when it triggered -- not the same seat as the active
+  -- player. alice is active and holds priority on both boards, and the Emissary's
+  -- controller is the only difference between them.
+  Spec.it s "CR 109.5 the mana goes to the ability's controller, not the active player" $ do
     bte <- S.printingOf s registry "Burning-Tree Emissary"
     let (_, alices) = burningTreeResolved bte S.alice
         (_, bobs) = burningTreeResolved bte S.bob
