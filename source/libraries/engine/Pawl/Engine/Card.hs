@@ -784,6 +784,11 @@ hasSharedTypeLine card = case Card.layout card of
 -- printed P/T boxes and colour indicator stay for the same reason: neither is
 -- rules text, and no printing has either.
 --
+-- pawl stores that shared line on every face rather than once, so what holds the
+-- copies to being copies is a corpus lint -- Pawl.CardSpec's "CR 709.5a a Room's
+-- faces agree on their shared type line". Without it unionTypeLines above would
+-- merge two disagreeing halves into a line neither prints.
+--
 -- The NAME is rebuilt rather than folded, because CR 709.4a's join is over the
 -- names the object HAS: a Room with one door open has one name, and joining an
 -- emptied one would leave the "Roaring Furnace//" of a half that was subtracted.
