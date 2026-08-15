@@ -725,8 +725,8 @@ viewOfCard face =
 -- characteristic-defining power can be evaluated: CR 604.3 and CR 208.2a make a
 -- CDA function in all zones, so Tarmogoyf in a library has the power its count
 -- says. The view a cost criterion and a mill tally take for an off-battlefield
--- card; viewOfCard survives for the FACE-only callers, and as the blind inner
--- view below.
+-- card; viewOfCard survives for the FACE-only callers, and as the off-battlefield
+-- half of candidateView below.
 --
 -- Not implemented: those readers take this view for a card that IS an object, so
 -- they read it as printed where the object has a CR 613 projection of its own
@@ -760,25 +760,14 @@ viewOfCardIn gs oid face =
 -- what controllerOf answers there (see defaultControllerOf and CR 108.4a). A
 -- searching player's perspective would be a different player's "you".
 --
--- The injected ViewOf is the CDA-BLIND viewOfCard, which is what bounds the
--- descent: Tarmogoyf's count sweeps every graveyard, so a Tarmogoyf in a
--- graveyard is one of its own candidates, and injecting this function would make
--- a CDA that read a candidate's POWER recur without end. Nothing in the pool
--- does -- swapping the injection leaves the suite green, since DistinctCardTypes
--- forces only Filter.cardTypes -- so the bound is unobserved today and is here
--- for the CDA that would observe it.
---
--- Not implemented: every candidate a CDA evaluated here sweeps is read as a
--- printed card rather than through its CR 613 projection, on the battlefield
--- (#1080) and off it (#160) alike. viewUpTo, the reader inside the fold, no
--- longer has that bound.
+-- The injected ViewOf is candidateView below: CR 613.1's projection for a
+-- candidate on the battlefield, the printed card for one off it.
 characteristicPowerIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
 characteristicPowerIn gs oid face = case seedCharacteristicPT face of
   Nothing -> printedPower face
   Just (CharacteristicPT.MkCharacteristicPT power _) ->
     let context = Filter.contextFor (controllerOf oid gs) (Just oid)
-        viewOf candidate = fmap viewOfCard (Game.faceOf candidate gs)
-     in Just (Quantity.determine viewOf context gs oid power)
+     in Just (Quantity.determine (candidateView gs) context gs oid power)
 
 -- characteristicPowerIn's mirror, reading CR 208.2a's other half. Every argument
 -- that function's comment makes is this one's too, the two differing only in
@@ -788,8 +777,33 @@ characteristicToughnessIn gs oid face = case seedCharacteristicPT face of
   Nothing -> printedToughness face
   Just (CharacteristicPT.MkCharacteristicPT _ toughness) ->
     let context = Filter.contextFor (controllerOf oid gs) (Just oid)
-        viewOf candidate = fmap viewOfCard (Game.faceOf candidate gs)
-     in Just (Quantity.determine viewOf context gs oid toughness)
+     in Just (Quantity.determine (candidateView gs) context gs oid toughness)
+
+-- What a CDA evaluated OFF the battlefield sees of the candidates its count
+-- sweeps: CR 613.1's projection for a candidate on the battlefield, and the
+-- printed card for one anywhere else. CR 613.1 names no zone, so the split is not
+-- the rule -- it is where the descent is bounded, and the off-battlefield half is
+-- read as printed for that reason alone (gap #160).
+--
+-- The bound holds, and it holds without the printed half doing the work:
+--
+--   * a BATTLEFIELD candidate enters the CR 613 fold, and the fold never comes
+--     back here. Every count it evaluates reads viewUpTo, whose layer bound
+--     strictly decreases (see projectDeciding), and the only door into this
+--     function is viewOfCardIn, whose three callers -- a cost criterion, a mill
+--     tally, a land test -- all sit outside the fold.
+--
+--   * an OFF-battlefield candidate is a printed face, which evaluates no count at
+--     all. That is what stops Tarmogoyf's own sweep of every graveyard from
+--     re-entering the Tarmogoyf in a graveyard that is one of its candidates.
+--
+-- So the descent is one hop deep whatever the board holds, where injecting
+-- viewOfCardIn itself would not be.
+candidateView :: GameState -> Count.ViewOf
+candidateView gs candidate =
+  if Set.member candidate (GameState.battlefield gs)
+    then fullView gs candidate
+    else fmap viewOfCard (Game.faceOf candidate gs)
 
 -- CR 208.1's PRINTED power box, for a card off the battlefield where there is no
 -- projection to read one from. Nothing for a face with no power box:
