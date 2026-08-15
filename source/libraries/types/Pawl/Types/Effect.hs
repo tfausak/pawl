@@ -107,10 +107,9 @@ data Effect card
   | -- | CR 701.23: the players Search.searcher names each search the library of
     -- each player Search.owner names, for Search.quantity cards matching
     -- Search.filter, put them where Search.destination says, then that library's
-    -- owner shuffles. The Filter is evaluated over the PRINTED-card view
-    -- (Projection.viewOfCardIn), plus CR 208.2a's characteristic-defining power;
-    -- not implemented: the library card's own projection (#160).
-    -- Evolving Wilds' "basic land card"
+    -- owner shuffles. The Filter is evaluated over each library card's own CR 613
+    -- projection (Projection.viewOfObject), so an effect that changed what the
+    -- filter reads is seen there. Evolving Wilds' "basic land card"
     -- (CR 701.23a / 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and
     -- CR 702.29e's basic landcycling is the same filter with the other
     -- destination.
