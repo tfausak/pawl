@@ -818,17 +818,18 @@ printedToughness face = case Face.characteristicPT face of
 -- Only Combat.declareAttackers appends one, which is what keeps CR 508.4's
 -- creature put onto the battlefield attacking -- one that "never attacked" --
 -- out of the answer.
--- CR 701.17a: does this event record THIS object being one of the cards a mill
--- milled? Only Pawl.Engine.Resolve's Mill arm appends one, which is what keeps a
--- surveil's or an explore's bin -- neither of them a mill -- out of the answer.
-milledIt :: ObjectId -> GameEvent.GameEvent -> Bool
-milledIt oid event = case event of
-  GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
-  _ -> False
-
 declaredIt :: ObjectId -> GameEvent.GameEvent -> Bool
 declaredIt oid event = case event of
   GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _) -> declared == oid
+  _ -> False
+
+-- CR 701.17a: does this event record THIS object being one of the cards a mill
+-- milled? declaredIt's twin over the other look-back entry. Only
+-- Pawl.Engine.Resolve's Mill arm appends one, which is what keeps a surveil's or
+-- an explore's bin -- neither of them a mill -- out of the answer.
+milledIt :: ObjectId -> GameEvent.GameEvent -> Bool
+milledIt oid event = case event of
+  GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
   _ -> False
 
 -- Shared assembly: fill a View from a projection's characteristics, a supplied
