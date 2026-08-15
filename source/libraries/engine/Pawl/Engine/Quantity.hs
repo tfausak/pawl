@@ -260,6 +260,15 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- is Player.counters' own convention and not this arm's invention: an absent
   -- key means the player has none of that counter, and "none" is a number. The
   -- outer Nothing is reserved for the reference, exactly as above.
+  --
+  -- "AN opponent has three or more poison counters" is therefore NOT written
+  -- here: it is an existential over the opponents, and it gets LifeTotal's
+  -- spelling -- Aggregation.Greatest over Scope.OverPlayers, with this arm
+  -- reading each candidate through PlayerRef.Candidate, since a maximum of at
+  -- least three and a member of at least three are the same claim. Viral
+  -- Spawning's Corrupted clause is that card, and CastSpec's three-seat
+  -- GrantedFlashback case is what proves the reading (a two-seat board cannot:
+  -- there "an opponent" and "your opponent" name one player).
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> case playersOf ref of
     Just [pid] -> fmap (toInteger . Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
     _ -> Nothing
