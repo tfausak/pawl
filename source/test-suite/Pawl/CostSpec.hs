@@ -758,8 +758,8 @@ frailExhumationBoard swamp nightmare exhumation battlefield buried =
 -- face.
 --
 -- Why the card is synthetic: no printing exiles a graveyard card qualified by
--- POWER as a cost, and Cost.exileCandidates and the mill tally are the only
--- readers left that match an off-battlefield card through the printed-card view
+-- POWER as a cost, and Cost.exileCandidates and the mill tally are the only two
+-- readers left that could ask about a power through the printed-card view
 -- (Projection.viewOfCardIn). Every printed power criterion over a graveyard --
 -- Alesha's and Reveillark's "target creature card with power 2 or less" -- is a
 -- TARGET, admitted off the full projection, and Imperial Recruiter's search reads
@@ -771,7 +771,8 @@ frailExhumationSpec s registry =
   Spec.describe s "Synthetic Frail Exhumation" $ do
     -- CR 613.1d layer 4: Urborg makes each of alice's four lands a Swamp, so the
     -- Nightmare in her graveyard is a 4/4 and the criterion refuses it. Read as
-    -- printed, only the one basic Swamp counts and it would be a 1/1.
+    -- printed the count reads 0 instead -- a printed-card candidate has no
+    -- controller for "you control" to match either -- and the cost was payable.
     Spec.it s "CR 613.1 Urborg makes the graveyard Nightmare too big to exile" $ do
       swamp <- S.printingOf s registry "Swamp"
       mountain <- S.printingOf s registry "Mountain"
