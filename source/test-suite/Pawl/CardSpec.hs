@@ -2844,26 +2844,6 @@ distinctFaceNamesOffends card =
   let names = fmap Face.name (NonEmpty.toList (Card.Type.faces card))
    in length (List.nub names) /= length names
 
--- Whether a layout's faces print ONE type line between them, so that pawl's
--- per-face storage is holding two copies of a single printed line rather than
--- two independent lines.
---
--- Exhaustive on purpose rather than `== Layout.Room`: a new layout is a claim
--- about whether its faces share a line, and equality would answer that claim
--- silently. CR 709.5 is the only layout that says "a single shared type line";
--- CR 709.4c gives an ordinary split card's halves separate lines it then
--- combines, CR 715.2 gives the adventurer card's inset frame its own line, and
--- CR 712.8f/712.8a give each face of a double-faced card the characteristics of
--- that face alone.
-sharesOneTypeLine :: Layout.Layout -> Bool
-sharesOneTypeLine layout = case layout of
-  Layout.Room -> True
-  Layout.Normal -> False
-  Layout.Split -> False
-  Layout.Adventure -> False
-  Layout.Transforming -> False
-  Layout.ModalDoubleFaced -> False
-
 -- CR 709.5a: "Each half of a split card with a shared type line shares the types
 -- and subtypes listed on that card's shared type line." pawl stores that
 -- literally -- both faces of a Room carry the whole line -- and
@@ -2872,19 +2852,24 @@ sharesOneTypeLine layout = case layout of
 -- without complaint, and Pawl.Engine.Card.unionTypeLines (set union) would merge
 -- the disagreement into a line NEITHER face prints.
 --
+-- Which cards the claim is about is Card.hasSharedTypeLine's answer rather than
+-- a `== Layout.Room` here, so that the lint and the engine's own subtraction
+-- range over exactly the same cards -- and so that a new layout has to state
+-- whether its faces share a line in the one place -Werror already asks.
+--
 -- Full type-line equality, not just the two sets CR 709.5a names. The types and
 -- subtypes are 709.5a's; the supertypes come from CR 709.5's premise instead --
 -- "permanent cards with a single shared type line" is one printed line, and a
--- supertype on it is on it for both halves. There is no printed Room with a
--- supertype today, so the stricter reading costs the corpus nothing and is the
--- one that keeps two stored copies of one line honest.
+-- supertype on it is on it for both halves. No printed Room has a supertype, so
+-- the stricter reading costs the corpus nothing and is the one that keeps two
+-- stored copies of one line honest.
 --
 -- Over the whole card rather than through anyFace, for distinctFaceNamesOffends'
 -- reason: this is a claim about the faces as a set.
 sharedTypeLineOffends :: Card.Type.Card -> Bool
 sharedTypeLineOffends card =
   let lines_ = fmap Face.typeLine (Card.Type.faces card)
-   in sharesOneTypeLine (Card.Type.layout card) && any (/= NonEmpty.head lines_) lines_
+   in Card.hasSharedTypeLine card && any (/= NonEmpty.head lines_) lines_
 
 -- Two things a TriggerCondition.AnyOf may not contain, checked at every depth so
 -- that a nested one cannot smuggle either in.
@@ -4351,7 +4336,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "CR 709.5a a Room's faces agree on their shared type line" $ do
     ps <- S.allPrintings s
     let offenders = filter (sharedTypeLineOffends . Printing.card) ps
-        rooms = filter (sharesOneTypeLine . Card.Type.layout . Printing.card) ps
+        rooms = filter (Card.hasSharedTypeLine . Printing.card) ps
     -- The guard the sibling lints carry, and it bites harder here than most: over
     -- a pool with no Room at all this sweep compares nothing, and over a Room with
     -- one face it compares a line against itself.
