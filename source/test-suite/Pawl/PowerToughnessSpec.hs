@@ -507,6 +507,46 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     Spec.assertEqWith s "no CDA survives layer 6" (PC.characteristicPT (Projection.project nightId gs)) Nothing
     Spec.assertEqWith s "1 power" (Projection.powerOf nightId gs) (Just 1)
     Spec.assertEqWith s "1 toughness" (Projection.toughnessOf nightId gs) (Just 1)
+  -- CR 208.2a makes the star in Nightmare's power box stand for an ability
+  -- printed in its TEXT BOX, and CR 604.3 makes it a characteristic-defining one.
+  -- CR 612.1 reaches any word printed on the object, so a Magical Hack naming
+  -- Swamp rewrites the words inside that ability too: the hacked Nightmare counts
+  -- Islands.
+  --
+  -- The two halves run in different layers, which is the whole of the ordering
+  -- argument. ChangeSubtypeWord is layer 3 (CR 613.1c) and rewrites the
+  -- UNEVALUATED quantity; applyCharacteristicPT determines it at layer 7a (CR
+  -- 613.4a). The last assertion is what shows the pair really is that way round:
+  -- an Island entering AFTER the Hack resolved still moves the P/T, which a swap
+  -- that had baked a number in at layer 3 could not do.
+  --
+  -- NO TWO READINGS OF THE CDA AGREE ON THIS BOARD. alice has 4 Swamps and 1
+  -- Island, bob has 1 Swamp and 2 Islands, so "Swamps you control" is 4, "Islands
+  -- you control" 1, "Swamps anyone controls" 5 and "Islands anyone controls" 3.
+  -- alice's lone Island is also the {U} that pays for the Hack.
+  --
+  -- THE NEGATIVE is the same board and the same spell with one word changed:
+  -- Forest -> Island instead of Swamp -> Island. Nightmare's CDA names no Forest,
+  -- so it stays 4/4 -- which a rewrite that blanked or greedily replaced the
+  -- quantity would fail.
+  Spec.it s "CR 612.1 a Magical Hack makes Nightmare's CDA count Islands" $ do
+    nightmare <- S.printingOf s registry "Nightmare"
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    magicalHack <- S.printingOf s registry "Magical Hack"
+    let lands = S.landsFor island S.bob 2 (S.landsFor swamp S.bob 1 (S.landsFor swamp S.alice 4 (S.landsInPlay island 1)))
+        (nightId, withNight) = S.addCreature nightmare S.alice lands
+        (withHack, hackSpell) = S.handOne magicalHack withNight
+        hackTo from to =
+          let cast = S.runPure (hackAt nightId from to) withHack (S.cast S.alice hackSpell)
+           in S.runPure (hackAt nightId from to) cast Stack.resolveTop
+        hacked = hackTo Subtype.Swamp Subtype.Island
+        unhacked = hackTo Subtype.Forest Subtype.Island
+        andAnotherIsland = snd (S.addCreature island S.alice hacked)
+    Spec.assertEqWith s "4 Swamps you control, as printed" (S.powerToughnessOf nightId withNight) (Just (4, 4))
+    Spec.assertEqWith s "hacked, it counts the 1 Island you control" (S.powerToughnessOf nightId hacked) (Just (1, 1))
+    Spec.assertEqWith s "and follows a second Island that enters after the Hack resolved" (S.powerToughnessOf nightId andAnotherIsland) (Just (2, 2))
+    Spec.assertEqWith s "the same Hack naming Forest reaches nothing in the CDA" (S.powerToughnessOf nightId unhacked) (Just (4, 4))
   Spec.it s "CR 303.4m: an attached Unholy Strength gives the enchanted creature +2/+1" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     unholyStrength <- S.printingOf s registry "Unholy Strength"
