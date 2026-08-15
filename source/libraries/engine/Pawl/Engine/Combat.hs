@@ -1712,9 +1712,8 @@ declareBlockers :: Game ()
 declareBlockers = do
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
-  Monad.unless (null attacking)
-    . Monad.forM_ (Maybe.maybeToList (Combat.defender (GameState.combat start)))
-    $ \pid -> do
+  Monad.unless (null attacking) $ do
+    Monad.forM_ (Maybe.maybeToList (Combat.defender (GameState.combat start))) $ \pid -> do
       gs <- State.get
       let candidates = legalBlockers pid gs
       Monad.unless (null candidates) $ do
@@ -1821,3 +1820,34 @@ declareBlockers = do
                 let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
                  in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker))) h) g (Set.toList becameBlocked)
             )
+    -- CR 509.1h's second half, and the last thing the turn-based action does:
+    -- every attacking creature the declaration named no blockers for became an
+    -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader --
+    -- the glossary sends "attacks and isn't blocked" to this rule.
+    --
+    -- OUTSIDE the loop above, and that placement is the whole fix: the loop is
+    -- guarded three times over -- on there being a defending player, on that
+    -- player having a legal blocker, and on the declaration naming a pair -- and
+    -- a board where nobody can block trips all three, which is exactly the board
+    -- where every attacker is unblocked. Rule 509.1h has no such condition; it
+    -- speaks of "one with no creatures declared as blockers for it", and a
+    -- declaration that named nothing is still a declaration.
+    --
+    -- Read off the LIVE state rather than `attacking` and rather than
+    -- declareBlockers' own `declaration`, since CR 509.1f's block costs can
+    -- change the board between the two: the attack record is what the action
+    -- leaves behind, and Combat.blockers keyed by attacker is CR 509.1h's status
+    -- itself (isBlocked). An attacker Combat.becomeBlocked reached first is
+    -- therefore already in the map and is skipped here, which is the rule's
+    -- "an effect says that it becomes blocked" beating the declaration to it.
+    --
+    -- Recorded ONCE, here, and never sampled again. That is the rule's last
+    -- sentence: an attacker keeps the blocked status even after every creature
+    -- blocking it leaves combat, so an entry whose SET has emptied out must not
+    -- produce this event later. Combat.blockers' KEY surviving that removal is
+    -- what makes reading the map sound at this one moment and unsound at any
+    -- other.
+    State.modify' $ \g ->
+      let c = GameState.combat g
+          unblocked = filter (\oid -> not (Map.member oid (Combat.blockers c))) (Map.keys (Combat.attackers c))
+       in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerUnblocked oid) h) g unblocked

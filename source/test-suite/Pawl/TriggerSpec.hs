@@ -49,6 +49,8 @@
 -- `prowessSpec`. CR 509.3a's blocking-side declaration trigger, the mirror of
 -- CR 508.3a's, with Pride Guardian -- `selfBlocksSpec`. CR 509.3c's attacking
 -- side of that same declaration, with Sacred Prey -- `selfBecomesBlockedSpec`.
+-- CR 509.1h's UNBLOCKED branch of that declaration, with Eternal of Harsh
+-- Truths at three seats -- `selfAttacksUnblockedSpec`.
 -- CR 702.45 bushido, the one such keyword to name both of those events, with
 -- Inner-Chamber Guard --
 -- `bushidoSpec`. CR 509.3d's once-per-blocker form of the same declaration,
@@ -4153,6 +4155,106 @@ selfBecomesBlockedSpec s registry =
         Spec.it s "CR 509.3c blocking is not becoming blocked, so a blocking Sacred Prey gains nothing" $ do
           (gs, _, _) <- board ["Goblin Piker"] ["Sacred Prey"]
           Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer gs)) (Just 20)
+
+-- CR 509.1h read from the UNBLOCKED side: "an attacking creature ... with no
+-- creatures declared as blockers for it becomes an unblocked creature", which
+-- the glossary's "attacks and isn't blocked" entry sends here.
+-- selfBecomesBlockedSpec above is the other branch of the same declaration.
+--
+-- Eternal of Harsh Truths {2}{U} Creature -- Zombie Cleric 1/3 is the card, and
+-- it prints BOTH branches: afflict 2 (CR 702.130a, CR 509.3c) and "whenever this
+-- creature attacks and isn't blocked, draw a card". One board therefore shows
+-- the two branches excluding each other, and their observables are disjoint --
+-- a life total on the defending seat against a card in the attacking seat's
+-- hand.
+--
+-- THREE SEATS, for afflictSpec's reason: at two players the defending player and
+-- the attacker's one opponent collapse.
+--
+-- Every number is distinct on purpose: afflict is 2, the Eternal's power is 1,
+-- and the draw is 1 card. A leg that lost 2 life cannot be read as a leg that
+-- took 1 combat damage.
+--
+-- alice's library is stocked, or CR 121.3's draw from an empty library would put
+-- her hand at 0 in the leg that is supposed to show 1.
+selfAttacksUnblockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfAttacksUnblockedSpec s registry =
+  let -- Attacks `who` with everything and lets them block with everything.
+      attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      attacking who p = case p of
+        Prompt.ChooseDefender {} -> who
+        _ -> S.aggressiveAnswer p
+      -- The same, with CR 509.1's declaration switched off -- the control leg,
+      -- and the only difference between the two answerers.
+      declining :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      declining who p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> attacking who p
+      stock piker gs = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) gs [1 :: Int, 2, 3]
+      board theirs others = do
+        eternal <- S.printingOf s registry "Eternal of Harsh Truths"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (gs, ours, yours, hers) = S.threePlayerCombat [eternal] (fmap (const piker) theirs) (fmap (const piker) others)
+        pure (stock piker gs, ours, yours, hers)
+      -- All three life totals plus alice's hand as one reading, so no mutation
+      -- can hide behind the order the assertions happen to be written in.
+      state gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs, S.handSize S.alice gs)
+   in Spec.describe s "SelfAttacksUnblocked" $ do
+        -- The proving test and its control, on ONE board differing only in the
+        -- answer to Prompt.DeclareBlockers. Unblocked: alice draws, and bob takes
+        -- the Eternal's 1. Blocked: alice draws nothing, and bob loses 2 to
+        -- afflict instead of taking damage. Before this change the declaration
+        -- recorded no event for an unblocked attacker at all, so the first leg
+        -- read 0 cards.
+        Spec.it s "CR 509.1h whole card: an unblocked Eternal of Harsh Truths draws a card, a blocked one does not" $ do
+          (gs, _, yours, _) <- board [()] [()]
+          let unblocked = S.runCombat (declining S.bob) gs
+              blocked = S.runCombat (attacking S.bob) gs
+          case yours of
+            [piker] -> do
+              Spec.assertEqWith s "unblocked: alice drew 1, bob took the Eternal's 1" (state unblocked) (Just 20, Just 19, Just 20, 1)
+              Spec.assertEqWith s "blocked: no draw, and afflict 2 instead of damage" (state blocked) (Just 20, Just 18, Just 20, 0)
+              Spec.assertBool s (S.onBattlefield piker unblocked) "the unblocked leg left bob's Piker alone"
+            _ -> Spec.assertFailure s "fixture should give bob one Goblin Piker"
+        -- CR 509.1h's last sentence: "a creature remains blocked even if all the
+        -- creatures blocking it are removed from combat." The 1/3 Eternal kills
+        -- the 2/1 Piker at CR 510.2, emptying its Combat.blockers entry, and
+        -- alice still draws nothing through the end of combat. The falsifier is
+        -- an implementation that samples the map for an attacker with no
+        -- CURRENT blockers rather than recording the declaration's own event.
+        Spec.it s "CR 509.1h losing every blocker does not make the Eternal unblocked" $ do
+          (gs, ours, yours, _) <- board [()] [()]
+          let after = S.runCombat (attacking S.bob) gs
+          case (ours, yours) of
+            ([eternal], [piker]) -> do
+              Spec.assertBool s (not (S.onBattlefield piker after)) "the 2/1 Piker died to the Eternal's 1"
+              Spec.assertBool s (S.onBattlefield eternal after) "and the 1/3 Eternal survived the Piker's 2"
+              Spec.assertEqWith s "alice still drew nothing" (S.handSize S.alice after) 0
+            _ -> Spec.assertFailure s "fixture should give alice an Eternal and bob a Piker"
+        -- The board where NOBODY can block, which is the one the old code could
+        -- not see: with no creature on either defending side, CR 509.1's
+        -- declaration raises no prompt at all, and rule 509.1h still makes the
+        -- attacker unblocked. The falsifier is recording the event inside the
+        -- loop that is guarded on there being a legal blocker.
+        Spec.it s "CR 509.1h an attacker nobody could block is unblocked too" $ do
+          (gs, _, _, _) <- board [] []
+          Spec.assertEqWith s "alice drew 1, bob took the Eternal's 1" (state (S.runCombat (attacking S.bob) gs)) (Just 20, Just 19, Just 20, 1)
+        -- CR 508.5: the third seat. The only difference from the first leg above
+        -- is which opponent was attacked, and the draw is ONE either way -- the
+        -- ability's controller draws, not a card per opponent and not a card per
+        -- seat that did not block.
+        Spec.it s "CR 509.1h the draw follows the attack rather than the seat count" $ do
+          (gs, _, _, _) <- board [()] [()]
+          Spec.assertEqWith s "carol took the 1 this time, and alice still drew exactly 1" (state (S.runCombat (declining S.carol) gs)) (Just 20, Just 20, Just 19, 1)
+        -- CR 603.2: the condition is the BEARER's own attack. bob's Eternal is
+        -- standing still while alice's Piker goes by unblocked, so the
+        -- declaration records a GameEvent.AttackerUnblocked naming somebody else.
+        Spec.it s "CR 603.2 a bystanding Eternal of Harsh Truths draws nothing" $ do
+          eternal <- S.printingOf s registry "Eternal of Harsh Truths"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (gs, _, _, _) = S.threePlayerCombat [piker] [eternal] []
+              after = S.runCombat (declining S.bob) gs
+          Spec.assertEqWith s "bob took the Piker's 2 and drew nothing" (S.lifeOf S.bob after, S.handSize S.bob after) (Just 18, 0)
 
 -- CR 702.83a's exalted, which rule 702 states as a triggered
 -- ability, and with it CR 506.5 -- "attacks alone", the one attack-trigger form
@@ -8369,6 +8471,9 @@ representativeEvents cond =
         -- reasoning -- and this one binds that player nothing, which is the
         -- difference the pin catches.
         TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> one (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked departed S.carol))
+        -- The same declaration's unblocked branch, which carries the attacker
+        -- and nothing else -- so the floor it pins is the empty set.
+        TriggerCondition.SelfAttacksUnblocked -> one (GameEvent.AttackerUnblocked departed)
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         -- Every origin zone is admitted, but the floor is the same for all of
         -- them: the destination is always a graveyard, which CR 400.2 makes
@@ -8517,6 +8622,7 @@ everyTriggerCondition =
     TriggerCondition.SelfBlocksOneOrMore (Filter.Type.And []),
     TriggerCondition.SelfBecomesBlockedBy (Filter.Type.And []),
     TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.Type.And []),
+    TriggerCondition.SelfAttacksUnblocked,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
@@ -11429,6 +11535,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   selfBlocksOneOrMoreSpec s registry
   selfBlocksCreatureSpec s registry
   selfBecomesBlockedSpec s registry
+  selfAttacksUnblockedSpec s registry
   bushidoSpec s registry
   flankingSpec s registry
   exaltedSpec s registry

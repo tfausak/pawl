@@ -602,6 +602,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- PermanentEnters' reason.
   TriggerCondition.SelfBecomesBlockedBy _ -> []
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> []
+  TriggerCondition.SelfAttacksUnblocked -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
@@ -2204,6 +2205,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- The same rule's attacking-side form, whose Filter is a predicate over the
   -- blockers -- Serra Inquisitors' "black".
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> [f]
+  TriggerCondition.SelfAttacksUnblocked -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.SelfRevealedForMiracle -> []
   TriggerCondition.PlayerDiscards _ -> []

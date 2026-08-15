@@ -358,6 +358,7 @@ movedOf event = case event of
   GameEvent.BlockerDeclared {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
   -- The Moved event `counter` records alongside this one is rule 701.6a's zone
   -- change; this one only says the move WAS a countering. The Discarded case.
   GameEvent.SpellCountered _ -> Nothing
@@ -395,6 +396,7 @@ damageOf event = case event of
   GameEvent.BlockerDeclared {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
@@ -430,6 +432,7 @@ revealOf event = case event of
   GameEvent.BlockerDeclared {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
@@ -3089,6 +3092,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3148,6 +3152,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3182,6 +3187,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3222,6 +3228,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3274,6 +3281,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3321,6 +3329,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3376,6 +3385,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3427,6 +3437,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3476,6 +3487,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3524,6 +3536,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -3562,6 +3575,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -3621,6 +3635,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -3669,6 +3684,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -3722,6 +3738,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -3768,6 +3785,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     -- The bearer BECOMING blocked is the other side of the same declaration and
     -- not this condition: CR 509.3a's creature is the one doing the blocking.
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -3808,6 +3826,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     -- CR 509.3c's grouped event is the bearer BECOMING blocked, which is not a
     -- block by it.
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -3846,6 +3865,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlocksDeclared (BlocksDeclared.MkBlocksDeclared blocker count) -> blocker == bearer && count >= n
     GameEvent.BlockerDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -3900,6 +3920,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     -- attacker blocked rather than once for the declaration.
     GameEvent.BlockerDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -3937,6 +3958,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- instead; Pawl.TriggerSpec's two-blocker case is what tells the two apart.
   TriggerCondition.SelfBecomesBlocked -> case event of
     GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked oid _) -> oid == bearer
+    -- The same declaration's other branch, and CR 509.1h makes the two exclusive
+    -- for any one attacker.
+    GameEvent.AttackerUnblocked _ -> False
     -- CR 509.4's creature put onto the battlefield blocking never "blocked", but
     -- that is not why this is False: a blocker's own declaration is CR 509.3a's
     -- event, whoever it was declared against.
@@ -3991,6 +4015,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     -- The GROUPED event is CR 509.3c's, and matching it here would collapse two
     -- blockers into one trigger.
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.AttackerDeclared {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -4034,9 +4059,53 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           let admits blocker = maybe False (\view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f) (Projection.viewWithLastKnown blocker gs blocker)
            in any admits (Set.toList (Map.findWithDefault Set.empty bearer (Combat.blockers (GameState.combat gs))))
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerDeclared {} -> False
+    GameEvent.Moved {} -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Drew {} -> False
+    GameEvent.Revealed {} -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameDesignated {} -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.Mentored {} -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost {} -> False
+    GameEvent.LifeGained {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.VentureMarkerEntered {} -> False
+    GameEvent.BecameTarget {} -> False
+    GameEvent.LeftTheGame _ -> False
+    GameEvent.Milled {} -> False
+  -- CR 509.1h: the bearer became an UNBLOCKED creature, which the glossary's
+  -- "attacks and isn't blocked" entry sends here. SelfBecomesBlocked's arm above
+  -- is the other branch of the same turn-based action, and no attacker can
+  -- produce both events in one declaration.
+  --
+  -- The event alone answers it. Reading Combat.blockers instead would answer for
+  -- the board at scan time, and rule 509.1h's last sentence is what that gets
+  -- wrong: an attacker whose blockers all left combat is still blocked.
+  TriggerCondition.SelfAttacksUnblocked -> case event of
+    GameEvent.AttackerUnblocked oid -> oid == bearer
+    -- CR 509.1i's declaration events are the blocked side of the same action; an
+    -- attacker this one names got a blocker, so it is not unblocked.
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.AttackerBlocked {} -> False
+    GameEvent.BlockerDeclared {} -> False
+    GameEvent.BlocksDeclared {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -4088,6 +4157,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4133,6 +4203,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4178,6 +4249,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4236,6 +4308,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4292,6 +4365,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4338,6 +4412,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4386,6 +4461,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated {} -> False
@@ -4443,6 +4519,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4497,6 +4574,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4557,6 +4635,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4611,6 +4690,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4651,6 +4731,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4724,6 +4805,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -4753,6 +4835,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4803,6 +4886,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4854,6 +4938,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -4899,6 +4984,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -4962,6 +5048,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5003,6 +5090,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5050,6 +5138,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5088,6 +5177,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5143,6 +5233,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5186,6 +5277,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5263,6 +5355,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5317,6 +5410,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5356,6 +5450,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.BlockerDeclared {} -> False
     GameEvent.BlocksDeclared {} -> False
     GameEvent.AttackerBlocked {} -> False
+    GameEvent.AttackerUnblocked _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost {} -> False
@@ -5419,6 +5514,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+  TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
   TriggerCondition.SelfDies -> False
@@ -5864,6 +5960,10 @@ eventBindingSlots cond = case cond of
   -- CR 509.3e names a SET of blockers rather than one, and no reader in the
   -- pool reaches into it: Serra Inquisitors' payload names only itself.
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> Set.empty
+  -- CR 509.1h's unblocked branch names no second object at all -- no blocker,
+  -- and no defending player on GameEvent.AttackerUnblocked to bind one from.
+  -- eventBindings therefore has no arm and falls through to the empty map.
+  TriggerCondition.SelfAttacksUnblocked -> Set.empty
   -- CR 113.6k: the bearer of a library-to-graveyard trigger IS the arriving
   -- incarnation, so binding it again under `became` would be a second name for
   -- one object. Narcomoeba reads the source slot instead.
@@ -6150,6 +6250,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+  TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
   TriggerCondition.DamageToPlayerPrevented _ -> False
   TriggerCondition.PlayerGainsLife _ -> False
@@ -6357,6 +6458,7 @@ eventTriggers events gs =
         GameEvent.BlockerDeclared {} -> Map.empty
         GameEvent.BlocksDeclared {} -> Map.empty
         GameEvent.AttackerBlocked {} -> Map.empty
+        GameEvent.AttackerUnblocked _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
@@ -6486,6 +6588,7 @@ eventTriggers events gs =
         GameEvent.BlockerDeclared {} -> Map.empty
         GameEvent.BlocksDeclared {} -> Map.empty
         GameEvent.AttackerBlocked {} -> Map.empty
+        GameEvent.AttackerUnblocked _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
@@ -6597,6 +6700,7 @@ eventTriggers events gs =
         GameEvent.BlockerDeclared {} -> Map.empty
         GameEvent.BlocksDeclared {} -> Map.empty
         GameEvent.AttackerBlocked {} -> Map.empty
+        GameEvent.AttackerUnblocked _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
@@ -6703,6 +6807,7 @@ eventTriggers events gs =
         GameEvent.BlockerDeclared {} -> Map.empty
         GameEvent.BlocksDeclared {} -> Map.empty
         GameEvent.AttackerBlocked {} -> Map.empty
+        GameEvent.AttackerUnblocked _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
@@ -6913,6 +7018,7 @@ zonesTriggeredFrom cond = case cond of
   TriggerCondition.SelfBecomesBlocked -> battlefield
   TriggerCondition.SelfBecomesBlockedBy _ -> battlefield
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> battlefield
+  TriggerCondition.SelfAttacksUnblocked -> battlefield
   -- CR 702.29c: a cycling ability triggers from whatever zone the card winds up
   -- in, the graveyard for every printing in this pool, and a cycled card cannot be
   -- on the battlefield. eventTriggers' `cycledCard` is what actually serves it.
@@ -7095,6 +7201,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+  TriggerCondition.SelfAttacksUnblocked -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
   TriggerCondition.SelfDies -> False
@@ -7236,6 +7343,7 @@ stateTriggers gs
               TriggerCondition.SelfBecomesBlocked -> False
               TriggerCondition.SelfBecomesBlockedBy _ -> False
               TriggerCondition.SelfBecomesBlockedByOneOrMore _ -> False
+              TriggerCondition.SelfAttacksUnblocked -> False
               TriggerCondition.SelfCycled -> False
               TriggerCondition.SelfRevealedForMiracle -> False
               TriggerCondition.PlayerDiscards _ -> False

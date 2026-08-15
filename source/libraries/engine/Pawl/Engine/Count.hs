@@ -418,6 +418,7 @@ snapshotView gs shape event = case event of
   GameEvent.BlockerDeclared {} -> Nothing
   GameEvent.BlocksDeclared {} -> Nothing
   GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.AttackerUnblocked _ -> Nothing
   -- A countering (CR 701.6a) does move the spell, but this event is not that
   -- move: Event.counter records a Moved event alongside this one, and matching
   -- both would count one countering twice. It carries no snapshot either.

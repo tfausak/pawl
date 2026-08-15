@@ -1959,6 +1959,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- The same rule's attacking-side form, whose Filter is a predicate over the
   -- blockers.
   TriggerCondition.SelfBecomesBlockedByOneOrMore f -> TriggerCondition.SelfBecomesBlockedByOneOrMore (Filter.rewrite pairs f)
+  TriggerCondition.SelfAttacksUnblocked -> condition
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition
   TriggerCondition.SelfDies -> condition
