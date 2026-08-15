@@ -67,6 +67,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
+import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -2431,7 +2432,7 @@ storedPlayerScope effect = case effect of
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ scope playerEffect) -> Just (scope, playerEffect)
   _ -> Nothing
 
--- The Filters an EntryRewrite carries, on three different axes. CR 201.4a's is the
+-- The Filters an EntryRewrite carries, on four different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null
 -- Chamber's "other than a basic land card name"), a predicate over a CARD in the
 -- Oracle card reference rather than over an object on the board -- the same shape
@@ -2439,15 +2440,19 @@ storedPlayerScope effect = case effect of
 -- sacrifice carries one of the ordinary kind, over permanents on the battlefield
 -- (Shimatsu the Bloodcloaked's "any number of permanents"). CR 614.1c's as-enters
 -- reveal carries a third, over a CARD IN A HAND (Rustic Clachan's "a Kithkin
--- card"). None of the three is framed.
+-- card"). CR 707.5's copy choice carries a fourth, over permanents on the
+-- battlefield (Copy Enchantment's "any enchantment"). None of the four is framed.
 entryRewriteFilters :: EntryRewrite.EntryRewrite -> [Filter.Type.Filter Keyword.Keyword]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> [f]
   EntryRewrite.RevealOrTapped f -> [f]
-  -- CR 707.9's exceptions carry no Filter: an "except ..." clause states values,
-  -- never a criterion over objects (Pawl.Types.CopyException imports no Filter,
-  -- which is what keeps the count above honest).
-  EntryRewrite.AsCopy _ -> []
+  -- CR 707.5's eligible set -- Clone's "any creature", Copy Enchantment's "any
+  -- enchantment" -- is a criterion over permanents on the battlefield, so it
+  -- belongs in this walk. CR 707.9's exceptions beside it carry no Filter: an
+  -- "except ..." clause states values, never a criterion over objects
+  -- (Pawl.Types.CopyException imports no Filter, which is what keeps that
+  -- honest).
+  EntryRewrite.AsCopy (AsCopy.MkAsCopy f _) -> [f]
   EntryRewrite.ChoiceOf _ -> []
   EntryRewrite.ChooseColor -> []
   EntryRewrite.ChooseBasicLandType -> []

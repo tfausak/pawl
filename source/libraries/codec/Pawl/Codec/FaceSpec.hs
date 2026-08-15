@@ -18,6 +18,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
+import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -210,7 +211,7 @@ populatedFace =
     { Face.keywords = Set.singleton Keyword.Deathtouch,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
       Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing],
-      Face.replacementEffects = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy []))],
+      Face.replacementEffects = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [])))],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       Face.loyalty = Just (Loyalty.MkLoyalty 3),
@@ -245,7 +246,7 @@ populatedFaceJson =
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
     <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[]},"
     <> "\"modal\":{\"modes\":[{}]}}],"
-    <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"AsCopy\"}}}],"
+    <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"AsCopy\",\"value\":{\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}}}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"

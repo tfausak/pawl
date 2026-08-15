@@ -1,7 +1,6 @@
 module Pawl.Codec.EntryRewrite where
 
-import qualified Data.Maybe as Maybe
-import qualified Pawl.Codec.CopyException as CopyException
+import qualified Pawl.Codec.AsCopy as AsCopy
 import qualified Pawl.Codec.EntryOption as EntryOption
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -12,27 +11,13 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 
--- | The wire format is unchanged by the conversion to a bundle.
---
--- @AsCopy@ takes 'Arm.optionalPayload': CR 707.9's exceptions are omitted when
--- there are none, so a plain Clone's rewrite stays the nullary tag it has always
--- been, and one constructor accepts both shapes. That is the case
--- 'Arm.optionalPayload' exists for.
+-- | @AsCopy@ takes a required object payload: the eligible filter has no default
+-- (#1512), so the bare tag a plain Clone used to write is no longer a legal
+-- rewrite. CR 707.9's exceptions stay optional INSIDE that object.
 codec :: Codec.Codec EntryRewrite.EntryRewrite
 codec =
   Arm.tagged
-    [ -- CR 707.9's exceptions are ELIDED when empty, so the matcher answers
-      -- @Just Nothing@ for a plain Clone and @Just (Just xs)@ otherwise -- which
-      -- is what keeps the bare tag this arm has always written.
-      Arm.optionalPayload
-        "AsCopy"
-        (Common.list CopyException.codec)
-        (EntryRewrite.AsCopy . Maybe.fromMaybe [])
-        ( \x -> case x of
-            EntryRewrite.AsCopy [] -> Just Nothing
-            EntryRewrite.AsCopy exceptions -> Just (Just exceptions)
-            _ -> Nothing
-        ),
+    [ Arm.payload "AsCopy" AsCopy.codec EntryRewrite.AsCopy (\x -> case x of EntryRewrite.AsCopy y -> Just y; _ -> Nothing),
       Arm.payload "ChoiceOf" (Common.list EntryOption.codec) EntryRewrite.ChoiceOf (\x -> case x of EntryRewrite.ChoiceOf y -> Just y; _ -> Nothing),
       Arm.payload "WithCounters" WithCounters.codec EntryRewrite.WithCounters (\x -> case x of EntryRewrite.WithCounters y -> Just y; _ -> Nothing),
       Arm.nullary "ChooseColor" EntryRewrite.ChooseColor,

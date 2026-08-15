@@ -49,6 +49,7 @@ import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AbilityTriggered as AbilityTriggered
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.AttackerBlocked as AttackerBlocked
 import qualified Pawl.Types.AttackerDeclared as AttackerDeclared
@@ -743,7 +744,7 @@ apply batch candidate event =
     -- outer pattern would let a new EntryRewrite constructor fall through
     -- silently whenever it happened to pair with WouldEnter.
     (ReplacementEffect.EntryR (EntryR.MkEntryR _ rewrite), ProposedEvent.WouldEnter oid) -> case rewrite of
-      EntryRewrite.AsCopy exceptions -> do
+      EntryRewrite.AsCopy asCopy -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
         case Projection.controllerOf oid gs of
@@ -753,12 +754,27 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             let decider = Decide.deciderFor controller gs
-            let legal = Replacement.legalCopyTargets batch oid gs
-            answer <- Game.choose (Prompt.ChooseCopyTarget decider controller oid legal)
+            -- The eligible set is the CARD's, not this arm's (#1512): Clone says
+            -- "any creature" and Copy Enchantment "any enchantment", and the
+            -- battlefield walk that supplies "on the battlefield" is
+            -- legalCopyTargets'. Read HERE, at CR 614.12a's moment, so an entry
+            -- replacement applied earlier in the same batch is already visible.
+            let legal = Replacement.legalCopyTargets batch (AsCopy.eligible asCopy) oid gs
+            answer <-
+              if null legal
+                then -- With nothing eligible, declining is the only legal answer
+                -- -- a forced selection rather than an elision of options a
+                -- player could tell apart -- so the prompt is skipped rather
+                -- than asked and overruled. RevealOrTapped's posture below.
+                -- One candidate IS still asked: the card's "may" makes
+                -- declining a real fork.
+                  pure Nothing
+                else Game.choose (Prompt.ChooseCopyTarget decider controller oid legal)
             -- FILTERED, NOT TRUSTED (#222). legalCopyTargets is the ONLY thing
-            -- enforcing CR 614.12a's same-batch exclusion, so honouring an
-            -- unoffered answer would let a Clone copy a sibling token entering
-            -- beside it.
+            -- enforcing CR 614.12a's same-batch exclusion and the printed noun
+            -- phrase, so honouring an unoffered answer would let a Clone copy a
+            -- sibling token entering beside it, or a Copy Enchantment copy a
+            -- creature.
             let chosen = case answer of
                   Just src | List.elem src legal -> Just src
                   _ -> Nothing
@@ -771,7 +787,7 @@ apply batch candidate event =
                   -- (CR 707.9b) rather than an effect layered over them. Only on
                   -- this branch: a declined copy is no copying process, so its
                   -- exceptions do not happen either.
-                  let stamped = Replacement.applyCopyExceptions exceptions (copiedSnapshot src2 g)
+                  let stamped = Replacement.applyCopyExceptions (AsCopy.exceptions asCopy) (copiedSnapshot src2 g)
                       stamp o = o {Object.bindings = Binding.setCopy stamped (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 pure (Just event)
