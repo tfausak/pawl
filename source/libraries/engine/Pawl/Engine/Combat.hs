@@ -1712,9 +1712,8 @@ declareBlockers :: Game ()
 declareBlockers = do
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
-  Monad.unless (null attacking)
-    . Monad.forM_ (Maybe.maybeToList (Combat.defender (GameState.combat start)))
-    $ \pid -> do
+  Monad.unless (null attacking) $ do
+    Monad.forM_ (Maybe.maybeToList (Combat.defender (GameState.combat start))) $ \pid -> do
       gs <- State.get
       let candidates = legalBlockers pid gs
       Monad.unless (null candidates) $ do
@@ -1821,3 +1820,34 @@ declareBlockers = do
                 let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
                  in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker))) h) g (Set.toList becameBlocked)
             )
+    -- CR 509.1h's other half, performed once CR 509.1g has assigned the
+    -- blockers: every attacking creature the declaration named no blockers for
+    -- became an UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the
+    -- reader -- the glossary sends "attacks and isn't blocked" to this rule.
+    --
+    -- OUTSIDE the loop above, and the placement is the point. That loop is
+    -- guarded three times over -- on there being a defending player, on that
+    -- player having a legal blocker, and on the declaration naming a pair -- and
+    -- a board where nobody can block trips all three, which is exactly the board
+    -- on which every attacker is unblocked. Rule 509.1h carries no such
+    -- condition: a declaration that named nothing is still a declaration.
+    --
+    -- Read off the state as it now stands rather than off `attacking` or
+    -- `declaration`, because that state IS what the turn-based action left
+    -- behind: Combat.attackers is the attack record, and Combat.blockers keyed
+    -- by attacker is rule 509.1h's status itself (isBlocked).
+    --
+    -- Recorded ONCE, here, and never sampled again -- the rule's last sentence,
+    -- which keeps an attacker blocked after every creature blocking it leaves
+    -- combat. An entry whose SET has emptied out must therefore not produce this
+    -- event later, and TriggerSpec's "losing every blocker does not make the
+    -- Eternal unblocked" is what proves that timing.
+    --
+    -- Testing the KEY rather than the set is isBlocked's own reading, but here
+    -- it is a regression fence rather than proved behaviour: becomeBlocked is
+    -- the only writer of an empty set and nothing resolves before this line, so
+    -- swapping the two leaves the suite green.
+    State.modify' $ \g ->
+      let c = GameState.combat g
+          unblocked = filter (\oid -> not (Map.member oid (Combat.blockers c))) (Map.keys (Combat.attackers c))
+       in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerUnblocked oid) h) g unblocked

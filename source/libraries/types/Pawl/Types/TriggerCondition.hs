@@ -383,6 +383,30 @@ data TriggerCondition
     -- creature put onto the battlefield blocking -- record no event (#1146), as
     -- for every condition in this family.
     SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
+  | -- | "Whenever this creature attacks and isn't blocked" -- Eternal of Harsh
+    -- Truths'. The glossary entry for that phrase sends it to CR 509.1h: the
+    -- ability triggers when the creature becomes an unblocked attacking
+    -- creature, which is one branch of the same turn-based action
+    -- SelfBecomesBlocked reads the other branch of. Self-scoped like it.
+    --
+    -- Matched against GameEvent.AttackerUnblocked, which
+    -- Pawl.Engine.Combat.declareBlockers records once per attacker the
+    -- declaration left with no blockers. Once per attacker is the only arity the
+    -- phrase can have -- there is no per-blocker reading of "isn't blocked" --
+    -- so this needs no once-per-combat dedup of SelfBecomesBlocked's kind; the
+    -- event's own grouping is it.
+    --
+    -- The condition is NOT "the bearer attacked, and is not blocked right now".
+    -- Rule 509.1h fixes the status at the declaration and its last sentence
+    -- keeps it fixed, so a state test at any later point would answer for an
+    -- attacker whose blockers all died. Reading an event recorded at the
+    -- declaration is what makes that distinction hold.
+    --
+    -- Nothing is bound. The printed forms that name the defending player (Crypt
+    -- Cobra) are not in the pool, and GameEvent.AttackerUnblocked carries no
+    -- player to bind for them; the attacker is the bearer, already CR 113.7a's
+    -- source.
+    SelfAttacksUnblocked
   | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters.
     --

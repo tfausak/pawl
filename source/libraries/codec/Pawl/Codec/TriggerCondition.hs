@@ -49,6 +49,7 @@ codec =
       Arm.nullary "SelfBecomesBlocked" TriggerCondition.SelfBecomesBlocked,
       Arm.payload "SelfBecomesBlockedBy" filterCodec TriggerCondition.SelfBecomesBlockedBy (\x -> case x of TriggerCondition.SelfBecomesBlockedBy y -> Just y; _ -> Nothing),
       Arm.payload "SelfBecomesBlockedByOneOrMore" filterCodec TriggerCondition.SelfBecomesBlockedByOneOrMore (\x -> case x of TriggerCondition.SelfBecomesBlockedByOneOrMore y -> Just y; _ -> Nothing),
+      Arm.nullary "SelfAttacksUnblocked" TriggerCondition.SelfAttacksUnblocked,
       Arm.nullary "SelfCycled" TriggerCondition.SelfCycled,
       Arm.nullary "SelfRevealedForMiracle" TriggerCondition.SelfRevealedForMiracle,
       Arm.payload "PlayerDiscards" PlayerRelation.codec TriggerCondition.PlayerDiscards (\x -> case x of TriggerCondition.PlayerDiscards y -> Just y; _ -> Nothing),
