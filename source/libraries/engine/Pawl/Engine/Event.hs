@@ -594,7 +594,8 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- rules:
 --
 --   * COPY TARGETS. CR 614.12a puts the choice BEFORE the permanent enters, and
---     Clone may only copy a creature already ON the battlefield, so a sibling
+--     an as-enters copy may only copy a permanent already ON the battlefield
+--     (Clone's "any creature", Copy Enchantment's "any enchantment"), so a sibling
 --     entering in the same batch is not there yet at the moment the choice is
 --     made. No rule states that exclusion outright: it follows from 614.12a's
 --     timing plus the copy effect's own wording. CR 614.13a is the wrong cite for
