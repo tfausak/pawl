@@ -2057,6 +2057,9 @@ rewriteQuantity pairs quantity = case quantity of
   -- And a leaf: CR 701.9a's tally holds logged events, which name players and
   -- object ids rather than any word CR 612.1 could swap.
   Quantity.Type.CardsDiscardedThisTurn _ -> quantity
+  -- And a leaf: CR 120.1's damage is a logged event naming players and object ids,
+  -- not any word CR 612.1 could swap.
+  Quantity.Type.PlayersDealtDamageThisTurn _ -> quantity
   -- And a leaf: CR 400.7's entry is a logged zone change, which names object ids
   -- and zones rather than any word CR 612.1 could swap.
   Quantity.Type.EnteredThisTurn -> quantity
@@ -3053,6 +3056,7 @@ quantityReads q = case q of
   Quantity.Type.WasKicked -> Set.empty
   Quantity.Type.OpponentsAttacked _ -> Set.empty
   Quantity.Type.CardsDiscardedThisTurn _ -> Set.empty
+  Quantity.Type.PlayersDealtDamageThisTurn _ -> Set.empty
   Quantity.Type.EnteredThisTurn -> Set.empty
   Quantity.Type.BlockersBeyondFirst -> Set.empty
 

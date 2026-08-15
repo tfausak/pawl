@@ -15,6 +15,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Discarded as Discarded
 import Pawl.Types.Face (Face)
 import qualified Pawl.Types.Face as Face
@@ -38,6 +39,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import qualified Pawl.Types.Status as Status
@@ -775,6 +777,71 @@ enteredBattlefield event = case event of
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost {} -> Nothing
   GameEvent.LifeGained {} -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
+  GameEvent.VentureMarkerEntered {} -> Nothing
+  GameEvent.BecameTarget {} -> Nothing
+  GameEvent.LeftTheGame _ -> Nothing
+  GameEvent.Milled {} -> Nothing
+
+-- The PLAYER an event describes being dealt damage, if it describes one. CR
+-- 120.1's damage with a Recipient.ToPlayer, which is the only recipient CR 120.3a
+-- calls a player -- damage to a planeswalker or a battle its controller protects
+-- is not damage to that player, and neither is damage to a creature they control.
+--
+-- castOf's, discardOf's and enteredBattlefield's sibling, and here for their
+-- import-graph reason: the caller is Pawl.Engine.Quantity's
+-- PlayersDealtDamageThisTurn arm.
+--
+-- The `amount > 0` test is CR 120.8 -- "if a source would deal 0 damage, it does
+-- not deal damage at all" -- and a FENCE rather than a reachable filter on the
+-- pool as it stands: Resolve's DealDamage gates on `n > 0`, combat events are
+-- built with amount > 0 (CR 510.1a), and a fully prevented event is dropped
+-- rather than shrunk to nothing (CR 615.6, Event.applyDamageRewrite's PreventNext
+-- arm). What could still reach here is a DamageRewrite.SetAmount 0 or a
+-- Scale to 0, and neither has a producer in the pool.
+--
+-- The LifeLost event the same damage also files is deliberately not an arm. CR
+-- 120.3a makes the life loss a RESULT of the damage rather than the damage, so
+-- reading it would count a Sign in Blood's loss as damage; and CR 120.3b's infect
+-- damage causes no life loss at all, yet it is damage dealt to that player.
+damagedPlayer :: GameEvent -> Maybe PlayerId
+damagedPlayer event = case event of
+  GameEvent.DamageDealt ev ->
+    if DamageEvent.amount ev > 0
+      then case DamageEvent.target ev of
+        Recipient.ToPlayer pid -> Just pid
+        Recipient.ToCreature _ -> Nothing
+        Recipient.ToPlaneswalker _ -> Nothing
+        Recipient.ToBattle _ -> Nothing
+        Recipient.ToObject _ -> Nothing
+      else Nothing
+  -- CR 615.13's record of damage that did NOT happen, which is the opposite fact.
+  GameEvent.DamagePrevented {} -> Nothing
+  -- CR 120.3a's result, not the damage; see the haddock above.
+  GameEvent.LifeLost {} -> Nothing
+  GameEvent.LifeGained {} -> Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Drew {} -> Nothing
+  GameEvent.SpellCast {} -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.BecameDesignated {} -> Nothing
+  GameEvent.Evolved _ -> Nothing
+  GameEvent.Mentored {} -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
+  GameEvent.Moved {} -> Nothing
+  GameEvent.StepBegan {} -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Revealed {} -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
+  GameEvent.BlockerDeclared {} -> Nothing
+  GameEvent.BlocksDeclared {} -> Nothing
+  GameEvent.AttackerBlocked {} -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
   GameEvent.ControlChanged {} -> Nothing

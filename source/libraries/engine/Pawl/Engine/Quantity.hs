@@ -332,6 +332,28 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.CardsDiscardedThisTurn ref -> case playersOf ref of
     Just [pid] -> Just (toInteger (length (filter ((== Just pid) . Game.discardOf . snd) (Foldable.toList (GameState.events gs)))))
     _ -> Nothing
+  -- CR 120.1 / 608.2i: how many of the players this reference names were dealt
+  -- damage this turn. CardsDiscardedThisTurn's arm in footing -- a live fold over
+  -- GameState.events, whose extent Engine.beginTurnOf makes "this turn" -- and
+  -- IsMonarch's in arity: the question is asked of each named player separately, so
+  -- a reference naming several is answered by counting them rather than by asking
+  -- "whose?". Furious Spinesplitter's "for each opponent who" is that count, and
+  -- rule 702.54a's bloodthirst is the same count compared against 1.
+  --
+  -- The PLAYERS are counted and not the events, which is why this filters the
+  -- player list rather than the log: two bolts at one opponent is one opponent.
+  --
+  -- NO liveness test on the players counted, OpponentsAttacked's posture and for
+  -- its reason: the record is what the rule asks about, so an opponent who has
+  -- since left the game (CR 800.4) still answers -- though playersFor's Opponent
+  -- arm will already have dropped them from `pids`, so this only matters for a
+  -- reference that names a player outright.
+  --
+  -- An EMPTY log answers 0 rather than Nothing, as CardsDiscardedThisTurn's does.
+  -- What is unanswered is only the reference.
+  Quantity.PlayersDealtDamageThisTurn ref -> case playersOf ref of
+    Nothing -> Nothing
+    Just pids -> Just (toInteger (length (filter wasDealtDamage pids)))
   -- CR 400.7 / 608.2i read as a 0/1: did the object this evaluation is aimed at
   -- enter the battlefield this turn?
   --
@@ -377,6 +399,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       mOid
   where
     recur = evaluateAgainst viewOf context gs announcedOn mOid mView
+    -- Was this player dealt damage this turn? Game.damagedPlayer is what makes a
+    -- DamageDealt event name a player at all; see it for CR 120.3a's recipient and
+    -- for CR 120.8's zero.
+    wasDealtDamage pid = any ((== Just pid) . Game.damagedPlayer . snd) (GameState.events gs)
     -- CR 102.1's reference, resolved by Count.playersFor for every arm but the
     -- fold's own candidate. That one is answered HERE because this is where the
     -- candidate is: Count.evaluate's Scope.OverPlayers arm hands each candidate
@@ -489,6 +515,7 @@ substituteStar star quantity = case quantity of
   Quantity.WasKicked -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
+  Quantity.PlayersDealtDamageThisTurn _ -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
   -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
@@ -557,6 +584,8 @@ slots quantity = case quantity of
   Quantity.OpponentsAttacked _ -> Set.empty
   -- And an eighth, CR 701.9a's tally having nothing beside its PlayerRef either.
   Quantity.CardsDiscardedThisTurn _ -> Set.empty
+  -- And a ninth, CR 120.1's damage tally likewise.
+  Quantity.PlayersDealtDamageThisTurn _ -> Set.empty
   -- And a nullary arm, which names nothing at all: CR 400.7's entry is read
   -- against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.EnteredThisTurn -> Set.empty
@@ -607,6 +636,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.WasKicked -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
+  Quantity.PlayersDealtDamageThisTurn ref -> playerRefIsSlotless ref
   Quantity.EnteredThisTurn -> True
   Quantity.BlockersBeyondFirst -> True
   -- True because `slots` above DOES report this arm's slot, unlike the nested
@@ -655,6 +685,7 @@ bakeBound players quantity = case quantity of
   Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (bakePlayerRef players ref) kind)
   Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (bakePlayerRef players ref)
   Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (bakePlayerRef players ref)
+  Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (bakePlayerRef players ref)
   Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = bakePlayerRef players (ManaCount.Type.player c)}
   -- Both halves: the Scope says whose zone or which players, and an
   -- Aggregation.Greatest's per-member quantity may hide a reference of its own.
@@ -771,6 +802,7 @@ readsX quantity = case quantity of
   Quantity.WasKicked -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
+  Quantity.PlayersDealtDamageThisTurn _ -> False
   Quantity.EnteredThisTurn -> False
   Quantity.BlockersBeyondFirst -> False
   -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion
