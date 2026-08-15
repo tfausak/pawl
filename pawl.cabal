@@ -1059,6 +1059,7 @@ library types
     Pawl.Types.PreventionRider
     Pawl.Types.PreventNextDamage
     Pawl.Types.Printing
+    Pawl.Types.PrintingId
     Pawl.Types.ProductionTag
     Pawl.Types.Program
     Pawl.Types.ProjectedCharacteristics

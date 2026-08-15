@@ -37,6 +37,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -90,6 +91,28 @@ freshTimestamp :: GameState -> (Timestamp.Timestamp, GameState)
 freshTimestamp gs =
   let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
    in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
+
+freshPrintingId :: GameState -> (PrintingId.PrintingId, GameState)
+freshPrintingId gs =
+  let PrintingId.MkPrintingId n = GameState.nextPrintingId gs
+   in (PrintingId.MkPrintingId n, gs {GameState.nextPrintingId = PrintingId.MkPrintingId (n + 1)})
+
+-- Put a printing in the table and answer with the id that names it. The ONLY
+-- way to obtain a PrintingId, which is what makes a dangling one
+-- unconstructible.
+--
+-- Deliberately not deduplicating. Both callers already intern once and create
+-- many -- Pawl.Engine.Setup.internDeck over a deck's distinct entries,
+-- Pawl.Engine.Event over one token-creation event's count -- so a reverse index
+-- would pay the deep Ord Card this indirection exists to avoid, at every
+-- intern, to save entries the call sites do not generate.
+intern :: Printing.Printing -> GameState -> (PrintingId.PrintingId, GameState)
+intern printing gs =
+  let (pid, gs1) = freshPrintingId gs
+   in (pid, gs1 {GameState.printings = Map.insert pid printing (GameState.printings gs1)})
+
+printingOf :: PrintingId.PrintingId -> GameState -> Maybe Printing.Printing
+printingOf pid gs = Map.lookup pid (GameState.printings gs)
 
 -- Reject-not-repair, as payment already does: only a genuine permutation of the
 -- offered indices is honoured. Anything else -- a short answer, a duplicate, an

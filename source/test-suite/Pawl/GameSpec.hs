@@ -71,6 +71,7 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
@@ -1503,9 +1504,35 @@ trustedActionSpec s registry = Spec.describe s "TrustedActions" $ do
     Spec.assertBool s (elem (A.Activate srcId ability) (Action.legalActions S.alice ready)) "it is offered now"
     Spec.assertEqWith s "so the Sorcerer taps" (fmap Object.tapped (Game.lookupObject srcId after)) (Just TapState.Tapped)
 
+-- The intern table: a printing goes in, an id names it, and an id nothing
+-- minted names nothing. Minting only through Game.intern is what makes a
+-- dangling PrintingId unconstructible, which is why the table is game-local
+-- rather than a reference into the registry -- whose pool cannot cover a token
+-- or an emblem (CR 111.6 / 114.3).
+printingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printingSpec s registry = Spec.describe s "PrintingTable" $ do
+  Spec.it s "intern reads back the printing it was given" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let (pid, gs) = Game.intern mountain (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "printingOf" (Game.printingOf pid gs) (Just mountain)
+
+  Spec.it s "intern mints a distinct id per call" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let (a, gs1) = Game.intern mountain (Setup.emptyGame S.bothPlayers)
+        (b, _) = Game.intern mountain gs1
+    Spec.assertBool s (a /= b) "ids differ"
+
+  Spec.it s "an unminted id names nothing" $
+    Spec.assertEqWith
+      s
+      "printingOf"
+      (Game.printingOf (PrintingId.MkPrintingId 99) (Setup.emptyGame S.bothPlayers))
+      Nothing
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Game" $ do
   gameSpec s registry
+  printingSpec s registry
   actionSpec s registry
   objectFactSpec s registry
   engineSpec s registry

@@ -90,6 +90,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -1514,6 +1515,8 @@ oneMountainState mountain ph =
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 1,
+          GameState.printings = Map.empty,
+          GameState.nextPrintingId = PrintingId.MkPrintingId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,

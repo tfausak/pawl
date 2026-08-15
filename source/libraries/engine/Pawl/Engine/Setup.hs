@@ -29,6 +29,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.Printing (Printing)
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
@@ -129,6 +130,8 @@ emptyGame order =
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 0,
+          GameState.printings = Map.empty,
+          GameState.nextPrintingId = PrintingId.MkPrintingId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
@@ -574,6 +577,17 @@ funnelBack finalSub parent =
         { GameState.objects = Map.union allReturned keptParentObjects,
           GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
           GameState.nextObjectId = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub),
+          -- The subgame's cards come back as library objects above, and each
+          -- names its printing by id -- so the entries those ids name have to
+          -- come back too, or the returned cards would resolve to nothing.
+          --
+          -- Union is unambiguous rather than merely convenient:
+          -- subgameStateFrom builds the subgame as a record update on `parent`,
+          -- so it INHERITS the table and the counter whole. Anything the
+          -- subgame interned was minted above every id the parent held, so the
+          -- two tables never disagree about an id.
+          GameState.printings = Map.union (GameState.printings finalSub) (GameState.printings parent),
+          GameState.nextPrintingId = max (GameState.nextPrintingId parent) (GameState.nextPrintingId finalSub),
           GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub),
           -- CR 104.4b: the subgame's events are not a stretch during which the
           -- parent's players could not act -- they were playing the subgame.
