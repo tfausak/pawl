@@ -199,6 +199,9 @@ abilitiesFor keyword count = case keyword of
   -- first of them is a replacement effect, so unlike vanishing's arm above only
   -- one trigger lands here.
   Keyword.Fading _ -> List.genericReplicate count fading
+  -- CR 702.68b says each instance triggers separately, so a creature with
+  -- frenzy twice gets both bonuses -- poisonous' multiplicity.
+  Keyword.Frenzy n -> List.genericReplicate count (frenzy n)
   -- CR 702.43a's SECOND ability, one per instance -- CR 702.43b says each works
   -- separately, so a permanent with modular twice dies with two triggers and
   -- each moves the whole pile.
@@ -376,6 +379,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
+  Keyword.Frenzy _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -583,6 +587,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
+  Keyword.Frenzy _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -851,6 +856,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
+  Keyword.Frenzy _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
@@ -1194,6 +1200,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- reason, so two instances would place two lots of N -- rule 702.32 states no
   -- multiplicity clause of its own, and no printing carries fading twice.
   Keyword.Fading n -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Fade n))))
+  Keyword.Frenzy _ -> []
   -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind:
   -- "this permanent enters with N +1/+1 counters on it". One row per instance
   -- for the same reason, and CR 702.43b makes them add up.
@@ -1391,6 +1398,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Riot -> []
   Keyword.Vanishing _ -> []
   Keyword.Fading _ -> []
+  Keyword.Frenzy _ -> []
   Keyword.Modular _ -> []
   Keyword.Crew _ -> []
   Keyword.Fabricate _ -> []
@@ -1507,6 +1515,7 @@ familyOf keyword = case keyword of
   Keyword.Modular _ -> Just KeywordFamily.Modular
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
   Keyword.Fading _ -> Just KeywordFamily.Fading
+  Keyword.Frenzy _ -> Just KeywordFamily.Frenzy
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Crew _ -> Just KeywordFamily.Crew
@@ -2107,6 +2116,47 @@ bushidoHalf condition n =
         ( ModifyTarget.MkModifyTarget
             Duration.UntilEndOfTurn
             (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal (toInteger n))))
+            (ObjectRef.EachMatching Filter.IsSource)
+        )
+
+-- CR 702.68a: "'Frenzy N' means 'Whenever this creature attacks and isn't
+-- blocked, it gets +N/+0 until end of turn.'" Rule 702 states it as a triggered
+-- ability, and it is bushidoHalf with one term changed: the toughness bonus is
+-- zero, because rule 702.68a's bonus is +N/+0 where rule 702.45a's is +N/+N.
+--
+-- The BONUS is a continuous effect from a RESOLVING ability (CR 611.2), not
+-- from a static one: the keyword mints a trigger, the trigger uses the stack,
+-- and a player can respond to it. It modifies power without setting it, so CR
+-- 613.4c's layer 7c is where it applies, and CR 611.2a is the duration --
+-- "until end of turn" is stated by the ability, which CR 514.2 ends.
+--
+-- The condition is TriggerCondition.SelfAttacksUnblocked, which the glossary's
+-- "attacks and isn't blocked" entry sends to CR 509.1h -- so the bonus lands in
+-- the declare blockers step, after the declaration, rather than with the
+-- attack triggers of CR 508.2. Rule 509.1h's last sentence is what keeps a
+-- creature whose only blocker left combat from getting it.
+--
+-- Same payload shape as bushido's: "it" is the bearer, so
+-- ObjectRef.EachMatching Filter.IsSource, and CR 611.2c fixes that singleton as
+-- the effect begins. Single mode, no targets, ChooseExactly 1, so nothing is
+-- asked as the ability is placed -- rule 702.68a leaves nothing to choose, and
+-- has no "if" clause, so intervening = Nothing.
+frenzy :: Natural -> TriggeredAbility Card
+frenzy n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacksUnblocked,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.ModifyTarget
+        ( ModifyTarget.MkModifyTarget
+            Duration.UntilEndOfTurn
+            (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal 0)))
             (ObjectRef.EachMatching Filter.IsSource)
         )
 

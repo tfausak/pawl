@@ -70,6 +70,7 @@ codec =
       Arm.nullary "Haunt" Keyword.Haunt,
       Arm.nullary "SplitSecond" Keyword.SplitSecond,
       Arm.payload "Vanishing" Common.natural Keyword.Vanishing (\x -> case x of Keyword.Vanishing y -> Just y; _ -> Nothing),
+      Arm.payload "Frenzy" Common.natural Keyword.Frenzy (\x -> case x of Keyword.Frenzy y -> Just y; _ -> Nothing),
       Arm.payload "Poisonous" Common.natural Keyword.Poisonous (\x -> case x of Keyword.Poisonous y -> Just y; _ -> Nothing),
       Arm.payload "Annihilator" Common.natural Keyword.Annihilator (\x -> case x of Keyword.Annihilator y -> Just y; _ -> Nothing),
       Arm.payload "Reinforce" (Reinforce.codec codec) Keyword.Reinforce (\x -> case x of Keyword.Reinforce y -> Just y; _ -> Nothing),

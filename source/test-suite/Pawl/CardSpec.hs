@@ -2004,6 +2004,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.32a names no quality either, for rule 702.63a's reason above: the fade
   -- counters and the upkeep are in what Pawl.Engine.Keyword mints.
   Keyword.Fading _ -> []
+  -- CR 702.68a names no quality: the payload is a NUMBER, and the +N/+0 is
+  -- written into the ability Pawl.Engine.Keyword.frenzy mints.
+  Keyword.Frenzy _ -> []
   Keyword.Toxic _ -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.

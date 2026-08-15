@@ -50,7 +50,10 @@
 -- CR 508.3a's, with Pride Guardian -- `selfBlocksSpec`. CR 509.3c's attacking
 -- side of that same declaration, with Sacred Prey -- `selfBecomesBlockedSpec`.
 -- CR 509.1h's UNBLOCKED branch of that declaration, with Eternal of Harsh
--- Truths at three seats -- `selfAttacksUnblockedSpec`.
+-- Truths at three seats -- `selfAttacksUnblockedSpec`. CR 702.68 frenzy, the
+-- keyword whose whole content is that branch, granted rather than printed and
+-- landing on a vanilla so the bonus and the power stay distinct, with Frenzy
+-- Sliver and Venser's Sliver -- `frenzySpec`.
 -- CR 702.45 bushido, the one such keyword to name both of those events, with
 -- Inner-Chamber Guard --
 -- `bushidoSpec`. CR 509.3d's once-per-blocker form of the same declaration,
@@ -4257,6 +4260,145 @@ selfAttacksUnblockedSpec s registry =
           let (gs, _, _, _) = S.threePlayerCombat [piker] [eternal] []
               after = S.runCombat (declining S.bob) gs
           Spec.assertEqWith s "bob took the Piker's 2 and drew nothing" (S.lifeOf S.bob after, S.handSize S.bob after) (Just 18, 0)
+
+-- CR 702.68a's frenzy, which rule 702 states as a triggered ability: "'Frenzy N'
+-- means 'Whenever this creature attacks and isn't blocked, it gets +N/+0 until
+-- end of turn.'" selfAttacksUnblockedSpec above proves CR 509.1h's event; this
+-- group proves the keyword Pawl.Engine.Keyword.frenzy mints on top of it, and
+-- with it rule 702's first +N/+0 -- bushido's +N/+N with the toughness term at
+-- zero, which is why every reading below is a PAIR.
+--
+-- Frenzy Sliver {1}{B} Creature -- Sliver 1/1 is the card, and it prints frenzy
+-- as a GRANT -- "all Sliver creatures have frenzy 1" -- so the ability is minted
+-- off the projection's POST-LAYER keyword count rather than off a printed
+-- keyword. Venser's Sliver {5} Artifact Creature -- Sliver 3/3, a vanilla, is
+-- the Sliver it lands on, and that split is what keeps the numbers apart: the
+-- bonus is 1 and the attacker's power is 3, so a payload reading its source's
+-- own power would say 6 where the rule says 4, and one reading the granting
+-- permanent's would say 4/2.
+--
+-- THREE SEATS. Rule 702.68a names no defending player, so what the third seat
+-- buys here is narrower than afflictSpec's: at two players "the player attacked"
+-- and "the attacker's opponent" collapse, and a bonus wrongly scoped to the seat
+-- count rather than to the attack would read the same either way.
+--
+-- Giant Spider 2/4 is the blocker, so the BLOCKED leg carries an observable of
+-- its own rather than only an absence: 3 damage leaves it alive where the 4 a
+-- wrongly fired frenzy would deal kills it.
+--
+-- Readings of power and toughness are taken at the COMBAT DAMAGE step, after the
+-- trigger has resolved in the declare blockers step and before damage is dealt.
+frenzySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+frenzySpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.threePlayerCombat ours yours [])
+      -- CR 508.1's declaration narrowed to the named creatures, against `who`.
+      -- S.aggressiveAnswer attacks with everything and would take whichever
+      -- defender sorts first, so a case that is about WHICH creature and WHICH
+      -- seat has to say both.
+      plan :: PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      plan who attackers p = case p of
+        Prompt.ChooseDefender {} -> who
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        _ -> S.aggressiveAnswer p
+      -- The same, with CR 509.1's declaration switched off. The blocked and
+      -- unblocked legs below differ in this and nothing else.
+      declining :: PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      declining who attackers p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> plan who attackers p
+      atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
+   in Spec.describe s "Frenzy" $ do
+        -- The proving test and its control, on ONE board differing only in the
+        -- answer to Prompt.DeclareBlockers. The Frenzy Sliver stays home in both,
+        -- so what is told apart is the bonus and not the presence of the grant.
+        Spec.it s "CR 702.68a whole card: an unblocked Venser's Sliver is 4/3, a blocked one is 3/3" $ do
+          (gs, mine, theirs, _) <- board ["Frenzy Sliver", "Venser's Sliver"] ["Giant Spider"]
+          case (mine, theirs) of
+            ([sliver, venser], [spider]) -> do
+              Spec.assertEqWith
+                s
+                "unblocked: +1/+0 on the attacker, and none on the Frenzy Sliver at home"
+                (S.powerToughnessOf venser (atDamage (declining S.bob [venser]) gs), S.powerToughnessOf sliver (atDamage (declining S.bob [venser]) gs))
+                (Just (4, 3), Just (1, 1))
+              Spec.assertEqWith
+                s
+                "blocked: the attacker is its printed 3/3"
+                (S.powerToughnessOf venser (atDamage (plan S.bob [venser]) gs))
+                (Just (3, 3))
+              Spec.assertEqWith
+                s
+                "unblocked: bob took 4"
+                (S.lifeOf S.bob (S.runCombat (declining S.bob [venser]) gs))
+                (Just 16)
+              let blocked = S.runCombat (plan S.bob [venser]) gs
+              Spec.assertEqWith
+                s
+                "blocked: bob took nothing and the 2/4 Spider survived 3"
+                (S.lifeOf S.bob blocked, S.onBattlefield spider blocked)
+                (Just 20, True)
+            _ -> Spec.assertFailure s "fixture should give alice two Slivers and bob a Spider"
+        -- CR 509.1h's last sentence: "a creature remains blocked even if all the
+        -- creatures blocking it are removed from combat." The 3/3 Sliver kills the
+        -- 2/1 Piker at CR 510.2 and still never gets the bonus.
+        Spec.it s "CR 509.1h losing every blocker does not earn the bonus" $ do
+          (gs, mine, theirs, _) <- board ["Frenzy Sliver", "Venser's Sliver"] ["Goblin Piker"]
+          case (mine, theirs) of
+            ([_, venser], [piker]) -> do
+              let after = S.runCombat (plan S.bob [venser]) gs
+              Spec.assertBool s (not (S.onBattlefield piker after)) "the 2/1 Piker died to the Sliver's 3"
+              Spec.assertEqWith
+                s
+                "the Sliver is still its printed 3/3 and bob took nothing"
+                (S.powerToughnessOf venser after, S.lifeOf S.bob after)
+                (Just (3, 3), Just 20)
+            _ -> Spec.assertFailure s "fixture should give alice two Slivers and bob a Piker"
+        -- Rule 509.1h carries no condition about anyone being ABLE to block, so
+        -- the board where nobody can is the bonus' board too.
+        Spec.it s "CR 509.1h an attacker nobody could block gets the bonus" $ do
+          (gs, mine, _, _) <- board ["Frenzy Sliver", "Venser's Sliver"] []
+          case mine of
+            [_, venser] -> do
+              Spec.assertEqWith s "4/3 at the damage step" (S.powerToughnessOf venser (atDamage (plan S.bob [venser]) gs)) (Just (4, 3))
+              Spec.assertEqWith s "and bob took 4" (S.lifeOf S.bob (S.runCombat (plan S.bob [venser]) gs)) (Just 16)
+            _ -> Spec.assertFailure s "fixture should give alice two Slivers"
+        -- "ALL SLIVER CREATURES", read as the card's own filter: the bearer is in
+        -- it and a Hill Giant is not. Both attack unblocked on one board, so the
+        -- two halves cannot hide behind each other -- a grant that missed the
+        -- bearer and a grant that reached everything both leave bob at 14, and
+        -- only the pair of sizes tells them apart.
+        Spec.it s "CR 702.68a the grant reaches the bearer and stops at the Slivers" $ do
+          (gs, mine, _, _) <- board ["Frenzy Sliver", "Hill Giant"] []
+          case mine of
+            [sliver, giant] -> do
+              Spec.assertEqWith
+                s
+                "the 1/1 Sliver is 2/1 and the 3/3 Giant is untouched"
+                (S.powerToughnessOf sliver (atDamage (plan S.bob [sliver, giant]) gs), S.powerToughnessOf giant (atDamage (plan S.bob [sliver, giant]) gs))
+                (Just (2, 1), Just (3, 3))
+              Spec.assertEqWith s "bob took 2 and 3" (S.lifeOf S.bob (S.runCombat (plan S.bob [sliver, giant]) gs)) (Just 15)
+            _ -> Spec.assertFailure s "fixture should give alice a Frenzy Sliver and a Hill Giant"
+        -- The third seat, which CR 508.1b's announcement is what changes: bob
+        -- keeps his Spider and cannot block for carol, so the bonus follows the
+        -- attack rather than the seat. Rule 702.68a names no defending player,
+        -- and that is the point of asserting both life totals.
+        Spec.it s "CR 509.1h the bonus follows the attack rather than the seat count" $ do
+          (gs, mine, _, _) <- board ["Frenzy Sliver", "Venser's Sliver"] ["Giant Spider"]
+          case mine of
+            [_, venser] -> do
+              let after = S.runCombat (plan S.carol [venser]) gs
+              Spec.assertEqWith s "4/3 all the same" (S.powerToughnessOf venser (atDamage (plan S.carol [venser]) gs)) (Just (4, 3))
+              Spec.assertEqWith s "carol took the 4 and bob took nothing" (S.lifeOf S.bob after, S.lifeOf S.carol after) (Just 20, Just 16)
+            _ -> Spec.assertFailure s "fixture should give alice two Slivers"
+        -- CR 702.68b: "if a creature has multiple instances of frenzy, each
+        -- triggers separately" -- poisonous' multiplicity, asserted at the MINT
+        -- because no board in this pool grants a second instance.
+        Spec.it s "CR 702.68b each instance is its own ability" $ do
+          Spec.assertEqWith s "frenzy 1 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Frenzy 1) 2)) [Keyword.frenzy 1, Keyword.frenzy 1]
+          Spec.assertEqWith s "and frenzy 3 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Frenzy 3) 1)) [Keyword.frenzy 3]
 
 -- CR 702.83a's exalted, which rule 702 states as a triggered
 -- ability, and with it CR 506.5 -- "attacks alone", the one attack-trigger form
@@ -11640,6 +11782,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   selfBlocksCreatureSpec s registry
   selfBecomesBlockedSpec s registry
   selfAttacksUnblockedSpec s registry
+  frenzySpec s registry
   bushidoSpec s registry
   flankingSpec s registry
   exaltedSpec s registry
