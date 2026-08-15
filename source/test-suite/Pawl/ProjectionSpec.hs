@@ -2450,8 +2450,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   -- The gameplay-level proof of Projection.printedPower. Imperial Recruiter's
   -- entry trigger searches alice's library for "a creature card with power 2 or
-  -- less", and the candidates come from each library card's CR 613 projection,
-  -- whose layer 7a is where CR 208.2a's number is filled in.
+  -- less", and the candidates come from Projection.viewOfObject -- the card's own
+  -- CR 613 projection, whose layer 7a is where CR 208.2a's number is filled in.
   --
   -- THE CANDIDATE SET IS THE ASSERTION, not what was found: with Filter.power
   -- Nothing for every card off the battlefield, CR 208.1's PowerAtMost answered

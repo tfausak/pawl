@@ -792,8 +792,9 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
   Spec.it s "CR 701.23a Search (And [HasCardType Land, HasSupertype Basic]) offers a basic land, not a nonland" $ do
     -- P9: the Search filter reads each library card through its own CR 613
-    -- projection (Projection.viewOfObject), which for a card no continuous
-    -- effect reaches is the printed card.
+    -- projection (Projection.viewOfObject) -- the card is an object and has one
+    -- there like any other. For a card no continuous effect reaches, that view
+    -- is the printed card.
     -- With a Mountain (basic land) and a Piker (creature) both in the library,
     -- only the Mountain is a candidate: findFirst fetches it while the Piker
     -- stays put. The Piker is added SECOND, so it is the head of the library

@@ -89,6 +89,18 @@ limit --- the name of what you widened, the zone or type it now reaches, and
 the absolutes these claims are written in (`only`, `never`, `does not`, `no
 card`). Re-derive every hit and rewrite it to say what it actually rests on.
 
+Sweep `source/test-suite/` along with the libraries, and the file you are
+editing along with the ones you are not. Both are where the survivors keep
+turning up: the sites #1562 had to clean up afterwards were split between the
+engine and the specs, and included files the widening PR had itself edited.
+Every example in this section is an engine module, which is plausibly why the
+specs were skipped.
+
+The alternation that found the projection family, as a starting point rather
+than a checklist --- widen it with the words your own change makes false:
+
+    git grep -niE 'no projection|not projected|never projected|projection does not reach|walks the battlefield|only view'
+
 Then write the replacement so a later grep finds it. A comment that enumerates
 a type's arms BY NAME is turned up by the grep `CLAUDE.md` already asks for
 when you add a constructor; "all four of `Pawl.Types.Affected`" is turned up by

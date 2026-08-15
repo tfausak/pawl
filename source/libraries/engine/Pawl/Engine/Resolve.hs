@@ -3395,10 +3395,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ milledBy $ \(pid, cards) -> do
       arrived <- Maybe.catMaybes <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
       Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
-    -- The tally, counted off the PRINTED card the way Effect.Search's filter is
-    -- (CR 701.23a's reason: a card in a library has no projection), and read
-    -- from the pre-move state because CR 400.7 has since minted new ids. Rule
-    -- 728.1's "nonland" is a card-type question, which the printed face answers.
+    -- The tally, counted off the PRINTED card and read from the pre-move state
+    -- because CR 400.7 has since minted new ids. Rule 728.1's "nonland" is a
+    -- card-type question, which the printed face answers.
+    --
+    -- Not implemented: the milled card is an object and has a CR 613 projection
+    -- of its own, so a tally keyed on an axis some effect changed reads the wrong
+    -- number (#160). This reader's own choice rather than the zone's --
+    -- Effect.Search's CR 701.23a filter, once the same reader, now takes
+    -- Projection.viewOfObject.
     --
     -- Bound onto this effect's SOURCE, so a later effect of the same resolution
     -- reads it as Quantity.InSlot -- Destroy's "destroyed this way" binding
