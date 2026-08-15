@@ -7,6 +7,19 @@ the brief carries only what is specific to your unit.
 
 You hold the build. Nothing else is building while you are.
 
+## Before you plan
+
+`CLAUDE.md` says to distrust an issue body's claims. Distrust its estimate of
+SIZE the same way: three units in a row needed no new machinery at all, because
+a funnel the engine already routes through, or an ordering it already imposes,
+satisfied the rule outright --- and in two of them the issue's own analysis had
+overstated the work.
+
+So the cheapest first move on a "needs new machinery" issue is to find that
+funnel --- the one function every path to the behaviour goes through --- and
+read what it already gates or orders. When it turns out to satisfy the rule,
+the unit is a test and a comment.
+
 ## Before the first build
 
 Copy `cabal.project.local` in from the primary checkout. A fresh worktree does
@@ -34,9 +47,11 @@ real hang fails at any budget. Two subtrees carry their own budgets via
 `Tasty.localOption` in `Main.hs`, which beats the command line. CI sets 5s
 suite-wide through `flake.nix`'s `testFlags`.
 
-Never pipe `cabal test` or `cabal build` output --- it stalls a ~30s suite for
-minutes. One build at a time. No `cabal clean`; the incremental build under
-`pedantic` is sufficient.
+Never pipe `cabal test` or `cabal build` output. It stalls a ~30s suite for
+minutes, and under a backgrounded run it also blinds you: `cabal test | tail`
+leaves the output file EMPTY, so the run cannot be read at all. Redirect to a
+file and read the file. One build at a time. No `cabal clean`; the incremental
+build under `pedantic` is sufficient.
 
 Adding or deleting a module means staging `pawl.cabal` along with the module,
 so that `hooky fix` regenerates its `exposed-modules`; an unstaged `.cabal` is
@@ -52,6 +67,32 @@ Then find the sites `-Werror` will *not* name. See `CLAUDE.md`'s note on `{}`
 and `_` patterns for where those live, and say in the PR which ones you read
 and why each is correct as it stands. "I read all of them" is a finding;
 silence is not.
+
+## Prose the compiler cannot check
+
+A comment asserting a limit the engine used to have becomes false the moment
+the limit lifts, and nothing catches it: it carries no issue number, so
+`script/check-gaps.sh` never looks at it, and `-Werror` has nothing to say
+about a sentence. One sweep found roughly twenty --- "pawl's projection does
+not reach a hand", "walks the battlefield only", "a card in a library has no
+projection" --- each true when written.
+
+This genre is not mechanically checkable, and proposing a script for it wastes
+a cycle: the elision check works because that genre has fixed wording and an
+issue number to test against, and prose rot has neither. Judging one of these
+comments means knowing what the code now does, which is the thing no grep can
+answer.
+
+The discipline instead: when your change lets a capability reach somewhere it
+previously did not, grep the tree before you push for prose asserting the old
+limit --- the name of what you widened, the zone or type it now reaches, and
+the absolutes these claims are written in (`only`, `never`, `does not`, `no
+card`). Re-derive every hit and rewrite it to say what it actually rests on.
+
+Then write the replacement so a later grep finds it. A comment that enumerates
+a type's arms BY NAME is turned up by the grep `CLAUDE.md` already asks for
+when you add a constructor; "all four of `Pawl.Types.Affected`" is turned up by
+nothing, and that one had gone false against a five-arm type.
 
 ## Stale reads
 
@@ -214,6 +255,10 @@ told this separately.
   `script/check-census.sh` now catches the eponymous case --- run it, and edit
   the body it names. #875 and a row landed under another name are still yours
   alone.
+- **Landing a capability means reading what it unblocked.** `gh api
+  repos/tfausak/pawl/issues/N/dependencies/blocking` lists the issues that
+  named yours as their blocker; say in the PR body which of them are now
+  workable. Leave the link in place --- a satisfied one is the record.
 - **Closing #N means re-deriving every inline `(#N)` in the tree, not just the
   one at the site you fixed.** Other sites cite the same issue for their own
   reasons. One PR found three of four `(#379)` sites were guarded off by
