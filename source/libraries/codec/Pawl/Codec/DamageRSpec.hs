@@ -2,7 +2,10 @@
 
 module Pawl.Codec.DamageRSpec where
 
+import qualified Data.Sequence as Seq
+import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.DamageR as DamageR
+import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -17,16 +20,18 @@ spec s = Spec.describe s "Pawl.Codec.DamageR" $ do
   Spec.it s "MkDamageR" $
     Common.assertCodec
       s
-      DamageR.codec
+      (DamageR.codec (Effect.codec Card.codec))
       ( DamageR.MkDamageR
           { DamageR.matching =
               DamagePattern.MkDamagePattern
                 { DamagePattern.whichKind = Just DamageKind.Combat,
                   DamagePattern.whatSource = Filter.And [],
+                  DamagePattern.whatRecipient = Nothing,
                   DamagePattern.whichRecipient = Nothing
                 },
-            DamageR.rewrite = DamageRewrite.PreventAll
+            DamageR.rewrite = DamageRewrite.PreventAll,
+            DamageR.riders = Seq.empty
           }
       )
       """ {"matching":{"whichKind":{"type":"Combat"}},"rewrite":{"type":"PreventAll"}} """
-  Spec.it s "has a schema" $ Common.assertHasSchema s DamageR.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (DamageR.codec (Effect.codec Card.codec))

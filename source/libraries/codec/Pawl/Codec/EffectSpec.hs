@@ -620,7 +620,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
               Replace.uses = Uses.Once,
               Replace.origin = ReplacementOrigin.SelfReplacement,
               Replace.condition = Just (Condition.Compares (Compares.MkCompares (Quantity.Count threeArtifacts) Comparison.AtLeast (Quantity.Literal 3))),
-              Replace.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing) (DamageRewrite.SetAmount 4))
+              Replace.effect = ReplacementEffect.DamageR (DamageR.MkDamageR (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing Nothing) (DamageRewrite.SetAmount 4) Seq.empty)
             }
       )
       """ {"type":"Replace","value":{"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"SelfReplacement"},"condition":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Members"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},"effect":{"type":"DamageR","value":{"matching":{"whatSource":{"type":"IsSource"}},"rewrite":{"type":"SetAmount","value":4}}}}} """

@@ -10,6 +10,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CharacteristicPT as CharacteristicPT
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Defense as Defense
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
@@ -123,7 +124,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     activatedAbilities :: [ActivatedAbility.ActivatedAbility Card.Card],
     -- | CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two.
-    replacementEffects :: [ReplacementEffect.ReplacementEffect],
+    replacementEffects :: [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card)],
     -- | CR 603 layer 6: the object's triggered abilities after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card]

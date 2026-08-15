@@ -31,8 +31,10 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
+import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CounterChange as CounterChange
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
@@ -164,7 +166,7 @@ tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 -- Unconditional because read ahead (CR 702.155b) is not implemented (#841); the
 -- card that brings it is the one that must split this into rule 714.3a's arm and
 -- rule 714.3b's.
-entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect]
+entryReplacementsOf :: PC.ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card)]
 entryReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source.
   ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Lore 1)))

@@ -30,6 +30,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
@@ -61,6 +62,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DestructionCause as DestructionCause
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryR as EntryR
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -82,6 +84,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Prevention as Prevention
+import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
@@ -160,9 +163,10 @@ collect sources floating =
             -- which puts it outside the self-replacement class -- so this
             -- segment is never CR 616.1a's, whatever it replaces.
             ReplacementCandidate.origin = ReplacementOrigin.Other,
-            -- CR 615.5: a static replacement ability has no field to carry an
-            -- additional effect (#1105).
-            ReplacementCandidate.rider = Nothing
+            -- CR 615.5, built rather than copied: the additional effect is
+            -- printed on the ability (DamageR.riders) and the environment it
+            -- runs in is read off the live board (see `printedRider`).
+            ReplacementCandidate.rider = printedRider (Projection.controllerOf src sources) re
           }
       fromFloating active =
         ReplacementCandidate.MkReplacementCandidate
@@ -191,6 +195,33 @@ collect sources floating =
    in fmap fromPermanent (numberInstances (Projection.replacementsAffecting sources))
         <> fmap fromFloating floating
 
+-- CR 615.5: the additional effect a PERMANENT's static prevention ability
+-- prints, packaged with the environment it will run in.
+--
+-- Nothing wherever the ability prints none, which is every arm but DamageR and
+-- every DamageR whose `riders` is empty -- so the wildcard is over effects that
+-- have nowhere to write one, not over effects this function declines to read.
+--
+-- The environment is BUILT here rather than snapshotted at installation, which
+-- is the whole difference between this rider and a floating row's (see
+-- Pawl.Types.ActiveReplacement): this ability's source is on the battlefield, so
+-- CR 109.5's "you" is whoever controls it now, and a static ability targets
+-- nothing (CR 115.10a), so there are no chosen targets to carry -- the slot map
+-- is empty. A source the board can no longer answer for has no "you", and gets
+-- no rider rather than one performed by nobody.
+printedRider :: Maybe PlayerId -> ReplacementEffect (Effect.Effect Card) -> Maybe PreventionRider.PreventionRider
+printedRider you re = case re of
+  ReplacementEffect.DamageR damageR
+    | not (Seq.null (DamageR.riders damageR)),
+      Just controller <- you ->
+        Just
+          PreventionRider.MkPreventionRider
+            { PreventionRider.effects = DamageR.riders damageR,
+              PreventionRider.targets = Map.empty,
+              PreventionRider.controller = controller
+            }
+  _ -> Nothing
+
 -- CR 614.5 / 702.136b: number each gathered row by how many rows EQUAL to it
 -- came before, so a permanent holding one ability twice offers two instances
 -- rather than one -- "if a permanent has multiple instances of riot, each works
@@ -208,7 +239,7 @@ collect sources floating =
 -- replacement's position mid-loop. What the ordinal DOES prove is the duplicate
 -- itself -- dropping it to a constant reddens Pawl.ReplacementSpec's two
 -- "CR 702.136b riot twice" cases.
-numberInstances :: [(ObjectId, ReplacementEffect)] -> [(Natural, (ObjectId, ReplacementEffect))]
+numberInstances :: [(ObjectId, ReplacementEffect (Effect.Effect Card))] -> [(Natural, (ObjectId, ReplacementEffect (Effect.Effect Card)))]
 numberInstances =
   let step seen row =
         let n = Map.findWithDefault 0 row seen
@@ -311,7 +342,7 @@ applies gs event candidate =
         -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
         -- plus the one fact about the ROW rather than the event -- a shield
         -- spent to nothing is no longer a prevention effect.
-        (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite), ProposedEvent.WouldDealDamage de) ->
+        (ReplacementEffect.DamageR (DamageR.MkDamageR pat rewrite _), ProposedEvent.WouldDealDamage de) ->
           matchesDamagePattern gs (candidateContext candidate) pat de && unspent rewrite && admitsRecipient src rewrite de
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only. CR
@@ -536,13 +567,14 @@ matchesDamageSource gs context filter_ de =
   Filter.matches context (Projection.viewOfObject (DamageEvent.source de) gs) filter_
 
 -- CR 615.1 / 614.1a: does this damage event have the qualities the pattern
--- names? Three of them, and they are the three a printed clause narrows by: a
--- pattern naming no KIND admits combat and noncombat alike (CR 510.2's dealing
--- versus CR 608's), one narrowing the SOURCE admits only the damage a source it
--- describes is dealing (CR 120.1's "an object that deals damage is the source of
--- that damage" -- CR 609.7b's characteristic, or CR 614.15's identity), and one
--- naming a RECIPIENT admits only the damage addressed to the permanent or player
--- it names (CR 615.7).
+-- names? Four of them: a pattern naming no KIND admits combat and noncombat
+-- alike (CR 510.2's dealing versus CR 608's), one narrowing the SOURCE admits
+-- only the damage a source it describes is dealing (CR 120.1's "an object that
+-- deals damage is the source of that damage" -- CR 609.7b's characteristic, or
+-- CR 614.15's identity), one DESCRIBING the recipient admits only damage
+-- addressed to an object matching it (Stormwild Capridor's "to this creature"),
+-- and one NAMING a recipient admits only the damage addressed to the permanent
+-- or player the engine baked in (CR 615.7).
 --
 -- ONE reading of what a DamagePattern means, shared by the two questions that
 -- ask it: `applies` above, for CR 615.1's shields and CR 614.1a's replacements,
@@ -557,7 +589,25 @@ matchesDamagePattern :: GameState -> Filter.Context -> DamagePattern.DamagePatte
 matchesDamagePattern gs context pat de =
   maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
     && matchesDamageSource gs context (DamagePattern.whatSource pat) de
+    && maybe True (matchesDamageRecipient gs context de) (DamagePattern.whatRecipient pat)
     && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
+
+-- CR 615.1: does the damage's RECIPIENT have the qualities the pattern's PRINTED
+-- clause names -- Stormwild Capridor's "if noncombat damage would be dealt to
+-- this creature"?
+--
+-- Read in the candidate's own Context, matchesDamageSource's exactly: the two
+-- filters of one pattern must agree on what IsSource and CR 109.5's "you" mean,
+-- and for a permanent's static ability both are answered off the permanent.
+--
+-- False for a PLAYER recipient (CR 120.3a), which is the only answer a Filter can
+-- give about something that is not an object. Nothing is lost by it: a pattern
+-- saying nothing about the recipient carries Nothing rather than a trivial
+-- filter, so this is reached only where a card really did describe an object.
+matchesDamageRecipient :: GameState -> Filter.Context -> DamageEvent.DamageEvent -> Filter.Type.Filter Keyword.Type.Keyword -> Bool
+matchesDamageRecipient gs context de filter_ = case Recipient.objectOf (DamageEvent.target de) of
+  Nothing -> False
+  Just oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_
 
 -- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
 --
@@ -730,7 +780,7 @@ bucketOf candidate = case ReplacementCandidate.origin candidate of
   ReplacementOrigin.Other -> bucketOfEffect (ReplacementCandidate.effect candidate)
 
 -- CR 616.1b-e: which bucket an effect that is NOT CR 614.15's falls in.
-bucketOfEffect :: ReplacementEffect -> ReplacementBucket
+bucketOfEffect :: ReplacementEffect (Effect.Effect Card) -> ReplacementBucket
 bucketOfEffect re = case re of
   ReplacementEffect.ZoneChangeR {} -> ReplacementBucket.Other
   -- CR 616.1c: entering as a copy is its own, HIGHER bucket. The split only
@@ -820,7 +870,7 @@ bucketOfEffect re = case re of
 -- bucketOfEffect and Event.apply. A wildcard defaulting to False would hand an
 -- author who teaches Event.apply a new controller-reading rewrite an unasked choice
 -- instead of a build failure.
-readsApplier :: ReplacementEffect -> Bool
+readsApplier :: ReplacementEffect (Effect.Effect Card) -> Bool
 readsApplier re = case re of
   -- The destination zone is the effect's own second field, and the pattern is
   -- matched before Event.apply runs (Rest in Peace, Leyline of the Void).
@@ -1186,8 +1236,8 @@ consume identity_ = case identity_ of
 -- are deliberately NOT reduced, since they apply separately to each event. No
 -- card can print a PreventNext at all (see Pawl.Types.DamageRewrite), so this
 -- arm has no producer.
-setShield :: CandidateId -> DamagePattern.DamagePattern -> Natural -> Game ()
-setShield identity_ pat left = case identity_ of
+setShield :: CandidateId -> DamageR.DamageR (Effect.Effect Card) -> Natural -> Game ()
+setShield identity_ damageR left = case identity_ of
   CandidateId.OfPermanent {} -> pure ()
   CandidateId.OfFloating src ts ->
     State.modify' $ \gs ->
@@ -1197,7 +1247,7 @@ setShield identity_ pat left = case identity_ of
           rewrite active
             | not (mine active) = Just active
             | left == 0 = Nothing
-            | otherwise = Just active {ActiveReplacement.effect = ReplacementEffect.DamageR (DamageR.MkDamageR pat (DamageRewrite.PreventNext left))}
+            | otherwise = Just active {ActiveReplacement.effect = ReplacementEffect.DamageR damageR {DamageR.rewrite = DamageRewrite.PreventNext left}}
        in gs {GameState.replacements = Maybe.mapMaybe rewrite (GameState.replacements gs)}
 
 -- CR 615.1a: is this damage rewrite a PREVENTION effect, rather than one of CR
@@ -1321,7 +1371,7 @@ preventable gs de =
 -- `prevents`, which this delegates to.
 inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Bool
 inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate, event) of
-  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite), ProposedEvent.WouldDealDamage de) ->
+  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de) ->
     prevents rewrite && not (preventable gs de)
   _ -> False
 
@@ -1337,7 +1387,7 @@ inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate
 -- module carries is discharged by `prevents` above, which the guard delegates to.
 preventionBy :: ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
 preventionBy candidate before after = case (ReplacementCandidate.effect candidate, before) of
-  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite), ProposedEvent.WouldDealDamage de)
+  (ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _), ProposedEvent.WouldDealDamage de)
     | prevents rewrite ->
         let was = DamageEvent.amount de
             -- The event that did not happen prevented all of it (CR 615.6).
@@ -1548,7 +1598,7 @@ contested gs events =
 -- build here rather than silently going unasked about.
 contestedResource :: GameState -> ReplacementCandidate -> Maybe (Natural, [DamageEvent.DamageEvent] -> Natural)
 contestedResource gs candidate = case ReplacementCandidate.effect candidate of
-  ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite) -> case rewrite of
+  ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite _) -> case rewrite of
     DamageRewrite.PreventNext remaining -> Just (remaining, sum . fmap DamageEvent.amount)
     -- CR 122.1c: one counter per application, so a batch of n events demands n
     -- of them, and the permanent's counters are the supply.

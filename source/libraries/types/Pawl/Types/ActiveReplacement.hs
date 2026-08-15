@@ -1,5 +1,7 @@
 module Pawl.Types.ActiveReplacement where
 
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -46,7 +48,7 @@ import qualified Pawl.Types.Uses as Uses
 -- self-replacement effect to a resolving spell or ability, ruling static
 -- replacement abilities out.
 data ActiveReplacement = MkActiveReplacement
-  { effect :: ReplacementEffect.ReplacementEffect,
+  { effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card),
     source :: ObjectId.ObjectId,
     -- | CR 109.5's "you", BAKED as the row is installed rather than re-derived
     -- from `source`, the same posture Pawl.Types.ContinuousEffect and
@@ -65,11 +67,17 @@ data ActiveReplacement = MkActiveReplacement
     expiry :: Expiry.Expiry,
     uses :: Uses.Uses,
     origin :: ReplacementOrigin.ReplacementOrigin,
-    -- | CR 615.5's additional effect, for the one carrier that can hold one:
-    -- Nothing on every row but a shield installed by an
-    -- Effect.PreventNextDamage whose rider is non-empty. Copied forward to
-    -- Pawl.Types.ReplacementCandidate and then to Pawl.Types.Prevention, since
-    -- the row may be spent and dropped in the very application that fires it.
+    -- | CR 615.5's additional effect for a FLOATING row: Nothing on every row
+    -- but a shield installed by an Effect.PreventNextDamage whose rider is
+    -- non-empty. Copied forward to Pawl.Types.ReplacementCandidate and then to
+    -- Pawl.Types.Prevention, since the row may be spent and dropped in the very
+    -- application that fires it.
+    --
+    -- A whole Pawl.Types.PreventionRider rather than the bare program a card
+    -- writes (DamageR.riders), because this carrier is the one that must
+    -- snapshot: the spell that installed the row is gone, so its chosen targets
+    -- and its CR 109.5 "you" cannot be re-derived. A permanent's static ability
+    -- keeps both live and needs no such field.
     rider :: Maybe PreventionRider.PreventionRider
   }
   deriving (Eq, Ord, Show)

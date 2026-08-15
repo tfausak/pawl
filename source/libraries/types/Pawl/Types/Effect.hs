@@ -651,7 +651,7 @@ data Effect card
     -- NOT Pawl.Types.Clause.condition: that one gates whether a clause's
     -- instructions run at all, while this one gates only whether this opcode
     -- installs its row.
-    Replace Replace.Replace
+    Replace (Replace.Replace (Effect card))
   | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue names a step; Stonehorn Dignitary names a whole
     -- phase (CR 500.1).
@@ -725,9 +725,10 @@ data Effect card
     -- card.
     --
     -- NOT a Replace carrying a DamageR, for PreventNextDamage's reason: the
-    -- pattern must name the shielded permanent or player, which card data cannot
-    -- write. Fog IS such a Replace precisely because it shields nobody in
-    -- particular.
+    -- pattern must name the shielded permanent or player BY ID, which card data
+    -- cannot write -- DamagePattern.whatRecipient describes a recipient and
+    -- cannot pick out the one this resolution chose. Fog IS such a Replace
+    -- precisely because it shields nobody in particular.
     PreventAllDamage DurationRef.DurationRef
   | -- | CR 614.9: install a floating REDIRECTION effect -- Turn the Tables' "all
     -- combat damage that would be dealt to you this turn is dealt to target

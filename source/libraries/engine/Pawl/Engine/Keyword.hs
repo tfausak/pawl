@@ -1110,7 +1110,7 @@ foretellCost keywords =
 --
 -- The door Pawl.Engine.Cast uses, so that module installs a REPLACEMENT EFFECT
 -- it never inspects rather than asking which of the three keywords a card has.
-castFromGraveyardReplacementsOf :: Set Keyword -> [ReplacementEffect]
+castFromGraveyardReplacementsOf :: Set Keyword -> [ReplacementEffect (Effect.Effect Card)]
 castFromGraveyardReplacementsOf keywords =
   [castFromGraveyardExile | Maybe.isJust (flashbackCost keywords)]
     -- CR 702.127a's THIRD static ability: "if this spell was cast from a
@@ -1128,7 +1128,7 @@ castFromGraveyardReplacementsOf keywords =
     -- flashback's gap (#101) with it.
     <> [castFromGraveyardExile | hasJumpStart keywords]
 
-castFromGraveyardExile :: ReplacementEffect
+castFromGraveyardExile :: ReplacementEffect (Effect.Effect Card)
 castFromGraveyardExile =
   ReplacementEffect.ZoneChangeR
     ( ZoneChangeR.MkZoneChangeR
@@ -1172,13 +1172,13 @@ castFromGraveyardExile =
 -- different event classes. Every caller passes the whole list to the CR 616.1
 -- loop, which matches each row against the event it is offered, so no caller has
 -- to tell them apart.
-mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect]
+mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect (Effect.Effect Card)]
 mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toAscList counts)
 
 -- Exhaustive for abilitiesFor's reason: rule 702 keeps adding abilities that
 -- rewrite an entry, and the next one must break this build rather than silently
 -- produce nothing.
-mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
+mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect (Effect.Effect Card)]
 mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.Riot))
   -- CR 702.98a's FIRST static ability, riot's row with the declining half

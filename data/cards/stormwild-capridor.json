@@ -1,0 +1,88 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Stormwild Capridor",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "replacementEffects": [
+        {
+          "type": "DamageR",
+          "value": {
+            "matching": {
+              "whatRecipient": {
+                "type": "IsSource"
+              },
+              "whichKind": {
+                "type": "Noncombat"
+              }
+            },
+            "rewrite": {
+              "type": "PreventAll"
+            },
+            "riders": [
+              {
+                "type": "PutCounters",
+                "value": {
+                  "kind": {
+                    "type": "PlusOnePlusOne"
+                  },
+                  "quantity": {
+                    "type": "InSlot",
+                    "value": "thatMuch"
+                  },
+                  "ref": {
+                    "type": "EachMatching",
+                    "value": {
+                      "type": "IsSource"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Bird"
+          },
+          {
+            "type": "Goat"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

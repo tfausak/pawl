@@ -24,15 +24,18 @@ defaultWhatSource = Filter.And []
 -- arms, never authored on a card -- but
 -- this codec is structural over the record and so accepts one from card JSON.
 -- A corpus lint keeps the pool honest instead, as for PhasePattern's
--- `whosePhase`.
+-- `whosePhase`. `whatRecipient` beside it is the authored half and needs no
+-- such lint: it describes the recipient rather than naming one.
 codec :: Codec.Codec DamagePattern.DamagePattern
 codec = Fields.object $ do
   whichKind <- Fields.defaulted "whichKind" Nothing (Common.maybe DamageKind.codec) DamagePattern.whichKind
   whatSource <- Fields.defaulted "whatSource" defaultWhatSource (Filter.codec Keyword.codec) DamagePattern.whatSource
+  whatRecipient <- Fields.defaulted "whatRecipient" Nothing (Common.maybe (Filter.codec Keyword.codec)) DamagePattern.whatRecipient
   whichRecipient <- Fields.defaulted "whichRecipient" Nothing (Common.maybe Recipient.codec) DamagePattern.whichRecipient
   pure
     DamagePattern.MkDamagePattern
       { DamagePattern.whichKind = whichKind,
         DamagePattern.whatSource = whatSource,
+        DamagePattern.whatRecipient = whatRecipient,
         DamagePattern.whichRecipient = whichRecipient
       }

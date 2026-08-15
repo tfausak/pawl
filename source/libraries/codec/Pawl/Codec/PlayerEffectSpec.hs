@@ -216,7 +216,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing (Filter.And []) Nothing))
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing (Filter.And []) Nothing Nothing))
       """ {"type":"DamageCantBePrevented","value":{}} """
   -- CR 615.12 narrowed / Excruciator, "damage that would be dealt by this
   -- creature": the same effect keyed to its own source (CR 614.15's relation),
@@ -225,7 +225,7 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing))
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing Filter.IsSource Nothing Nothing))
       """ {"type":"DamageCantBePrevented","value":{"whatSource":{"type":"IsSource"}}} """
   -- CR 701.23 / Leonin Arbiter.
   Spec.it s "CantSearchLibraries" $

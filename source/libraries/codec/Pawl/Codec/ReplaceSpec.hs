@@ -2,6 +2,8 @@
 
 module Pawl.Codec.ReplaceSpec where
 
+import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Replace as Replace
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -23,7 +25,7 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
   Spec.it s "MkReplace, condition elided" $
     Common.assertCodec
       s
-      Replace.codec
+      codec
       ( Replace.MkReplace
           { Replace.duration = Duration.UntilEndOfTurn,
             Replace.uses = Uses.Once,
@@ -37,7 +39,7 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
   Spec.it s "MkReplace, condition written" $
     Common.assertCodec
       s
-      Replace.codec
+      codec
       ( Replace.MkReplace
           { Replace.duration = Duration.UntilEndOfTurn,
             Replace.uses = Uses.Once,
@@ -47,4 +49,8 @@ spec s = Spec.describe s "Pawl.Codec.Replace" $ do
           }
       )
       """ {"duration":{"type":"UntilEndOfTurn"},"uses":{"type":"Once"},"origin":{"type":"SelfReplacement"},"condition":{"type":"Compares","value":{"measured":{"type":"Literal","value":3},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}}},"effect":{"type":"DestructionR","value":{"type":"Regenerate"}}} """
-  Spec.it s "has a schema" $ Common.assertHasSchema s Replace.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s codec
+  where
+    -- The effect codec the card boundary would pass in (CR 615.5's riders ride
+    -- the DamageR arm underneath).
+    codec = Replace.codec (Effect.codec Card.codec)

@@ -1,5 +1,7 @@
 module Pawl.Types.ReplacementEntry where
 
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 
@@ -24,12 +26,13 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 --     one source installing two rows across a control change.
 --   * `origin` is constant across the bucket highestBucket already partitioned
 --     on, and `identity` is CR 614.5 bookkeeping no player chooses by.
---   * `rider` (CR 615.5) is Nothing for every candidate but a floating
---     prevention shield's, so differing here would take one source installing
---     two shields alike in pattern AND in remaining amount -- `effect` carries
---     both -- yet carrying different additional effects. That is one card
---     printing two prevention clauses of the same size with different riders,
---     which no printing does.
+--   * `rider` (CR 615.5) is derived from the two fields this entry already
+--     carries wherever a permanent's static ability supplies it -- the riders
+--     ride `effect` itself -- so it can differ only on a FLOATING shield, which
+--     would take one source installing two shields alike in pattern AND in
+--     remaining amount yet carrying different additional effects. That is one
+--     card printing two prevention clauses of the same size with different
+--     riders, which no printing does.
 --
 -- `effect` is the DISCRIMINATOR (#74): Coldsteel Heart's "This artifact enters
 -- tapped" and "As this artifact enters, choose a color" are two applicable
@@ -49,6 +52,6 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 -- the prompt is raised at all only when some other pair in the list differs.
 data ReplacementEntry = MkReplacementEntry
   { source :: ObjectId.ObjectId,
-    effect :: ReplacementEffect.ReplacementEffect
+    effect :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card)
   }
   deriving (Eq, Ord, Show)
