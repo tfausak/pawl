@@ -709,14 +709,15 @@ viewOfCard face =
 -- viewOfCard for a card that IS an object in some zone, so a
 -- characteristic-defining power can be evaluated: CR 604.3 and CR 208.2a make a
 -- CDA function in all zones, so Tarmogoyf in a library has the power its count
--- says, which is what Imperial Recruiter's "creature card with power 2 or less"
--- must read. The view a library search, a cost criterion and a mill tally take
--- for an off-battlefield card; viewOfCard survives for the FACE-only callers,
--- and as the blind inner view below.
+-- says. The view a cost criterion and a mill tally take for an off-battlefield
+-- card; viewOfCard survives for the FACE-only callers, and as the blind inner
+-- view below.
 --
 -- Not implemented: those readers take this view for a card that IS an object, so
 -- they read it as printed where the object has a CR 613 projection of its own
--- (#160). viewUpTo above is the reader that no longer does.
+-- (#160). viewUpTo above is the reader that no longer does, and neither does
+-- Resolve's library search -- Imperial Recruiter's "creature card with power 2
+-- or less" reads a full projection there, CDA power and all.
 --
 -- The power and toughness axes differ, CR 208.2a naming both, and so does the
 -- one axis that is not a characteristic at all: having an id is what lets CR
