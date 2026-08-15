@@ -2189,7 +2189,7 @@ tenRingsDrawSpec s registry =
         let (_, gs0) = S.addCreature tenRings S.alice (Setup.emptyGame S.bothPlayers)
          in List.foldl' (\g _ -> snd (S.addLibraryCard plains S.alice g)) (stockHand held plains gs0) [1 .. 20 :: Int]
    in Spec.describe s "TheTenRingsDraw" $ do
-        Spec.it s "CR 603.4 four cards in hand draws the difference, six, to reach ten" $ do
+        Spec.it s "CR 603.2b/121.1 four cards in hand draws the difference, six, to reach ten" $ do
           tenRings <- S.printingOf s registry "The Ten Rings"
           plains <- S.printingOf s registry "Plains"
           let atEnd = settle (beginEndStep (board tenRings plains 4))
@@ -2206,11 +2206,12 @@ tenRingsDrawSpec s registry =
           let atEnd = settle (beginEndStep (board tenRings plains 10))
           Spec.assertEqWith s "nothing on the stack" (length (GameState.stack atEnd)) 0
           Spec.assertEqWith s "and the hand is untouched" (S.handSize S.alice (resolveAll atEnd)) 10
-        -- CR 608.2c: "the difference" is read as the ability RESOLVES, not as it
-        -- triggered. Three cards arrive while it waits on the stack, so the draw
-        -- is three rather than the six the trigger-time hand of four would give
-        -- -- ten either way is impossible, since that reading ends on thirteen.
-        Spec.it s "CR 608.2c cards gained in response shrink the draw, which is read on resolution" $ do
+        -- CR 608.2h: "the difference" is information the effect requires, so it is
+        -- determined once, as the effect is APPLIED rather than as the ability
+        -- triggered. Three cards arrive while it waits on the stack, so the draw is
+        -- three rather than the six a trigger-time hand of four would give -- ten
+        -- either way is impossible, since that reading ends on thirteen.
+        Spec.it s "CR 608.2h cards gained in response shrink the draw, which is read on resolution" $ do
           tenRings <- S.printingOf s registry "The Ten Rings"
           plains <- S.printingOf s registry "Plains"
           let atEnd = settle (beginEndStep (board tenRings plains 4))
