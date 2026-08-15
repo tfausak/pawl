@@ -2833,7 +2833,10 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 --
 -- The permanent's own timestamp, counterGathered's choice: the grant has no
 -- source of its own to take one from. It is load-bearing only against a CR 613.1f
--- removal, layer-6 grants being commutative among themselves.
+-- removal, layer-6 grants being commutative among themselves -- and rule 701.60c's
+-- other half reads the SAME timestamp through abilityRemovalAfter, so one sentence
+-- gets one order. Pawl.CombatSpec's suspectedAbilityRemovalSpec is the pair of
+-- boards that proves the two halves move together.
 designationGathered :: GameState -> [Gathered]
 designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs))
   where

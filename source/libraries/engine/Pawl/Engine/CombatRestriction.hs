@@ -255,11 +255,11 @@ inForce gs =
       -- menace half is a characteristic, and lives in
       -- Pawl.Engine.Projection.designationGathered.
       --
-      -- Outside `anyMinted`, which asks about keywords, and outside
-      -- `keepsAbilities` below, which is the printed rows' pair of gates. Rule
+      -- Outside `anyMinted`, which asks about keywords, and it takes one half of
+      -- `keepsAbilities` below rather than the pair the printed rows take. Rule
       -- 701.60c states the restriction as quoted text, so what the designation
-      -- gives the permanent is an ABILITY -- but it is an ability the RULES grant,
-      -- and neither of those two gates is the question to ask about one:
+      -- gives the permanent is an ABILITY -- but an ability the RULES grant, which
+      -- the two halves of that gate stand differently towards:
       --
       --   * CR 613.1f's layer-6 removal reaches it, in CR 613.7 TIMESTAMP ORDER.
       --     The grant's timestamp is the permanent's own, which is what
@@ -269,23 +269,26 @@ inForce gs =
       --     earlier and leaves both in place, and one that arrived later wipes
       --     both. `keepsAbilities`'s blanket removal question cannot tell the two
       --     apart, which is what CombatSpec's pair of boards proves.
-      --   * CR 305.7 does not reach it at all: it strips "all abilities generated
-      --     from its rules text", and says outright that it "doesn't remove any
-      --     abilities that were granted to the land by other effects". Rule
-      --     701.60c's is granted by the rulebook rather than printed on the card,
-      --     so a suspected land whose subtype is set keeps it -- as it keeps the
-      --     menace, which the layer-4 strip never touched either.
+      --   * CR 305.7's layer-4 strip is asked, as `keepsRulesText`. Not
+      --     implemented: that rule reaches "all abilities generated from its rules
+      --     text" and says outright that it "doesn't remove any abilities that were
+      --     granted to the land by other effects", so it should not reach this one
+      --     at all -- and the menace half, which no layer-4 strip touches, already
+      --     does not (#1606).
       designationRows source = case Game.lookupObject source gs of
         Just obj
           | Set.member Designation.Suspected (Object.designations obj),
+            keepsRulesText source,
             not (removedAfter (Object.timestamp obj) source) ->
               [(source, [], CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.Type.IsSource) Nothing))]
         _ -> []
       -- The two ability losses the printed rows below check for: CR 305.7's
       -- basic-land subtype set, and CR 604.2 against a CR 613.1f layer-6 removal.
-      -- Both are about abilities GENERATED FROM THE CARD'S RULES TEXT, which is why
-      -- neither the minted rows above nor the designation row asks them.
-      keepsAbilities source = (null setEffs || Projection.liveAfterLayers setEffs source gs) && not (removed source)
+      -- Split, because the designation row above asks the first and not the second:
+      -- what a layer-6 removal costs a RULES-granted ability is a timestamp
+      -- question, and only the printed rows can settle it with a bare bit.
+      keepsRulesText source = null setEffs || Projection.liveAfterLayers setEffs source gs
+      keepsAbilities source = keepsRulesText source && not (removed source)
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
         Just face ->
