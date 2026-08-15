@@ -1135,6 +1135,7 @@ spinesplitterSpec s registry =
               atBobTwice = atEnd (hit spine (Recipient.ToPlayer S.bob) 5 (hit spine (Recipient.ToPlayer S.bob) 3 base))
               atAlice = atEnd (hit spine (Recipient.ToPlayer S.alice) 7 base)
               atBobsSentry = atEnd (hit spine (Recipient.ToCreature bobsSentry) 1 base)
+              bobPaid = atEnd (Event.payLife S.bob 6 base)
           Spec.assertEqWith s "CR 702.19: the printed trample is there" (Map.member Keyword.Type.Trample (Projection.keywordsOf spine base)) True
           Spec.assertEqWith s "nobody was dealt damage, so no counter" (countersOn spine quiet) 0
           Spec.assertEqWith s "one opponent was, so one" (countersOn spine atBob) 1
@@ -1146,6 +1147,11 @@ spinesplitterSpec s registry =
           -- CR 120.3a names the PLAYER recipient; a creature bob controls is not bob.
           Spec.assertEqWith s "damage to an opponent's creature is not damage to them" (countersOn spine atBobsSentry) 0
           Spec.assertEqWith s "and the 3/3 Sentry survived the 1 damage, so the board is otherwise the same" (Set.member bobsSentry (GameState.battlefield atBobsSentry)) True
+          -- CR 119.4's life loss is not CR 120.1's damage, and the log records the
+          -- two separately. Without this the reader could be looking at
+          -- GameEvent.LifeLost and pass every assertion above, since CR 120.3a's
+          -- damage to a player files one of those too.
+          Spec.assertEqWith s "CR 119.4 life lost without damage is not damage" (countersOn spine bobPaid) 0
         -- CR 608.2i: the window is THIS turn. Without this, a lifetime tally passes
         -- every assertion above. The turn goes all the way round to alice again, so
         -- the only difference from the two-opponent case is which turn it is.

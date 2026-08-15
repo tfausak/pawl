@@ -400,6 +400,11 @@ data Quantity
     -- nobody having been dealt damage is a number. Nothing is reserved for a
     -- reference that could not be resolved at all.
     --
+    -- Rule 702.54b's variant asks a DIFFERENT question -- "the total damage your
+    -- opponents have been dealt this turn", which sums amounts where this counts
+    -- players -- and no quantity is implemented for it; the keyword it belongs to
+    -- is not either (#877).
+    --
     -- A LEAF, like LifeTotal, Speed and CardsDiscardedThisTurn: it holds no Quantity.
     PlayersDealtDamageThisTurn PlayerRef.PlayerRef
   | -- | CR 400.7 / 608.2i: did the object this quantity is evaluated against ENTER
