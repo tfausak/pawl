@@ -332,9 +332,9 @@ data Object = MkObject
     -- is named here and still cannot find it (#668).
     --
     -- PLAYABLE and not castable, after the rules' own word (CR 601.1a: "playing
-    -- a card means playing that card as a land or casting that card as a spell").
-    -- What reads it is narrower than that: only Pawl.Engine.Cast does, so a land
-    -- under this permission would be permitted nothing (#670).
+    -- a card means playing that card as a land or casting that card as a spell"),
+    -- and both halves read it: Pawl.Engine.Cast.permitsCastFromExile for the
+    -- spell, Pawl.Engine.Action.playableLands for CR 305.1's special action.
     playableFromExile :: Maybe ExilePlayPermission.ExilePlayPermission,
     -- | CR 702.170a: this exiled card is a PLOTTED card, stamped with the turn on
     -- which it became one. Nothing for everything that is not plotted.

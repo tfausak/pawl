@@ -45,6 +45,23 @@
                     }
                   },
                   {
+                    "type": "AffectPlayers",
+                    "value": {
+                      "duration": {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "effect": {
+                        "type": "PlayLandsFromGraveyard"
+                      },
+                      "players": {
+                        "type": "Scoped",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    }
+                  },
+                  {
                     "type": "Replace",
                     "value": {
                       "duration": {

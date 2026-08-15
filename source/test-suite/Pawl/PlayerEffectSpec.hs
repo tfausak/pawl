@@ -3669,10 +3669,12 @@ willResolved willId gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer 
 -- Firebolt group) is the object-scoped half: the card that becomes castable
 -- carries no permission of its own and never learns one.
 --
--- The play-lands half of the first sentence is NOT implemented -- a land is
--- played and never cast (CR 305.1), and no effect can grant a zone permission on
--- the play side (#1364). pawl's Yawgmoth's Will is therefore STRICTER than
--- printed, which the last case here pins.
+-- BOTH halves of the first sentence are declared, as two arms of one clause: a
+-- land is played and never cast (CR 305.1), so the play half is
+-- PlayerEffect.PlayLandsFromGraveyard and the cast half is
+-- PlayerEffect.CastFromGraveyard. The last case here is the play half; the
+-- unrestricted producer of that arm is Crucible of Worlds, in its own group
+-- below.
 yawgmothsWillSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 yawgmothsWillSpec s registry =
   let board = do
@@ -3745,20 +3747,173 @@ yawgmothsWillSpec s registry =
           (willId, hers, _, gs) <- board
           let after = willResolved willId gs
               ended = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
-          Spec.assertEqWith s "one stored effect while it lasts" (length (GameState.playerEffects after)) 1
+          -- TWO, one per half of the card's first sentence.
+          Spec.assertEqWith s "both stored effects while they last" (length (GameState.playerEffects after)) 2
           Spec.assertEqWith s "nothing stored afterwards" (GameState.playerEffects ended) []
           Spec.assertBool s (not (PlayerEffect.mayCastFromGraveyard S.alice hers ended)) "the permission is gone"
           Spec.assertBool s (not (S.castable S.alice hers ended)) "and the cast is refused again"
 
-        -- CR 305.1: the play-lands half of the same sentence has no carrier, so a
-        -- land in the graveyard stays unplayable (#1364). pawl's card is stricter
-        -- than printed here, and this is what says so.
-        Spec.it s "CR 305.1 a land in the graveyard is still not playable" $ do
+        -- CR 305.1: the play-lands half of the same sentence, on a board that
+        -- differs from its own control in nothing but whether the Will resolved.
+        -- The Swamp is put in the graveyard BEFORE the Will resolves, so the
+        -- card's second sentence never sees it move and it is lying there for
+        -- both readings.
+        Spec.it s "CR 305.1 the play-lands half reaches a land in the graveyard" $ do
           (willId, _, _, gs) <- board
           swamp <- S.printingOf s registry "Swamp"
           let (landId, withLand) = S.addGraveyardCard swamp S.alice gs
               after = willResolved willId withLand
-          Spec.assertBool s (notElem (Action.Type.Play landId Nothing) (Action.legalActions S.alice after)) "not offered as a land play"
+          Spec.assertBool s (notElem (Action.Type.Play landId Nothing) (Action.legalActions S.alice withLand)) "not offered before the Will resolves"
+          Spec.assertBool s (elem (Action.Type.Play landId Nothing) (Action.legalActions S.alice after)) "offered once it has"
+
+-- THREE SEATS, each with a Mountain in hand and a Swamp in their own graveyard,
+-- and `present` says whether alice also controls a Crucible of Worlds. It is
+-- alice's precombat main phase and nobody has played a land yet.
+--
+-- The Mountain in hand is what keeps every negative below from passing
+-- vacuously: on its own turn each seat is offered that Mountain whatever the
+-- Crucible does, so an assertion that the graveyard Swamp is absent is read off
+-- a list that is never empty for want of a window. Two different basic land
+-- types, so the two offers can never be mistaken for each other.
+--
+-- Prodigal Sorcerer sits in alice's graveyard as the nonland control: the
+-- Crucible's sentence is about lands, and a permission read as "play anything
+-- from your graveyard" would offer it.
+--
+-- Returns alice's Swamp, bob's, carol's, alice's Mountain, bob's, the Sorcerer
+-- and the board.
+crucibleBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+crucibleBoard swamp mountain sorcerer crucible present =
+  let (hers, g1) = S.addGraveyardCard swamp S.alice S.threePlayerGame
+      (his, g2) = S.addGraveyardCard swamp S.bob g1
+      (theirs, g3) = S.addGraveyardCard swamp S.carol g2
+      (sorcererId, g4) = S.addGraveyardCard sorcerer S.alice g3
+      (herMountain, g5) = S.addHandCard mountain S.alice g4
+      (hisMountain, g6) = S.addHandCard mountain S.bob g5
+      (_, g7) = S.addHandCard mountain S.carol g6
+      g8 = if present then snd (S.addCreature crucible S.alice g7) else g7
+   in ( hers,
+        his,
+        theirs,
+        herMountain,
+        hisMountain,
+        sorcererId,
+        g8
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Play ONE named object and pass at every other prompt. Pinned to an id rather
+-- than to "whichever land play is offered" (S.playLandAnswer), because this
+-- board offers a land in a hand as well: an answerer that took the first play
+-- would put the Mountain onto the battlefield and the assertions would read the
+-- wrong card.
+playOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+playOnly wanted p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter (playing wanted) actions of
+    h : _ -> h
+    [] -> Action.Type.Pass
+  _ -> S.identityAnswer p
+
+-- Is this the offer to play THAT object as a land? Enumerated rather than
+-- wildcarded, so a new Action constructor is named by -Werror.
+playing :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+playing wanted action = case action of
+  Action.Type.Play oid _ -> oid == wanted
+  Action.Type.Pass -> False
+  Action.Type.Cast {} -> False
+  Action.Type.Activate _ _ -> False
+  Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Plot _ -> False
+  Action.Type.Foretell _ -> False
+  Action.Type.Ignore _ -> False
+  Action.Type.ActivateManaAbility _ -> False
+
+-- Crucible of Worlds {3} Artifact: "You may play lands from your graveyard." The
+-- unrestricted producer of PlayerEffect.PlayLandsFromGraveyard -- one sentence, a
+-- static ability of a battlefield permanent, PlayerScope.You, and nothing else on
+-- the card -- where Yawgmoth's Will above grants the same arm from the stored CR
+-- 611.2c carrier with a duration on it.
+crucibleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+crucibleSpec s registry =
+  let board present = do
+        swamp <- S.printingOf s registry "Swamp"
+        mountain <- S.printingOf s registry "Mountain"
+        sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+        crucible <- S.printingOf s registry "Crucible of Worlds"
+        pure (crucibleBoard swamp mountain sorcerer crucible present)
+   in Spec.describe s "CrucibleOfWorlds" $ do
+        -- The pair. Two boards differing in the Crucible and in nothing else,
+        -- and the hand's Mountain is offered on both -- so the Swamp appearing
+        -- is the grant and can be nothing else.
+        Spec.it s "CR 305.1 the grant widens the land play to the graveyard" $ do
+          (hers, _, _, herMountain, _, sorcererId, without) <- board False
+          (_, _, _, _, _, _, with) <- board True
+          Spec.assertEqWith s "without it only the hand is offered" (filter isPlay (Action.legalActions S.alice without)) [Action.Type.Play herMountain Nothing]
+          Spec.assertEqWith
+            s
+            "with it the graveyard Swamp joins the Mountain"
+            (filter isPlay (Action.legalActions S.alice with))
+            [Action.Type.Play herMountain Nothing, Action.Type.Play hers Nothing]
+          -- CR 305.1's subject is a LAND CARD, so the Sorcerer in the same
+          -- graveyard is offered nothing. Implied by the equality above and
+          -- asserted anyway, because it is the reading the equality is guarding
+          -- against.
+          Spec.assertBool s (notElem (Action.Type.Play sorcererId Nothing) (Action.legalActions S.alice with)) "the nonland card in the same graveyard is not offered"
+
+        -- CR 109.5 at three seats, which is what tells "you" from "an opponent"
+        -- and from "the next seat in turn order". Each opponent is asked in
+        -- their OWN main phase, so CR 305.1's window is open and the refusal is
+        -- about the scope.
+        Spec.it s "CR 109.5 the You scope reaches neither opponent's graveyard" $ do
+          (hers, his, theirs, _, hisMountain, _, with) <- board True
+          let bobsTurn = with {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+              carolsTurn = with {GameState.activePlayer = S.carol, GameState.priority = Just S.carol}
+          Spec.assertBool s (PlayerEffect.mayPlayLandsFromGraveyard S.alice with) "alice has the permission"
+          Spec.assertBool s (not (PlayerEffect.mayPlayLandsFromGraveyard S.bob with)) "bob does not"
+          Spec.assertBool s (not (PlayerEffect.mayPlayLandsFromGraveyard S.carol with)) "nor carol"
+          Spec.assertEqWith s "bob is offered his hand and nothing else" (filter isPlay (Action.legalActions S.bob bobsTurn)) [Action.Type.Play hisMountain Nothing]
+          Spec.assertBool s (notElem (Action.Type.Play his Nothing) (Action.legalActions S.bob bobsTurn)) "not bob's own graveyard Swamp"
+          Spec.assertBool s (notElem (Action.Type.Play theirs Nothing) (Action.legalActions S.carol carolsTurn)) "nor carol's"
+          -- And the GRANTED player's own Swamp is not offered to them either,
+          -- which is the other way a zone permission could leak: exile is
+          -- shared, a graveyard is not (CR 400.1), so carol may not play out of
+          -- alice's even though alice may.
+          Spec.assertBool s (notElem (Action.Type.Play hers Nothing) (Action.legalActions S.carol carolsTurn)) "and carol cannot reach alice's graveyard"
+
+        -- CR 305.2a: the count is applied ABOVE this in
+        -- Pawl.Engine.Action.legalActions and the grant does not touch it. One
+        -- land already played leaves the allowance equal to the tally, so BOTH
+        -- offers go -- a grant read as a second allowance would leave the Swamp.
+        Spec.it s "CR 305.2a a player who has played their land is offered neither zone" $ do
+          (hers, _, _, _, _, _, with) <- board True
+          let played = with {GameState.landsPlayed = Map.singleton S.alice 1}
+          Spec.assertEqWith s "the allowance is still one" (PlayerEffect.landPlaysAllowed S.alice played) 1
+          Spec.assertEqWith s "and no land play is offered at all" (filter isPlay (Action.legalActions S.alice played)) []
+          Spec.assertBool s (PlayerEffect.mayPlayLandsFromGraveyard S.alice played) "though the permission is still standing"
+          Spec.assertBool s (notElem (Action.Type.Play hers Nothing) (Action.legalActions S.alice played)) "so the Swamp is refused by the count"
+
+        -- CR 305.1's window. The same board one phase earlier: a grant that
+        -- widened the zone must not widen the moment.
+        Spec.it s "CR 305.1 the grant does not open the sorcery-speed window" $ do
+          (hers, _, _, _, _, _, with) <- board True
+          let upkeep = with {GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+          Spec.assertEqWith s "no land play is offered in her upkeep" (filter isPlay (Action.legalActions S.alice upkeep)) []
+          Spec.assertBool s (notElem (Action.Type.Play hers Nothing) (Action.legalActions S.alice upkeep)) "the graveyard Swamp included"
+
+        -- End to end: the special action really moves the card, and CR 305.2a's
+        -- tally counts it exactly as a play from hand does.
+        Spec.it s "CR 305.1 playing it puts the graveyard land onto the battlefield" $ do
+          (hers, _, _, _, _, _, with) <- board True
+          swamp <- S.printingOf s registry "Swamp"
+          let after = S.runPure (playOnly hers) with Engine.priorityLoop
+          Spec.assertEqWith s "the Swamp is on the battlefield" (S.countOnBattlefieldByName (S.printingName swamp) S.alice after) 1
+          Spec.assertEqWith s "her graveyard has only the Sorcerer left" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+          Spec.assertEqWith s "and CR 305.2a's tally counted it" (Map.lookup S.alice (GameState.landsPlayed after)) (Just 1)
 
 -- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
 -- counteringBoard above, with a Goblin Piker as the victim spell.
@@ -4230,6 +4385,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   matchesObjectSpec s registry
   vedalkenOrrerySpec s registry
   yawgmothsWillSpec s registry
+  crucibleSpec s registry
   voidWinnowerSpec s registry
   spiderPunkSpec s registry
   prowlingSerpopardSpec s registry

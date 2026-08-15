@@ -1412,9 +1412,10 @@ data Effect card
     --
     -- PLAY and not cast, after CR 601.1a's "playing a card means playing that
     -- card as a land or casting that card as a spell, whichever is appropriate".
-    -- Not implemented: the land half. Only Pawl.Engine.Cast reads the permission
-    -- this writes, so a land granted it is permitted nothing and CR 305.1's
-    -- special action is never offered (#670).
+    -- Both halves of that sentence are served: Pawl.Engine.Cast reads the
+    -- permission this writes for the spell, and Pawl.Engine.Action.playableLands
+    -- reads it for CR 305.1's special action, so an exiled LAND granted it is
+    -- offered a land play (Pawl.CastSpec's VictorMancha group).
     --
     -- CR 611.2b: if the stated duration never starts, the effect does nothing --
     -- Pawl.Engine.Expiry.arm answers Nothing and Resolve stores no permission at

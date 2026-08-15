@@ -452,9 +452,39 @@ data PlayerEffect
     -- A PERMISSION, folded as a disjunction for CastAsThoughItHadFlash's reason:
     -- there is nothing for a second permission to outvote.
     --
-    -- Not implemented: the PLAY-LANDS half of the same sentence ("you may play
-    -- lands and cast spells from your graveyard"). A land is played and never
-    -- cast (CR 305.1), so this arm reaches no land however its Filter reads, and
-    -- the play side has no zone permission at all (#1364).
+    -- The PLAY-LANDS half of the same sentence ("you may play lands and cast
+    -- spells from your graveyard") is PlayLandsFromGraveyard below: a land is
+    -- played and never cast (CR 305.1), so this arm reaches no land however its
+    -- Filter reads.
     CastFromGraveyard (Filter.Filter Keyword.Keyword)
+  | -- | CR 305.1 / Crucible of Worlds: this player may play lands from their
+    -- graveyard.
+    --
+    -- The same zone widening CastFromGraveyard above states for a cast, stated
+    -- for a PLAY, and a separate arm for the reason CantPlayLandChosenName is
+    -- separate from CantCastChosenName: CR 305.1 makes playing a land a special
+    -- action that never uses the stack, so the two are read by two different
+    -- gates (Pawl.Engine.Action.playableLands, Pawl.Engine.Cast.castableZones).
+    -- Yawgmoth's Will's one printed sentence declares both, exactly as Null
+    -- Chamber's and Damping Engine's do, and Crucible of Worlds declares only
+    -- this one.
+    --
+    -- NOT a widening of PlayAdditionalLands either. That arm is CR 305.2's COUNT
+    -- and names no zone; this one names a zone and no count. They compose in
+    -- Pawl.Engine.Action.legalActions without either knowing of the other -- the
+    -- count settles how many plays the whole list allows, this one says which
+    -- piles the list is drawn from -- so Crucible of Worlds alone still allows
+    -- only one land play a turn, and Exploration beside it makes the second
+    -- play available out of either zone.
+    --
+    -- NULLARY, where CastFromGraveyard carries a Filter. A land play has already
+    -- fixed the card type (CR 305.1's "land card"), and no printed sentence
+    -- narrows which land beyond that; a card that said "you may play basic lands
+    -- from your graveyard" would want a Filter here rather than a second arm.
+    --
+    -- WHOSE graveyard is the carrier's PlayerScope, as for every arm here, and
+    -- WHICH graveyard needs no field of its own: CR 400.1 makes a graveyard a
+    -- per-player zone and both printings say "your graveyard", which is the pile
+    -- Pawl.Engine.Action.playableLands hands the permission.
+    PlayLandsFromGraveyard
   deriving (Eq, Ord, Show)

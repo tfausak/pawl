@@ -2356,9 +2356,14 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
 -- Effect-granted permission to play a card from exile (CR 601.3), and the only
 -- one of either kind with a STATED duration -- CR 715.3d's states none, so
 -- Pawl.AdventureSpec cannot reach the sweep this group exercises.
-victorName, benalishHeroName :: CardName.CardName
+--
+-- Its target slot names CardsInGraveyard with no filter, so the permitted card
+-- may be a LAND -- which is played and never cast (CR 305.1), and is the last
+-- two cases here.
+victorName, benalishHeroName, swampName :: CardName.CardName
 victorName = CardName.MkCardName (Text.pack "Victor Mancha, Runaway")
 benalishHeroName = CardName.MkCardName (Text.pack "Benalish Hero")
+swampName = CardName.MkCardName (Text.pack "Swamp")
 
 -- The battlefield objects answering to a name -- how a test reaches the
 -- permanent a cast produced, whose id is neither the card's in hand nor the
@@ -2366,24 +2371,26 @@ benalishHeroName = CardName.MkCardName (Text.pack "Benalish Hero")
 namedOnBattlefield :: CardName.CardName -> GameState.GameState -> [ObjectId.ObjectId]
 namedOnBattlefield name gs = filter (\o -> Projection.hasName name o gs) (Set.toList (GameState.battlefield gs))
 
--- Six Plains, a Benalish Hero ({W} 1/1) in alice's graveyard, and Victor Mancha
--- cast out of her hand and resolved, with his ETB waiting on the stack.
+-- Six Plains, `victim` in alice's graveyard, and Victor Mancha cast out of her
+-- hand and resolved, with his ETB waiting on the stack.
 --
--- FIVE Plains pay Victor's {5} and the SIXTH pays the Hero's {W}. That is the
--- whole answer to the cast-gate vacuity trap: every assertion below about the
--- Hero being castable or not is made on a board where the mana for it is
--- untapped and the window is the same precombat main phase, so a missing offer
--- is about the permission and can be about nothing else.
+-- FIVE Plains pay Victor's {5} and the SIXTH is left untapped. That is the whole
+-- answer to the cast-gate vacuity trap: every assertion below about the
+-- graveyard card being castable or not is made on a board where the {W} for the
+-- Benalish Hero is untapped and the window is the same precombat main phase, so
+-- a missing offer is about the permission and can be about nothing else.
 --
--- The Hero is the ONLY card in alice's graveyard, so CR 603.3d's target choice
--- is forced and S.identityAnswer suffices. It is also a 1/1 whose only text is
--- banding, so nothing it prints can be the reason a cast succeeds or fails.
+-- `victim` is the ONLY card in alice's graveyard, so CR 603.3d's target choice is
+-- forced and S.identityAnswer suffices. The cast cases pass a Benalish Hero, a
+-- 1/1 whose only text is banding, so nothing it prints can be the reason a cast
+-- succeeds or fails; the land-play cases pass a Swamp, which is the same board
+-- with a card type the cast path cannot serve.
 --
--- Returns the Hero's graveyard id, the battlefield objects named Victor Mancha
+-- Returns the victim's graveyard id, the battlefield objects named Victor Mancha
 -- (a list, so a case that removes him can assert it emptied), and the state.
 victorTriggered :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-victorTriggered plains victor hero =
-  let (heroId, board) = S.addGraveyardCard hero S.alice (S.landsInPlay plains 6)
+victorTriggered plains victor victim =
+  let (heroId, board) = S.addGraveyardCard victim S.alice (S.landsInPlay plains 6)
       (gs, victorCard) = S.handOne victor board
       cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice victorCard victorName Facing.FaceUp)
       entered = S.runPure S.identityAnswer cast Stack.resolveTop
@@ -2395,6 +2402,35 @@ victorTriggered plains victor hero =
 -- Whether alice is offered the cast of this object under this name.
 offeredCast :: ObjectId.ObjectId -> CardName.CardName -> GameState.GameState -> Bool
 offeredCast oid name gs = elem (A.Cast oid name Facing.FaceUp) (Action.legalActions S.alice gs)
+
+-- The land plays this player is offered, in the engine's own order. A list
+-- rather than a membership test, so a negative below is read off something that
+-- is never empty (see the land-play case's board).
+offeredPlays :: PlayerId.PlayerId -> GameState.GameState -> [A.Action]
+offeredPlays pid gs =
+  let isPlay action = case action of
+        A.Play {} -> True
+        A.Pass -> False
+        A.Cast {} -> False
+        A.Activate _ _ -> False
+        A.TurnFaceUp _ -> False
+        A.Unlock _ _ -> False
+        A.DiscardFromHand _ -> False
+        A.Plot _ -> False
+        A.Foretell _ -> False
+        A.Ignore _ -> False
+        A.ActivateManaAbility _ -> False
+   in filter isPlay (Action.legalActions pid gs)
+
+-- The board victorTriggered leaves, moved to alice's precombat main phase with
+-- the stack empty: CR 305.1's window, which that fixture's untap step is not.
+inHerMainPhase :: GameState.GameState -> GameState.GameState
+inHerMainPhase gs =
+  gs
+    { GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = S.alice,
+      GameState.priority = Just S.alice
+    }
 
 victorManchaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
@@ -2479,6 +2515,59 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
           (Just Nothing)
         Spec.assertBool s (not (offeredCast exiledId benalishHeroName after)) "and it is not castable from exile"
       other -> Spec.assertFailure s ("expected exactly one exiled Hero, got " <> show (length other))
+  -- CR 715.3d's verb is PLAY, and CR 305.1 makes playing a land a special action
+  -- rather than a cast (CR 601.1 is the rule that "play" once meant casting).
+  -- Victor's target slot is CardsInGraveyard with no filter, so a land card is a
+  -- legal target and this is the board that follows.
+  --
+  -- The SAME fixture with a Swamp where the Hero was, and a Mountain added to
+  -- each seat's hand: every list below therefore holds that seat's own land
+  -- play whatever the permission does, so an absent Swamp is the permission and
+  -- not an empty menu.
+  Spec.it s "CR 305.1 an exiled LAND is offered as a land play, and only to the permitted player" $ do
+    plains <- S.printingOf s registry "Plains"
+    victor <- S.printingOf s registry "Victor Mancha, Runaway"
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, _, placed) = victorTriggered plains victor swamp
+        resolved = S.runPure S.identityAnswer placed Stack.resolveTop
+        (herMountain, withHers) = S.addHandCard mountain S.alice (inHerMainPhase resolved)
+        (hisMountain, after) = S.addHandCard mountain S.bob withHers
+        bobsTurn = after {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+    case Game.zoneMembers Zone.Exile S.alice after of
+      [exiledId] -> do
+        Spec.assertEqWith
+          s
+          "her hand's Mountain and the exiled Swamp, in that order"
+          (offeredPlays S.alice after)
+          [A.Play herMountain Nothing, A.Play exiledId Nothing]
+        -- The permission is to PLAY it, and a land has no castable face, so the
+        -- cast path offers it nothing. Both readings of "play" would pass the
+        -- assertion above; only this one separates them.
+        Spec.assertBool s (not (offeredCast exiledId swampName after)) "and it is not offered as a cast"
+        -- CR 109.5 again: exile is a SHARED zone, so bob can reach the object --
+        -- what stops him is that the permission names alice.
+        Spec.assertEqWith s "bob is offered his own hand and nothing else" (offeredPlays S.bob bobsTurn) [A.Play hisMountain Nothing]
+      other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
+  -- The negative of the pair, and the same one the cast side takes above: Victor
+  -- leaves, CR 611.2b's duration ends, and the same board with the same Swamp in
+  -- the same zone offers nothing but the hand.
+  Spec.it s "CR 611.2b the land play goes with the permission" $ do
+    plains <- S.printingOf s registry "Plains"
+    victor <- S.printingOf s registry "Victor Mancha, Runaway"
+    swamp <- S.printingOf s registry "Swamp"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, victors, placed) = victorTriggered plains victor swamp
+        resolved = S.runPure S.identityAnswer placed Stack.resolveTop
+        (herMountain, after) = S.addHandCard mountain S.alice (inHerMainPhase resolved)
+        dead = S.runPure S.identityAnswer after (Event.destroy Regenerability.Regenerable victors)
+        swept = S.runPure S.identityAnswer dead Engine.settleForPriority
+    case Game.zoneMembers Zone.Exile S.alice after of
+      [exiledId] -> do
+        Spec.assertBool s (elem (A.Play exiledId Nothing) (offeredPlays S.alice after)) "offered while Victor stands"
+        Spec.assertBool s (elem exiledId (Game.zoneMembers Zone.Exile S.alice swept)) "the Swamp is still in exile"
+        Spec.assertEqWith s "and only her hand is offered now" (offeredPlays S.alice swept) [A.Play herMountain Nothing]
+      other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
 
 -- Dire Fleet Daredevil {1}{R} Creature -- Human Pirate 2/1: "First strike. When
 -- this creature enters, exile target instant or sorcery card from an opponent's
