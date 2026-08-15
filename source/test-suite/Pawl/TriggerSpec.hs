@@ -25,7 +25,8 @@
 -- with Harried Dronesmith -- `singleTokenSlotReadSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingSpec`. The CR 603.4 / 608.2a intervening "if" --
--- `interveningSpec`. Also Pawl.Engine.Keyword: CR
+-- `interveningSpec`, and the same rule over a draw count that is a SUBTRACTION,
+-- with The Ten Rings -- `tenRingsDrawSpec`. Also Pawl.Engine.Keyword: CR
 -- 702.70 poisonous, the first keyword whose rule text IS a triggered ability,
 -- and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousSpec`. CR
@@ -2158,6 +2159,61 @@ zombieTokenOf sarcomancy pikerFallback =
    in case Maybe.mapMaybe created abilityEffects of
         card : _ -> card
         [] -> Printing.card pikerFallback
+
+-- The Ten Rings {8} Legendary Artifact: "Your maximum hand size is ten. At the
+-- beginning of your end step, if you have fewer than ten cards in hand, draw
+-- cards equal to the difference." The maximum-hand-size half is
+-- Pawl.PlayerEffectSpec's; this is the second line.
+--
+-- The pool's first card whose DRAW COUNT is a subtraction -- Plus of Literal 10
+-- and Negate of the hand count -- and its first Comparison.AtMost, CR 603.4's
+-- "fewer than ten" being a hand count of at most nine.
+--
+-- Four cards held on every board, so three wrong readings of "the difference"
+-- miss ten and are caught: a flat draw of ten ends on fourteen, a draw of the
+-- hand size ends on eight, and a draw of one ends on five.
+tenRingsDrawSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tenRingsDrawSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      stockHand n printing gs = List.foldl' (\g _ -> snd (S.addHandCard printing S.alice g)) gs [1 .. n :: Int]
+      -- alice with The Ten Rings out, `held` Plains in hand and twenty more in
+      -- her library. The library is stocked well past the six the positive board
+      -- draws, so CR 104.3c decks nobody before the assertion runs.
+      board tenRings plains held =
+        let (_, gs0) = S.addCreature tenRings S.alice (Setup.emptyGame S.bothPlayers)
+         in List.foldl' (\g _ -> snd (S.addLibraryCard plains S.alice g)) (stockHand held plains gs0) [1 .. 20 :: Int]
+   in Spec.describe s "TheTenRingsDraw" $ do
+        Spec.it s "CR 603.4 four cards in hand draws the difference, six, to reach ten" $ do
+          tenRings <- S.printingOf s registry "The Ten Rings"
+          plains <- S.printingOf s registry "Plains"
+          let atEnd = settle (beginEndStep (board tenRings plains 4))
+          Spec.assertEqWith s "the ability triggered" (length (GameState.stack atEnd)) 1
+          Spec.assertEqWith s "and drew up to ten" (S.handSize S.alice (resolveAll atEnd)) 10
+        -- THE NEGATIVE, the same board with only the hand changed. Ten cards is
+        -- not "fewer than ten", so CR 603.4 keeps the ability off the stack
+        -- entirely. Asserted on the STACK rather than on the hand, because a
+        -- threshold read one too high would trigger and then draw a difference of
+        -- zero -- which no hand size can tell from not triggering at all.
+        Spec.it s "CR 603.4 ten cards in hand is not fewer than ten, so nothing triggers" $ do
+          tenRings <- S.printingOf s registry "The Ten Rings"
+          plains <- S.printingOf s registry "Plains"
+          let atEnd = settle (beginEndStep (board tenRings plains 10))
+          Spec.assertEqWith s "nothing on the stack" (length (GameState.stack atEnd)) 0
+          Spec.assertEqWith s "and the hand is untouched" (S.handSize S.alice (resolveAll atEnd)) 10
+        -- CR 608.2c: "the difference" is read as the ability RESOLVES, not as it
+        -- triggered. Three cards arrive while it waits on the stack, so the draw
+        -- is three rather than the six the trigger-time hand of four would give
+        -- -- ten either way is impossible, since that reading ends on thirteen.
+        Spec.it s "CR 608.2c cards gained in response shrink the draw, which is read on resolution" $ do
+          tenRings <- S.printingOf s registry "The Ten Rings"
+          plains <- S.printingOf s registry "Plains"
+          let atEnd = settle (beginEndStep (board tenRings plains 4))
+              responded = stockHand 3 plains atEnd
+          Spec.assertEqWith s "the ability really is waiting on the stack" (length (GameState.stack atEnd)) 1
+          Spec.assertEqWith s "seven held when it resolves, so three drawn" (S.handSize S.alice (resolveAll responded)) 10
 
 -- CR 702.70: poisonous -- the first keyword whose rule text IS a triggered
 -- ability, so it is minted by Pawl.Engine.Keyword and gathered by the same
@@ -11050,6 +11106,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   secondPlacementPassSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
+  tenRingsDrawSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry
