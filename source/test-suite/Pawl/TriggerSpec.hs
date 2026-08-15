@@ -2172,9 +2172,10 @@ zombieTokenOf sarcomancy pikerFallback =
 -- and Negate of the hand count -- and its first Comparison.AtMost, CR 603.4's
 -- "fewer than ten" being a hand count of at most nine.
 --
--- Four cards held on every board, so three wrong readings of "the difference"
--- miss ten and are caught: a flat draw of ten ends on fourteen, a draw of the
--- hand size ends on eight, and a draw of one ends on five.
+-- Four cards held on the drawing board, so three wrong readings of "the
+-- difference" miss ten and are caught: a flat draw of ten ends on fourteen, a
+-- draw of the hand size ends on eight, and a draw of one ends on five. The
+-- boards differ in the HAND alone -- same seats, same permanent, same library.
 tenRingsDrawSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tenRingsDrawSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
