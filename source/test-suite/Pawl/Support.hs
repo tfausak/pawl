@@ -1256,7 +1256,13 @@ withEvents events gs =
       GameState.nextEventGroup = EventGroup.MkEventGroup (Natural.length events),
       GameState.eventGroupDepth = 0,
       GameState.scannedThrough = 0,
-      GameState.damageScannedThrough = 0
+      GameState.damageScannedThrough = 0,
+      -- Rewriting the log rewrites the groups, so any sample Event.recordEvent
+      -- took is now filed under a group number this fixture has just reused for a
+      -- different event. Cleared rather than left standing, which sends
+      -- Event.eventTriggers to its live reading -- the only honest one for an event
+      -- no funnel recorded.
+      GameState.battlefieldWhenTriggered = Map.empty
     }
 
 -- Set the monarch directly, for tests that need the designation without
@@ -1488,7 +1494,7 @@ oneMountainState mountain ph =
           GameState.eventGroupDepth = 0,
           GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
-          GameState.controlWhenTriggered = Map.empty,
+          GameState.battlefieldWhenTriggered = Map.empty,
           GameState.controlSample = Map.empty,
           GameState.damageScannedThrough = 0,
           GameState.delayedTriggers = Seq.empty,

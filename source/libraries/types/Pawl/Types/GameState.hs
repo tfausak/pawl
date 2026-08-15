@@ -26,6 +26,7 @@ import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prevention as Prevention
+import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -146,31 +147,42 @@ data GameState = MkGameState
     -- | CR 117.5: how far the trigger scan has consumed. Everything at or after
     -- this index is unscanned. Consumption is an index bump; the record stays.
     scannedThrough :: Natural.Natural,
-    -- | CR 603.3a: a triggered ability is controlled by the player who controlled
-    -- its source at the time it triggered. The trigger scan runs at the CR 117.5
-    -- boundary rather than at each event, so by the time it asks, control may
-    -- already have moved -- CR 514.2 ends an "until end of turn" control effect
-    -- between CR 514.1's discard and CR 514.3a's placement. This is the answer as
-    -- of the moment the OLDEST UNSCANNED event was recorded: every object a
-    -- CR 613.1b layer-2 control effect named then, and the player it named it
-    -- for. Read by Event.eventTriggers in preference to the live projection.
+    -- | CR 603.10's first sentence: "objects that exist immediately after an event
+    -- are checked to see if the event matched any trigger conditions, and
+    -- continuous effects that exist at that time are used to determine what the
+    -- trigger conditions are". The trigger scan runs once at the CR 117.5 boundary
+    -- rather than at each event, so this is what "at that time" costs: the
+    -- battlefield as it stood immediately after each unscanned event, keyed by that
+    -- event's group.
     --
-    -- OVERRIDES ONLY, not the whole battlefield: an object no layer-2 effect
-    -- names has its CR 110.2 default controller, which cannot change while it
-    -- stays on the battlefield, so an absent id is answered live and gets the
-    -- same answer.
-    controlWhenTriggered :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
+    -- Three answers ride on it, and the live board at the scan gets all three
+    -- wrong on some board: WHICH permanents were there to be checked, WHAT
+    -- abilities each of them had, and CR 603.3a's controller of each. Written by
+    -- the one append point (Event.recordEvent) and read by Event.eventTriggers,
+    -- which falls back to the live board for a group this does not name.
+    --
+    -- ONE ENTRY PER GROUP, last write winning, because a group is CR 608.2f's
+    -- single event: its members are recorded one after another as the bracket
+    -- applies them, so the LAST of them is the one standing "immediately after"
+    -- the whole thing. Between groups the entries genuinely differ, which a
+    -- per-batch sample cannot express -- a permanent that entered at the second
+    -- group was not there to be checked against the first.
+    --
+    -- LAZY, and worth saying because it decides the cost: each entry is a thunk
+    -- over the state at that moment, so a group whose entry the scan never reads
+    -- costs nothing, and one it does costs the projection it would have paid at
+    -- the scan anyway. Cleared as the scan consumes the log, which is what bounds
+    -- both the map and the states its thunks retain.
+    battlefieldWhenTriggered :: Map.Map EventGroup.EventGroup (Map.Map ObjectId.ObjectId (PlayerId.PlayerId, ProjectedCharacteristics.ProjectedCharacteristics)),
     -- | Who controlled each permanent on the battlefield the last time
     -- Pawl.Engine.Engine.sampleControl looked. The OBSERVATION POINT for a control
     -- change: control is derived (CR 613.1b layer 2), so nothing announces a
     -- change, and comparing this snapshot against the live projection is what
     -- turns one into the GameEvent.ControlChanged that CR 603.2 needs.
     --
-    -- The WHOLE battlefield and not overrides only, unlike controlWhenTriggered
-    -- above: a diff has to distinguish "controlled by their default controller"
-    -- from "not observed yet", and an overrides-only map collapses the two, so an
-    -- until-end-of-turn effect ending would read as an object that had never been
-    -- looked at.
+    -- ONE READING, not a history, unlike battlefieldWhenTriggered above: a diff
+    -- compares the board against the last look rather than against a named moment,
+    -- so the entry a group would key is exactly what it must not keep.
     --
     -- REBUILT from the battlefield at every sample rather than updated in place,
     -- which is what prunes it: a permanent that left has no entry to go stale, and

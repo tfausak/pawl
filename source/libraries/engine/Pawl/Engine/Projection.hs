@@ -4197,26 +4197,6 @@ controlNames gs source a = case a of
   Affected.MatchingAnywhere _ -> Set.empty
   Affected.AttachedPlayerControls _ -> Set.empty
 
--- CR 603.3a: every object whose controller a CR 613.1b layer-2 effect OVERRIDES,
--- and who it says controls it -- the sample Event.recordEvent takes so a trigger
--- scanned at the CR 117.5 boundary is still credited to whoever controlled its
--- source at the event. See GameState.controlWhenTriggered for why unnamed objects
--- need no entry.
---
--- Both of controllerOfGiven's setter sources are enumerated in the order it
--- consults them, and the VALUE is its own answer rather than a re-derivation, so
--- the CR 613.7 timestamp contest is settled once.
-controlOverrides :: GameState -> Map ObjectId PlayerId.PlayerId
-controlOverrides gs =
-  let grants = controlGrants gs
-      fromStored eff = case ContinuousEffect.modification eff of
-        Modification.SetController _ -> controlNames gs (ContinuousEffect.source eff) (ContinuousEffect.affected eff)
-        _ -> Set.empty
-      fromGrant g = controlNames gs (cgSource g) (cgAffected g)
-      named = Set.unions (fmap fromStored (GameState.continuousEffects gs) <> fmap fromGrant grants)
-      entry oid = fmap ((,) oid) (controllerOfGiven grants Set.empty oid gs)
-   in Map.fromList (Maybe.mapMaybe entry (Set.toList named))
-
 -- CR 110.2 / 108.4a: the controller a CR 613.1b layer-2 effect OVERRIDES. Two
 -- rules, one per kind of object: a permanent's default controller is whoever it
 -- entered under (CR 110.2), and a card that has no controller at all uses its
