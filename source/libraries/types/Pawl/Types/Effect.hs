@@ -892,6 +892,25 @@ data Effect card
     -- neither reaches this opcode: both are about effects that do something ELSE,
     -- where this one says "remove from combat" in as many words.
     RemoveFromCombat SlotName.SlotName
+  | -- | CR 509.1h's escape clause: an effect SAYS an attacking creature becomes
+    -- blocked. Curtain of Light's "target unblocked attacking creature becomes
+    -- blocked" is the card text it exists for, and CR 508.4d names the same
+    -- clause for a creature that entered the battlefield attacking after the
+    -- declaration.
+    --
+    -- Blocked BY NOTHING, and that is the rule rather than an omission: the
+    -- status and the set of creatures blocking are separate (CR 509.1h against
+    -- CR 510.1c), so a creature this blocks assigns no combat damage and takes
+    -- none. Nothing here can name a blocker -- an effect that makes a creature
+    -- BLOCK is a different act (#1387).
+    --
+    -- One direction only, and the rules are why rather than an omission: CR
+    -- 509.1h's sentence also names an effect saying a creature becomes
+    -- UNBLOCKED, and NO printing says it (Scryfall, `oracle:"becomes
+    -- unblocked"`, 2026-08-14 -- zero results), so there is nothing for an
+    -- opcode to carry. A bare SlotName rather than an ObjectRef, the posture
+    -- RemoveFromCombat above takes: no printing blocks a swept SET.
+    BecomesBlocked SlotName.SlotName
   | -- | CR 500.8: add phases to a turn, directly after the specified phase, in
     -- written order -- Aggravated Assault is `[ExtraCombat, ExtraMain]`, Full
     -- Throttle `[ExtraCombat, ExtraCombat]`. A payload rather than a sibling

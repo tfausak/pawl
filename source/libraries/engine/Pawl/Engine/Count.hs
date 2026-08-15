@@ -201,6 +201,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.IsPlayer _ -> predicate
   Filter.Type.IsAttacking -> predicate
   Filter.Type.IsBlocking -> predicate
+  Filter.Type.IsBlocked -> predicate
   Filter.Type.AttackedThisTurn -> predicate
   Filter.Type.IsAttachedToCreature -> predicate
   Filter.Type.IsAttachedToPermanent -> predicate
@@ -479,6 +480,7 @@ viewOfSnapshot mController isToken snapshot =
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
       Filter.blocking = False,
+      Filter.blocked = False,
       Filter.attackedThisTurn = False,
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,

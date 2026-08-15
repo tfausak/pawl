@@ -325,9 +325,12 @@ data TriggerCondition
     -- blocked by multiple creatures" -- the same grouping SelfBlocks reads on the
     -- blocking side.
     --
-    -- Only a DECLARATION makes the event, so rule 509.3c's other two producers --
-    -- an effect, and a creature put onto the battlefield as a blocker (CR 509.4)
-    -- -- do not reach it. Neither has a producer in the pool (#1146).
+    -- Rule 509.3c's SECOND producer reaches it too: an effect that says the
+    -- creature becomes blocked (Effect.BecomesBlocked, Curtain of Light) records
+    -- the same event, and the rule's "only if the attacking creature was an
+    -- unblocked creature at that time" is Pawl.Engine.Combat.becomeBlocked's own
+    -- guard. The third -- a creature put onto the battlefield as a blocker (CR
+    -- 509.4) -- has no producer in the pool (#1387).
     --
     -- No blocker is bound: rule 509.3c's form names none. CR 509.3d's does, and
     -- that is SelfBecomesBlockedBy below. CR 508.5's defending player IS bound,

@@ -105,6 +105,11 @@ data View = MkView
     -- Combat.blockers is keyed by attacker, and a blocking creature is a MEMBER
     -- of some attacker's set.
     blocking :: Bool,
+    -- CR 509.1h: is this candidate a BLOCKED creature right now? Read from
+    -- GameState.combat like the two above, and off the same map `blocking`
+    -- reads -- but from its KEYS, which is Pawl.Engine.Combat.isBlocked's
+    -- question and never `blocking`'s.
+    blocked :: Bool,
     -- CR 608.2i: was this candidate declared as an attacker earlier this turn?
     -- Unlike `attacking` not even a present state: it is a look-back read of the
     -- turn-scoped GameEvent log.
@@ -275,6 +280,9 @@ playerView pid =
       attacking = False,
       -- CR 509.1a: only a creature can block, either.
       blocking = False,
+      -- CR 509.1h: blocked-ness is a status of an ATTACKING creature, and by CR
+      -- 506.3 a player never is one.
+      blocked = False,
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
@@ -552,6 +560,11 @@ matches context view predicate = case predicate of
   -- blocked after every creature blocking it has gone, so this can be False for
   -- everything while that is still True.
   Filter.IsBlocking -> blocking view
+  -- CR 509.1h: the status the declaration confers, or that an effect confers
+  -- (Effect.BecomesBlocked). A live read of the same record, off the keys rather
+  -- than the sets -- so this can be True with nothing at all blocking the
+  -- creature, which is the case CR 510.1c gives no combat damage.
+  Filter.IsBlocked -> blocked view
   -- CR 608.2i: a look-back read of the turn's event log. Unlike IsAttacking it
   -- cannot stop being true within a turn -- nothing removes a GameEvent -- so a
   -- creature removed from combat (CR 506.4) still attacked, which is what
@@ -686,6 +699,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsControllerOfBound _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsBlocking -> predicate
+  Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
   Filter.IsAttachedToPermanent -> predicate
@@ -987,6 +1001,7 @@ bakeBound players predicate = case predicate of
   Filter.IsControllerOfBound _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsBlocking -> predicate
+  Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
   Filter.IsAttachedToPermanent -> predicate
@@ -1053,6 +1068,7 @@ manaValueThresholds predicate = case predicate of
   Filter.IsControllerOfBound _ -> []
   Filter.IsAttacking -> []
   Filter.IsBlocking -> []
+  Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
   Filter.IsAttachedToCreature -> []
   Filter.IsAttachedToPermanent -> []
@@ -1122,6 +1138,7 @@ statesAQuality predicate = case predicate of
   Filter.IsControllerOfBound _ -> True
   Filter.IsAttacking -> True
   Filter.IsBlocking -> True
+  Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True
   Filter.IsAttachedToCreature -> True
   Filter.IsAttachedToPermanent -> True

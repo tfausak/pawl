@@ -697,6 +697,7 @@ effectCounts effect = case effect of
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationCounts duration
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
@@ -1008,6 +1009,7 @@ effectReplacements effect = case effect of
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
@@ -1544,6 +1546,7 @@ effectMintedFaces effect = case effect of
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
@@ -1785,6 +1788,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsControllerOfBound _ -> 0
   Filter.Type.IsAttacking -> 0
   Filter.Type.IsBlocking -> 0
+  Filter.Type.IsBlocked -> 0
   Filter.Type.AttackedThisTurn -> 0
   Filter.Type.IsAttachedToCreature -> 0
   Filter.Type.IsAttachedToPermanent -> 0
@@ -2608,6 +2612,7 @@ effectFilters effect = case effect of
     unframed (durationFilters duration <> objectRefFilters srcRef <> objectRefFilters destRef)
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
   -- BOTH positions: the ObjectRef carries Renegade Krasis' "each other creature
   -- you control with a +1/+1 counter on it", and a Filter there would otherwise

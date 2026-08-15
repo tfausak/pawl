@@ -64,6 +64,7 @@ codec keywordCodec =
       Arm.payload "IsBound" SlotName.codec Filter.IsBound (\x -> case x of Filter.IsBound y -> Just y; _ -> Nothing),
       Arm.nullary "IsAttacking" Filter.IsAttacking,
       Arm.nullary "IsBlocking" Filter.IsBlocking,
+      Arm.nullary "IsBlocked" Filter.IsBlocked,
       Arm.nullary "AttackedThisTurn" Filter.AttackedThisTurn,
       Arm.nullary "IsAttachedToCreature" Filter.IsAttachedToCreature,
       Arm.nullary "IsAttachedToPermanent" Filter.IsAttachedToPermanent,
