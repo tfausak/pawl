@@ -58,6 +58,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
@@ -1172,9 +1173,9 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     Spec.assertEqWith
       s
       "two Islands: the additional cost is {1}"
-      (Cast.entwineOffer S.alice richSpell (Cost.costsFor (S.printingName dreamsGrip) richSpell rich) rich)
+      (Cast.entwineOffer ManaSpending.AsProduced S.alice richSpell (Cost.costsFor (S.printingName dreamsGrip) richSpell rich) rich)
       (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]), Cost.Type.components = []}))
-    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer S.alice poorSpell (Cost.costsFor (S.printingName dreamsGrip) poorSpell poor) poor) Nothing
+    Spec.assertEqWith s "one Island: unaffordable, so not offered" (Cast.entwineOffer ManaSpending.AsProduced S.alice poorSpell (Cost.costsFor (S.printingName dreamsGrip) poorSpell poor) poor) Nothing
   -- A card with no entwine is never asked, which is the other half of "where
   -- the rules leave nothing to ask, don't prompt".
   Spec.it s "CR 702.42a a modal spell without entwine (Chaos Charm) is never offered one" $ do
@@ -1183,7 +1184,7 @@ entwineSpec s registry = Spec.describe s "Entwine" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs0, spellId) = S.handOne chaosCharm (S.landsInPlay mountain 3)
         (_, gs) = S.addCreature piker S.bob gs0
-    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer S.alice spellId (Cost.costsFor (S.printingName chaosCharm) spellId gs) gs) Nothing
+    Spec.assertEqWith s "no entwine cost to offer" (Cast.entwineOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor (S.printingName chaosCharm) spellId gs) gs) Nothing
 
 -- Burst Lightning's one mode is "Burst Lightning deals 2 damage to any target",
 -- slot "target" (CR 702.33 / data/cards/burst-lightning.json), plus "Kicker {4}"
@@ -1280,9 +1281,9 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     Spec.assertEqWith
       s
       "five Mountains: the additional cost is {4}"
-      (Cast.kickerOffer S.alice richSpell (Cost.costsFor (S.printingName burstLightning) richSpell rich) rich)
+      (Cast.kickerOffer ManaSpending.AsProduced S.alice richSpell (Cost.costsFor (S.printingName burstLightning) richSpell rich) rich)
       (Just (Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 4]), Cost.Type.components = []}))
-    Spec.assertEqWith s "four Mountains: unaffordable, so not offered" (Cast.kickerOffer S.alice poorSpell (Cost.costsFor (S.printingName burstLightning) poorSpell poor) poor) Nothing
+    Spec.assertEqWith s "four Mountains: unaffordable, so not offered" (Cast.kickerOffer ManaSpending.AsProduced S.alice poorSpell (Cost.costsFor (S.printingName burstLightning) poorSpell poor) poor) Nothing
   -- A card with no kicker is never asked, which is the other half of "where the
   -- rules leave nothing to ask, don't prompt".
   Spec.it s "CR 702.33a a spell without kicker (Lightning Bolt) is never offered one" $ do
@@ -1290,7 +1291,7 @@ kickerSpec s registry = Spec.describe s "Kicker" $ do
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     hillGiant <- S.printingOf s registry "Hill Giant"
     let (gs, spellId, _) = kickerBoard mountain lightningBolt hillGiant 5
-    Spec.assertEqWith s "no kicker cost to offer" (Cast.kickerOffer S.alice spellId (Cost.costsFor (S.printingName lightningBolt) spellId gs) gs) Nothing
+    Spec.assertEqWith s "no kicker cost to offer" (Cast.kickerOffer ManaSpending.AsProduced S.alice spellId (Cost.costsFor (S.printingName lightningBolt) spellId gs) gs) Nothing
 
 -- CR 303.4a/601.2c: an Aura spell's target is its enchant slot, defined by the
 -- card, not by a mode -- Unholy Strength (the Auras gate card) has one empty
@@ -2485,12 +2486,14 @@ victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
 -- player cast a card somebody else OWNS, which is the one board where CR 405.4's
 -- controller and CR 108.3's owner name different players (#83).
 --
--- Two clauses of the printed card are not expressed. "Mana of any type can be
--- spent to cast that spell" (#1357) -- the board below pays with the colours the
--- spell actually asks for, so nothing here leans on it. "If that spell would be
--- put into a graveyard, exile it instead" (#1358) -- a floating CR 614.1a
--- redirect naming one object, which card data cannot write. Both leave pawl's
--- card STRICTER than printed.
+-- One clause of the printed card is not implemented: "if that spell would be put
+-- into a graveyard, exile it instead" (#1358), a floating CR 614.1a redirect
+-- naming one object, which card data cannot write. That leaves pawl's card
+-- STRICTER than printed.
+--
+-- The other rider IS expressed: "and mana of any type can be spent to cast that
+-- spell" is CR 118.14, carried by the grant as ManaSpending.AnyType, and the two
+-- cases at the end of this group are what prove it.
 daredevilName, renewedFaithName :: CardName.CardName
 daredevilName = CardName.MkCardName (Text.pack "Dire Fleet Daredevil")
 renewedFaithName = CardName.MkCardName (Text.pack "Renewed Faith")
@@ -2541,6 +2544,38 @@ daredevilFaithCast mountain plains daredevil faith =
         -- exiled the card is one where nothing was cast either.
         _ -> exiled
 
+-- daredevilExiled's board with the white mana taken away and a SECOND Renewed
+-- Faith put into alice's hand -- CR 118.14's board, and the pair the negative
+-- rests on.
+--
+-- alice's five lands are all Mountains: two pay the Daredevil's {1}{R} and the
+-- three that are left are the only mana she has for a {2}{W}. Nothing on this
+-- board can make white (asserted, rather than assumed, in the case below), so
+-- the exiled Faith is payable only under the permission's rider and the copy in
+-- her hand is payable not at all.
+--
+-- THE PAIR IS ON ONE BOARD, which is what makes it a pair: the two Faiths are
+-- the same card at the same cost, held by the same player, in the same step with
+-- the same empty stack, and both are instants so CR 117.1a permits either at
+-- this moment. The single difference is that one of them is being cast under CR
+-- 118.14's permission. Returns the exiled card's id, the hand copy's, and the
+-- board.
+daredevilRedOnly :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (Maybe ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+daredevilRedOnly mountain daredevil faith =
+  let lands = S.landsFor mountain S.alice 5 S.threePlayerGame
+      (_, stocked) = S.addGraveyardCard faith S.bob lands
+      (handFaithId, withFaith) = S.addHandCard faith S.alice stocked
+      (handId, board) = S.addHandCard daredevil S.alice withFaith
+      cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice handId daredevilName Facing.FaceUp)
+      entered = S.runPure S.identityAnswer cast Stack.resolveTop
+      placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+      after = S.runPure S.identityAnswer placed Stack.resolveTop
+   in (Maybe.listToMaybe (exiledNamed renewedFaithName after), handFaithId, after)
+
+-- One symbol of the colour the board cannot make, as a cost to ask canPay about.
+whiteCost :: ManaCost.ManaCost
+whiteCost = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White)]
+
 direFleetDaredevilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
   -- CR 601.3: the permission names a player, so the search for castable cards in
@@ -2587,6 +2622,45 @@ direFleetDaredevilSpec s registry = Spec.describe s "DireFleetDaredevil" $ do
     -- life assertion above from being readable as "owner and controller are the
     -- same player after all".
     Spec.assertEqWith s "CR 608.2n: the card goes to bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+  -- CR 118.14: "mana of any type can be spent to cast that spell". The offer
+  -- side, on a board with no white mana on it at all -- and the same board's
+  -- second Renewed Faith, in alice's hand, is the negative: same cost, same
+  -- player, same step, no permission.
+  Spec.it s "CR 118.14 an off-colour spell in exile is offered where the same card in hand is not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    daredevil <- S.printingOf s registry "Dire Fleet Daredevil"
+    faith <- S.printingOf s registry "Renewed Faith"
+    let (exiled, handFaithId, after) = daredevilRedOnly mountain daredevil faith
+    -- The board's own claim, asked of the mana engine rather than assumed from
+    -- the land names: nothing alice controls can pay {W}.
+    Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice whiteCost after)) "alice can make no white mana"
+    Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) after) "but she has three mana"
+    case exiled of
+      Nothing -> Spec.assertFailure s "expected the Faith to be exiled"
+      Just exiledId -> do
+        Spec.assertBool s (offeredCast exiledId renewedFaithName after) "the exiled Faith is offered: CR 118.14 pays its {W} with red"
+        Spec.assertBool s (not (offeredCast handFaithId renewedFaithName after)) "the copy in her hand is not, and nothing but the rider tells them apart"
+  -- CR 609.4b: the permission "affects only how the player may pay a cost. It
+  -- doesn't change that cost, and it doesn't change what mana was actually
+  -- spent" -- so the payment goes through, and what pays it is three RED mana
+  -- off three Mountains.
+  Spec.it s "CR 609.4b the off-colour cost is paid with red mana and resolves" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    daredevil <- S.printingOf s registry "Dire Fleet Daredevil"
+    faith <- S.printingOf s registry "Renewed Faith"
+    let (exiled, _, board) = daredevilRedOnly mountain daredevil faith
+    case exiled of
+      Nothing -> Spec.assertFailure s "expected the Faith to be exiled"
+      Just exiledId -> do
+        Spec.assertEqWith s "two Mountains paid for the Daredevil" (S.tappedCount S.alice board) 2
+        let cast = S.runPure S.identityAnswer board (Cast.castSpell S.alice exiledId renewedFaithName Facing.FaceUp)
+            after = S.runPure S.identityAnswer cast Stack.resolveTop
+        Spec.assertBool s (not (null (GameState.stack cast))) "the Faith really was cast"
+        Spec.assertEqWith s "CR 118.14: the {2}{W} was paid, and alice gains the 6 life" (S.lifeOf S.alice after) (Just 26)
+        -- WHAT WAS SPENT, which is rule 609.4b's second clause: three more
+        -- Mountains, so the mana that paid the {W} was red and stayed red.
+        Spec.assertEqWith s "all five Mountains are tapped" (S.tappedCount S.alice after) 5
+        Spec.assertEqWith s "and nothing is left floating" (Game.poolOf S.alice after) (Mana.Type.MkMana [])
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do

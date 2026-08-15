@@ -103,6 +103,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.GraveyardScope as GraveyardScope
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -110,6 +111,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Mentored as Mentored
 import qualified Pawl.Types.Mill as Mill
@@ -435,7 +437,7 @@ slotsOf effect = case effect of
   -- Both a READ: the ObjectRef names the object being permitted, normally bound
   -- by a MoveToZone earlier in the same list (CR 400.7) exactly as OfferCast's
   -- slot is, and the Duration's Condition may read a slot as a Quantity.
-  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> joinTwo (durationSlots duration) (objectRefSlots ref)
+  Effect.GrantPlayFromExile grant -> joinTwo (durationSlots (GrantPlayFromExile.duration grant)) (objectRefSlots (GrantPlayFromExile.ref grant))
   -- Both the swept ref and everything the BODY reads, the shape
   -- PreventNextDamage's rider takes. The loop's own slot is NOT subtracted, as
   -- the rider's reserved amount slot is: this one is authored by the card and
@@ -645,7 +647,7 @@ slotsAreExhaustive effect = case effect of
   Effect.TakeExtraTurn (TakeExtraTurn.MkTakeExtraTurn _ _) -> True
   Effect.ShuffleIntoLibrary {} -> True
   Effect.OfferCast {} -> True
-  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration _) -> durationSlotsAreExhaustive duration
+  Effect.GrantPlayFromExile grant -> durationSlotsAreExhaustive (GrantPlayFromExile.duration grant)
   -- PreventNextDamage's answer: the ref is reported by slotsOf, so only the
   -- body can hide a read, and each of its effects answers for itself.
   Effect.ForEach (ForEach.MkForEach _ _ body) -> all slotsAreExhaustive body
@@ -1311,7 +1313,10 @@ finishSpell oid face controller =
       ExilePlayPermission.MkExilePlayPermission
         { ExilePlayPermission.player = controller,
           ExilePlayPermission.source = newId,
-          ExilePlayPermission.expiry = Expiry.Type.Never
+          ExilePlayPermission.expiry = Expiry.Type.Never,
+          -- CR 715.3d grants permission and says nothing about mana, so the
+          -- Adventure is paid for in the colours it prints.
+          ExilePlayPermission.spending = ManaSpending.AsProduced
         }
 
 -- The no-subgame spell resolver (Stack's default path and every direct caller).
@@ -1563,7 +1568,7 @@ payGatePaid resolving source idx cIdx legal gate = do
           case decision of
             PaymentDecision.Declines -> pure False
             PaymentDecision.Pays -> do
-              outcome <- Cost.pay payer source cost
+              outcome <- Cost.pay ManaSpending.AsProduced payer source cost
               pure (outcome == Payment.Paid)
 
 -- Which player a resolution cost is offered to. ONE slot read answering in two
@@ -3298,7 +3303,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- zone-scoped, and Cast.castableZones consults this field only on its exile
   -- arm, so a zone test here would be the rules core deciding what the effect
   -- means rather than the effect saying it.
-  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) ->
+  Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile duration ref spending) ->
     State.modify' $ \gs ->
       -- The same sweep every ObjectRef-taking opcode shares: a player recipient,
       -- an illegal slot (CR 608.2b) and a set that matched nothing all arrive as
@@ -3314,7 +3319,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   ExilePlayPermission.MkExilePlayPermission
                     { ExilePlayPermission.player = controller,
                       ExilePlayPermission.source = source,
-                      ExilePlayPermission.expiry = expiry
+                      ExilePlayPermission.expiry = expiry,
+                      -- CR 118.14, carried from the opcode unread: this module
+                      -- stores what the card said and Pawl.Engine.Mana is the
+                      -- only thing that acts on it.
+                      ExilePlayPermission.spending = spending
                     }
                 grant o = o {Object.playableFromExile = Just permission}
              in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}

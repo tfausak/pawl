@@ -17,6 +17,7 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.Mill as Mill
@@ -1418,7 +1419,13 @@ data Effect card
     -- CR 611.2b: if the stated duration never starts, the effect does nothing --
     -- Pawl.Engine.Expiry.arm answers Nothing and Resolve stores no permission at
     -- all, rather than storing one that a later sweep would remove.
-    GrantPlayFromExile DurationRef.DurationRef
+    -- CR 118.14's "and mana of any type can be spent to cast that spell" is the
+    -- payload's `spending` rider, and it rides the GRANT because rule 118.14's
+    -- last sentence scopes it to the permission: "if that effect also gives a
+    -- player permission to cast spells, this applies only to mana that player
+    -- spends to cast spells that way". Dire Fleet Daredevil prints both clauses
+    -- in one sentence; Pawl.Types.ManaSpending is what the rider says.
+    GrantPlayFromExile GrantPlayFromExile.GrantPlayFromExile
   | -- | CR 608.2f: an action taken on several objects and/or players that cannot
     -- be processed simultaneously "is instead processed considering each
     -- affected player or object individually" -- so take the swept set one

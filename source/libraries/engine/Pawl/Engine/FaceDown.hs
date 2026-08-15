@@ -42,6 +42,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -138,7 +139,7 @@ turnFaceUp pid oid = do
     else case morphCostOf oid before of
       Nothing -> pure ()
       Just cost -> do
-        payment <- Cost.pay pid oid cost
+        payment <- Cost.pay ManaSpending.AsProduced pid oid cost
         case payment of
           Payment.Unpaid -> State.put before
           -- CR 708.8: the copiable values revert, which for pawl is the status

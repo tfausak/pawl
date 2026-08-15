@@ -63,6 +63,9 @@
                           "ref": {
                             "type": "InSlot",
                             "value": "exiled"
+                          },
+                          "spending": {
+                            "type": "AnyType"
                           }
                         }
                       }

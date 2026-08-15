@@ -61,6 +61,7 @@ import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
@@ -249,7 +250,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
   -- S.identityAnswer would answer anyway; what this pins is the tap count.
   Spec.it s "paying {1}{R} taps exactly two of three Mountains and leaves no float" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 3) (Cost.payMana S.alice pikerCost)
+    let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 3) (Cost.payMana ManaSpending.AsProduced S.alice pikerCost)
     Spec.assertBool s paid "three Mountains should pay {1}{R}"
     Spec.assertEqWith s "tapped" (S.tappedCount S.alice after) 2
     Spec.assertEqWith s "no float" (poolSize S.alice after) 0
@@ -499,8 +500,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         cost = Cost.Type.MkCost (Just green) []
         tappedElf g = fmap Object.tapped (Game.lookupObject elfId g)
-    Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay S.alice elfId cost))) (Just TapState.Tapped)
-    Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay S.alice elfId cost))) (Just TapState.Untapped)
+    Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Tapped)
+    Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay ManaSpending.AsProduced S.alice elfId cost))) (Just TapState.Untapped)
 
   -- The other half of the invariant: WHEN the window asks, counted directly --
   -- without which an implementation that never asks would still pass the test
@@ -522,7 +523,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             State.modify' (\(short, extra) -> (short, extra + 1))
             pure Nothing
           _ -> pure (S.identityAnswer p)
-        promptsFor g = State.execState (Engine.runGame countingAnswer g (Cost.payMana S.alice green)) (0, 0)
+        promptsFor g = State.execState (Engine.runGame countingAnswer g (Cost.payMana ManaSpending.AsProduced S.alice green)) (0, 0)
     Spec.assertEqWith s "a lone Forest: asked once, and nothing left to float" (promptsFor (S.landsInPlay forest 1)) (1, 0)
     Spec.assertEqWith s "three Forests: asked once short, then offered the float" (promptsFor (S.landsInPlay forest 3)) (1, 1)
 
@@ -538,7 +539,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
           Prompt.ChooseManaSource {} -> Just bogus
           _ -> S.identityAnswer p
         gs = S.landsInPlay forest 3
-        (paid, after) = S.runPureWith liar gs (Cost.payMana S.alice green)
+        (paid, after) = S.runPureWith liar gs (Cost.payMana ManaSpending.AsProduced S.alice green)
     Spec.assertBool s (not paid) "the cost goes unpaid"
     Spec.assertEqWith s "and no Forest was tapped in its name" (S.tappedCount S.alice after) 0
 
@@ -1941,7 +1942,7 @@ sharedVictimSpec s registry = Spec.describe s "Two mana sources over one creatur
   Spec.it s "CR 601.2g the window offers both sources, then neither" $ do
     board <- sharedVictimBoard s registry 1
     let cost = ManaCost.MkManaCost [ManaSymbol.Generic 4]
-        offers = State.execState (Engine.runGame recordingManaSources board (Cost.payMana S.alice cost)) []
+        offers = State.execState (Engine.runGame recordingManaSources board (Cost.payMana ManaSpending.AsProduced S.alice cost)) []
     Spec.assertEqWith s "two candidates, then the one the sacrifice did not spend" (fmap length offers) [2, 1]
 
 -- Alice's Ashnod's Altar, her Phyrexian Tower and `victims` Goblin Pikers.
@@ -2320,12 +2321,12 @@ snowSpec s registry = Spec.describe s "Snow" $ do
     Spec.assertEqWith
       s
       "snow first"
-      (Mana.spend 0 snowCost (Mana.Type.MkMana [snowRed, plainRed]))
+      (Mana.spend ManaSpending.AsProduced 0 snowCost (Mana.Type.MkMana [snowRed, plainRed]))
       (Just (Mana.Type.MkMana [plainRed], 0))
     Spec.assertEqWith
       s
       "snow last"
-      (Mana.spend 0 snowCost (Mana.Type.MkMana [plainRed, snowRed]))
+      (Mana.spend ManaSpending.AsProduced 0 snowCost (Mana.Type.MkMana [plainRed, snowRed]))
       (Just (Mana.Type.MkMana [plainRed], 0))
 
   -- CR 202.2d's colour-granting list names the hybrid and Phyrexian symbols and
@@ -2455,7 +2456,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     let cost = ManaCost.MkManaCost [redGreen, redSymbol]
         gs = mixedLands mountain forest 1 1
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice cost gs) "canPay says yes"
-    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana S.alice cost)
+    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice cost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "both lands tapped" (S.tappedCount S.alice after) 2
     Spec.assertEqWith s "nothing left floating" (poolSize S.alice after) 0
@@ -2468,7 +2469,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     let cost = ManaCost.MkManaCost [redGreen, redSymbol]
         gs = mixedLands mountain forest 0 2
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice cost gs)) "canPay says no"
-    Spec.assertBool s (not (fst (S.runPureWith S.identityAnswer gs (Cost.payMana S.alice cost)))) "and paying fails"
+    Spec.assertBool s (not (fst (S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice cost)))) "and paying fails"
     Spec.assertEqWith s "two {R/G} alone WOULD be payable from them" (Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [redGreen, redGreen]) gs) True
 
   Spec.it s "CR 107.4e whole card: Burning-Tree Emissary casts off RR, GG, or RG" $ do
@@ -2601,7 +2602,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     let gs = S.landsInPlay mountain 3
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice javelinCost gs) "canPay says yes"
     Spec.assertEqWith s "and it casts" (castsOff flameJavelin gs) 1
-    let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 6) (Cost.payMana S.alice javelinCost)
+    let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 6) (Cost.payMana ManaSpending.AsProduced S.alice javelinCost)
     Spec.assertBool s paid "six Mountains pay it too"
     Spec.assertEqWith s "and only three of them are tapped" (S.tappedCount S.alice after) 3
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice after) 0
@@ -2670,7 +2671,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
      in Spec.assertEqWith
           s
           "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"
-          (Mana.spend 0 (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless]))
+          (Mana.spend ManaSpending.AsProduced 0 (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless]))
           (Just (Mana.Type.MkMana [colorless, colorless], 0))
 
   -- CR 601.2b: "If a cost that will be paid as the spell is being cast
@@ -2911,7 +2912,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     forest <- S.printingOf s registry "Forest"
     let gs = S.landsInPlay forest 1
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice phyrexianCost gs) "canPay says yes"
-    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana S.alice phyrexianCost)
+    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "the Forest is tapped" (S.tappedCount S.alice after) 1
     Spec.assertEqWith s "nothing left floating" (poolSize S.alice after) 0
@@ -2924,7 +2925,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     mountain <- S.printingOf s registry "Mountain"
     let gs = S.landsInPlay mountain 1
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice phyrexianCost gs) "canPay says yes"
-    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana S.alice phyrexianCost)
+    let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "exactly 2 life" (S.lifeOf S.alice after) (Just 18)
     Spec.assertEqWith s "the Mountain is untouched" (S.tappedCount S.alice after) 0
@@ -2938,10 +2939,10 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice phyrexianCost (aliceAt 2)) "2 life is enough"
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice phyrexianCost (aliceAt 1))) "1 life is not"
     Spec.assertBool s (not (Mana.canPay Cost.manaActivations S.alice phyrexianCost (aliceAt 0))) "0 life is not"
-    let (paid, after) = S.runPureWith S.identityAnswer (aliceAt 2) (Cost.payMana S.alice phyrexianCost)
+    let (paid, after) = S.runPureWith S.identityAnswer (aliceAt 2) (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paid "paying at 2 really works"
     Spec.assertEqWith s "and takes her to 0" (S.lifeOf S.alice after) (Just 0)
-    let (failed, unchanged) = S.runPureWith S.identityAnswer (aliceAt 1) (Cost.payMana S.alice phyrexianCost)
+    let (failed, unchanged) = S.runPureWith S.identityAnswer (aliceAt 1) (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s (not failed) "at 1 the payment fails"
     Spec.assertEqWith s "and CR 601.2h leaves the life total alone" (S.lifeOf S.alice unchanged) (Just 1)
 
@@ -3038,7 +3039,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertEqWith
       s
       "the {G} plus {2} route, costing no life"
-      (Mana.lifeNeeded Cost.manaActivations S.alice cost (mixedLands island birds 2 1))
+      (Mana.lifeNeeded Cost.manaActivations ManaSpending.AsProduced S.alice cost (mixedLands island birds 2 1))
       (Just 0)
     Spec.assertBool s (Mana.canPay Cost.manaActivations S.alice cost (mixedLands island birds 2 1)) "and it is payable"
     -- The discriminator: the same cost and the same three permanents, but a
@@ -3047,17 +3048,17 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertEqWith
       s
       "with a Mountain instead, 2 life is the cheapest there is"
-      (Mana.lifeNeeded Cost.manaActivations S.alice cost (mixedLands island mountain 2 1))
+      (Mana.lifeNeeded Cost.manaActivations ManaSpending.AsProduced S.alice cost (mixedLands island mountain 2 1))
       (Just 2)
     Spec.assertEqWith
       s
       "and a lone {G/P} off nothing at all is 2 as well"
-      (Mana.lifeNeeded Cost.manaActivations S.alice phyrexianCost (Setup.emptyGame S.bothPlayers))
+      (Mana.lifeNeeded Cost.manaActivations ManaSpending.AsProduced S.alice phyrexianCost (Setup.emptyGame S.bothPlayers))
       (Just 2)
     Spec.assertEqWith
       s
       "while a lone {G/P} with a Forest is 0"
-      (Mana.lifeNeeded Cost.manaActivations S.alice phyrexianCost (S.landsInPlay forest 1))
+      (Mana.lifeNeeded Cost.manaActivations ManaSpending.AsProduced S.alice phyrexianCost (S.landsInPlay forest 1))
       (Just 0)
 
   -- The budget is recomputed as sources are tapped, not fixed when the
@@ -3071,13 +3072,13 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
-        (paidBlue, afterBlue) = S.runPureWith (prefersColor Color.Blue) gs (Cost.payMana S.alice phyrexianCost)
+        (paidBlue, afterBlue) = S.runPureWith (prefersColor Color.Blue) gs (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paidBlue "the cost is still paid"
     Spec.assertEqWith s "by 2 life" (S.lifeOf S.alice afterBlue) (Just 18)
     Spec.assertEqWith s "the Birds was tapped on the way" (S.tappedCount S.alice afterBlue) 1
     Spec.assertEqWith s "and its blue mana is still floating" (poolSize S.alice afterBlue) 1
     -- The control: the same board and the same card, one different answer.
-    let (paidGreen, afterGreen) = S.runPureWith (prefersColor Color.Green) gs (Cost.payMana S.alice phyrexianCost)
+    let (paidGreen, afterGreen) = S.runPureWith (prefersColor Color.Green) gs (Cost.payMana ManaSpending.AsProduced S.alice phyrexianCost)
     Spec.assertBool s paidGreen "green pays it too"
     Spec.assertEqWith s "and costs no life at all" (S.lifeOf S.alice afterGreen) (Just 20)
     Spec.assertEqWith s "with nothing left floating" (poolSize S.alice afterGreen) 0

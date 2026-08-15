@@ -55,6 +55,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
@@ -191,7 +192,7 @@ doorSpec s registry =
     Spec.it s "CR 118.6 paying an unpayable cost changes nothing" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs = S.landsInPlay mountain 3
-          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay S.alice S.noSource (Cost.Type.MkCost Nothing []))
+          (outcome, after) = S.runPureWith S.identityAnswer gs (Cost.pay ManaSpending.AsProduced S.alice S.noSource (Cost.Type.MkCost Nothing []))
       Spec.assertEqWith s "Unpaid" outcome Payment.Unpaid
       Spec.assertEqWith s "no land tapped" (S.tappedCount S.alice after) 0
     -- CR 701.21a: enough controlled permanents matching the criterion.

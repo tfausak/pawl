@@ -53,12 +53,14 @@ import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
@@ -923,14 +925,24 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.GrantPlayFromExile (DurationRef.MkDurationRef Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled")))))
+      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AsProduced))
       """ {"type":"GrantPlayFromExile","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"exiled"}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.GrantPlayFromExile (DurationRef.MkDurationRef Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature))))
+      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) ManaSpending.AsProduced))
       """ {"type":"GrantPlayFromExile","value":{"duration":{"type":"Indefinite"},"ref":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}}} """
+  -- CR 118.14's rider, through the ARM rather than through the payload codec
+  -- alone: the Effect layer is what a card's JSON actually goes through, and
+  -- Dire Fleet Daredevil's clause has to survive it.
+  Spec.it s "GrantPlayFromExile round-trips CR 118.14's spending rider" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.GrantPlayFromExile (GrantPlayFromExile.MkGrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))) ManaSpending.AnyType))
+      """ {"type":"GrantPlayFromExile","value":{"duration":{"type":"UntilEndOfTurn"},"ref":{"type":"InSlot","value":"exiled"},"spending":{"type":"AnyType"}}} """
   -- The shapes the encoder can emit, told apart by LENGTH: a bare ability name
   -- (CR 603.7a/b's defaults), a two-element form (a stated duration, onset
   -- still the default), and a three-element form (a stated onset, whose last

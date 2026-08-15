@@ -36,6 +36,7 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -147,7 +148,7 @@ unlock pid oid half = do
     else case filter ((== half) . Face.name) (lockedHalves oid before) of
       [] -> pure ()
       face : _ -> do
-        payment <- Cost.pay pid oid (unlockCostOf face)
+        payment <- Cost.pay ManaSpending.AsProduced pid oid (unlockCostOf face)
         case payment of
           Payment.Unpaid -> State.put before
           Payment.Paid -> Event.unlockHalf oid half

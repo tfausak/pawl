@@ -29,6 +29,7 @@ import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.ForEach as ForEach
+import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Codec.LookAt as LookAt
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.Mill as Mill
@@ -134,7 +135,7 @@ codec cardCodec =
       Arm.payload "TakeExtraTurn" TakeExtraTurn.codec Effect.TakeExtraTurn (\x -> case x of Effect.TakeExtraTurn y -> Just y; _ -> Nothing),
       Arm.payload "ShuffleIntoLibrary" ShuffleIntoLibrary.codec Effect.ShuffleIntoLibrary (\x -> case x of Effect.ShuffleIntoLibrary y -> Just y; _ -> Nothing),
       Arm.payload "OfferCast" OfferCast.codec Effect.OfferCast (\x -> case x of Effect.OfferCast y -> Just y; _ -> Nothing),
-      Arm.payload "GrantPlayFromExile" DurationRef.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
+      Arm.payload "GrantPlayFromExile" GrantPlayFromExile.codec Effect.GrantPlayFromExile (\x -> case x of Effect.GrantPlayFromExile y -> Just y; _ -> Nothing),
       Arm.payload "ForEach" forEachCodec Effect.ForEach (\x -> case x of Effect.ForEach y -> Just y; _ -> Nothing)
     ]
   where

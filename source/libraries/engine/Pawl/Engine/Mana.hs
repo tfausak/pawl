@@ -39,6 +39,8 @@ import Pawl.Types.ManaOption (ManaOption)
 import qualified Pawl.Types.ManaOption as ManaOption
 import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import Pawl.Types.ManaSpending (ManaSpending)
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import Pawl.Types.ManaSymbol (ManaSymbol)
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import Pawl.Types.ManaType (ManaType)
@@ -439,6 +441,26 @@ supplyOf unit =
 ofTypes :: Set.Set ManaType -> Demand
 ofTypes types = MkDemand {demandTypes = types, demandTags = Set.empty}
 
+-- CR 118.14, applied to ONE demand: under a permission to spend mana of any
+-- type, a demand for red mana is served by any of CR 106.1b's six types.
+--
+-- THE DEMAND SIDE and not the supply side, which is CR 609.4b's limit made
+-- structural: the pool is untouched, so what was actually spent to pay the cost
+-- is still whatever mana the units are, and `resolutions` still reads the
+-- unmodified ManaCost, so the cost is unchanged too. A model that recoloured the
+-- units instead would have answered CR 500.5's leftover pool and a "spend only
+-- black mana" restriction wrongly.
+--
+-- The TAGS ride through untouched, which is what keeps CR 107.4h's {S} honest:
+-- rule 118.14 permits mana of any TYPE to be spent and says nothing about where
+-- that mana came from, so a snow demand still wants a snow supply. It is also
+-- why this widens rather than deleting the demand outright -- a demand nothing
+-- constrains would spend a non-snow mana on {S}.
+relax :: ManaSpending -> Demand -> Demand
+relax spending demand = case spending of
+  ManaSpending.AsProduced -> demand
+  ManaSpending.AnyType -> demand {demandTypes = everyManaType}
+
 -- CR 106.1b: the six types of mana. Written out rather than derived, for the
 -- reason producedTypes writes out CR 105.1's five: the enumeration IS the rule.
 --
@@ -505,6 +527,11 @@ waysOf symbol = case symbol of
 -- one entry per combination of per-symbol ways. `traverse` over the list
 -- applicative is that product.
 --
+-- CR 118.14's permission is applied HERE, to the demands and to nothing else --
+-- one place, so payment (`spend`) and payability (`payableResolutions`) cannot
+-- come to disagree about what a widened cost asks for, exactly as `serves` is
+-- one relation for both. See `relax` for why the cost itself is left alone.
+--
 -- This is what lets everything below it keep the ONE-SUPPLY-PER-DEMAND shape
 -- spendDemands and canPay's Hall condition both rest on. CR 107.4e's {2/B} is the
 -- only symbol two mana can pay, and rather than teach those two about a demand
@@ -534,10 +561,10 @@ waysOf symbol = case symbol of
 --
 -- The sort is what makes rule 1 hold across symbols rather than within one: for
 -- {2/R}{G/P} the product alone would offer a 2-life way before a 0-life one.
-resolutions :: ManaCost -> [([Demand], Natural, Natural)]
-resolutions (ManaCost.MkManaCost symbols) =
+resolutions :: ManaSpending -> ManaCost -> [([Demand], Natural, Natural)]
+resolutions spending (ManaCost.MkManaCost symbols) =
   let collect ways =
-        ( Maybe.mapMaybe (\(demand, _, _) -> demand) ways,
+        ( fmap (relax spending) (Maybe.mapMaybe (\(demand, _, _) -> demand) ways),
           sum (fmap (\(_, generic, _) -> generic) ways),
           sum (fmap (\(_, _, life) -> life) ways)
         )
@@ -597,6 +624,12 @@ takeAny units _ = case units of
 -- hybrid or a Phyrexian symbol there is only one; where there are several,
 -- `resolutions` has already put the least-life, fewest-units one first.
 --
+-- The SPENDING permission is the payer's (CR 118.14), threaded in from the
+-- caller rather than read off a board: what a spell may be paid with is fixed by
+-- the effect that permitted the cast, and by the time the payment happens CR
+-- 601.2a has already moved the card to a new incarnation that holds no
+-- permission (Pawl.Engine.Cast.castSpellWith captures it before the move).
+--
 -- The BUDGET is a cap and not a target, and it is what keeps that ordering
 -- meaningful during payCost's loop. Left uncapped, a {G/P} would take the 2-life
 -- resolution on the first pass -- the pool is empty before any source is tapped,
@@ -604,14 +637,14 @@ takeAny units _ = case units of
 -- at all. payCost passes `lifeNeeded`, the least life any PAYABLE resolution
 -- costs, so a cost the board can pay with mana is capped at zero life and the
 -- loop is forced to tap for it.
-spend :: Natural -> ManaCost -> Mana -> Maybe (Mana, Natural)
-spend budget cost (Mana.MkMana units) =
+spend :: ManaSpending -> Natural -> ManaCost -> Mana -> Maybe (Mana, Natural)
+spend spending budget cost (Mana.MkMana units) =
   let attempt (demands, generic, life) = do
         Monad.guard (life <= budget)
         afterTyped <- spendDemands units demands
         left <- Monad.foldM takeAny afterTyped [1 .. generic]
         pure (Mana.MkMana left, life)
-   in Maybe.listToMaybe (Maybe.mapMaybe attempt (resolutions cost))
+   in Maybe.listToMaybe (Maybe.mapMaybe attempt (resolutions spending cost))
 
 -- CR 107.4f's 2 life. The one place that number is written.
 phyrexianLife :: Natural
@@ -685,9 +718,14 @@ monocoloredHybridGeneric = 2
 -- which every route offered here has to be payable alongside (#1134). Empty for a
 -- cost whose components take nothing out of a zone.
 --
+-- `spending` is CR 118.14's permission, riding through to the payability
+-- question below for the reason `outside` and `claimed` do: a route this
+-- function refuses is a choice taken away from the player, and under a
+-- permission to spend mana of any type the off-colour route is a real one.
+--
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announce :: Capacity -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural)
-announce capacity pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 symbols
+announce :: Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural)
+announce capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 symbols
   where
     -- "Payable" here means SOME completion of the remaining announcements pays
     -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
@@ -701,7 +739,7 @@ announce capacity pid oid total outside claimed (ManaCost.MkManaCost symbols) = 
     stillPayable done rest gs extra ways =
       let candidate (tail_, life) =
             any
-              (\totalled -> canPayCommitting capacity pid (outside + extra + life) claimed totalled gs)
+              (\totalled -> canPayCommitting capacity spending pid (outside + extra + life) claimed totalled gs)
               (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
        in any candidate (completions rest)
     -- One symbol's announcement. Asked only where two routes are payable, and
@@ -837,13 +875,17 @@ hybridHalves a b = if a == b then [a] else [a, b]
 --
 -- A mana cost that is part of a whole COST goes through canPayCommitting below
 -- instead, because its components may want life too (CR 118.3 again). What is
--- left here is the mana cost asked about on its own.
+-- left here is the mana cost asked about on its own -- with nothing committed,
+-- nothing claimed and no CR 118.14 permission, which is the spending rule every
+-- cost takes when no effect has spoken about it.
 canPay :: Capacity -> PlayerId -> ManaCost -> GameState -> Bool
-canPay capacity pid = canPayCommitting capacity pid 0 []
+canPay capacity pid = canPayCommitting capacity ManaSpending.AsProduced pid 0 []
 
--- The same question with resources already spoken for: `committed` life, which CR
--- 119.4's floor must still admit alongside whatever the rest of this cost costs,
--- and `claimed`, the objects the rest of this cost will take out of a zone.
+-- The same question with the payer's CR 118.14 permission and with resources
+-- already spoken for: `spending`, which `relax` applies to the demands;
+-- `committed` life, which CR 119.4's floor must still admit alongside whatever
+-- the rest of this cost costs; and `claimed`, the objects the rest of this cost
+-- will take out of a zone.
 --
 -- Two callers commit life: `announce`, for CR 118.13a's choices -- both those
 -- already made and those a `completions` entry is standing in for -- and
@@ -855,15 +897,15 @@ canPay capacity pid = canPayCommitting capacity pid 0 []
 -- Village Rites' "sacrifice a creature" and Phyrexian Tower's are one demand on
 -- one creature under CR 118.3, exactly as two sources' are (#1134). Zero and
 -- empty everywhere else, which is what `canPay` is.
-canPayCommitting :: Capacity -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
-canPayCommitting capacity pid committed claimed cost gs =
+canPayCommitting :: Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommitting capacity spending pid committed claimed cost gs =
   let pcs = Projection.projectAll gs
-   in canPayCommittingGiven capacity (manaSourcesGiven capacity (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in canPayCommittingGiven capacity spending (manaSourcesGiven capacity (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same question given a board already walked -- see payableResolutionsGiven
 -- for what `sources` and `pcs` are and why handing them in changes no answer.
-canPayCommittingGiven :: Capacity -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
-canPayCommittingGiven capacity sources pcs pid committed claimed cost gs = not (null (payableResolutionsGiven capacity sources pcs pid committed claimed cost gs))
+canPayCommittingGiven :: Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommittingGiven capacity spending sources pcs pid committed claimed cost gs = not (null (payableResolutionsGiven capacity spending sources pcs pid committed claimed cost gs))
 
 -- One source's contribution to the supply side, as the OPTIONS it offers: one
 -- option per group of yields (see the collapse below), and each option is that
@@ -1019,10 +1061,10 @@ sourceOptions supplies =
 -- into charging {2/B} a single mana. CR 107.4f's {G/P} rides on the same
 -- enumeration: its life way is a resolution with one fewer demand, so neither
 -- has to learn about a symbol that consumes no supply at all.
-payableResolutions :: Capacity -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutions capacity pid committed claimed cost gs =
+payableResolutions :: Capacity -> ManaSpending -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutions capacity spending pid committed claimed cost gs =
   let pcs = Projection.projectAll gs
-   in payableResolutionsGiven capacity (manaSourcesGiven capacity (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
+   in payableResolutionsGiven capacity spending (manaSourcesGiven capacity (Projection.controlGrants gs) pcs pid gs) pcs pid committed claimed cost gs
 
 -- The same list given a board the CALLER has already walked, which is the half
 -- Action.legalActions' enumeration wants: the wrapper above takes one
@@ -1060,8 +1102,8 @@ payableResolutions capacity pid committed claimed cost gs =
 -- case -- the creature buys the {B} or pays the additional cost, not both
 -- (#1134). It is the whole cost's claims and not the remainder's, which is
 -- exact: `Cost.canPay` asks this before any part of the cost is paid.
-payableResolutionsGiven :: Capacity -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutionsGiven capacity sources pcs pid committed claimed cost gs =
+payableResolutionsGiven :: Capacity -> ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutionsGiven capacity spending sources pcs pid committed claimed cost gs =
   let Mana.MkMana units = Game.poolOf pid gs
       pooled = fmap supplyOf units
       options = fmap (\oid -> sourceOptions (manaSuppliesGiven capacity pcs pid oid gs)) sources
@@ -1088,7 +1130,7 @@ payableResolutionsGiven capacity sources pcs pid committed claimed cost gs =
                     && Natural.length supplies >= Natural.length demands + generic
                     && all hallHolds subsets
          in any fits boards
-   in filter payable (resolutions cost)
+   in filter payable (resolutions spending cost)
 
 -- The least life any payable resolution of this cost costs, or Nothing when none
 -- is payable. `resolutions` is sorted by life ascending and payableResolutions
@@ -1103,7 +1145,7 @@ payableResolutionsGiven capacity sources pcs pid committed claimed cost gs =
 -- cost's claims would be partly spent ones. Refusing an unpayable cost is the
 -- gates' job (Pawl.Engine.Cost.canPay); all this picks is which resolution the
 -- mana is spent under.
-lifeNeeded :: Capacity -> PlayerId -> ManaCost -> GameState -> Maybe Natural
-lifeNeeded capacity pid cost gs = case payableResolutions capacity pid 0 [] cost gs of
+lifeNeeded :: Capacity -> ManaSpending -> PlayerId -> ManaCost -> GameState -> Maybe Natural
+lifeNeeded capacity spending pid cost gs = case payableResolutions capacity spending pid 0 [] cost gs of
   (_, _, life) : _ -> Just life
   [] -> Nothing
