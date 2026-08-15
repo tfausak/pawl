@@ -1085,26 +1085,27 @@ historySpec s registry =
 
 -- Furious Spinesplitter {2}{R/G}{R/G} Creature -- Ogre Warrior 3/3 with trample:
 -- "At the beginning of your end step, put a +1/+1 counter on this creature for
--- each opponent who was dealt damage this turn." Khabál Ghoul's group above read
--- over CR 120.1's damage instead of CR 700.4's death, and the two measurements are
--- built differently on purpose: that one is a Scope.InHistory fold over objects,
--- this one Quantity.PlayersDealtDamageThisTurn, because CR 120.3a's recipient here
--- is a PLAYER and the thing counted is players rather than events.
+-- each opponent who was dealt damage this turn." Khabál Ghoul's window over CR
+-- 120.1's damage instead of over CR 700.4's death -- and the two measurements are
+-- built differently on purpose. The Ghoul's is a Scope.InHistory fold over the
+-- objects a Filter kept; this is Quantity.PlayersDealtDamageThisTurn, because CR
+-- 120.3a's recipient is a PLAYER, who has no Filter view, and because what the
+-- card counts is players rather than events.
 --
 -- ONE BOARD throughout -- three seats, alice's Spinesplitter, an Ogre Sentry of
--- bob's -- and every case below differs from the others in nothing but the damage
--- dealt before the end step. Three seats because a two-player board collapses "an
--- opponent" onto the only other player, so a reading that counted every damaged
--- player could not be told from one that counted opponents.
+-- bob's -- and every case below differs from the others in nothing but what was
+-- dealt to whom before the end step. Three seats because a two-player board
+-- collapses "an opponent" onto the only other player, so a reading that counted
+-- every damaged player could not be told from one that counted opponents.
 --
--- Every amount is distinct (1, 3, 4, 5, 7) so that no sum of damage coincides with
--- a count of players: the two-opponent case is 2 against a sum of 7, and the
+-- Every amount is distinct (1, 3, 4, 5, 6, 7) so that no sum coincides with a count
+-- of players: the two-opponent case is 2 against a damage sum of 7, and the
 -- twice-at-one-opponent case is 1 against a sum of 8 and an event count of 2.
 --
--- The damage goes in through Damage.applyDamage rather than off a spell, which is
--- the funnel that records the event and the same level Khabál Ghoul's group deals
--- with Event.destroy at. Everything downstream of the record -- the trigger, the
--- quantity, the counters -- is the card's own, driven through the real scan and
+-- The damage goes in through Damage.applyDamage rather than off a spell. That is
+-- the funnel which records the event, and it is the level Khabál Ghoul's group
+-- reaches for Event.destroy at. Everything downstream of the record -- the trigger,
+-- the quantity, the counters -- is the card's own, driven through the real scan and
 -- the real resolution.
 spinesplitterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spinesplitterSpec s registry =
@@ -1141,8 +1142,8 @@ spinesplitterSpec s registry =
           Spec.assertEqWith s "one opponent was, so one" (countersOn spine atBob) 1
           Spec.assertEqWith s "both opponents were, so two" (countersOn spine atBoth) 2
           Spec.assertEqWith s "one opponent hit twice is still one opponent" (countersOn spine atBobTwice) 1
-          -- CR 102.2: alice is nobody's opponent but her own seat's, and the
-          -- controller of the ability is not an opponent of it.
+          -- CR 102.2 / 109.5: "your opponents" is every player but you, so the
+          -- ability's own controller is never among them.
           Spec.assertEqWith s "damage to alice herself is not damage to an opponent" (countersOn spine atAlice) 0
           -- CR 120.3a names the PLAYER recipient; a creature bob controls is not bob.
           Spec.assertEqWith s "damage to an opponent's creature is not damage to them" (countersOn spine atBobsSentry) 0

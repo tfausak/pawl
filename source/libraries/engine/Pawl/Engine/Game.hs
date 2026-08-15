@@ -787,8 +787,9 @@ enteredBattlefield event = case event of
 
 -- The PLAYER an event describes being dealt damage, if it describes one. CR
 -- 120.1's damage with a Recipient.ToPlayer, which is the only recipient CR 120.3a
--- calls a player -- damage to a planeswalker or a battle its controller protects
--- is not damage to that player, and neither is damage to a creature they control.
+-- calls a player: damage to a permanent a player controls -- their creature, their
+-- planeswalker, a battle they protect -- is not damage to them, and CR 120.3c and
+-- CR 120.3h are what it is instead.
 --
 -- castOf's, discardOf's and enteredBattlefield's sibling, and here for their
 -- import-graph reason: the caller is Pawl.Engine.Quantity's
@@ -804,8 +805,8 @@ enteredBattlefield event = case event of
 --
 -- The LifeLost event the same damage also files is deliberately not an arm. CR
 -- 120.3a makes the life loss a RESULT of the damage rather than the damage, so
--- reading it would count a Sign in Blood's loss as damage; and CR 120.3b's infect
--- damage causes no life loss at all, yet it is damage dealt to that player.
+-- reading it would count an effect's bare "loses 2 life" as damage; and CR 120.3b's
+-- infect damage causes no life loss at all, yet it is damage dealt to that player.
 damagedPlayer :: GameEvent -> Maybe PlayerId
 damagedPlayer event = case event of
   GameEvent.DamageDealt ev ->
