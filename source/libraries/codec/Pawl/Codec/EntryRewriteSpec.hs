@@ -124,6 +124,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.codec
       (EntryRewrite.PayLifeOrTapped 3)
       """ {"type":"PayLifeOrTapped","value":3} """
+  -- CR 614.1c: the same tap-state rewrite again, avoided by revealing a card
+  -- instead of by paying life. The payload is which card in the hand qualifies,
+  -- which is card text as PayLifeOrTapped's amount is.
+  Spec.it s "RevealOrTapped (Rustic Clachan)" $
+    Common.assertCodec
+      s
+      EntryRewrite.codec
+      (EntryRewrite.RevealOrTapped (Filter.HasSubtype Subtype.Kithkin))
+      """ {"type":"RevealOrTapped","value":{"type":"HasSubtype","value":{"type":"Kithkin"}}} """
   -- CR 616.1b: a control rewrite, payload-free because CR 109.5 derives the
   -- player.
   Spec.it s "UnderSourceControl (Gather Specimens)" $

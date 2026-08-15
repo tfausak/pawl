@@ -44,5 +44,6 @@ codec =
       Arm.nullary "Tapped" EntryRewrite.Tapped,
       Arm.nullary "EntersTransformed" EntryRewrite.EntersTransformed,
       Arm.payload "PayLifeOrTapped" Common.natural EntryRewrite.PayLifeOrTapped (\x -> case x of EntryRewrite.PayLifeOrTapped y -> Just y; _ -> Nothing),
+      Arm.payload "RevealOrTapped" (Filter.codec Keyword.codec) EntryRewrite.RevealOrTapped (\x -> case x of EntryRewrite.RevealOrTapped y -> Just y; _ -> Nothing),
       Arm.payload "SacrificeAnyNumber" SacrificeAnyNumber.codec EntryRewrite.SacrificeAnyNumber (\x -> case x of EntryRewrite.SacrificeAnyNumber y -> Just y; _ -> Nothing)
     ]

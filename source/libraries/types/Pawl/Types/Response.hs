@@ -177,6 +177,13 @@ data Response
     -- ChoseRiot is distinct from ChoseOptional: a transcript that answered one
     -- as-enters "may" must not silently answer a different one.
     ChosePayLifeOnEntry OptionalDecision.OptionalDecision
+  | -- | CR 614.1c / 701.20a: the card a permanent's controller revealed from
+    -- their hand to keep it from entering tapped (Nothing = declined, and it
+    -- entered tapped). Distinct from ChoseCopyTarget, which is the other
+    -- Maybe-ObjectId as-enters answer, and from ChosePayLifeOnEntry for its
+    -- reason: a transcript that answered one as-enters "may" must not silently
+    -- answer a different one.
+    ChoseRevealOnEntry (Maybe ObjectId.ObjectId)
   | -- | CR 303.4k: whether an Aura being turned face up exercised its printed
     -- "you may attach it" (Exercises) or left itself unattached (Declines).
     -- Distinct from ChoseRiot and ChosePayLifeOnEntry for their own reason, one
