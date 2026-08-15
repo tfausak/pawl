@@ -1325,23 +1325,36 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
         (gs, spellId) = S.handOne unholyStrength base
     Spec.assertBool s (not (S.castable S.alice spellId gs)) "not castable with an empty board"
 
+-- alice active in her own precombat main phase, holding priority. boardWith's
+-- tail, split out so the three-seat board below sets up the same way.
+aliceOnTurn :: GameState.GameState -> GameState.GameState
+aliceOnTurn gs =
+  gs
+    { GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = S.alice,
+      GameState.priority = Just S.alice
+    }
+
 -- alice controls `n` untapped copies of `land` and has one card of `printing`
 -- wherever `place` puts it, with priority in her own precombat main phase.
 boardWith :: (Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)) -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 boardWith place land printing n =
   let (oid, gs) = place printing S.alice (S.landsInPlay land n)
-   in ( oid,
-        gs
-          { GameState.phase = Phase.PrecombatMain,
-            GameState.activePlayer = S.alice,
-            GameState.priority = Just S.alice
-          }
-      )
+   in (oid, aliceOnTurn gs)
 
 -- The same board with the card in alice's HAND / in her GRAVEYARD.
 inHandWith, inGraveyardWith :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 inHandWith = boardWith S.addHandCard
 inGraveyardWith = boardWith S.addGraveyardCard
+
+-- inGraveyardWith at THREE seats: the same lands, the same card in alice's
+-- graveyard, the same phase and priority, with bob and carol both opposing her.
+-- CR 800.1's board, and the smallest one on which "an opponent" and "your
+-- opponent" are different questions.
+inGraveyardWithThree :: Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+inGraveyardWithThree land printing n =
+  let (oid, gs) = S.addGraveyardCard printing S.alice (S.landsFor land S.alice n S.threePlayerGame)
+   in (oid, aliceOnTurn gs)
 
 theRed :: ManaSymbol.ManaSymbol
 theRed = ManaSymbol.OfType (ManaType.Colored Color.Red)
@@ -1499,7 +1512,9 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
 --
 -- The pair of boards differs in ONE number, the opponent's poison count, so the
 -- branch cannot flip on mana, timing, the stack or the card. Three poison
--- counters is the rule's own threshold and two is one short.
+-- counters is the rule's own threshold and two is one short. The case after it
+-- adds a third seat, which is what makes the clause's "an opponent" observable
+-- as an existential rather than as a name for the one other player.
 --
 -- What Viral Spawning cannot prove is WHICH cost was paid -- its flashback cost
 -- and its mana cost are both {2}{G} -- so the second half of the group grants a
@@ -1524,6 +1539,30 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
     -- flashback cast from a bare permission: the card must not come back.
     Spec.assertEqWith s "it did NOT go back to the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
     Spec.assertEqWith s "it was exiled instead" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
+  -- CR 122.1 / 102.2: "an opponent has three or more poison counters" is an
+  -- EXISTENTIAL over the opponents, and three seats are the smallest board that
+  -- tells it from "your opponent has" -- at two seats the two readings name the
+  -- same player, which is why the case above cannot prove this one.
+  --
+  -- The three boards differ in the two opponents' poison counts and in nothing
+  -- else. 2/2 is the negative: no opponent is at three, and it also rules out a
+  -- SUM reading, which would total 4 and offer the cast. 2/4 and 4/2 are the two
+  -- positives, so neither "the first opponent" nor "the last" is what is being
+  -- read. No two of 2, 4 and the rule's own 3 coincide.
+  Spec.it s "CR 122.1 the clause holds when ANY opponent is at three poison, at three seats" $ do
+    forest <- S.printingOf s registry "Forest"
+    spawning <- S.printingOf s registry "Viral Spawning"
+    let (inGraveyard, board) = inGraveyardWithThree forest spawning 3
+        poisoned b c = S.addPlayerCounter PlayerCounterKind.Poison c S.carol (S.addPlayerCounter PlayerCounterKind.Poison b S.bob board)
+        neither = poisoned 2 2
+        carolCorrupted = poisoned 2 4
+        bobCorrupted = poisoned 4 2
+    Spec.assertBool s (not (S.castable S.alice inGraveyard neither)) "two poison each: no opponent is at three, so no flashback"
+    Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice neither))) "and not offered"
+    Spec.assertBool s (S.castable S.alice inGraveyard carolCorrupted) "carol at four: castable"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice carolCorrupted)) "and offered"
+    Spec.assertBool s (S.castable S.alice inGraveyard bobCorrupted) "bob at four: castable too"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice bobCorrupted)) "and offered"
   -- CR 601.2b: the GRANTED cost is the one offered, and the printed mana cost is
   -- not. Lightning Bolt {R} carries no flashback of its own, so every candidate
   -- below came from the grant; the two costs share no symbol, so no board can
