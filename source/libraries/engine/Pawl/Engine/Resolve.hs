@@ -3378,10 +3378,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           _ -> []
     -- Funnelled so each move mints a new incarnation.
     Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) milled
-    -- The tally, counted off the PRINTED card the way Effect.Search's filter is
-    -- (CR 701.23a's reason: a card in a library has no projection), and read
-    -- from the pre-move state because CR 400.7 has since minted new ids. Rule
-    -- 728.1's "nonland" is a card-type question, which the printed face answers.
+    -- The tally, counted off the PRINTED card the way Effect.Search's filter
+    -- reads a CR 701.23a candidate -- that reader's choice rather than the
+    -- library's, since the card is an object with a CR 613 projection there (see
+    -- #160) -- and read from the pre-move state because CR 400.7 has since
+    -- minted new ids. Rule 728.1's "nonland" is a card-type question, which the
+    -- printed face answers.
     --
     -- Bound onto this effect's SOURCE, so a later effect of the same resolution
     -- reads it as Quantity.InSlot -- Destroy's "destroyed this way" binding
