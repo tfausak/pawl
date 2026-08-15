@@ -39,15 +39,23 @@
             },
             "rewrite": {
               "type": "AsCopy",
-              "value": [
-                {
-                  "type": "SetPowerToughness",
+              "value": {
+                "eligible": {
+                  "type": "HasCardType",
                   "value": {
-                    "power": 7,
-                    "toughness": 7
+                    "type": "Creature"
                   }
-                }
-              ]
+                },
+                "exceptions": [
+                  {
+                    "type": "SetPowerToughness",
+                    "value": {
+                      "power": 7,
+                      "toughness": 7
+                    }
+                  }
+                ]
+              }
             }
           }
         }

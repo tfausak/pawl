@@ -3,7 +3,9 @@
 
 -- Covers: Pawl.Engine.Replacement's EntryR AsCopy arm (the CR 614.12a copy choice, run
 -- from inside Pawl.Engine.Event's changeZone) and its CR 707.9 exceptions
--- (Replacement.applyCopyExceptions, Quicksilver Gargantuan), the P2 copy gate (Clone), and
+-- (Replacement.applyCopyExceptions, Quicksilver Gargantuan), its CR 707.5 eligible set
+-- (Replacement.legalCopyTargets, Copy Enchantment's "any enchantment" against Clone's
+-- "any creature"), the P2 copy gate (Clone), and
 -- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
 -- Counterpart and Watchful Radstag; its count, and the simultaneous entry that
 -- count buys, kicked Rite of Replication). Gameplay-level: Clone enters via the
@@ -11,6 +13,7 @@
 -- evolves, and their projected characteristics are asserted.
 module Pawl.CopySpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
@@ -169,18 +172,92 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         resolved = resolveAndSettle copyNewest staged
     Spec.assertEqWith s "the 0/0 Clone is gone (state-based action)" (cloneOnBattlefield resolved) Nothing
 
-  -- #222: with no creature on the battlefield there are no legal copy
-  -- targets at all, so an interpreter naming one must be refused -- the Clone
-  -- enters as a 0/0 and dies exactly as it does when it declines. Same
-  -- fixture as the "no creature to copy" test above, so the only variable is
-  -- the answer.
+  -- #222: an interpreter naming an id that was never offered must be refused --
+  -- the Clone enters as a 0/0 and dies exactly as it does when it declines.
+  --
+  -- The Piker is on the board so the prompt is REALLY RAISED and really answered
+  -- with the phantom; on an empty board there would be nothing eligible, the
+  -- prompt would be skipped (#1512's elision), and this test would pass without
+  -- the refusal ever running. The board is the "Clone copies a creature" board
+  -- above, so the only variable is the answer.
   Spec.it s "#222 a copy target that was never offered is refused" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
     clone <- S.printingOf s registry "Clone"
     let gs0 = Setup.emptyGame S.bothPlayers
-        (_, staged) = S.spellOnStack clone S.alice gs0
+        (_, board) = S.addCreature piker S.alice gs0
+        (_, staged) = S.spellOnStack clone S.alice board
         phantom = ObjectId.MkObjectId 9999
         resolved = resolveAndSettle (copyNamed phantom) staged
     Spec.assertEqWith s "the Clone copied nothing and died as a 0/0" (cloneOnBattlefield resolved) Nothing
+
+  -- THE PROVING TEST for #1512: the eligible set is the CARD's noun phrase, not
+  -- "any creature". Copy Enchantment reads "you may have this enchantment enter
+  -- as a copy of any enchantment on the battlefield", so on a board carrying
+  -- BOTH a creature and an enchantment the two halves must come apart -- and
+  -- under the hardcoded creature set they could not, since the enchantment was
+  -- not offered at all and the creature was.
+  --
+  -- One board, two pinned answers. The answers are pinned rather than searched
+  -- so that widening the filter back to creatures cannot be repaired by an
+  -- answerer finding the enchantment anyway.
+  Spec.it s "Copy Enchantment copies an ENCHANTMENT the creature filter would not offer (CR 707.5)" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    scales <- S.printingOf s registry "Hardened Scales"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, withPiker) = S.addCreature piker S.alice gs0
+        (scalesId, board) = S.addCreature scales S.alice withPiker
+        (_, staged) = S.spellOnStack copyEnchantment S.alice board
+        resolved = resolveAndSettle (copyNamed scalesId) staged
+    case newest (printedOnBattlefield "Copy Enchantment" resolved) of
+      Nothing -> Spec.assertFailure s "Copy Enchantment left the battlefield unexpectedly"
+      Just copyId -> do
+        Spec.assertEqWith s "it is the Scales" (Projection.namesOf copyId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Hardened Scales"
+        Spec.assertBool s (not (Projection.isCreatureOf copyId resolved)) "and did not become a creature"
+
+  -- The negative half, on the SAME board with the SAME mana and the SAME stock:
+  -- only the pinned answer differs. The Piker is a legal copy target for a Clone
+  -- and is not one for a Copy Enchantment, so the filtered-not-trusted check
+  -- refuses it and the enchantment enters as its printed self.
+  Spec.it s "Copy Enchantment refuses the creature on that same board (CR 707.5)" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    scales <- S.printingOf s registry "Hardened Scales"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (pikerId, withPiker) = S.addCreature piker S.alice gs0
+        (_, board) = S.addCreature scales S.alice withPiker
+        (_, staged) = S.spellOnStack copyEnchantment S.alice board
+        resolved = resolveAndSettle (copyNamed pikerId) staged
+    case newest (printedOnBattlefield "Copy Enchantment" resolved) of
+      Nothing -> Spec.assertFailure s "Copy Enchantment left the battlefield unexpectedly"
+      Just copyId -> do
+        Spec.assertEqWith s "it stayed itself" (Projection.namesOf copyId resolved) . Set.singleton . CardName.MkCardName $ Text.pack "Copy Enchantment"
+        Spec.assertBool s (not (Projection.isCreatureOf copyId resolved)) "it is not the Piker"
+
+  -- The elision side of the invariant, which narrowing the eligible set is what
+  -- makes reachable: with nothing eligible, declining is the only legal answer,
+  -- so the prompt is not raised. A pair of boards differing in exactly one thing
+  -- -- whether a second enchantment is on the battlefield -- since a board with
+  -- no enchantment at all would also have no creature to tell "not asked" from
+  -- "asked about nothing".
+  Spec.it s "CR 707.5: a copy choice with nothing eligible is not asked" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    scales <- S.printingOf s registry "Hardened Scales"
+    copyEnchantment <- S.printingOf s registry "Copy Enchantment"
+    let countingAnswer :: Prompt.Prompt r -> State.State Int r
+        countingAnswer p = case p of
+          Prompt.ChooseCopyTarget {} -> do
+            State.modify' (+ 1)
+            pure (S.identityAnswer p)
+          _ -> pure (copyNewest p)
+        asks board =
+          let (_, staged) = S.spellOnStack copyEnchantment S.alice board
+           in State.execState (Engine.runGame countingAnswer staged (Stack.resolveTop >> Engine.settleForPriority)) 0
+        gs0 = Setup.emptyGame S.bothPlayers
+        (_, withPiker) = S.addCreature piker S.alice gs0
+        (_, withScales) = S.addCreature scales S.alice withPiker
+    Spec.assertEqWith s "a creature but no enchantment: nothing to ask" (asks withPiker) 0
+    Spec.assertEqWith s "an enchantment beside it: one real decision" (asks withScales) 1
 
   Spec.it s "Clone copies base P/T, not a counter-boosted P/T (CR 707.2 falsifier)" $ do
     piker <- S.printingOf s registry "Goblin Piker"

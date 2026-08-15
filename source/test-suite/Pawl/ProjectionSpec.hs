@@ -2427,12 +2427,20 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "base power" (Projection.powerOf pikerId gs1) (Just 2)
     Spec.assertEqWith s "base toughness" (Projection.toughnessOf pikerId gs1) (Just 1)
 
-  Spec.it s "legalCopyTargets is battlefield creatures excluding self" $ do
+  -- The unit half of #1512: one board, two filters, two answers. The filter is
+  -- the card's, so the same battlefield offers the creature to Clone's "any
+  -- creature" and the enchantment to Copy Enchantment's "any enchantment".
+  Spec.it s "legalCopyTargets is the filter's battlefield matches excluding self" $ do
     piker <- S.printingOf s registry "Goblin Piker"
+    scales <- S.printingOf s registry "Hardened Scales"
     let gs0 = Setup.emptyGame S.bothPlayers
         (pikerId, gs1) = S.addCreature piker S.alice gs0
-        (cloneId, gs2) = S.addCreature piker S.alice gs1
-    Spec.assertEqWith s "excludes self, includes the other creature" (Replacement.legalCopyTargets Set.empty cloneId gs2) [pikerId]
+        (scalesId, gs2) = S.addCreature scales S.alice gs1
+        (cloneId, gs3) = S.addCreature piker S.alice gs2
+        creatures = Filter.Type.HasCardType CardType.Creature
+        enchantments = Filter.Type.HasCardType CardType.Enchantment
+    Spec.assertEqWith s "excludes self, includes the other creature" (Replacement.legalCopyTargets Set.empty creatures cloneId gs3) [pikerId]
+    Spec.assertEqWith s "the same board under an enchantment filter" (Replacement.legalCopyTargets Set.empty enchantments cloneId gs3) [scalesId]
 
   Spec.it s "viewOfObject reads a projected creature's characteristics" $ do
     piker <- S.printingOf s registry "Goblin Piker"
