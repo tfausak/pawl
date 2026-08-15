@@ -1844,9 +1844,13 @@ declareBlockers = do
     -- Recorded ONCE, here, and never sampled again. That is the rule's last
     -- sentence: an attacker keeps the blocked status even after every creature
     -- blocking it leaves combat, so an entry whose SET has emptied out must not
-    -- produce this event later. Combat.blockers' KEY surviving that removal is
-    -- what makes reading the map sound at this one moment and unsound at any
-    -- other.
+    -- produce this event later. TriggerSpec's "losing every blocker does not
+    -- make the Eternal unblocked" is what proves the one-shot timing.
+    --
+    -- Testing the KEY rather than the set is isBlocked's own reading, but it is
+    -- a regression fence here rather than proved behaviour: the only writer of
+    -- an empty set is becomeBlocked, and nothing resolves between the
+    -- declaration and this line, so swapping the two leaves the suite green.
     State.modify' $ \g ->
       let c = GameState.combat g
           unblocked = filter (\oid -> not (Map.member oid (Combat.blockers c))) (Map.keys (Combat.attackers c))
