@@ -2903,7 +2903,8 @@ bitterblossomChain s registry swap = do
 -- controls a Ministrant of Obligation ({2}{W} Creature -- Human Cleric 2/1 whose
 -- whole text box is "Afterlife 2", checked against Scryfall), optionally has an
 -- Artificial Evolution resolved at it, and then Murder kills it so the afterlife
--- trigger fires and resolves. Returns the tokens and the final state.
+-- trigger fires and resolves. Returns the Ministrant's id, the state in which it
+-- was still alive, the tokens and the final state.
 --
 -- Three Swamps and an Island: the Murder is {1}{B}{B} and the Evolution {U}, and
 -- the generic half may be paid from either without stranding the Evolution.
@@ -2935,8 +2936,8 @@ ministrantChain s registry swap = do
       killed = S.runPure (aimAtCreature ministrantId) evolved $ do
         S.cast S.alice murderId
         Stack.resolveTop
-      -- CR 603.3: the dies trigger reaches the stack at the next boundary, and
-      -- resolving it is what mints the tokens.
+      -- CR 603.3: the dies trigger goes on the stack the next time a player would
+      -- receive priority, and resolving it is what mints the tokens.
       settled = S.runPure S.identityAnswer killed Engine.settleForPriority
       after = S.runPure S.identityAnswer settled Stack.resolveTop
   pure (ministrantId, evolved, S.tokensOf after, after)
@@ -3101,7 +3102,7 @@ artificialEvolutionSpec s registry = Spec.describe s "ArtificialEvolution" $ do
   Spec.it s "CR 612.2 an Evolution naming Human leaves the Spirits Spirits" $ do
     (ministrantId, alive, tokens, after) <- ministrantChain s registry (Just (Subtype.Human, Subtype.Elf))
     -- The Evolution DID resolve and DID land on the Ministrant: without this the
-    -- case below would pass for a spell that fizzled.
+    -- assertions below would pass for a spell that never took effect.
     Spec.assertEqWith s "Elf Cleric while it lived" (Projection.subtypesOf ministrantId alive) (Set.fromList [Subtype.Elf, Subtype.Cleric])
     Spec.assertEqWith s "two tokens" (length tokens) 2
     mapM_ (\oid -> Spec.assertEqWith s "Creature -- Spirit" (Projection.subtypesOf oid after) (Set.singleton Subtype.Spirit)) tokens

@@ -4058,9 +4058,10 @@ triggeredAbilitiesOf oid gs = PC.triggeredAbilities (project oid gs)
 -- the rule's, not the card's ("afterlife N" MEANS rule 702.135a's sentence), so
 -- the words a text change reaches do not exist until the mint runs -- and the
 -- mint reads the POST-LAYER counts, which is what makes Humility and a layer-6
--- grant free. CR 612.2a is the rule that puts the token-defining word in reach,
--- and rule 702.135a's Spirit, rule 702.123a's Servo and rule 702.46a's "target
--- Spirit card" are the three the pool has.
+-- grant free. Three minted abilities hold a subtype word today: rule 702.135a's
+-- afterlife and rule 702.123a's fabricate name the type their TOKEN is, which is
+-- CR 612.2a's licensed case, and rule 702.46a's soulshift asks for a "target
+-- Spirit card", which is CR 612.1's ordinary one.
 --
 -- Over-reaches by CR 612.3 in one position nothing in the pool occupies: a
 -- keyword GRANTED at layer 6 arrives after the layer-3 swap and its minted
