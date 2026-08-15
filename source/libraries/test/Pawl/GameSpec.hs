@@ -49,6 +49,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
+import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -166,7 +167,9 @@ gameSpec s registry = Spec.describe s "Game" $ do
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard mountain,
+              -- S.oneMountainState interns the Mountain as the game's first
+              -- printing, so this is the id that fixture minted.
+              Object.source = Source.OfCard (PrintingId.MkPrintingId 0),
               Object.zone = Zone.Battlefield,
               Object.tapped = TapState.Untapped,
               Object.facing = Facing.FaceUp,
@@ -553,7 +556,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         boltInBobGrave =
           length
             ( filter
-                (namedIs (CardName.MkCardName $ Text.pack "Lightning Bolt"))
+                (namedIs (CardName.MkCardName $ Text.pack "Lightning Bolt") after)
                 (fmap (\i -> Game.lookupObject i after) (Game.zoneMembers Zone.Graveyard S.bob after))
             )
     Spec.assertEqWith s "bob took 3 from his own Bolt" (S.lifeOf S.bob after) (Just 17)
@@ -597,7 +600,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         boltInBobGrave =
           length
             ( filter
-                (namedIs (CardName.MkCardName $ Text.pack "Lightning Bolt"))
+                (namedIs (CardName.MkCardName $ Text.pack "Lightning Bolt") bobPlayed)
                 (fmap (\i -> Game.lookupObject i bobPlayed) (Game.zoneMembers Zone.Graveyard S.bob bobPlayed))
             )
     Spec.assertEqWith s "CR 723.1: control pending for bob after activation" (Map.lookup S.bob (GameState.pendingControl afterActivation)) (Just (Decider.MkDecider S.alice))
@@ -1894,6 +1897,29 @@ printingSpec s registry = Spec.describe s "PrintingTable" $ do
       (Game.printingOf (PrintingId.MkPrintingId 99) (Setup.emptyGame S.bothPlayers))
       Nothing
 
+  Spec.it s "an object built by Setup answers cardOf with its deck entry's card" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.fromCards (Map.singleton mountain 2)
+        gs = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice deck)
+    case Game.zoneMembers Zone.Library S.alice gs of
+      [] -> Spec.assertFailure s "fixture should have two Mountains"
+      oid : _ ->
+        Spec.assertEqWith
+          s
+          "cardOf"
+          (fmap S.nameOf (Game.cardOf oid gs))
+          (Just (S.printingName mountain))
+
+  -- The copies of a 4-of share one entry because the DECK groups them, not
+  -- because intern deduplicates -- Setup.internDeck is what makes that true, and
+  -- Pawl.Engine.Commander's designation check depends on it.
+  Spec.it s "two objects from one deck entry name one printing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let deck = Deck.fromCards (Map.singleton mountain 2)
+        gs = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice deck)
+        ids = List.nub [p | obj <- Map.elems (GameState.objects gs), Source.OfCard p <- [Object.source obj]]
+    Spec.assertEqWith s "distinct printing ids" (length ids) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Game" $ do
   gameSpec s registry
@@ -2090,13 +2116,14 @@ choicelessBoard mountain tapped =
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handBobBolt lightningBolt gs =
-  let (oid, gs1) = Game.freshObjectId gs
+  let (printingId, gsP) = Game.intern lightningBolt gs
+      (oid, gs1) = Game.freshObjectId gsP
       (ts, gs2) = Game.freshTimestamp gs1
       obj =
         Object.MkObject
           { Object.owner = S.bob,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard lightningBolt,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -2135,16 +2162,18 @@ handBobBolt lightningBolt gs =
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
-namedIs :: CardName.CardName -> Maybe Object.Object -> Bool
-namedIs wanted mo = case mo of
-  Just o -> case Object.source o of
-    Source.OfCard printing -> Face.name (S.combinedFace printing) == wanted
-    Source.OfToken card -> S.nameOf card == wanted
-    Source.OfAbility _ _ -> False
-    Source.OfTrigger _ _ -> False
-    Source.OfEmblem _ -> False
-    Source.OfInherentTrigger _ _ -> False
-  Nothing -> False
+namedIs :: CardName.CardName -> GameState.GameState -> Maybe Object.Object -> Bool
+namedIs wanted gs mo =
+  let named printingId = fmap S.nameOf (Game.cardOfPrinting printingId gs) == Just wanted
+   in case mo of
+        Just o -> case Object.source o of
+          Source.OfCard printingId -> named printingId
+          Source.OfToken printingId -> named printingId
+          Source.OfAbility _ _ -> False
+          Source.OfTrigger _ _ -> False
+          Source.OfEmblem _ -> False
+          Source.OfInherentTrigger _ _ -> False
+        Nothing -> False
 
 -- The controller's strategy: when asked to decide for bob (the CONTROLLED player,
 -- routed because the prompt's Decider is alice), cast the Bolt at bob; otherwise
@@ -2664,7 +2693,7 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
     -- graveyard, hence `any`.
     Spec.assertBool
       s
-      (any (\i -> namedIs (CardName.MkCardName $ Text.pack "Goblin Piker") (Game.lookupObject i after)) (Game.zoneMembers Zone.Graveyard S.alice after))
+      (any (\i -> namedIs (CardName.MkCardName $ Text.pack "Goblin Piker") after (Game.lookupObject i after)) (Game.zoneMembers Zone.Graveyard S.alice after))
       "CR 704.5f buried it once CR 514.2 ended the pump"
     Spec.assertEqWith s "nothing triggered, so the SBA alone bought the priority round" asked 2
     Spec.assertEqWith s "and another cleanup step began" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)

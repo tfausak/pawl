@@ -21,7 +21,6 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
-import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Source as Source
@@ -52,38 +51,39 @@ resolveTopWith runSubgame = do
       -- than wedging the loop.
       Nothing -> State.put gs {GameState.stack = rest}
       Just obj -> case Object.source obj of
-        Source.OfCard printing ->
-          -- CR 709.3b: if this spell has a face singled out, its classification
-          -- is read off THAT half, not the two combined -- routed through
-          -- Game.faceOf rather than Card.combined directly, so this
-          -- is-it-a-permanent/is-it-an-Aura check narrows the same way every
-          -- OTHER characteristic read of a stack object already does
-          -- (Cost.costsFor resolves the same way, through Game.resolveFace).
-          -- Action.playableLands asks the same question of a land play through
-          -- Card.landFaces, which CR 712.12 gives the same shape: a chosen face
-          -- where the layout has one, and the combined view where it does not.
-          --
-          -- Falls back to the combined view for parity with faceOf's own
-          -- fallback; unreachable here since `obj` already resolved via this
-          -- same `oid`.
-          let face = Maybe.fromMaybe (Card.combined (Printing.card printing)) (Game.faceOf oid gs)
-              -- CR 712.13 / 709.5d: the half this spell showed on the stack,
-              -- carried onto the permanent for the layouts whose rules say so and
-              -- dropped for the rest (Card.enteringFace). What the permanent then
-              -- does with it is the MOVE's question and not this one -- CR 712.13
-              -- leaves a double-faced permanent showing the face, CR 709.5d turns
-              -- a Room's into an unlocked designation. Read off `obj` rather than
-              -- off `face`, because what the rules carry is the object's own
-              -- record of which half is up and not the face a fallback resolved
-              -- to.
-              entering = Card.enteringFace (Printing.card printing) (Object.face obj)
-              -- CR 110.2b: "the permanent's controller by default is the player
-              -- who put that spell onto the stack" -- CR 405.4's caster, which is
-              -- what Object.enteredUnder holds for a spell and what
-              -- defaultControllerOf reads off it. It is Object.owner for every
-              -- spell whose caster owns the card, which is why this argument was
-              -- Nothing until one did not (#83).
+        Source.OfCard printingId
+          | Just card <- Game.cardOfPrinting printingId gs ->
+              -- CR 709.3b: if this spell has a face singled out, its classification
+              -- is read off THAT half, not the two combined -- routed through
+              -- Game.faceOf rather than Card.combined directly, so this
+              -- is-it-a-permanent/is-it-an-Aura check narrows the same way every
+              -- OTHER characteristic read of a stack object already does
+              -- (Cost.costsFor resolves the same way, through Game.resolveFace).
+              -- Action.playableLands asks the same question of a land play through
+              -- Card.landFaces, which CR 712.12 gives the same shape: a chosen face
+              -- where the layout has one, and the combined view where it does not.
               --
+              -- Falls back to the combined view for parity with faceOf's own
+              -- fallback; unreachable here since `obj` already resolved via this
+              -- same `oid`.
+              let face = Maybe.fromMaybe (Card.combined card) (Game.faceOf oid gs)
+                  -- CR 712.13 / 709.5d: the half this spell showed on the stack,
+                  -- carried onto the permanent for the layouts whose rules say so and
+                  -- dropped for the rest (Card.enteringFace). What the permanent then
+                  -- does with it is the MOVE's question and not this one -- CR 712.13
+                  -- leaves a double-faced permanent showing the face, CR 709.5d turns
+                  -- a Room's into an unlocked designation. Read off `obj` rather than
+                  -- off `face`, because what the rules carry is the object's own
+                  -- record of which half is up and not the face a fallback resolved
+                  -- to.
+                  entering = Card.enteringFace card (Object.face obj)
+                  -- CR 110.2b: "the permanent's controller by default is the player
+                  -- who put that spell onto the stack" -- CR 405.4's caster, which is
+                  -- what Object.enteredUnder holds for a spell and what
+                  -- defaultControllerOf reads off it. It is Object.owner for every
+                  -- spell whose caster owns the card, which is why this argument was
+                  -- Nothing until one did not (#83).
+                  --
               -- The DEFAULT and not Resolve.spellController's projected answer,
               -- which is the same rule's other half: an effect that gave someone
               -- control of the permanent SPELL leaves them controlling the
@@ -135,6 +135,11 @@ resolveTopWith runSubgame = do
                           carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
+        -- Unreachable, and here for totality: a PrintingId is minted only by
+        -- Game.intern, which inserts, so every OfCard names an entry. Drops the
+        -- id rather than wedging the loop, which is what the arms below do for a
+        -- source with no card behind it.
+        Source.OfCard _ -> State.put gs {GameState.stack = rest}
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do
           -- CR 601.3's offer is NOT made here. It belongs to the Search effect

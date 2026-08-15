@@ -44,16 +44,16 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | CR 903.3: record which card this player designated as their commander.
 -- Called once per player by Pawl.Engine.Setup.createDeck, from the Deck.
-designate :: PlayerId -> Printing.Printing -> GameState -> GameState
-designate pid printing gs =
-  gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just printing}) pid (GameState.players gs)}
+designate :: PlayerId -> PrintingId.PrintingId -> GameState -> GameState
+designate pid printingId gs =
+  gs {GameState.players = Map.adjust (\p -> p {Player.commander = Just printingId}) pid (GameState.players gs)}
 
 -- | CR 903.3: is this object its owner's commander?
 --
@@ -62,16 +62,18 @@ designate pid printing gs =
 -- commander, which is also what makes CR 903.9 send it to its owner's command
 -- zone rather than the thief's.
 --
--- Matches on the PRINTING, which is exact under CR 903.5's singleton rule and is
--- the only thing that survives CR 400.7's fresh id. Pawl does not enforce rule
+-- Matches on the PRINTING ID, which is exact under CR 903.5's singleton rule and
+-- is the only thing that survives CR 400.7's fresh id. Setup.internDeck is what
+-- makes the comparison sound: it interns a deck's distinct printings once, so
+-- the designation and the object name the same entry. Pawl does not enforce rule
 -- 903.5 (#940), so a deck holding two copies of its commander would have both
 -- answer True here.
 isCommander :: ObjectId -> GameState -> Bool
 isCommander oid gs = case Game.lookupObject oid gs of
   Nothing -> False
   Just obj -> case Object.source obj of
-    Source.OfCard printing ->
-      fmap Player.commander (Map.lookup (Object.owner obj) (GameState.players gs)) == Just (Just printing)
+    Source.OfCard printingId ->
+      fmap Player.commander (Map.lookup (Object.owner obj) (GameState.players gs)) == Just (Just printingId)
     _ -> False
 
 -- | CR 903.10a's key: the owner of the commander that dealt this damage, or

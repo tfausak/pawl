@@ -121,7 +121,7 @@ designationSpec s registry = Spec.describe s "Designation" $ do
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     let gs = commanderBoard mountain shimatsu 4
     Spec.assertEqWith s "one card in the command zone" (length (inCommandZone gs)) 1
-    Spec.assertEqWith s "alice is designated it" (fmap Player.commander (Map.lookup S.alice (GameState.players gs))) (Just (Just shimatsu))
+    Spec.assertEqWith s "alice is designated it" (Map.lookup S.alice (GameState.players gs) >>= Player.commander >>= \i -> Game.printingOf i gs) (Just shimatsu)
     Spec.assertEqWith s "and it is her commander" (fmap (\oid -> Commander.isCommander oid gs) (inCommandZone gs)) [True]
     Spec.assertEqWith s "having cast it no times yet" (commanderCastsOf gs) (Just 0)
   -- The falsifier for a commander smuggled into the library: CR 903.6 puts it in
