@@ -1149,7 +1149,8 @@ blockersOf oid gs = Map.findWithDefault Set.empty oid (Combat.blockers (GameStat
 -- still blocking. The map's KEY is that status -- declareBlockers creates it, so
 -- does becomeBlocked below for the effect that says a creature becomes blocked
 -- (CR 509.1h again), and only Game.removeFromCombat's Map.delete arm (the
--- attacker itself leaving combat, CR 506.4) and Combat.clearCombat ever drop it. The SET behind
+-- attacker itself leaving combat, CR 506.4) and Combat.clearCombat ever drop it.
+-- The SET behind
 -- the key is the separate CR 510.1c question of who is currently blocking, and it
 -- can empty out while the key stays: a regenerated blocker (CR 701.19a) is
 -- deleted from it, and a blocker that merely died is filtered out at assignment
