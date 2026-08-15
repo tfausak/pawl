@@ -89,6 +89,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
@@ -256,6 +257,7 @@ vanillaFace name typeLine =
       Face.specialActions = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
+      Face.costReductions = [],
       Face.enchant = [],
       Face.counterability = Counterability.Counterable
     }
@@ -864,6 +866,7 @@ cardCounts card =
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
     <> concatMap (concatMap effectCounts . Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
     <> concatMap (concatMap conditionCounts . Maybe.maybeToList . AlternativeCost.condition) (Face.alternativeCosts card)
+    <> concatMap (quantityCounts . CostReduction.perEach) (Face.costReductions card)
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
     <> concatMap blockPermissionCounts (Face.blockPermissions card)
 
@@ -2836,6 +2839,7 @@ cardFilters card =
         <> concatMap targetSlotFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
         <> concatMap alternativeCostFilters (Face.alternativeCosts card)
+        <> concatMap (quantityFilters . CostReduction.perEach) (Face.costReductions card)
         <> concatMap specialActionFilters (Face.specialActions card)
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap (affectedFilters . BlockRequirement.attacker) (Face.blockRequirements card)

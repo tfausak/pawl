@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Summoning as Summoning
@@ -51,6 +52,7 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostAdjustments as CostAdjustments
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -339,8 +341,8 @@ total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost 
 total pid oid cost gs = totalWith (spellAdjustments pid oid gs) cost
 
 -- CR 601.2f's increases and reductions for a SPELL being cast: the ones CARDS
--- generate (Pawl.Engine.PlayerEffect) plus the one the RULES do, CR 903.8's
--- commander tax.
+-- generate (Pawl.Engine.PlayerEffect, plus the spell's own text through
+-- selfReductions below) plus the one the RULES do, CR 903.8's commander tax.
 --
 -- The tax joins the increases rather than being added to the printed mana cost,
 -- because rule 903.8 words it "plus {2} for each previous time" -- an increase
@@ -351,13 +353,77 @@ total pid oid cost gs = totalWith (spellAdjustments pid oid gs) cost
 -- Zero for every spell that is not a commander being cast from the command zone,
 -- and Pawl.Engine.Commander.tax short-circuits on that, so an ordinary game pays
 -- nothing to ask.
+--
+-- The spell's OWN reductions are APPENDED to the ones the battlefield generates
+-- rather than being applied first or last. Rule 601.2f lets the player apply
+-- multiple reductions in any order, and applyAdjustments' descending-floor sort
+-- is what fixes the order pawl actually takes (#88); every reduction gathered
+-- here states no floor, so where they land in the list changes no total.
 spellAdjustments :: PlayerId -> ObjectId -> GameState -> CostAdjustments.CostAdjustments
 spellAdjustments pid oid gs =
   let adjustments = PlayerEffect.spellCostAdjustments pid oid gs
+      withSelf =
+        adjustments
+          { CostAdjustments.reductions =
+              CostAdjustments.reductions adjustments <> fmap (\amount -> (amount, 0)) (selfReductions pid oid gs)
+          }
       commanderTax = Commander.tax pid oid gs
    in if commanderTax == 0
-        then adjustments
-        else adjustments {CostAdjustments.increases = commanderTax : CostAdjustments.increases adjustments}
+        then withSelf
+        else withSelf {CostAdjustments.increases = commanderTax : CostAdjustments.increases withSelf}
+
+-- CR 601.2f / 113.6d: the reductions a spell's OWN printed text applies to its
+-- own cost -- Thrasta, Tempest's Roar's "This spell costs {3} less to cast for
+-- each other spell cast this turn" -- with each one's Quantity evaluated and
+-- its amount repeated that many times.
+--
+-- REPEATED rather than multiplied, which is what makes a typed amount fall out
+-- with no arithmetic of its own: applyAdjustments reads a reduction's generic
+-- symbols as a sum and cancels its typed ones one for one, so three copies of
+-- {3} is {9} of generic reduction and three copies of a {W} would cancel three
+-- white symbols. Zero copies is the empty list, which is {0} and reduces
+-- nothing; a Quantity that comes out NEGATIVE takes the same floor, since a
+-- reduction of a negative amount is not an increase (CR 601.2f orders the two
+-- and does not let one become the other).
+--
+-- An UNDETERMINABLE Quantity (Nothing) contributes nothing at all, which is the
+-- direction that leaves the spell dearer rather than cheaper -- the same answer
+-- Pawl.Engine.Quantity gives every other reader that cannot resolve a
+-- reference.
+--
+-- The face comes straight off the object rather than through a projection, for
+-- Pawl.Types.CostReduction's reason (#160). It is the face the CAST has already
+-- singled out: Cast.asProposed stamps the chosen half before any of this
+-- module's gates run, so a split card is priced from the half being cast (CR
+-- 709.3b) and a face-down proposal reads Card.faceDownFace, which prints none of
+-- these (CR 708.2a).
+--
+-- Read LIVE, at the moment CR 601.2f determines the total, and never from a
+-- snapshot taken earlier: this is a pure function of the `gs` its caller hands
+-- it, and Cast.castProposed hands it the post-CR-601.2a state. The lock-in the
+-- rule then imposes is the CALLER's -- see `total` above -- so the value is
+-- computed once from live state and then frozen, rather than being frozen
+-- before it was ever computed.
+selfReductions :: PlayerId -> ObjectId -> GameState -> [ManaCost.ManaCost]
+selfReductions pid oid gs =
+  let -- The evaluation's perspective is the CASTER's (CR 109.5: "its would-be
+      -- controller, if a player is attempting to cast it"), which for a spell
+      -- being cast is `pid` -- and not Projection.controllerOf, which answers
+      -- Nothing for a card still in a hand. The source is the spell itself,
+      -- since the reduction is printed on it: a Filter.IsSource written inside
+      -- one of these counts names the spell being cast.
+      context = Filter.contextFor (Just pid) (Just oid)
+      scaled reduction =
+        let copies = Quantity.evaluate (Projection.fullView gs) context gs oid (CostReduction.perEach reduction)
+            -- Saturating rather than partial: an Int cannot hold every Integer,
+            -- and a count that overflowed one would be a reduction no cost could
+            -- survive anyway. A negative saturates to 0, which is the floor the
+            -- header states.
+            times n = concat (replicate (max 0 (Integer.toIntSaturating n)) (ManaCost.unwrap (CostReduction.amount reduction)))
+         in fmap (ManaCost.MkManaCost . times) copies
+   in case Game.faceOf oid gs of
+        Nothing -> []
+        Just face -> Maybe.mapMaybe scaled (Face.costReductions face)
 
 -- CR 601.2f's adjustments for an ACTIVATION cost, which CR 602.2b routes through
 -- rule 601.2b-i like a spell's. Heartstone's floored reduction and Blossoming
@@ -2198,10 +2264,11 @@ payComponent pid oid component = case component of
 --    text settles what that means -- a {1}{W} Cleric spell costs {1}, so the
 --    stranded {B} leaves the {1} alone. CR 118.7b-d's spill has no printed
 --    producer (#309). The pool's reducers WITHOUT that sentence are the four
---    synthetics CR 118.7e-g needed, and no test aims a TYPED one at a cost the
---    spill would reach: the {S} and {2/B} reductions name no type for the spill
---    to strand, and the {G/P} and {W/B} ones are aimed at costs with no generic
---    component for CR 118.7b-c to move the stranded mana onto.
+--    synthetics CR 118.7e-g needed and Thrasta's self-reduction, and no test aims
+--    a TYPED one at a cost the spill would reach: Thrasta's {3} and the {S} and
+--    {2/B} reductions name no type for the spill to strand, and the {G/P} and
+--    {W/B} ones are aimed at costs with no generic component for CR 118.7b-c to
+--    move the stranded mana onto.
 -- 4. CR 601.2f's floor at {0} needs no special case: ManaCost is a list of
 --    symbols and the empty list IS {0}.
 -- 5. A REDUCING EFFECT'S OWN FLOOR is applied as that reduction lands, never as a

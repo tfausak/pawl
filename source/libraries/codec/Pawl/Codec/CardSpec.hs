@@ -56,6 +56,7 @@ bareFace n =
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
+      Face.costReductions = [],
       Face.playerAbilities = [],
       Face.blockRequirements = [],
       Face.blockPermissions = [],

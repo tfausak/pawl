@@ -32,6 +32,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryR as EntryR
@@ -135,6 +136,7 @@ baseFace =
       Face.attackCosts = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
+      Face.costReductions = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
       Face.specialActions = [],
@@ -170,6 +172,7 @@ minimalFace =
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
+      Face.costReductions = [],
       Face.playerAbilities = [],
       Face.blockRequirements = [],
       Face.blockPermissions = [],
@@ -229,6 +232,7 @@ populatedFace =
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (ManaCost.MkManaCost [ManaSymbol.Generic 2])],
       Face.additionalCosts = [CostComponent.TapThis],
       Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
+      Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)],
       Face.counterability = Counterability.CantBeCountered,
       Face.mulliganActions = [[Effect.ExileHandThenDraw]],
       Face.openingHandActions = [[Effect.ExileHandThenDraw]],
@@ -263,6 +267,7 @@ populatedFaceJson =
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
+    <> "\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
     <> "\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
     <> "\"openingHandActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
@@ -330,6 +335,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "alternativeCosts (CR 118.9) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.alternativeCosts <$> decodeFace v) (Right [])
+    Spec.it s "costReductions (CR 601.2f) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.costReductions <$> decodeFace v) (Right [])
     -- The registry-backed pair lives in Pawl.CodecIntegrationSpec, which can
     -- reach real Printings; this sublibrary cannot.
     Spec.it s "counterability (CR 113.6g) defaults to Counterable" $ do
@@ -455,6 +463,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])]}
         (init baseFaceJson <> ",\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}]}")
+    Spec.it s "costReductions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.costReductions = [CostReduction.MkCostReduction (ManaCost.MkManaCost [ManaSymbol.Generic 3]) (Quantity.Literal 1)]}
+        (init baseFaceJson <> ",\"costReductions\":[{\"amount\":[{\"type\":\"Generic\",\"value\":3}],\"perEach\":{\"type\":\"Literal\",\"value\":1}}]}")
     Spec.it s "counterability" $
       Common.assertJsonCodec
         s
