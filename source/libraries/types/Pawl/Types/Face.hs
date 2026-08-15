@@ -246,9 +246,9 @@ data Face card = MkFace
     -- each other spell cast this turn". Pawl.Types.CostReduction argues why
     -- playerAbilities below cannot hold one.
     --
-    -- The self-scoped member of the castingRestrictions family, and read the
-    -- same way: straight off the card, never through the projection (#160).
-    -- Pawl.Engine.Cost.spellAdjustments is the one reader, and it folds these in
+    -- The third member of the additionalCosts/alternativeCosts family above, and
+    -- read the way they are: straight off the card, never through the projection
+    -- (#160). Pawl.Engine.Cost.selfReductions is the one reader, and it folds these in
     -- alongside the CR 613.11 reductions other permanents generate, so CR
     -- 601.2f's "minus all cost reductions" is applied once over both.
     --

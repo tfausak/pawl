@@ -8,15 +8,15 @@ import qualified Pawl.Types.Quantity as Quantity
 -- spell cast this turn".
 --
 -- The SELF-scoped sibling of Pawl.Types.ReduceSpellCost, which is a battlefield
--- permanent's static ability discounting OTHER players' spells (Sapphire
--- Medallion). Neither carrier can hold the other's sentence. That one is a CR
--- 613.11 continuous effect gathered off the battlefield
+-- permanent's static ability discounting whatever spells its Filter names
+-- (Sapphire Medallion). Neither carrier can hold the other's sentence: that one
+-- is a CR 613.11 continuous effect gathered off the battlefield
 -- (Pawl.Engine.PlayerEffect.printedRows walks it), and a spell reducing its own
 -- cost is not on the battlefield when the reduction applies; this one names no
 -- spells to match against, because the only spell it reduces is the one it is
 -- printed on, and it carries a Quantity where that one carries a literal amount.
 --
--- Read straight off the card by Pawl.Engine.Cost.spellAdjustments and NOT
+-- Read straight off the card by Pawl.Engine.Cost.selfReductions and NOT
 -- through the projection -- Pawl.Types.Face.castingPermissions' precedent, for
 -- its reason: the ability is consulted while the object is in a hand or on the
 -- stack, neither of which Pawl.Engine.Projection.gather reaches (#160). CR
