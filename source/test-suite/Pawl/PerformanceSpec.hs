@@ -92,9 +92,8 @@ largeBoard = 256
 -- here and the battlefield loop is the only thing that varies with `n`.
 boardOf :: Printing.Printing -> Int -> GameState.GameState
 boardOf printing n =
-  let (printingId, base) = Game.intern printing (Setup.emptyGame S.bothPlayers)
-      addOne gs _ = snd (S.addCreatureOf printingId S.alice gs)
-      board = List.foldl' addOne base [1 .. n]
+  let addOne gs _ = snd (S.addCreature printing S.alice gs)
+      board = List.foldl' addOne (Setup.emptyGame S.bothPlayers) [1 .. n]
    in board {GameState.phase = Phase.PrecombatMain}
 
 -- One whole enumeration over a board of `n` of a printing, forced.

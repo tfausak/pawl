@@ -28,7 +28,6 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
-import Pawl.Types.Printing (Printing)
 import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Sickness as Sickness
@@ -136,6 +135,7 @@ emptyGame order =
           GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 0,
           GameState.printings = Map.empty,
+          GameState.printingIds = Map.empty,
           GameState.nextPrintingId = PrintingId.MkPrintingId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
@@ -155,36 +155,6 @@ emptyGame order =
           GameState.extraTurns = [],
           GameState.turnAnchor = Nothing
         }
-
--- Every distinct printing a deck names, interned once, so that the copies of a
--- 4-of share one id -- and so that the commander's id is the one its own
--- objects carry. Pawl.Engine.Commander's designation check compares the
--- player's record against the object's printing, which id equality decides more
--- strictly than value equality did: two structurally equal Printings interned
--- separately would no longer match.
---
--- Local to building one deck, and so not the reverse index Game.intern
--- declines. The deep Ord Printing is paid once per deck here, at setup, and
--- never again.
-internDeck :: Deck.Deck -> Game (Map.Map Printing PrintingId.PrintingId)
-internDeck deck =
-  let distinct =
-        Map.keys (Deck.cards deck)
-          <> Maybe.maybeToList (Deck.commander deck)
-          <> Maybe.maybeToList (Deck.dungeon deck)
-   in Monad.foldM
-        ( \acc printing ->
-            -- The guard is not dead work: Map.keys is already distinct, but a
-            -- deck whose commander is ALSO among its cards (CR 903.5b forbids
-            -- it, and #940 means pawl does not enforce it) would otherwise
-            -- intern that printing twice and break Commander.isCommander's id
-            -- comparison.
-            if Map.member printing acc
-              then pure acc
-              else fmap (\pid -> Map.insert printing pid acc) (State.state (Game.intern printing))
-        )
-        Map.empty
-        distinct
 
 createCard :: PlayerId -> PrintingId.PrintingId -> Game ObjectId
 createCard pid printingId = do
@@ -244,10 +214,7 @@ createCard pid printingId = do
 -- zones constantly; an id or an object field could not survive that.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid deck = do
-  -- Before any object is minted: every id below comes out of this one map, which
-  -- is what makes the copies of a 4-of share an entry and the commander's
-  -- designation name the same printing its object does.
-  ids <- internDeck deck
+  dungeonId <- Monad.mapM (State.state . Game.intern) (Deck.dungeon deck)
   -- CR 903.7 / CR 103.4: the starting life total, which is the deck's business
   -- and so cannot be settled by emptyGame above.
   State.modify' $ \gs ->
@@ -257,12 +224,18 @@ createDeck pid deck = do
           -- minted for it, because dungeon cards begin OUTSIDE the game and
           -- outside the game is not a zone (CR 400.11). CR 701.49a is what brings
           -- it in; Pawl.Engine.Dungeon.enter is that rule.
-          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeon = Deck.dungeon deck >>= \d -> Map.lookup d ids}) pid (GameState.players gs)
+          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeon = dungeonId}) pid (GameState.players gs)
       }
-  Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) ->
-    Monad.forM_ (Map.lookup printing ids) $ \printingId ->
-      Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
-  Monad.forM_ (Deck.commander deck) $ \printing -> Monad.forM_ (Map.lookup printing ids) $ \printingId -> do
+  Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) -> do
+    printingId <- State.state (Game.intern printing)
+    Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
+  -- One intern, and the id goes to BOTH the object and the designation below --
+  -- which is why Commander.isCommander's comparison holds without leaning on
+  -- Game.intern's idempotence. That idempotence is what keeps a malformed deck
+  -- listing its commander among its cards too (CR 903.5b forbids it; #940 means
+  -- pawl does not enforce it) down to one entry.
+  Monad.forM_ (Deck.commander deck) $ \printing -> do
+    printingId <- State.state (Game.intern printing)
     oid <- createCard pid printingId
     State.modify' $ \gs ->
       let moved =
@@ -627,6 +600,7 @@ funnelBack finalSub parent =
           -- subgame interned was minted above every id the parent held, so the
           -- two tables never disagree about an id.
           GameState.printings = Map.union (GameState.printings finalSub) (GameState.printings parent),
+          GameState.printingIds = Map.union (GameState.printingIds finalSub) (GameState.printingIds parent),
           GameState.nextPrintingId = max (GameState.nextPrintingId parent) (GameState.nextPrintingId finalSub),
           GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub),
           -- CR 104.4b: the subgame's events are not a stretch during which the

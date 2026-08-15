@@ -296,6 +296,22 @@ data GameState = MkGameState
     -- Append-only, and never collected -- a token that ceases to exist under
     -- CR 704.5d drops its Object but keeps its entry (gap #1594).
     printings :: Map.Map PrintingId.PrintingId Printing.Printing,
+    -- | `printings` read backwards, so Pawl.Engine.Game.intern answers with the
+    -- id a printing already has instead of minting a second one for it. That
+    -- makes "objects of the same printing share an id" a property of the table
+    -- rather than a convention each minting site has to keep.
+    --
+    -- No CURRENT reader breaks without it: Pawl.Engine.Setup.createDeck interns
+    -- once and hands the one id to both createCard and Commander.designate, so
+    -- isCommander's comparison holds either way. What it buys is that a future
+    -- minting site cannot get it wrong, and that a deck listing its commander
+    -- among its cards too (CR 903.5b forbids it; #940 means pawl does not
+    -- enforce it) behaves like a well-formed one.
+    --
+    -- Keyed by the whole Printing, so interning pays a deep Ord Card. It is paid
+    -- once per DISTINCT printing per game: at setup, and once per
+    -- token-creation or emblem event.
+    printingIds :: Map.Map Printing.Printing PrintingId.PrintingId,
     nextPrintingId :: PrintingId.PrintingId,
     -- | CR 613.7: the monotonic source of timestamps for objects (at creation) and
     -- stored continuous effects (at CR 611 creation). See Timestamp.

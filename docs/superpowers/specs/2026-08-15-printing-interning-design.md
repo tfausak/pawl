@@ -100,19 +100,31 @@ Two call sites, both of which already intern once and create many:
   objects from one card. One intern per token-creation event. `Event.hs:522`
   does the same for an emblem.
 
-`Game.intern` therefore does no content-keyed dedup and keeps no reverse
-`Map Printing PrintingId` index: a global one would pay the deep `Ord Card` this
-change exists to avoid, at every intern, to save entries the engine's call sites
-do not generate.
+**Deviation from the original design: `Game.intern` deduplicates.** The spec
+first called for no reverse index, on the grounds that callers intern once and
+create many. That held for the engine but not for `Pawl.Support`, whose
+`addCreature` is one call per object and had to grow a second entry point to
+keep the discipline -- a helper split in two because the shared mechanism would
+not dedup, which is the shape of a fix at the wrong depth.
 
-**Deviation, deliberate: `Setup.internDeck` does dedup, deck-locally.** A deck's
-distinct printings are interned once into a `Map Printing PrintingId` that
-`createDeck` then looks ids out of. `Pawl.Engine.Commander.isCommander` forces
-it: that function compares `Player.commander` against the commander object's own
-printing, and id equality is stricter than the value equality it replaced --
-`Deck.commander` interned separately from `Deck.cards` would no longer match.
-The deep `Ord Printing` is paid once per deck at setup and never again, which is
-the trade `Game.intern` declines to make globally.
+`GameState.printingIds` is now the reverse index and `Game.intern` is
+idempotent. It deletes `Setup.internDeck` and `Support.addCreatureOf`, and
+bounds the table by distinct printings rather than by minting events, which is
+most of #1594.
+
+To be exact about what it does NOT buy: no current reader breaks without it.
+`createDeck` interns a commander once and gives the one id to both `createCard`
+and `Commander.designate`, so `isCommander`'s comparison holds either way. An
+earlier draft of this spec claimed that comparison forced the dedup; it does
+not. What dedup buys is that a later minting site cannot quietly break the
+property, and that a deck listing its commander among its cards too behaves like
+a well-formed one.
+
+The cost is a deep `Ord Card` per intern, paid once per distinct printing per
+game and never on a read. It moved `PerformanceSpec`'s Sorcerer board from
+130,376 to 131,652 bytes per permanent and the Elves board from 10,531 to
+11,736 -- both because those fixtures intern per object where a real game's
+`createDeck` interns per distinct deck entry.
 
 **Deck is unchanged.** `Deck.cards :: Map Printing Natural` stays as it is. A
 deck is a pre-game input, constructed before any `GameState` exists, so it

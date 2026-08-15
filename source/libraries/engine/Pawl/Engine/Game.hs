@@ -101,15 +101,30 @@ freshPrintingId gs =
 -- way to obtain a PrintingId, which is what makes a dangling one
 -- unconstructible.
 --
--- Deliberately not deduplicating. Both callers already intern once and create
--- many -- Pawl.Engine.Setup.internDeck over a deck's distinct entries,
--- Pawl.Engine.Event over one token-creation event's count -- so a reverse index
--- would pay the deep Ord Card this indirection exists to avoid, at every
--- intern, to save entries the call sites do not generate.
+-- IDEMPOTENT: a printing already in the table answers with the id it already
+-- has, so a caller may intern wherever it is convenient rather than exactly
+-- once. It also bounds the table by DISTINCT printings rather than by minting
+-- events, which is most of what #1594 is about.
+--
+-- Not load-bearing for any reader today -- Pawl.Engine.Setup.createDeck interns
+-- once and gives the same id to the object and to the designation, so
+-- Pawl.Engine.Commander.isCommander holds without it. It is here so that a
+-- later minting site cannot quietly break that.
+--
+-- The cost is a deep Ord Card per intern, through GameState.printingIds. It is
+-- paid once per distinct printing per game -- at setup, and per token-creation
+-- or emblem event -- and never on a read.
 intern :: Printing.Printing -> GameState -> (PrintingId.PrintingId, GameState)
-intern printing gs =
-  let (pid, gs1) = freshPrintingId gs
-   in (pid, gs1 {GameState.printings = Map.insert pid printing (GameState.printings gs1)})
+intern printing gs = case Map.lookup printing (GameState.printingIds gs) of
+  Just pid -> (pid, gs)
+  Nothing ->
+    let (pid, gs1) = freshPrintingId gs
+     in ( pid,
+          gs1
+            { GameState.printings = Map.insert pid printing (GameState.printings gs1),
+              GameState.printingIds = Map.insert printing pid (GameState.printingIds gs1)
+            }
+        )
 
 printingOf :: PrintingId.PrintingId -> GameState -> Maybe Printing.Printing
 printingOf pid gs = Map.lookup pid (GameState.printings gs)
