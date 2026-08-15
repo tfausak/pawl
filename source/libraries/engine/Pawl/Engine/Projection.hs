@@ -2489,6 +2489,34 @@ abilityRemoval gs =
         then abilitiesRemoved ungated gs
         else const False
 
+-- abilityRemoval asked AT A TIMESTAMP: "were this object's abilities removed by a
+-- removal applied AFTER `ts`?" -- CR 613.1f's question ordered by CR 613.7.
+--
+-- The distinction the blanket predicate cannot make. A layer-6 grant is wiped only
+-- by a removal with a LATER timestamp than its own; a removal with an earlier one
+-- has already applied by the time the grant lands, and the grant survives it. That
+-- is CR 613.9's first Example -- one Aura granting flying and one removing it,
+-- settled by timestamp with no dependency between them.
+--
+-- For the reader holding a layer-6 grant OUTSIDE the layer fold, which is where
+-- the fold's own ordering is unavailable: rule 701.60c's "this creature can't
+-- block" in Pawl.Engine.CombatRestriction. That rule's menace half is folded in
+-- with everything else and needs none of this.
+--
+-- STRICTLY after. Two objects never share a timestamp -- Game.freshTimestamp hands
+-- out a fresh one per object -- so CR 613.7m's APNAP tie-break has nothing to
+-- decide here, and the boundary case cannot arise.
+--
+-- Hoisted over the whole game, and short-circuited on a board with no remover at
+-- all, both for abilityRemoval's reasons. `ungated` is shared across every
+-- timestamp asked about, so a per-permanent caller gathers once.
+abilityRemovalAfter :: GameState -> Timestamp -> ObjectId -> Bool
+abilityRemovalAfter gs =
+  let ungated = gatherGiven (const False) alwaysFunctioning gs
+   in if any (removesAbilities . gModification) ungated
+        then \ts -> abilitiesRemovedBy ((> ts) . gTimestamp) ungated gs
+        else \_ _ -> False
+
 -- CR 613.1f: does this modification remove abilities? Total: a new
 -- ability-removing Modification must break this build rather than silently answer
 -- False and reopen #297.
@@ -2574,8 +2602,18 @@ removesAbilities m = case m of
 -- by CR 613.8 instead -- see appliedSetEffects -- because there the strip decides
 -- whether the effect EXISTS rather than merely when it lands.
 abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
-abilitiesRemoved cands gs oid =
-  let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c)]
+abilitiesRemoved = abilitiesRemovedBy (const True)
+
+-- abilitiesRemoved over a SUBSET of the removers, `keep` naming which -- the shape
+-- abilityRemovalAfter needs to ask about the removers later than a timestamp.
+--
+-- `keep` narrows the removers alone and never the candidate list, which is the
+-- whole reason the parameter is here rather than at the call site: `cands` is also
+-- what the object is projected THROUGH, so filtering it would answer the question
+-- against a board the game does not have.
+abilitiesRemovedBy :: (Gathered -> Bool) -> [Gathered] -> GameState -> ObjectId -> Bool
+abilitiesRemovedBy keep cands gs oid =
+  let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c), keep c]
       removesAt (lyr, cs) =
         let partial = projectUpTo lyr cands oid gs
             decided = decisionsUpTo lyr cands oid gs
