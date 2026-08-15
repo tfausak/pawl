@@ -76,6 +76,8 @@ data KeywordFamily
     Bloodthirst
   | -- | CR 702.63a: vanishing N.
     Vanishing
+  | -- | CR 702.68a: frenzy N.
+    Frenzy
   | -- | CR 702.70a: poisonous N.
     Poisonous
   | -- | CR 702.77a: reinforce N-[cost].
