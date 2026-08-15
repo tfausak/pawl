@@ -1,7 +1,7 @@
 module Pawl.Types.EntryRewrite where
 
 import qualified Numeric.Natural as Natural
-import qualified Pawl.Types.CopyException as CopyException
+import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -33,14 +33,9 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- states the argument in full and names the board that proves it.
 data EntryRewrite
   = -- | CR 707.5 / 614.1c: "you may have this permanent enter as a copy of ...".
-    -- The list is CR 707.9's exceptions to the copying process -- the "except
-    -- ..." clause -- and is empty for a plain Clone.
-    --
-    -- The exceptions ride the rewrite rather than being a rewrite of their own,
-    -- because CR 707.9 makes them modifications OF the copying process: they
-    -- happen only when a copy is actually made, so declining the "may" leaves
-    -- the object its printed self and no exception applies.
-    AsCopy [CopyException.CopyException]
+    -- The payload carries WHICH permanents the printed noun phrase admits and CR
+    -- 707.9's exceptions to the copying process; see Pawl.Types.AsCopy.
+    AsCopy AsCopy.AsCopy
   | ChoiceOf [EntryOption.EntryOption]
   | -- | CR 614.1c's other choosing shape: choose a colour as this enters
     -- (Painter's Servant). Nullary -- CR 105.1's five colours are the offer, and

@@ -674,8 +674,15 @@ data Prompt r where
   -- [ObjectId] is the legal copy targets, pre-filtered by the engine; Nothing is
   -- the card's own "may" decline, after which it enters as itself. Answered inside the zone change (CR 614.12a) before
   -- the enters event is recorded, so the choice really is made as the object
-  -- enters. The legal set excludes anything entering in the same batch, a sibling
-  -- not yet being "on the battlefield" when the choice is made.
+  -- enters. The legal set is the CARD's printed noun phrase over the battlefield
+  -- (Clone's "any creature", Copy Enchantment's "any enchantment"), minus
+  -- anything entering in the same batch -- a sibling not yet being "on the
+  -- battlefield" when the choice is made.
+  --
+  -- Asked whenever one or more permanents are eligible, because the "may" makes
+  -- declining a real fork even against a single candidate. NOT asked when none
+  -- is: declining is then the only legal answer, a forced selection rather than
+  -- an elision of options a player could tell apart.
   ChooseCopyTarget :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
   -- | CR 208.2b / 614.1c: as an object enters, its controller chooses among the
   -- shapes an "as this creature enters, it becomes your choice of ..." ability

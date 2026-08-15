@@ -827,8 +827,9 @@ readsApplier re = case re of
   ReplacementEffect.ZoneChangeR {} -> False
   -- CR 707.5 / 109.5: Clone's "you" is the ENTERING object's controller, read
   -- live off the board at CR 614.12a's moment, not the candidate's -- so two
-  -- such rows offer the same player the same legal set. CR 707.9's exceptions
-  -- ride the effect, so two rows carrying the same ones are still the same offer.
+  -- such rows offer the same player the same legal set. Both halves of the
+  -- payload ride the effect -- the eligible filter and CR 707.9's exceptions --
+  -- so two rows carrying the same ones are still the same offer.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy _)) -> False
   -- Same chooser, and the options ride the effect: CR 614.1c's "enters as"
   -- (Primal Plasma).
@@ -1108,12 +1109,30 @@ applyCopyException snapshot exception = case exception of
       }
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
--- creatures other than itself, minus anything entering in the same batch (see
--- the CR 614.12a note on Event.applyReplacementsIn for why the batch set, not
--- 614.13a, is what excludes them).
-legalCopyTargets :: Set ObjectId -> ObjectId -> GameState -> [ObjectId]
-legalCopyTargets batch self gs =
-  let eligible oid = oid /= self && not (Set.member oid batch) && Projection.isCreatureOf oid gs
+-- permanents matching the rewrite's printed noun phrase, other than itself, minus
+-- anything entering in the same batch (see the CR 614.12a note on
+-- Event.applyReplacementsIn for why the batch set, not 614.13a, is what excludes
+-- them).
+--
+-- The Filter comes off the card (Pawl.Types.AsCopy's `eligible`) rather than
+-- being hardcoded here (#1512): Clone writes "any creature" and Copy Enchantment
+-- "any enchantment", and this function must not know which. The zone is the one
+-- half that is NOT the card's to say -- "on the battlefield" is the domain the
+-- walk below supplies.
+--
+-- Matched through each candidate's own CR 613 projection, revealableFromHand's
+-- reading, so a continuous effect that made a permanent an enchantment reaches
+-- it. Perspective and source are the ENTERING object's controller and the
+-- entering object, so a filter naming "you" or "this" resolves against the
+-- player making the choice (CR 109.5); nothing printed today uses either, and
+-- supplying Nothing would silently answer False if one did.
+legalCopyTargets :: Set ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> GameState -> [ObjectId]
+legalCopyTargets batch filter_ self gs =
+  let context = Filter.contextFor (Projection.controllerOf self gs) (Just self)
+      eligible oid =
+        oid /= self
+          && not (Set.member oid batch)
+          && Filter.matches context (Projection.viewOfObject oid gs) filter_
    in filter eligible (Set.toAscList (GameState.battlefield gs))
 
 -- CR 614.1c / 701.20a: the cards a player may reveal from their hand to satisfy

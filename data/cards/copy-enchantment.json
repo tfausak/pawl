@@ -4,7 +4,7 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 3
+          "value": 2
         },
         {
           "type": "OfType",
@@ -16,11 +16,7 @@
           }
         }
       ],
-      "name": "Clone",
-      "power": {
-        "type": "Literal",
-        "value": 0
-      },
+      "name": "Copy Enchantment",
       "replacementEffects": [
         {
           "type": "EntryR",
@@ -34,7 +30,7 @@
                 "eligible": {
                   "type": "HasCardType",
                   "value": {
-                    "type": "Creature"
+                    "type": "Enchantment"
                   }
                 }
               }
@@ -42,19 +38,10 @@
           }
         }
       ],
-      "toughness": {
-        "type": "Literal",
-        "value": 0
-      },
       "typeLine": {
-        "subtypes": [
-          {
-            "type": "Shapeshifter"
-          }
-        ],
         "types": [
           {
-            "type": "Creature"
+            "type": "Enchantment"
           }
         ]
       }

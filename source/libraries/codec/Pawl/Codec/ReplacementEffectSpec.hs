@@ -6,6 +6,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -78,8 +79,8 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
     Common.assertCodec
       s
       ReplacementEffect.codec
-      (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy [])))
-      """ {"type":"EntryR","value":{"matching":{"type":"IsSource"},"rewrite":{"type":"AsCopy"}}} """
+      (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) []))))
+      """ {"type":"EntryR","value":{"matching":{"type":"IsSource"},"rewrite":{"type":"AsCopy","value":{"eligible":{"type":"HasCardType","value":{"type":"Creature"}}}}}} """
   -- CR 208.2b: Primal Plasma's ChoiceOf, carrying P/T and keywords.
   Spec.it s "EntryR (Primal Plasma, ChoiceOf)" $
     Common.assertCodec
