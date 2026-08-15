@@ -285,11 +285,11 @@ controlEffectsEnd pid gs =
   let heldBy decider = case decider of
         Decider.MkDecider d -> d == pid
    in gs
-        { GameState.continuousEffects = filter (\eff -> not (Projection.givesControlTo pid eff)) (GameState.continuousEffects gs),
+        { GameState.continuousEffects = filter (not . Projection.givesControlTo pid) (GameState.continuousEffects gs),
           GameState.activeControl = case GameState.activeControl gs of
             Just decider -> if heldBy decider then Nothing else Just decider
             Nothing -> Nothing,
-          GameState.pendingControl = Map.filter (\decider -> not (heldBy decider)) (GameState.pendingControl gs)
+          GameState.pendingControl = Map.filter (not . heldBy) (GameState.pendingControl gs)
         }
 
 -- CR 800.4a, third clause: objects on the stack the departing player controlled

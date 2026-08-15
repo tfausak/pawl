@@ -24,6 +24,7 @@
 -- values regardless of it.
 module Pawl.JsonCodec.Common where
 
+import Control.Monad ((>=>))
 import qualified Data.Either as Either
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -315,7 +316,7 @@ list :: Codec.Codec a -> Codec.Codec [a]
 list c =
   Codec.MkCodec
     { Codec.encode = Value.array . fmap (Codec.encode c),
-      Codec.decode = \value -> asArray value >>= traverse (Codec.decode c),
+      Codec.decode = asArray >=> traverse (Codec.decode c),
       Codec.schema = Schema.array <$> Codec.schema c
     }
 

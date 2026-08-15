@@ -4341,7 +4341,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "an unlock trigger names one of its own card's faces" $ do
     ps <- S.allPrintings s
     let doors c = [n | TriggerCondition.SelfHalfUnlocked n <- fmap TriggeredAbility.condition (Face.triggeredAbilities c)]
-        offends card = any (\c -> any (`notElem` fmap Face.name (NonEmpty.toList (Card.Type.faces card))) (doors c)) (Card.Type.faces card)
+        offends card = any (any (`notElem` fmap Face.name (NonEmpty.toList (Card.Type.faces card))) . doors) (Card.Type.faces card)
         offenders = filter (offends . Printing.card) ps
     Spec.assertBool
       s
@@ -4455,7 +4455,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "and it is the pool's only one"
-      (sum (fmap (\p -> uncurry (+) (canHostSubjectCounts (S.combinedFace p))) ps))
+      (sum (fmap (uncurry (+) . canHostSubjectCounts . S.combinedFace) ps))
       1
     -- The traversal reaches a Filter position no effect, target slot or affected
     -- set would have led it to: CR 702.29e's typecycling predicate, on a real

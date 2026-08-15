@@ -20,6 +20,7 @@
 -- side only, since encoding cannot fail.
 module Pawl.JsonCodec.Fields where
 
+import Control.Monad ((>=>))
 import qualified Data.Text as Text
 import qualified Data.Typeable as Typeable
 import qualified Pawl.Json.Pair as Pair
@@ -68,7 +69,7 @@ required :: String -> Codec.Codec a -> (o -> a) -> Fields o a
 required key c get =
   MkFields
     { encode = \o -> [Value.pair key (Codec.encode c (get o))],
-      decode = \ps -> Common.field key ps >>= Codec.decode c,
+      decode = Common.field key >=> Codec.decode c,
       schema = do
         s <- Codec.schema c
         pure ([Value.pair key (Schema.unwrap s)], [Text.pack key])

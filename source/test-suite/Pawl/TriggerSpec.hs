@@ -5603,7 +5603,7 @@ arborColossusSpec s registry =
         Spec.it s "CR 701.37b a creature becoming monstrous is not a creature becoming renowned" $ do
           wardensPrinting <- S.printingOf s registry "Valeron Wardens"
           piker <- S.printingOf s registry "Goblin Piker"
-          (colossus, maiden, _, gs) <- board (\base -> pure (snd (S.addLibraryCard piker S.alice (snd (S.addCreature wardensPrinting S.alice base)))))
+          (colossus, maiden, _, gs) <- board (pure . snd . S.addLibraryCard piker S.alice . snd . S.addCreature wardensPrinting S.alice)
           case monstrosity colossus maiden gs of
             Left n -> Spec.assertFailure s ("expected one activatable monstrosity ability, got " <> show n)
             Right after -> do

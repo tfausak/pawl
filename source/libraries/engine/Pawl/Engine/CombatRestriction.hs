@@ -324,7 +324,7 @@ inForce gs =
           | isEmblem source ->
               fmap
                 (\restriction -> (source, [], restriction))
-                (filter (\restriction -> not (lifted source [] restriction)) (Face.combatRestrictions face))
+                (filter (not . lifted source []) (Face.combatRestrictions face))
         _ -> []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
         <> concatMap fromCommandZone (Set.toList (GameState.command gs))

@@ -9207,7 +9207,7 @@ announcingCount n p = case p of
 takingTargets :: Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
 takingTargets n wanted p = case p of
   Prompt.AnnounceTargets {} -> announcingCount n p
-  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> maybe False (\oid -> elem oid wanted) (Recipient.objectOf r)) sets
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (maybe False (\oid -> elem oid wanted) . Recipient.objectOf) sets
   _ -> S.identityAnswer p
 
 -- The +1/+1 counters on one permanent.

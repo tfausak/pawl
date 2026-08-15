@@ -460,7 +460,7 @@ runTurnBasedActions phase = do
   -- creatures CR 800.4a already took, so those three are vacuous; only the
   -- defending-player choice is real, and it is unobservable rather than vacuous
   -- for the reason on Pawl.Types.Combat's defender field.
-  hasActive <- State.gets (\gs -> List.elem active (Game.stillPlaying gs))
+  hasActive <- State.gets (List.elem active . Game.stillPlaying)
   case phase of
     Phase.Beginning BeginningStep.Untap -> do
       -- CR 502.1 / 703.4a: phasing, immediately after the step begins and so
