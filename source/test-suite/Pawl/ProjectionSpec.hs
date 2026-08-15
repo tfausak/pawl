@@ -360,8 +360,9 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
 -- time, each reports a different one-way dependency, and the pair of answers is
 -- one no single order of the two effects produces.
 --
--- Shroofus is the pool's only printed nontoken Saproling, and is transcribed
--- without its combat-damage token trigger (#1113).
+-- Shroofus is the pool's only printed nontoken Saproling. His combat-damage token
+-- trigger never fires here: these cases read a projection off a board that runs
+-- no combat.
 -- Synthetic Ferocious Chorus, Bad Moon, a Bog Wraith and a Child of Night, all
 -- alice's. `chorusFirst` controls the timestamp order (fresh timestamps ascend
 -- with placement).

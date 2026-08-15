@@ -124,9 +124,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   --     Progress' "for each permanent destroyed this way".
   --   * Event.eventBindings writes to the object CR 603.3 put ON THE STACK, as
   --     the trigger was gathered -- Selfless Squire's "that many", the amount CR
-  --     615.13's prevention supplied, and Sanguine Bond's and Exquisite Blood's
+  --     615.13's prevention supplied; Sanguine Bond's and Exquisite Blood's
   --     "that much", the amount a life gain (CR 119.9) or a life loss (CR 119.3)
-  --     supplied.
+  --     supplied; and Shroofus Sproutsire's "that many", the combat damage CR
+  --     510.2 dealt a player.
   --
   -- The source is asked first so the existing reading is untouched, and the two
   -- cannot collide over one name: a mid-resolution bind names a slot the CARD

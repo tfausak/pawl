@@ -5088,8 +5088,9 @@ runPreventionRiders = do
 -- has no such object, so its rider does not run (#1104).
 --
 -- The stamp is UNDONE afterwards, restoring whatever was there. It is the one
--- writer that puts Binding.eventAmount on a BATTLEFIELD permanent -- the other
--- two write to a resolving object's own bindings -- and Quantity.evaluateFor
+-- writer that puts Binding.eventAmount on a BATTLEFIELD permanent -- every other
+-- writer of that slot is Pawl.Engine.Event.eventBindings, stamping a resolving
+-- object's own bindings as a trigger is gathered -- and Quantity.evaluateFor
 -- asks an effect's SOURCE before the object on the stack, so a value left behind
 -- here would shadow the amount a later CR 615.13 trigger of that same permanent
 -- supplied. No board in the pool reaches that collision, so this is a fence

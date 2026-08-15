@@ -5657,14 +5657,22 @@ eventBindings cond event = case (cond, event) of
   -- the same field matchesTrigger applied the Filter to, so the slot names exactly
   -- the permanent the condition admitted.
   --
-  -- Unconditional given a match, which is what eventBindingSlots' per-condition
-  -- promise needs: every GameEvent.DamageDealt carries a DamageEvent.source.
+  -- HOW MUCH, alongside it: Shroofus Sproutsire's "create that many 1/1 green
+  -- Saproling creature tokens" counts the damage the event carried, under the same
+  -- reserved slot CR 615.13's prevention and CR 119.9's life gain stamp (see
+  -- Binding.eventAmount). The AMOUNT the event recorded and never the damager's
+  -- power: CR 702.19b lets a trampler assign part of its power to a blocker, so
+  -- the two come apart on exactly the board Pawl.TriggerSpec's shroofusSpec runs.
   --
-  -- The DAMAGED PLAYER is not bound alongside it. The event names one and CR
+  -- Both unconditional given a match, which is what eventBindingSlots'
+  -- per-condition promise needs: every GameEvent.DamageDealt carries a
+  -- DamageEvent.source and a DamageEvent.amount.
+  --
+  -- The DAMAGED PLAYER is not bound alongside them. The event names one and CR
   -- 702.70a's `triggerPlayer` is the slot it would take, but no card in the pool
   -- reads it under this condition (#1175).
   (TriggerCondition.PermanentDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
-    Binding.setCombatDamager (DamageEvent.source ev) Map.empty
+    Binding.setCombatDamager (DamageEvent.source ev) (Binding.setEventAmount (DamageEvent.amount ev) Map.empty)
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
   -- from the other side.
@@ -5961,9 +5969,14 @@ eventBindingSlots cond = case cond of
   -- is the reader. Guaranteed given a match -- every DamageDealt event carries a
   -- source.
   --
+  -- CR 510.2's amount beside its damager, which Shroofus Sproutsire's "that many"
+  -- reads: the same slot CR 615.13's prevention and CR 119.9's life gain stamp, and
+  -- guaranteed given a match for the same reason -- every DamageDealt event carries
+  -- an amount.
+  --
   -- No `triggerPlayer`: the event names the damaged player too, and no card in the
   -- pool reads it under this condition (#1175).
-  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.singleton Binding.combatDamager
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.fromList [Binding.combatDamager, Binding.eventAmount]
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
   -- condition would honestly get nothing from the event.
