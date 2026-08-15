@@ -165,18 +165,21 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 
 -- CR 608.2i: append one entry to the turn-scoped log. The single APPEND point,
--- which is also what lets it be where CR 603.3a's controller is sampled: an event
--- that OPENS a batch takes GameState.controlWhenTriggered from the board as it
--- stands, before anything between here and the CR 117.5 scan can move control.
--- Nothing is sampled mid-batch, and the pre-append state is the same board.
+-- which is also what lets it be where CR 603.10's "immediately after an event" is
+-- sampled: the caller has already applied the event to the board by the time it
+-- gets here, so the pre-append state IS the board the rule asks about, and
+-- GameState.battlefieldWhenTriggered files it under this event's group.
 --
--- One sample per BATCH rather than per event; the two differ only for a batch
--- whose own events straddle a control change, which nothing in this pool produces
--- (#603).
+-- Sampled at EVERY record, not only at the one that opens a batch, and the
+-- overwrite within a group is deliberate rather than waste: a group is CR 608.2f's
+-- single event, its members are applied and recorded one at a time, and the rule
+-- asks about the board after the whole thing -- so the last member's sample is the
+-- right one and the earlier thunks are dropped unforced.
 --
--- On a hot path, and paid once per batch: controlOverrides costs one controlGrants
--- walk plus one controllerOfGiven per object a layer-2 effect names, and the
--- common board names none. Measured below the benchmark suite's noise floor.
+-- Cheap for that reason: the thunk a discarded sample left is never projected, and
+-- the one that survives is projected at the scan, which would have projected the
+-- board there anyway. What the change costs against a per-batch sample is one
+-- projection per event GROUP instead of one per batch.
 --
 -- The group stamped on the entry is CR 704.3 / CR 608.2f's "single event": a
 -- fresh one per record, unless a `simultaneously` bracket is open, in which case
@@ -185,17 +188,42 @@ import qualified Pawl.Types.ZoneChangeR as ZoneChangeR
 recordEvent :: GameEvent -> GameState -> GameState
 recordEvent event gs =
   let group = GameState.nextEventGroup gs
-      recorded =
-        gs
-          { GameState.events = GameState.events gs Seq.|> (group, event),
-            GameState.nextEventGroup =
-              if GameState.eventGroupDepth gs == 0
-                then EventGroup.next group
-                else group
-          }
-   in if GameState.scannedThrough gs < Natural.length (GameState.events gs)
-        then recorded
-        else recorded {GameState.controlWhenTriggered = Projection.controlOverrides gs}
+   in gs
+        { GameState.events = GameState.events gs Seq.|> (group, event),
+          GameState.nextEventGroup =
+            if GameState.eventGroupDepth gs == 0
+              then EventGroup.next group
+              else group,
+          GameState.battlefieldWhenTriggered =
+            Map.insert group (battlefieldCandidates gs) (GameState.battlefieldWhenTriggered gs)
+        }
+
+-- CR 603.10's "objects that exist immediately after an event", taken of the
+-- battlefield: every permanent standing on it, the player controlling it, and the
+-- projection its abilities are read out of.
+--
+-- The whole battlefield rather than a diff or an overrides-only map, because all
+-- three of the answers the scan wants can move and only a full reading tells
+-- "unchanged" from "not there". The controller half is the one that used to be
+-- kept alone, as a layer-2 overrides map; folding it in here costs nothing extra,
+-- since the projection this walks is the same one the controller walk needs.
+--
+-- Projected ONCE for the whole board rather than per permanent, Projection.project
+-- rerunning the whole-board gather fold on every call.
+battlefieldCandidates :: GameState -> Map.Map ObjectId (PlayerId, PC.ProjectedCharacteristics)
+battlefieldCandidates gs =
+  let projected = Projection.projectAll gs
+      grants = Projection.controlGrants gs
+   in Map.fromList
+        ( Maybe.mapMaybe
+            ( \oid -> case Map.lookup oid projected of
+                -- Unreachable: projectAll is keyed on the same battlefield set this
+                -- list walks, so every oid drawn from it has an entry.
+                Nothing -> Nothing
+                Just pc -> fmap (\ctrl -> (oid, (ctrl, pc))) (Projection.controllerOfGiven grants Set.empty oid gs)
+            )
+            (Set.toAscList (GameState.battlefield gs))
+        )
 
 -- CR 704.3 / CR 608.2f: run `body` as ONE event, so every event it records
 -- shares an EventGroup and CR 603.10a's look-back can tell "at the same time"
@@ -6150,10 +6178,13 @@ looksBack condition = case condition of
 -- battlefield, not only the object the event names -- a step trigger belongs to a
 -- permanent with nothing to do with the event.
 --
--- The candidate set is the same for every event, so it is projected ONCE via
--- projectAll rather than per (event, permanent) pair: Projection.project reruns
--- the whole-board `gather` fold on every call, which made this scan quadratic in
--- board size.
+-- "Currently" is the word CR 603.10's first sentence corrects, and the battlefield
+-- reading here is per EVENT GROUP for that reason: each group's permanents, their
+-- abilities and their controllers are the ones GameState.battlefieldWhenTriggered
+-- sampled as the group was recorded, never the board the scan finds. The sample is
+-- one projectAll per group rather than per (event, permanent) pair --
+-- Projection.project reruns the whole-board `gather` fold on every call, which made
+-- this scan quadratic in board size.
 --
 -- The battlefield is not the only scanned zone -- every GRAVEYARD and the whole
 -- EXILE zone are scanned for the abilities CR 113.6k puts there, a spell that
@@ -6162,14 +6193,16 @@ looksBack condition = case condition of
 -- offered from the command zone under CR 114.4. The rest of the command zone is
 -- unscanned (#1411).
 --
--- CR 603.10's FIRST sentence is a per-EVENT question, and the live battlefield set
--- answers a per-BOUNDARY one: the scan runs once at CR 117.5, after CR 704.5's
--- state-based actions, so every permanent that left anywhere inside the batch is
--- missing even for events it was plainly there for.
+-- Two holes are left in that reading, and last known information fills both. A
+-- permanent that left WITHIN its own group is missing from that group's sample, the
+-- sample being taken as the last of the group's members is recorded and CR 704.3's
+-- whole destruction batch being one group; and a group nothing sampled has no
+-- reading but the live board, which the departed are not on either.
 --
--- So each event contributes the permanents that left the battlefield at a LATER
--- EVENT GROUP in the same batch, read from CR 608.2h last known information --
--- `laterGroups` below. Four things make that exact rather than approximate:
+-- So each event ALSO contributes the permanents that left the battlefield at a
+-- LATER EVENT GROUP in the same batch, read from CR 608.2h last known information
+-- -- `laterGroups` below, which the sample outranks wherever both hold the same id.
+-- Four things make that exact rather than approximate:
 --
 --   * The same reading, one event later. A permanent removed by a later event
 --     existed immediately after this one, which is what the rule asks. It reaches
@@ -6202,13 +6235,7 @@ looksBack condition = case condition of
 -- they decide which permanents an event is offered, never in what order.
 eventTriggers :: [(EventGroup, GameEvent)] -> GameState -> [PendingTrigger]
 eventTriggers events gs =
-  let projected = Projection.projectAll gs
-      -- The control-grant list is the same for every permanent in this scan
-      -- (same reason projected is computed once): Projection.controllerOf
-      -- would otherwise rebuild it, and re-run its liveGiven fixpoint, once
-      -- per battlefield object.
-      grants = Projection.controlGrants gs
-      -- CR 702.70a: a keyword can BE a triggered ability, so a permanent's
+  let -- CR 702.70a: a keyword can BE a triggered ability, so a permanent's
       -- abilities are its printed-and-granted ones plus the ones rule 702 mints
       -- from its keywords. Derived from POST-LAYER counts, so Humility takes them
       -- away and a layer-6 grant adds them without special-casing. Shared by both
@@ -6239,39 +6266,27 @@ eventTriggers events gs =
       -- implemented (#819), so filtering there would read the rule's first half
       -- without its second.
       battlefieldAbilitiesOf pc = filter (functionsIn Zone.Battlefield) (abilitiesOf pc)
-      onBattlefield =
-        Map.fromList
-          ( Maybe.mapMaybe
-              ( \oid -> case Map.lookup oid projected of
-                  -- Unreachable: projected (Projection.projectAll gs) is keyed on
-                  -- the same GameState.battlefield set this list walks, so every
-                  -- oid drawn from that set has an entry.
-                  Nothing -> Nothing
-                  -- CR 603.3a: a triggered ability is controlled by whoever
-                  -- controlled its source AT THE TIME IT TRIGGERED, not at this
-                  -- scan -- so recordEvent's batch-open sample is consulted first
-                  -- and the live projection answers only for an id it does not
-                  -- name. The two disagree for exactly one board shape, which is
-                  -- what this exists for: a layer-2 control effect in force at the
-                  -- event and gone by the scan (CR 514.2 is where the pool reaches
-                  -- it).
-                  --
-                  -- Falling back LIVE rather than to the CR 110.2 default is not a
-                  -- shortcut: an id the sample does not name had no layer-2
-                  -- controller when the batch opened, so for a permanent already
-                  -- there this is its default, and for one that ARRIVED mid-batch
-                  -- it is the controller it arrived with -- which is what CR
-                  -- 603.10's first sentence asks for.
-                  Just pc ->
-                    fmap
-                      (\ctrl -> (oid, (ctrl, battlefieldAbilitiesOf pc)))
-                      ( case Map.lookup oid (GameState.controlWhenTriggered gs) of
-                          Just who -> Just who
-                          Nothing -> Projection.controllerOfGiven grants Set.empty oid gs
-                      )
-              )
-              (Set.toAscList (GameState.battlefield gs))
-          )
+      -- CR 603.10's first sentence, per EVENT GROUP: the permanents that existed
+      -- immediately after the event, with the abilities and the CR 603.3a
+      -- controller each of them had THEN. The three readings the live board gets
+      -- wrong are the three this recovers, and each has a board that tells them
+      -- apart: a permanent that entered later in the batch was not there to be
+      -- checked against an earlier event, one whose abilities were stripped after
+      -- the event still triggered on it (Pawl.TriggerSpec's "abilities as of the
+      -- event"), and one whose layer-2 controller changed after it (CR 514.2's
+      -- "until end of turn" ending between CR 514.1's discard and CR 514.3a's
+      -- placement) triggered under the old one.
+      --
+      -- The LIVE board answers for a group the sample does not name, which is the
+      -- honest reading for an event this module never recorded: a fixture that
+      -- appends to the log directly has no sampled board, and the game as it stands
+      -- is the only one there is. Lazy, so a scan whose every group is sampled
+      -- never projects it.
+      liveBattlefield = battlefieldCandidates gs
+      onBattlefieldAt group =
+        Map.map
+          (fmap battlefieldAbilitiesOf)
+          (Map.findWithDefault liveBattlefield group (GameState.battlefieldWhenTriggered gs))
       -- The permanent this event took OFF the battlefield, read from
       -- CR 608.2h last known information -- both the abilities and the objects'
       -- appearance immediately prior to the event, which is what CR 603.10 says
@@ -6387,16 +6402,23 @@ eventTriggers events gs =
       -- union rather than one per death. `drop 1` is the alignment, shifting
       -- scanr's "from i onward" to "from i+1 onward".
       --
-      -- The controller and abilities are the ones the permanent had as it LEFT --
-      -- one moment after the event that triggered them, not at it (#603). Nothing
-      -- in this pool moves control or grants an ability in that window.
+      -- The controller and abilities here are the ones the permanent had as it
+      -- LEFT, one moment after the event that triggered them rather than at it --
+      -- so this is the SECOND reading of such a permanent, and loses to the first.
+      -- `onBattlefieldAt` above already holds it, sampled at the event itself,
+      -- because a permanent that departs at a later group was still standing when
+      -- this group's sample was taken; Map.unions is left-biased and that entry
+      -- comes first. What is left for this binding is the group the sample does not
+      -- name, where last known information is the only reading there is.
       --
       -- CR 113.6m applies here and not to `leftBattlefield`: this permanent WAS
       -- on the battlefield when the event happened, so one of its abilities that
       -- functions only in a graveyard was no more watching then than it is now.
-      -- The proving case is Squee, Goblin Nabob leaving the battlefield after an
-      -- upkeep began in the same batch, in Pawl.TriggerSpec's
-      -- `bystanderZoneSpec`.
+      -- The behaviour's proving case is Squee, Goblin Nabob leaving the battlefield
+      -- after an upkeep began in the same batch, in Pawl.TriggerSpec's
+      -- `bystanderZoneSpec` -- which reaches the same answer through the sample
+      -- above, that being the reading that wins. The filter is kept identical here
+      -- so the two cannot disagree on the fallback path.
       laterGroups = drop 1 (List.scanr (\block acc -> Map.union (departuresIn block) acc) Map.empty groups)
       -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
       -- board that matters is "the appearance of objects immediately prior to the
@@ -6702,18 +6724,25 @@ eventTriggers events gs =
       forOne event (oid, (ctrl, abilities)) =
         let -- The bearer's own slot environment, so a condition naming a slot
             -- (TriggerCondition.LoseControlOfBound) is read the same way here as it
-            -- is for a CR 603.7 delayed entry. Empty for a bearer read out of last
-            -- known information, which has no object left to ask.
+            -- is for a CR 603.7 delayed entry. Empty for a bearer that has since
+            -- left, there being no object to ask -- whether it arrived here out of
+            -- last known information or out of a sample taken while it stood.
             bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
-      -- Map.unions is left-biased, so a live battlefield reading wins over a
+      -- Map.unions is left-biased, so the battlefield reading wins over a
       -- last-known one, a cycled card and a graveyard reading. That rules out a
       -- double fire: one entry per id means one pass of `forOne` per id.
       --
-      -- The first four sets are disjoint by construction, and the bias is belt and
-      -- braces. `inGraveyards` genuinely overlaps `cycledCard` on purpose -- a card
+      -- Two of the first four genuinely overlap, and there the bias is load-bearing
+      -- rather than belt and braces: a permanent that departs at a LATER group was
+      -- still standing when this group's sample was taken, so it is in both
+      -- `onBattlefield` and `later`, and the sample's at-the-event reading is the
+      -- one CR 603.10 asks for. `leftBattlefield` and `same` cannot collide with
+      -- the sample -- both name a permanent that had already gone when the sample
+      -- was taken -- nor with each other, an id departing at exactly one group.
+      -- `inGraveyards` genuinely overlaps `cycledCard` on purpose -- a card
       -- cycled into a graveyard is honestly a member of both -- and the winner
       -- offers that card's printed abilities unfiltered, a superset either way.
       -- `spellCast` overlaps nothing: CR 601.2a keeps its object on the stack,
@@ -6723,9 +6752,15 @@ eventTriggers events gs =
       -- `inExile`: CR 400.1 makes exile a zone of its own, and an id in it is in
       -- no other. Nor does `revealedInHand`: CR 701.20b leaves the revealed card
       -- in the hand, which no other source reads.
-      candidates event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, inGraveyards, inCommand, inExile])
-      scanOne later same event = concatMap (forOne event) (candidates event later same)
-   in concat (List.zipWith3 (\block later same -> concatMap (scanOne later same . snd) block) groups laterGroups sameGroup)
+      candidates onBattlefield event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, spellCast event, revealedInHand event, inGraveyards, inCommand, inExile])
+      scanOne onBattlefield later same event = concatMap (forOne event) (candidates onBattlefield event later same)
+      -- The battlefield reading is per GROUP and so is hoisted out of the block:
+      -- every event in one group happened at the same time, so they share it. A
+      -- group with no events cannot occur -- List.groupBy yields no empty block.
+      scanBlock block later same = case block of
+        [] -> []
+        (group, _) : _ -> concatMap (scanOne (onBattlefieldAt group) later same . snd) block
+   in concat (List.zipWith3 scanBlock groups laterGroups sameGroup)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
 -- specifies that it moves the object it's on out of a particular zone functions
