@@ -2844,6 +2844,48 @@ distinctFaceNamesOffends card =
   let names = fmap Face.name (NonEmpty.toList (Card.Type.faces card))
    in length (List.nub names) /= length names
 
+-- Whether a layout's faces print ONE type line between them, so that pawl's
+-- per-face storage is holding two copies of a single printed line rather than
+-- two independent lines.
+--
+-- Exhaustive on purpose rather than `== Layout.Room`: a new layout is a claim
+-- about whether its faces share a line, and equality would answer that claim
+-- silently. CR 709.5 is the only layout that says "a single shared type line";
+-- CR 709.4c gives an ordinary split card's halves separate lines it then
+-- combines, CR 715.2 gives the adventurer card's inset frame its own line, and
+-- CR 712.8f/712.8a give each face of a double-faced card the characteristics of
+-- that face alone.
+sharesOneTypeLine :: Layout.Layout -> Bool
+sharesOneTypeLine layout = case layout of
+  Layout.Room -> True
+  Layout.Normal -> False
+  Layout.Split -> False
+  Layout.Adventure -> False
+  Layout.Transforming -> False
+  Layout.ModalDoubleFaced -> False
+
+-- CR 709.5a: "Each half of a split card with a shared type line shares the types
+-- and subtypes listed on that card's shared type line." pawl stores that
+-- literally -- both faces of a Room carry the whole line -- and
+-- Pawl.Engine.Card.roomFace deliberately does not subtract it, citing the rule.
+-- Nothing else enforces the duplication: a Room whose faces disagreed would load
+-- without complaint, and Pawl.Engine.Card.unionTypeLines (set union) would merge
+-- the disagreement into a line NEITHER face prints.
+--
+-- Full type-line equality, not just the two sets CR 709.5a names. The types and
+-- subtypes are 709.5a's; the supertypes come from CR 709.5's premise instead --
+-- "permanent cards with a single shared type line" is one printed line, and a
+-- supertype on it is on it for both halves. There is no printed Room with a
+-- supertype today, so the stricter reading costs the corpus nothing and is the
+-- one that keeps two stored copies of one line honest.
+--
+-- Over the whole card rather than through anyFace, for distinctFaceNamesOffends'
+-- reason: this is a claim about the faces as a set.
+sharedTypeLineOffends :: Card.Type.Card -> Bool
+sharedTypeLineOffends card =
+  let lines_ = fmap Face.typeLine (Card.Type.faces card)
+   in sharesOneTypeLine (Card.Type.layout card) && any (/= NonEmpty.head lines_) lines_
+
 -- Two things a TriggerCondition.AnyOf may not contain, checked at every depth so
 -- that a nested one cannot smuggle either in.
 --
@@ -4304,6 +4346,55 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (not (all (all (null . doors) . Card.Type.faces . Printing.card) ps))
       "the pool has a card with an unlock trigger to lint"
     Spec.assertEqWith s "every door named is a face of the card naming it" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 709.5a, swept over the pool. See sharedTypeLineOffends for what the rule
+  -- asks and why the check is full type-line equality.
+  Spec.it s "CR 709.5a a Room's faces agree on their shared type line" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (sharedTypeLineOffends . Printing.card) ps
+        rooms = filter (sharesOneTypeLine . Card.Type.layout . Printing.card) ps
+    -- The guard the sibling lints carry, and it bites harder here than most: over
+    -- a pool with no Room at all this sweep compares nothing, and over a Room with
+    -- one face it compares a line against itself.
+    Spec.assertBool s (any ((> 1) . length . Card.Type.faces . Printing.card) rooms) "the pool has a multi-face Room to lint"
+    Spec.assertEqWith s "no Room's halves disagree" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The REJECTING direction, against the real card restated rather than a card
+  -- file, as the repeated-face-name lint above does it: a Room whose halves
+  -- disagree must not be loadable. Restating a printed Room rather than building
+  -- one is what makes this a claim about the corpus's own shape.
+  Spec.it s "the lint itself catches a Room whose halves disagree" $ do
+    furnace <- S.printingOf s registry "Roaring Furnace"
+    let card = Printing.card furnace
+        -- The RIGHT half restated and the left left alone, so each mutation below
+        -- is a disagreement rather than a card-wide edit the lint would accept.
+        retype f = case Card.Type.faces card of
+          x NonEmpty.:| xs -> card {Card.Type.faces = x NonEmpty.:| fmap f xs}
+        addType face =
+          face
+            { Face.typeLine =
+                (Face.typeLine face)
+                  { TypeLine.types = Set.insert CardType.Artifact (TypeLine.types (Face.typeLine face))
+                  }
+            }
+        dropSubtype face =
+          face {Face.typeLine = (Face.typeLine face) {TypeLine.subtypes = Set.empty}}
+        addSupertype face =
+          face
+            { Face.typeLine =
+                (Face.typeLine face)
+                  { TypeLine.supertypes = Set.singleton Supertype.Legendary
+                  }
+            }
+    Spec.assertBool s (not (sharedTypeLineOffends card)) "the real Roaring Furnace // Steaming Sauna is accepted"
+    Spec.assertBool s (sharedTypeLineOffends (retype addType)) "one half gaining a card type is rejected"
+    Spec.assertBool s (sharedTypeLineOffends (retype dropSubtype)) "one half losing the Room subtype is rejected"
+    -- The set CR 709.5a does not name, and which sharedTypeLineOffends checks
+    -- anyway on CR 709.5's premise that the line is one printed line.
+    Spec.assertBool s (sharedTypeLineOffends (retype addSupertype)) "one half gaining a supertype is rejected"
+    -- NOT an offence on a layout whose halves print their own lines: Wax // Wane's
+    -- successor Onward // Victory is Instant against Sorcery, and CR 709.4c is
+    -- what makes that legal authoring rather than a defect.
+    victory <- S.printingOf s registry "Onward"
+    Spec.assertBool s (not (sharedTypeLineOffends (Printing.card victory))) "a Split card's halves may differ"
   -- CR 603.2's event triggers and CR 603.8's state triggers are gathered by two
   -- different scans, so one ability may not be both. See anyOfOffends for the two
   -- shapes this rejects and why each would be incoherent rather than merely odd.
