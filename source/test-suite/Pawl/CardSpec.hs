@@ -2433,16 +2433,19 @@ storedPlayerScope effect = case effect of
   Effect.AffectPlayers (AffectPlayers.MkAffectPlayers _ scope playerEffect) -> Just (scope, playerEffect)
   _ -> Nothing
 
--- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
+-- The Filters an EntryRewrite carries, on three different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null
 -- Chamber's "other than a basic land card name"), a predicate over a CARD in the
 -- Oracle card reference rather than over an object on the board -- the same shape
 -- Effect.Search's is, and why it belongs in this walk. CR 614.1c's as-enters
 -- sacrifice carries one of the ordinary kind, over permanents on the battlefield
--- (Shimatsu the Bloodcloaked's "any number of permanents"). Neither is framed.
+-- (Shimatsu the Bloodcloaked's "any number of permanents"). CR 614.1c's as-enters
+-- reveal carries a third, over a CARD IN A HAND (Rustic Clachan's "a Kithkin
+-- card"). None of the three is framed.
 entryRewriteFilters :: EntryRewrite.EntryRewrite -> [Filter.Type.Filter Keyword.Keyword]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> [f]
+  EntryRewrite.RevealOrTapped f -> [f]
   -- CR 707.9's exceptions carry no Filter: an "except ..." clause states values,
   -- never a criterion over objects (Pawl.Types.CopyException imports no Filter,
   -- which is what keeps the count above honest).

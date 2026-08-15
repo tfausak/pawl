@@ -88,6 +88,7 @@ encode p answer = case p of
   Prompt.ChooseRiot {} -> Response.ChoseRiot answer
   Prompt.ChooseUnleash {} -> Response.ChoseUnleash answer
   Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
+  Prompt.ChooseRevealOnEntry {} -> Response.ChoseRevealOnEntry answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
   Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
@@ -245,6 +246,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChoosePayLifeOnEntry {} -> case response of
     Response.ChosePayLifeOnEntry d -> Just d
+    _ -> Nothing
+  Prompt.ChooseRevealOnEntry {} -> case response of
+    Response.ChoseRevealOnEntry m -> Just m
     _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
@@ -509,6 +513,9 @@ defaultAnswer p = case p of
   -- enters tapped" -- and it is the half that spends nothing, so a transcript
   -- that ran out cannot drain a life total a real game never spent.
   Prompt.ChoosePayLifeOnEntry {} -> OptionalDecision.Declines
+  -- CR 614.1c: declining, for ChoosePayLifeOnEntry's reason above -- it is the
+  -- branch the card states as its default, and the half that shows nobody a card.
+  Prompt.ChooseRevealOnEntry {} -> Nothing
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
   -- THE ONE ILLEGAL ANSWER, deliberately. CR 201.4 offers every card in the
