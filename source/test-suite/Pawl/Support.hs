@@ -1521,6 +1521,7 @@ oneMountainState mountain ph =
           GameState.spellsCastLastTurn = 0,
           GameState.exiledUntilMonarch = Map.empty,
           GameState.haunting = Map.empty,
+          GameState.exiledWith = Map.empty,
           GameState.extraTurns = [],
           GameState.turnAnchor = Nothing
         }
@@ -1694,7 +1695,9 @@ stubView table oid =
                 Filter.playerIdentity = Nothing,
                 Filter.attacking = False,
                 Filter.blocking = False,
+                Filter.blocked = False,
                 Filter.attackedThisTurn = False,
+                Filter.milledThisTurn = False,
                 Filter.attachedToCreature = False,
                 Filter.attachedToPermanent = False,
                 Filter.attachedTo = Nothing,

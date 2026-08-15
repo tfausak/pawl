@@ -233,9 +233,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "it was exiled instead" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
 
   -- The second clause: "a creature card not on the battlefield would be put into
-  -- an opponent's graveyard". Off the battlefield there is no projection, so the
-  -- Filter reads the PRINTED type line (Projection.baseCharacteristics), which is
-  -- the other half of the same field.
+  -- an opponent's graveyard". Replacement.matchesFiltered reads the moving card
+  -- through Projection.viewOfObject, which projects an object in a library like
+  -- one on the battlefield; nothing on this board modifies the Piker, so that
+  -- projection is its seed (Projection.baseCharacteristics) -- the printed type
+  -- line, which is the other half of the same field.
   Spec.it s "CR 614.1a Anafenza exiles an opponent's creature card headed for a graveyard from a library" $ do
     anafenza <- S.printingOf s registry "Anafenza, the Foremost"
     piker <- S.printingOf s registry "Goblin Piker"

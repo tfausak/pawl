@@ -7,6 +7,19 @@ the brief carries only what is specific to your unit.
 
 You hold the build. Nothing else is building while you are.
 
+## Before you plan
+
+`CLAUDE.md` says to distrust an issue body's claims. Distrust its estimate of
+SIZE the same way: three units in a row needed no new machinery at all, because
+a funnel the engine already routes through, or an ordering it already imposes,
+satisfied the rule outright --- and in two of them the issue's own analysis had
+overstated the work.
+
+So the cheapest first move on a "needs new machinery" issue is to find that
+funnel --- the one function every path to the behaviour goes through --- and
+read what it already gates or orders. When it turns out to satisfy the rule,
+the unit is a test and a comment.
+
 ## Before the first build
 
 Copy `cabal.project.local` in from the primary checkout. A fresh worktree does
@@ -34,9 +47,11 @@ real hang fails at any budget. Two subtrees carry their own budgets via
 `Tasty.localOption` in `Main.hs`, which beats the command line. CI sets 5s
 suite-wide through `flake.nix`'s `testFlags`.
 
-Never pipe `cabal test` or `cabal build` output --- it stalls a ~30s suite for
-minutes. One build at a time. No `cabal clean`; the incremental build under
-`pedantic` is sufficient.
+Never pipe `cabal test` or `cabal build` output. It stalls a ~30s suite for
+minutes, and under a backgrounded run it also blinds you: `cabal test | tail`
+leaves the output file EMPTY, so the run cannot be read at all. Redirect to a
+file and read the file. One build at a time. No `cabal clean`; the incremental
+build under `pedantic` is sufficient.
 
 Adding or deleting a module means staging `pawl.cabal` along with the module,
 so that `hooky fix` regenerates its `exposed-modules`; an unstaged `.cabal` is
@@ -52,6 +67,54 @@ Then find the sites `-Werror` will *not* name. See `CLAUDE.md`'s note on `{}`
 and `_` patterns for where those live, and say in the PR which ones you read
 and why each is correct as it stands. "I read all of them" is a finding;
 silence is not.
+
+## Prose the compiler cannot check
+
+A comment asserting a limit the engine used to have becomes false the moment
+the limit lifts, and nothing catches it: it carries no issue number, so
+`script/check-gaps.sh` never looks at it, and `-Werror` has nothing to say
+about a sentence. One sweep found roughly twenty --- "pawl's projection does
+not reach a hand", "walks the battlefield only", "a card in a library has no
+projection" --- each true when written.
+
+This genre is not mechanically checkable, and proposing a script for it wastes
+a cycle: the elision check works because that genre has fixed wording and an
+issue number to test against, and prose rot has neither. Judging one of these
+comments means knowing what the code now does, which is the thing no grep can
+answer.
+
+The discipline instead: when your change lets a capability reach somewhere it
+previously did not, grep the tree before you push for prose asserting the old
+limit --- the name of what you widened, the zone or type it now reaches, and
+the absolutes these claims are written in (`only`, `never`, `does not`, `no
+card`). Re-derive every hit and rewrite it to say what it actually rests on.
+
+Sweep `source/test-suite/` along with the libraries, and the file you are
+editing along with the ones you are not. Both are where the survivors keep
+turning up: the sites #1562 had to clean up afterwards were split between the
+engine and the specs, and included files the widening PR had itself edited.
+Every example in this section is an engine module, which is plausibly why the
+specs were skipped.
+
+The alternation that found the projection family, as a starting point rather
+than a checklist --- widen it with the words your own change makes false:
+
+    git grep -niE 'no projection|not projected|never projected|projection does not reach|walks the battlefield|only view'
+
+Then write the replacement so a later grep finds it. A comment that enumerates
+a type's arms BY NAME is turned up by the grep `CLAUDE.md` already asks for
+when you add a constructor; "all four of `Pawl.Types.Affected`" is turned up by
+nothing, and that one had gone false against a five-arm type.
+
+## Stale reads
+
+pawl's recurring defect shape is a consumer reading a snapshot where the rule
+asks about live state --- a condition that went derived while its consumer
+stayed stored, or a gate reading the bindings captured when resolution began,
+so a slot an earlier clause defined is invisible to a later one. When your
+change adds a gate, a prompt or a condition, ask what it reads and WHEN that
+was captured; `Pawl.Engine.Resolve.gateHolds` and its callers are where this
+has bitten.
 
 ## Mutation testing
 
@@ -152,13 +215,26 @@ These have each shipped a green-but-meaningless test in this repository:
 
 Verify Oracle text with `curl` against `api.scryfall.com` --- WebFetch gets
 403s here, and the vendored dumps under `_scratch/` are stale. Never transcribe
-from a brief; briefs have carried a wrong mana cost and a card claimed to be in
-the pool that was not.
+a card's printed values from a brief OR from an issue body; both have carried a
+wrong mana cost --- `{3}{R}` for a card printed `{3}{R}{R}` --- and a card
+claimed to be in the pool that was not.
 
 If a clause cannot be expressed, say which, and say whether the omission leaves
 pawl's card **stricter** or **weaker** than printed. Weaker in the controller's
 favour is the dishonest direction and disqualifies the card --- find another
 producer or stop. Stricter is admissible with an issue and an inline `(#N)`.
+
+**A stale transcription looks exactly like a missing capability.** Before
+concluding the engine cannot express something, grep `data/cards/` for a card
+that already uses it. One issue filed as "no optional as-enters life payment
+exists" was a single card transcribed a clause short, against a capability that
+had been in the tree for months. Report it in the same stricter/weaker terms:
+a card missing a clause plays wrong, and which way it errs is the finding.
+
+Having fixed one card, **sweep the corpus for its siblings** --- every other
+card written in the same shape. It is one grep, and it turns a one-card fix
+into a claim about the corpus; without it the next instance of the same defect
+waits for an issue of its own.
 
 ## Prompts
 
@@ -186,9 +262,20 @@ told this separately.
 - Resolve conflicts by taking **both** sides, then re-run the mutations.
 - **Landing a capability a census tracks means editing the census in the same
   PR.** The censuses are #875 (CR 116 special actions), #876 (CR 701 keyword
-  actions) and #877 (CR 702 keyword abilities). PR #1485 landed amass and closed
-  its issue but left #876's row under "not implemented"; nothing catches that
-  but you.
+  actions) and #877 (CR 702 keyword abilities). PR #1485 landed amass and left
+  #876's row under "not implemented", PR #1527 landed ward and left #877's, so
+  `script/check-census.sh` now catches the eponymous case --- run it, and edit
+  the body it names. #875 and a row landed under another name are still yours
+  alone.
+- **Landing a capability means reading what it unblocked.** `gh api
+  repos/tfausak/pawl/issues/N/dependencies/blocking` lists the issues that
+  named yours as their blocker; say in the PR body which of them are now
+  workable. Leave the link in place --- a satisfied one is the record.
+- **Closing #N means re-deriving every inline `(#N)` in the tree, not just the
+  one at the site you fixed.** Other sites cite the same issue for their own
+  reasons. One PR found three of four `(#379)` sites were guarded off by
+  unrelated work, and their comments now carry the argument instead of a
+  number; a citation left pointing at a closed issue says nothing.
 
 `Closes #N` must be bare plain text in the PR body --- backticks break the
 link. **Never write close, fix or resolve next to an issue number you do not
@@ -212,6 +299,15 @@ Two of the hooks bite differently when you run them by hand:
   `docs/rules.txt` and defaults to the whole tree. Run it bare after taking a
   CR update, since a renumbering breaks citations in files you never touched.
   It found eight wrong citations on one branch, two of them rule numbers that
-  never existed --- write CR numbers from `docs/rules.txt`, never from memory.
+  never existed --- write CR numbers from `docs/rules.txt`, never from memory,
+  and treat a number a brief or an issue hands you as memory: one brief cited
+  CR 118 for paying life, which this revision numbers 119.
+
+Two more checks are NOT hooks, because they read GitHub and `hooky fix` is
+offline: `script/check-census.sh` (a census row still saying "not implemented"
+about a constructor that exists) and `script/check-gaps.sh` (an elision comment
+citing a closed issue). Both take no arguments, take a second, and run in CI's
+Tracker job --- which you will not be waiting for, so run them yourself before
+you push.
 
 Then stop. Do not wait on CI, and do not start another unit.

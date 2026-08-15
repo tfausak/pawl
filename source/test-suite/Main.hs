@@ -122,6 +122,7 @@ import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
 import qualified Pawl.Codec.LifeChangeSpec
 import qualified Pawl.Codec.LimitUnlessSpec
+import qualified Pawl.Codec.LookAtSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaCountSpec
@@ -132,6 +133,7 @@ import qualified Pawl.Codec.ManaTypeSpec
 import qualified Pawl.Codec.MentoredSpec
 import qualified Pawl.Codec.MillSpec
 import qualified Pawl.Codec.MillTallySpec
+import qualified Pawl.Codec.MilledSpec
 import qualified Pawl.Codec.ModalSpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
@@ -150,6 +152,8 @@ import qualified Pawl.Codec.ObjectRefSpec
 import qualified Pawl.Codec.OfferCastSpec
 import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
+import qualified Pawl.Codec.PayBranchSpec
+import qualified Pawl.Codec.PayGateSpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
 import qualified Pawl.Codec.PermanentSacrificedSpec
 import qualified Pawl.Codec.PhasePatternSpec
@@ -230,7 +234,6 @@ import qualified Pawl.Codec.TurnUpRSpec
 import qualified Pawl.Codec.TurnUpRewriteSpec
 import qualified Pawl.Codec.TurnWindowSpec
 import qualified Pawl.Codec.TypeLineSpec
-import qualified Pawl.Codec.UnlessPaidSpec
 import qualified Pawl.Codec.UntapRestrictionSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.VentureMarkerEnteredSpec
@@ -498,6 +501,7 @@ spec s registry = do
   Pawl.Codec.LibraryPositionSpec.spec s
   Pawl.Codec.LifeChangeSpec.spec s
   Pawl.Codec.LimitUnlessSpec.spec s
+  Pawl.Codec.LookAtSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
   Pawl.Codec.ManaCountSpec.spec s
@@ -508,6 +512,7 @@ spec s registry = do
   Pawl.Codec.MentoredSpec.spec s
   Pawl.Codec.MillSpec.spec s
   Pawl.Codec.MillTallySpec.spec s
+  Pawl.Codec.MilledSpec.spec s
   Pawl.Codec.ModalSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s
@@ -526,6 +531,8 @@ spec s registry = do
   Pawl.Codec.OfferCastSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
   Pawl.Codec.OptionalitySpec.spec s
+  Pawl.Codec.PayBranchSpec.spec s
+  Pawl.Codec.PayGateSpec.spec s
   Pawl.Codec.PermanentBecomesDesignatedSpec.spec s
   Pawl.Codec.PermanentSacrificedSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s
@@ -606,7 +613,6 @@ spec s registry = do
   Pawl.Codec.TurnUpRewriteSpec.spec s
   Pawl.Codec.TurnWindowSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
-  Pawl.Codec.UnlessPaidSpec.spec s
   Pawl.Codec.UntapRestrictionSpec.spec s
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.VentureMarkerEnteredSpec.spec s

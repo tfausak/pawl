@@ -105,6 +105,11 @@ data View = MkView
     -- Combat.blockers is keyed by attacker, and a blocking creature is a MEMBER
     -- of some attacker's set.
     blocking :: Bool,
+    -- CR 509.1h: is this candidate a BLOCKED creature right now? Read from
+    -- GameState.combat like the two above, and off the same map `blocking`
+    -- reads -- but from its KEYS, which is Pawl.Engine.Combat.isBlocked's
+    -- question and never `blocking`'s.
+    blocked :: Bool,
     -- CR 608.2i: was this candidate declared as an attacker earlier this turn?
     -- Unlike `attacking` not even a present state: it is a look-back read of the
     -- turn-scoped GameEvent log.
@@ -114,6 +119,10 @@ data View = MkView
     -- actually contains AttackedThisTurn. That is a cost argument rather than
     -- the recursion hazard the next field records.
     attackedThisTurn :: Bool,
+    -- CR 701.17a: was this candidate MILLED earlier this turn? A look-back read
+    -- of the same log `attackedThisTurn` above reads, and LAZY for that field's
+    -- reason -- nothing forces it unless a Filter contains MilledThisTurn.
+    milledThisTurn :: Bool,
     -- CR 701.3a: is this candidate attached to a CREATURE right now? Not a
     -- characteristic either (CR 109.3), so it is read from Object.attachedTo plus
     -- the HOST's projected card types rather than from the candidate's own
@@ -275,8 +284,13 @@ playerView pid =
       attacking = False,
       -- CR 509.1a: only a creature can block, either.
       blocking = False,
+      -- CR 509.1h: blocked-ness is a status of an ATTACKING creature, and by CR
+      -- 506.3 a player never is one.
+      blocked = False,
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
+      -- CR 701.17a mills CARDS, and a player is not one.
+      milledThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
       -- player is not itself attached to anything, because Object.attachedTo is
       -- a field of the ATTACHED permanent, and a player is not one.
@@ -515,6 +529,12 @@ matches context view predicate = case predicate of
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
     _ -> False
+  -- IsSource one field over: the id the RESOLUTION bound rather than the id the
+  -- evaluation is sourced at. Vacuously False for a view with no object behind
+  -- it and for a slot naming nothing, which is the posture the atom above takes.
+  Filter.IsBound slot -> case (identity view, Map.lookup slot (slotObjects context)) of
+    (Just oid, Just bound) -> oid == bound
+    _ -> False
   -- CR 115.1's "target opponent". Same "every other player is an opponent"
   -- reading the ControlledBy arm above argues for, and wrong for the same one
   -- case (CR 102.3's teams, #175). Vacuously False for an object candidate,
@@ -546,11 +566,21 @@ matches context view predicate = case predicate of
   -- blocked after every creature blocking it has gone, so this can be False for
   -- everything while that is still True.
   Filter.IsBlocking -> blocking view
+  -- CR 509.1h: the status the declaration confers, or that an effect confers
+  -- (Effect.BecomesBlocked). A live read of the same record, off the keys rather
+  -- than the sets -- so this can be True with nothing at all blocking the
+  -- creature, which is the case CR 510.1c gives no combat damage.
+  Filter.IsBlocked -> blocked view
   -- CR 608.2i: a look-back read of the turn's event log. Unlike IsAttacking it
   -- cannot stop being true within a turn -- nothing removes a GameEvent -- so a
   -- creature removed from combat (CR 506.4) still attacked, which is what
   -- Relentless Assault's "creatures that attacked this turn" means.
   Filter.AttackedThisTurn -> attackedThisTurn view
+  -- CR 701.17a: the same look-back, over the mills rather than the attacks. Like
+  -- the atom above it cannot stop being true within a turn, and unlike it the
+  -- candidate can stop EXISTING -- CR 400.7 mints a new object the moment the
+  -- milled card moves again, and the new one was not milled.
+  Filter.MilledThisTurn -> milledThisTurn view
   -- CR 701.3a: a live read of Object.attachedTo and the host's projected types,
   -- never a stamp on the candidate -- an Aura whose host stops being a creature
   -- stops matching, and CR 704.5m buries it on the next state-based-action pass.
@@ -673,13 +703,16 @@ rewrite pairs predicate = case predicate of
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
+  Filter.IsBound _ -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
   -- atom names a slot rather than a subtype.
   Filter.IsControllerOfBound _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsBlocking -> predicate
+  Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
+  Filter.MilledThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
   Filter.IsAttachedToPermanent -> predicate
   Filter.IsAttachedToSource -> predicate
@@ -969,6 +1002,10 @@ bakeBound players predicate = case predicate of
   Filter.ControlledByDefendingPlayer -> predicate
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
+  -- Untouched for the reason IsControllerOfBound below is, and one step shorter:
+  -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
+  -- OBJECT. Pawl.Engine.Filter.matches answers it as it stands.
+  Filter.IsBound _ -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
   -- holding an OBJECT -- there is nothing here to substitute.
@@ -976,7 +1013,9 @@ bakeBound players predicate = case predicate of
   Filter.IsControllerOfBound _ -> predicate
   Filter.IsAttacking -> predicate
   Filter.IsBlocking -> predicate
+  Filter.IsBlocked -> predicate
   Filter.AttackedThisTurn -> predicate
+  Filter.MilledThisTurn -> predicate
   Filter.IsAttachedToCreature -> predicate
   Filter.IsAttachedToPermanent -> predicate
   Filter.IsAttachedToSource -> predicate
@@ -1037,11 +1076,14 @@ manaValueThresholds predicate = case predicate of
   Filter.ControlledByRecipient -> []
   Filter.OwnedBy _ -> []
   Filter.IsSource -> []
+  Filter.IsBound _ -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
   Filter.IsAttacking -> []
   Filter.IsBlocking -> []
+  Filter.IsBlocked -> []
   Filter.AttackedThisTurn -> []
+  Filter.MilledThisTurn -> []
   Filter.IsAttachedToCreature -> []
   Filter.IsAttachedToPermanent -> []
   Filter.IsAttachedToSource -> []
@@ -1105,11 +1147,14 @@ statesAQuality predicate = case predicate of
   Filter.ControlledByRecipient -> True
   Filter.OwnedBy _ -> True
   Filter.IsSource -> True
+  Filter.IsBound _ -> True
   Filter.IsPlayer _ -> True
   Filter.IsControllerOfBound _ -> True
   Filter.IsAttacking -> True
   Filter.IsBlocking -> True
+  Filter.IsBlocked -> True
   Filter.AttackedThisTurn -> True
+  Filter.MilledThisTurn -> True
   Filter.IsAttachedToCreature -> True
   Filter.IsAttachedToPermanent -> True
   Filter.IsAttachedToSource -> True
@@ -1139,6 +1184,10 @@ boundSlots predicate = case predicate of
   -- over, at Pawl.Engine.Count.bakePerspective, which holds the board a
   -- controller has to be projected off.
   Filter.IsControllerOfBound slot -> Set.singleton slot
+  -- Reported although `bakeBound` leaves it standing too, and answerable in the
+  -- same sense the atom above is -- here rather than one module over, off the
+  -- Context `matches` is already handed.
+  Filter.IsBound slot -> Set.singleton slot
   Filter.And fs -> foldMap boundSlots fs
   Filter.Or fs -> foldMap boundSlots fs
   Filter.Not f -> boundSlots f

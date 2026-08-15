@@ -324,13 +324,14 @@ data PlayerEffect
     -- CLASSIFICATION: the engine asks the pattern whether it admits the event
     -- and never asks which card wrote it.
     --
-    -- Not implemented: Questing Beast's "combat damage that would be dealt by
-    -- CREATURES YOU CONTROL" narrows the source by a characteristic rather than
-    -- by identity, which is the same gap CR 615.1's shields have on that axis
-    -- (#588). Whippoorwill's recipient limb has no site to bake a recipient into
-    -- this pattern (#845). Banefire's "the damage can't be prevented" is a
-    -- different carrier again -- a self-referential clause of one resolution,
-    -- the shape Pawl.Types.Counterability takes (#844).
+    -- Questing Beast's "combat damage that would be dealt by CREATURES YOU
+    -- CONTROL" narrows the source by a characteristic rather than by identity,
+    -- which the pattern's Filter says and no card in the pool writes (#1544).
+    --
+    -- Not implemented: Whippoorwill's recipient limb has no site to bake a
+    -- recipient into this pattern (#845). Banefire's "the damage can't be
+    -- prevented" is a different carrier again -- a self-referential clause of
+    -- one resolution, the shape Pawl.Types.Counterability takes (#844).
     --
     -- A DURATION is not carried, and needs nothing new: Skullcrack's
     -- "damage can't be prevented this turn" is this same effect on the CR 611.2c
@@ -445,8 +446,8 @@ data PlayerEffect
     -- through Pawl.Engine.PlayerEffect.matchesObject, the same read
     -- CantCastMatching makes of a card in a hand. What a NARROWING filter sees
     -- of a card in a graveyard is unobserved, since the one producer writes the
-    -- predicate that is true of everything -- pawl's projection does not reach
-    -- that zone (#160).
+    -- predicate that is true of everything, and this reader takes the printed
+    -- card there (#160).
     --
     -- A PERMISSION, folded as a disjunction for CastAsThoughItHadFlash's reason:
     -- there is nothing for a second permission to outvote.

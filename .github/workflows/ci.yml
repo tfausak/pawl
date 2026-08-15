@@ -61,3 +61,21 @@ jobs:
       - uses: actions/checkout@v7
       - uses: nixbuild/nix-quick-install-action@v35
       - run: nix build --print-build-logs .#checks.x86_64-linux.ormolu
+  tracker:
+    # The two checks that read GitHub itself, which is why they live here rather
+    # than in `.hooky.kdl`: a census lives in an issue body and an issue's state
+    # lives on GitHub, where `hooky fix` is offline and fast. Not a nix check
+    # either -- a nix build sandbox has no network.
+    name: Tracker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@v7
+      - run: script/check-census.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: script/check-gaps.sh
+        env:
+          GH_TOKEN: ${{ github.token }}

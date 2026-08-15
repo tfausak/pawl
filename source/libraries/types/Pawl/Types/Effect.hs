@@ -17,6 +17,7 @@ import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
@@ -106,9 +107,9 @@ data Effect card
   | -- | CR 701.23: the players Search.searcher names each search the library of
     -- each player Search.owner names, for Search.quantity cards matching
     -- Search.filter, put them where Search.destination says, then that library's
-    -- owner shuffles. The Filter is evaluated over the PRINTED-card view
-    -- (Projection.viewOfCardIn) -- a card in a library has no projection, only CR
-    -- 208.2a's characteristic-defining power. Evolving Wilds' "basic land card"
+    -- owner shuffles. The Filter is evaluated over each library card's own CR 613
+    -- projection (Projection.viewOfObject), so an effect that changed what the
+    -- filter reads is seen there. Evolving Wilds' "basic land card"
     -- (CR 701.23a / 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and
     -- CR 702.29e's basic landcycling is the same filter with the other
     -- destination.
@@ -308,6 +309,37 @@ data Effect card
     -- "for each nonland card milled this way". Nothing for a mill nothing looks
     -- back at, which is every mill in the pool but rule 728.1's.
     Mill Mill.Mill
+  | -- | CR 701.20e: the cards the ObjectRef names are LOOKED AT -- shown to one
+    -- player rather than to all of them -- and bound into the slot, so a later
+    -- clause of the same resolution can act on what was seen. Into the Wilds'
+    -- "look at the top card of your library. If it's a land card, you may put it
+    -- onto the battlefield" is the producer: this opcode, then a clause whose
+    -- condition counts the bound card through Filter.IsBound and whose
+    -- MoveToZone names it through ObjectRef.InSlot.
+    --
+    -- NOTHING MOVES and nothing is recorded. Rule 701.20e reaches CR 701.20b
+    -- through "the same rules as revealing a card", so the cards stay where they
+    -- are; and GameEvent.Revealed would be the wrong event, that one being
+    -- public (CR 701.20a) -- the call Scry's arm below already makes.
+    --
+    -- The BINDING is the whole of the look, which is a fact about pawl rather
+    -- than about the rule: no seat is shown anything, because there is no
+    -- per-player view of the state to show it in (#1412), so what the look
+    -- leaves behind is the resolution's own ability to name the cards. WHO looks
+    -- is not carried for that reason -- see Pawl.Types.LookAt.
+    --
+    -- The ObjectRef is what makes this reusable where Scry's look is not:
+    -- ObjectRef.TopOfLibrary names a card in a library by POSITION, which is the
+    -- one thing no Filter can say about a hidden zone (CR 400.2). A look naming
+    -- SEVERAL cards binds them as a group, which ObjectRef.InSlot reads and
+    -- Filter.IsBound cannot -- so no card in the corpus can yet look at more than
+    -- one card and then ask a question about what it saw (#1532).
+    --
+    -- Not Explore's shape (CR 701.44a), which reveals PUBLICLY and decides its
+    -- branch inside the opcode because rule 701.44 is part of the rulebook. This
+    -- one leaves the branch in the card, which is where Into the Wilds' printed
+    -- text has it.
+    LookAt LookAt.LookAt
   | -- | CR 701.22a: the players the PlayerRef names each scry this many -- look at
     -- the top N of their own library, then put any number of them on the bottom
     -- in any order and the rest back on top in any order.
@@ -336,9 +368,12 @@ data Effect card
     -- The LOOK is the prompt. CR 701.20e makes looking a reveal shown only to
     -- the named player, and the prompt is the only thing in pawl that shows a
     -- hidden zone to exactly one seat -- so no GameEvent is recorded, a public
-    -- GameEvent.Revealed being the wrong event. Not implemented: a standalone
-    -- look-at-the-top-card opcode (#1338), and CR 701.22d's "whenever a player
-    -- scries" trigger (#1339).
+    -- GameEvent.Revealed being the wrong event. Not the LookAt arm above either,
+    -- and rule 701.22a is why: scry's look and scry's ordered partition are one
+    -- instruction, so the cards it looks at are the candidate list of the very
+    -- prompt that decides where they go, rather than something a later clause
+    -- names. Not implemented: CR 701.22d's "whenever a player scries" trigger
+    -- (#1339).
     Scry PlayerQuantity.PlayerQuantity
   | -- | CR 701.25a: the players the PlayerRef names each surveil this many -- look
     -- at the top N of their own library, then put any number of them into their
@@ -391,8 +426,11 @@ data Effect card
     -- 701.44 is part of the rulebook, so reading "is a land card" here is the
     -- same kind of act as Pawl.Engine.Keyword casing on CR 702's keywords --
     -- where a general Effect.Reveal plus a condition over the revealed card
-    -- would put a hidden-zone read into the card DSL, which no rule asks for and
-    -- no other printing needs (#1338 tracks the standalone look).
+    -- would put a PUBLIC reveal's branch into the card DSL, which rule 701.44a
+    -- states itself and no other printing needs. The LookAt arm above is the
+    -- private counterpart, and its branch does live in the card: rule 701.20e's
+    -- look is not a keyword action at all, so there is no rulebook sentence to
+    -- read the branch off.
     --
     -- An ObjectRef and not a bare slot, for PutCounters' reason: Merfolk
     -- Branchwalker's "it explores" is `InSlot Binding.triggerSource` and Map's
@@ -853,6 +891,25 @@ data Effect card
     -- neither reaches this opcode: both are about effects that do something ELSE,
     -- where this one says "remove from combat" in as many words.
     RemoveFromCombat SlotName.SlotName
+  | -- | CR 509.1h's escape clause: an effect SAYS an attacking creature becomes
+    -- blocked. Curtain of Light's "target unblocked attacking creature becomes
+    -- blocked" is the card text it exists for, and CR 508.4d names the same
+    -- clause for a creature that entered the battlefield attacking after the
+    -- declaration.
+    --
+    -- Blocked BY NOTHING, and that is the rule rather than an omission: the
+    -- status and the set of creatures blocking are separate (CR 509.1h against
+    -- CR 510.1c), so a creature this blocks assigns no combat damage and takes
+    -- none. Nothing here can name a blocker -- an effect that makes a creature
+    -- BLOCK is a different act (#1387).
+    --
+    -- One direction only, and the rules are why rather than an omission: CR
+    -- 509.1h's sentence also names an effect saying a creature becomes
+    -- UNBLOCKED, and NO printing says it (Scryfall, `oracle:"becomes
+    -- unblocked"`, 2026-08-14 -- zero results), so there is nothing for an
+    -- opcode to carry. A bare SlotName rather than an ObjectRef, the posture
+    -- RemoveFromCombat above takes: no printing blocks a swept SET.
+    BecomesBlocked SlotName.SlotName
   | -- | CR 500.8: add phases to a turn, directly after the specified phase, in
     -- written order -- Aggravated Assault is `[ExtraCombat, ExtraMain]`, Full
     -- Throttle `[ExtraCombat, ExtraCombat]`. A payload rather than a sibling

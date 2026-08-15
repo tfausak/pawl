@@ -25,7 +25,8 @@
 -- with Harried Dronesmith -- `singleTokenSlotReadSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingSpec`. The CR 603.4 / 608.2a intervening "if" --
--- `interveningSpec`. Also Pawl.Engine.Keyword: CR
+-- `interveningSpec`, and the same rule over a draw count that is a SUBTRACTION,
+-- with The Ten Rings -- `tenRingsDrawSpec`. Also Pawl.Engine.Keyword: CR
 -- 702.70 poisonous, the first keyword whose rule text IS a triggered ability,
 -- and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousSpec`. CR
@@ -164,7 +165,10 @@
 -- BYSTANDER -- "whenever another creature you control dies", where the bearer
 -- watches a permanent other than itself leave the battlefield -- with Meren of
 -- Clan Nel Toth, which is also the pool's producer for CR 122.1's experience
--- counters -- `permanentDiesSpec`, and the pool's first READER of that same
+-- counters -- `permanentDiesSpec`. That card's OTHER ability, a CR 603.2b step
+-- trigger on CR 513's end step whose destination depends on a comparison, and
+-- so the pool's first two-clause "if ... otherwise" -- `merenEndStepSpec`, and
+-- the pool's first READER of that same
 -- counter kind, whose two triggers are CR 603.6a's entry form narrowed by a
 -- power floor and a CR 603.2b step trigger whose Quantity counts a player's
 -- counters, with Ezuri, Claw of Progress -- `ezuriExperienceSpec`. CR 119.9's life-gain trigger, from both
@@ -2159,6 +2163,63 @@ zombieTokenOf sarcomancy pikerFallback =
         card : _ -> card
         [] -> Printing.card pikerFallback
 
+-- The Ten Rings {8} Legendary Artifact: "Your maximum hand size is ten. At the
+-- beginning of your end step, if you have fewer than ten cards in hand, draw
+-- cards equal to the difference." The maximum-hand-size half is
+-- Pawl.PlayerEffectSpec's; this is the second line.
+--
+-- The pool's first card whose DRAW COUNT is a subtraction -- Plus of Literal 10
+-- and Negate of the hand count -- and its first Comparison.AtMost, CR 603.4's
+-- "fewer than ten" being a hand count of at most nine.
+--
+-- Four cards held on the drawing board, so three wrong readings of "the
+-- difference" miss ten and are caught: a flat draw of ten ends on fourteen, a
+-- draw of the hand size ends on eight, and a draw of one ends on five. The
+-- boards differ in the HAND alone -- same seats, same permanent, same library.
+tenRingsDrawSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tenRingsDrawSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan (StepBegan.MkStepBegan endStep S.alice)) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      stockHand n printing gs = List.foldl' (\g _ -> snd (S.addHandCard printing S.alice g)) gs [1 .. n :: Int]
+      -- alice with The Ten Rings out, `held` Plains in hand and twenty more in
+      -- her library. The library is stocked well past the six the positive board
+      -- draws, so CR 104.3c decks nobody before the assertion runs.
+      board tenRings plains held =
+        let (_, gs0) = S.addCreature tenRings S.alice (Setup.emptyGame S.bothPlayers)
+         in List.foldl' (\g _ -> snd (S.addLibraryCard plains S.alice g)) (stockHand held plains gs0) [1 .. 20 :: Int]
+   in Spec.describe s "TheTenRingsDraw" $ do
+        Spec.it s "CR 603.2b/121.1 four cards in hand draws the difference, six, to reach ten" $ do
+          tenRings <- S.printingOf s registry "The Ten Rings"
+          plains <- S.printingOf s registry "Plains"
+          let atEnd = settle (beginEndStep (board tenRings plains 4))
+          Spec.assertEqWith s "the ability triggered" (length (GameState.stack atEnd)) 1
+          Spec.assertEqWith s "and drew up to ten" (S.handSize S.alice (resolveAll atEnd)) 10
+        -- THE NEGATIVE, the same board with only the hand changed. Ten cards is
+        -- not "fewer than ten", so CR 603.4 keeps the ability off the stack
+        -- entirely. Asserted on the STACK rather than on the hand, because a
+        -- threshold read one too high would trigger and then draw a difference of
+        -- zero -- which no hand size can tell from not triggering at all.
+        Spec.it s "CR 603.4 ten cards in hand is not fewer than ten, so nothing triggers" $ do
+          tenRings <- S.printingOf s registry "The Ten Rings"
+          plains <- S.printingOf s registry "Plains"
+          let atEnd = settle (beginEndStep (board tenRings plains 10))
+          Spec.assertEqWith s "nothing on the stack" (length (GameState.stack atEnd)) 0
+          Spec.assertEqWith s "and the hand is untouched" (S.handSize S.alice (resolveAll atEnd)) 10
+        -- CR 608.2h: "the difference" is information the effect requires, so it is
+        -- determined once, as the effect is APPLIED rather than as the ability
+        -- triggered. Three cards arrive while it waits on the stack, so the draw is
+        -- three rather than the six a trigger-time hand of four would give -- ten
+        -- either way is impossible, since that reading ends on thirteen.
+        Spec.it s "CR 608.2h cards gained in response shrink the draw, which is read on resolution" $ do
+          tenRings <- S.printingOf s registry "The Ten Rings"
+          plains <- S.printingOf s registry "Plains"
+          let atEnd = settle (beginEndStep (board tenRings plains 4))
+              responded = stockHand 3 plains atEnd
+          Spec.assertEqWith s "the ability really is waiting on the stack" (length (GameState.stack atEnd)) 1
+          Spec.assertEqWith s "seven held when it resolves, so three drawn" (S.handSize S.alice (resolveAll responded)) 10
+
 -- CR 702.70: poisonous -- the first keyword whose rule text IS a triggered
 -- ability, so it is minted by Pawl.Engine.Keyword and gathered by the same
 -- Pawl.Engine.Event.eventTriggers scan a printed trigger goes through, with the damaged
@@ -3418,10 +3479,11 @@ counterTriggerSpec s registry =
         -- before the gate, or that read the zone change instead.
         --
         -- Rending Volley rather than Blurred Mongoose, whose "this spell
-        -- can't be countered" sits on a creature card: the Mongoose also
-        -- prints shroud, and CR 702.18 is not implemented (#488), so it could
-        -- not be modelled faithfully. Both cards reach this gate the same way
-        -- -- through Face.counterability, read off the spell on the stack.
+        -- can't be countered" sits on a creature card, so an uncountered
+        -- resolution leaves a permanent behind for the rest of the case to
+        -- carry, where the instant's resolution ends the board it was cast on.
+        -- Both cards are in the pool and both reach this gate the same way --
+        -- through Face.counterability, read off the spell on the stack.
         Spec.it s "CR 113.6g the same Cancel at Rending Volley counters nothing, so Baral does not trigger" $ do
           island <- S.printingOf s registry "Island"
           cancel <- S.printingOf s registry "Cancel"
@@ -7167,10 +7229,9 @@ diesTriggerSpec s registry =
 -- credited back to the player who no longer had it. The Control Magic case at
 -- the end is that falsifier.
 --
--- Meren's SECOND ability -- "At the beginning of your end step, choose target
--- creature card in your graveyard. If that card's mana value is less than or
--- equal to the number of experience counters you have, return it to the
--- battlefield. Otherwise, put it into your hand." -- is not transcribed (#614).
+-- Meren's SECOND ability -- the end-step reanimation -- is `merenEndStepSpec`
+-- below; the last assertion in this group is what keeps the two from drifting
+-- onto different cards.
 --
 -- Two cases here kill the bearer and another creature in one batch, and they are
 -- a PAIR: CR 704.3 makes Day of Judgment's deaths one event, so Meren sees the
@@ -7373,14 +7434,160 @@ permanentDiesSpec s registry =
           Spec.assertEqWith s "alice controlled it as it died" (Projection.controllerOf pikerId stolen) (Just S.alice)
           Spec.assertEqWith s "so her Meren triggered" (sourcesOf died) [TriggerSource.OfObject merenId]
         -- The condition is the card's, not this spec's: the printed Filter is
-        -- what the matcher is asked about everywhere above.
+        -- what the matcher is asked about everywhere above. The second entry is
+        -- the end-step ability merenEndStepSpec below plays out, and it is
+        -- asserted here so the two groups cannot drift onto different cards.
         Spec.it s "Meren's printed condition is PermanentDies over another creature you control" $ do
           meren <- S.printingOf s registry "Meren of Clan Nel Toth"
           Spec.assertEqWith
             s
-            "one triggered ability, with that condition"
+            "two triggered abilities, the first with that condition"
             (fmap TriggeredAbility.condition (Face.triggeredAbilities (S.combinedFace meren)))
-            [TriggerCondition.PermanentDies anotherCreatureYouControl]
+            [ TriggerCondition.PermanentDies anotherCreatureYouControl,
+              TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
+            ]
+
+-- Meren of Clan Nel Toth's SECOND ability, the half permanentDiesSpec above does
+-- not cover: "At the beginning of your end step, choose target
+-- creature card in your graveyard. If that card's mana value is less than or
+-- equal to the number of experience counters you have, return it to the
+-- battlefield. Otherwise, put it into your hand."
+--
+-- A CR 603.2b step trigger on CR 513's end step, a CR 115.2 clause (a) target in
+-- a graveyard (Raise Dead's pool), and a destination that depends on a
+-- comparison. That last part is the reason this card sat half-transcribed: the
+-- ISA has no branch, and #614 proposed a purpose-built two-destination opcode
+-- for it. It needs no such opcode. CR 608.2e's clause is already the unit a condition
+-- rides (Pawl.Types.Clause.condition), so the printed sentence is TWO clauses of
+-- one mode sharing one target slot, each gated by one half of the comparison --
+-- and Resolve.gateHolds reads each gate as its own clause is applied (CR
+-- 608.2c's written order), never once up front.
+--
+-- The two gates are exclusive by ARITHMETIC rather than by negation: CR 202.3's
+-- mana value and a counter tally are whole numbers, so "greater than n" is
+-- "at least n + 1", which is how Pawl.Engine.Keyword.evolve spells rule 702.100a's
+-- own strict comparison. Pawl.Types.Condition has no Not, and wanting one here
+-- would be the wrong instinct anyway: Condition.holds reads an unanswerable
+-- quantity as False, so a negated gate would fire on the very board where the
+-- first clause had already moved the card out from under it.
+--
+-- That same ordering makes the "+ 1" itself UNOBSERVABLE, and no case below
+-- proves it: on the one board where strict and non-strict differ -- an equal
+-- mana value and count -- the first clause has already moved the card, so the
+-- second clause's slot names an id CR 400.7 retired and the move is a no-op
+-- either way. Dropping the "+ 1" leaves this whole group green. It is written
+-- strictly because that is what the card says, not because a case fences it.
+--
+-- The cases below vary ONE thing, the experience-counter count -- 3, then 1, then
+-- 2 -- over one board and one target of mana value 2, and the branches land the
+-- card in different ZONES, so no arithmetic slip can make one read as the other.
+-- On the count-of-3 board every other number differs from it: Meren's own mana
+-- value is 4, the Thragtusk beside the target in the graveyard is 5, the Bonded
+-- Construct on the battlefield is 1, and alice controls 2 creatures -- so a gate
+-- reading the SOURCE's mana value, the wrong slot's, or the board's population
+-- rather than the counters lands in a zone that case does not accept. The
+-- count-of-1 board is the otherwise branch and the count-of-2 board the printed
+-- boundary.
+merenEndStepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+merenEndStepSpec s registry =
+  let experienceOf = S.playerCounterOf PlayerCounterKind.Experience
+      pikerName = CardName.MkCardName (Text.pack "Goblin Piker")
+      -- alice's end step, staged directly as ezuriExperienceSpec stages its
+      -- beginning of combat: Engine.runStep is what writes the CR 603.2b
+      -- StepBegan record this trigger matches.
+      atEndStep pid gs =
+        gs
+          { GameState.phase = Phase.Ending EndingStep.EndStep,
+            GameState.activePlayer = pid,
+            GameState.priority = Just pid
+          }
+      -- alice's Meren and a Bonded Construct on the battlefield, her Goblin Piker
+      -- (mana value 2) and Thragtusk (mana value 5) in her graveyard, her hand
+      -- empty. Everything is ARRANGED rather than cast, so no entry gives out an
+      -- experience counter of its own and every counter is one a case put there.
+      board = do
+        meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+        construct <- S.printingOf s registry "Bonded Construct"
+        piker <- S.printingOf s registry "Goblin Piker"
+        thragtusk <- S.printingOf s registry "Thragtusk"
+        let (_, withMeren) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+            (_, withConstruct) = S.addCreature construct S.alice withMeren
+            (pikerId, withPiker) = S.addGraveyardCard piker S.alice withConstruct
+            (thragtuskId, gs) = S.addGraveyardCard thragtusk S.alice withPiker
+        pure (pikerId, thragtuskId, gs)
+      -- The Piker by id rather than by S.identityAnswer's least Recipient, which
+      -- would take whichever graveyard card sorts first.
+      aimAt oid p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+        _ -> S.identityAnswer p
+      -- The one knob: how many experience counters alice has as her end step
+      -- begins. Everything else about the two boards is the same object graph.
+      withExperience n = do
+        (pikerId, thragtuskId, base) <- board
+        let gs = S.addPlayerCounter PlayerCounterKind.Experience n S.alice base
+        pure (pikerId, thragtuskId, gs, S.runPure (aimAt pikerId) (atEndStep S.alice gs) (Engine.runStep >> Engine.priorityLoop))
+   in Spec.describe s "Meren of Clan Nel Toth's end step" $ do
+        -- The mana value is AT MOST the count, so the first clause's gate holds
+        -- and the card is reanimated. The second clause's gate -- 2 at least 4 --
+        -- is then false, and the hand stays empty. That assertion is about the
+        -- BOARD rather than about the gate: per the note above, a second gate that
+        -- held would no-op anyway on the id the first clause retired.
+        Spec.it s "CR 603.2b mana value 2 against three experience counters returns the card to the battlefield" $ do
+          (pikerId, thragtuskId, before, after) <- withExperience 3
+          Spec.assertEqWith s "alice has three experience counters as the step begins" (experienceOf S.alice before) 3
+          Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard (CR 400.7)"
+          Spec.assertEqWith s "and a Goblin Piker is on the battlefield under her control" (S.countOnBattlefieldByName pikerName S.alice after) 1
+          Spec.assertEqWith s "her hand is still empty, so the otherwise clause did not also fire" (S.handSize S.alice after) 0
+          Spec.assertBool s (elem thragtuskId (Game.zoneMembers Zone.Graveyard S.alice after)) "the untargeted Thragtusk stayed in the graveyard"
+          Spec.assertEqWith s "and reading the counters did not spend them" (experienceOf S.alice after) 3
+        -- The other branch, one counter instead of three: 2 is not at most 1, so
+        -- the first gate fails and the second -- 2 is at least 1 + 1 -- carries
+        -- the card to the hand instead. The battlefield assertion is what makes
+        -- this the OTHER branch rather than a trigger that did nothing.
+        Spec.it s "CR 603.2b the same card against one experience counter goes to the hand instead" $ do
+          (pikerId, thragtuskId, before, after) <- withExperience 1
+          Spec.assertEqWith s "alice has one experience counter as the step begins" (experienceOf S.alice before) 1
+          Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard"
+          Spec.assertEqWith s "no Goblin Piker reached the battlefield" (S.countOnBattlefieldByName pikerName S.alice after) 0
+          Spec.assertEqWith s "alice's hand holds exactly one card" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "and it is the Piker" (S.countByName pikerName S.alice after) 1
+          Spec.assertBool s (elem thragtuskId (Game.zoneMembers Zone.Graveyard S.alice after)) "the untargeted Thragtusk stayed in the graveyard"
+        -- The BOUNDARY the printed "less than or equal to" names, which neither
+        -- case above sits on: the count equals the mana value, and the card is
+        -- reanimated rather than bounced. This case alone does not discriminate a
+        -- gate that counted the board -- 2 is also alice's creature count, and
+        -- deliberately so, since the boundary is what fixes the number -- which is
+        -- what the two cases above are for.
+        Spec.it s "CR 603.2b an equal mana value and count take the battlefield branch, not the otherwise one" $ do
+          (pikerId, _, _, after) <- withExperience 2
+          Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard"
+          Spec.assertEqWith s "a Goblin Piker is on the battlefield" (S.countOnBattlefieldByName pikerName S.alice after) 1
+          Spec.assertEqWith s "and her hand is empty" (S.handSize S.alice after) 0
+        -- CR 115.2 clause (a) and CR 603.3d, which hands a triggered ability's
+        -- targeting to CR 601.2c: the choice is a real one. Both
+        -- creature cards in alice's own graveyard are offered and nothing else
+        -- is, so the cases above are answered by the pinned target rather than by
+        -- a pool with one member the engine could not get wrong.
+        Spec.it s "CR 115.2 both creature cards in her graveyard are offered, and neither of bob's" $ do
+          (pikerId, thragtuskId, base) <- board
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, withBolt) = S.addGraveyardCard bolt S.alice base
+              (theirs, gs) = S.addGraveyardCard piker S.bob withBolt
+              recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Natural, Set.Set Recipient.Recipient)] r
+              recordTargets p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> do
+                  State.modify' (<> [sets])
+                  pure (aimAt pikerId p)
+                _ -> pure (aimAt pikerId p)
+              (_, offered) =
+                State.runState (Engine.runGame recordTargets (atEndStep S.alice gs) (Engine.runStep >> Engine.priorityLoop)) []
+          Spec.assertEqWith
+            s
+            "one target slot, offering exactly the two creature cards in alice's graveyard"
+            (fmap (fmap snd . Map.elems) offered)
+            [[Set.fromList [Recipient.ToObject pikerId, Recipient.ToObject thragtuskId]]]
+          Spec.assertBool s (elem theirs (Game.zoneMembers Zone.Graveyard S.bob gs)) "bob's identical Piker was in his graveyard to be excluded (CR 400.1)"
 
 -- CR 603.6c's FIRST written form, and the whole of its first clause:
 -- "Leaves-the-battlefield abilities trigger when a permanent moves from the
@@ -7652,8 +7859,8 @@ youngPyromancerSpec s registry =
 -- Desolation Twin, {10} Creature -- Eldrazi 10/10: "When you cast this spell,
 -- create a 10/10 colorless Eldrazi creature token." Chosen from the cast-trigger
 -- family because it is the one member whose WHOLE printed text pawl can write:
--- every other printing in that family wants CR 707.10's copy-a-spell or CR
--- 118.12's positive half (#701). Nothing of this card is omitted.
+-- every other printing in that family wants CR 707.10's copy-a-spell. Nothing of
+-- this card is omitted.
 --
 -- The bearer is the SPELL, which is what makes this a zone test rather than
 -- another SpellCast case: at CR 601.2i the Twin is on nobody's battlefield and in
@@ -8085,9 +8292,12 @@ representativeEvents cond =
         TriggerCondition.PermanentDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- CR 603.6c admits every destination, and CR 400.2 splits them into
         -- public and hidden, so both sides of CR 400.7e's proviso have to be
-        -- here for the floor to be the honest answer.
+        -- here for the floor to be the honest answer. Rule 603.6c's second
+        -- trigger event is the third: CR 800.4a's departure reaches no zone at
+        -- all, so there is no arriving object for CR 400.7e to offer and it
+        -- binds nothing -- which is what keeps the floor empty.
         TriggerCondition.SelfLeavesTheBattlefield ->
-          moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand]
+          moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand, GameEvent.LeftTheGame departed]
         -- SelfDies' event, since CR 700.4 is the same word: the haunted creature
         -- is put into a graveyard from the battlefield. Which permanent it is
         -- rides GameState.haunting rather than the event, so one event says all
@@ -8405,8 +8615,9 @@ becameSlotSpec s registry =
 -- here where becameSlotSpec's Endless Cockroaches had to keep two incarnations
 -- of one card apart. Not transcribed: the second ability, "at the beginning of
 -- each end step, if you control no creatures, sacrifice this enchantment and
--- return all cards exiled with it to the battlefield under your control"
--- (#968).
+-- return all cards exiled with it to the battlefield under your control" -- CR
+-- 607.2a's link is recorded now, so what is left is the end-step trigger, the
+-- sacrifice of the ability's own source, and the battlefield destination (#968).
 --
 -- The discriminating assertion is WHICH id the payload moves. CR 603.10a makes
 -- Event.matchesTrigger's PermanentDies arm match on ZoneChange.departed, so
@@ -8855,7 +9066,7 @@ isPayResponse response = case response of
 -- CR 702.123 fabricate N: "When this permanent enters, you may put N +1/+1
 -- counters on it. If you don't, create N 1/1 colorless Servo artifact creature
 -- tokens." Rule 702.123a prints CR 118.12a's rewriting already done, so the
--- minted clause is one UnlessPaid over
+-- minted clause is one PayGate over
 -- CostComponent.PutPlusOneCountersOnThis and the tokens are its "if you don't"
 -- branch -- afterlife's mint with a gate on it, and the first minted keyword
 -- ability that offers a COST at resolution. (Soulshift's and provoke's clauses
@@ -11045,6 +11256,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   secondPlacementPassSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
+  tenRingsDrawSpec s registry
   poisonousSpec s registry
   ingestSpec s registry
   annihilatorSpec s registry
@@ -11085,6 +11297,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   serraAvatarSpec s registry
   diesTriggerSpec s registry
   permanentDiesSpec s registry
+  merenEndStepSpec s registry
   leavesBattlefieldSpec s registry
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry

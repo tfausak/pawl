@@ -66,9 +66,11 @@ to agents as written. What it doesn't say:
 - That file sets `semaphore: True`, so concurrent `cabal` runs in *different*
   worktrees contend on one shared GHC job semaphore --- that is the mechanism
   behind one-build-at-a-time. A killed or crashed run corrupts it; the symptom
-  is `semWait: invalid argument`, and `cabal test --no-semaphore -j1` gets
-  through. Never `pkill -f 'cabal test'` --- it reaches into other agents'
-  worktrees. Match your own worktree path, or wait.
+  is `semWait: invalid argument`, and `cabal test --no-semaphore -j4` gets
+  through. The likeliest killer is not a deliberate one: a tool timeout reaping
+  a backgrounded `cabal` corrupts the semaphore exactly as a `pkill` does.
+  Never `pkill -f 'cabal test'` --- it reaches into other agents' worktrees.
+  Match your own worktree path, or wait.
 
 - Derive against `origin/main`, not the working checkout. The primary checkout
   drifts --- it sat 47 commits behind during one drain run --- so a grep there
@@ -184,6 +186,14 @@ to agents as written. What it doesn't say:
   checks, and it drifted at a 23% rate before the tracker existed. That comment
   dies in the commit that closes the issue. A comment citing the test that
   *proves* a behavior is a different genre and outlives the issue.
+
+  Which genre a `(#N)` is has to be readable, because `script/check-gaps.sh`
+  checks the elision genre for exactly that death: an elision comment whose
+  issue has closed is a comment claiming a capability is missing that landed.
+  It reads the WORDING --- a comment paragraph saying "not implemented" is an
+  elision paragraph, and every `(#N)` in it must be open. An elision phrased
+  otherwise marks its citation `(gap #N)`, and a historical reference that
+  shares a paragraph with an elision drops the parentheses (`see #1116`).
 
   A BLOCKED issue records its blocker as a GitHub dependency, not as prose:
 

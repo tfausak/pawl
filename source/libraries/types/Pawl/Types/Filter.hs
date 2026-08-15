@@ -49,9 +49,11 @@ data Filter keyword
     -- so Quagmire's "creatures with swampwalk" must not reach islandwalk. Ask the
     -- family with HasKeywordFamily below; Pawl.FilterSpec pins the pair apart.
     --
-    -- Read through the PROJECTION wherever one exists, so a creature that gains
-    -- flying at CR 613.1f layer 6 matches and a Humility'd one stops matching;
-    -- Projection.viewOfCardIn is the printed-card fallback off the battlefield.
+    -- Read through the PROJECTION, so a creature that gains flying at CR 613.1f
+    -- layer 6 matches and a Humility'd one stops matching. The readers that take
+    -- Projection.viewOfCardIn instead -- a cost criterion, a mill tally -- see
+    -- the printed keywords of a card off the battlefield (#160); a library
+    -- search no longer does.
     HasKeyword keyword
   | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
     -- its payload -- Flensing Raptor's "another target creature you control with
@@ -257,6 +259,27 @@ data Filter keyword
     -- relation, one spelling, rather than a parallel Exclusion field on each
     -- (#163).
     IsSource
+  | -- | The candidate IS the object the resolution bound in this slot -- Into the
+    -- Wilds' "if it's a land card", where the clause before it looked at the top
+    -- card of the library and bound it (Effect.LookAt).
+    --
+    -- IsSource's sibling: that atom tests the candidate against the evaluation's
+    -- source and this one against an object the RESOLUTION named, and neither
+    -- carries an id -- both read Pawl.Engine.Filter.Context, this one through
+    -- `slotObjects`. So the atom is what lets a Count NARROW a zone to one card
+    -- the resolution already named, which is what makes Into the Wilds' count
+    -- over a hidden zone (CR 400.2) a question about the card its controller was
+    -- shown rather than about the library it sits in.
+    --
+    -- NOT ControlledByBound, which asks after the bound object's CONTROLLER: CR
+    -- 108.4 gives a card in a library none at all, so that atom is vacuously
+    -- False for the very candidates this one exists to match.
+    --
+    -- Vacuously False where the slot names no object: outside a resolution the
+    -- map is empty, an illegal target (CR 608.2b) and a multi-object slot drop
+    -- out of it, and a slot bound to a GROUP never enters it (#1532). That is
+    -- the posture every context-relative atom here takes.
+    IsBound SlotName.SlotName
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
     -- "target opponent". Context-relative like ControlledBy, but separate from it
     -- rather than a reuse, because ControlledBy asks who controls an OBJECT
@@ -341,6 +364,20 @@ data Filter keyword
     -- them apart -- a creature remains blocked once every blocker leaves combat --
     -- so an attacker can be blocked when nothing answers True here.
     IsBlocking
+  | -- | CR 509.1h: the candidate is a BLOCKED creature -- an attacking creature
+    -- one or more creatures were declared blocking, or that an effect said
+    -- becomes blocked. Curtain of Light's "target unblocked attacking creature"
+    -- is `And [IsAttacking, Not IsBlocked]`, the one-relation-one-spelling
+    -- posture IsToken and IsTapped take. Uncharacteristic for IsAttacking's
+    -- reason.
+    --
+    -- The OTHER side of IsBlocking above, and not derivable from it in either
+    -- direction: this is Pawl.Engine.Combat.isBlocked, membership of the KEY of
+    -- Combat.blockers, where IsBlocking asks about the sets. CR 509.1h is what
+    -- pulls them apart -- a creature stays blocked once every creature blocking
+    -- it has left combat, and an effect can confer the status with no blocker
+    -- ever assigned.
+    IsBlocked
   | -- | CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
     -- Relentless Assault's "all creatures that attacked this turn". A look-back
     -- read of the turn-scoped GameEvent log, which CR 608.2i sanctions; never a
@@ -356,6 +393,24 @@ data Filter keyword
     -- 508.4 says a creature put onto the battlefield attacking never attacked, and
     -- only Combat.declareAttackers appends GameEvent.AttackerDeclared.
     AttackedThisTurn
+  | -- | CR 701.17a: the candidate is a card that was MILLED earlier this turn --
+    -- The Master, Transcendent's "target creature card in a graveyard that was
+    -- milled this turn". AttackedThisTurn's look-back read of the turn-scoped
+    -- GameEvent log, one event arm over (GameEvent.Milled), and uncharacteristic
+    -- for IsAttacking's reason: how a card reached the zone it is in is a rules
+    -- record the closed half owns, not a characteristic of the card (CR 109.3).
+    --
+    -- NOT expressible as "moved from a library to a graveyard this turn", which
+    -- is the reading the Moved entries would give: The Master's own ruling says a
+    -- card put into a graveyard from a library without the word "mill" -- Rowan's
+    -- Grim Search -- is not a legal target, and surveil (CR 701.25a) and explore
+    -- (CR 701.44a) each bin a card off the top of a library without milling it.
+    --
+    -- Matches the incarnation the mill LEFT the card as (CR 400.7, CR 701.17c),
+    -- so a milled card that has since moved again is no longer one this admits --
+    -- the card in the graveyard is a different object from the one that came back
+    -- to it.
+    MilledThisTurn
   | -- | CR 303.4b / 701.3a: the candidate is ATTACHED to a creature, which is what
     -- Crown of the Ages' "target Aura attached to a creature" narrows by.
     -- Uncharacteristic for IsAttacking's reason -- attachment is a rules concept

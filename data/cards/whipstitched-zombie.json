@@ -52,7 +52,10 @@
                         "value": "self"
                       }
                     ],
-                    "unlessPaid": {
+                    "payGate": {
+                      "branch": {
+                        "type": "IfNotPaid"
+                      },
                       "cost": {
                         "mana": [
                           {

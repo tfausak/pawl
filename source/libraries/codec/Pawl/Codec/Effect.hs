@@ -29,6 +29,7 @@ import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExileHaunting as ExileHaunting
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.ForEach as ForEach
+import qualified Pawl.Codec.LookAt as LookAt
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.ModifyTarget as ModifyTarget
@@ -80,9 +81,11 @@ codec cardCodec =
       Arm.payload "Sacrifice" SlotName.codec Effect.Sacrifice (\x -> case x of Effect.Sacrifice y -> Just y; _ -> Nothing),
       Arm.payload "TurnFaceDown" SlotName.codec Effect.TurnFaceDown (\x -> case x of Effect.TurnFaceDown y -> Just y; _ -> Nothing),
       Arm.payload "RemoveFromCombat" SlotName.codec Effect.RemoveFromCombat (\x -> case x of Effect.RemoveFromCombat y -> Just y; _ -> Nothing),
+      Arm.payload "BecomesBlocked" SlotName.codec Effect.BecomesBlocked (\x -> case x of Effect.BecomesBlocked y -> Just y; _ -> Nothing),
       Arm.payload "Counter" SlotName.codec Effect.Counter (\x -> case x of Effect.Counter y -> Just y; _ -> Nothing),
       Arm.payload "MoveToZone" MoveToZone.codec Effect.MoveToZone (\x -> case x of Effect.MoveToZone y -> Just y; _ -> Nothing),
       Arm.payload "Draw" PlayerQuantity.codec Effect.Draw (\x -> case x of Effect.Draw y -> Just y; _ -> Nothing),
+      Arm.payload "LookAt" LookAt.codec Effect.LookAt (\x -> case x of Effect.LookAt y -> Just y; _ -> Nothing),
       Arm.payload "Scry" PlayerQuantity.codec Effect.Scry (\x -> case x of Effect.Scry y -> Just y; _ -> Nothing),
       Arm.payload "Surveil" PlayerQuantity.codec Effect.Surveil (\x -> case x of Effect.Surveil y -> Just y; _ -> Nothing),
       Arm.payload "Fateseal" PlayerQuantity.codec Effect.Fateseal (\x -> case x of Effect.Fateseal y -> Just y; _ -> Nothing),

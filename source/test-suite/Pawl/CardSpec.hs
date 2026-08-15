@@ -125,6 +125,7 @@ import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LimitUnless as LimitUnless
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -662,6 +663,9 @@ effectCounts effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
+  -- No Quantity: rule 701.20e's look names its cards through an ObjectRef, and
+  -- ObjectRef.TopOfLibrary's depth is a literal Natural.
+  Effect.LookAt {} -> []
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -693,6 +697,7 @@ effectCounts effect = case effect of
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationCounts duration
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
@@ -982,6 +987,7 @@ effectReplacements effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.Mill {} -> []
+  Effect.LookAt {} -> []
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
@@ -1003,6 +1009,7 @@ effectReplacements effect = case effect of
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
@@ -1517,6 +1524,7 @@ effectMintedFaces effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.Mill {} -> []
+  Effect.LookAt {} -> []
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
   Effect.Fateseal {} -> []
@@ -1538,6 +1546,7 @@ effectMintedFaces effect = case effect of
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
@@ -1775,10 +1784,13 @@ canHostSubjects predicate = case predicate of
   Filter.Type.OwnedBy _ -> 0
   Filter.Type.IsSource -> 0
   Filter.Type.IsPlayer _ -> 0
+  Filter.Type.IsBound _ -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   Filter.Type.IsAttacking -> 0
   Filter.Type.IsBlocking -> 0
+  Filter.Type.IsBlocked -> 0
   Filter.Type.AttackedThisTurn -> 0
+  Filter.Type.MilledThisTurn -> 0
   Filter.Type.IsAttachedToCreature -> 0
   Filter.Type.IsAttachedToPermanent -> 0
   Filter.Type.IsAttachedToSource -> 0
@@ -2054,6 +2066,9 @@ objectRefFilters ref = case ref of
   -- Ignorant Bliss' "all cards from your hand" holds none either: CR 400.2
   -- makes a hand hidden, so the arm carries no Filter to lint.
   ObjectRef.EachCardInYourHand -> []
+  -- Hoarding Dragon's "the exiled card" holds none either: CR 607.2a's set is
+  -- named by which object exiled the cards, never by their characteristics.
+  ObjectRef.EachCardExiledWithSource -> []
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it holds
@@ -2432,6 +2447,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.Unleash -> []
   EntryRewrite.Tapped -> []
   EntryRewrite.PayLifeOrTapped _ -> []
+  EntryRewrite.EntersTransformed -> []
   EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f _) -> [f]
 
 -- The Filter a TurnUpRewrite carries. CR 303.4k's destination text -- Gift of
@@ -2561,6 +2577,9 @@ effectFilters effect = case effect of
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
   Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
+  -- The ObjectRef's Filter is a position a card author writes, so the lint
+  -- reaches it, as Explore's does.
+  Effect.LookAt (LookAt.MkLookAt ref _) -> unframed (objectRefFilters ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
@@ -2594,6 +2613,7 @@ effectFilters effect = case effect of
     unframed (durationFilters duration <> objectRefFilters srcRef <> objectRefFilters destRef)
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
+  Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
   -- BOTH positions: the ObjectRef carries Renegade Krasis' "each other creature
   -- you control with a +1/+1 counter on it", and a Filter there would otherwise
@@ -3876,6 +3896,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ObjectRef.EachMatching _ -> False
           ObjectRef.EachCardInGraveyard {} -> False
           ObjectRef.EachCardInYourHand -> False
+          -- CR 607.3 is what makes this one plural even where the card's own
+          -- words are singular: an ability referring to "the exiled card" whose
+          -- linked ability exiled several performs its action on each of them.
+          ObjectRef.EachCardExiledWithSource -> False
           ObjectRef.EachPlayer -> False
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
             depth <= 1 && case player of
@@ -3975,6 +3999,28 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- prints one.
     Spec.assertBool s (any (anyFace (any hides . cardResolutionEffects) . Printing.card) ps) "the pool has a card exiling face down"
     Spec.assertEqWith s "only exile keeps a card face down (CR 406.3)" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The sibling lint for the OTHER face-down rider, one field over and pointed
+  -- at the opposite zone: CR 708.3 is a rule about entering the BATTLEFIELD, so
+  -- on any other destination it is inert card data. Inert on a Create outright,
+  -- for the reason CR 712.14a's transformed rider is -- a token is not a card,
+  -- and no rule puts one onto the battlefield face down.
+  -- Event.changeZoneEntering gates on the destination, so this lints an
+  -- authoring mistake rather than guarding the engine.
+  Spec.it s "no effect enters face down anywhere but the battlefield" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ zone riders _ _ _) -> EntryRiders.faceDown riders && zone /= Zone.Battlefield
+          Effect.Create (Create.MkCreate _ _ riders _) -> EntryRiders.faceDown riders
+          _ -> False
+        manifests effect = case effect of
+          Effect.MoveToZone (MoveToZone.MkMoveToZone _ _ riders _ _ _) -> EntryRiders.faceDown riders
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no face-down entry in the pool at all
+    -- this would pass whatever a card said. Soul Summons is the card that
+    -- prints one.
+    Spec.assertBool s (any (anyFace (any manifests . cardResolutionEffects) . Printing.card) ps) "the pool has a card putting a permanent onto the battlefield face down"
+    Spec.assertEqWith s "only the battlefield takes a face-down entry (CR 708.3)" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
   -- the codec accepts. See phasePatternOffends for why a card cannot name a
   -- player, and for why this is a lint rather than a type split (#437).

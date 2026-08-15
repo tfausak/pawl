@@ -1860,6 +1860,35 @@ reliquaryTowerSpec s registry =
       let board = reliquaryHandOfNine plains [reliquaryTower, bloodMoon]
       Spec.assertEqWith s "seven again" (PlayerEffect.maximumHandSize S.alice board) (Just 7)
 
+    -- The same strip with a CR 604.2 clause on the stripper, which is what
+    -- Projection.setLandSubtypeEffects used to ignore: this reader is outside the
+    -- layer fold (CR 613.10), so it asks liveAfterLayers, and liveAfterLayers is
+    -- handed the list of subtype-setting effects the gate builds. Wired open, an
+    -- ability whose clause was false still stripped the Tower here while
+    -- gatherStatic dropped it from the fold -- the two halves of one rule
+    -- disagreeing.
+    --
+    -- The pair differs in ONE permanent, the Forest. It is basic, so the Moon's own
+    -- affected set does not name it and it changes nothing but the clause's answer.
+    --
+    -- Synthetic Waxing Moon stands in for Zhao, the Moon Slayer, the only printed
+    -- static ability pairing an "as long as" clause with a land-subtype set: Zhao's
+    -- clause counts a conqueror counter, which no card can name yet (#1386).
+    Spec.it s "CR 604.2/305.7 with no Forest the Waxing Moon's clause is false, and the Tower keeps its ability" $ do
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+      waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
+      let board = reliquaryHandOfNine plains [reliquaryTower, waxingMoon]
+      Spec.assertEqWith s "no maximum" (PlayerEffect.maximumHandSize S.alice board) Nothing
+
+    Spec.it s "CR 604.2/305.7 one Forest turns the clause on, and the Tower is stripped" $ do
+      plains <- S.printingOf s registry "Plains"
+      reliquaryTower <- S.printingOf s registry "Reliquary Tower"
+      waxingMoon <- S.printingOf s registry "Synthetic Waxing Moon"
+      forest <- S.printingOf s registry "Forest"
+      let board = reliquaryHandOfNine plains [reliquaryTower, waxingMoon, forest]
+      Spec.assertEqWith s "seven again" (PlayerEffect.maximumHandSize S.alice board) (Just 7)
+
 -- alice's board with BOTH maximum-hand-size effects live, built in one of the two
 -- orders: `ringsFirst` decides whether The Ten Rings' printed CR 613.7a effect is
 -- older or newer than Sea Gate Restoration's stored CR 613.7b one.
@@ -1902,13 +1931,12 @@ ringsAndRestoration ringsFirst plains island tenRings restoration =
         else let (ringsId, withRings) = rings (resolve (cast ready)) in (withRings, ringsId)
 
 -- The Ten Rings, a Legendary Artifact: "Your maximum hand size is ten." Its
--- end-step draw-to-ten ability is not implemented (#1239).
+-- other line, the end-step draw to ten, is Pawl.TriggerSpec's.
 --
 -- Sea Gate Restoration, the front face of a modal double-faced card: "Draw cards
 -- equal to the number of cards in your hand plus one. You have no maximum hand
--- size for the rest of the game." Its back face Sea Gate, Reborn always enters
--- tapped -- the "you may pay 3 life" that buys it in untapped is not implemented
--- (#1240).
+-- size for the rest of the game." Only the front face is cast here; the back
+-- face's "you may pay 3 life" is exercised in Pawl.ReplacementSpec.
 --
 -- Together they are the pair CR 613.11's timestamp order decides, one on each
 -- carrier: a SET maximum and a REMOVED one disagree, and Reliquary Tower's own

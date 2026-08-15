@@ -64,7 +64,7 @@ actionCost =
 --
 -- Read off the CARD (Card.combined) and never a projection, the reading
 -- Pawl.Engine.Plot.plotCostOf gives one rule over: the ability functions in the
--- hand, which pawl's projection does not reach (#160).
+-- hand, where no pool effect changes a card's abilities (#160).
 --
 -- Returns the CAST cost the keyword carries, though this module never spends it:
 -- what it answers here is only "is the keyword there", and returning the payload
@@ -165,7 +165,8 @@ riders =
       EntryRiders.transformed = False,
       EntryRiders.counters = Map.empty,
       EntryRiders.underOwner = False,
-      EntryRiders.exiledFaceDown = True
+      EntryRiders.exiledFaceDown = True,
+      EntryRiders.faceDown = False
     }
 
 -- CR 702.143a's foretold card, stamped with the turn the action was taken on --

@@ -57,6 +57,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
@@ -98,6 +99,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -298,7 +300,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     let slot = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
         bound = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))
         boundSlot = SlotName.MkSlotName (Text.pack "exiled")
-        attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False}
+        attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
     Common.assertJsonCodec
       s
       toJson
@@ -389,6 +391,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)))
       """ {"type":"Draw","value":{"player":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3}}} """
+  -- Into the Wilds' "look at the top card of your library", whose slot the next
+  -- clause reads back.
+  Spec.it s "LookAt" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.LookAt
+          ( LookAt.MkLookAt
+              (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 1))
+              (SlotName.MkSlotName (Text.pack "looked"))
+          )
+      )
+      """ {"type":"LookAt","value":{"ref":{"type":"TopOfLibrary","value":{"count":1,"player":{"type":"Relative","value":{"type":"You"}}}},"slot":"looked"}} """
   -- Both of Scry's PlayerRef shapes: Crystal Ball's controller scry and
   -- Kozilek's Command's "target player scries 2".
   Spec.it s "Scry" $ do
@@ -520,7 +536,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
   -- default, exactly like MoveToZone above: four emitted forms, the middle two
   -- told apart at decode by JSON TYPE.
   Spec.it s "Create round-trips all four shapes, and elides the defaults" $ do
-    let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False}
+    let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False, EntryRiders.exiledFaceDown = False, EntryRiders.faceDown = False}
         plain = EntryRiders.defaultValue
         slot = SlotName.MkSlotName (Text.pack "token")
         card = Text.pack "Goblin Piker"
@@ -868,6 +884,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.RemoveFromCombat (SlotName.MkSlotName (Text.pack "target")))
       """ {"type":"RemoveFromCombat","value":"target"} """
+  Spec.it s "BecomesBlocked" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.BecomesBlocked (SlotName.MkSlotName (Text.pack "target")))
+      """ {"type":"BecomesBlocked","value":"target"} """
   -- Both shapes in the pool: a pair, and a repeated phase.
   Spec.it s "AddPhases round-trips the pair and a repeated phase" $ do
     Common.assertJsonCodec

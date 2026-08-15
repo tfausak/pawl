@@ -2107,8 +2107,8 @@ flashSpec s registry = Spec.describe s "Flash" $ do
   -- battlefield, and a card in a hand is not one of them, so the window stays
   -- open and the projection says so.
   --
-  -- Nothing in the pool could close it either way -- no effect can put a
-  -- keyword-changing modification on a card in a hand at all (#160).
+  -- Nothing in the pool could close it either way -- no effect in the pool puts
+  -- a keyword-changing modification on a card in a hand (#160).
   -- Pawl.Engine.Keyword.hasFlash carries that argument in full.
   Spec.it s "CR 702.8a the projection of a card in hand carries flash, and Humility does not reach it" $ do
     forest <- S.printingOf s registry "Forest"

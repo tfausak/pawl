@@ -520,9 +520,13 @@ inCastableZone pid oid name gs =
 -- learning from data a restriction it already knows. Reading a supertype and a
 -- card type is the same closed-half act as CR 704.5j's legend rule.
 --
--- The SPELL's own type line is read PRINTED (Card.isLegendary): it is in a hand
--- or a graveyard when this is asked, where no projection exists, and CR 205.4a
--- makes supertypes a printed-type-line read regardless.
+-- The SPELL's own type line is read PRINTED (Card.isLegendary), on CR 205.4a's
+-- authority: a supertype is a read of the printed type line. Not because the
+-- card lacks a projection in the hand or graveyard it is asked from -- CR 613.1
+-- names no zone and Projection.viewOfObject reaches every one of them. The two
+-- can differ only for an effect granting or removing a supertype there (CR
+-- 205.4b) -- the off-battlefield printed read (gap #160), which no card in the
+-- pool reaches.
 legendaryRestrictionOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 legendaryRestrictionOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
@@ -553,8 +557,8 @@ controlsLegendaryCreatureOrPlaneswalker pid gs =
 --
 -- The exact counterweight to permissionsWith below, and read the way its LIBRARY
 -- caller reads keywords: off the card, never through the projection (CR 113.6e,
--- which for this pool means a hand, which pawl's projection does not reach --
--- #160). ALL of them must hold, which is what CR 601.3's "no ... prohibits"
+-- which for this pool means a hand, where no pool effect changes a card's
+-- keywords -- #160). ALL of them must hold, which is what CR 601.3's "no ... prohibits"
 -- means; one permission, by contrast, suffices.
 --
 -- Casing on the arms is a classification, not an effect's identity:

@@ -823,7 +823,7 @@ chooseTargets decider pid oid slots sets = do
 -- An announced COUNT is still measured against the union: a caster who announces
 -- four targets and then cannot name four coherent ones fails here and CR 601.2
 -- returns the game to before the spell was proposed, the same posture CR 601.2b's
--- unaffordable X announcement already takes (#417). Narrowing the offered count
+-- unaffordable X announcement already takes. Narrowing the offered count
 -- to what a coherent answer could reach is not implemented (#1296).
 selectionLegal :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> Map SlotName (Set Recipient) -> Map SlotName (Set Recipient) -> GameState -> Bool
 selectionLegal perspective source slots sets chosen gs =

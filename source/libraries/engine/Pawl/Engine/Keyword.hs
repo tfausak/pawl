@@ -74,6 +74,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OfferCast as OfferCast
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PayBranch as PayBranch
+import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -111,7 +113,6 @@ import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
-import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.WithCounters as WithCounters
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -298,8 +299,8 @@ abilitiesFor keyword count = case keyword of
 --
 -- Printed keywords rather than a projection's post-layer ones, the same rules
 -- fact castingPermissionsOf records: CR 113.6b confines an ability to the zones
--- it states, and rules 702.29a and 702.77a state the hand -- which pawl's
--- projection does not reach (#160).
+-- it states, and rules 702.29a and 702.77a state the hand -- where no pool
+-- effect changes a card's abilities (#160).
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
@@ -722,7 +723,7 @@ outlast cost =
 -- WHICH keyword set is the caller's to choose, and the two callers choose
 -- differently: a card in a GRAVEYARD is read through the projection, so a
 -- granted flashback grants its permission too, while a card in a LIBRARY is read
--- as printed, that being a zone pawl's projection does not reach (#160).
+-- as printed, no pool effect changing a card's keywords there (#160).
 --
 -- The card types come along because rule 702.34a's permission is CONDITIONAL on
 -- them. They are the types of the one FACE being proposed, which is the caller's
@@ -875,6 +876,17 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Persist -> []
   Keyword.Undying -> []
 
+-- | CR 702.127a's SECOND static ability: "this half of this split card can't be
+-- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
+-- Pawl.Engine.Cast asks of the zone it is about to offer rather than anything
+-- minted here -- the counterweight to the CastFromGraveyard permission
+-- permissionsFor grants for the same keyword.
+--
+-- Membership rather than a count: rule 702.127a takes no parameter and a second
+-- instance would forbid nothing further.
+hasAftermath :: Set Keyword -> Bool
+hasAftermath = Set.member Keyword.Aftermath
+
 -- CR 702.8a: does this card's keyword set let it be played any time its
 -- controller could cast an instant? Its one reader is
 -- Pawl.Engine.Cast.instantSpeed, which turns it into the CR 302.1 / 307.1 window
@@ -895,44 +907,30 @@ permissionsFor cardTypes keyword = case keyword of
 -- say it is: CR 613.1 names no zone, and CR 122.1b's keyword counter reaches a
 -- card outside the battlefield explicitly. What makes the printed read safe is
 -- that it is INDISTINGUISHABLE from a projected one today, which is a claim about
--- what pawl CANNOT EXPRESS rather than about Magic. Nothing can put a
--- keyword-changing effect on a card in a hand, and that takes all four of
+-- pawl's pool rather than about Magic. That takes all five of
 -- Pawl.Types.Affected:
 --
 --   * Matching and AttachedPlayerControls are gated on battlefield membership,
 --     structurally, inside Projection.affects.
 --   * Attached names the object the SOURCE is attached to, which an Aura only
 --     ever has while both are on the battlefield.
---   * TheseObjects is the one that could in principle reach elsewhere -- it is
---     CR 611.2c's frozen set, and Magical Hack's ChangeText already stores one
---     naming a spell on the STACK. What stops it here is the pool: no
---     Pawl.Types.Pool arm names a card in a hand at all.
+--   * TheseObjects is CR 611.2c's frozen set, and Magical Hack's ChangeText
+--     already stores one naming a spell on the STACK. What stops it here is the
+--     pool: no Pawl.Types.Pool arm names a card in a hand at all.
+--   * MatchingAnywhere is gated nowhere, and both readers project a card off the
+--     battlefield -- Projection.viewOfObject always did, Projection.viewUpTo
+--     since #623 -- so a card in a hand is as reachable as a permanent. Only the
+--     pool stops it: Viral Spawning grants a keyword to a card in a GRAVEYARD
+--     already, and no effect in the pool grants or removes FLASH off the
+--     battlefield.
 --
--- So a card in a hand projects exactly its printed keywords, and nothing can
--- grant or remove flash there (#160). The same posture handAbilitiesOf above
--- takes (#567).
---
--- A GRAVEYARD is no longer covered by that argument: MatchingAnywhere reaches
--- one, and Viral Spawning grants a keyword to a card lying there. Still exact,
--- and now for a narrower reason -- no effect in the pool grants FLASH off the
--- battlefield, so the two reads agree on every board (#160). castingPermissionsOf
--- above is the read that has already parted, and this is the next.
+-- So the printed read and a projected one agree on every board pawl can build
+-- (#160). The same posture handAbilitiesOf above takes (#567), and
+-- castingPermissionsOf above is the read that has already parted.
 --
 -- A membership test rather than an exhaustive case: this asks about ONE named
 -- constructor rather than classifying every keyword, so a new arm has nothing to
 -- say here.
-
--- | CR 702.127a's SECOND static ability: "this half of this split card can't be
--- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
--- Pawl.Engine.Cast asks of the zone it is about to offer rather than anything
--- minted here -- the counterweight to the CastFromGraveyard permission
--- permissionsFor grants for the same keyword.
---
--- Membership rather than a count: rule 702.127a takes no parameter and a second
--- instance would forbid nothing further.
-hasAftermath :: Set Keyword -> Bool
-hasAftermath = Set.member Keyword.Aftermath
-
 hasFlash :: Set Keyword -> Bool
 hasFlash = Set.member Keyword.Flash
 
@@ -1015,7 +1013,7 @@ morphCost keywords =
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
 --
 -- Nothing beyond the FIRST kicker cost is reachable, so CR 702.33b's "kicker
--- [cost 1] and/or [cost 2]" is unrepresented (#1235).
+-- [cost 1] and/or [cost 2]" is unrepresented (gap #1235).
 kickerCost :: Set Keyword -> Maybe (Cost Keyword)
 kickerCost keywords =
   let costOf keyword = case keyword of
@@ -1031,7 +1029,7 @@ kickerCost keywords =
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
 --
 -- Nothing beyond the FIRST entwine cost is reachable: a card printing two
--- entwine abilities is expressible and unrepresented (#474).
+-- entwine abilities is expressible and unrepresented (gap #474).
 entwineCost :: Set Keyword -> Maybe (Cost Keyword)
 entwineCost keywords =
   let costOf keyword = case keyword of
@@ -1279,7 +1277,25 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Skulk -> []
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
-  Keyword.Daybound -> []
+  -- CR 702.145b's FIRST static ability: "if it is night and this permanent is
+  -- represented by a double-faced card, it enters transformed" -- CR 712.13a's
+  -- rule seen from the keyword side, and the one producer CR 616.1d's bucket has.
+  -- Filter.IsSource for riot's reason, one subrule over: CR 614.1d's "[this
+  -- permanent] enters . . ." is the entering object's own ability.
+  --
+  -- The rule's two conditions are asked by Pawl.Engine.Replacement.applies rather
+  -- than here, because neither is knowable from a keyword count: the designation
+  -- is the game's and the layout is the entering object's.
+  --
+  -- ONE ROW PER INSTANCE for riot's reason, and safe twice over for neither of
+  -- riot's: the second row is a distinct CandidateId, so CR 614.5 would let it
+  -- apply, and it would write the same back face the first one did. Idempotent,
+  -- because the write names Card.backFace outright rather than the successor of
+  -- whatever face is up now. Unreachable anyway -- rule 702.145a puts daybound on
+  -- a front face, and nothing in the pool grants a second instance.
+  Keyword.Daybound -> List.genericReplicate count (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource EntryRewrite.EntersTransformed))
+  -- CR 702.145e gives nightbound only TWO static abilities, and neither rewrites
+  -- an entry: the enters-transformed half is daybound's alone.
   Keyword.Nightbound -> []
   Keyword.Decayed -> []
   Keyword.Training -> []
@@ -1622,7 +1638,8 @@ ingest =
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.empty,
                 EntryRiders.underOwner = False,
-                EntryRiders.exiledFaceDown = False
+                EntryRiders.exiledFaceDown = False,
+                EntryRiders.faceDown = False
               }
             Nothing
             Nothing
@@ -2224,7 +2241,7 @@ training =
 -- ONE CLAUSE and no branching opcode, fabricate's shape: CR 118.12a rewrites "[do
 -- something] unless [a player does something else]" as an offer followed by the
 -- thing, so the Counter is the clause's "if they don't" branch and
--- Pawl.Types.UnlessPaid is the offer. CR 118.12 puts that payment at RESOLUTION,
+-- Pawl.Types.PayGate is the offer. CR 118.12 puts that payment at RESOLUTION,
 -- which is what rule 702.21a needs -- the opponent has already paid to cast.
 --
 -- THE PAYER IS THE TARGETER'S CONTROLLER, not the bearer's: rule 702.21a's "that
@@ -2254,7 +2271,7 @@ ward cost =
     }
   where
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
-    gate = UnlessPaid.MkUnlessPaid {UnlessPaid.payer = Binding.targetingObject, UnlessPaid.cost = cost}
+    gate = PayGate.MkPayGate {PayGate.payer = Binding.targetingObject, PayGate.cost = cost, PayGate.branch = PayBranch.IfNotPaid}
     effect = Effect.Counter Binding.targetingObject
 
 -- CR 702.147a's TRIGGERED half: "When this creature attacks, sacrifice it at end
@@ -2559,7 +2576,8 @@ returns kind =
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.singleton kind 1,
                 EntryRiders.underOwner = True,
-                EntryRiders.exiledFaceDown = False
+                EntryRiders.exiledFaceDown = False,
+                EntryRiders.faceDown = False
               }
             Nothing
             Nothing
@@ -2618,7 +2636,8 @@ afterlife n =
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.empty,
                   EntryRiders.underOwner = False,
-                  EntryRiders.exiledFaceDown = False
+                  EntryRiders.exiledFaceDown = False,
+                  EntryRiders.faceDown = False
                 },
             Create.slot = Nothing
           }
@@ -2682,7 +2701,7 @@ spiritToken =
 --
 -- ONE CLAUSE and not two, and no branching opcode: rule 702.123a prints CR
 -- 118.12a's rewriting already performed, so CR 118.12 makes the counters a COST
--- paid as the ability resolves (Pawl.Types.UnlessPaid, over
+-- paid as the ability resolves (Pawl.Types.PayGate, over
 -- CostComponent.PutPlusOneCountersOnThis) and the clause's own effects are its
 -- "if you don't" branch. The counters go on the ability's SOURCE (CR 113.7a),
 -- which is what rule 702.123a's "it" names, so no slot is needed for them.
@@ -2714,15 +2733,18 @@ fabricate n =
   where
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton spawn)
     gate =
-      UnlessPaid.MkUnlessPaid
-        { UnlessPaid.payer = Binding.you,
-          UnlessPaid.cost =
+      PayGate.MkPayGate
+        { PayGate.payer = Binding.you,
+          PayGate.cost =
             Cost.MkCost
               { -- CR 118.5, crew's note above: no mana part is `Just` an empty
                 -- one, never the Nothing that means unpayable.
                 Cost.mana = Just (ManaCost.MkManaCost []),
                 Cost.components = [CostComponent.PutPlusOneCountersOnThis n]
-              }
+              },
+          -- Rule 702.123a prints CR 118.12a's rewriting already done, so the
+          -- Servos are the "if you don't" branch.
+          PayGate.branch = PayBranch.IfNotPaid
         }
     spawn =
       Effect.Create
@@ -2736,7 +2758,8 @@ fabricate n =
                   EntryRiders.transformed = False,
                   EntryRiders.counters = Map.empty,
                   EntryRiders.underOwner = False,
-                  EntryRiders.exiledFaceDown = False
+                  EntryRiders.exiledFaceDown = False,
+                  EntryRiders.faceDown = False
                 },
             Create.slot = Nothing
           }
@@ -2848,7 +2871,8 @@ soulshift n =
                 EntryRiders.transformed = False,
                 EntryRiders.counters = Map.empty,
                 EntryRiders.underOwner = False,
-                EntryRiders.exiledFaceDown = False
+                EntryRiders.exiledFaceDown = False,
+                EntryRiders.faceDown = False
               }
             Nothing
             Nothing
@@ -2944,7 +2968,7 @@ miracle cost =
 -- flashbackCost's shape exactly, including the wildcard -- this asks about ONE
 -- constructor rather than classifying every keyword -- and asked of the card's
 -- PRINTED keywords for that function's reason: rule 702.94a's abilities function
--- in the hand (CR 113.6b), which pawl's projection does not reach (#160).
+-- in the hand (CR 113.6b), where no pool effect changes a card's keywords (#160).
 --
 -- Nothing beyond the FIRST miracle cost is reachable, also for flashbackCost's
 -- reason. No printing carries miracle twice.

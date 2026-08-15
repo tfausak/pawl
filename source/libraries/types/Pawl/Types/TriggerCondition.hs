@@ -325,9 +325,12 @@ data TriggerCondition
     -- blocked by multiple creatures" -- the same grouping SelfBlocks reads on the
     -- blocking side.
     --
-    -- Only a DECLARATION makes the event, so rule 509.3c's other two producers --
-    -- an effect, and a creature put onto the battlefield as a blocker (CR 509.4)
-    -- -- do not reach it. Neither has a producer in the pool (#1146).
+    -- Rule 509.3c's SECOND producer reaches it too: an effect that says the
+    -- creature becomes blocked (Effect.BecomesBlocked, Curtain of Light) records
+    -- the same event, and the rule's "only if the attacking creature was an
+    -- unblocked creature at that time" is Pawl.Engine.Combat.becomeBlocked's own
+    -- guard. The third -- a creature put onto the battlefield as a blocker (CR
+    -- 509.4) -- has no producer in the pool (#1387).
     --
     -- No blocker is bound: rule 509.3c's form names none. CR 509.3d's does, and
     -- that is SelfBecomesBlockedBy below. CR 508.5's defending player IS bound,
@@ -495,8 +498,12 @@ data TriggerCondition
     -- hidden. Pawl.Engine.Event.eventBindings binds Pawl.Engine.Binding.became only
     -- for a public destination, and nothing at all for a hidden one.
     --
-    -- CR 603.6c's SECOND trigger event, a phased-in permanent leaving the game
-    -- with its owner, is not matched (#385).
+    -- CR 603.6c's SECOND trigger event -- a phased-in permanent leaving the game
+    -- with its owner (CR 800.4a) -- is matched too, off GameEvent.LeftTheGame.
+    -- It is the one form of this condition that fires without a zone change, and
+    -- so the one whose bearer can only be read from CR 608.2h last known
+    -- information: Pawl.DepartureSpec's Thragtusk case is the proof, and its
+    -- phased-out pair is CR 702.26k's.
     SelfLeavesTheBattlefield
   | -- | CR 702.55b/702.55c: "when the creature this card haunts dies" -- the death
     -- half of Blind Hunter's printed ability, borne by the haunting CARD IN

@@ -174,6 +174,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsSource
       """ {"type":"IsSource"} """
+  Spec.it s "IsBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.IsBound (SlotName.MkSlotName (Text.pack "looked")))
+      """ {"type":"IsBound","value":"looked"} """
   Spec.it s "IsAttacking" $
     Common.assertCodec
       s
@@ -186,12 +192,24 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       Filter.IsBlocking
       """ {"type":"IsBlocking"} """
+  Spec.it s "IsBlocked" $
+    Common.assertCodec
+      s
+      codec
+      Filter.IsBlocked
+      """ {"type":"IsBlocked"} """
   Spec.it s "AttackedThisTurn" $
     Common.assertCodec
       s
       codec
       Filter.AttackedThisTurn
       """ {"type":"AttackedThisTurn"} """
+  Spec.it s "MilledThisTurn" $
+    Common.assertCodec
+      s
+      codec
+      Filter.MilledThisTurn
+      """ {"type":"MilledThisTurn"} """
   Spec.it s "IsAttachedToCreature" $
     Common.assertCodec
       s

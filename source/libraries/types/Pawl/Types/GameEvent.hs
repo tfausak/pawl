@@ -17,6 +17,7 @@ import qualified Pawl.Types.Drew as Drew
 import qualified Pawl.Types.HalfUnlocked as HalfUnlocked
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.Mentored as Mentored
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PermanentSacrificed as PermanentSacrificed
@@ -135,6 +136,21 @@ data GameEvent
     -- a hidden zone instead has still been discarded, so a reader matching the
     -- hand-to-graveyard zone pair would lose the case Rest in Peace creates.
     Discarded Discarded.Discarded
+  | -- | CR 701.17a: a player MILLED cards. Emitted by Pawl.Engine.Resolve's Mill
+    -- arm, the one place in the engine that mills, alongside the Moved event
+    -- each of those moves records.
+    --
+    -- Distinct from those Moved events for the reason the Discarded arm above is
+    -- distinct from its own, and the card's own ruling says so outright: a card
+    -- put into a graveyard from a library without the word "mill" is not a legal
+    -- target for The Master, Transcendent's ability. Surveil (CR 701.25a) and
+    -- explore (CR 701.44a) both move a card from the top of a library into a
+    -- graveyard without milling it, and a Moved entry records only the zone
+    -- pair, so a reader folding those would admit all three.
+    --
+    -- ONE event per instruction per player, holding every card that player
+    -- milled at once (CR 701.17a).
+    Milled Milled.Milled
   | -- | CR 121.1: a player DREW a card, and which of that player's draws this
     -- turn it was -- 1 for the first, counting up. Emitted by
     -- Pawl.Engine.Event.drawCard, the one funnel every draw goes through.
@@ -226,8 +242,10 @@ data GameEvent
     -- from combat (CR 506.4) leaves no record of what it was declared against.
     BlockerDeclared BlockerDeclared.BlockerDeclared
   | -- | CR 509.1h: an attacking creature BECAME a blocked creature -- one event
-    -- per attacker the CR 509.1 declaration gave at least one blocker, appended
-    -- by Pawl.Engine.Combat.declareBlockers alone.
+    -- per attacker the CR 509.1 declaration gave at least one blocker, plus one
+    -- per attacker an effect said becomes blocked (Effect.BecomesBlocked).
+    -- Pawl.Engine.Combat.declareBlockers and Pawl.Engine.Combat.becomeBlocked are
+    -- the two appenders, which are the two writers of the status itself.
     --
     -- Derived from the same declaration as BlockerDeclared and not folded into
     -- it, because the two have different arities: an attacker can be blocked by
@@ -240,15 +258,14 @@ data GameEvent
     -- is the condition that names one, and it reads BlockerDeclared's pair
     -- instead -- this event exists to be the once-per-combat one (#1146).
     --
-    -- A DECLARATION is the only producer, which is STRICTER than rule 509.3c:
-    -- that rule also makes an attacker become blocked when an effect blocks it,
-    -- or when its only blocker is one put onto the battlefield (CR 509.4 denies
-    -- that creature having "blocked", but says nothing about the attacker).
-    -- Neither producer exists in the pool (#1146).
+    -- CR 509.3c's third producer is missing: an attacker whose only blocker is
+    -- one put onto the battlefield blocking becomes blocked too (CR 509.4 denies
+    -- that creature having "blocked", but says nothing about the attacker), and
+    -- nothing can put a creature onto the battlefield blocking (#1387).
     --
     -- The PlayerId is CR 508.5's defending player for this attacker, exactly as
-    -- AttackerDeclared above carries it and computed the same way, by
-    -- Pawl.Engine.Combat.declareBlockers off what the creature is attacking. CR
+    -- AttackerDeclared above carries it and computed the same way, off what the
+    -- creature is attacking. CR
     -- 702.130a's afflict is what reads it. Carried rather than derived for
     -- AttackerDeclared's reason: Pawl.Engine.Event.eventBindings takes no game
     -- state, and the planeswalker and battle forms of CR 508.5 need the board.
@@ -654,4 +671,23 @@ data GameEvent
     -- targets, an ACTIVATED ability records no cast event at all, and this is one
     -- event per target rather than one per announcement.
     BecameTarget BecameTarget.BecameTarget
+  | -- | CR 800.4a: a permanent left the GAME, rather than the battlefield,
+    -- because its owner left the game. The ObjectId is the id it had while it
+    -- existed -- the key Pawl.Engine.Departure files its CR 608.2h last known
+    -- information under, and the only route back to what it was, since leaving
+    -- the game mints no new incarnation for it to become.
+    --
+    -- Not a GameEvent.Moved, and the difference is the rules': CR 800.4a takes
+    -- the object out of the game entirely, so there is no destination zone to
+    -- name and CR 400.7 never runs. A Moved carrying an invented destination
+    -- would answer "did it go to a graveyard" -- which is what CR 700.4's
+    -- "dies" asks -- and the answer would be a fiction.
+    --
+    -- Emitted for a PHASED-IN BATTLEFIELD permanent and for nothing else, which
+    -- is exactly the set CR 603.6c's second trigger event ranges over: rule
+    -- 702.26k says a phased-out permanent leaving this way causes no zone-change
+    -- ability to trigger, and no rule reads the departure of a card that was in
+    -- a hand, a library, a graveyard, exile or on the stack. Those still file
+    -- last known information; what they do not do is enter this log.
+    LeftTheGame ObjectId.ObjectId
   deriving (Eq, Ord, Show)

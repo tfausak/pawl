@@ -1,5 +1,6 @@
 module Pawl.Engine.Projection where
 
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -71,12 +72,14 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
+import qualified Pawl.Types.LookAt as LookAt
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.MillTally as MillTally
+import qualified Pawl.Types.Milled as Milled
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.Modification (Modification)
@@ -560,35 +563,44 @@ powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
   Nothing -> powerGiven pcs oid gs
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
--- candidates projected through the layers BEFORE that one. A candidate in a
--- library, hand, graveyard or exile falls back to the printed card and is
--- matched against its PRINTED characteristics (#160). A GRAVEYARD card is the
--- one of the four gather now reaches -- CR 113.6f, fromGraveyardCard -- so this
--- fallback is a bound rather than an absence there: the effects exist and a
--- clause read INSIDE the fold still does not see them. Unobservable, since no
--- clause in the pool reads a graveyard card's characteristics.
+-- candidates projected through the layers BEFORE that one. EVERY object in the
+-- game, in whatever zone -- CR 613.1 starts from the actual object and names no
+-- zone, so a card in a graveyard, a hand or a library is projected exactly as a
+-- permanent is. WHICH effects reach it is the affected set's question and not
+-- this function's: Affected.MatchingAnywhere is the arm a card uses to reach one
+-- (Maskwood Nexus), TheseObjects can name any id at all, being CR 611.2c's
+-- frozen set, and the other three are battlefield-gated inside `affects` -- so
+-- the fold applies nothing here that a card did not aim off the battlefield.
 --
--- POWER is the one axis a rule reaches into there: CR 208.2a makes a
--- characteristic-defining one function everywhere, which is why the fallback is
--- viewOfCardIn rather than viewOfCard.
+-- This is the reader that used to fall back to the PRINTED card off the
+-- battlefield while viewOfObject projected it, so a one-shot count and a count
+-- inside the CR 613 fold disagreed about the same graveyard card (#623). The
+-- axes that only an object has -- its controller (CR 108.4a's owner default off
+-- the battlefield), its counters, CR 702.33d's kicked flag -- come with the
+-- change, and the printed-card view survives for the callers that hold a FACE
+-- rather than an object.
 --
--- The STACK is projected, not fallen back on, and gatherGiven's CR 113.6 walk is
--- what makes that worth doing: a spell can carry a static ability of its own, so
--- a clause read against it must see the grant. It also brings this in line with
--- viewOfObject, which has never had a zone gate -- so a "target spell" filter
--- and an "as long as" clause now read one spell the same way. The axes that only
--- an object has (its controller, CR 702.33d's kicked flag) come with that, and
--- Molten Disaster's own clause is the reader of the second.
+-- Nothing for an id that names no object, which is the one answer the printed
+-- fallback gave that is kept: CR 400.7 makes a departed object a new one, and a
+-- caller handed a dead id wants the no-op an unevaluable quantity already gives,
+-- not a Just over an empty projection. fullView is the unbounded counterpart and
+-- answers Just there, which is why viewWithLastKnownAnywhere has to guard it.
+--
+-- A characteristic-defining P/T is applied at layer 7a like anywhere else, so a
+-- count taken BELOW that layer no longer sees CR 208.2a's number for an
+-- off-battlefield candidate the way viewOfCardIn did. That is CR 613.1's own
+-- order rather than a loss: the same count over a battlefield candidate has
+-- never seen it either.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
-  if Set.member oid (GameState.battlefield gs) || elem oid (GameState.stack gs)
+  if Map.member oid (GameState.objects gs)
     then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
-    else fmap (viewOfCardIn gs oid) (Game.faceOf oid gs)
+    else Nothing
 
--- The characteristics view of a printed card off the battlefield, from the FACE
--- alone. No projection exists there, so every axis is read from the printed
--- face; the axes that only an OBJECT can have -- a controller, counters, an
--- attacking flag -- are Nothing or empty, and each says so at its field.
+-- The characteristics view of a printed card, from the FACE alone. Every axis is
+-- read from the printed face; the axes that only an OBJECT can have -- a
+-- controller, counters, an attacking flag -- are Nothing or empty, and each says
+-- so at its field.
 --
 -- A reader holding a game state wants viewOfCardIn below instead, which is this
 -- with CR 208.2a's characteristic-defining power filled in. This one survives
@@ -599,17 +611,16 @@ viewOfCard face =
    in Filter.MkView
         { Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,
-          -- CR 604.3 / 702.114a: a CDA functions in all zones, and nothing off
-          -- the battlefield is projected (#160), so devoid is applied here
-          -- rather than inherited from a fold this object never enters.
+          -- CR 604.3 / 702.114a: a CDA functions in all zones, and this view is
+          -- built from a face rather than folded through CR 613, so devoid is
+          -- applied here rather than inherited from a fold it never enters.
           Filter.colors =
             if definesColorless (Face.keywords face)
               then Set.empty
               else printedColorsOf face,
           -- CR 604.3 / 702.73a, the line above's reason one layer down: rule
-          -- 702.73a says outright that changeling "works everywhere", and a
-          -- card in a graveyard is never projected (#160), so it is applied
-          -- here too.
+          -- 702.73a says outright that changeling "works everywhere", and this
+          -- view enters no fold either, so it is applied here too.
           Filter.subtypes =
             if definesEveryCreatureType (Face.keywords face)
               then Set.union Subtype.everyCreatureType (TypeLine.subtypes typeLine)
@@ -646,7 +657,12 @@ viewOfCard face =
           -- 303.4b: nor is it a permanent attached to anything.
           Filter.attacking = False,
           Filter.blocking = False,
+          Filter.blocked = False,
           Filter.attackedThisTurn = False,
+          -- CR 701.17a mills an OBJECT out of a library, and this builder
+          -- describes a printed FACE, which the turn's mills name nothing of.
+          -- viewOfCardIn below is the caller that holds an id and answers.
+          Filter.milledThisTurn = False,
           Filter.attachedToCreature = False,
           Filter.attachedToPermanent = False,
           Filter.attachedTo = Nothing,
@@ -676,7 +692,7 @@ viewOfCard face =
           Filter.designations = Set.empty,
           Filter.kicked = False,
           -- CR 602.1 / 605.1a off the PRINTED face, the posture `keywords` above
-          -- takes: nothing off the battlefield is projected (#160).
+          -- takes: this view is built from a face rather than folded.
           --
           -- The card's printed abilities plus rule 702's HAND ones, which CR 702.29b
           -- and CR 702.77b keep in existence in every zone. NOT the battlefield ones
@@ -693,16 +709,26 @@ viewOfCard face =
 -- viewOfCard for a card that IS an object in some zone, so a
 -- characteristic-defining power can be evaluated: CR 604.3 and CR 208.2a make a
 -- CDA function in all zones, so Tarmogoyf in a library has the power its count
--- says, which is what Imperial Recruiter's "creature card with power 2 or less"
--- must read. The view every off-battlefield reader gets; viewOfCard survives for
--- the FACE-only callers, and as the blind inner view below.
+-- says. The view a cost criterion and a mill tally take for an off-battlefield
+-- card; viewOfCard survives for the FACE-only callers, and as the blind inner
+-- view below.
 --
--- Only the power and toughness axes differ, CR 208.2a naming both.
+-- Not implemented: those readers take this view for a card that IS an object, so
+-- they read it as printed where the object has a CR 613 projection of its own
+-- (#160). viewUpTo above is the reader that no longer does, and neither does
+-- Resolve's library search -- Imperial Recruiter's "creature card with power 2
+-- or less" reads a full projection there, CDA power and all.
+--
+-- The power and toughness axes differ, CR 208.2a naming both, and so does the
+-- one axis that is not a characteristic at all: having an id is what lets CR
+-- 701.17a's mills be looked up (CR 608.2i), where the printed face this is built
+-- on cannot answer.
 viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
 viewOfCardIn gs oid face =
   (viewOfCard face)
     { Filter.power = characteristicPowerIn gs oid face,
-      Filter.toughness = characteristicToughnessIn gs oid face
+      Filter.toughness = characteristicToughnessIn gs oid face,
+      Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs)
     }
 
 -- CR 208.2a's power for a face whose CDA sets it, and printedPower's answer for
@@ -725,11 +751,12 @@ viewOfCardIn gs oid face =
 -- a CDA that read a candidate's POWER recur without end. Nothing in the pool
 -- does -- swapping the injection leaves the suite green, since DistinctCardTypes
 -- forces only Filter.cardTypes -- so the bound is unobserved today and is here
--- for the CDA that would observe it. Blind is also the posture viewUpTo already
--- takes for an off-battlefield candidate (#160).
+-- for the CDA that would observe it.
 --
--- Not implemented: a BATTLEFIELD candidate that a CDA evaluated here sweeps is
--- read as a printed card rather than through its CR 613 projection (#1080).
+-- Not implemented: every candidate a CDA evaluated here sweeps is read as a
+-- printed card rather than through its CR 613 projection, on the battlefield
+-- (#1080) and off it (#160) alike. viewUpTo, the reader inside the fold, no
+-- longer has that bound.
 characteristicPowerIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
 characteristicPowerIn gs oid face = case seedCharacteristicPT face of
   Nothing -> printedPower face
@@ -797,6 +824,15 @@ declaredIt oid event = case event of
   GameEvent.AttackerDeclared (AttackerDeclared.MkAttackerDeclared declared _ _) -> declared == oid
   _ -> False
 
+-- CR 701.17a: does this event record THIS object being one of the cards a mill
+-- milled? declaredIt's twin over the other look-back entry. Only
+-- Pawl.Engine.Resolve's Mill arm appends one, which is what keeps a surveil's or
+-- an explore's bin -- neither of them a mill -- out of the answer.
+milledIt :: ObjectId -> GameEvent.GameEvent -> Bool
+milledIt oid event = case event of
+  GameEvent.Milled (Milled.MkMilled _ cards) -> Foldable.elem oid cards
+  _ -> False
+
 -- Shared assembly: fill a View from a projection's characteristics, a supplied
 -- controller and supplied counters.
 --
@@ -852,9 +888,17 @@ viewOfCharacteristics oid pc controller counters gs =
       -- membership in some attacker's set rather than a key lookup -- Map.member
       -- would be Pawl.Engine.Combat.isBlocked's question instead (CR 509.1h).
       Filter.blocking = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs))),
+      -- CR 509.1h: the key lookup the line above is careful not to be. True for
+      -- an attacker the declaration blocked and for one Effect.BecomesBlocked
+      -- did, and it stays True once every creature blocking it has left combat.
+      Filter.blocked = Map.member oid (Combat.blockers (GameState.combat gs)),
       -- CR 608.2i: read from the turn's event log, not the combat record, which
       -- CR 511.3 clears at end of combat. The log spans the turn.
       Filter.attackedThisTurn = any (declaredIt oid . snd) (GameState.events gs),
+      -- CR 701.17a / 608.2i: the same log, read for the mills. CR 400.7 is what
+      -- makes an id enough to ask with -- the event names the incarnation the
+      -- mill left the card as, and a later move would have minted another.
+      Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs),
       -- CR 701.3a: also not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's creature-ness is projected (layer 4
       -- can make a land a creature), so it goes through isCreatureOf. That is why
@@ -1236,10 +1280,33 @@ quantitiesOf m = case m of
 
 -- Every SetLandSubtype and SetLandSubtypeToChosen effect in the game, each with
 -- its source and affected set (from stored effects and battlefield permanents'
--- static abilities). This is a legitimate case-on-Modification -- Projection is
--- its sole home.
+-- static abilities), for a reader OUTSIDE the layer fold. This is a legitimate
+-- case-on-Modification -- Projection is its sole home.
+--
+-- CR 604.2's "as long as" gate is answered here, against the same seed list gather
+-- feeds its own gates: a static ability whose clause is currently false generates
+-- no continuous effect, so it strips nothing under CR 305.7 either. Wired open,
+-- the two halves of one rule disagreed -- gatherStatic dropped the ability, so the
+-- land's type did not change, while this kept it, so the land's rules text went
+-- away regardless.
+--
+-- The seed costs a whole extra walk, so it is spent only on a board that has a
+-- conditional static ability at all -- abilityRemoval's posture for its own gate,
+-- and anyConditional is the same cheap structural test gather uses.
 setLandSubtypeEffects :: GameState -> [(ObjectId, Affected.Affected)]
 setLandSubtypeEffects gs =
+  let functioning =
+        if anyConditional gs
+          then conditionHolds (gatherGiven (const False) alwaysFunctioning gs) gs
+          else alwaysFunctioning
+   in setLandSubtypeEffectsGiven functioning gs
+
+-- setLandSubtypeEffects with the CR 604.2 gate left open, for a caller INSIDE the
+-- layer fold. gatherGiven passes its own pass's gate -- open on the seed pass,
+-- answered on the second -- which is what keeps this off the fixpoint: the gated
+-- reader above is never called from anywhere the projection can reach.
+setLandSubtypeEffectsGiven :: (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [(ObjectId, Affected.Affected)]
+setLandSubtypeEffectsGiven functioning gs =
   let isSet m = case m of
         Modification.SetLandSubtype _ -> True
         -- CR 305.7 does not care where the type came from: a type chosen as the
@@ -1296,8 +1363,12 @@ setLandSubtypeEffects gs =
         Nothing -> []
         Just face ->
           let changes = textChangesAffecting permId gs
+              -- CR 604.2's clause, asked exactly as gatherStatic asks it: same
+              -- rewrite, same CR 613.6 decision point. Free for an unconditional
+              -- ability, since staticLives answers before the layer is forced.
+              lives sa = staticLives (functioning permId) changes (minimum (fmap layer (staticParts changes sa))) sa
            in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
-                filter (any isSet . StaticAbility.modifications) (Face.staticAbilities face)
+                filter (\sa -> any isSet (StaticAbility.modifications sa) && lives sa) (Face.staticAbilities face)
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
@@ -1572,6 +1643,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
   Effect.RemoveFromCombat _ -> effect
+  Effect.BecomesBlocked _ -> effect
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword through the swap (#1190).
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin position)
@@ -1580,6 +1652,9 @@ rewriteEffect pairs effect = case effect of
   -- swap reaches it; the slot it binds to is a name no card prints.
   Effect.Mill (Mill.MkMill ref quantity mTally) ->
     Effect.Mill (Mill.MkMill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally))
+  -- The ObjectRef alone, as Explore below: the slot name is not a word a CR
+  -- 612.1 swap reaches.
+  Effect.LookAt (LookAt.MkLookAt ref slot) -> Effect.LookAt (LookAt.MkLookAt (rewriteObjectRef pairs ref) slot)
   Effect.Scry {} -> effect
   Effect.Surveil {} -> effect
   Effect.Fateseal {} -> effect
@@ -1679,13 +1754,15 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- Chooser name players rather than subtypes. EachPlayer, TopOfLibrary and
 -- EachCardInYourHand carry no word at all -- CR 612.1 changes subtype words, and
 -- "each player", "the top card of your library" and "all cards from your hand"
--- have none.
+-- have none. Nor does EachCardExiledWithSource: CR 607.2a's set is named by which
+-- object exiled the cards, so "the exiled card" carries no subtype either.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s f) -> ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s (Filter.rewrite pairs f))
   ObjectRef.EachCardInYourHand -> ref
+  ObjectRef.EachCardExiledWithSource -> ref
   ObjectRef.EachPlayer -> ref
   ObjectRef.TopOfLibrary {} -> ref
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
@@ -1800,6 +1877,12 @@ rewriteModal pairs modal =
           { Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c),
             -- CR 701.46a's clause gate is a Condition, so its Filters are
             -- printed words a text change must reach too.
+            --
+            -- Not implemented: the clause's CR 118.12 pay gate. Its Cost can
+            -- name a subtype -- "unless you sacrifice a Goblin" -- and that word
+            -- is left as printed here, so the resolution-time offer asks the
+            -- pre-hack question (#635). No card in the pool states one, which is
+            -- why this is a record update rather than a Filter.rewriteCost call.
             Clause.condition = fmap (rewriteCondition pairs) (Clause.condition c)
           }
       rewriteTargetSlot slot = slot {TargetSlot.filter = fmap (Filter.rewrite pairs) (TargetSlot.filter slot)}
@@ -2032,9 +2115,9 @@ gather gs =
 -- condition is judged against, never leave gather to re-enter itself.
 --
 -- Not implemented: the CR 613.1f removal question the seed answers is therefore
--- asked of a conditional ability whose clause is false, as is abilityRemoval's,
--- and setLandSubtypeEffects and controlGrants read the printed list without the
--- gate at all (#727).
+-- asked of a conditional ability whose clause is false, as is abilityRemoval's
+-- (#1528), and controlGrants reads the printed list without the gate at all
+-- (#1529).
 alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
 alwaysFunctioning _ _ _ = True
 
@@ -2096,7 +2179,7 @@ conditionHolds cands gs src lowest =
 -- with the real answers.
 gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered]
 gatherGiven stripped functioning gs =
-  let setEffs = setLandSubtypeEffects gs
+  let setEffs = setLandSubtypeEffectsGiven functioning gs
       -- A stored effect carries exactly one modification, so CR 613.6 has nothing
       -- to hold together -- and every stored effect's set is CR 611.2c's
       -- TheseObjects, locked when the effect began: at resolution for the ones a
@@ -2280,7 +2363,10 @@ frozenStaticParts src gs =
   let cands = gather gs
       -- gather's own seed list, and the same one it feeds its two gates.
       ungated = gatherGiven (const False) alwaysFunctioning gs
-      parts = permanentParts (abilitiesRemoved ungated gs) (conditionHolds ungated gs) (setLandSubtypeEffects gs) gs src
+      -- gather's CR 604.2 gate, shared by the two readers that must agree on it:
+      -- which abilities are gathered, and which of them CR 305.7 strips.
+      functioning = conditionHolds ungated gs
+      parts = permanentParts (abilitiesRemoved ungated gs) functioning (setLandSubtypeEffectsGiven functioning gs) gs src
       applies c oid =
         let lyr = gLowest c
             partial = projectUpTo lyr cands oid gs
@@ -2508,10 +2594,7 @@ grantedDefiningParts m = case m of
 -- the effect start to apply at all.
 gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
 gatherStatic functioning src ts changes stripped n sa =
-  let -- CR 612 rewrites each printed modification, and grantedDefiningParts then
-      -- expands what the rewrite produced -- in that order, since the expansion
-      -- emits an engine-minted part that is not card text for CR 612 to reach.
-      ms = StaticAbility.modifications sa >>= grantedDefiningParts . rewriteModification changes
+  let ms = staticParts changes sa
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
         _ -> Nothing
@@ -2539,20 +2622,38 @@ gatherStatic functioning src ts changes stripped n sa =
             gModification = m'
           }
       parts = fmap one (NonEmpty.toList ms)
-      -- Free for an unconditional ability, which is all but Kird Ape's: the Maybe
-      -- answers before `functioning` -- and so before conditionHolds' projection --
-      -- is ever forced.
-      --
-      -- CR 612.1: the CR 604.2 "as long as" clause is printed in the text box
-      -- just as the affected clause beside it is, so the same word swap reaches
-      -- it (#765). Short-circuited on `null changes` for the same reason
-      -- `affected` is -- Filter.rewrite walks the whole tree either way -- but
-      -- kept inside the maybe, since an unconditional ability has no clause to
-      -- rewrite at all.
-      lives = maybe True (\c -> functioning lowest (if null changes then c else rewriteCondition changes c)) (StaticAbility.condition sa)
+      -- CR 604.2's clause, shared with setLandSubtypeEffects -- see staticLives.
+      lives = staticLives functioning changes lowest sa
    in -- The cheap structural test first, so `stripped`'s projection is forced only
       -- for an ability the rest of the rule could reach.
       if (lowest > Layer.Ability && stripped) || not lives then [] else parts
+
+-- The parts one printed static ability contributes. CR 612 rewrites each printed
+-- modification, and grantedDefiningParts then expands what the rewrite produced --
+-- in that order, since the expansion emits an engine-minted part that is not card
+-- text for CR 612 to reach.
+staticParts :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> StaticAbility.StaticAbility -> NonEmpty.NonEmpty Modification
+staticParts changes sa = StaticAbility.modifications sa >>= grantedDefiningParts . rewriteModification changes
+
+-- CR 604.2's "as long as" gate for ONE printed static ability, asked at `lowest` --
+-- CR 613.6's decision point, which is the minimum layer over the ability's parts.
+--
+-- Shared rather than restated, since the two readers must agree: gatherStatic
+-- decides whether the ability's effect applies at all, and setLandSubtypeEffects
+-- whose rules text CR 305.7 strips because it did.
+--
+-- Free for an unconditional ability, which is all but a handful: the Maybe answers
+-- before `functioning` -- and so before conditionHolds' projection -- or `lowest`
+-- is ever forced.
+--
+-- CR 612.1: the clause is printed in the text box just as the affected clause
+-- beside it is, so the same word swap reaches it (#765). Short-circuited on
+-- `null changes` for the reason gatherStatic's `affected` is -- Filter.rewrite
+-- walks the whole tree either way -- but kept inside the maybe, since an
+-- unconditional ability has no clause to rewrite at all.
+staticLives :: (Layer -> Condition.Type.Condition -> Bool) -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Layer -> StaticAbility.StaticAbility -> Bool
+staticLives functioning changes lowest sa =
+  maybe True (\c -> functioning lowest (if null changes then c else rewriteCondition changes c)) (StaticAbility.condition sa)
 
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c. Each
 -- object's counters are emitted as ONE synthetic 7c ModifyPowerToughness carrying
@@ -2750,6 +2851,10 @@ filterReads f = case f of
   -- should.
   Filter.Type.OwnedBy _ -> Set.empty
   Filter.Type.IsSource -> Set.empty
+  -- Reads an object's IDENTITY, which CR 109.3 does not count among its
+  -- characteristics and no CR 613 layer writes -- IsSource's answer, and for its
+  -- reason.
+  Filter.Type.IsBound _ -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   -- Reads a CONTROLLER rather than a characteristic (CR 109.3 lists none), so it
   -- declares nothing -- IsPlayer's answer, and ControlledBy's.
@@ -2767,9 +2872,15 @@ filterReads f = case f of
   -- restrictions gate the declaration on projected characteristics, but the
   -- declaration is a turn-based action that writes the record once and is over.
   Filter.Type.IsBlocking -> Set.empty
+  -- Reads nothing, for IsBlocking's reason and off the same record: an effect
+  -- conferring the status (Effect.BecomesBlocked) writes it from a resolution,
+  -- which is between projections like every other writer.
+  Filter.Type.IsBlocked -> Set.empty
   -- Reads nothing: no Modification writes GameState.events, so no CR 613 layer can
   -- move a set this atom selects.
   Filter.Type.AttackedThisTurn -> Set.empty
+  -- Reads nothing, for AttackedThisTurn's reason and off the same log.
+  Filter.Type.MilledThisTurn -> Set.empty
   -- Declared as reading Types even though the types are the HOST's. Aspect names
   -- an aspect of ONE object's projection, so there is no way to say "another
   -- object's card types"; over-declaring is the conservative direction. Nothing in
@@ -3253,11 +3364,12 @@ projectDeciding admits cands = forObject
                         -- partials are already built. What made a bound necessary
                         -- was a count RE-PROJECTING its candidates; this reads them.
                         --
-                        -- An object with no entry falls back to the bounded view. A
-                        -- card in a zone gather does not walk has no continuous
-                        -- effect on it to miss (#160). Not implemented: a SPELL is
-                        -- projected but not scanned here, so a count reading a
-                        -- same-layer effect on one still gets the bound (#1332).
+                        -- An object with no entry falls back to the bounded view:
+                        -- the running board holds the battlefield plus the object
+                        -- being projected, so a spell and a card in a hidden zone
+                        -- both land there. Not implemented: each is projected but
+                        -- not scanned here, so a count reading a same-layer effect
+                        -- on one still gets the bound (#1332).
                         --
                         -- noncreaturePT is CR 208.3, applied for the reason
                         -- projectDeciding applies it to its own result: the card types
@@ -3997,6 +4109,9 @@ data ControlGrant = MkControlGrant
 -- via Pawl.ProjectionSpec's two Celestial Dawn cases. Pawl.ProjectionSpec's "a
 -- layer-6 strip on the Aura does not undo its layer-2 grant" pins the same
 -- direction for layer 6.
+--
+-- Not implemented: CR 604.2's "as long as" gate, which setLandSubtypeEffects does
+-- ask -- the same mutual recursion rules it out here (#1529).
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
   let grantsOf permId = case Game.lookupObject permId gs of

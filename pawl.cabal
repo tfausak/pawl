@@ -294,6 +294,8 @@ library codec
     Pawl.Codec.LifeChangeSpec
     Pawl.Codec.LimitUnless
     Pawl.Codec.LimitUnlessSpec
+    Pawl.Codec.LookAt
+    Pawl.Codec.LookAtSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltySpec
     Pawl.Codec.ManaCost
@@ -311,6 +313,8 @@ library codec
     Pawl.Codec.Mentored
     Pawl.Codec.MentoredSpec
     Pawl.Codec.Mill
+    Pawl.Codec.Milled
+    Pawl.Codec.MilledSpec
     Pawl.Codec.MillSpec
     Pawl.Codec.MillTally
     Pawl.Codec.MillTallySpec
@@ -350,6 +354,10 @@ library codec
     Pawl.Codec.OnsetSpec
     Pawl.Codec.Optionality
     Pawl.Codec.OptionalitySpec
+    Pawl.Codec.PayBranch
+    Pawl.Codec.PayBranchSpec
+    Pawl.Codec.PayGate
+    Pawl.Codec.PayGateSpec
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
     Pawl.Codec.PermanentSacrificed
@@ -510,8 +518,6 @@ library codec
     Pawl.Codec.TurnWindowSpec
     Pawl.Codec.TypeLine
     Pawl.Codec.TypeLineSpec
-    Pawl.Codec.UnlessPaid
-    Pawl.Codec.UnlessPaidSpec
     Pawl.Codec.UntapRestriction
     Pawl.Codec.UntapRestrictionSpec
     Pawl.Codec.Uses
@@ -973,6 +979,7 @@ library types
     Pawl.Types.LibraryPosition
     Pawl.Types.LifeChange
     Pawl.Types.LimitUnless
+    Pawl.Types.LookAt
     Pawl.Types.Loyalty
     Pawl.Types.Mana
     Pawl.Types.ManaCost
@@ -985,6 +992,7 @@ library types
     Pawl.Types.ManaUnit
     Pawl.Types.Mentored
     Pawl.Types.Mill
+    Pawl.Types.Milled
     Pawl.Types.MillTally
     Pawl.Types.Modal
     Pawl.Types.Mode
@@ -1010,6 +1018,8 @@ library types
     Pawl.Types.Onset
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
+    Pawl.Types.PayBranch
+    Pawl.Types.PayGate
     Pawl.Types.Payment
     Pawl.Types.PaymentDecision
     Pawl.Types.PendingTrigger
@@ -1115,7 +1125,6 @@ library types
     Pawl.Types.TurnUpRewrite
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
-    Pawl.Types.UnlessPaid
     Pawl.Types.UntapRestriction
     Pawl.Types.Uses
     Pawl.Types.VentureMarkerEntered
