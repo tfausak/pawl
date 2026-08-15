@@ -718,6 +718,11 @@ monocoloredHybridGeneric = 2
 -- which every route offered here has to be payable alongside (#1134). Empty for a
 -- cost whose components take nothing out of a zone.
 --
+-- `spending` is CR 118.14's permission, riding through to the payability
+-- question below for the reason `outside` and `claimed` do: a route this
+-- function refuses is a choice taken away from the player, and under a
+-- permission to spend mana of any type the off-colour route is a real one.
+--
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
 announce :: Capacity -> ManaSpending -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural)
 announce capacity spending pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 symbols
@@ -870,17 +875,17 @@ hybridHalves a b = if a == b then [a] else [a, b]
 --
 -- A mana cost that is part of a whole COST goes through canPayCommitting below
 -- instead, because its components may want life too (CR 118.3 again). What is
--- left here is the mana cost asked about on its own.
--- Nothing committed, nothing claimed and no CR 118.14 permission: this is the
--- mana cost asked about on its own, under the spending rule every cost takes
--- when no effect has spoken about it.
+-- left here is the mana cost asked about on its own -- with nothing committed,
+-- nothing claimed and no CR 118.14 permission, which is the spending rule every
+-- cost takes when no effect has spoken about it.
 canPay :: Capacity -> PlayerId -> ManaCost -> GameState -> Bool
 canPay capacity pid = canPayCommitting capacity ManaSpending.AsProduced pid 0 []
 
--- The same question with the payer's CR 118.14 permission and resources already
--- spoken for: `committed` life, which CR
--- 119.4's floor must still admit alongside whatever the rest of this cost costs,
--- and `claimed`, the objects the rest of this cost will take out of a zone.
+-- The same question with the payer's CR 118.14 permission and with resources
+-- already spoken for: `spending`, which `relax` applies to the demands;
+-- `committed` life, which CR 119.4's floor must still admit alongside whatever
+-- the rest of this cost costs; and `claimed`, the objects the rest of this cost
+-- will take out of a zone.
 --
 -- Two callers commit life: `announce`, for CR 118.13a's choices -- both those
 -- already made and those a `completions` entry is standing in for -- and

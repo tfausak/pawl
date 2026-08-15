@@ -1571,7 +1571,11 @@ canPayComponent pid oid component gs = case component of
 --
 -- The cost is the one the CALLER determined, taken as a value and never re-read
 -- from the game state -- which is CR 601.2f's "locked in" (see `total` above).
--- Paying one part of it therefore cannot change what another part costs.
+-- Paying one part of it therefore cannot change what another part costs. CR
+-- 118.14's `spending` arrives the same way and for a sharper reason: the object
+-- that granted the payer that permission is not the object being paid for, since
+-- CR 601.2a moved the card to the stack before any of this
+-- (Pawl.Engine.Cast.spendingFor).
 --
 -- A payment can still go Unpaid where `canPay` called the cost payable, and that
 -- is the player's own doing rather than the engine's: paying one object-removing
