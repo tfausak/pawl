@@ -37,7 +37,9 @@ first question.
   `docs/design.md`
 
 - Rules ground truth:
-  `docs/rules.txt`, grepped by rule number --- never memory
+  `docs/rules.txt`, grepped by rule number --- never memory, and never a rule
+  number quoted in an issue or a brief. `script/cr.hs --number 702.21a` prints
+  one rule; it errors rather than guessing when the number does not exist.
 
 - Prior-art evidence:
   `docs/prior-art-lessons.md`
