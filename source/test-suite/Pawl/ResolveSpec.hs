@@ -607,12 +607,13 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let base = Setup.emptyGame S.bothPlayers
         (islandId, g1) = S.addCreature island S.alice base
         (forestId, g2) = S.addCreature forest S.alice g1
-        (boilId, g3) = Game.freshObjectId g2
+        (boilPrintingId, g2b) = Game.intern boil g2
+        (boilId, g3) = Game.freshObjectId g2b
         boilObj =
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard boil,
+              Object.source = Source.OfCard boilPrintingId,
               Object.zone = Zone.Stack,
               Object.tapped = TapState.Untapped,
               Object.facing = Facing.FaceUp,
@@ -663,12 +664,13 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let base = Setup.emptyGame S.bothPlayers
         (nonbasicId, g1) = S.addCreature urborg S.alice base
-        (bloodMoonSpellId, g2) = Game.freshObjectId g1
+        (bloodMoonPrintingId, g1b) = Game.intern bloodMoon g1
+        (bloodMoonSpellId, g2) = Game.freshObjectId g1b
         bmObj =
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              Object.source = Source.OfCard bloodMoon,
+              Object.source = Source.OfCard bloodMoonPrintingId,
               Object.zone = Zone.Stack,
               Object.tapped = TapState.Untapped,
               Object.facing = Facing.FaceUp,
@@ -1322,7 +1324,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         stubRunner = pure (Result.Won S.alice)
         -- hand-build alice's spell on the stack: one chosen mode (index 0),
         -- effects [PlaySubgame slot, DealDamage slot (Literal 3)], no targets.
-        (spellId, g1) = Game.freshObjectId g0
+        (spellPrintingId, g0b) = Game.intern (Printing.MkPrinting card) g0
+        (spellId, g1) = Game.freshObjectId g0b
         (ts, g2) = Game.freshTimestamp g1
         -- a minimal synthetic card whose spell has the two effects above;
         -- mirrors the file's existing synthetic-card idiom (CR 612 test above).
@@ -1371,7 +1374,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              Object.source = Source.OfToken card,
+              Object.source = Source.OfToken spellPrintingId,
               Object.zone = Zone.Stack,
               Object.tapped = TapState.Untapped,
               Object.facing = Facing.FaceUp,
@@ -1413,7 +1416,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         slot = SlotName.MkSlotName (Text.pack "loser")
         stubRunner :: Game Result.Result
         stubRunner = pure (Result.Won S.alice)
-        (spellId, g1) = Game.freshObjectId g0
+        (spellPrintingId, g0b) = Game.intern (Printing.MkPrinting card) g0
+        (spellId, g1) = Game.freshObjectId g0b
         (ts, g2) = Game.freshTimestamp g1
         card = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
         face =
@@ -1460,7 +1464,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           Object.MkObject
             { Object.owner = S.alice,
               Object.enteredUnder = Nothing,
-              Object.source = Source.OfToken card,
+              Object.source = Source.OfToken spellPrintingId,
               Object.zone = Zone.Stack,
               Object.tapped = TapState.Untapped,
               Object.facing = Facing.FaceUp,
@@ -1993,12 +1997,13 @@ twoBoltState :: Printing.Printing -> Printing.Printing -> Printing.Printing -> G
 twoBoltState piker mountain lightningBolt =
   let (_, withPiker) = S.addCreature piker S.bob (S.landsInPlay mountain 2)
       (gs1, _oid1) = S.handOne lightningBolt withPiker
-      (oid2, gs2) = Game.freshObjectId gs1
+      (boltPrintingId, gs1b) = Game.intern lightningBolt gs1
+      (oid2, gs2) = Game.freshObjectId gs1b
       obj =
         Object.MkObject
           { Object.owner = S.alice,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard lightningBolt,
+            Object.source = Source.OfCard boltPrintingId,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -2046,8 +2051,9 @@ cancelVictim island cancel victim =
 -- so a second in-hand card must be appended, not re-inserted).
 handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handAppend printing pid gs =
-  let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
+  let (printingId, gsP) = Game.intern printing gs
+      (oid, gs1) = Game.freshObjectId gsP
+      obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -3334,8 +3340,9 @@ handCards :: Printing.Printing -> PlayerId.PlayerId -> Int -> GameState.GameStat
 handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
   where
     addOne g =
-      let (oid, g1) = Game.freshObjectId g
-          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
+      let (printingId, gP) = Game.intern printing g
+          (oid, g1) = Game.freshObjectId gP
+          obj = Object.MkObject pid Nothing (Source.OfCard printingId) Zone.Hand TapState.Untapped Facing.FaceUp False 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Set.empty Set.empty False
        in g1
             { GameState.objects = Map.insert oid obj (GameState.objects g1),
               GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)

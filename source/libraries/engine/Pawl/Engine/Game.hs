@@ -292,7 +292,7 @@ cease abilId gs =
 
 -- The card an object is a copy of. Nothing when the id is unknown.
 cardOf :: ObjectId -> GameState -> Maybe Card
-cardOf oid gs = cardOfSource (fmap Object.source (lookupObject oid gs))
+cardOf oid gs = cardOfSource gs (fmap Object.source (lookupObject oid gs))
 
 -- CR 608.2h: `cardOf` for an object that may already be gone. The live object
 -- first, then the record filed under the id it had while it existed.
@@ -311,21 +311,43 @@ cardOf oid gs = cardOfSource (fmap Object.source (lookupObject oid gs))
 -- permanent for every projection and quantity read that goes through it.
 cardOfWithLastKnown :: ObjectId -> GameState -> Maybe Card
 cardOfWithLastKnown oid gs = case lookupObject oid gs of
-  Just obj -> cardOfSource (Just (Object.source obj))
-  Nothing -> cardOfSource (fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs)))
+  Just obj -> cardOfSource gs (Just (Object.source obj))
+  Nothing -> cardOfSource gs (fmap LastKnown.source (Map.lookup oid (GameState.lastKnown gs)))
 
 -- The card behind a Source, if it has one. An ability on the stack does not: it
 -- is an object in its own right (CR 113.7a), and the card is its SOURCE's.
-cardOfSource :: Maybe Source.Source -> Maybe Card
-cardOfSource mSource = case mSource of
+--
+-- Takes the GameState because the three card-shaped constructors name their
+-- printing rather than carrying it (#1592). Both callers above already held it.
+cardOfSource :: GameState -> Maybe Source.Source -> Maybe Card
+cardOfSource gs mSource = case mSource of
   Nothing -> Nothing
   Just source -> case source of
-    Source.OfCard printing -> Just (Printing.card printing)
-    Source.OfToken card -> Just card
+    Source.OfCard pid -> cardOfPrinting pid gs
+    Source.OfToken pid -> cardOfPrinting pid gs
     Source.OfAbility _ _ -> Nothing
     Source.OfTrigger _ _ -> Nothing
-    Source.OfEmblem card -> Just card
+    Source.OfEmblem pid -> cardOfPrinting pid gs
     Source.OfInherentTrigger _ _ -> Nothing
+
+cardOfPrinting :: PrintingId.PrintingId -> GameState -> Maybe Card
+cardOfPrinting pid gs = fmap Printing.card (printingOf pid gs)
+
+-- `cardOf` for a member of a HAND. An emblem answers Nothing where `cardOf`
+-- answers a card: CR 114.5 keeps an emblem off the battlefield, and CR 114.1
+-- puts it in the command zone, so the arm states what a hand can hold rather
+-- than covering a case a hand can reach.
+--
+-- One reader for the four that asked it separately -- Pawl.Engine.Foretell's
+-- and Pawl.Engine.Plot's cost lookups, and Pawl.Engine.Action's land-play and
+-- special-action scans. All four read a card in the hand, which pawl's
+-- projection does not reach (#160), so all four go to the printed card.
+cardOfHandMember :: ObjectId -> GameState -> Maybe Card
+cardOfHandMember oid gs = do
+  obj <- lookupObject oid gs
+  case Object.source obj of
+    Source.OfEmblem _ -> Nothing
+    source -> cardOfSource gs (Just source)
 
 -- Narrow a card down to the face a (possibly absent) chosen name picks out --
 -- CR 709.3b's half of resolveFaceFor below, which faceOf and faceOfWithLastKnown

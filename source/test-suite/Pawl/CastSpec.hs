@@ -238,8 +238,8 @@ stackSpec s registry = Spec.describe s "Stack" $ do
         Just obj -> do
           Spec.assertEqWith s "zone" (Object.zone obj) Zone.Battlefield
           case Object.source obj of
-            Source.OfCard printing ->
-              Spec.assertBool s (Card.isCreature (S.combinedFace printing)) "creature"
+            Source.OfCard printingId ->
+              Spec.assertBool s (maybe False (Card.isCreature . Card.combined) (Game.cardOfPrinting printingId after)) "creature"
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
@@ -347,8 +347,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
         Just obj -> do
           Spec.assertEqWith s "zone" (Object.zone obj) Zone.Stack
           case Object.source obj of
-            Source.OfCard printing ->
-              Spec.assertEqWith s "name" (Face.name (S.combinedFace printing)) (CardName.MkCardName $ Text.pack "Goblin Piker")
+            Source.OfCard printingId ->
+              Spec.assertEqWith s "name" (fmap S.nameOf (Game.cardOfPrinting printingId after)) (Just (CardName.MkCardName $ Text.pack "Goblin Piker"))
             Source.OfToken _ -> Spec.assertFailure s "expected a card source"
             Source.OfAbility _ _ -> Spec.assertFailure s "expected a card source"
             Source.OfTrigger _ _ -> Spec.assertFailure s "expected a card source"
@@ -636,13 +636,14 @@ discardSpec s registry = Spec.describe s "Discard" $ do
 -- phase with priority.
 handInPlay :: Printing.Printing -> GameState.GameState -> (GameState.GameState, ObjectId.ObjectId)
 handInPlay printing board =
-  let (oid, g1) = Game.freshObjectId board
+  let (printingId, boardP) = Game.intern printing board
+      (oid, g1) = Game.freshObjectId boardP
       (ts, g2) = Game.freshTimestamp g1
       obj =
         Object.MkObject
           { Object.owner = S.alice,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -2779,7 +2780,7 @@ nameOnStack :: CardName.CardName -> GameState.GameState -> ObjectId.ObjectId -> 
 nameOnStack wanted gs oid = case Game.lookupObject oid gs of
   Just o -> case Object.source o of
     Source.OfCard _ -> fmap Face.name (Game.faceOf oid gs) == Just wanted
-    Source.OfToken card -> S.nameOf card == wanted
+    Source.OfToken printingId -> fmap S.nameOf (Game.cardOfPrinting printingId gs) == Just wanted
     Source.OfAbility _ _ -> False
     Source.OfTrigger _ _ -> False
     Source.OfEmblem _ -> False

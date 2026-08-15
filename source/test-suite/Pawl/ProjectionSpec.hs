@@ -266,7 +266,7 @@ humilityTimestamp humility gs =
   let isHum oid = case Game.lookupObject oid gs of
         Nothing -> False
         Just obj -> case Object.source obj of
-          Source.OfCard p -> Printing.card p == Printing.card humility
+          Source.OfCard p -> Game.cardOfPrinting p gs == Just (Printing.card humility)
           Source.OfToken _ -> False
           Source.OfAbility _ _ -> False
           Source.OfTrigger _ _ -> False

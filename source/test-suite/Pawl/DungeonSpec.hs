@@ -128,8 +128,11 @@ dungeonBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> I
 dungeonBoard island door lostMine lands =
   let stocked = List.foldl' (\g _ -> snd (S.addLibraryCard island S.alice g)) (S.landsInPlay island lands) [1 .. (4 :: Int)]
       (doorId, g1) = S.addCreature door S.alice stocked
-      owned p = p {Player.dungeon = Just lostMine}
-   in (doorId, g1 {GameState.players = Map.adjust owned S.alice (GameState.players g1)})
+      -- CR 309.2: the dungeon is recorded on the player and no object is minted
+      -- for it, so its printing is interned here rather than by an object build.
+      (lostMineId, g2) = Game.intern lostMine g1
+      owned p = p {Player.dungeon = Just lostMineId}
+   in (doorId, g2 {GameState.players = Map.adjust owned S.alice (GameState.players g2)})
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
@@ -248,7 +251,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Dungeon" $ do
     lostMine <- S.printingOf s registry "Lost Mine of Phandelver"
     let deck = Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = Nothing, Deck.dungeon = Just lostMine}
         after = S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.createDeck S.alice deck)
-    Spec.assertEqWith s "alice owns it" (Map.lookup S.alice (GameState.players after) >>= Player.dungeon) (Just lostMine)
+    Spec.assertEqWith s "alice owns it" (Map.lookup S.alice (GameState.players after) >>= Player.dungeon >>= \i -> Game.printingOf i after) (Just lostMine)
     Spec.assertEqWith s "bob owns none" (Map.lookup S.bob (GameState.players after) >>= Player.dungeon) Nothing
     -- CR 309.2 / 400.11: it begins OUTSIDE the game, so setup mints no object for
     -- it at all.

@@ -22,11 +22,8 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
-import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.Zone as Zone
 
@@ -56,16 +53,7 @@ import qualified Pawl.Types.Zone as Zone
 -- prohibition is a membership test rather than a comparison all the same.
 playableLands :: PlayerId -> GameState -> [(ObjectId, Maybe CardName.CardName)]
 playableLands pid gs =
-  let cardOfHandCard oid = case Game.lookupObject oid gs of
-        Just obj -> case Object.source obj of
-          Source.OfCard printing -> Just (Printing.card printing)
-          Source.OfToken card -> Just card
-          Source.OfAbility _ _ -> Nothing
-          Source.OfTrigger _ _ -> Nothing
-          Source.OfEmblem _ -> Nothing
-          Source.OfInherentTrigger _ _ -> Nothing
-        Nothing -> Nothing
-      playable oid = case cardOfHandCard oid of
+  let playable oid = case Game.cardOfHandMember oid gs of
         Nothing -> []
         Just card ->
           if PlayerEffect.prohibitsPlayingLand pid (Card.combinedNames card) gs
@@ -86,15 +74,7 @@ playableLands pid gs =
 -- card data grants the operation, never which card it is.
 discardableCards :: PlayerId -> GameState -> [ObjectId]
 discardableCards pid gs =
-  let grantsIt oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> case Object.source obj of
-          Source.OfCard printing -> granted (Printing.card printing)
-          Source.OfToken card -> granted card
-          Source.OfAbility _ _ -> False
-          Source.OfTrigger _ _ -> False
-          Source.OfEmblem _ -> False
-          Source.OfInherentTrigger _ _ -> False
+  let grantsIt oid = maybe False granted (Game.cardOfHandMember oid gs)
       granted card = List.elem SpecialAction.DiscardThisAnyTime (Face.specialActions (Card.combined card))
    in filter grantsIt (Game.zoneMembers Zone.Hand pid gs)
 

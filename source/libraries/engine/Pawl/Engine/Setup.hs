@@ -46,7 +46,12 @@ import qualified Pawl.Types.Zone as Zone
 -- rather than on a claim about Magic: Deck.commander is set by nothing but a
 -- Commander deck, and pawl has no game options at all (#175), so there is no
 -- way for the two to come apart.
-startingLife :: Maybe Printing -> Integer
+--
+-- Parametric because the designation reaches it two ways -- as the Deck's
+-- Printing when a game is built, and as the Player's PrintingId when one is
+-- restarted (CR 727) -- and rule 903.7 turns on WHETHER a commander was
+-- designated, never on which card it is.
+startingLife :: Maybe a -> Integer
 startingLife commander = if Maybe.isJust commander then 40 else 20
 
 -- How many cards this deck holds, CR 903.5's commander included: rule 903.5
@@ -151,8 +156,37 @@ emptyGame order =
           GameState.turnAnchor = Nothing
         }
 
-createCard :: PlayerId -> Printing -> Game ObjectId
-createCard pid printing = do
+-- Every distinct printing a deck names, interned once, so that the copies of a
+-- 4-of share one id -- and so that the commander's id is the one its own
+-- objects carry. Pawl.Engine.Commander's designation check compares the
+-- player's record against the object's printing, which id equality decides more
+-- strictly than value equality did: two structurally equal Printings interned
+-- separately would no longer match.
+--
+-- Local to building one deck, and so not the reverse index Game.intern
+-- declines. The deep Ord Printing is paid once per deck here, at setup, and
+-- never again.
+internDeck :: Deck.Deck -> Game (Map.Map Printing PrintingId.PrintingId)
+internDeck deck =
+  let distinct =
+        Map.keys (Deck.cards deck)
+          <> Maybe.maybeToList (Deck.commander deck)
+          <> Maybe.maybeToList (Deck.dungeon deck)
+   in Monad.foldM
+        ( \acc printing ->
+            if Map.member printing acc
+              then pure acc
+              else do
+                gs <- State.get
+                let (pid, gs1) = Game.intern printing gs
+                State.put gs1
+                pure (Map.insert printing pid acc)
+        )
+        Map.empty
+        distinct
+
+createCard :: PlayerId -> PrintingId.PrintingId -> Game ObjectId
+createCard pid printingId = do
   gs <- State.get
   let (oid, gs1) = Game.freshObjectId gs
       (ts, gs2) = Game.freshTimestamp gs1
@@ -160,7 +194,7 @@ createCard pid printing = do
         Object.MkObject
           { Object.owner = pid,
             Object.enteredUnder = Nothing,
-            Object.source = Source.OfCard printing,
+            Object.source = Source.OfCard printingId,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,
             Object.facing = Facing.FaceUp,
@@ -209,6 +243,10 @@ createCard pid printing = do
 -- zones constantly; an id or an object field could not survive that.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid deck = do
+  -- Before any object is minted: every id below comes out of this one map, which
+  -- is what makes the copies of a 4-of share an entry and the commander's
+  -- designation name the same printing its object does.
+  ids <- internDeck deck
   -- CR 903.7 / CR 103.4: the starting life total, which is the deck's business
   -- and so cannot be settled by emptyGame above.
   State.modify' $ \gs ->
@@ -218,12 +256,13 @@ createDeck pid deck = do
           -- minted for it, because dungeon cards begin OUTSIDE the game and
           -- outside the game is not a zone (CR 400.11). CR 701.49a is what brings
           -- it in; Pawl.Engine.Dungeon.enter is that rule.
-          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeon = Deck.dungeon deck}) pid (GameState.players gs)
+          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck), Player.dungeon = Deck.dungeon deck >>= \d -> Map.lookup d ids}) pid (GameState.players gs)
       }
   Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) ->
-    Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printing)
-  Monad.forM_ (Deck.commander deck) $ \printing -> do
-    oid <- createCard pid printing
+    Monad.forM_ (Map.lookup printing ids) $ \printingId ->
+      Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printingId)
+  Monad.forM_ (Deck.commander deck) $ \printing -> Monad.forM_ (Map.lookup printing ids) $ \printingId -> do
+    oid <- createCard pid printingId
     State.modify' $ \gs ->
       let moved =
             Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones pid oid gs)
@@ -236,7 +275,7 @@ createDeck pid deck = do
               { GameState.objects =
                   Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved)
               }
-       in Commander.designate pid printing rezoned
+       in Commander.designate pid printingId rezoned
 
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do

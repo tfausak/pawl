@@ -40,8 +40,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -72,14 +70,7 @@ actionCost =
 -- keeps one reader of the keyword rather than two.
 foretellCostOf :: ObjectId -> GameState -> Maybe (Cost Keyword)
 foretellCostOf oid gs = do
-  obj <- Game.lookupObject oid gs
-  card <- case Object.source obj of
-    Source.OfCard printing -> Just (Printing.card printing)
-    Source.OfToken card -> Just card
-    Source.OfAbility _ _ -> Nothing
-    Source.OfTrigger _ _ -> Nothing
-    Source.OfEmblem _ -> Nothing
-    Source.OfInherentTrigger _ _ -> Nothing
+  card <- Game.cardOfHandMember oid gs
   Keyword.foretellCost (Face.keywords (Card.combined card))
 
 -- CR 702.143a / 116.2h: may this player foretell this card right now? Three
