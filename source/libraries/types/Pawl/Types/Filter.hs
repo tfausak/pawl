@@ -51,8 +51,9 @@ data Filter keyword
     --
     -- Read through the PROJECTION, so a creature that gains flying at CR 613.1f
     -- layer 6 matches and a Humility'd one stops matching. The readers that take
-    -- Projection.viewOfCardIn instead -- a search, a cost criterion, a mill tally
-    -- -- see the printed keywords of a card off the battlefield (#160).
+    -- Projection.viewOfCardIn instead -- a cost criterion, a mill tally -- see
+    -- the printed keywords of a card off the battlefield (#160); a library
+    -- search no longer does.
     HasKeyword keyword
   | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
     -- its payload -- Flensing Raptor's "another target creature you control with

@@ -62,6 +62,7 @@ import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -180,6 +181,45 @@ recruiterCandidates s registry buried = do
           (Engine.runGame (searchRecordingAnswer pikerId) gs (do S.cast S.alice spellId; Engine.priorityLoop))
           ([], [])
   pure (fmap (namesOf gs) searches)
+
+-- Goblin Matron's search candidates, by card name, over a board that either has
+-- Maskwood Nexus on the battlefield or does not. Alice's library is fixed: a
+-- Goblin Piker (printed a Goblin, so both boards have a candidate and the prompt
+-- is never short-circuited down to the one card it had to offer), a Hill Giant
+-- (a creature card printed a Giant) and a Mountain (a land, outside the Nexus's
+-- creature-card set on either board). The Piker is what the answerer takes, so
+-- neither search fails for want of a legal pick and the candidate SET is the
+-- only thing that moves.
+--
+-- The library is stocked BEFORE the Nexus reaches the battlefield, which is what
+-- separates "the effect applied to those cards as they arrived" from "the effect
+-- applies to cards sitting in a library": the former reads the same set on both
+-- boards.
+matronCandidates :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m [Set.Set Text.Text]
+matronCandidates s registry withNexus = do
+  mountain <- S.printingOf s registry "Mountain"
+  matron <- S.printingOf s registry "Goblin Matron"
+  nexus <- S.printingOf s registry "Maskwood Nexus"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  let base0 = S.landsInPlay mountain 3
+      (_, base1) = S.addLibraryCard mountain S.alice base0
+      (_, base2) = S.addLibraryCard giant S.alice base1
+      (pikerId, base3) = S.addLibraryCard piker S.alice base2
+      base4 = if withNexus then snd (S.addCreature nexus S.alice base3) else base3
+      (gs, spellId) = S.handOne matron base4
+      (_, (searches, _)) =
+        State.runState
+          (Engine.runGame (matronAnswer pikerId) gs (do S.cast S.alice spellId; Engine.priorityLoop))
+          ([], [])
+  pure (fmap (namesOf gs) searches)
+
+-- searchRecordingAnswer with CR 603.5's "may" exercised, which Goblin Matron's
+-- trigger asks and Imperial Recruiter's mandatory one does not.
+matronAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State ([[ObjectId.ObjectId]], [[ObjectId.ObjectId]]) r
+matronAnswer wanted p = case p of
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  _ -> searchRecordingAnswer wanted p
 
 -- aimAtObject for a Pool.Creatures slot, whose recipients are ToCreature.
 aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -2410,10 +2450,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   -- The gameplay-level proof of Projection.printedPower. Imperial Recruiter's
   -- entry trigger searches alice's library for "a creature card with power 2 or
-  -- less", and the candidates come from Projection.viewOfCardIn -- the
-  -- printed-card view a library search still takes, not the only view the card
-  -- has: it is an object, so Projection.viewOfObject projects it here as it does
-  -- anywhere (see #160 for the gap between the two).
+  -- less", and the candidates come from Projection.viewOfObject -- the card's own
+  -- CR 613 projection, whose layer 7a is where CR 208.2a's number is filled in.
   --
   -- THE CANDIDATE SET IS THE ASSERTION, not what was found: with Filter.power
   -- Nothing for every card off the battlefield, CR 208.1's PowerAtMost answered
@@ -2495,6 +2533,28 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         libraryPower = Game.faceOf inLibrary gs3 >>= Filter.power . Projection.viewOfCardIn gs3 inLibrary
     Spec.assertEqWith s "on the battlefield" (Projection.powerOf onBattlefield gs3) (Just 2)
     Spec.assertEqWith s "in the library" libraryPower (Just 2)
+
+  -- CR 613.1 over a card in a LIBRARY, read from OUTSIDE the fold: the search
+  -- filter. Rule 613.1 starts from the actual object and names no zone, so
+  -- Maskwood Nexus's creature-card set (CR 613.1d, layer 4) reaches a card in a
+  -- library, and CR 701.23a's "given description" has to be matched against that
+  -- projection rather than against the printed card.
+  --
+  -- Three readings the pair separates. The Hill Giant is a printed Giant, so
+  -- "the card was always a Goblin" would offer it on the Nexus-less board too.
+  -- It is in the library before the Nexus arrives, so "the effect applied to it
+  -- as it arrived" offers it on neither. Only an effect applying to a card
+  -- sitting in a library offers it on exactly one. The Piker is a candidate on
+  -- both boards, so the difference is not the prompt appearing or vanishing.
+  Spec.it s "CR 613.1d Maskwood Nexus makes a library's Giant a Goblin, and Goblin Matron's search offers it" $ do
+    candidates <- matronCandidates s registry True
+    Spec.assertEqWith s "the printed Goblin and the Giant the Nexus made one" candidates [Set.fromList (fmap Text.pack ["Goblin Piker", "Hill Giant"])]
+
+  -- The negative half of the pair, differing in exactly one thing: whether the
+  -- Nexus is on the battlefield. Same library, same mana, same answers.
+  Spec.it s "CR 701.23a without the Nexus, Goblin Matron's search offers the printed Goblin alone" $ do
+    candidates <- matronCandidates s registry False
+    Spec.assertEqWith s "the Piker alone" candidates [Set.singleton (Text.pack "Goblin Piker")]
 
   -- CR 613.1 over a card in a GRAVEYARD, read from inside the fold. Maskwood
   -- Nexus's third clause ("creature cards you own that aren't on the

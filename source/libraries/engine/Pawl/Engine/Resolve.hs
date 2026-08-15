@@ -2533,20 +2533,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
   Effect.Search (Search.MkSearch searcherRef ownerRef quantity filter_ destination) ->
-    -- CR 701.23a: match each library card through the PRINTED-card view. Its
-    -- power is CR 208.2a's exception, which is why the view is
-    -- Projection.viewOfCardIn: Imperial Recruiter's "creature card with power 2
-    -- or less" sees a Tarmogoyf's real power.
+    -- CR 701.23a: match each library card against "the given description",
+    -- through the card's own CR 613 projection. Rule 613.1 starts from the actual
+    -- object and names no zone, so a library card is folded exactly as a permanent
+    -- is: Maskwood Nexus makes every creature card its controller owns every
+    -- creature type (CR 613.1d), and Goblin Matron's "a Goblin card" then finds
+    -- one printed as something else. CR 208.2a's characteristic-defining power
+    -- rides along at layer 7a, so Imperial Recruiter's "creature card with power 2
+    -- or less" still sees a Tarmogoyf's real power -- Pawl.ProjectionSpec proves
+    -- both readings through this same site.
     --
-    -- Not implemented: a library card has a projection of its own, so a
-    -- continuous effect that changed what this filter reads is missed (#160).
-    -- The context has
-    -- no perspective (CR 109.5): a search filter never references a player, so
-    -- ControlledBy is vacuously False. No source in scope at this site.
+    -- The context has no perspective (CR 109.5): a search filter never references
+    -- a player, so ControlledBy is vacuously False. No source in scope at this
+    -- site.
     let searchContext = Filter.contextFor Nothing Nothing
-        matches1 g oid = case Game.faceOf oid g of
-          Nothing -> False
-          Just face -> Filter.matches searchContext (Projection.viewOfCardIn g oid face) filter_
+        matches1 g oid = Filter.matches searchContext (Projection.viewOfObject oid g) filter_
      in do
           gs0 <- State.get
           -- Whoever Search.searcher names searches -- the controller for
@@ -3394,12 +3395,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Monad.forM_ milledBy $ \(pid, cards) -> do
       arrived <- Maybe.catMaybes <$> Monad.mapM (\c -> Event.changeZoneReturning c Zone.Graveyard) cards
       Monad.unless (null arrived) (State.modify' (Event.recordEvent (GameEvent.Milled (Milled.MkMilled pid (Seq.fromList arrived)))))
-    -- The tally, counted off the PRINTED card the way Effect.Search's filter
-    -- reads a CR 701.23a candidate -- that reader's choice rather than the
-    -- library's, since the card is an object with a CR 613 projection there (see
-    -- #160) -- and read from the pre-move state because CR 400.7 has since
-    -- minted new ids. Rule 728.1's "nonland" is a card-type question, which the
-    -- printed face answers.
+    -- The tally, counted off the PRINTED card and read from the pre-move state
+    -- because CR 400.7 has since minted new ids. Rule 728.1's "nonland" is a
+    -- card-type question, which the printed face answers.
+    --
+    -- Not implemented: the milled card is an object and has a CR 613 projection
+    -- of its own, so a tally keyed on an axis some effect changed reads the wrong
+    -- number (#160). This reader's own choice rather than the zone's --
+    -- Effect.Search's CR 701.23a filter, once the same reader, now takes
+    -- Projection.viewOfObject.
     --
     -- Bound onto this effect's SOURCE, so a later effect of the same resolution
     -- reads it as Quantity.InSlot -- Destroy's "destroyed this way" binding
