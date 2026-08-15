@@ -688,7 +688,7 @@ performStateBasedActions = Event.simultaneously $ do
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.
-  State.modify' (\g -> g {GameState.objects = List.foldl' (\m oid -> Map.adjust (\o -> o {Object.attachedTo = Nothing}) oid m) (GameState.objects g) detaching})
+  State.modify' (\g -> g {GameState.objects = List.foldl' (flip (Map.adjust (\o -> o {Object.attachedTo = Nothing}))) (GameState.objects g) detaching})
   -- CR 704.5g/h: destruction through the funnel, Regenerable -- the point rather
   -- than a default, since CR 701.19a's shield exists to replace exactly this
   -- destruction. ByRule for the mirror-image reason: no effect is destroying

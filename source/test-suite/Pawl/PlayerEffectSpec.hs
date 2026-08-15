@@ -2340,8 +2340,8 @@ ceaseFireBoard ::
 ceaseFireBoard plains ceaseFire mountain piker lightningBolt =
   let gs0 = Setup.emptyGame S.threePlayers
       repeatedly f n gs = List.foldl' (\g _ -> f g) gs [1 .. n :: Int]
-      addLands printing pid = repeatedly (\g -> snd (S.addCreature printing pid g))
-      stockLibrary pid = repeatedly (\g -> snd (S.addLibraryCard plains pid g)) (2 :: Int)
+      addLands printing pid = repeatedly (snd . S.addCreature printing pid)
+      stockLibrary pid = repeatedly (snd . S.addLibraryCard plains pid) (2 :: Int)
       gs1 = addLands plains S.alice (3 :: Int) gs0
       gs2 = addLands mountain S.alice (2 :: Int) gs1
       (ceaseFireId, gs3) = S.addHandCard ceaseFire S.alice gs2
