@@ -3812,9 +3812,9 @@ readyForAlice gs =
     }
 
 -- CR 702.54: bloodthirst, on Bloodrage Vampire ({2}{B} 3/1 Vampire, "Bloodthirst
--- 1" and nothing else). The FIRST minted entry replacement whose own rule states
--- a condition, which is why Pawl.Engine.Replacement.admitsEntry has a second arm
--- beside rule 702.145b's.
+-- 1" and nothing else). The second minted entry replacement whose own rule states
+-- a condition, after rule 702.145b's daybound, which is why
+-- Pawl.Engine.Replacement.admitsEntry now has two arms that are not `True`.
 --
 -- ONE BOARD throughout, and every case differs from the others in nothing but
 -- what happened before the cast: the same three seats, the same three Swamps, the

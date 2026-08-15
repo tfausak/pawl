@@ -455,9 +455,8 @@ data Keyword
   | -- | 702.54a: bloodthirst N, a STATIC ability meaning "If an opponent was
     -- dealt damage this turn, this permanent enters with N +1/+1 counters on
     -- it." Minted by Pawl.Engine.Keyword.mintedReplacementsFor as a CR 614.1c
-    -- entry replacement, vanishing's position -- and the FIRST minted entry
-    -- replacement whose rule states a condition of its own, which
-    -- Pawl.Engine.Replacement.admitsEntry asks (daybound's position).
+    -- entry replacement, vanishing's position -- with a condition of its own,
+    -- which Pawl.Engine.Replacement.admitsEntry asks as it asks rule 702.145b's.
     --
     -- N rides the constructor, as Vanishing's does, and CR 702.54c makes each
     -- instance apply separately -- so its reader takes the per-keyword COUNT and

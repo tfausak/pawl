@@ -178,7 +178,7 @@ data EntryRewrite
     -- WithCounters with rule 702.54a's condition attached, and its own arm rather
     -- than a flag on that one for two reasons. WithCounters' amount is an
     -- unconditional Natural placed by Pawl.Engine.Event whatever the board looks
-    -- like, which is what CR 306.5b's intrinsic loyalty must stay; and the
+    -- like, which is what CR 306.5b's intrinsic loyalty needs it to be; and the
     -- condition is asked in Pawl.Engine.Replacement.admitsEntry, which cases on
     -- the constructor, so a bloodthirst row indistinguishable from a loyalty row
     -- could not be gated without gating loyalty too.

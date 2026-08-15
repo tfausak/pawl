@@ -423,8 +423,8 @@ admitsEntry gs oid rewrite = case rewrite of
   -- take a CR 616.1e bucket and could be handed the entry ahead of a rewrite with
   -- something to do.
   --
-  -- The measurement is Quantity.PlayersDealtDamageThisTurn, the one reader of
-  -- CR 120.3a's damaged-player record (Pawl.Engine.Game.damagedPlayer): damage to
+  -- The measurement is Quantity.PlayersDealtDamageThisTurn, which reads CR
+  -- 120.3a's damaged-player record (Pawl.Engine.Game.damagedPlayer): damage to
   -- an opponent's creature or to the controller herself is not damage to an
   -- opponent, and CR 119.4's bare life loss is not damage at all. "Was an
   -- opponent dealt damage" is that count compared against zero, which is why
