@@ -792,8 +792,9 @@ readsApplier re = case re of
   ReplacementEffect.ZoneChangeR {} -> False
   -- CR 707.5 / 109.5: Clone's "you" is the ENTERING object's controller, read
   -- live off the board at CR 614.12a's moment, not the candidate's -- so two
-  -- such rows offer the same player the same legal set. CR 707.9's exceptions
-  -- ride the effect, so two rows carrying the same ones are still the same offer.
+  -- such rows offer the same player the same legal set. Both halves of the
+  -- payload ride the effect -- the eligible filter and CR 707.9's exceptions --
+  -- so two rows carrying the same ones are still the same offer.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.AsCopy _)) -> False
   -- Same chooser, and the options ride the effect: CR 614.1c's "enters as"
   -- (Primal Plasma).
