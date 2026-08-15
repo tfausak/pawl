@@ -65,12 +65,13 @@ import qualified Pawl.Types.Zone as Zone
 -- against the face chosen to be played: CR 712.8a gives a double-faced card
 -- "only the characteristics of its front face" while it is anywhere but the
 -- battlefield or the stack -- which is every zone this list draws from -- so the
--- land a player is playing is named by that face while they play it. CR 712.19 does let the chooser name the OTHER face -- "the player may
--- choose the name of either face of a double-faced card but not both" -- and
--- naming it prohibits nothing here, which is the same reading from the other
--- side rather than a second decision. A land with SEVERAL names is asked as a
--- set, CR 709.4a's "one of its names": no printed land has two, but the
--- prohibition is a membership test rather than a comparison all the same.
+-- land a player is playing is named by that face while they play it. CR 712.19
+-- does let the chooser name the OTHER face -- "the player may choose the name of
+-- either face of a double-faced card but not both" -- and naming it prohibits
+-- nothing here, which is the same reading from the other side rather than a
+-- second decision. A land with SEVERAL names is asked as a set, CR 709.4a's "one
+-- of its names": no printed land has two, but the prohibition is a membership
+-- test rather than a comparison all the same.
 playableLands :: PlayerId -> GameState -> [(ObjectId, Maybe CardName.CardName)]
 playableLands pid gs =
   let cardOfCandidate oid = case Game.lookupObject oid gs of
