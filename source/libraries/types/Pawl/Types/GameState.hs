@@ -31,6 +31,8 @@ import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Prevention as Prevention
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.PrintingId as PrintingId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Result as Result
@@ -371,6 +373,16 @@ data GameState = MkGameState
     -- Engine.runStep lowers it as CR 724.1d's cleanup step begins.
     endTurnSignal :: EndTurnSignal.EndTurnSignal,
     nextObjectId :: ObjectId.ObjectId,
+    -- | Every printing this game knows, named by an id the objects carry
+    -- instead of the whole Printing. Two ids naming the same card is a benign
+    -- state, not something to guard against: CR 108.2 puts the illustration and
+    -- set symbol outside a card's characteristics, and the engine's identity
+    -- questions are name-keyed (CR 100.2a's deck limit, CR 201.2's matching).
+    --
+    -- Append-only, and never collected -- a token that ceases to exist under
+    -- CR 704.5d drops its Object but keeps its entry (gap #1594).
+    printings :: Map.Map PrintingId.PrintingId Printing.Printing,
+    nextPrintingId :: PrintingId.PrintingId,
     -- | CR 613.7: the monotonic source of timestamps for objects (at creation) and
     -- stored continuous effects (at CR 611 creation). See Timestamp.
     nextTimestamp :: Timestamp.Timestamp,
