@@ -282,10 +282,12 @@ data GameEvent
     -- every creature blocking it is removed from combat, so an entry that has
     -- emptied out is not this event.
     --
-    -- The declaration is the only producer, which is STRICTER than rule 509.1h's
-    -- "an effect says that it becomes blocked or unblocked": the blocked half of
-    -- that clause is Pawl.Engine.Combat.becomeBlocked, and the unblocked half has
-    -- no producer in the pool (#1146).
+    -- The declaration is the only producer, and that is not a shortfall against
+    -- rule 509.1h's "an effect says that it becomes blocked or unblocked": the
+    -- blocked half of that clause is Pawl.Engine.Combat.becomeBlocked (Curtain
+    -- of Light), and no printing states the unblocked half at all -- Scryfall
+    -- has no card whose text makes a creature become unblocked. Nothing to
+    -- observe, so nothing is elided.
     --
     -- No defending player rides it, unlike AttackerBlocked: the pool's reader
     -- (Eternal of Harsh Truths) names nobody but its controller. The printed

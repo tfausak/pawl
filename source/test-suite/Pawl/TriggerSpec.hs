@@ -4175,8 +4175,9 @@ selfBecomesBlockedSpec s registry =
 -- and the draw is 1 card. A leg that lost 2 life cannot be read as a leg that
 -- took 1 combat damage.
 --
--- alice's library is stocked, or CR 121.3's draw from an empty library would put
--- her hand at 0 in the leg that is supposed to show 1.
+-- alice's library is stocked, or the draw would find nothing and CR 121.4 would
+-- lose her the game -- leaving the leg that is supposed to show a card in hand
+-- showing 0 for a reason that is not the trigger.
 selfAttacksUnblockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 selfAttacksUnblockedSpec s registry =
   let -- Attacks `who` with everything and lets them block with everything.

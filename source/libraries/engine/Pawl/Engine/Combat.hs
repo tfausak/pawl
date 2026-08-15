@@ -1820,37 +1820,33 @@ declareBlockers = do
                 let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
                  in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked (AttackerBlocked.MkAttackerBlocked attacker (defendingFor attacker))) h) g (Set.toList becameBlocked)
             )
-    -- CR 509.1h's second half, and the last thing the turn-based action does:
-    -- every attacking creature the declaration named no blockers for became an
-    -- UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the reader --
-    -- the glossary sends "attacks and isn't blocked" to this rule.
+    -- CR 509.1h's other half, performed once CR 509.1g has assigned the
+    -- blockers: every attacking creature the declaration named no blockers for
+    -- became an UNBLOCKED creature. TriggerCondition.SelfAttacksUnblocked is the
+    -- reader -- the glossary sends "attacks and isn't blocked" to this rule.
     --
-    -- OUTSIDE the loop above, and that placement is the whole fix: the loop is
+    -- OUTSIDE the loop above, and the placement is the point. That loop is
     -- guarded three times over -- on there being a defending player, on that
     -- player having a legal blocker, and on the declaration naming a pair -- and
     -- a board where nobody can block trips all three, which is exactly the board
-    -- where every attacker is unblocked. Rule 509.1h has no such condition; it
-    -- speaks of "one with no creatures declared as blockers for it", and a
-    -- declaration that named nothing is still a declaration.
+    -- on which every attacker is unblocked. Rule 509.1h carries no such
+    -- condition: a declaration that named nothing is still a declaration.
     --
-    -- Read off the LIVE state rather than `attacking` and rather than
-    -- declareBlockers' own `declaration`, since CR 509.1f's block costs can
-    -- change the board between the two: the attack record is what the action
-    -- leaves behind, and Combat.blockers keyed by attacker is CR 509.1h's status
-    -- itself (isBlocked). An attacker Combat.becomeBlocked reached first is
-    -- therefore already in the map and is skipped here, which is the rule's
-    -- "an effect says that it becomes blocked" beating the declaration to it.
+    -- Read off the state as it now stands rather than off `attacking` or
+    -- `declaration`, because that state IS what the turn-based action left
+    -- behind: Combat.attackers is the attack record, and Combat.blockers keyed
+    -- by attacker is rule 509.1h's status itself (isBlocked).
     --
-    -- Recorded ONCE, here, and never sampled again. That is the rule's last
-    -- sentence: an attacker keeps the blocked status even after every creature
-    -- blocking it leaves combat, so an entry whose SET has emptied out must not
-    -- produce this event later. TriggerSpec's "losing every blocker does not
-    -- make the Eternal unblocked" is what proves the one-shot timing.
+    -- Recorded ONCE, here, and never sampled again -- the rule's last sentence,
+    -- which keeps an attacker blocked after every creature blocking it leaves
+    -- combat. An entry whose SET has emptied out must therefore not produce this
+    -- event later, and TriggerSpec's "losing every blocker does not make the
+    -- Eternal unblocked" is what proves that timing.
     --
-    -- Testing the KEY rather than the set is isBlocked's own reading, but it is
-    -- a regression fence here rather than proved behaviour: the only writer of
-    -- an empty set is becomeBlocked, and nothing resolves between the
-    -- declaration and this line, so swapping the two leaves the suite green.
+    -- Testing the KEY rather than the set is isBlocked's own reading, but here
+    -- it is a regression fence rather than proved behaviour: becomeBlocked is
+    -- the only writer of an empty set and nothing resolves before this line, so
+    -- swapping the two leaves the suite green.
     State.modify' $ \g ->
       let c = GameState.combat g
           unblocked = filter (\oid -> not (Map.member oid (Combat.blockers c))) (Map.keys (Combat.attackers c))
