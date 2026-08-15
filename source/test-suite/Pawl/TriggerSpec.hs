@@ -6307,8 +6307,9 @@ aragornSpec s registry =
 -- board: CR 702.19b lets the attacker's controller hold damage back on the
 -- blocker, so a 5/5 trampler can deal 4 to the player. Four tokens is therefore
 -- not the damager's power (5), not a fixed count (1), and not one per damager (2
--- creatures connect) -- and the card would read identically under all three if
--- the trampler connected unblocked.
+-- creatures connect). The power reading is the one that needs the trample: an
+-- unblocked trampler deals its whole power, and no board without a blocker tells
+-- the two apart.
 --
 -- Shroofus is himself a Saproling, so the filter admits the watcher, and the
 -- Goblin Piker (Goblin Warrior 2/1) beside him is the creature it must reject.
@@ -6358,13 +6359,15 @@ shroofusSpec s registry =
               Spec.assertEqWith s "the counters make Shroofus a 5/5" (S.powerToughnessOf shroofus loaded) (Just (5, 5))
               Spec.assertEqWith s "4 spilled past the blocker, plus the Piker's 2" (S.lifeOf S.bob after) (Just 14)
               Spec.assertBool s (not (Set.member blocker (GameState.battlefield after))) "CR 704.5g: the blocker took its 1"
-              -- 6 = Shroofus, the Piker, and four tokens. 7 would be his power, 5
-              -- a fixed one, and 8 the filter admitting the Goblin Piker's 2 too.
+              -- 6 = Shroofus, the Goblin Piker, and four tokens. A count read off
+              -- his POWER would be 7, a fixed count of one 3, and a filter that
+              -- admitted the Goblin Piker's 2 as well 8.
               Spec.assertEqWith s "so four tokens, not five and not one and not six" (S.creaturesInPlay S.alice after) 6
               Spec.assertEqWith s "and bob keeps nothing" (S.creaturesInPlay S.bob after) 0
             _ -> Spec.assertFailure s "fixture should give alice a Shroofus and a Piker, bob a Piker"
-        -- The negative, on the SAME board with the same mana, seats and stock: CR
-        -- 702.19b lets the whole 5 stay on the blocker, so the Saproling deals its
+        -- The negative, on the SAME board with the same seats, the same creatures
+        -- and the same declaration -- only the division differs. CR 702.19b lets
+        -- the whole 5 stay on the blocker, so the Saproling deals its
         -- combat damage to a creature rather than to a player and the condition's
         -- recipient half rejects the event. The Goblin Piker still connects for 2,
         -- which the filter rejects -- so both halves answer at once, and neither
