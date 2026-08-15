@@ -4352,8 +4352,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a Room whose halves disagree" $ do
     furnace <- S.printingOf s registry "Roaring Furnace"
     let card = Printing.card furnace
-        -- The RIGHT half restated and the left left alone, so each mutation below
-        -- is a disagreement rather than a card-wide edit the lint would accept.
+        -- Every half but the left one restated, so each mutation below is a
+        -- disagreement rather than a card-wide edit the lint would accept.
         retype f = case Card.Type.faces card of
           x NonEmpty.:| xs -> card {Card.Type.faces = x NonEmpty.:| fmap f xs}
         addType face =
@@ -4378,9 +4378,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- The set CR 709.5a does not name, and which sharedTypeLineOffends checks
     -- anyway on CR 709.5's premise that the line is one printed line.
     Spec.assertBool s (sharedTypeLineOffends (retype addSupertype)) "one half gaining a supertype is rejected"
-    -- NOT an offence on a layout whose halves print their own lines: Wax // Wane's
-    -- successor Onward // Victory is Instant against Sorcery, and CR 709.4c is
-    -- what makes that legal authoring rather than a defect.
+    -- NOT an offence on a layout whose halves print their own lines: Onward //
+    -- Victory is Instant against Sorcery, and CR 709.4c is what makes that legal
+    -- authoring rather than a defect.
     victory <- S.printingOf s registry "Onward"
     Spec.assertBool s (not (sharedTypeLineOffends (Printing.card victory))) "a Split card's halves may differ"
   -- CR 603.2's event triggers and CR 603.8's state triggers are gathered by two
