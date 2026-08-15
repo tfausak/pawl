@@ -10222,6 +10222,77 @@ lifeGainTriggerSpec s registry =
           Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
           Spec.assertEqWith s "zero damage records nothing" (gainsIn (after 0)) []
 
+-- CR 603.10's first sentence, asked of a permanent that never leaves: "objects
+-- that exist immediately after an event are checked to see if the event matched
+-- any trigger conditions, and continuous effects that exist at that time are used
+-- to determine what the trigger conditions are". The abilities that decide are the
+-- ones the permanent had AT THE EVENT, not the ones it has when the CR 117.5 scan
+-- gets around to looking.
+--
+-- The two readings need an ability set that MOVES between an event and the scan,
+-- with the event first. Synthetic Humbling Draught, {W} Instant, "You gain 2 life.
+-- Until end of turn, target creature loses all abilities. You gain 3 life", is that
+-- in one resolution: the first CR 119.3 life gain is recorded, the CR 613.1f
+-- layer-6 removal lands after it, and the second gain after that -- all before any
+-- player could have priority, so the whole thing is one CR 117.5 batch.
+--
+-- The SECOND gain is what makes the board tell the three readings apart, on the one
+-- number every case asserts. Aimed at the Pridemate:
+--
+--   * abilities as of each event (the rule): the first gain triggers, the second
+--     does not -- ONE counter.
+--   * abilities as of the scan: neither triggers, the Pridemate having none by then
+--     -- NO counter.
+--   * abilities as of the batch's first event: both trigger, one sample being
+--     stretched over two events that straddle the strip -- TWO counters.
+--
+-- SYNTHETIC, after searching the printings. Every card that says "loses all
+-- abilities" and does anything else in the same resolution strips FIRST -- Day of
+-- Black Sun, Patriar's Humiliation, Resolute Rejection, Snakeform, Abigale -- so
+-- the ability set has already moved when the event happens and the readings agree.
+-- The three printings that order it the other way each need a trigger condition
+-- pawl does not have: Merfolk Trickster and The Wondrous Wasp tap first, and
+-- nothing here watches a permanent becoming tapped, while Tishana's Tidebinder
+-- counters an ability first. Nothing in the CR forbids the card as written; it is
+-- Blossoming Calm's shape with Turn to Frog's one layer.
+--
+-- The pair differs in the TARGET and in nothing else: the same board, the same
+-- mana, the same 5 life gained, the same two legal creatures to aim at. Aiming at
+-- the Goblin Piker is the control that proves the plumbing -- the Pridemate takes
+-- both counters -- and aiming at the Pridemate is the case.
+abilitiesWhenTriggeredSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+abilitiesWhenTriggeredSpec s registry =
+  let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- Pinned to the one recipient rather than searched for among the legal ones:
+      -- a searching answerer would find the other creature again once the case
+      -- under test broke.
+      aimAt victimId p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victimId))) sets
+        _ -> S.identityAnswer p
+      board = do
+        plains <- S.printingOf s registry "Plains"
+        pridemate <- S.printingOf s registry "Ajani's Pridemate"
+        piker <- S.printingOf s registry "Goblin Piker"
+        draught <- S.printingOf s registry "Synthetic Humbling Draught"
+        let (mateId, b0) = S.addCreature pridemate S.alice (S.landsInPlay plains 1)
+            (pikerId, b1) = S.addCreature piker S.alice b0
+        pure (mateId, pikerId, S.handOne draught b1)
+      drinkAt victimId (gs, spellId) =
+        let cast = snd (Engine.runGamePure (aimAt victimId) gs (S.cast S.alice spellId))
+         in snd (Engine.runGamePure (aimAt victimId) cast Engine.priorityLoop)
+   in Spec.describe s "CR 603.10 abilities as of the event" $ do
+        Spec.it s "CR 603.10 the control: the Draught strips the PIKER and both gains reach the Pridemate" $ do
+          (mateId, pikerId, gs) <- board
+          let after = drinkAt pikerId gs
+          Spec.assertEqWith s "alice gained 2 and then 3" (S.lifeOf S.alice after) (Just 25)
+          Spec.assertEqWith s "and her Pridemate, untouched, took a counter for each" (countersOn mateId after) (Just 2)
+        Spec.it s "CR 603.10 stripping the PRIDEMATE takes the second gain from it and not the first" $ do
+          (mateId, _, gs) <- board
+          let after = drinkAt mateId gs
+          Spec.assertEqWith s "the same 5 life, the strip changing neither gain" (S.lifeOf S.alice after) (Just 25)
+          Spec.assertBool s (null (Projection.triggeredAbilitiesOf mateId after)) "and the Pridemate really has no abilities left"
+          Spec.assertEqWith s "exactly one counter: the gain it still had the ability for" (countersOn mateId after) (Just 1)
+
 -- CR 119.9 read for its NUMBER, which the group above never asks for: Ajani's
 -- Pridemate's payload names no amount, so nothing there could tell a bound amount
 -- from an unbound one.
@@ -11320,6 +11391,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
   lifeGainTriggerSpec s registry
+  abilitiesWhenTriggeredSpec s registry
   lifeGainAmountSpec s registry
   lifeLossTriggerSpec s registry
   mindcrankSpec s registry

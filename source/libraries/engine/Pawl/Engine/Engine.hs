@@ -356,8 +356,8 @@ sampleWorldSince = do
 -- only mints on a difference and writes the difference away, so a board that stops
 -- changing mints nothing.
 --
--- Recording through Event.recordEvent means the CR 603.3a control sample
--- (GameState.controlWhenTriggered) can be taken here, on a settle where nothing else
+-- Recording through Event.recordEvent means the CR 603.10 board sample
+-- (GameState.battlefieldWhenTriggered) is taken here, on a settle where nothing else
 -- was unscanned. That is the right reading and not an accident: an ability triggering
 -- off a control change triggered when control had already moved, so the controller
 -- the scan reads is the post-change one.
@@ -547,8 +547,8 @@ runTurnBasedActions phase = do
       -- simultaneously. One sweep over both carriers (Pawl.Engine.Expiry). NOT
       -- guarded: CR 703.4p is the game's action, not the active player's.
       --
-      -- This is the pool's one reachable CR 603.3a window, and the reason
-      -- GameState.controlWhenTriggered exists: the discard above has already
+      -- This is the pool's one reachable CR 603.3a window, one of the three
+      -- GameState.battlefieldWhenTriggered closes: the discard above has already
       -- fired a rule 701.9a trigger, CR 514.3a does not place it until after this
       -- line, and an "until end of turn" control effect the sweep ends here would
       -- otherwise have the scan credit that trigger to whoever got the permanent
@@ -623,7 +623,7 @@ advanceSagas pid = do
 -- `apnapPlayers` -> `orderFor` -> `Game.permute` pipeline can INTRODUCE an entry. Two
 -- carriers can reach this with a departed controller -- a DELAYED ability, whose
 -- controller CR 603.7d fixed as the arming spell resolved, and an OBJECT-BORNE
--- ability reading CR 603.3a's controller from GameState.controlWhenTriggered
+-- ability reading CR 603.3a's controller from GameState.battlefieldWhenTriggered
 -- rather than live. No board in the pool reaches either (#604);
 -- Event.stateTriggers is not a third, since CR 603.8 evaluates a state trigger
 -- AT this scan. The DELAYED entry is still CONSUMED regardless, because CR
@@ -687,11 +687,11 @@ placePendingTriggers = do
         -- TRIGGERING, so an instance countered on the stack has still spent the
         -- turn's one. Cleared at the turn handoff (beginTurnOf).
         GameState.speedIncreasedThisTurn = List.foldl' (flip Set.insert) (GameState.speedIncreasedThisTurn gs) (fmap PendingTrigger.controller revving),
-        -- CR 603.3a's sample is spent with the batch it was taken for. Cleared
-        -- rather than left standing, so the next event to open a batch takes a
-        -- fresh one (Event.recordEvent samples only when nothing is unscanned)
-        -- and a stale reading can never outlive the events it described.
-        GameState.controlWhenTriggered = Map.empty,
+        -- CR 603.10's per-group samples are spent with the batch they were taken
+        -- for. Cleared rather than left standing, which is what bounds both the map
+        -- and the game states its unforced thunks retain: a group's entry can never
+        -- outlive the events it described, and the ids in it are gone besides.
+        GameState.battlefieldWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
   gathered <- reactions (pending <> inherent <> revving <> irradiated <> entered)
@@ -760,14 +760,14 @@ reactions batch
       State.modify' (\g -> List.foldl' (flip Event.recordEvent) g (Maybe.mapMaybe triggeredEvent batch))
       gs <- State.get
       let fresh = Event.reactionTriggers (Event.unscannedGrouped gs) gs
-      -- The round's own events are consumed here, and CR 603.3a's sample is
-      -- spent with them for the reason the batch's own is cleared above: the
-      -- next round's recordEvent re-takes it, this having left nothing unscanned.
+      -- The round's own events are consumed here, and CR 603.10's samples are
+      -- spent with them for the reason the batch's own are cleared above: the
+      -- next round's recordEvent takes fresh ones under fresh groups.
       State.modify'
         ( \g ->
             g
               { GameState.scannedThrough = Natural.length (GameState.events g),
-                GameState.controlWhenTriggered = Map.empty
+                GameState.battlefieldWhenTriggered = Map.empty
               }
         )
       rest <- reactions fresh
@@ -1557,7 +1557,7 @@ beginTurnOf pid gs =
             -- Cleared with the log it describes: the settle Engine.advance runs
             -- immediately before this leaves nothing unscanned, so the sample has
             -- no batch left to answer for.
-            GameState.controlWhenTriggered = Map.empty,
+            GameState.battlefieldWhenTriggered = Map.empty,
             GameState.damageScannedThrough = 0,
             -- GameState.lastKnown is deliberately NOT cleared alongside them.
             -- CR 608.2h's last known information is not history a card asks
