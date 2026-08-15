@@ -98,8 +98,12 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- came off (CR 712.8e, CR 708.2a) is settled at the projection's seed.
   --
   -- Nothing when the view cannot say: no object at all, or an object with no
-  -- card behind it. Off the battlefield the view is the printed card's
-  -- (Projection.viewOfCardIn), which answers CR 202.3 in every zone.
+  -- card behind it. WHICH view arrives is the caller's choice rather than the
+  -- zone's, and every one of them answers CR 202.3 off the battlefield: the
+  -- printed-card view for the readers that still take it
+  -- (Projection.viewOfCardIn), and the CR 613 projection for the rest
+  -- (Projection.fullView, Projection.viewUpTo), which project an object in any
+  -- zone.
   Quantity.ManaValue -> mView >>= Filter.manaValue
   -- CR 208.1 read through the injected view, so this arm never learns whether
   -- it is looking at a live projection or a CR 608.2h snapshot -- the caller
