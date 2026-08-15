@@ -175,7 +175,7 @@ reanimationSpec s registry = Spec.describe s "The Master, Transcendent's reanima
     piker <- S.printingOf s registry "Goblin Piker"
     berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
     mountain <- S.printingOf s registry "Mountain"
-    let (masterId, milledBoard) = radBoard master berserkers
+    let (masterId, bystanderId, milledBoard) = radBoard master berserkers
         -- The Piker on top, so rule 728.1's one-card mill is what puts it in the
         -- graveyard. The Mountains under it are the library CR 104.3c needs.
         stocked = libraryTopped [piker, mountain, mountain] S.alice milledBoard
@@ -190,8 +190,10 @@ reanimationSpec s registry = Spec.describe s "The Master, Transcendent's reanima
     Spec.assertEqWith s "a Mutant and nothing else" (fmap (\o -> Projection.subtypesOf o after) reanimated) [Set.singleton Subtype.Mutant]
     Spec.assertEqWith s "under alice's control" (fmap (\o -> Projection.controllerOf o after) reanimated) [Just S.alice]
     -- The falsifier for a filter that admitted any creature card: the Berserkers
-    -- was in the graveyard before the mill and stays there.
-    Spec.assertEqWith s "and the card that was NOT milled stayed put" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    -- was in the graveyard before the mill and is still the only thing in it.
+    -- Its IDENTITY is the assertion, since a bundle that overwrites colour, type
+    -- and size leaves the two cards indistinguishable by characteristic.
+    Spec.assertEqWith s "and the card that was NOT milled stayed put" (Game.zoneMembers Zone.Graveyard S.alice after) [bystanderId]
   -- The same board with the mill turned onto a land, so the Piker reaches the
   -- graveyard by being PUT there rather than by being milled. Nothing else moves.
   Spec.it s "CR 701.17a a creature card that reached the graveyard another way is no target" $ do
@@ -199,7 +201,7 @@ reanimationSpec s registry = Spec.describe s "The Master, Transcendent's reanima
     piker <- S.printingOf s registry "Goblin Piker"
     berserkers <- S.printingOf s registry "Berserkers of Blood Ridge"
     mountain <- S.printingOf s registry "Mountain"
-    let (masterId, radded) = radBoard master berserkers
+    let (masterId, _, radded) = radBoard master berserkers
         (pikerId, placed) = S.addGraveyardCard piker S.alice radded
         stocked = libraryTopped [mountain, mountain, mountain] S.alice placed
         milled = afterTheMill stocked
@@ -213,11 +215,11 @@ reanimationSpec s registry = Spec.describe s "The Master, Transcendent's reanima
 
 -- alice with The Master settled on the battlefield, one rad counter, and one
 -- creature card sitting in her graveyard from the start.
-radBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+radBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 radBoard master bystander =
   let (masterId, board) = S.addCreature master S.alice (Setup.emptyGame S.bothPlayers)
-      (_, withBystander) = S.addGraveyardCard bystander S.alice board
-   in (masterId, S.addPlayerCounter PlayerCounterKind.Rad 1 S.alice withBystander)
+      (bystanderId, withBystander) = S.addGraveyardCard bystander S.alice board
+   in (masterId, bystanderId, S.addPlayerCounter PlayerCounterKind.Rad 1 S.alice withBystander)
 
 -- The board after rule 728.1's ability has resolved on alice's precombat main
 -- phase, with alice holding priority again.
