@@ -48,6 +48,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -2506,6 +2507,97 @@ combatRestrictionSpec s registry = Spec.describe s "CombatRestrictions" $ do
         Spec.assertBool s (Combat.canBlock S.alice alicesPiker gs) "and the same card under the Winnower's own controller may block"
         Spec.assertBool s (Combat.canBlock S.bob evenBlocker bare) "the pair: with the Winnower gone the even creature may block again"
       _ -> Spec.assertFailure s "fixture should have two creatures a side"
+
+-- CR 601.2c: announce every variable slot at one, then aim each slot at `oid`
+-- where it is a legal recipient and take the rest as they come. Reasonable Doubt
+-- has two slots and only one of them may be a creature, so the spell slot keeps
+-- the one spell on the stack while the creature slot takes the named Piker.
+suspecting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+suspecting oid p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
+  Prompt.ChooseTargets _ _ _ offers -> S.preferring (\r -> Recipient.objectOf r == Just oid) offers
+  _ -> S.identityAnswer p
+
+-- bob's two Pikers and his two Islands, with `ahead` placed under him BEFORE the
+-- Pikers and `behind` after them -- which is how the pair below puts one Humility on
+-- either side of the same permanent and changes nothing else. Placement order is
+-- timestamp order (Pawl.Support.addCreature allocates one per object), so the two
+-- boards differ in exactly one timestamp comparison.
+--
+-- Then alice attacks, a Goblin Piker spell of hers goes on the stack to be
+-- Reasonable Doubt's counter target, and bob casts the Doubt suspecting his FIRST
+-- Piker. Returns the settled board, the suspected Piker, the one beside it,
+-- alice's attacker and the spell the Doubt countered.
+suspectBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [Printing.Printing] ->
+  [Printing.Printing] ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+suspectBoard s registry ahead behind = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  island <- S.printingOf s registry "Island"
+  doubt <- S.printingOf s registry "Reasonable Doubt"
+  let (gs0, mine, _) = S.combatBoardOf [piker] []
+      (suspect, gsA) = S.addCreature piker S.bob (withPermanents S.bob ahead gs0)
+      (other, gsB) = S.addCreature piker S.bob gsA
+      gs2 = withPermanents S.bob (behind <> [island, island]) gsB
+      declared = S.runPure S.aggressiveAnswer gs2 (Combat.declareAttackers S.alice)
+      (victim, gs3) = S.spellOnStack piker S.alice declared
+      (doubtId, gs4) = S.addHandCard doubt S.bob gs3
+      resolved = S.runPure (suspecting suspect) gs4 (S.cast S.bob doubtId >> Stack.resolveTop >> Engine.settleForPriority)
+      attacker = case mine of
+        a : _ -> a
+        [] -> S.noSource
+  pure (resolved, suspect, other, attacker, victim)
+
+-- CR 701.60b's designation, read off the object -- Nothing for an object that has
+-- left, which no assertion below wants to pass for.
+suspectedOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Bool
+suspectedOf oid gs = fmap (Set.member Designation.Suspected . Object.designations) (Game.lookupObject oid gs)
+
+-- CR 701.60c against CR 613.1f, ordered by CR 613.7 -- proved by Reasonable Doubt
+-- {1}{U} Instant, "Counter target spell unless its controller pays {2}. Suspect up
+-- to one target creature", cast under Humility.
+--
+-- Rule 701.60c states its restriction as quoted text, so what the designation gives
+-- a permanent is an ABILITY, and CR 613.1f puts Humility's removal in the same
+-- layer as the grant. The grant's timestamp is the suspected permanent's own (see
+-- Pawl.Engine.Projection.designationGathered), so ORDER decides: a Humility already
+-- on the battlefield when the Piker arrived applies first and the grant lands on
+-- top of it, while one that arrived later applies last and takes the ability away.
+--
+-- The pair of boards differs in that one thing, and the two boards must DISAGREE --
+-- a reading with no timestamps in it answers both alike. Rule 701.60c's two halves
+-- are then each other's anti-vacuity leg: menace goes through the layer fold and
+-- "can't block" through Pawl.Engine.CombatRestriction, so if only one of them moves
+-- between the boards, one subsystem read the order and the other did not. The
+-- second Piker is the third leg: it entered beside the suspect and was never
+-- suspected, so a board on which nothing can block fails at it rather than passing.
+suspectedAbilityRemovalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+suspectedAbilityRemovalSpec s registry = Spec.describe s "SuspectedAbilityRemoval" $ do
+  Spec.it s "CR 613.7 a Humility older than the suspect leaves rule 701.60c's ability in place" $ do
+    humility <- S.printingOf s registry "Humility"
+    (gs, suspect, other, attacker, victim) <- suspectBoard s registry [humility] []
+    Spec.assertEqWith s "the Doubt resolved and suspected the Piker it named, not the one beside it" (suspectedOf suspect gs, suspectedOf other gs) (Just True, Just False)
+    -- The Doubt's other clause, so the card is exercised whole rather than only in
+    -- the half this pair turns on: alice paid nothing, so her spell was countered.
+    -- Her graveyard is what separates that from the spell having RESOLVED, which
+    -- would have put a third Piker onto the battlefield instead. CR 701.6a puts the
+    -- countered spell into its owner's graveyard as a new incarnation, so the stack
+    -- object itself is gone.
+    Spec.assertEqWith s "and countered the spell it named" (Maybe.isNothing (Game.lookupObject victim gs), length (Game.zoneMembers Zone.Graveyard S.alice gs)) (True, 1)
+    Spec.assertBool s (Projection.hasKeyword Keyword.Menace suspect gs) "CR 701.60c: the later grant survives the earlier removal, so the menace half is there"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) gs)) "CR 701.60c: and so is the can't-block half"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) gs) "while the unsuspected Piker beside it blocks"
+  Spec.it s "CR 613.7 a Humility younger than the suspect removes it" $ do
+    humility <- S.printingOf s registry "Humility"
+    (gs, suspect, other, attacker, _) <- suspectBoard s registry [] [humility]
+    Spec.assertEqWith s "the same designation, on the same Piker: CR 701.60b makes it no ability, so no removal reaches it" (suspectedOf suspect gs, suspectedOf other gs) (Just True, Just False)
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Menace suspect gs)) "CR 613.1f: the later removal wipes the grant, so the menace half is gone"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton suspect (Set.singleton attacker)) gs) "CR 613.1f: and the can't-block half with it"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton attacker)) gs) "as the Piker beside it could all along"
 
 -- CR 508.1c's and CR 509.1b's SECOND clause -- "or that it can't attack unless
 -- some condition is met" -- proved by Blind-Spot Giant ("This creature can't
@@ -5593,6 +5685,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   blockRequirementSpec s registry
   attackRequirementSpec s registry
   combatRestrictionSpec s registry
+  suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
