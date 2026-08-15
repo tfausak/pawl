@@ -965,8 +965,9 @@ asmorBoard swamp asmorPrinting vultures =
 --
 -- Not implemented: the enters-the-battlefield tutor, which needs a Filter that
 -- names a card by name (#1228), and "Sacrifice two Foods: Target creature deals 6
--- damage to itself", which needs the damage's source to be an object the effect
--- names rather than the ability's own source (#1229). Both are abilities that
+-- damage to itself", whose every part is now sayable -- Effect.DealDamage's
+-- `dealer` names the same slot its `ref` does -- but which no board can pay,
+-- since no card in the pool is a Food (#1603). Both are abilities that
 -- would only ever help the controller, so pawl's card is stricter than the
 -- printing rather than weaker.
 asmorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
