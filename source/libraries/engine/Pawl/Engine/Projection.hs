@@ -660,8 +660,8 @@ viewOfCard face =
           Filter.blocked = False,
           Filter.attackedThisTurn = False,
           -- CR 701.17a mills an OBJECT out of a library, and this builder
-          -- describes a printed FACE -- viewOfCardIn below is the one that holds
-          -- an id and can answer.
+          -- describes a printed FACE, which the turn's mills name nothing of.
+          -- viewOfCardIn below is the caller that holds an id and answers.
           Filter.milledThisTurn = False,
           Filter.attachedToCreature = False,
           Filter.attachedToPermanent = False,
@@ -718,12 +718,16 @@ viewOfCard face =
 -- they read it as printed where the object has a CR 613 projection of its own
 -- (#160). viewUpTo above is the reader that no longer does.
 --
--- Only the power and toughness axes differ, CR 208.2a naming both.
+-- The power and toughness axes differ, CR 208.2a naming both, and so does the
+-- one axis that is not a characteristic at all: having an id is what lets CR
+-- 701.17a's mills be looked up (CR 608.2i), where the printed face this is built
+-- on cannot answer.
 viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
 viewOfCardIn gs oid face =
   (viewOfCard face)
     { Filter.power = characteristicPowerIn gs oid face,
-      Filter.toughness = characteristicToughnessIn gs oid face
+      Filter.toughness = characteristicToughnessIn gs oid face,
+      Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs)
     }
 
 -- CR 208.2a's power for a face whose CDA sets it, and printedPower's answer for
