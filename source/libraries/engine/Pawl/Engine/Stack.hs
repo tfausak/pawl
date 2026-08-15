@@ -51,95 +51,94 @@ resolveTopWith runSubgame = do
       -- than wedging the loop.
       Nothing -> State.put gs {GameState.stack = rest}
       Just obj -> case Object.source obj of
-        Source.OfCard printingId
-          | Just card <- Game.cardOfPrinting printingId gs ->
-              -- CR 709.3b: if this spell has a face singled out, its classification
-              -- is read off THAT half, not the two combined -- routed through
-              -- Game.faceOf rather than Card.combined directly, so this
-              -- is-it-a-permanent/is-it-an-Aura check narrows the same way every
-              -- OTHER characteristic read of a stack object already does
-              -- (Cost.costsFor resolves the same way, through Game.resolveFace).
-              -- Action.playableLands asks the same question of a land play through
-              -- Card.landFaces, which CR 712.12 gives the same shape: a chosen face
-              -- where the layout has one, and the combined view where it does not.
-              --
-              -- Falls back to the combined view for parity with faceOf's own
-              -- fallback; unreachable here since `obj` already resolved via this
-              -- same `oid`.
-              let face = Maybe.fromMaybe (Card.combined card) (Game.faceOf oid gs)
-                  -- CR 712.13 / 709.5d: the half this spell showed on the stack,
-                  -- carried onto the permanent for the layouts whose rules say so and
-                  -- dropped for the rest (Card.enteringFace). What the permanent then
-                  -- does with it is the MOVE's question and not this one -- CR 712.13
-                  -- leaves a double-faced permanent showing the face, CR 709.5d turns
-                  -- a Room's into an unlocked designation. Read off `obj` rather than
-                  -- off `face`, because what the rules carry is the object's own
-                  -- record of which half is up and not the face a fallback resolved
-                  -- to.
-                  entering = Card.enteringFace card (Object.face obj)
-                  -- CR 110.2b: "the permanent's controller by default is the player
-                  -- who put that spell onto the stack" -- CR 405.4's caster, which is
-                  -- what Object.enteredUnder holds for a spell and what
-                  -- defaultControllerOf reads off it. It is Object.owner for every
-                  -- spell whose caster owns the card, which is why this argument was
-                  -- Nothing until one did not (#83).
-                  --
-              -- The DEFAULT and not Resolve.spellController's projected answer,
-              -- which is the same rule's other half: an effect that gave someone
-              -- control of the permanent SPELL leaves them controlling the
-              -- permanent, and CR 110.2b flags that as a different thing from the
-              -- default precisely because CR 800.4c tells them apart. Writing a
-              -- layer-2 answer into this field would put a control-changing
-              -- effect on the wrong side of that line (see Pawl.Types.Object).
-              -- Nothing in the pool changes a spell's control, so the two
-              -- coincide today.
-              --
-              -- UNOBSERVED, and said plainly rather than left to look tested: the
-              -- pool's one card that casts somebody else's card (Dire Fleet
-              -- Daredevil) reaches only instants and sorceries, so no permanent
-              -- spell in the suite has a caster its owner disagrees with, and
-              -- replacing this with Object.owner leaves the suite green. It is
-              -- CR 110.2b written out, not a passing test.
-              controller = Projection.defaultControllerOf obj
-           in if not (Card.isPermanent face)
-                then Resolve.resolveSpellWith runSubgame oid
-                else
-                  -- `entering` is carried on BOTH branches below: CR 712.13 is
-                  -- about the resolving spell rather than about which kind of
-                  -- permanent it becomes, and an Aura back face would carry its
-                  -- face for the same reason a creature one does.
-                  if not (Card.isAura face)
-                    then -- CR 708.4's last sentence: "the permanent the spell becomes
-                    -- will be a face-down permanent". A STATUS carried across a
-                    -- zone change, which CR 400.7 otherwise forgets -- so it is
-                    -- read off the resolving spell and handed to the move,
-                    -- exactly as `entering` is. A closed-half read: rule 110.5's
-                    -- status, never the card's identity.
-                    --
-                    -- The Aura branch below carries FaceUp instead, and cannot
+        Source.OfCard printingId -> case Game.cardOfPrinting printingId gs of
+          -- Unreachable: a PrintingId is minted only by Game.intern, which
+          -- inserts. Drops the id rather than wedging the loop, which is what
+          -- the arms below do for a source with no card behind it.
+          Nothing -> State.put gs {GameState.stack = rest}
+          Just card ->
+            -- CR 709.3b: if this spell has a face singled out, its classification
+            -- is read off THAT half, not the two combined -- routed through
+            -- Game.faceOf rather than Card.combined directly, so this
+            -- is-it-a-permanent/is-it-an-Aura check narrows the same way every
+            -- OTHER characteristic read of a stack object already does
+            -- (Cost.costsFor resolves the same way, through Game.resolveFace).
+            -- Action.playableLands asks the same question of a land play through
+            -- Card.landFaces, which CR 712.12 gives the same shape: a chosen face
+            -- where the layout has one, and the combined view where it does not.
+            --
+            -- Falls back to the combined view for parity with faceOf's own
+            -- fallback; unreachable here since `obj` already resolved via this
+            -- same `oid`.
+            let face = Maybe.fromMaybe (Card.combined card) (Game.faceOf oid gs)
+                -- CR 712.13 / 709.5d: the half this spell showed on the stack,
+                -- carried onto the permanent for the layouts whose rules say so and
+                -- dropped for the rest (Card.enteringFace). What the permanent then
+                -- does with it is the MOVE's question and not this one -- CR 712.13
+                -- leaves a double-faced permanent showing the face, CR 709.5d turns
+                -- a Room's into an unlocked designation. Read off `obj` rather than
+                -- off `face`, because what the rules carry is the object's own
+                -- record of which half is up and not the face a fallback resolved
+                -- to.
+                entering = Card.enteringFace card (Object.face obj)
+                -- CR 110.2b: "the permanent's controller by default is the player
+                -- who put that spell onto the stack" -- CR 405.4's caster, which is
+                -- what Object.enteredUnder holds for a spell and what
+                -- defaultControllerOf reads off it. It is Object.owner for every
+                -- spell whose caster owns the card, which is why this argument was
+                -- Nothing until one did not (#83).
+                --
+                -- The DEFAULT and not Resolve.spellController's projected answer,
+                -- which is the same rule's other half: an effect that gave someone
+                -- control of the permanent SPELL leaves them controlling the
+                -- permanent, and CR 110.2b flags that as a different thing from the
+                -- default precisely because CR 800.4c tells them apart. Writing a
+                -- layer-2 answer into this field would put a control-changing
+                -- effect on the wrong side of that line (see Pawl.Types.Object).
+                -- Nothing in the pool changes a spell's control, so the two
+                -- coincide today.
+                --
+                -- UNOBSERVED, and said plainly rather than left to look tested: the
+                -- pool's one card that casts somebody else's card (Dire Fleet
+                -- Daredevil) reaches only instants and sorceries, so no permanent
+                -- spell in the suite has a caster its owner disagrees with, and
+                -- replacing this with Object.owner leaves the suite green. It is
+                -- CR 110.2b written out, not a passing test.
+                controller = Projection.defaultControllerOf obj
+             in if not (Card.isPermanent face)
+                  then Resolve.resolveSpellWith runSubgame oid
+                  else
+                    -- `entering` is carried on BOTH branches below: CR 712.13 is
+                    -- about the resolving spell rather than about which kind of
+                    -- permanent it becomes, and an Aura back face would carry its
+                    -- face for the same reason a creature one does.
+                    if not (Card.isAura face)
+                      then -- CR 708.4's last sentence: "the permanent the spell becomes
+                      -- will be a face-down permanent". A STATUS carried across a
+                      -- zone change, which CR 400.7 otherwise forgets -- so it is
+                      -- read off the resolving spell and handed to the move,
+                      -- exactly as `entering` is. A closed-half read: rule 110.5's
+                      -- status, never the card's identity.
+                      --
+                      -- The Aura branch below carries FaceUp instead, and cannot
                     -- need this: it is reached only for a spell `face` calls an
                     -- Aura, and a face-down spell's `face` is
                     -- Card.faceDownFace -- whose subtypes are the ones the
                     -- listing names, and no listing in the pool names Aura.
-                      carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False
-                    else -- CR 303.4a made this spell target, so CR 608.2b applies
-                    -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
-                    -- the type line (CR 205.3h), the same closed-half
-                    -- classification as is-it-a-permanent above it.
-                      if Resolve.targetsAllIllegal oid gs
-                        then Event.changeZone oid Zone.Graveyard
-                        else
-                          -- CR 303.4: an Aura ENTERS attached, so the target is
-                          -- seeded into the new incarnation rather than written
-                          -- after the move (see Event.changeZoneAttaching).
-                          carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False
+                        carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty (Just controller) entering (Object.facing obj) False
+                      else -- CR 303.4a made this spell target, so CR 608.2b applies
+                      -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
+                      -- the type line (CR 205.3h), the same closed-half
+                      -- classification as is-it-a-permanent above it.
+                        if Resolve.targetsAllIllegal oid gs
+                          then Event.changeZone oid Zone.Graveyard
+                          else
+                            -- CR 303.4: an Aura ENTERS attached, so the target is
+                            -- seeded into the new incarnation rather than written
+                            -- after the move (see Event.changeZoneAttaching).
+                            carryOver oid =<< Event.changeZoneAttaching Nothing Set.empty oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty (Just controller) entering Facing.FaceUp False
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
-        -- Unreachable, and here for totality: a PrintingId is minted only by
-        -- Game.intern, which inserts, so every OfCard names an entry. Drops the
-        -- id rather than wedging the loop, which is what the arms below do for a
-        -- source with no card behind it.
-        Source.OfCard _ -> State.put gs {GameState.stack = rest}
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do
           -- CR 601.3's offer is NOT made here. It belongs to the Search effect

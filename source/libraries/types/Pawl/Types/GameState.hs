@@ -375,9 +375,12 @@ data GameState = MkGameState
     nextObjectId :: ObjectId.ObjectId,
     -- | Every printing this game knows, named by an id the objects carry
     -- instead of the whole Printing. Two ids naming the same card is a benign
-    -- state, not something to guard against: CR 108.2 puts the illustration and
-    -- set symbol outside a card's characteristics, and the engine's identity
-    -- questions are name-keyed (CR 100.2a's deck limit, CR 201.2's matching).
+    -- state, not something to guard against: CR 109.3 lists what an object's
+    -- characteristics are and closes with "any other information about an
+    -- object isn't a characteristic", which is where the illustration (CR
+    -- 203.1) and the expansion symbol (CR 206.1) sit -- both stated to have no
+    -- effect on game play. The engine's identity questions are name-keyed
+    -- instead (CR 100.2a's deck limit, CR 201.2's matching).
     --
     -- Append-only, and never collected -- a token that ceases to exist under
     -- CR 704.5d drops its Object but keeps its entry (gap #1594).

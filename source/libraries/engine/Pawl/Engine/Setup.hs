@@ -56,7 +56,7 @@ import qualified Pawl.Types.Zone as Zone
 startingLife :: Maybe a -> Integer
 startingLife commander = if Maybe.isJust commander then 40 else 20
 
--- How many cards this deck holds, CR 903.5's commander included: rule 903.5
+-- How many cards this deck holds, CR 903.5a's commander included: rule 903.5a
 -- counts the deck at exactly 100 cards "including its commander", so the card
 -- that starts in the command zone is still one of the deck's cards. Every
 -- non-Commander deck has no commander and so is unaffected.
@@ -182,13 +182,14 @@ internDeck deck =
           <> Maybe.maybeToList (Deck.dungeon deck)
    in Monad.foldM
         ( \acc printing ->
+            -- The guard is not dead work: Map.keys is already distinct, but a
+            -- deck whose commander is ALSO among its cards (CR 903.5b forbids
+            -- it, and #940 means pawl does not enforce it) would otherwise
+            -- intern that printing twice and break Commander.isCommander's id
+            -- comparison.
             if Map.member printing acc
               then pure acc
-              else do
-                gs <- State.get
-                let (pid, gs1) = Game.intern printing gs
-                State.put gs1
-                pure (Map.insert printing pid acc)
+              else fmap (\pid -> Map.insert printing pid acc) (State.state (Game.intern printing))
         )
         Map.empty
         distinct

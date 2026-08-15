@@ -163,100 +163,98 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj | Facing.isFaceDown (Object.facing obj) -> [untagged faceDownCost]
   Just obj -> case Object.source obj of
-    Source.OfCard printingId
-      | Just card <- Game.cardOfPrinting printingId gs ->
-          let face = Game.resolveFace (Just name) card
-              printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
-              -- CR 118.9d: an alternative replaces only the MANA cost; every
-              -- additional cost still applies. CR 702.34a's last sentence sends
-              -- flashback through the same rules, so its cost is wrapped the same.
-              withAdditional alternative =
-                alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
-              -- CR 604.2: an alternative cost whose "as long as" clause does not
-              -- hold is not offered at all.
+    Source.OfCard printingId -> case Game.cardOfPrinting printingId gs of
+      -- Unreachable: a PrintingId is minted only by Game.intern, which inserts.
+      Nothing -> []
+      Just card ->
+        let face = Game.resolveFace (Just name) card
+            printed = Cost.MkCost {Cost.mana = Face.manaCost face, Cost.components = Face.additionalCosts face}
+            -- CR 118.9d: an alternative replaces only the MANA cost; every
+            -- additional cost still applies. CR 702.34a's last sentence sends
+            -- flashback through the same rules, so its cost is wrapped the same.
+            withAdditional alternative =
+              alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
+            -- CR 604.2: an alternative cost whose "as long as" clause does not
+            -- hold is not offered at all.
+            --
+            -- CR 109.5's "you" is the OWNER: CR 400.1 files a hand and a graveyard
+            -- by player and Cast.zoneCandidates hands out only the caster's own, so
+            -- owner and caster coincide wherever this is asked. The graveyard arm's
+            -- CR 601.3 permission below reads the owner for the same reason.
+            available alternative = case AlternativeCost.condition alternative of
+              Nothing -> True
+              Just cond ->
+                Condition.holds
+                  (Projection.fullView gs)
+                  (Filter.contextFor (Just (Object.owner obj)) (Just oid))
+                  gs
+                  oid
+                  cond
+            alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
+         in case Object.zone obj of
+              -- Four shapes, differing in what they do to the printed cost.
+              -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
+              -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it
+              -- is `printed`; jump-start (CR 702.133a) ADDS a discard to `printed`,
+              -- one however many such abilities the card has; and CR 601.3 /
+              -- Yawgmoth's Will is an EFFECT stating no cost, offering the hand's
+              -- list BESIDE the three rather than instead of them. Rule 702.34a's
+              -- "if the resulting spell is an instant or sorcery spell" gates the
+              -- PERMISSION (Keyword.permissionsFor) and is not re-asked here.
+              Zone.Graveyard ->
+                let -- CR 613.1: the keywords the card HAS in the graveyard, not
+                    -- the ones it prints, an ability granted there (CR 113.6f)
+                    -- stating rule 702.34a's cost as much as a printed one. Read
+                    -- off the OBJECT, so the caller's CR 709.3a half is measured.
+                    keywords = Map.keysSet (Projection.keywordsOf oid gs)
+                    -- The flashback keyword AS IT WAS READ: rule 702.34a's ability
+                    -- and its cost are one sentence, so the cost is what
+                    -- distinguishes one instance from another.
+                    flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
+                 in fmap flashback (Keyword.flashbackCosts keywords)
+                      <> [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed | Keyword.hasAftermath keywords]
+                      <> [ CandidateCost.MkCandidateCost
+                             (Just Keyword.Type.JumpStart)
+                             -- CR 702.133a's cost names no quality -- "discard a
+                             -- card" -- so the criterion admits everything.
+                             printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))]}
+                         | Keyword.hasJumpStart keywords
+                         ]
+                      -- UNTAGGED: an effect's permission states no cost, so
+                      -- neither rule 702.34a's clause nor rule 702.133a's is
+                      -- satisfied by paying it.
+                      <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then fmap untagged (printed : alternatives) else [])
+              -- CR 702.170d: a PLOTTED card is cast "without paying its mana
+              -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
+              -- rule 702.170d being the only thing permitting this cast. The zone's
+              -- other permissions (CR 715.3d, Effect.GrantPlayFromExile) state no
+              -- cost and fall through to the `_` arm.
+              Zone.Exile
+                | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
+              -- CR 702.143a: a FORETOLD card is cast for its foretell cost, CR
+              -- 118.9's alternative cost, wrapped by withAdditional as flashback's
+              -- is. INSTEAD of the printed cost, the plotted arm's reason.
               --
-              -- CR 109.5's "you" is the OWNER: CR 400.1 files a hand and a graveyard
-              -- by player and Cast.zoneCandidates hands out only the caster's own, so
-              -- owner and caster coincide wherever this is asked. The graveyard arm's
-              -- CR 601.3 permission below reads the owner for the same reason.
-              available alternative = case AlternativeCost.condition alternative of
-                Nothing -> True
-                Just cond ->
-                  Condition.holds
-                    (Projection.fullView gs)
-                    (Filter.contextFor (Just (Object.owner obj)) (Just oid))
-                    gs
-                    oid
-                    cond
-              alternatives = fmap (withAdditional . AlternativeCost.cost) (filter available (Face.alternativeCosts face))
-           in case Object.zone obj of
-                -- Four shapes, differing in what they do to the printed cost.
-                -- Flashback (CR 702.34a) REPLACES the mana cost, so it is wrapped by
-                -- `withAdditional`; aftermath (CR 702.127a) replaces nothing, so it
-                -- is `printed`; jump-start (CR 702.133a) ADDS a discard to `printed`,
-                -- one however many such abilities the card has; and CR 601.3 /
-                -- Yawgmoth's Will is an EFFECT stating no cost, offering the hand's
-                -- list BESIDE the three rather than instead of them. Rule 702.34a's
-                -- "if the resulting spell is an instant or sorcery spell" gates the
-                -- PERMISSION (Keyword.permissionsFor) and is not re-asked here.
-                Zone.Graveyard ->
-                  let -- CR 613.1: the keywords the card HAS in the graveyard, not
-                      -- the ones it prints, an ability granted there (CR 113.6f)
-                      -- stating rule 702.34a's cost as much as a printed one. Read
-                      -- off the OBJECT, so the caller's CR 709.3a half is measured.
-                      keywords = Map.keysSet (Projection.keywordsOf oid gs)
-                      -- The flashback keyword AS IT WAS READ: rule 702.34a's ability
-                      -- and its cost are one sentence, so the cost is what
-                      -- distinguishes one instance from another.
-                      flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
-                   in fmap flashback (Keyword.flashbackCosts keywords)
-                        <> [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed | Keyword.hasAftermath keywords]
-                        <> [ CandidateCost.MkCandidateCost
-                               (Just Keyword.Type.JumpStart)
-                               -- CR 702.133a's cost names no quality -- "discard a
-                               -- card" -- so the criterion admits everything.
-                               printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))]}
-                           | Keyword.hasJumpStart keywords
-                           ]
-                        -- UNTAGGED: an effect's permission states no cost, so
-                        -- neither rule 702.34a's clause nor rule 702.133a's is
-                        -- satisfied by paying it.
-                        <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then fmap untagged (printed : alternatives) else [])
-                -- CR 702.170d: a PLOTTED card is cast "without paying its mana
-                -- cost", CR 118.9's alternative cost. INSTEAD of the printed cost,
-                -- rule 702.170d being the only thing permitting this cast. The zone's
-                -- other permissions (CR 715.3d, Effect.GrantPlayFromExile) state no
-                -- cost and fall through to the `_` arm.
-                Zone.Exile
-                  | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
-                -- CR 702.143a: a FORETOLD card is cast for its foretell cost, CR
-                -- 118.9's alternative cost, wrapped by withAdditional as flashback's
-                -- is. INSTEAD of the printed cost, the plotted arm's reason.
-                --
-                -- Not implemented: CR 702.143d's card foretold with NO foretell cost,
-                -- unreachable from this module's own writer since CR 116.2h exiles
-                -- only a card with foretell (#1486).
-                Zone.Exile
-                  | Maybe.isJust (Object.foretold obj) ->
-                      fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
-                -- CR 118.9's other half, "applied to it from another effect", as a
-                -- STANDING grant (Omniscience): a player-scoped alternative cost no
-                -- per-card list can hold. APPENDED to the hand's ordinary list rather
-                -- than replacing it, CR 118.9a letting the controller announce which
-                -- single alternative they pay, and last so that `firstOffered` still
-                -- reads the printed cost. Untagged, `untagged`'s reason.
-                --
-                -- CR 107.3b's "the only legal choice for X is 0" falls out rather
-                -- than being enforced: withoutPayingManaCost carries an empty
-                -- ManaCost, which has no variable to prompt for.
-                Zone.Hand ->
-                  fmap untagged (printed : alternatives)
-                    <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost (Object.owner obj) oid gs]
-                _ -> fmap untagged (printed : alternatives)
-    -- Unreachable, and here for totality: a PrintingId is minted only by
-    -- Game.intern, which inserts, so every OfCard names an entry. Costs nothing
-    -- and says the same thing the other arms do -- no card, no cost.
-    Source.OfCard _ -> []
+              -- Not implemented: CR 702.143d's card foretold with NO foretell cost,
+              -- unreachable from this module's own writer since CR 116.2h exiles
+              -- only a card with foretell (#1486).
+              Zone.Exile
+                | Maybe.isJust (Object.foretold obj) ->
+                    fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
+              -- CR 118.9's other half, "applied to it from another effect", as a
+              -- STANDING grant (Omniscience): a player-scoped alternative cost no
+              -- per-card list can hold. APPENDED to the hand's ordinary list rather
+              -- than replacing it, CR 118.9a letting the controller announce which
+              -- single alternative they pay, and last so that `firstOffered` still
+              -- reads the printed cost. Untagged, `untagged`'s reason.
+              --
+              -- CR 107.3b's "the only legal choice for X is 0" falls out rather
+              -- than being enforced: withoutPayingManaCost carries an empty
+              -- ManaCost, which has no variable to prompt for.
+              Zone.Hand ->
+                fmap untagged (printed : alternatives)
+                  <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost (Object.owner obj) oid gs]
+              _ -> fmap untagged (printed : alternatives)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []
