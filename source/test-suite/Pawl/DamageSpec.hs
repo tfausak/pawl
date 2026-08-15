@@ -1,8 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, its deal-time riders
--- (deathtouch, infect, wither, toxic, lifelink), trample, and state-based actions.
+-- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, who the
+-- funnel credits as a damage event's source, its deal-time riders (deathtouch,
+-- infect, wither, toxic, lifelink), trample, and state-based actions.
 module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
@@ -2279,9 +2280,103 @@ damageRecipientSpec s registry =
       Spec.assertEqWith s "battle" (Damage.damageRecipient gs (Recipient.ToBattle battleId)) (Just (Recipient.ToBattle battleId))
       Spec.assertEqWith s "player" (Damage.damageRecipient gs (Recipient.ToPlayer S.bob)) (Just (Recipient.ToPlayer S.bob))
 
+-- Two Forests, one creature for alice, one for bob, and Rabid Bite cast from
+-- alice's hand at the only legal target in each slot. Returns the dealer, the
+-- victim and the board after the sorcery has resolved -- state-based actions
+-- NOT yet checked, so a caller that wants CR 704.5h runs S.settleSba itself.
+biteBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+biteBoard forest rabidBite dealerPrinting victimPrinting =
+  let (dealerId, withDealer) = S.addCreature dealerPrinting S.alice (S.landsInPlay forest 2)
+      (victimId, withVictim) = S.addCreature victimPrinting S.bob withDealer
+      (gs, spellId) = S.handOne rabidBite withVictim
+      after = S.runPure S.identityAnswer gs (S.cast S.alice spellId Monad.>> Stack.resolveTop)
+   in (dealerId, victimId, after)
+
+-- CR 120.1's "an object that deals damage is the source of that damage", where
+-- the object is NOT the resolving one -- CR 120.2b: "the spell or ability will
+-- specify which object deals that damage."
+--
+-- Rabid Bite {1}{G} Sorcery (data/cards/rabid-bite.json): "Target creature you
+-- control deals damage equal to its power to target creature you don't
+-- control." The sorcery is the instruction; the targeted creature is the source.
+--
+-- A source is invisible unless something READS it, so no case here stops at the
+-- marked damage -- which would pass whichever object the engine credited. The
+-- readers are the CR 608.2i record's own DamageEvent.source, CR 120.3f's
+-- lifelink payee and CR 702.2b's deathtouch destruction. Rabid Bite itself has
+-- none of those keywords, so every one of them answers only if the creature is
+-- the source.
+--
+-- Two pairs, each differing in exactly one thing. Child of Night and Goblin
+-- Piker are both 2/1, so the damage is 2 either way and only lifelink differs;
+-- Typhoid Rats and Llanowar Elves are both 1/1, so the damage is 1 either way
+-- and only deathtouch differs (the Elves' mana ability is never activated). The
+-- two amounts differ from each other, and the victim is a 0/8 Wall of Stone
+-- throughout, which survives both -- so its destruction can only be deathtouch.
+damageSourceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+damageSourceSpec s registry = Spec.describe s "DamageSource" $ do
+  Spec.it s "CR 120.1/120.2b the event credits the targeted creature, and CR 120.3f pays ITS controller" $ do
+    forest <- S.printingOf s registry "Forest"
+    rabidBite <- S.printingOf s registry "Rabid Bite"
+    childOfNight <- S.printingOf s registry "Child of Night"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (vampire, wall, after) = biteBoard forest rabidBite childOfNight wallOfStone
+    -- The OBSERVER first, deliberately: a mutation that credits the sorcery has
+    -- to be caught by a rule reading the source, not only by the field itself.
+    Spec.assertEqWith s "alice gained two off ITS lifelink" (S.lifeOf S.alice after) (Just 22)
+    Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "two damage marked on the Wall" (S.damageOf wall after) (Just 2)
+    Spec.assertBool s (S.onBattlefield wall (S.settleSba after)) "the 0/8 Wall survives two damage"
+    Spec.assertEqWith s "and the Vampire dealt it, not the sorcery" (fmap DamageEvent.source (S.damageEventsOf after)) [vampire]
+  -- The paired control: same seats, same mana, same 2 power, same recipient. A
+  -- reading that gained life for the sorcery's own damage would gain it here too.
+  Spec.it s "CR 120.3f a Goblin Piker dealing the same two gains nobody anything" $ do
+    forest <- S.printingOf s registry "Forest"
+    rabidBite <- S.printingOf s registry "Rabid Bite"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (pikerId, wall, after) = biteBoard forest rabidBite piker wallOfStone
+    Spec.assertEqWith s "the Piker dealt it" (fmap DamageEvent.source (S.damageEventsOf after)) [pikerId]
+    Spec.assertEqWith s "two damage marked on the Wall" (S.damageOf wall after) (Just 2)
+    Spec.assertEqWith s "and no lifelink to pay" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertBool s (S.onBattlefield wall (S.settleSba after)) "the Wall survives"
+  -- CR 702.2b reads the SOURCE's deathtouch, and one damage kills a 0/8 only if
+  -- the source is the Rat. The rider is captured at deal time
+  -- (DamageEvent.dealtByDeathtouch), so this also pins that the redirected id is
+  -- what damageEvent read the keywords off.
+  Spec.it s "CR 702.2b a Typhoid Rats' one damage destroys the 0/8 Wall" $ do
+    forest <- S.printingOf s registry "Forest"
+    rabidBite <- S.printingOf s registry "Rabid Bite"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (ratId, wall, after) = biteBoard forest rabidBite rats wallOfStone
+    -- The observer first, for the reason the lifelink case above puts it first.
+    Spec.assertBool s (not (S.onBattlefield wall (S.settleSba after))) "CR 704.5h destroyed the Wall"
+    Spec.assertEqWith s "one damage, not two" (S.damageOf wall after) (Just 1)
+    Spec.assertEqWith s "the deal-time rider read the Rat" (fmap DamageEvent.dealtByDeathtouch (S.damageEventsOf after)) [True]
+    Spec.assertEqWith s "and the Rat dealt it" (fmap DamageEvent.source (S.damageEventsOf after)) [ratId]
+  -- The paired control for that one: another 1/1, so the same one damage, and
+  -- the only difference is the keyword.
+  Spec.it s "CR 702.2b Llanowar Elves' one damage leaves the Wall standing" $ do
+    forest <- S.printingOf s registry "Forest"
+    rabidBite <- S.printingOf s registry "Rabid Bite"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (elfId, wall, after) = biteBoard forest rabidBite elves wallOfStone
+    Spec.assertEqWith s "the Elf dealt it" (fmap DamageEvent.source (S.damageEventsOf after)) [elfId]
+    Spec.assertEqWith s "one damage" (S.damageOf wall after) (Just 1)
+    Spec.assertEqWith s "no deathtouch rider" (fmap DamageEvent.dealtByDeathtouch (S.damageEventsOf after)) [False]
+    Spec.assertBool s (S.onBattlefield wall (S.settleSba after)) "the Wall survives"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   damageSpec s registry
+  damageSourceSpec s registry
   damageRecipientSpec s registry
   legendRuleSpec s registry
   worldRuleSpec s registry
