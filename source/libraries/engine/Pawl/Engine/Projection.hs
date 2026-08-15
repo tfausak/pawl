@@ -655,6 +655,7 @@ viewOfCard face =
           -- 303.4b: nor is it a permanent attached to anything.
           Filter.attacking = False,
           Filter.blocking = False,
+          Filter.blocked = False,
           Filter.attackedThisTurn = False,
           Filter.attachedToCreature = False,
           Filter.attachedToPermanent = False,
@@ -867,6 +868,10 @@ viewOfCharacteristics oid pc controller counters gs =
       -- membership in some attacker's set rather than a key lookup -- Map.member
       -- would be Pawl.Engine.Combat.isBlocked's question instead (CR 509.1h).
       Filter.blocking = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs))),
+      -- CR 509.1h: the key lookup the line above is careful not to be. True for
+      -- an attacker the declaration blocked and for one Effect.BecomesBlocked
+      -- did, and it stays True once every creature blocking it has left combat.
+      Filter.blocked = Map.member oid (Combat.blockers (GameState.combat gs)),
       -- CR 608.2i: read from the turn's event log, not the combat record, which
       -- CR 511.3 clears at end of combat. The log spans the turn.
       Filter.attackedThisTurn = any (declaredIt oid . snd) (GameState.events gs),
@@ -1614,6 +1619,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
   Effect.RemoveFromCombat _ -> effect
+  Effect.BecomesBlocked _ -> effect
   -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
   -- printed keyword through the swap (#1190).
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref zone riders mSlot mOrigin position) -> Effect.MoveToZone (MoveToZone.MkMoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin position)
@@ -2842,6 +2848,10 @@ filterReads f = case f of
   -- restrictions gate the declaration on projected characteristics, but the
   -- declaration is a turn-based action that writes the record once and is over.
   Filter.Type.IsBlocking -> Set.empty
+  -- Reads nothing, for IsBlocking's reason and off the same record: an effect
+  -- conferring the status (Effect.BecomesBlocked) writes it from a resolution,
+  -- which is between projections like every other writer.
+  Filter.Type.IsBlocked -> Set.empty
   -- Reads nothing: no Modification writes GameState.events, so no CR 613 layer can
   -- move a set this atom selects.
   Filter.Type.AttackedThisTurn -> Set.empty

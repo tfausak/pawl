@@ -81,6 +81,7 @@ codec cardCodec =
       Arm.payload "Sacrifice" SlotName.codec Effect.Sacrifice (\x -> case x of Effect.Sacrifice y -> Just y; _ -> Nothing),
       Arm.payload "TurnFaceDown" SlotName.codec Effect.TurnFaceDown (\x -> case x of Effect.TurnFaceDown y -> Just y; _ -> Nothing),
       Arm.payload "RemoveFromCombat" SlotName.codec Effect.RemoveFromCombat (\x -> case x of Effect.RemoveFromCombat y -> Just y; _ -> Nothing),
+      Arm.payload "BecomesBlocked" SlotName.codec Effect.BecomesBlocked (\x -> case x of Effect.BecomesBlocked y -> Just y; _ -> Nothing),
       Arm.payload "Counter" SlotName.codec Effect.Counter (\x -> case x of Effect.Counter y -> Just y; _ -> Nothing),
       Arm.payload "MoveToZone" MoveToZone.codec Effect.MoveToZone (\x -> case x of Effect.MoveToZone y -> Just y; _ -> Nothing),
       Arm.payload "Draw" PlayerQuantity.codec Effect.Draw (\x -> case x of Effect.Draw y -> Just y; _ -> Nothing),

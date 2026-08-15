@@ -103,6 +103,7 @@ manaProduced effect = case effect of
   Effect.Sacrifice _ -> Nothing
   Effect.TurnFaceDown _ -> Nothing
   Effect.RemoveFromCombat _ -> Nothing
+  Effect.BecomesBlocked _ -> Nothing
   Effect.MoveToZone {} -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
@@ -236,6 +237,7 @@ movesLibraryCard effect = case effect of
   Effect.Sacrifice _ -> False
   Effect.TurnFaceDown _ -> False
   Effect.RemoveFromCombat _ -> False
+  Effect.BecomesBlocked _ -> False
   -- CR 701.22 and CR 701.29 rearrange a library's own cards; nothing enters or
   -- leaves it.
   Effect.Scry {} -> False

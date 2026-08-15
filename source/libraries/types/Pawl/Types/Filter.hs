@@ -363,6 +363,20 @@ data Filter keyword
     -- them apart -- a creature remains blocked once every blocker leaves combat --
     -- so an attacker can be blocked when nothing answers True here.
     IsBlocking
+  | -- | CR 509.1h: the candidate is a BLOCKED creature -- an attacking creature
+    -- one or more creatures were declared blocking, or that an effect said
+    -- becomes blocked. Curtain of Light's "target unblocked attacking creature"
+    -- is `And [IsAttacking, Not IsBlocked]`, the one-relation-one-spelling
+    -- posture IsToken and IsTapped take. Uncharacteristic for IsAttacking's
+    -- reason.
+    --
+    -- The OTHER side of IsBlocking above, and not derivable from it in either
+    -- direction: this is Pawl.Engine.Combat.isBlocked, membership of the KEY of
+    -- Combat.blockers, where IsBlocking asks about the sets. CR 509.1h is what
+    -- pulls them apart -- a creature stays blocked once every creature blocking
+    -- it has left combat, and an effect can confer the status with no blocker
+    -- ever assigned.
+    IsBlocked
   | -- | CR 608.2i: the candidate was DECLARED as an attacker earlier this turn --
     -- Relentless Assault's "all creatures that attacked this turn". A look-back
     -- read of the turn-scoped GameEvent log, which CR 608.2i sanctions; never a

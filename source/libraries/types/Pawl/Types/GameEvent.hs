@@ -226,8 +226,10 @@ data GameEvent
     -- from combat (CR 506.4) leaves no record of what it was declared against.
     BlockerDeclared BlockerDeclared.BlockerDeclared
   | -- | CR 509.1h: an attacking creature BECAME a blocked creature -- one event
-    -- per attacker the CR 509.1 declaration gave at least one blocker, appended
-    -- by Pawl.Engine.Combat.declareBlockers alone.
+    -- per attacker the CR 509.1 declaration gave at least one blocker, plus one
+    -- per attacker an effect said becomes blocked (Effect.BecomesBlocked).
+    -- Pawl.Engine.Combat.declareBlockers and Pawl.Engine.Combat.becomeBlocked are
+    -- the two appenders, which are the two writers of the status itself.
     --
     -- Derived from the same declaration as BlockerDeclared and not folded into
     -- it, because the two have different arities: an attacker can be blocked by
@@ -240,15 +242,14 @@ data GameEvent
     -- is the condition that names one, and it reads BlockerDeclared's pair
     -- instead -- this event exists to be the once-per-combat one (#1146).
     --
-    -- A DECLARATION is the only producer, which is STRICTER than rule 509.3c:
-    -- that rule also makes an attacker become blocked when an effect blocks it,
-    -- or when its only blocker is one put onto the battlefield (CR 509.4 denies
-    -- that creature having "blocked", but says nothing about the attacker).
-    -- Neither producer exists in the pool (#1146).
+    -- CR 509.3c's third producer is missing: an attacker whose only blocker is
+    -- one put onto the battlefield blocking becomes blocked too (CR 509.4 denies
+    -- that creature having "blocked", but says nothing about the attacker), and
+    -- nothing can put a creature onto the battlefield blocking (#1387).
     --
     -- The PlayerId is CR 508.5's defending player for this attacker, exactly as
-    -- AttackerDeclared above carries it and computed the same way, by
-    -- Pawl.Engine.Combat.declareBlockers off what the creature is attacking. CR
+    -- AttackerDeclared above carries it and computed the same way, off what the
+    -- creature is attacking. CR
     -- 702.130a's afflict is what reads it. Carried rather than derived for
     -- AttackerDeclared's reason: Pawl.Engine.Event.eventBindings takes no game
     -- state, and the planeswalker and battle forms of CR 508.5 need the board.
