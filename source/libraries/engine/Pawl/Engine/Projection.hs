@@ -273,15 +273,26 @@ applyModification viewOf src gs oid m pc =
         -- do, and CR 702.14e makes the total unobservable for landwalk anyway --
         -- Combat.landwalkAllowsGiven reads membership, never the count.
         --
-        -- Not implemented: the swap does not reach PC.replacementEffects, a
-        -- mode's targetSlots, or an activated ability's cost (#635).
+        -- The CDA half is CR 604.3's. CR 208.2a makes the star in the power box
+        -- stand for an ability printed in the text box, so its words are CR
+        -- 612.1's like any others: a hacked Nightmare counts Islands. What is
+        -- rewritten here is the UNEVALUATED pair -- PC.characteristicPT is
+        -- written at this layer and read at 7a (applyCharacteristicPT), so the
+        -- number is determined once, from the rewritten text, against the board
+        -- every earlier layer has already settled. Neither double-counted nor
+        -- missed: a layer-4 type change and a layer-6 grant both fall between
+        -- these two points, so the count that finally runs sees them, and this
+        -- layer writes no PC.power of its own for 7a to overwrite.
+        --
+        -- Not implemented: the swap does not reach PC.replacementEffects (#635).
         Modification.ChangeSubtypeWord (ChangeSubtypeWord.MkChangeSubtypeWord from to) ->
           let pairs = [(from, to)]
               pc' =
                 pc
                   { PC.keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc),
                     PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
-                    PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc)
+                    PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc),
+                    PC.characteristicPT = fmap (rewriteCharacteristicPT pairs) (PC.characteristicPT pc)
                   }
            in if Set.member from (PC.subtypes pc')
                 then pc' {PC.subtypes = Set.insert to (Set.delete from (PC.subtypes pc'))}
@@ -2081,6 +2092,17 @@ rewriteAggregation pairs aggregation = case aggregation of
   Aggregation.Members -> aggregation
   Aggregation.DistinctCardTypes -> aggregation
 
+-- CR 612.1 through CR 208.2a's characteristic-defining power and toughness. Both
+-- boxes are rewritten rather than only the one a card happens to fill, since CR
+-- 208.2a's wording gives a card either or both and seedCharacteristicPT already
+-- keeps them as a pair.
+rewriteCharacteristicPT :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> CharacteristicPT.CharacteristicPT -> CharacteristicPT.CharacteristicPT
+rewriteCharacteristicPT pairs cda =
+  CharacteristicPT.MkCharacteristicPT
+    { CharacteristicPT.power = rewriteQuantity pairs (CharacteristicPT.power cda),
+      CharacteristicPT.toughness = rewriteQuantity pairs (CharacteristicPT.toughness cda)
+    }
+
 -- Every continuous effect in the game: stored resolution effects, plus every
 -- battlefield permanent's static abilities (CR 613.7a, with the permanent's own
 -- timestamp), dropping a permanent whose static abilities are not live (CR
@@ -2959,6 +2981,13 @@ filterReads f = case f of
 --
 -- An ability change can also matter to CR 613.8 by changing an effect's EXISTENCE,
 -- a different clause that lives in liveGiven.
+--
+-- ChangeSubtypeWord also rewrites PC.characteristicPT, and that is deliberately
+-- not PowerA here. This asks what a modification writes IN ITS OWN LAYER, which
+-- is the only comparison writesByLayer makes -- and the rewritten CDA is still an
+-- unevaluated pair at layer 3, its power written at 7a by applyCharacteristicPT,
+-- which is no gathered candidate at all. CR 613.8a clause (c) says the same thing
+-- from the rule's side: a CDA and a non-CDA effect are never dependent.
 modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.singleton Keywords
