@@ -7389,8 +7389,8 @@ permanentDiesSpec s registry =
               TriggerCondition.StepBegins (StepBegins.MkStepBegins (Phase.Ending EndingStep.EndStep) TurnScope.ControllersTurn)
             ]
 
--- Meren of Clan Nel Toth's SECOND ability, which permanentDiesSpec above left
--- untranscribed until now: "At the beginning of your end step, choose target
+-- Meren of Clan Nel Toth's SECOND ability, the half permanentDiesSpec above does
+-- not cover: "At the beginning of your end step, choose target
 -- creature card in your graveyard. If that card's mana value is less than or
 -- equal to the number of experience counters you have, return it to the
 -- battlefield. Otherwise, put it into your hand."
@@ -7399,7 +7399,7 @@ permanentDiesSpec s registry =
 -- a graveyard (Raise Dead's pool), and a destination that depends on a
 -- comparison. That last part is the reason this card sat half-transcribed: the
 -- ISA has no branch, and #614 proposed a purpose-built two-destination opcode
--- for it. It needs neither. CR 608.2e's clause is already the unit a condition
+-- for it. It needs no such opcode. CR 608.2e's clause is already the unit a condition
 -- rides (Pawl.Types.Clause.condition), so the printed sentence is TWO clauses of
 -- one mode sharing one target slot, each gated by one half of the comparison --
 -- and Resolve.gateHolds reads each gate as its own clause is applied (CR
@@ -7413,14 +7413,23 @@ permanentDiesSpec s registry =
 -- quantity as False, so a negated gate would fire on the very board where the
 -- first clause had already moved the card out from under it.
 --
--- The pair below differs in ONE thing, the experience-counter count -- 3 and 1
--- against a target of mana value 2 -- and the two branches land the card in
--- different ZONES, so no arithmetic slip can make one read as the other. Every
--- other number on the board is distinct from both counts: Meren's own mana value
--- is 4, the Thragtusk beside the target in the graveyard is 5, the Bonded
--- Construct on the battlefield is 1, and alice controls 2 creatures. So a gate
--- reading the SOURCE's mana value, or the wrong slot's, or counting the board
--- instead of the counters, lands in a zone neither case accepts.
+-- That same ordering makes the "+ 1" itself UNOBSERVABLE, and no case below
+-- proves it: on the one board where strict and non-strict differ -- an equal
+-- mana value and count -- the first clause has already moved the card, so the
+-- second clause's slot names an id CR 400.7 retired and the move is a no-op
+-- either way. Dropping the "+ 1" leaves this whole group green. It is written
+-- strictly because that is what the card says, not because a case fences it.
+--
+-- The cases below vary ONE thing, the experience-counter count -- 3, then 1, then
+-- 2 -- over one board and one target of mana value 2, and the branches land the
+-- card in different ZONES, so no arithmetic slip can make one read as the other.
+-- On the count-of-3 board every other number differs from it: Meren's own mana
+-- value is 4, the Thragtusk beside the target in the graveyard is 5, the Bonded
+-- Construct on the battlefield is 1, and alice controls 2 creatures -- so a gate
+-- reading the SOURCE's mana value, the wrong slot's, or the board's population
+-- rather than the counters lands in a zone that case does not accept. The
+-- count-of-1 board is the otherwise branch and the count-of-2 board the printed
+-- boundary.
 merenEndStepSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 merenEndStepSpec s registry =
   let experienceOf = S.playerCounterOf PlayerCounterKind.Experience
@@ -7461,10 +7470,11 @@ merenEndStepSpec s registry =
         pure (pikerId, thragtuskId, gs, S.runPure (aimAt pikerId) (atEndStep S.alice gs) (Engine.runStep >> Engine.priorityLoop))
    in Spec.describe s "Meren of Clan Nel Toth's end step" $ do
         -- The mana value is AT MOST the count, so the first clause's gate holds
-        -- and the card is reanimated. The second clause's gate is asked after
-        -- that move and does not hold, which the empty hand is what proves --
-        -- both clauses firing would put the card in two places.
-        Spec.it s "CR 513.1 mana value 2 against three experience counters returns the card to the battlefield" $ do
+        -- and the card is reanimated. The second clause's gate -- 2 at least 4 --
+        -- is then false, and the hand stays empty. That assertion is about the
+        -- BOARD rather than about the gate: per the note above, a second gate that
+        -- held would no-op anyway on the id the first clause retired.
+        Spec.it s "CR 603.2b mana value 2 against three experience counters returns the card to the battlefield" $ do
           (pikerId, thragtuskId, before, after) <- withExperience 3
           Spec.assertEqWith s "alice has three experience counters as the step begins" (experienceOf S.alice before) 3
           Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard (CR 400.7)"
@@ -7476,7 +7486,7 @@ merenEndStepSpec s registry =
         -- the first gate fails and the second -- 2 is at least 1 + 1 -- carries
         -- the card to the hand instead. The battlefield assertion is what makes
         -- this the OTHER branch rather than a trigger that did nothing.
-        Spec.it s "CR 513.1 the same card against one experience counter goes to the hand instead" $ do
+        Spec.it s "CR 603.2b the same card against one experience counter goes to the hand instead" $ do
           (pikerId, thragtuskId, before, after) <- withExperience 1
           Spec.assertEqWith s "alice has one experience counter as the step begins" (experienceOf S.alice before) 1
           Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard"
@@ -7490,12 +7500,13 @@ merenEndStepSpec s registry =
         -- gate that counted the board -- 2 is also alice's creature count, and
         -- deliberately so, since the boundary is what fixes the number -- which is
         -- what the two cases above are for.
-        Spec.it s "CR 513.1 an equal mana value and count take the battlefield branch, not the otherwise one" $ do
+        Spec.it s "CR 603.2b an equal mana value and count take the battlefield branch, not the otherwise one" $ do
           (pikerId, _, _, after) <- withExperience 2
           Spec.assertBool s (notElem pikerId (Game.zoneMembers Zone.Graveyard S.alice after)) "the targeted card left the graveyard"
           Spec.assertEqWith s "a Goblin Piker is on the battlefield" (S.countOnBattlefieldByName pikerName S.alice after) 1
           Spec.assertEqWith s "and her hand is empty" (S.handSize S.alice after) 0
-        -- CR 115.2 clause (a) and CR 601.2c: the choice is a real one. Both
+        -- CR 115.2 clause (a) and CR 603.3d, which hands a triggered ability's
+        -- targeting to CR 601.2c: the choice is a real one. Both
         -- creature cards in alice's own graveyard are offered and nothing else
         -- is, so the cases above are answered by the pinned target rather than by
         -- a pool with one member the engine could not get wrong.
