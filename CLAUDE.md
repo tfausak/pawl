@@ -38,8 +38,9 @@ first question.
 
 - Rules ground truth:
   `docs/rules.txt`, grepped by rule number --- never memory, and never a rule
-  number quoted in an issue or a brief. `script/cr.hs --number 702.21a` prints
-  one rule; it errors rather than guessing when the number does not exist.
+  number quoted in an issue or a dispatch brief. One brief cited CR 118 for
+  paying life, which this revision numbers 119; #1239's own title cited
+  CR 208.2a for something that rule does not govern.
 
 - Prior-art evidence:
   `docs/prior-art-lessons.md`
