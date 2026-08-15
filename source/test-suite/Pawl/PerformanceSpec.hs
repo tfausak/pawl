@@ -200,17 +200,20 @@ growthBound = 8
 -- every object costs without changing the shape of the loop keeps the ratio at
 -- 4x, and only an absolute figure catches it.
 --
--- Measured at 9,188 bytes per permanent on GHC 9.14.1, so this carries ~1.3x
+-- Measured at 11,736 bytes per permanent on GHC 9.14.1, so this carries ~1.3x
 -- headroom: enough to absorb a compiler bump, a change of architecture (this
 -- was measured on aarch64 and CI runs the suite on x86_64), or a feature
 -- landing in the enumeration -- and still tight enough to fail on a doubling.
 -- It read 7,515 before CR 605.3a's priority window (#1123) added an action per
--- source to the list this walk builds.
+-- source to the list this walk builds, and 9,188 before #1592 put an object's
+-- printing behind an id: a card read is now a lookup into GameState.printings
+-- where it was a field read, and this fixture interns per object where a real
+-- game's Setup.createDeck interns per distinct deck entry.
 -- To REGENERATE it, run this test and read the observed figure out of the
 -- failure message; if the increase is understood and wanted, raise this
 -- constant in the commit that causes it.
 ceilingBytesPerPermanent :: Integer
-ceilingBytesPerPermanent = 12000
+ceilingBytesPerPermanent = 15000
 
 -- The same committed ceiling for the OTHER fixture -- the one whose ability is
 -- not a mana ability, so the enumeration runs the two conjuncts that ask about
@@ -231,14 +234,27 @@ ceilingBytesPerPermanent = 12000
 -- THE BRACKET this number sits in, all measured at largeBoard on GHC 9.14.1 /
 -- aarch64:
 --
---   * 99,221 as it stands.
+--   * 131,652 as it stands.
 --   * 571,352 with the base pools taken away again (build them per slot in
 --     Target.basePoolGiven rather than reading Action.legalActions' Pools).
 --   * 813,080 with the mana-source sweep taken away too, which is the pre-#1073
 --     tree.
 --
--- So this carries ~1.3x headroom over the reading -- enough for a compiler bump
--- or the x86_64 CI runner -- and catches the pool regression 5.7x over. It does
+-- The lower two were measured before #1592 and are NOT re-read here, so treat
+-- them as the shape of the bracket rather than as current figures.
+--
+-- It read 99,221 before #1592, which put an object's printing behind an id: a
+-- card read became a lookup into GameState.printings where it was a field read,
+-- and Pawl.Engine.Projection.baseCharacteristics sits on this fixture's
+-- quadratic path. 167,512 of that was recovered to 130,376 by having
+-- Game.printingOfObject hand back the Maybe the lookup already built; the
+-- remaining 1,276 is Game.intern's reverse-index dedup, which this fixture pays
+-- per object because it interns per object.
+--
+-- So this carries ~1.03x headroom over the reading -- deliberately tighter than
+-- the ceiling above, because the figure is large enough that a proportional
+-- margin would stop catching anything -- and catches the pool regression 4.2x
+-- over. It does
 -- NOT catch losing the MANA-SOURCE hoist alone, which the two figures above put
 -- at about 1.4x: no ceiling could, without being tight enough to fail on a
 -- differently sized allocation. What holds that one is that it is a single
@@ -249,7 +265,7 @@ ceilingBytesPerPermanent = 12000
 -- REGENERATED exactly as ceilingBytesPerPermanent above is: run this test and
 -- read the observed figure out of the failure message.
 sorcererCeilingBytesPerPermanent :: Integer
-sorcererCeilingBytesPerPermanent = 130000
+sorcererCeilingBytesPerPermanent = 135000
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "performance" $ do
