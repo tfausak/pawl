@@ -30,9 +30,9 @@ data DamageR effect = MkDamageR
     -- battlefield to be asked -- so it needs only the program, and
     -- Pawl.Engine.Replacement.collect supplies the environment live.
     --
-    -- Meaningful only beside a preventing `rewrite` (CR 615.5 is about
-    -- prevention effects); Pawl.CardSpec's lint is what holds card data to that,
-    -- since the type cannot.
+    -- Meaningful only beside a preventing `rewrite`, since CR 615.5 is about
+    -- prevention effects; Pawl.CardSpec's riderWithoutPreventionOffends is what
+    -- holds card data to that, the type being unable to.
     riders :: Seq.Seq effect
   }
   deriving (Eq, Ord, Show)

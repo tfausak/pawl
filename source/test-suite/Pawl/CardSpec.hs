@@ -1175,6 +1175,41 @@ isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
   _ -> False
 
+-- CR 615.5: "SOME PREVENTION EFFECTS also include an additional effect." So a
+-- rider beside a rewrite that prevents nothing is a shape the type admits and
+-- the rule does not -- Furnace of Rath's doubling with counters hung off it is
+-- not a card. Stormwild Capridor's PreventAll is the pool's one producer.
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum: an arm
+-- that gains a riders field of its own must be classified here.
+riderWithoutPreventionOffends :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+riderWithoutPreventionOffends replacement = case replacement of
+  ReplacementEffect.DamageR (DamageR.MkDamageR _ rewrite riders) -> not (null riders) && not (preventsDamage rewrite)
+  ReplacementEffect.CounterR {} -> False
+  ReplacementEffect.ZoneChangeR {} -> False
+  ReplacementEffect.EntryR {} -> False
+  ReplacementEffect.DestructionR _ -> False
+  ReplacementEffect.TokenR {} -> False
+  ReplacementEffect.TurnUpR {} -> False
+  ReplacementEffect.PhaseR _ -> False
+
+-- CR 615.1a: does this rewrite use the word "prevent"? engineMintedDamage's
+-- shape, and the same classification Pawl.Engine.Replacement.prevents makes --
+-- restated here rather than imported so the lint holds even if that function is
+-- what a change gets wrong.
+preventsDamage :: DamageRewrite.DamageRewrite -> Bool
+preventsDamage rewrite = case rewrite of
+  DamageRewrite.PreventAll -> True
+  DamageRewrite.PreventNext _ -> True
+  DamageRewrite.PreventRemovingShieldCounter -> True
+  DamageRewrite.SetAmount _ -> False
+  DamageRewrite.Scale _ -> False
+  DamageRewrite.Redirect _ -> False
+
+-- The non-vacuity half of riderWithoutPreventionOffends' lint, isPhaseR's shape.
+hasRider :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
+hasRider = not . null . replacementEffectRiders
+
 -- The non-vacuity half of engineOnlyOffends' lint, isPhaseR's shape.
 isDamageR :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> Bool
 isDamageR replacement = case replacement of
@@ -4166,6 +4201,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any (engineOnlyOffends . bakeCounterShield) printed) "and so is one removing a shield counter"
     Spec.assertBool s (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter)) "and so is CR 122.1c's destruction half"
     Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))) "while CR 701.19a's printed regeneration is accepted"
+  -- CR 615.5's rider is a PREVENTION effect's, which the type cannot say. See
+  -- riderWithoutPreventionOffends.
+  Spec.it s "no card hangs CR 615.5's additional effect off a rewrite that prevents nothing" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace (any riderWithoutPreventionOffends . cardReplacementEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: Stormwild Capridor is the card that prints
+    -- a rider at all.
+    Spec.assertBool s (any (anyFace (any hasRider . cardReplacementEffects) . Printing.card) ps) "the pool has a card printing a CR 615.5 rider"
+    Spec.assertEqWith s "and every one of them rides a prevention" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against Stormwild Capridor rather than a
+  -- card file, exactly as the two cases above are.
+  Spec.it s "the lint itself catches a rider on a rewrite that prevents nothing" $ do
+    capridor <- S.printingOf s registry "Stormwild Capridor"
+    let printed = cardReplacementEffects (S.combinedFace capridor)
+        unprevent replacement = case replacement of
+          ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern _ riders) -> ReplacementEffect.DamageR (DamageR.MkDamageR damagePattern (DamageRewrite.Scale (Scaling.Multiply 2)) riders)
+          other -> other
+    Spec.assertBool s (any hasRider printed) "setup: the Capridor prints a rider to move"
+    Spec.assertBool s (not (any riderWithoutPreventionOffends printed)) "the real Capridor hangs it off a prevention"
+    Spec.assertBool s (any (riderWithoutPreventionOffends . unprevent) printed) "and the same rider on a doubling is rejected"
   -- The same shape one axis over, and the thing that makes
   -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
   -- approximate. See unpreventableScopeOffends.
