@@ -125,7 +125,9 @@
 -- against the keys eventBindings actually stamps, over every event each
 -- condition admits. The same slot under a BYSTANDER's dies trigger, where the
 -- bearer is a third object entirely, with Promise of Tomorrow --
--- `promiseOfTomorrowSpec`. CR 603.4's intervening "if"
+-- `promiseOfTomorrowSpec`, whose linked SECOND ability -- CR 607.2a's "all cards
+-- exiled with it", returned under CR 110.2a's stated controller and past an
+-- unlinked decoy -- is `promiseOfTomorrowReturnSpec`. CR 603.4's intervening "if"
 -- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
 -- -- `lookBackInterveningSpec`, and the same clause asking about a COUNTER rather
 -- than a characteristic -- the one thing CR 613 folds away before the snapshot
@@ -9055,11 +9057,8 @@ becameSlotSpec s registry =
 -- dies, exile it." The bearer is a THIRD object -- neither the creature that
 -- died nor its graveyard incarnation -- which is what makes "it" unambiguous
 -- here where becameSlotSpec's Endless Cockroaches had to keep two incarnations
--- of one card apart. Not transcribed: the second ability, "at the beginning of
--- each end step, if you control no creatures, sacrifice this enchantment and
--- return all cards exiled with it to the battlefield under your control" -- CR
--- 607.2a's link is recorded now, so what is left is the end-step trigger, the
--- sacrifice of the ability's own source, and the battlefield destination (#968).
+-- of one card apart. The card's OTHER ability, which reads CR 607.2a's link back
+-- off what this one exiled, is promiseOfTomorrowReturnSpec below.
 --
 -- The discriminating assertion is WHICH id the payload moves. CR 603.10a makes
 -- Event.matchesTrigger's PermanentDies arm match on ZoneChange.departed, so
@@ -9127,6 +9126,123 @@ promiseOfTomorrowSpec s registry =
               arrived = ObjectId.MkObjectId 2
               died = GameEvent.Moved (Moved.MkMoved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics)
           Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
+
+-- CR 607.2a's linked pair read from the SECOND ability, which is the half
+-- promiseOfTomorrowSpec above could not reach: "At the beginning of each end
+-- step, if you control no creatures, sacrifice this enchantment and return all
+-- cards exiled with it to the battlefield under your control."
+--
+-- Three separations, each a different way the return could be wrong:
+--
+--   * IDENTITY, not count. Wall of Stone sits in exile from the start, put there
+--     by no ability at all, so GameState.exiledWith files it against nothing.
+--     A return that swept exile rather than the linked set would bring it back.
+--
+--   * CONTROL, not ownership. The Ogre Sentry is BOB's card under alice's
+--     control when it dies, so CR 110.2a's "unless the effect states otherwise"
+--     is observable: "under your control" hands it to alice, while
+--     EntryRiders.underOwner would hand it to bob. The Goblin Piker, which alice
+--     owns, cannot tell those apart on its own.
+--
+--   * "YOU control no creatures", not "no creatures". Bob's Hill Giant is on the
+--     battlefield in BOTH legs, so a CR 603.4 clause reading the whole
+--     battlefield would never fire at all.
+--
+-- The negative leg is the same board with the Hill Giant under ALICE instead of
+-- bob -- one difference, and it is the clause's subject. Alice then still
+-- controls a creature when the end step begins, the ability does not trigger,
+-- and nothing moves: Promise stays on the battlefield and both cards stay in
+-- exile.
+--
+-- The two deaths are dealt one at a time so that exactly one trigger is on the
+-- stack per settle; two at once would make CR 603.3b's ordering a question the
+-- fixture answerer would have to answer, and the order is not what is under
+-- test.
+--
+-- WHAT IS NOT COVERED: an exiled card that leaves exile by some other means
+-- before the return. Resolve.recordExiledWith drops such a key on its next
+-- window (its own comment carries the argument, and CR 400.7 mints the departed
+-- card a new id besides), but no card in the pool can pull a card out of exile
+-- between Promise's two abilities, so there is nothing to drive it with. The
+-- source leaving the battlefield first IS covered, and by construction: the
+-- sacrifice runs BEFORE the return in the same resolution, so every assertion
+-- below is already read off a board where the linking object is in the
+-- graveyard.
+promiseOfTomorrowReturnSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+promiseOfTomorrowReturnSpec s registry =
+  let board giantUnder = do
+        promise <- S.printingOf s registry "Promise of Tomorrow"
+        piker <- S.printingOf s registry "Goblin Piker"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        giant <- S.printingOf s registry "Hill Giant"
+        wall <- S.printingOf s registry "Wall of Stone"
+        let empty = Setup.emptyGame S.bothPlayers
+            (promiseId, withPromise) = S.addCreature promise S.alice empty
+            (pikerId, withPiker) = S.addCreature piker S.alice withPromise
+            -- Bob's card, alice's permanent (CR 108.4).
+            (sentryId, withSentry) = S.addCreature sentry S.bob withPiker
+            stolen = S.giveControl sentryId S.alice withSentry
+            (giantId, withGiant) = S.addCreature giant S.bob stolen
+            seated = if giantUnder == S.alice then S.giveControl giantId S.alice withGiant else withGiant
+            (wallId, withWall) = S.addExiledCard wall S.alice seated
+        pure (promiseId, pikerId, sentryId, wallId, withWall)
+      -- Destroy one permanent (CR 701.8a), settle so the CR 117.5 boundary scans
+      -- the death and places Promise's dies trigger, then resolve that trigger.
+      killIt oid gs =
+        let killed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [oid])
+            settled = S.runPure S.identityAnswer killed Engine.settleForPriority
+         in S.runPure S.identityAnswer settled Stack.resolveTop
+      -- Record the end step's beginning, place what it gathers (CR 603.3), and
+      -- resolve the one ability that can be there.
+      endStepOf gs =
+        let began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs
+            placed = S.runPure S.identityAnswer began Engine.settleForPriority
+         in S.runPure S.identityAnswer placed Stack.resolveTop
+      nameOf oid gs = fmap Face.name (Game.faceOf oid gs)
+      -- The battlefield permanents whose PROJECTED controller is pid, by name.
+      -- Sorted, since GameState.battlefield is a set and the returned cards are
+      -- minted fresh ids in no order the card states.
+      controlledNames pid gs =
+        List.sort (Maybe.mapMaybe (\oid -> if Projection.controllerOf oid gs == Just pid then nameOf oid gs else Nothing) (Set.toList (GameState.battlefield gs)))
+      -- Everything in exile by name, whoever owns it -- CR 400.1 makes exile one
+      -- shared zone, and the Sentry there is bob's card.
+      exiledNames gs = List.sort (Maybe.mapMaybe (`nameOf` gs) (Set.toList (GameState.exile gs)))
+      named = CardName.MkCardName . Text.pack
+   in Spec.describe s "CR 607.2a Promise of Tomorrow returns the cards it exiled" $ do
+        Spec.it s "CR 700.4 whole card: the linked cards come back under alice, the unlinked one stays in exile" $ do
+          (promiseId, pikerId, sentryId, wallId, board0) <- board S.bob
+          let exiled = killIt sentryId (killIt pikerId board0)
+          -- The premise, stated so a failure below cannot be a failure of the
+          -- first ability wearing the second's clothes.
+          Spec.assertEqWith s "both deaths were exiled, alongside the decoy" (exiledNames exiled) (fmap named ["Goblin Piker", "Ogre Sentry", "Wall of Stone"])
+          Spec.assertEqWith s "and alice controls no creatures" (controlledNames S.alice exiled) [named "Promise of Tomorrow"]
+          Spec.assertEqWith s "while bob still has one on the battlefield" (controlledNames S.bob exiled) [named "Hill Giant"]
+          let after = endStepOf exiled
+          Spec.assertBool s (not (S.onBattlefield promiseId after)) "CR 701.21a: the enchantment sacrificed itself"
+          Spec.assertEqWith s "and it is in alice's graveyard" (fmap Face.name (Maybe.mapMaybe (`Game.faceOf` after) (Game.zoneMembers Zone.Graveyard S.alice after))) [named "Promise of Tomorrow"]
+          -- The three separations, as one tuple so a failure says which.
+          Spec.assertEqWith
+            s
+            "the linked pair returned under alice, the decoy stayed, bob kept only his Giant"
+            (controlledNames S.alice after, exiledNames after, controlledNames S.bob after)
+            (fmap named ["Goblin Piker", "Ogre Sentry"], [named "Wall of Stone"], [named "Hill Giant"])
+          -- CR 400.7: what came back is a new object, so the exiled ids name
+          -- nothing on the battlefield. Reading `pikerId`/`sentryId` would have
+          -- been a false way to write the assertion above.
+          Spec.assertBool s (not (S.onBattlefield pikerId after || S.onBattlefield sentryId after)) "and both are new objects"
+          Spec.assertBool s (Maybe.isJust (Game.lookupObject wallId after)) "the decoy id is untouched"
+        -- The one-difference control: bob's Hill Giant moves to alice, so alice
+        -- controls a creature at the beginning of the end step and CR 603.4 stops
+        -- the ability triggering at all.
+        Spec.it s "CR 603.4 control: alice keeping ANY creature leaves the exiled cards where they are" $ do
+          (promiseId, pikerId, sentryId, _, board0) <- board S.alice
+          let exiled = killIt sentryId (killIt pikerId board0)
+          Spec.assertEqWith s "the same two cards are exiled" (exiledNames exiled) (fmap named ["Goblin Piker", "Ogre Sentry", "Wall of Stone"])
+          Spec.assertEqWith s "but alice still controls the Giant" (controlledNames S.alice exiled) (fmap named ["Hill Giant", "Promise of Tomorrow"])
+          let after = endStepOf exiled
+          Spec.assertEqWith s "nothing was placed on the stack" (length (GameState.stack after)) 0
+          Spec.assertBool s (S.onBattlefield promiseId after) "the enchantment is still there"
+          Spec.assertEqWith s "and exile is unchanged" (exiledNames after) (fmap named ["Goblin Piker", "Ogre Sentry", "Wall of Stone"])
 
 -- CR 603.4's intervening "if" on a LOOK-BACK trigger, which is the one shape
 -- where the clause has to be read against an object that no longer exists:
@@ -11821,6 +11937,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   leavesBattlefieldSpec s registry
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry
+  promiseOfTomorrowReturnSpec s registry
   lookBackInterveningSpec s registry
   counterLookBackSpec s registry
   undyingSpec s registry
