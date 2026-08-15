@@ -6400,16 +6400,23 @@ eventTriggers events gs =
       -- union rather than one per death. `drop 1` is the alignment, shifting
       -- scanr's "from i onward" to "from i+1 onward".
       --
-      -- The controller and abilities are the ones the permanent had as it LEFT --
-      -- one moment after the event that triggered them, not at it (#603). Nothing
-      -- in this pool moves control or grants an ability in that window.
+      -- The controller and abilities here are the ones the permanent had as it
+      -- LEFT, one moment after the event that triggered them rather than at it --
+      -- so this is the SECOND reading of such a permanent, and loses to the first.
+      -- `onBattlefieldAt` above already holds it, sampled at the event itself,
+      -- because a permanent that departs at a later group was still standing when
+      -- this group's sample was taken; Map.unions is left-biased and that entry
+      -- comes first. What is left for this binding is the group the sample does not
+      -- name, where last known information is the only reading there is.
       --
       -- CR 113.6m applies here and not to `leftBattlefield`: this permanent WAS
       -- on the battlefield when the event happened, so one of its abilities that
       -- functions only in a graveyard was no more watching then than it is now.
-      -- The proving case is Squee, Goblin Nabob leaving the battlefield after an
-      -- upkeep began in the same batch, in Pawl.TriggerSpec's
-      -- `bystanderZoneSpec`.
+      -- The behaviour's proving case is Squee, Goblin Nabob leaving the battlefield
+      -- after an upkeep began in the same batch, in Pawl.TriggerSpec's
+      -- `bystanderZoneSpec` -- which reaches the same answer through the sample
+      -- above, that being the reading that wins. The filter is kept identical here
+      -- so the two cannot disagree on the fallback path.
       laterGroups = drop 1 (List.scanr (\block acc -> Map.union (departuresIn block) acc) Map.empty groups)
       -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
       -- board that matters is "the appearance of objects immediately prior to the
@@ -6721,12 +6728,18 @@ eventTriggers events gs =
             fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
-      -- Map.unions is left-biased, so a live battlefield reading wins over a
+      -- Map.unions is left-biased, so the battlefield reading wins over a
       -- last-known one, a cycled card and a graveyard reading. That rules out a
       -- double fire: one entry per id means one pass of `forOne` per id.
       --
-      -- The first four sets are disjoint by construction, and the bias is belt and
-      -- braces. `inGraveyards` genuinely overlaps `cycledCard` on purpose -- a card
+      -- Two of the first four genuinely overlap, and there the bias is load-bearing
+      -- rather than belt and braces: a permanent that departs at a LATER group was
+      -- still standing when this group's sample was taken, so it is in both
+      -- `onBattlefield` and `later`, and the sample's at-the-event reading is the
+      -- one CR 603.10 asks for. `leftBattlefield` and `same` cannot collide with
+      -- the sample -- both name a permanent that had already gone when the sample
+      -- was taken -- nor with each other, an id departing at exactly one group.
+      -- `inGraveyards` genuinely overlaps `cycledCard` on purpose -- a card
       -- cycled into a graveyard is honestly a member of both -- and the winner
       -- offers that card's printed abilities unfiltered, a superset either way.
       -- `spellCast` overlaps nothing: CR 601.2a keeps its object on the stack,

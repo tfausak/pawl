@@ -9473,10 +9473,13 @@ soulshiftSpec s registry =
 -- "It loses all abilities generated from its rules text" reaching a TRIGGER.
 --
 -- The entry is staged the way Pawl.TriggerSpec's other entry fixtures stage it:
--- the permanent is placed, its Moved event recorded, and the scan run at the next
--- settle. CR 603.6a checks every battlefield permanent against the event, and it
--- reads each one's PROJECTION -- so a Blood Moon that has already made the
--- Fountain a Mountain leaves nothing there to trigger.
+-- the permanent is placed, its Moved event appended to the log directly, and the
+-- scan run at the next settle. CR 603.6a checks every battlefield permanent against
+-- the event, and it reads each one's PROJECTION -- so a Blood Moon that has already
+-- made the Fountain a Mountain leaves nothing there to trigger. The appended event
+-- carries no sampled board, so this is the live-fallback reading in
+-- Event.eventTriggers rather than the per-group one; the Blood Moon was standing
+-- before the entry either way, so the two agree here.
 strippedTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 strippedTriggerSpec s registry =
   let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
