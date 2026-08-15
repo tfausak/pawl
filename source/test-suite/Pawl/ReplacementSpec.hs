@@ -972,6 +972,101 @@ testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
     Spec.assertEqWith s "with 2 of the shield left (CR 615.7)" (shieldsLeft after) [2]
     Spec.assertEqWith s "and unshielded the same ping marks 1 and puts no counter on" (S.damageOf victim control, countersOn CounterKind.PlusOnePlusOne victim control) (Just 1, 0)
 
+-- CR 615.5's additional effect on a STATIC prevention ability, which is where
+-- Test of Faith's floating shield above cannot reach: Stormwild Capridor ({2}{W}
+-- Creature -- Bird Goat 1/3, flying) prints "If noncombat damage would be dealt
+-- to this creature, prevent that damage. Put a +1/+1 counter on this creature
+-- for each 1 damage prevented this way."
+--
+-- Three clauses, three cases, and each case is a PAIR of boards differing in one
+-- thing:
+--
+--   * the rider itself -- 3 prevented becomes 3 counters -- against the same
+--     Bolt aimed at the Goblin Piker beside it, which the ability does not cover;
+--   * CR 615.1's printed recipient, which is why that second board's Piker dies;
+--   * the printed KIND, combat damage passing where the same amount of
+--     noncombat damage does not.
+--
+-- Numbers all distinct: the Bolt is 3, the combat hit is 2, the counters are 3,
+-- and the shielded creature goes from 1/3 to 4/6. No two readings of the rule
+-- meet on one of them -- a "one counter per event" reading would answer 1, an
+-- unrun rider 0, and a Vigor-shaped "another creature you control" reading would
+-- have saved the Piker instead.
+stormwildCapridorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5)" $ do
+  let hit kind src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing kind
+  -- The rider fires from the funnel a RESOLVING spell drains
+  -- (Resolve.runPreventionRiders), the same seam Test of Faith's shield uses --
+  -- so what is new here is only where the rider came from: the permanent's
+  -- printed ability rather than a row a resolution installed.
+  Spec.it s "CR 615.5 prevented noncombat damage becomes that many +1/+1 counters" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    capridorPrinting <- S.printingOf s registry "Stormwild Capridor"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let base = S.landsInPlay mountain 1
+        (capridor, g1) = S.addCreature capridorPrinting S.alice base
+        (piker, g2) = S.addCreature pikerPrinting S.alice g1
+        (g3, spellId) = S.handOne bolt g2
+        -- ONE board, two aims: the only difference between these is which
+        -- creature the Bolt names.
+        atCapridor = castAndResolve (aimCreature capridor) g3 spellId
+        atPiker = castAndResolve (aimCreature piker) g3 spellId
+    Spec.assertEqWith s "setup: the Capridor is a 1/3" (S.powerToughnessOf capridor g3) (Just (1, 3))
+    -- CR 615.6: the prevented event never happened, so nothing is marked.
+    Spec.assertEqWith s "no damage is marked on the Capridor" (S.damageOf capridor atCapridor) (Just 0)
+    Spec.assertEqWith s "three +1/+1 counters, one per damage prevented" (countersOn CounterKind.PlusOnePlusOne capridor atCapridor) 3
+    Spec.assertEqWith s "so it is a 4/6" (S.powerToughnessOf capridor atCapridor) (Just (4, 6))
+    -- CR 615.1's printed recipient: the ability covers "this creature" and
+    -- nothing else, so the same Bolt lands on the Piker in full. Marked rather
+    -- than dead, since nothing has taken priority to run CR 704.3's check.
+    Spec.assertEqWith s "the same Bolt marks its whole 3 on the Piker beside it" (S.damageOf piker atPiker) (Just 3)
+    Spec.assertEqWith s "and puts no counter on the Capridor" (countersOn CounterKind.PlusOnePlusOne capridor atPiker) 0
+  -- The printed KIND, asked through the damage funnel alone: one field of the
+  -- event differs between these two boards and nothing else does. Only the
+  -- prevention is read here -- Damage.applyDamage queues the rider for a caller
+  -- to drain, and the case below is what proves the queue stays empty on the
+  -- combat side.
+  Spec.it s "CR 615.1 the printed kind admits noncombat damage and refuses combat damage" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    capridorPrinting <- S.printingOf s registry "Stormwild Capridor"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let base = S.landsInPlay mountain 1
+        (capridor, g1) = S.addCreature capridorPrinting S.alice base
+        (attacker, g2) = S.addCreature pikerPrinting S.bob g1
+        settle kind = settleDamage S.identityAnswer g2 [hit kind attacker (Recipient.ToCreature capridor) 2]
+    Spec.assertEqWith s "noncombat: the 2 is prevented" (S.damageOf capridor (settle DamageKind.Noncombat)) (Just 0)
+    Spec.assertEqWith s "combat: the same 2 is marked" (S.damageOf capridor (settle DamageKind.Combat)) (Just 2)
+  -- The same refusal driven through a REAL combat phase, which is the funnel
+  -- that would run a rider if one fired (Engine's combat damage step drains the
+  -- queue): the Capridor blocks, takes 2, and gains nothing.
+  Spec.it s "CR 615.5 combat damage puts no counter on, because none of it was prevented" $ do
+    plains <- S.printingOf s registry "Plains"
+    capridorPrinting <- S.printingOf s registry "Stormwild Capridor"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let base = S.landsInPlay plains 1
+        (_attacker, g1) = S.addCreature pikerPrinting S.alice base
+        (capridor, g2) = S.addCreature capridorPrinting S.bob g1
+        after =
+          S.runCombat S.aggressiveAnswer $
+            g2
+              { GameState.activePlayer = S.alice,
+                GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+                GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob},
+                GameState.remaining =
+                  Seq.fromList
+                    [ Phase.Combat CombatStep.DeclareBlockers,
+                      Phase.Combat CombatStep.CombatDamage,
+                      Phase.Combat CombatStep.EndOfCombat,
+                      Phase.PostcombatMain
+                    ]
+              }
+    Spec.assertBool s (S.onBattlefield capridor after) "the 1/3 blocker survived a 2-power attacker"
+    Spec.assertEqWith s "with the attacker's 2 marked on it" (S.damageOf capridor after) (Just 2)
+    Spec.assertEqWith s "and no counters, since nothing was prevented" (countersOn CounterKind.PlusOnePlusOne capridor after) 0
+    Spec.assertEqWith s "so it is still a 1/3" (S.powerToughnessOf capridor after) (Just (1, 3))
+
 -- CR 615.12's damage that "can't be prevented", whose one producer in the pool
 -- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's
 -- Spider-Man 92), set against the pool's one COUNTDOWN shield, Mending Hands
@@ -2637,6 +2732,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   galvanicBlastSpec s registry
   mendingHandsSpec s registry
   testOfFaithSpec s registry
+  stormwildCapridorSpec s registry
   spiderPunkSpec s registry
   apnapSpec s registry
   excruciatorSpec s registry
