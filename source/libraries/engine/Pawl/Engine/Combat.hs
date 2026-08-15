@@ -42,6 +42,7 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -1538,7 +1539,7 @@ declareAttackers pid = do
         paid <-
           if null (ManaCost.unwrap owed)
             then pure True
-            else Cost.payMana pid owed
+            else Cost.payMana ManaSpending.AsProduced pid owed
         if not paid
           then
             -- CR 508.1's preamble: the declaration is illegal and the game returns

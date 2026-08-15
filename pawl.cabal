@@ -268,6 +268,8 @@ library codec
     Pawl.Codec.ForEachSpec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
+    Pawl.Codec.GrantPlayFromExile
+    Pawl.Codec.GrantPlayFromExileSpec
     Pawl.Codec.GraveyardScope
     Pawl.Codec.GraveyardScopeSpec
     Pawl.Codec.HalfUnlocked
@@ -306,6 +308,8 @@ library codec
     Pawl.Codec.ManaFilterSpec
     Pawl.Codec.ManaProduction
     Pawl.Codec.ManaProductionSpec
+    Pawl.Codec.ManaSpending
+    Pawl.Codec.ManaSpendingSpec
     Pawl.Codec.ManaSymbol
     Pawl.Codec.ManaSymbolSpec
     Pawl.Codec.ManaType
@@ -959,6 +963,7 @@ library types
     Pawl.Types.Game
     Pawl.Types.GameEvent
     Pawl.Types.GameState
+    Pawl.Types.GrantPlayFromExile
     Pawl.Types.GraveyardScope
     Pawl.Types.HalfUnlocked
     Pawl.Types.Halved
@@ -987,6 +992,7 @@ library types
     Pawl.Types.ManaFilter
     Pawl.Types.ManaOption
     Pawl.Types.ManaProduction
+    Pawl.Types.ManaSpending
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType
     Pawl.Types.ManaUnit

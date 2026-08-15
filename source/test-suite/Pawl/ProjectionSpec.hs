@@ -1311,8 +1311,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Not implemented, so the card file omits them: Celestial Dawn's colour clause
   -- for spells you control and nonland cards you own off the battlefield (#160),
   -- and its mana clause -- "You may spend white mana as though it were mana of any
-  -- color. You may spend other mana only as though it were colorless mana", which
-  -- wants the CR 609.4b spending axis nothing in pawl carries (#1357).
+  -- color. You may spend other mana only as though it were colorless mana" (#1579).
+  -- Pawl.Types.ManaSpending is CR 609.4b's axis, but it rides one cast permission
+  -- (CR 118.14) where this clause is a continuous effect on a player, and it only
+  -- widens where this one also narrows.
   -- That clause's permission and restriction go together, so pawl's card is more
   -- permissive than printed about spending non-white mana; nothing below reads
   -- mana. Its first two clauses are printed in full.

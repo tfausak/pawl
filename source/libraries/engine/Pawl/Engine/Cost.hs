@@ -65,6 +65,7 @@ import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
@@ -631,8 +632,13 @@ greatestPayableX payableAt cost =
 -- The COST that arrives already carries CR 601.2b's announced value of X, since
 -- that rule puts the value of the variable before this announcement. Named
 -- `total_` only because this module's own `total` is in scope.
-announce :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
-announce pid oid total_ cost = case Cost.mana cost of
+--
+-- `spending` is CR 118.14's permission, and it belongs here for the reason
+-- `total` does: this offer measures payability, so a payer who may spend mana of
+-- any type must be offered the routes that permission opens -- otherwise the
+-- gate and the announcement disagree again, one resource over.
+announce :: ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
+announce spending pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
@@ -641,7 +647,7 @@ announce pid oid total_ cost = case Cost.mana cost of
     -- other way about. Nothing announcing changes the board, so reading them once
     -- is the same answer every offer would have got.
     gs <- State.get
-    (announced, life) <- Mana.announce manaActivations pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
+    (announced, life) <- Mana.announce manaActivations spending pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -1125,7 +1131,11 @@ canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
-    Mana.canPayCommitting manaActivations pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
+    -- CR 118.14's permission is a CAST's (rule 118.14 scopes it to the spells an
+    -- effect permitted), and no caller of this one is casting: what is left here
+    -- is a special action's cost and CR 118.12's resolution-time payment, so the
+    -- mana is spent as it is.
+    Mana.canPayCommitting manaActivations ManaSpending.AsProduced pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
       && jointlyPayable pid oid (Cost.components cost) gs
 
@@ -1324,10 +1334,10 @@ lifeTotalOf pid gs = case Map.lookup pid (GameState.players gs) of
 --
 -- The COMPONENTS are asked exactly as `canPay` asks them, and no completion
 -- touches them: `completions` rewrites mana symbols only.
-canPaySomeCompletion :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletion pid oid total_ cost gs =
+canPaySomeCompletion :: ManaSpending.ManaSpending -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletion spending pid oid total_ cost gs =
   let pcs = Projection.projectAll gs
-   in canPaySomeCompletionGiven (activationManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ cost gs
+   in canPaySomeCompletionGiven spending (activationManaSourcesGiven (Projection.controlGrants gs) pcs pid gs) pcs pid oid total_ cost gs
 
 -- The mana sources an ACTIVATION payment is judged against, which is what every
 -- gate below hands Mana.payableResolutionsGiven. ONE function pairing
@@ -1353,15 +1363,15 @@ activationManaSourcesGiven = Mana.manaSourcesGiven manaActivations
 -- asked through canPayComponent, whose Sacrifice and TapForTotalPower arms make
 -- per-object walks of their own (#1448); no activation cost in the pool carries
 -- one. Their CLAIMS do reach the mana side, for `canPay`'s reason (#1134).
-canPaySomeCompletionGiven :: [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletionGiven sources pcs pid oid total_ cost gs = case Cost.mana cost of
+canPaySomeCompletionGiven :: ManaSpending.ManaSpending -> [ObjectId] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletionGiven spending sources pcs pid oid total_ cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy (Cost.components cost)
         claimed = claimsOf pid oid (Cost.components cost) gs
         payable (completed, life) =
           any
-            (\totalled -> Mana.canPayCommittingGiven manaActivations sources pcs pid (outside + life) claimed totalled gs)
+            (\totalled -> Mana.canPayCommittingGiven manaActivations spending sources pcs pid (outside + life) claimed totalled gs)
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
@@ -1576,8 +1586,8 @@ canPayComponent pid oid component gs = case component of
 -- no-op even though paying is monadic and a component may prompt. That no-op is
 -- what CR 118.12's resolution-time caller rests on too, where an Unpaid result
 -- lands on the same branch as a refusal (Pawl.Engine.Resolve.paid).
-pay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
-pay pid oid cost = do
+pay :: ManaSpending.ManaSpending -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+pay spending pid oid cost = do
   before <- State.get
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
@@ -1585,7 +1595,7 @@ pay pid oid cost = do
     -- CR 601.2g: payMana PROMPTS for which sources to activate, so it is monadic
     -- and restores the pre-payment state itself when it cannot be paid.
     Just manaCost -> do
-      paidMana <- payMana pid manaCost
+      paidMana <- payMana spending pid manaCost
       if not paidMana
         then pure Payment.Unpaid
         else do
@@ -1741,15 +1751,15 @@ orderSensitive component = case component of
 -- payment the way the paragraph above lets a mis-tapped {B} fail -- the same MORE
 -- PERMISSIVE posture, and reachable only where nothing announced (#373). Zero
 -- when the cost is unpayable outright.
-payMana :: PlayerId -> ManaCost.ManaCost -> Game Bool
-payMana pid cost = do
+payMana :: ManaSpending.ManaSpending -> PlayerId -> ManaCost.ManaCost -> Game Bool
+payMana spending pid cost = do
   before <- State.get
   paid <- window Set.empty
   Monad.unless paid (State.put before)
   pure paid
   where
     -- What the pool would leave if the cost were paid out of it right now.
-    settlement gs = Mana.spend (Maybe.fromMaybe 0 (Mana.lifeNeeded manaActivations pid cost gs)) cost (Game.poolOf pid gs)
+    settlement gs = Mana.spend spending (Maybe.fromMaybe 0 (Mana.lifeNeeded manaActivations spending pid cost gs)) cost (Game.poolOf pid gs)
     window refused = do
       gs <- State.get
       let covered = Maybe.isJust (settlement gs)
@@ -1886,7 +1896,10 @@ payActivation pid oid cost = do
   outcome <- payComponents pid oid (Cost.components cost)
   paid <- case (outcome, Cost.mana cost) of
     (Payment.Paid, Just (ManaCost.MkManaCost [])) -> pure True
-    (Payment.Paid, Just manaCost) -> payMana pid manaCost
+    -- CR 118.14's permission is granted to CAST a spell and never to activate an
+    -- ability, so an activation cost is paid with the mana it is (rule 118.14's
+    -- last sentence: "to cast spells that way").
+    (Payment.Paid, Just manaCost) -> payMana ManaSpending.AsProduced pid manaCost
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     _ -> pure False
   Monad.unless paid (State.put before)

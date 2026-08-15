@@ -65,6 +65,7 @@ import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.Halved as Halved
 import qualified Pawl.Types.Hybrid as Hybrid
 import Pawl.Types.Keyword (Keyword)
@@ -1734,8 +1735,10 @@ rewriteEffect pairs effect = case effect of
   -- The ObjectRef alone, exactly as GainControl above: the Duration is left
   -- untouched, so a ForAsLongAs Condition's Filters are not rewritten. That
   -- asymmetry is GainControl's and predates this opcode; matching it keeps the
-  -- two arms one behaviour rather than two.
-  Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration ref) -> Effect.GrantPlayFromExile (DurationRef.MkDurationRef duration (rewriteObjectRef pairs ref))
+  -- two arms one behaviour rather than two. The CR 118.14 rider names no colour
+  -- word at all -- it permits every type (Pawl.Types.ManaSpending) -- so CR
+  -- 612.1's substitution has nothing to change in it either.
+  Effect.GrantPlayFromExile grant -> Effect.GrantPlayFromExile grant {GrantPlayFromExile.ref = rewriteObjectRef pairs (GrantPlayFromExile.ref grant)}
   -- CR 612.1 reaches the body for the rider's reason one opcode over, and the
   -- swept ref alongside it -- both are this card's own text.
   Effect.ForEach (ForEach.MkForEach ref slot body) ->

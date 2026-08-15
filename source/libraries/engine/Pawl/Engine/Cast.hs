@@ -42,6 +42,8 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.KickerDecision as KickerDecision
+import Pawl.Types.ManaSpending (ManaSpending)
+import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
@@ -206,7 +208,13 @@ targetable pid oid name gs = case proposedFace oid name gs of
 -- state with that face stamped on (asProposed) and the two cannot name different
 -- halves. AdventureSpec's "Thalia taxes the Adventure half and not the creature
 -- half" is what holds it.
-payableCost :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+--
+-- The SPENDING permission is CR 118.14's and comes in as an argument for the
+-- same reason the cost does: after CR 601.2a's move the object being priced is a
+-- stack incarnation that holds no permission, so a gate that read one off the
+-- board would answer this cast's question about the wrong object. `spendingFor`
+-- is what the pre-move callers derive it with.
+payableCost :: ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost = payableCostAt 0
 
 -- The same question asked at some OTHER value of X. `payableCost` is this at CR
@@ -225,9 +233,9 @@ payableCost = payableCostAt 0
 -- gate asks whether some resolution pays: the choice is the payer's, made at CR
 -- 601.2f, and a gate that priced the symbol at nothing refused casts the payer
 -- was entitled to.
-payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x pid oid gs cost =
-  Cost.canPaySomeCompletion pid oid (Cost.totalManas (Cost.spellAdjustments pid oid gs)) (Cost.substituteX x cost) gs
+payableCostAt :: Natural -> ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAt x spending pid oid gs cost =
+  Cost.canPaySomeCompletion spending pid oid (Cost.totalManas (Cost.spellAdjustments pid oid gs)) (Cost.substituteX x cost) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -262,8 +270,8 @@ payableCostAt x pid oid gs cost =
 -- and one unpayable even at X=0 -- both answer 0, and Cost.greatestPayableX says
 -- why. Neither is reachable from castSpell, which asks only about a candidate
 -- that already passed payableCost and only when Cost.hasVariable holds.
-affordableX :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
-affordableX pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid oid gs cost) cost
+affordableX :: ManaSpending -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
+affordableX spending pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x spending pid oid gs cost) cost
 
 -- CR 702.42a: the ADDITIONAL cost this player may pay right now to choose all of
 -- this modal spell's modes, or Nothing when entwining is not on offer at all.
@@ -295,15 +303,15 @@ affordableX pid oid gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid o
 -- time castSpell asks, CR 601.2a has already moved the card to the stack, and
 -- pawl offers a candidate cost BY ZONE (flashback's only from a graveyard), so
 -- the list has to come from the proposal. See castSpell.
-entwineOffer :: PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Maybe (Cost Keyword)
-entwineOffer pid oid candidates gs = case Game.faceOf oid gs of
+entwineOffer :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Maybe (Cost Keyword)
+entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
   Nothing -> Nothing
   Just face -> do
     cost <- Keyword.entwineCost (Face.keywords face)
     let modal = Face.spell face
         legal = Target.fillableModes (Just pid) oid (Card.enchantSlotMap face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
-    Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) candidates)
+    Monad.guard (any (\candidate -> payableCost spending pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
 
 -- CR 702.33a: the ADDITIONAL cost this player may pay as they cast this spell, or
@@ -328,12 +336,12 @@ entwineOffer pid oid candidates gs = case Game.faceOf oid gs of
 -- not have, or that CR 118.3 says cannot be paid, is not an option. WHICH candidate
 -- will carry the cost is not decided here -- castProposed narrows the candidates
 -- once the answer is in -- and `candidates` is handed in for entwineOffer's reason.
-kickerOffer :: PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Maybe (Cost Keyword)
-kickerOffer pid oid candidates gs = case Game.faceOf oid gs of
+kickerOffer :: ManaSpending -> PlayerId -> ObjectId -> [Cost Keyword] -> GameState -> Maybe (Cost Keyword)
+kickerOffer spending pid oid candidates gs = case Game.faceOf oid gs of
   Nothing -> Nothing
   Just face -> do
     cost <- Keyword.kickerCost (Face.keywords face)
-    Monad.guard (any (\candidate -> payableCost pid oid gs (Cost.plus candidate cost)) candidates)
+    Monad.guard (any (\candidate -> payableCost spending pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
 
 -- CR 702.33d's designation, written onto the spell's own stack incarnation: "that
@@ -419,6 +427,27 @@ permitsCastFromExile pid oid face gs =
   (fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid && not (Card.isAdventure face))
     || permitsCastPlotted pid oid gs
     || permitsCastForetold pid oid gs
+
+-- CR 118.14: how may this player spend mana toward casting THIS object, as the
+-- object lies right now? Dire Fleet Daredevil's "and mana of any type can be
+-- spent to cast that spell" is the only thing that answers anything but
+-- AsProduced, and it rides the exile permission (Pawl.Types.ExilePlayPermission)
+-- because rule 118.14 scopes the clause to the permission its effect granted.
+--
+-- BEFORE CR 601.2a'S MOVE and nowhere after it. The move mints a fresh
+-- incarnation on the stack (CR 400.7), and Object.newIncarnation clears the
+-- permission with everything else per-incarnation -- so this answers AsProduced
+-- for a spell already on the stack, and castSpellWith captures the answer one
+-- step ahead of the move exactly as it captures `castFrom` and `keywordsBefore`.
+--
+-- The PLAYER is checked, for permitsCastFromExile's reason: a permission names
+-- one player, and nobody else spends mana under it. CR 702.170d's plotted card
+-- and CR 702.143a's foretold card each permit a cast and neither says anything
+-- about mana, so both answer AsProduced by having no rider to read.
+spendingFor :: PlayerId -> ObjectId -> GameState -> ManaSpending
+spendingFor pid oid gs = case Game.lookupObject oid gs >>= Object.playableFromExile of
+  Just permission | ExilePlayPermission.player permission == pid -> ExilePlayPermission.spending permission
+  _ -> ManaSpending.AsProduced
 
 -- CR 702.170d: may this player cast this PLOTTED card? Three conjuncts, and the
 -- rule states each of them:
@@ -673,7 +702,10 @@ castable pid oid name facing gs =
         && not (SplitSecond.inForce proposed)
         && printedRestrictionsOk pid oid name proposed
         && legendaryRestrictionOk pid oid name proposed
-        && any (payableCost pid oid proposed) (Cost.costsFor name oid proposed)
+        -- CR 118.14 read off the card WHERE IT LIES, which is the only place it
+        -- can be read: this gate runs before any move, so the permission is still
+        -- on the object.
+        && any (payableCost (spendingFor pid oid proposed) pid oid proposed) (Cost.costsFor name oid proposed)
         && targetable pid oid name proposed
 
 -- Every cast this player may propose right now, in castZones' order, as the
@@ -859,7 +891,7 @@ castableWhenOffered pid oid name candidates proposed =
     -- on the stack, so one can resolve ABOVE the split-second spell and offer a
     -- cast while it is still there.
     && not (SplitSecond.inForce proposed)
-    && any (payableCost pid oid proposed) candidates
+    && any (payableCost (spendingFor pid oid proposed) pid oid proposed) candidates
     && printedRestrictionsOk pid oid name proposed
     && legendaryRestrictionOk pid oid name proposed
     && targetable pid oid name proposed
@@ -993,6 +1025,12 @@ castSpellWith applied pid oid name facing = do
           -- stops applying the moment it leaves -- so armCastFromGraveyard, which
           -- runs after the move, could not ask the question there.
           keywordsBefore = graveyardKeywords oid proposed
+          -- CR 118.14, read one step ahead of the move for `keywordsBefore`'s
+          -- reason and a stronger one: the permission carrying the clause lives
+          -- on the exiled card, and CR 400.7's new incarnation on the stack has
+          -- none -- so every payability question below, which asks about `sid`,
+          -- has to be handed the answer rather than look it up.
+          spending = spendingFor pid oid before
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -1019,15 +1057,19 @@ castSpellWith applied pid oid name facing = do
       moved <- Event.changeZoneCasting pid oid Zone.Stack (Just name) facing
       case moved of
         Nothing -> State.put before
-        Just sid -> castProposed pid sid face castFrom keywordsBefore candidates before
+        Just sid -> castProposed spending pid sid face castFrom keywordsBefore candidates before
 
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
 -- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object
 -- every step below announces for, targets relative to, is projected from and
 -- stamps its choices onto; `before` is the state to return to. Split out so the
 -- whole announcement reads one state and one id.
-castProposed :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [Cost Keyword] -> GameState -> Game ()
-castProposed pid sid face castFrom keywordsBefore candidates before = do
+--
+-- `spending` is CR 118.14's permission as it stood before the move, and it is
+-- taken as a VALUE for the reason `candidates` and `keywordsBefore` are: the
+-- object it was a fact about no longer exists.
+castProposed :: ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [Cost Keyword] -> GameState -> Game ()
+castProposed spending pid sid face castFrom keywordsBefore candidates before = do
   gs <- State.get
   let decider = Decide.deciderFor pid gs
       modal = Face.spell face
@@ -1050,7 +1092,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
   -- Carried as the additional Cost itself rather than as a flag, so the two
   -- things it changes -- the mode count just below and the candidate costs
   -- further down -- read the same value.
-  entwined <- case entwineOffer pid sid candidates gs of
+  entwined <- case entwineOffer spending pid sid candidates gs of
     Nothing -> pure Nothing
     Just extra -> do
       decision <- Game.choose (Prompt.ChooseEntwine decider pid sid extra)
@@ -1123,7 +1165,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
       --
       -- Carried as the additional Cost itself rather than as a flag, for entwine's
       -- reason: the candidate costs below and the CR 702.33d stamp read one value.
-      kicked <- case kickerOffer pid sid entwinedCandidates gs of
+      kicked <- case kickerOffer spending pid sid entwinedCandidates gs of
         Nothing -> pure Nothing
         Just extra -> do
           decision <- Game.choose (Prompt.ChooseKicker decider pid sid extra)
@@ -1137,7 +1179,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
       -- takes the stamp with it along with the spell.
       Monad.when (Maybe.isJust kicked) (State.modify' (stampKicked sid))
       let withKicker candidate = maybe candidate (Cost.plus candidate) kicked
-          payable = filter (payableCost pid sid gs) (fmap withKicker entwinedCandidates)
+          payable = filter (payableCost spending pid sid gs) (fmap withKicker entwinedCandidates)
       if null payable
         then reject
         else do
@@ -1155,7 +1197,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
               -- unaffordable announcement still reverses the whole cast (#417).
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX pid sid gs chosenCost)))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX spending pid sid gs chosenCost)))
                   else pure Nothing
               -- CR 601.2: a step the player cannot comply with makes the casting
               -- illegal and returns the game to before it was proposed. The X just
@@ -1181,7 +1223,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
               -- one predicate over one cost instead of two spellings of when the
               -- gate applies.
               let announcedAtX = maybe chosenCost (\x -> Cost.substituteX x chosenCost) mAmount
-              if not (payableCost pid sid gs announcedAtX)
+              if not (payableCost spending pid sid gs announcedAtX)
                 then reject
                 else do
                   -- CR 601.2b's own order puts the hybrid and Phyrexian
@@ -1193,7 +1235,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
                   -- payableCost gated this cast on, read from the same `gs` the
                   -- total below is.
-                  announcedCost <- Cost.announce pid sid (Cost.totalManas (Cost.spellAdjustments pid sid gs)) announcedAtX
+                  announcedCost <- Cost.announce spending pid sid (Cost.totalManas (Cost.spellAdjustments pid sid gs)) announcedAtX
                   -- CR 601.2c, and the spell is on the stack for it: `sets` above
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in
@@ -1230,7 +1272,7 @@ castProposed pid sid face castFrom keywordsBefore candidates before = do
                       -- Reap still costs {B}).
                       adjustments <- Cost.announceReductions pid sid gs (Cost.spellAdjustments pid sid gs)
                       let paidCost = Cost.totalWith adjustments announcedCost
-                      payment <- Cost.pay pid sid paidCost
+                      payment <- Cost.pay spending pid sid paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal
                         -- and CR 601.2 returns the game to before it was proposed
