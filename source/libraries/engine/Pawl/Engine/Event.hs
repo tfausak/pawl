@@ -1138,6 +1138,22 @@ apply batch candidate event =
               OptionalDecision.Exercises -> Monad.void (putOwnCounters oid CounterKind.PlusOnePlusOne 1)
               OptionalDecision.Declines -> pure ()
             pure (Just event)
+      -- CR 702.54a via CR 614.1c: bloodthirst N on Bloodrage Vampire. The
+      -- WithCounters arm above with the kind fixed at +1/+1 by rule 702.54a, and
+      -- through putCounters for that arm's reason -- CR 122.6's funnel is what
+      -- makes CR 614.16 reach these, so Doubling Season sees bloodthirst's
+      -- counters as it sees riot's.
+      --
+      -- NO CONDITION HERE. Rule 702.54a's "if an opponent was dealt damage this
+      -- turn" is asked by Pawl.Engine.Replacement.admitsEntry, which is why the
+      -- row reaching this point already means the condition held; see that
+      -- function for why the question is asked there rather than here.
+      --
+      -- No prompt, and none is owed: rule 702.54a states no choice.
+      EntryRewrite.Bloodthirst n -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        Monad.void (putOwnCounters oid CounterKind.PlusOnePlusOne n)
+        pure (Just event)
       -- CR 614.1d / 110.5b: "This permanent enters tapped" (Zof Bloodbog's land,
       -- Headless Skaab's creature -- the arm gates on no card type). CR 110.5b
       -- has a permanent enter untapped "unless a spell or ability says otherwise",

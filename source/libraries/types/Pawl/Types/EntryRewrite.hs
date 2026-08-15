@@ -177,6 +177,29 @@ data EntryRewrite
     -- The counter goes through Pawl.Engine.Event.putCounters, CR 122.6's funnel,
     -- as riot's does, so CR 614.16 applies to it.
     Unleash
+  | -- | CR 702.54a via CR 614.1c: bloodthirst N. "If an opponent was dealt
+    -- damage this turn, this permanent enters with N +1/+1 counters on it."
+    --
+    -- WithCounters with rule 702.54a's condition attached, and its own arm rather
+    -- than a flag on that one for two reasons. WithCounters' amount is an
+    -- unconditional Natural placed by Pawl.Engine.Event whatever the board looks
+    -- like, which is what CR 306.5b's intrinsic loyalty must stay; and the
+    -- condition is asked in Pawl.Engine.Replacement.admitsEntry, which cases on
+    -- the constructor, so a bloodthirst row indistinguishable from a loyalty row
+    -- could not be gated without gating loyalty too.
+    --
+    -- N RIDES THE CONSTRUCTOR, WithCounters' position and not Riot's: the printed
+    -- number varies by card, where rule 702.136a fixes riot's at one. The
+    -- COUNTER KIND does not, because rule 702.54a fixes it at +1/+1.
+    --
+    -- NOT WRITTEN BY A CARD -- minted from the finished projection by
+    -- Pawl.Engine.Keyword.mintedReplacementsFor, so a card says only
+    -- `Keyword.Bloodthirst 1` and rule 702.54a says what it means. It still
+    -- round-trips through the codec, because every arm of this type does.
+    --
+    -- The counters go through Pawl.Engine.Event.putCounters, CR 122.6's funnel,
+    -- as WithCounters' and riot's do, so CR 614.16 applies to them.
+    Bloodthirst Natural.Natural
   | -- | CR 614.1d: "This permanent enters tapped" (Zof Bloodbog's land half,
     -- Headless Skaab's creature). The one arm a permanent's OWN printed text
     -- writes about the STATUS it enters with, where every other writer of an

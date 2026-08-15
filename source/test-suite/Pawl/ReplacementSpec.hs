@@ -28,6 +28,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator module Pawl.Engine.Filter may later be imported and must not collide.
@@ -2647,6 +2648,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   entryBudgetSpec s registry
   riotSpec s registry
   unleashSpec s registry
+  bloodthirstSpec s registry
   brineElementalSpec s registry
   coldsteelHeartSpec s registry
   vorinclexSpec s registry
@@ -3783,6 +3785,154 @@ unleashSpec s registry = Spec.describe s "Unleash (CR 702.98)" $ do
                 -- creature on the board.
                 Spec.assertBool s (Combat.canBlock S.alice bystander counted) "the Spider with the same counter still blocks"
       _ -> Spec.assertFailure s "fixture did not deal a card"
+
+-- alice controls three untapped Swamps on a THREE-SEAT board and holds one
+-- Bloodrage Vampire, in her precombat main phase with priority; bob controls one
+-- Ogre Sentry. Returns the state, the card in hand and the Sentry.
+--
+-- Three seats rather than riotBoard's two, and for rule 702.54a's word "an
+-- opponent": a two-player board collapses "an opponent" onto the only other
+-- player, so a reading that admitted the entry whenever ANY player was dealt
+-- damage could not be told from one that admitted it only for an opponent's.
+bloodthirstBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+bloodthirstBoard swamp vampire sentry =
+  let lands = S.landsFor swamp S.alice 3 S.threePlayerGame
+      (bobsSentry, withSentry) = S.addCreature sentry S.bob lands
+      (held, gs) = S.addHandCard vampire S.alice withSentry
+   in (readyForAlice gs, held, bobsSentry)
+
+-- alice, in her precombat main phase, with priority. Applied by the fixture above
+-- and again after a turn handoff, which leaves the game in CR 502's untap step.
+readyForAlice :: GameState.GameState -> GameState.GameState
+readyForAlice gs =
+  gs
+    { GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = S.alice,
+      GameState.priority = Just S.alice
+    }
+
+-- CR 702.54: bloodthirst, on Bloodrage Vampire ({2}{B} 3/1 Vampire, "Bloodthirst
+-- 1" and nothing else). The FIRST minted entry replacement whose own rule states
+-- a condition, which is why Pawl.Engine.Replacement.admitsEntry has a second arm
+-- beside rule 702.145b's.
+--
+-- ONE BOARD throughout, and every case differs from the others in nothing but
+-- what happened before the cast: the same three seats, the same three Swamps, the
+-- same card cast the same way. The Vampire ENTERS in every case, so what the
+-- assertions tell apart is "entered with counters" from "entered", never "entered"
+-- from "did not".
+--
+-- Distinct numbers everywhere, so no two readings coincide: bloodthirst 1 on a
+-- printed 3/1 shows as a 4/2, and the damage amounts are 4 at bob, 5 at alice, 2
+-- at bob's Sentry (which a 3/3 survives) and 6 of life paid.
+--
+-- The damage goes in through Damage.applyDamage, the funnel that records the
+-- event, exactly as Pawl.TriggerSpec's Furious Spinesplitter group does -- and
+-- everything downstream of the record is the card's own, driven through a real
+-- cast and a real resolution.
+bloodthirstSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bloodthirstSpec s registry =
+  let hit src target amount gs =
+        S.runPure
+          S.identityAnswer
+          gs
+          (Damage.applyDamage [DamageEvent.MkDamageEvent src target amount False False False 0 Nothing DamageKind.Noncombat])
+      enters = castAndResolve S.aggressiveAnswer
+      vampireIn = newestNamed (CardName.MkCardName $ Text.pack "Bloodrage Vampire")
+   in Spec.describe s "Bloodthirst (CR 702.54)" $ do
+        Spec.it s "CR 702.54a nobody was dealt damage, so it enters a 3/1" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vampire <- S.printingOf s registry "Bloodrage Vampire"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs, held, _) = bloodthirstBoard swamp vampire sentry
+              after = enters gs held
+          case vampireIn after of
+            Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
+            Just vamp -> do
+              Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne vamp after) 0
+              Spec.assertEqWith s "power" (Projection.powerOf vamp after) (Just 3)
+              Spec.assertEqWith s "toughness" (Projection.toughnessOf vamp after) (Just 1)
+        -- THE PAIR THAT MAKES THE CONDITION REAL. The board above with one damage
+        -- event added and nothing else changed.
+        Spec.it s "CR 702.54a an opponent was dealt damage, so it enters a 4/2" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vampire <- S.printingOf s registry "Bloodrage Vampire"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, bobsSentry) = bloodthirstBoard swamp vampire sentry
+              after = enters (hit bobsSentry (Recipient.ToPlayer S.bob) 4 gs0) held
+          case vampireIn after of
+            Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
+            Just vamp -> do
+              Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne vamp after) 1
+              -- Printed 3/1, so the counter shows in the projection (CR 613.4c,
+              -- layer 7c).
+              Spec.assertEqWith s "power" (Projection.powerOf vamp after) (Just 4)
+              Spec.assertEqWith s "toughness" (Projection.toughnessOf vamp after) (Just 2)
+        -- CR 102.2 / 109.5: "an opponent" is a player other than the entering
+        -- permanent's controller, so alice's own damage is not an opponent's.
+        -- Unreachable on a two-seat board, which is why this group takes three.
+        Spec.it s "CR 102.2 damage to the controller herself does not turn it on" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vampire <- S.printingOf s registry "Bloodrage Vampire"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, bobsSentry) = bloodthirstBoard swamp vampire sentry
+              after = enters (hit bobsSentry (Recipient.ToPlayer S.alice) 5 gs0) held
+          case vampireIn after of
+            Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
+            Just vamp -> Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne vamp after) 0
+        -- CR 120.3a names the PLAYER recipient; a creature bob controls is not bob.
+        Spec.it s "CR 120.3a damage to an opponent's creature does not either" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vampire <- S.printingOf s registry "Bloodrage Vampire"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, bobsSentry) = bloodthirstBoard swamp vampire sentry
+              damaged = hit bobsSentry (Recipient.ToCreature bobsSentry) 2 gs0
+              after = enters damaged held
+          case vampireIn after of
+            Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
+            Just vamp -> do
+              Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne vamp after) 0
+              Spec.assertBool s (Set.member bobsSentry (GameState.battlefield after)) "and the 3/3 Sentry survived the 2, so the board is otherwise the same"
+        -- CR 119.4's life loss is not CR 120.1's damage, and the log records the
+        -- two separately. Without this the condition could be reading
+        -- GameEvent.LifeLost and pass every case above, since damage to a player
+        -- files one of those too.
+        Spec.it s "CR 119.4 life lost without damage is not damage" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vampire <- S.printingOf s registry "Bloodrage Vampire"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, _) = bloodthirstBoard swamp vampire sentry
+              after = enters (Event.payLife S.bob 6 gs0) held
+          case vampireIn after of
+            Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
+            Just vamp -> Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne vamp after) 0
+        -- CR 608.2i: the window is THIS turn. Without this a lifetime tally passes
+        -- every case above. The turn goes all the way round to alice again, so the
+        -- only difference from the positive case is which turn it is.
+        Spec.it s "CR 608.2i the damage is THIS turn's: the handoff clears it" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          vampire <- S.printingOf s registry "Bloodrage Vampire"
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          let (gs0, held, bobsSentry) = bloodthirstBoard swamp vampire sentry
+              damaged = hit bobsSentry (Recipient.ToPlayer S.bob) 4 gs0
+              handoff gs = S.runPure S.identityAnswer gs Engine.handoffTurn
+              roundAgain = readyForAlice (handoff (handoff (handoff damaged)))
+              after = enters roundAgain held
+          Spec.assertEqWith s "the turn came back to alice" (GameState.activePlayer roundAgain) S.alice
+          case vampireIn after of
+            Nothing -> Spec.assertFailure s "Bloodrage Vampire did not reach the battlefield"
+            Just vamp -> Spec.assertEqWith s "no counters a turn cycle later" (countersOn CounterKind.PlusOnePlusOne vamp after) 0
+        -- CR 702.54c: "if an object has multiple instances of bloodthirst, each
+        -- applies separately." Asserted at the mint rather than at gameplay level,
+        -- because nothing in the pool prints or grants a second instance -- the
+        -- same footing Pawl.TriggerSpec's vanishing group states its rule 702.63c
+        -- claim on.
+        Spec.it s "CR 702.54c each instance is its own row" $
+          Spec.assertEqWith
+            s
+            "bloodthirst 1 held twice mints two rows"
+            (Keyword.Engine.mintedReplacementsFor (Keyword.Bloodthirst 1) 2)
+            (replicate 2 (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.Bloodthirst 1))))
 
 -- The tap state of a permanent, which is what CR 502.3's untap step writes -- and
 -- so what a skipped untap step leaves alone.

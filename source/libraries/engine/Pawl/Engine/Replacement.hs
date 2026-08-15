@@ -40,6 +40,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
@@ -77,12 +78,15 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
 import qualified Pawl.Types.ProposedEvent as ProposedEvent
+import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import Pawl.Types.ReplacementBucket (ReplacementBucket)
@@ -386,10 +390,11 @@ applies gs event candidate =
 -- Does the REWRITE itself admit this entry, over and above the pattern matching
 -- the entering object? `admits` and `unspent` above, for the entry class.
 --
--- Almost every rewrite answers True unconditionally, because every producer but
--- one states its whole applicability in the wording the pattern already carries.
--- An ability that states a further condition of its own is what needs an arm
--- here, and rule 702.145b is the only one that does.
+-- Almost every rewrite answers True unconditionally, because almost every
+-- producer states its whole applicability in the wording the pattern already
+-- carries. An ability that states a further condition of its own is what needs an
+-- arm here: rule 702.145b's night-and-double-faced pair, and rule 702.54a's "if
+-- an opponent was dealt damage this turn".
 --
 -- One arm per constructor, no wildcard, so a new rewrite with a condition breaks
 -- the build here as well as in bucketOfEffect, readsApplier and Event.apply. A
@@ -411,6 +416,32 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.SacrificeAnyNumber {} -> True
   EntryRewrite.Riot -> True
   EntryRewrite.Unleash -> True
+  -- CR 702.54a's own condition, the ability's rather than the pattern's: "IF AN
+  -- OPPONENT WAS DEALT DAMAGE THIS TURN, this permanent enters with N +1/+1
+  -- counters on it." Asked here rather than in Event's arm for rule 702.145b's
+  -- reason below -- a rewrite that applied and then placed nothing would still
+  -- take a CR 616.1e bucket and could be handed the entry ahead of a rewrite with
+  -- something to do.
+  --
+  -- The measurement is Quantity.PlayersDealtDamageThisTurn, the one reader of
+  -- CR 120.3a's damaged-player record (Pawl.Engine.Game.damagedPlayer): damage to
+  -- an opponent's creature or to the controller herself is not damage to an
+  -- opponent, and CR 119.4's bare life loss is not damage at all. "Was an
+  -- opponent dealt damage" is that count compared against zero, which is why
+  -- nothing here needs rule 702.54b's SUM (#1588).
+  --
+  -- CR 109.5's "you" is the ENTERING object's controller, read live off the board
+  -- rather than off the candidate -- AsCopy's and SacrificeAnyNumber's posture,
+  -- and what keeps `readsApplier` honest in answering False for this arm. The two
+  -- coincide for a minted row, whose Filter.IsSource makes the entering permanent
+  -- its own source; reading the object is what would still be right for a granted
+  -- one.
+  --
+  -- The window is the event log's, which Engine.beginTurnOf clears at the turn
+  -- handoff -- so "this turn" costs nothing here.
+  EntryRewrite.Bloodthirst _ ->
+    let context = Filter.contextFor (Projection.controllerOf oid gs) (Just oid)
+     in maybe False (> 0) (Quantity.evaluate (Projection.fullView gs) context gs oid (Quantity.Type.PlayersDealtDamageThisTurn (PlayerRef.Relative PlayerRelation.Opponent)))
   EntryRewrite.Tapped -> True
   EntryRewrite.PayLifeOrTapped _ -> True
   EntryRewrite.RevealOrTapped _ -> True
@@ -730,6 +761,10 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Riot) -> ReplacementBucket.Other
   -- CR 702.98a is none of CR 616.1a-d for riot's reason, one keyword over.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Unleash) -> ReplacementBucket.Other
+  -- CR 702.54a is none of CR 616.1a-d for riot's reason too: bloodthirst rewrites
+  -- what the permanent enters WITH. Its condition does not change the bucket --
+  -- `admitsEntry` has already kept an unsatisfied row out of the collection.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> ReplacementBucket.Other
   -- CR 614.1d is none of CR 616.1a-d either: a tap-state rewrite changes the
   -- STATUS the permanent enters with (CR 110.5b), never whose it is, what it
   -- copies or which face is up. So CR 616.1e.
@@ -826,6 +861,11 @@ readsApplier re = case re of
   -- chooser is the entering object's controller and the rewrite carries no
   -- payload, so two unleash rows offer that player the same counter twice.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.Unleash) -> False
+  -- CR 702.54a: no chooser at all, and the count rides the effect. The condition
+  -- `admitsEntry` asks reads the ENTERING object's controller rather than the
+  -- applier, so two bloodthirst rows on one permanent are admitted together and
+  -- place the same counters in either order.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.Bloodthirst _)) -> False
   -- CR 614.1d: no chooser at all, and no payload -- the rewrite sets one status on
   -- the object the event already named (CR 110.5b), so it applies the same way
   -- whoever's row is applying it. Two such rows are the same write twice.
