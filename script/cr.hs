@@ -54,14 +54,17 @@ main = do
 
 -- | Every rule the document defines, in document order, paired with the line
 -- that defines it. This is the one place that decides what @docs/rules.txt@
--- means: a rule is a line of the numbered-rules body --- which runs from the
--- @Credits@ heading that ends the table of contents to the @Glossary@ heading
--- that follows it --- leading with its own number. Both @--number@ and
--- @--list@ read it, and @script/check-citations.sh@ consumes the @--list@
--- rendering rather than re-deriving any of this.
+-- means: a rule is a line leading with its own number, taken from the
+-- numbered-rules body --- which runs from the @Credits@ entry that ends the
+-- table of contents to the @Glossary@ heading that follows the last rule.
+--
+-- Both @--number@ and @--list@ read this, and @script/check-citations.sh@
+-- consumes the @--list@ rendering rather than parsing the document a second
+-- way, so a revision that reshapes the file cannot move one answer without
+-- moving the other.
 definedRules :: String -> [(Number, String)]
 definedRules =
-  Maybe.mapMaybe (\l -> fmap (\n -> (n, l)) $ runReadP ruleLineP l)
+  Maybe.mapMaybe (\line -> fmap (\number -> (number, line)) $ runReadP ruleLineP line)
     . takeWhile (/= "Glossary")
     . dropWhile (/= "Credits")
     . lines

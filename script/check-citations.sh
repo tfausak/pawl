@@ -13,9 +13,10 @@
 # rule does not exist, and is skipped. Nothing else is exempt.
 #
 # What counts as a defined rule is `script/cr.hs`'s answer, not one this script
-# re-derives: it is the same question the lookup script asks, so a revision
-# that reshapes the document must not be able to move one answer without the
-# other. This script only decides what a citation looks like.
+# re-derives: it is the same question the lookup script asks, so a revision that
+# reshapes the document must not be able to move one answer without the other.
+# What is left here is about the tree rather than the document --- which files
+# to read, what a citation looks like, and which wording is exempt.
 
 set -o errexit
 set -o nounset
@@ -31,8 +32,8 @@ defined=$(mktemp)
 trap 'rm -f "$defined"' EXIT
 script/cr.hs --list > "$defined"
 
-# An empty list would report every citation in the tree, which reads as a
-# thousand bad citations rather than as one broken parse.
+# An empty list would report every citation in the tree, which reads as the
+# whole repository being wrong rather than as one broken parse.
 if [ ! -s "$defined" ]; then
   echo 'script/cr.hs --list defined no rules at all' >&2
   exit 1
