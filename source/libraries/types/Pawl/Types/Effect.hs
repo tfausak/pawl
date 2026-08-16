@@ -20,7 +20,7 @@ import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Types.LookAt as LookAt
-import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.Mill as Mill
 import qualified Pawl.Types.ModifyTarget as ModifyTarget
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
@@ -104,13 +104,24 @@ data Effect card
     -- family of the word being REPLACED, which Pawl.Engine.Subtype answers from
     -- the word itself.
     ChangeText ChangeText.ChangeText
-  | -- | CR 605: add one unit of mana, of the type the ManaProduction names -- one
-    -- fixed type, or one colour its controller chooses (CR 105.4). ONE unit, so a
-    -- mode adding more holds the opcode more than once: Sol Ring's "{T}: Add
-    -- {C}{C}" is two of these, and Mana.manaRoutesOfGiven reads a mode's whole
-    -- list as one activation's yield. Executed by Cost.tapForMana at payment (CR
-    -- 605.3b: a mana ability never uses the stack), never by Resolve.applyEffect.
-    AddMana ManaProduction.ManaProduction
+  | -- | CR 605: one player adds one unit of mana, of the type the payload's
+    -- ManaProduction names -- one fixed type, or one colour its controller chooses
+    -- (CR 105.4). ONE unit, so a mode adding more holds the opcode more than once:
+    -- Sol Ring's "{T}: Add {C}{C}" is two of these, and Mana.manaRoutesOfGiven
+    -- reads a mode's whole list as one activation's yield.
+    --
+    -- WHICH player is the payload's other half, and CR 106.4 is why it is written
+    -- rather than assumed: the rule puts the mana in "a player's mana pool"
+    -- without saying whose, and CR 106.3's "instructs a player to add that mana"
+    -- is the sentence a card fills in. Shizuko, Caller of Autumn's "that player
+    -- adds {G}{G}{G}" names the seat CR 603.2b's step event bound; every other
+    -- printing in the pool leaves it at CR 109.5's "you".
+    --
+    -- Two routes reach a pool. A MANA ABILITY's is Cost.tapForMana at payment (CR
+    -- 605.3b: it never uses the stack), which reads the ManaProduction and ignores
+    -- the PlayerRef -- see Pawl.Engine.ManaAbility.manaProduced. Everything else
+    -- resolves through Resolve.applyEffect's arm, which reads both.
+    AddMana ManaAddition.ManaAddition
   | -- | CR 701.23: the players Search.searcher names each search the library of
     -- each player Search.owner names, for Search.quantity cards matching
     -- Search.filter, put them where Search.destination says, then that library's

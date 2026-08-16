@@ -42,6 +42,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -53,11 +54,13 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Hybrid as Hybrid
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaProduction as ManaProduction
@@ -76,6 +79,8 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProductionTag as ProductionTag
@@ -86,6 +91,7 @@ import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.StepBegan as StepBegan
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -404,7 +410,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     let ab =
           ActivatedAbility.MkActivatedAbility
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
-              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))] Map.empty,
+              ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)))] Map.empty,
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
@@ -416,7 +422,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal =
                 singleModeAbility
-                  [Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))]
+                  [Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green)))]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSlot.required Pool.AnyTarget Nothing)),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
@@ -2219,6 +2225,88 @@ burningTreeArranged bte pid =
 plainGreen :: ManaUnit.ManaUnit
 plainGreen = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Green, ManaUnit.tags = Set.empty}
 
+-- CR 106.4's other half, the one CR 109.5 does NOT answer: an effect may name the
+-- player whose pool the mana lands in. Shizuko, Caller of Autumn ({1}{G}{G} 2/3
+-- Legendary Creature -- Snake Shaman, "At the beginning of each player's upkeep,
+-- that player adds {G}{G}{G}") is the printing, and the two halves it needs are
+-- CR 603.2b's step event binding the active player (Event.eventBindings) and the
+-- AddMana payload's PlayerRef reading that slot (Resolve's arm).
+--
+-- Not implemented: the card's third clause, "Until end of turn, they don't lose
+-- this mana as steps and phases end". Retention in pawl is a player-axis property
+-- of a mana TYPE, and "this mana" is a set of units, so pawl's Shizuko is
+-- STRICTER than printed -- the three green empty at the end of the step (#352).
+--
+-- THREE SEATS, because two collapse the reading under test: with alice and bob
+-- alone, "that player" and "an opponent of the controller" name the same seat.
+-- carol takes the upkeep, alice controls Shizuko, and bob is the third seat that
+-- separates them.
+shizukoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+shizukoSpec s registry = Spec.describe s "Shizuko, Caller of Autumn" $ do
+  Spec.it s "CR 106.4 the three green land in the UPKEEP player's pool, not the controller's" $ do
+    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
+    let after = shizukoUpkeep shizuko S.carol
+    Spec.assertEqWith s "carol got {G}{G}{G}" (poolOf S.carol after) [plainGreen, plainGreen, plainGreen]
+    Spec.assertEqWith s "alice, who controls Shizuko, got nothing" (poolOf S.alice after) []
+    Spec.assertEqWith s "and neither did bob" (poolOf S.bob after) []
+    Spec.assertEqWith s "the stack is empty again" (length (GameState.stack after)) 0
+
+  -- The other half of the pair, differing in ONE thing: whose upkeep it is. Under
+  -- CR 603.2b's EachTurn scope the same ability fires on the controller's own
+  -- turn, and then "that player" IS the controller -- a redundancy, not a wrong
+  -- answer, and the reading that stops "always the upkeep player" from being
+  -- indistinguishable from "always somebody else".
+  Spec.it s "CR 603.2b on the controller's own upkeep the same trigger pays the controller" $ do
+    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
+    let after = shizukoUpkeep shizuko S.alice
+    Spec.assertEqWith s "alice got {G}{G}{G}" (poolOf S.alice after) [plainGreen, plainGreen, plainGreen]
+    Spec.assertEqWith s "carol got nothing" (poolOf S.carol after) []
+
+  -- Gameplay level: the floated mana is ordinary mana, so carol can spend it. The
+  -- two boards differ in ONE thing -- whose upkeep the trigger fired on -- and
+  -- share seats, timing, priority and the card in carol's hand; on the second her
+  -- pool is empty, so the same cast is not offered. There is no land and no other
+  -- mana source anywhere, so the trigger's {G}{G}{G} is the only way to pay.
+  Spec.it s "CR 106.4 carol can cast a {1}{G}{G} spell off it, and cannot when the upkeep was alice's" $ do
+    shizuko <- S.printingOf s registry "Shizuko, Caller of Autumn"
+    let (oid, hers) = S.addHandCard shizuko S.carol (carolMain (shizukoUpkeep shizuko S.carol))
+        (otherOid, his) = S.addHandCard shizuko S.carol (carolMain (shizukoUpkeep shizuko S.alice))
+    Spec.assertEqWith s "the two boards differ only in whose pool holds the mana" (poolOf S.carol hers, poolOf S.carol his) ([plainGreen, plainGreen, plainGreen], [])
+    Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.carol hers)) "carol casts a second Shizuko off her own upkeep's mana"
+    Spec.assertBool s (not (any (S.isCastOf otherOid) (Action.legalActions S.carol his))) "and cannot when the mana went to alice"
+
+-- One Shizuko on the battlefield under ALICE's control, with @upkeep@'s upkeep
+-- beginning (CR 500.1: a step belongs to exactly one turn, so the event names one
+-- seat and GameState.activePlayer agrees with it), that trigger placed and
+-- resolved. Three seats, no land and no other mana source anywhere, so the only
+-- mana on the board is what the trigger added.
+shizukoUpkeep :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState
+shizukoUpkeep shizuko upkeep =
+  let (_, board) = S.addCreature shizuko S.alice S.threePlayerGame
+      began =
+        S.withEvents
+          [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Beginning BeginningStep.Upkeep) upkeep)]
+          board {GameState.activePlayer = upkeep, GameState.phase = Phase.Beginning BeginningStep.Upkeep}
+      placed = snd (Engine.runGamePure S.identityAnswer began Engine.placePendingTriggers)
+   in snd (Engine.runGamePure S.identityAnswer placed Stack.resolveTop)
+
+-- CR 307.1 / 117.1a: carol active with priority in her own precombat main phase,
+-- which is what a sorcery-speed cast of hers needs. Applied to BOTH boards of the
+-- pair below, so the seat and the timing are shared and only the pool differs.
+carolMain :: GameState.GameState -> GameState.GameState
+carolMain gs =
+  gs
+    { GameState.activePlayer = S.carol,
+      GameState.phase = Phase.PrecombatMain,
+      GameState.priority = Just S.carol
+    }
+
+-- The units of one player's pool, poolUnits generalised over the seat -- three
+-- seats being what tells "that player" from "the controller".
+poolOf :: PlayerId.PlayerId -> GameState.GameState -> [ManaUnit.ManaUnit]
+poolOf pid gs = case Game.poolOf pid gs of
+  Mana.Type.MkMana units -> units
+
 -- These printings on the battlefield under alice's control, untapped and settled.
 alicePermanents :: [Printing.Printing] -> GameState.GameState
 alicePermanents = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers)
@@ -2272,6 +2360,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   villageRitesSpec s registry
   chromaticSpec s registry
   burningTreeSpec s registry
+  shizukoSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against

@@ -130,6 +130,7 @@ import qualified Pawl.Codec.LifeChangeSpec
 import qualified Pawl.Codec.LimitUnlessSpec
 import qualified Pawl.Codec.LookAtSpec
 import qualified Pawl.Codec.LoyaltySpec
+import qualified Pawl.Codec.ManaAdditionSpec
 import qualified Pawl.Codec.ManaCostSpec
 import qualified Pawl.Codec.ManaCountSpec
 import qualified Pawl.Codec.ManaFilterSpec
@@ -523,6 +524,7 @@ spec s registry = do
   Pawl.Codec.ManaCostSpec.spec s
   Pawl.Codec.ManaCountSpec.spec s
   Pawl.Codec.ManaFilterSpec.spec s
+  Pawl.Codec.ManaAdditionSpec.spec s
   Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaSpendingSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s

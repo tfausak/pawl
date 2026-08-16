@@ -20,13 +20,17 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "SnowSymbol"
+                          "production": {
+                            "type": "SnowSymbol"
+                          }
                         }
                       },
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "SnowSymbol"
+                          "production": {
+                            "type": "SnowSymbol"
+                          }
                         }
                       }
                     ]

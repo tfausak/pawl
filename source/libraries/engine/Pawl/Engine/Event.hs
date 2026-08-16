@@ -5887,6 +5887,22 @@ reactsToAbilityTriggering cond = case cond of
 -- Monarch.inherentMatch, which has no bearer to scope a shared matcher to.
 eventBindings :: TriggerCondition -> GameEvent -> Map.Map SlotName.SlotName Binding
 eventBindings cond event = case (cond, event) of
+  -- CR 603.2b's "that player": the active player, on whose turn the step began.
+  -- Shizuko, Caller of Autumn's "at the beginning of each player's upkeep, THAT
+  -- PLAYER adds {G}{G}{G}" is the reader, and the seat it names is nobody the
+  -- ability already has -- CR 109.5's "you" is Shizuko's controller, and CR
+  -- 603.2b's step is each player's in turn.
+  --
+  -- Bound for EVERY TurnScope, not only EachTurn. Under ControllersTurn the
+  -- active player IS the controller, which makes the slot a redundant second name
+  -- rather than a wrong one -- the posture the PlayerBecomesMonarch arm below
+  -- takes for its own You case, and what eventBindingSlots' unconditional promise
+  -- for this condition needs.
+  --
+  -- Unconditional given a match: every GameEvent.StepBegan carries a PlayerId,
+  -- CR 500.1 giving every step exactly one turn to belong to.
+  (TriggerCondition.StepBegins {}, GameEvent.StepBegan ev) ->
+    Binding.setTriggerPlayer (StepBegan.player ev) Map.empty
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
   (TriggerCondition.SelfDealsCombatDamageToPlayer, GameEvent.DamageDealt ev) ->
     case DamageEvent.target ev of
@@ -6197,9 +6213,13 @@ eventBindingSlots cond = case cond of
   -- "Whenever a [type] enters" has no such luck.
   TriggerCondition.SelfEnters -> Set.empty
   TriggerCondition.PermanentEnters _ -> Set.singleton Binding.became
-  -- CR 603.2b's step beginning names no object and no player but the active one,
-  -- and the active player is not what CR 109.5's `you` means.
-  TriggerCondition.StepBegins {} -> Set.empty
+  -- CR 603.2b's step beginning names no OBJECT -- but it names the active player,
+  -- and the active player is not what CR 109.5's `you` means, so "that player"
+  -- needs a slot of its own. Shizuko, Caller of Autumn is the reader.
+  --
+  -- Unconditional, as this classification has to be: every GameEvent.StepBegan
+  -- carries a PlayerId, whatever the TurnScope.
+  TriggerCondition.StepBegins {} -> Set.singleton Binding.triggerPlayer
   -- CR 603.8: a state trigger matches a game STATE rather than an event
   -- (matchesTrigger's StateIs arm answers False for every event), so no event
   -- contributes anything to one.

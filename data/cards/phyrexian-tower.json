@@ -20,9 +20,11 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colorless"
+                          "production": {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colorless"
+                            }
                           }
                         }
                       }
@@ -63,11 +65,13 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colored",
+                          "production": {
+                            "type": "OfType",
                             "value": {
-                              "type": "Black"
+                              "type": "Colored",
+                              "value": {
+                                "type": "Black"
+                              }
                             }
                           }
                         }
@@ -75,11 +79,13 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colored",
+                          "production": {
+                            "type": "OfType",
                             "value": {
-                              "type": "Black"
+                              "type": "Colored",
+                              "value": {
+                                "type": "Black"
+                              }
                             }
                           }
                         }
