@@ -120,6 +120,11 @@ import qualified Pawl.Types.TapState as TapState
 -- enters-the-battlefield trigger on the way in, which is the one thing the rule
 -- exists to forbid.
 --
+-- A Bool, so it always writes CR 708.2a's characteristics. CR 708.2a's "unless
+-- otherwise specified by the effect that put it onto the battlefield face down"
+-- -- an entry that LISTS its own, as Yedora, Grave Gardener and Missy do -- is
+-- not implemented (#1668).
+--
 -- A SECOND rider beside `exiledFaceDown` and not the same one widened, which is
 -- CR 110.5d in as many words: an exiled card's face-downness "has no correlation
 -- to the face-down status of a permanent". This one writes Object.facing, which

@@ -120,6 +120,7 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
@@ -210,6 +211,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpR as TurnUpR
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
@@ -722,7 +724,12 @@ effectCounts effect = case effect of
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage duration _ quantity rider) -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationCounts duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationCounts duration
-  Effect.TurnFaceDown _ -> []
+  -- CR 708.2's listed characteristics are card data, so the listed power and
+  -- toughness are walked for the reason Create's minted face is. The listed type
+  -- line holds no Quantity.
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown _ listed) ->
+    concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.power listed))
+      <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.toughness listed))
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
   Effect.Counter _ -> []
@@ -1132,6 +1139,7 @@ effectReplacements effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectReplacements body
   Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
+  -- CR 708.2's listed characteristics hold no replacement effect (gap #1667).
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
@@ -1713,6 +1721,9 @@ effectMintedFaces effect = case effect of
   Effect.ForEach (ForEach.MkForEach _ _ body) -> concatMap effectMintedFaces body
   Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
+  -- CR 708.2's listed characteristics are not a minted FACE: they replace an
+  -- existing object's, and Pawl.Engine.Card.faceDownFace supplies every field
+  -- they do not name.
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
@@ -2882,6 +2893,7 @@ effectFilters effect = case effect of
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
     unframed (durationFilters duration <> objectRefFilters srcRef <> objectRefFilters destRef)
+  -- CR 708.2's listed characteristics hold no Filter.
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []

@@ -941,8 +941,9 @@ data TriggerCondition
     -- look-back exceptions does not reach this condition and CR 603.10's first
     -- sentence governs. The Filter reads the permanent as it is AFTER the
     -- turning, which is what makes "a creature is turned face up" answerable at
-    -- all -- a face-down permanent is a 2/2 with no subtypes (CR 708.2a), so
-    -- reading it before would answer every narrowed form wrong.
+    -- all -- a face-down permanent has only the characteristics its listing
+    -- names (CR 708.2), never the card's, so reading it before would answer
+    -- every narrowed form wrong.
     PermanentTurnedFaceUp (Filter.Filter Keyword.Keyword)
   | -- | A permanent the Filter admits GAINED THIS DESIGNATION -- Valeron Wardens'
     -- "whenever a creature you control becomes renowned" (CR 702.112b) and Arbor

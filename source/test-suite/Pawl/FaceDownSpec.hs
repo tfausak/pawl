@@ -12,9 +12,10 @@
 --
 -- FOUR morph cards carry the CAST and TURN-FACE-UP halves of rule 708, one per
 -- part of them this file reaches, another carries the TURN-FACE-DOWN half,
--- Aven Farseer -- which has no morph ability at all -- is the WATCHER of rule
--- 708.7's other written form, and Soul Summons is the one card here that reaches
--- rule 708 without a cast at all.
+-- Cyber Conversion carries the half where the effect LISTS characteristics of
+-- its own, Aven Farseer -- which has no morph ability at all -- is the WATCHER
+-- of rule 708.7's other written form, and Soul Summons is the one card here that
+-- reaches rule 708 without a cast at all.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable

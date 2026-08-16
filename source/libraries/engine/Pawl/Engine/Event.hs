@@ -5261,9 +5261,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- normal copiable values restored, so there is nothing for CR 603.10a's
   -- look-back to recover and the live read is what CR 603.10's first sentence
   -- asks for. It is also the only read that can answer a narrowed form correctly
-  -- -- CR 708.2a gives a face-down permanent no subtypes and no name, so a Filter
-  -- applied to the pre-turning object would decline every "a Dragon is turned
-  -- face up" there is.
+  -- -- CR 708.2 gives a face-down permanent only the characteristics its listing
+  -- names and never the card's, so a Filter applied to the pre-turning object
+  -- would decline every "a Dragon is turned face up" there is.
   --
   -- viewWithLastKnown rather than viewOfObject for PermanentEnters' reason: a
   -- permanent turned face up and gone again before the CR 117.5 boundary is still

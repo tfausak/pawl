@@ -28,9 +28,9 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- name, mana cost, colour, supertypes, text -- is empty for every listing there
 -- is, so it is Card.faceDownFace's constant rather than a field here.
 --
--- Two listings pawl cannot yet carry: the ABILITIES Magar lists (#1667), and
--- the KEYWORD disguise and cloak list (#922). Both are more fields on this
--- record when a card asks.
+-- Two listings are not implemented: the ABILITIES Magar lists (#1667), and the
+-- KEYWORD disguise and cloak list (#922). Both are more fields on this record
+-- when a card asks.
 data FaceDownCharacteristics = MkFaceDownCharacteristics
   { typeLine :: TypeLine.TypeLine,
     -- | Absent for a listing that names no creature -- Yedora's "Forest land"
