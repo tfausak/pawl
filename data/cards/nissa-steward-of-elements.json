@@ -279,7 +279,7 @@
                             "type": "UntilEndOfTurn"
                           },
                           "modification": {
-                            "type": "AddCreatureSubtype",
+                            "type": "SetCreatureSubtype",
                             "value": {
                               "type": "Elemental"
                             }

@@ -24,6 +24,7 @@
 module Pawl.PlaneswalkerSpec where
 
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -32,6 +33,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
@@ -42,15 +44,19 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 -- Jace Beleren's abilities in printed order: +2, -1, -10. Indexed rather than
@@ -481,3 +487,24 @@ variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
     Spec.assertEqWith s "loyalty 1" (S.counterOf CounterKind.Loyalty nissaId after) 1
     Spec.assertEqWith s "seven Forests: the six paid with plus the one put onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 7
     Spec.assertEqWith s "only the Bird Maiden is left in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+
+  -- The -6, which the X-derived loyalty is what pays for. CR 205.1b's "become
+  -- 5/5 Elemental creatures ... they're still lands": the creature type is SET
+  -- where the card type is ADDED, which is what the card's last sentence says.
+  Spec.it s "CR 205.1b the -6 untaps two lands and makes them 5/5 Elemental creature lands with flying and haste" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    let (nissaId, board) = nissaCastFor forest island nissa [] 6
+        after = useNissaAbility minusSix nissa nissaId board
+        animated = filter (Set.member CardType.Creature . PC.cardTypes) (fmap (`Projection.project` after) (Set.toList (GameState.battlefield after)))
+    Spec.assertEqWith s "the -6 spent the six counters it cost" (S.counterOf CounterKind.Loyalty nissaId after) 0
+    -- Eight of the nine lands paid for {6}{G}{U}; two of those eight are untapped
+    -- again, and nothing else on this board taps or untaps.
+    Spec.assertEqWith s "eight lands were tapped to cast her" (S.tappedCount S.alice board) 8
+    Spec.assertEqWith s "and two of them are untapped again" (S.tappedCount S.alice after) 6
+    Spec.assertEqWith s "two lands were animated, not one and not every land" (length animated) 2
+    Spec.assertEqWith s "each is 5/5" (fmap (\pc -> (PC.power pc, PC.toughness pc)) animated) [(Just 5, Just 5), (Just 5, Just 5)]
+    Spec.assertBool s (all (Set.member CardType.Land . PC.cardTypes) animated) "they're still lands"
+    Spec.assertBool s (all (Set.member Subtype.Elemental . PC.subtypes) animated) "each is an Elemental"
+    Spec.assertBool s (all (\pc -> Map.member Keyword.Flying (PC.keywords pc) && Map.member Keyword.Haste (PC.keywords pc)) animated) "with flying and haste"

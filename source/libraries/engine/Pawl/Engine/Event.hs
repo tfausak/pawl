@@ -2418,6 +2418,11 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                     -- puts the X of a card outside the stack at 0. Nothing for
                     -- every move whose object bound no X, which is every move
                     -- but a resolving {X} permanent spell's.
+                    --
+                    -- That gate is a regression fence rather than proven
+                    -- behaviour: the field's only reader is the entry
+                    -- replacement mint, which asks it of a permanent, so
+                    -- dropping the gate leaves the suite green.
                     Object.announcedX = if dest == Zone.Battlefield then Binding.amountOf Binding.variableX (Object.bindings obj) else Nothing
                   }
               -- CR 604.2 ends a static ability's continuous effect the moment
