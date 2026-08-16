@@ -10,7 +10,9 @@
 -- mandatory spell-side additional cost), Headless Skaab (an additional cost paid
 -- out of a zone that is not the battlefield), Fireblast (an alternative cost
 -- with no mana in it at all) and Asmoranomardicadaistinaculdacar (an alternative
--- cost applied to an unpayable one, CR 118.6a).
+-- cost applied to an unpayable one, CR 118.6a). Asmoranomardicadaistinaculdacar
+-- carries a sixth gate on its other ability: a Sacrifice component with a count
+-- and a criterion, paid with Golden Eggs.
 module Pawl.CostSpec where
 
 import qualified Control.Monad as Monad
