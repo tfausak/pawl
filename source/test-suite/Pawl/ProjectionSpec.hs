@@ -646,7 +646,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (pikerId, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         freeze :: Projection.Modification -> Maybe Projection.Modification
-        freeze = Projection.freezeQuantities gs pikerId (Just S.alice)
+        -- One object twice: the SPELL case, where CR 601.2b's announcer and CR
+        -- 113.7a's source are the same id. Pawl.ActivateSpec is where they part.
+        freeze = Projection.freezeQuantities gs pikerId pikerId (Just S.alice)
     Spec.assertEqWith
       s
       "read against the SOURCE, the Piker's power locks in at 2"
