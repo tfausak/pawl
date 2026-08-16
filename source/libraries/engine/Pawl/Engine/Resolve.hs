@@ -2605,8 +2605,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         --
         -- An unevaluable amount drops that recipient, the powerOf posture, and
         -- so does a zero: CR 120.8's "if a source would deal 0 damage, it does
-        -- not deal damage at all". Dropping a recipient is not dropping the batch, which
-        -- is the difference from reading the amount once.
+        -- not deal damage at all". Dropping a recipient is not dropping the
+        -- batch, which is the difference from reading the amount once.
         let amountFor recipient = case recipientSeat gs recipient of
               Nothing -> Quantity.evaluateFor viewOf context gs resolving source quantity
               Just pid -> evaluateForRecipient viewOf context gs resolving source pid quantity
