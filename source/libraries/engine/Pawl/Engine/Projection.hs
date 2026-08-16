@@ -363,6 +363,10 @@ applyModification viewOf src gs oid m pc =
 
 -- CR 205.1a's named exception to its own set: "an object with either the instant
 -- or sorcery card type retains that type". Every other card type is replaced.
+--
+-- Unobserved rather than proved: no permanent has either type, and no card in the
+-- pool sets the card type of a spell on the stack, so neutralizing this to `const
+-- False` leaves the whole suite green. A regression fence for the day one does.
 retainedThroughCardTypeSet :: CardType.CardType -> Bool
 retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
 
