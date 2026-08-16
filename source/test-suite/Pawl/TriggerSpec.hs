@@ -9193,11 +9193,13 @@ promiseOfTomorrowReturnSpec s registry =
             settled = S.runPure S.identityAnswer killed Engine.settleForPriority
          in S.runPure S.identityAnswer settled Stack.resolveTop
       -- Record the end step's beginning, place what it gathers (CR 603.3), and
-      -- resolve the one ability that can be there.
+      -- resolve the one ability that can be there. BOTH states come back: the
+      -- stack is empty after the resolution either way, so "the ability did not
+      -- trigger" is only readable at the placement.
       endStepOf gs =
         let began = S.withEvents [GameEvent.StepBegan (StepBegan.MkStepBegan (Phase.Ending EndingStep.EndStep) S.alice)] gs
             placed = S.runPure S.identityAnswer began Engine.settleForPriority
-         in S.runPure S.identityAnswer placed Stack.resolveTop
+         in (placed, S.runPure S.identityAnswer placed Stack.resolveTop)
       nameOf oid gs = fmap Face.name (Game.faceOf oid gs)
       -- The battlefield permanents whose PROJECTED controller is pid, by name.
       -- Sorted, since GameState.battlefield is a set and the returned cards are
@@ -9217,7 +9219,8 @@ promiseOfTomorrowReturnSpec s registry =
           Spec.assertEqWith s "both deaths were exiled, alongside the decoy" (exiledNames exiled) (fmap named ["Goblin Piker", "Ogre Sentry", "Wall of Stone"])
           Spec.assertEqWith s "and alice controls no creatures" (controlledNames S.alice exiled) [named "Promise of Tomorrow"]
           Spec.assertEqWith s "while bob still has one on the battlefield" (controlledNames S.bob exiled) [named "Hill Giant"]
-          let after = endStepOf exiled
+          let (placed, after) = endStepOf exiled
+          Spec.assertEqWith s "CR 603.4: the ability triggered" (length (GameState.stack placed)) 1
           Spec.assertBool s (not (S.onBattlefield promiseId after)) "CR 701.21a: the enchantment sacrificed itself"
           Spec.assertEqWith s "and it is in alice's graveyard" (fmap Face.name (Maybe.mapMaybe (`Game.faceOf` after) (Game.zoneMembers Zone.Graveyard S.alice after))) [named "Promise of Tomorrow"]
           -- The three separations, as one tuple so a failure says which.
@@ -9226,21 +9229,23 @@ promiseOfTomorrowReturnSpec s registry =
             "the linked pair returned under alice, the decoy stayed, bob kept only his Giant"
             (controlledNames S.alice after, exiledNames after, controlledNames S.bob after)
             (fmap named ["Goblin Piker", "Ogre Sentry"], [named "Wall of Stone"], [named "Hill Giant"])
-          -- CR 400.7: what came back is a new object, so the exiled ids name
-          -- nothing on the battlefield. Reading `pikerId`/`sentryId` would have
-          -- been a false way to write the assertion above.
-          Spec.assertBool s (not (S.onBattlefield pikerId after || S.onBattlefield sentryId after)) "and both are new objects"
-          Spec.assertBool s (Maybe.isJust (Game.lookupObject wallId after)) "the decoy id is untouched"
+          -- CR 400.7: what came back is a NEW object, which is why the assertion
+          -- above reads names rather than ids. `pikerId` and `sentryId` would
+          -- have been the wrong ids twice over -- the battlefield incarnations
+          -- died two moves ago -- so the ids compared here are the ones exile
+          -- actually held.
+          Spec.assertBool s (Set.disjoint (GameState.exile exiled) (GameState.battlefield after)) "no exiled id is on the battlefield"
+          Spec.assertBool s (Maybe.isJust (Game.lookupObject wallId after)) "and the decoy, which never moved, keeps its id"
         -- The one-difference control: bob's Hill Giant moves to alice, so alice
         -- controls a creature at the beginning of the end step and CR 603.4 stops
         -- the ability triggering at all.
         Spec.it s "CR 603.4 control: alice keeping ANY creature leaves the exiled cards where they are" $ do
           (promiseId, pikerId, sentryId, _, board0) <- board S.alice
           let exiled = killIt sentryId (killIt pikerId board0)
-          Spec.assertEqWith s "the same two cards are exiled" (exiledNames exiled) (fmap named ["Goblin Piker", "Ogre Sentry", "Wall of Stone"])
+          Spec.assertEqWith s "exile holds the same three cards" (exiledNames exiled) (fmap named ["Goblin Piker", "Ogre Sentry", "Wall of Stone"])
           Spec.assertEqWith s "but alice still controls the Giant" (controlledNames S.alice exiled) (fmap named ["Hill Giant", "Promise of Tomorrow"])
-          let after = endStepOf exiled
-          Spec.assertEqWith s "nothing was placed on the stack" (length (GameState.stack after)) 0
+          let (placed, after) = endStepOf exiled
+          Spec.assertEqWith s "CR 603.4: nothing was placed on the stack" (length (GameState.stack placed)) 0
           Spec.assertBool s (S.onBattlefield promiseId after) "the enchantment is still there"
           Spec.assertEqWith s "and exile is unchanged" (exiledNames after) (fmap named ["Goblin Piker", "Ogre Sentry", "Wall of Stone"])
 
