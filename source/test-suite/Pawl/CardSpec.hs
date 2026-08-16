@@ -2708,9 +2708,9 @@ blockPermissionFilters permission =
     <> foldMap conditionFilters (BlockPermission.while permission)
 
 -- WHICH position of a card's text a Filter sits in, for the two lints that are
--- about position rather than about the atom. Both atoms they police are answered
--- off a Filter.Context field that only one caller fills, so the position IS the
--- soundness question.
+-- about position rather than about the atom. Each atom they police is answered
+-- off a field that exactly one caller fills -- a Filter.View's for CR 701.3a, a
+-- Filter.Context's for CR 709.4a -- so the position IS the soundness question.
 --
 --   * AttachDestination -- Effect.AttachTarget's destination, the one position
 --     evaluated against a view whose `canHostSubject` is filled in
@@ -3045,9 +3045,9 @@ canHostSubjectOffends card =
 
 -- jsonAtoms narrowed from a whole face to ONE Filter position of it. The atom
 -- this is asked about carries a payload (a SlotName), so counting the tag by hand
--- would mean a second copy of canHostSubjects' sixty arms; Pawl.Codec.Filter
--- already walks every one of them, including the ones a hand-written recursion
--- has dropped before (landwalk's Subtype, now a Filter).
+-- would mean a second copy of canHostSubjects' whole recursion; Pawl.Codec.Filter
+-- already walks every arm of it, including the ones a hand-written recursion has
+-- dropped before (landwalk's Subtype, now a Filter).
 --
 -- Sound as a per-position count because a TargetSlot's codec embeds its Filter's
 -- encoding verbatim, so the sum over cardFilters' positions and jsonAtoms over
@@ -4850,10 +4850,6 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and it is the pool's only one"
       (sum (fmap (uncurry (+) . sameNameAsBoundCounts . S.combinedFace) ps))
       1
-    -- What keeps the sweep from silently iterating over nothing: cardFilters is
-    -- what the counts are taken over, and a pool this size has thousands of
-    -- positions in it. A traversal that had stopped walking would fail here rather
-    -- than pass the sweep above.
     -- Both sides of the split, with room to spare under the pool's real figures:
     -- a traversal that had stopped walking, or a Framing that had stopped marking
     -- target slots, would fail here rather than pass the sweep above by iterating
