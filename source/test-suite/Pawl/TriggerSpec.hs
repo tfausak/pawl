@@ -8545,9 +8545,10 @@ clarionSpiritSpec s registry =
             ([first, second], withHand) -> do
               let (bobsBoil, gs) = S.addHandCard boil S.bob withHand
                   afterAlice = castAndResolve S.alice first gs
-                  interleaved = castAndResolve S.alice second (castAndResolve S.bob bobsBoil afterAlice)
+                  afterBob = castAndResolve S.bob bobsBoil afterAlice
+                  interleaved = castAndResolve S.alice second afterBob
                   straight = castAndResolve S.alice second afterAlice
-              Spec.assertEqWith s "bob's cast alone makes nobody a Spirit" (spiritsOf S.alice (castAndResolve S.bob bobsBoil afterAlice)) 0
+              Spec.assertEqWith s "bob's cast alone makes nobody a Spirit" (spiritsOf S.alice afterBob) 0
               Spec.assertEqWith s "alice's second still fires with his cast in between" (spiritsOf S.alice interleaved) 1
               -- The same board without bob's cast, which is the only difference
               -- between the two: it fires either way.
