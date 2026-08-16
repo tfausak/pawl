@@ -89,6 +89,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.BecomesBlocked _ -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
+  Effect.Reveal {} -> Nothing
   Effect.LookAt {} -> Nothing
   Effect.Scry {} -> Nothing
   Effect.Surveil {} -> Nothing
