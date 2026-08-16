@@ -543,6 +543,58 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertBool s (not paid) "the cost goes unpaid"
     Spec.assertEqWith s "and no Forest was tapped in its name" (S.tappedCount S.alice after) 0
 
+  -- Paying {0}{G}{U} against three Islands and six Forests was observed to tap
+  -- FOUR lands where two suffice (#1610). The payer is not over-tapping. CR
+  -- 601.2g's window asks on every pass and taps exactly what the answer names,
+  -- which is the first assertion: name the LAST Island and the LAST Forest --
+  -- the two a head-taking payer would never reach -- and those two are the only
+  -- lands tapped.
+  --
+  -- The four are the ANSWERER's, which is the second assertion: the tapped set
+  -- equals the set of ids it named, one per pass. Replay.defaultAnswer takes the
+  -- head because a Prompt.ChooseManaSource carries object ids, a Decider and
+  -- nothing else -- no board, no cost -- so a state-free fallback cannot tell an
+  -- Island from a Forest, nor which colour the cost still wants. Three Islands
+  -- named ahead of a Forest is a legal, wasteful line of play, and choosing it
+  -- for a caller with no player attached is what that function is for.
+  --
+  -- WHICH lands, never how many: a count cannot tell a payer that spent a source
+  -- nobody named from one that did not.
+  Spec.it s "CR 601.2g paying {0}{G}{U} off nine lands taps exactly the ones the answer named" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    let gs = S.landsFor forest S.alice 6 (S.landsInPlay island 3)
+        lands = Game.zoneMembers Zone.Battlefield S.alice gs
+        named nm oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack nm))
+        cost =
+          ManaCost.MkManaCost
+            [ ManaSymbol.Generic 0,
+              ManaSymbol.OfType (ManaType.Colored Color.Green),
+              ManaSymbol.OfType (ManaType.Colored Color.Blue)
+            ]
+        tappedLands g = Set.fromList (filter (\oid -> fmap Object.tapped (Game.lookupObject oid g) == Just TapState.Tapped) lands)
+        lastNamed nm = case reverse (filter (named nm) lands) of
+          oid : _ -> oid
+          [] -> ObjectId.MkObjectId 9999
+        theIsland = lastNamed "Island"
+        theForest = lastNamed "Forest"
+        naming :: Prompt.Prompt r -> r
+        naming p = case p of
+          Prompt.ChooseManaSource _ _ candidates -> List.find (`elem` NonEmpty.toList candidates) [theForest, theIsland]
+          _ -> S.identityAnswer p
+        (paid, chosen) = S.runPureWith naming gs (Cost.payMana ManaSpending.AsProduced S.alice cost)
+        heading :: Prompt.Prompt r -> State.State (Set.Set ObjectId.ObjectId) r
+        heading p = case p of
+          Prompt.ChooseManaSource _ _ candidates -> do
+            State.modify' (Set.insert (NonEmpty.head candidates))
+            pure (Just (NonEmpty.head candidates))
+          _ -> pure (S.identityAnswer p)
+        ((headPaid, headed), asked) = State.runState (Engine.runGame heading gs (Cost.payMana ManaSpending.AsProduced S.alice cost)) Set.empty
+    Spec.assertBool s paid "two lands pay the cost"
+    Spec.assertEqWith s "and they are the two that were named" (tappedLands chosen) (Set.fromList [theIsland, theForest])
+    Spec.assertBool s headPaid "the head-taking answer pays too"
+    Spec.assertEqWith s "tapping every source it named, and no other" (tappedLands headed) asked
+
   Spec.it s "mana from a controlled permanent goes to its controller, not owner" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let (oid, base) = S.addCreature llanowarElves S.bob (Setup.emptyGame S.bothPlayers)
