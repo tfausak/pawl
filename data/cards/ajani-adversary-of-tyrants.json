@@ -225,7 +225,10 @@
           }
         }
       ],
-      "loyalty": 4,
+      "loyalty": {
+        "type": "Literal",
+        "value": 4
+      },
       "manaCost": [
         {
           "type": "Generic",

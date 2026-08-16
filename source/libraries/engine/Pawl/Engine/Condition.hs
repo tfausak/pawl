@@ -58,6 +58,11 @@ holds viewOf context gs oid condition = case condition of
   -- empty list is False and a disjunct reading a slot nothing filled cannot
   -- poison the ones beside it.
   Condition.Type.Any conditions -> any (holds viewOf context gs oid) conditions
+  -- Each conjunct collapses its own unanswerable quantities to False, so a
+  -- conjunct nothing could evaluate makes the whole conjunction False rather
+  -- than leaving it undetermined -- the same conservative reading the header
+  -- gives one comparison. An empty list is True, the fold's unit.
+  Condition.Type.All conditions -> all (holds viewOf context gs oid) conditions
   where
     evaluate = Quantity.evaluate viewOf context gs oid
 
@@ -76,3 +81,4 @@ bakeBound players condition = case condition of
           Compares.threshold = Quantity.bakeBound players (Compares.threshold c)
         }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (bakeBound players) conditions)
+  Condition.Type.All conditions -> Condition.Type.All (fmap (bakeBound players) conditions)

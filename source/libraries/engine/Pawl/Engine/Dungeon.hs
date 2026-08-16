@@ -209,7 +209,8 @@ enter pid = do
                 Object.ventureRoom = Just RoomIndex.topmost,
                 Object.unlockedHalves = Set.empty,
                 Object.designations = Set.empty,
-                Object.kicked = False
+                Object.kicked = False,
+                Object.announcedX = Nothing
               }
           gs3 =
             Game.insertIntoZone

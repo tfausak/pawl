@@ -129,6 +129,7 @@ import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LimitUnless as LimitUnless
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -486,13 +487,14 @@ countCounts count = case Count.Type.aggregation count of
   Aggregation.Greatest quantity -> quantityCounts quantity
 
 -- Every Count reachable from a Condition: both sides of a comparison are
--- Quantities and either may embed one, and a disjunction holds more conditions
--- (Pawl.Types.Condition).
+-- Quantities and either may embed one, and a disjunction or a conjunction holds
+-- more conditions (Pawl.Types.Condition).
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
 conditionCounts condition = case condition of
   Condition.Type.Compares (Compares.MkCompares measured _ threshold) ->
     quantityCounts measured <> quantityCounts threshold
   Condition.Type.Any conditions -> concatMap conditionCounts conditions
+  Condition.Type.All conditions -> concatMap conditionCounts conditions
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
@@ -3143,9 +3145,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- The SPELL half of CR 601.2b's contract: what a card's own modes read is
   -- announced against the card's own cost -- mana cost, additional costs and
   -- alternative costs together (`spellCostsOf`), since CR 107.3a names all of them.
+  --
+  -- A PRINTED LOYALTY OF X reads X without any effect doing so: CR 306.5b's
+  -- intrinsic replacement is the reader, and CR 107.3m values its X at the
+  -- announcement the spell made. Nissa, Steward of Elements is the pool's
+  -- producer, and without this disjunct the lint would call it an offender for
+  -- declaring an {X} nothing reads.
   Spec.it s "every printing that reads X declares X, and vice versa" $ do
     ps <- S.allPrintings s
-    let readsX c = Resolve.readsX (Card.allEffects c)
+    let readsX c = Resolve.readsX (Card.allEffects c) || Face.loyalty c == Just Loyalty.Variable
         offenders =
           filter
             (anyFace (\f -> readsX f /= any declaresVariable (spellCostsOf f)) . Printing.card)

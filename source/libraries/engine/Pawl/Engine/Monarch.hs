@@ -192,7 +192,8 @@ placeInherent pending = do
             Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False
+            Object.kicked = False,
+            Object.announcedX = Nothing
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
 

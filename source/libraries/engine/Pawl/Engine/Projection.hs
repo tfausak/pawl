@@ -2061,6 +2061,7 @@ rewriteCondition pairs condition = case condition of
           Compares.threshold = rewriteQuantity pairs (Compares.threshold c)
         }
   Condition.Type.Any conditions -> Condition.Type.Any (fmap (rewriteCondition pairs) conditions)
+  Condition.Type.All conditions -> Condition.Type.All (fmap (rewriteCondition pairs) conditions)
 
 -- CR 612.1 through a Quantity. A Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity; the descent is structural and
@@ -3867,7 +3868,19 @@ abilitiesFromCharacteristics pc oid gs =
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
 replacementsOf oid gs =
   let pc = project oid gs
-   in PC.replacementEffects pc <> intrinsicReplacementsOf pc <> shieldOf oid gs
+   in PC.replacementEffects pc <> intrinsicReplacementsOf (announcedXOf oid gs) pc <> shieldOf oid gs
+
+-- CR 107.3m: the value of X for this object's enters-the-battlefield replacement
+-- effects -- the value chosen for the spell that became it (Object.announcedX),
+-- and 0 for every object no such spell stands behind. That zero is the rule's own
+-- last clause, not a fallback: "the value of X for that permanent is 0".
+--
+-- Read off the OBJECT rather than off the projection, as shieldOf's counters are
+-- and for the same reason: an announcement is not a characteristic, so no CR 613
+-- layer can write it and CR 707.2 does not copy it. That is what makes a token
+-- copy of Nissa, Steward of Elements enter with no loyalty counters at all.
+announcedXOf :: ObjectId -> GameState -> Natural
+announcedXOf oid gs = Maybe.fromMaybe 0 (Object.announcedX =<< Game.lookupObject oid gs)
 
 -- CR 122.1c: the pair of effects one or more shield counters create -- "if this
 -- permanent would be destroyed as the result of an effect, instead remove a shield
@@ -3950,7 +3963,9 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 --     is judged as one and a paper-only one is not;
 --   * reads the PROJECTED loyalty, a copiable value under CR 707.2, so a Clone of
 --     a planeswalker enters with the copy's printed loyalty per CR 707.5 -- which
---     falls out of the mint, since the loop re-collects each iteration (CR 616.1f);
+--     falls out of the mint, since the loop re-collects each iteration (CR 616.1f).
+--     A printed X is copied as an X, and CR 107.3m then values it at 0 for the
+--     copy, no spell of the copy's own having announced one;
 --   * minting AFTER the layer fold puts it out of reach of LoseAllAbilities, which
 --     is deliberate: CR 306.5b gives the ability as a rule, so the card type is
 --     what layer 6 would have to remove.
@@ -3972,13 +3987,22 @@ shieldCounters oid gs = case Game.lookupObject oid gs of
 -- TURNED-FACE-UP row through the same call. It needs no gathering of its own,
 -- because the CR 616.1 loop matches every gathered row against the event it is
 -- offered -- so a row of one class simply never applies to an event of another.
-intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
-intrinsicReplacementsOf pc =
+--
+-- `announcedX` is CR 107.3m's, and the loyalty arm is its one reader: a printed
+-- loyalty of X (Nissa, Steward of Elements) is the value chosen for the spell
+-- that became this permanent. It is a NUMBER by the time it arrives here, settled
+-- at CR 601.2b and snapshotted onto the object by the move, so nothing about this
+-- mint became live.
+intrinsicReplacementsOf :: Natural -> ProjectedCharacteristics -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
+intrinsicReplacementsOf announcedX pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
   -- is Filter.IsSource.
   ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource (EntryRewrite.WithCounters (WithCounters.MkWithCounters CounterKind.Loyalty n)))
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
-    Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
+    printed <- Maybe.maybeToList (PC.loyalty pc),
+    let n = case printed of
+          Loyalty.Literal m -> m
+          Loyalty.Variable -> announcedX
   ]
     -- CR 310.4b's intrinsic "this permanent enters with a number of defense
     -- counters on it equal to its printed defense number" -- CR 306.5b's clause

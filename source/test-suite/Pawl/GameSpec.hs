@@ -187,7 +187,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.ventureRoom = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.designations = Set.empty,
-              Object.kicked = False
+              Object.kicked = False,
+              Object.announcedX = Nothing
             }
       )
 
@@ -1702,7 +1703,8 @@ handBobBolt lightningBolt gs =
             Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False
+            Object.kicked = False,
+            Object.announcedX = Nothing
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -2005,7 +2007,8 @@ restartOnStack mountain =
             Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False
+            Object.kicked = False,
+            Object.announcedX = Nothing
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

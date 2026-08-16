@@ -182,7 +182,8 @@ createCard pid printing = do
             Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False
+            Object.kicked = False,
+            Object.announcedX = Nothing
           }
       gs3 =
         gs2
