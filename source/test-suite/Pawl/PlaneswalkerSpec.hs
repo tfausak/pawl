@@ -207,9 +207,9 @@ announcingX x p = case p of
 -- ordinary path -- so her loyalty counters come from CR 306.5b's replacement
 -- reading CR 107.3m's announced value and never from a fixture.
 --
--- Nine lands is more than the largest X below needs ({5}{G}{U} is seven), so the
--- BOARD is what every pair here holds constant and the announcement is the only
--- thing that moves between the halves.
+-- Nine lands covers the largest X below ({6}{G}{U} is eight), so the BOARD is
+-- what every pair here holds constant and the announcement is the only thing that
+-- moves between the halves.
 nissaCastFor :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Natural -> (ObjectId.ObjectId, GameState.GameState)
 nissaCastFor forest island nissa deck x =
   let lands = S.landsFor forest S.alice 6 (S.landsInPlay island 3)
@@ -488,9 +488,10 @@ variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
     Spec.assertEqWith s "seven Forests: the six paid with plus the one put onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 7
     Spec.assertEqWith s "only the Bird Maiden is left in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
 
-  -- The -6, which the X-derived loyalty is what pays for. CR 205.1b's "become
-  -- 5/5 Elemental creatures ... they're still lands": the creature type is SET
-  -- where the card type is ADDED, which is what the card's last sentence says.
+  -- The -6, paid for out of the X-derived loyalty. CR 205.1b splits the card's
+  -- two sentences: "they're still lands" is why the CREATURE card type is added
+  -- rather than set, and the same rule's last clause is why the creature TYPE is
+  -- set rather than added.
   Spec.it s "CR 205.1b the -6 untaps two lands and makes them 5/5 Elemental creature lands with flying and haste" $ do
     forest <- S.printingOf s registry "Forest"
     island <- S.printingOf s registry "Island"
