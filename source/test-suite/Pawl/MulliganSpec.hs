@@ -24,8 +24,10 @@ import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
@@ -37,8 +39,10 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Response as Response
+import qualified Pawl.Types.Revealed as Revealed
 import qualified Pawl.Types.Zone as Zone
 
 -- Move every object a player owns onto their library (mirror of
@@ -217,6 +221,46 @@ twofoldGame twofold mountain n =
       addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
       withAlice = addMany mountain S.alice n (addMany twofold S.alice 1 g0)
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
+
+-- alice's library: a No-Regrets Egret on top, then `n` Mountains; bob's is
+-- uniform. The Egret is drawn into her opening hand, which is where CR 103.5b
+-- reads from -- and unlike the Powder its action leaves it there.
+egretGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+egretGame egret mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany egret S.alice 1 g0)
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
+
+-- Takes the first offered CR 103.5b action for the first `k` offers, declines
+-- the next, and keeps; every offer's candidate list is recorded.
+--
+-- The bound is the ANSWERER's, deliberately. handWindow re-offers an action
+-- that stays in hand for as long as the player keeps taking it (CR 103.5b caps
+-- nothing, CR 104.4b leaves an optional loop alone), so a test that answered
+-- "take" forever would hang rather than fail. Counting the offers instead makes
+-- both wrong answers legible and fast: too few offers means the window stopped
+-- re-offering, too many means it ignored the decline.
+takeThenDecline :: Int -> Prompt.Prompt r -> State.State [[(ObjectId.ObjectId, HandActionIndex.HandActionIndex)]] r
+takeThenDecline k p = case p of
+  Prompt.MulliganAction _ _ candidates -> do
+    seen <- State.get
+    State.put (candidates : seen)
+    pure (if length seen < k then Maybe.listToMaybe candidates else Nothing)
+  Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
+  _ -> pure (S.identityAnswer p)
+
+-- The names of the cards alice REVEALED (CR 701.20a), in event order. CR
+-- 701.20e's look is not one of them -- it is private and records no event --
+-- which is what keeps this a count of the reveals alone.
+revealedNames :: GameState.GameState -> [String]
+revealedNames gs = Maybe.mapMaybe revealedName (S.eventsOf gs)
+  where
+    revealedName event = case event of
+      GameEvent.Revealed (Revealed.MkRevealed pid _ _ pc)
+        | pid == S.alice ->
+            fmap (Text.unpack . CardName.unwrap) (Maybe.listToMaybe (Set.toList (PC.names pc)))
+      _ -> Nothing
 
 -- alice's library: `above` Mountains, then a Serum Powder, then 20 more; bob's
 -- is uniform. With `above` = 7 the Powder is NOT in the opening hand and is
@@ -519,6 +563,25 @@ spec s registry =
       let after = run usePowder (chainGame powder mountain)
       Spec.assertEqWith s "two hands exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 14
       Spec.assertEqWith s "and the third hand is a full seven" (S.handSize S.alice after) 7
+    Spec.it s "CR 103.5b: an action that leaves its card in hand is offered again" $ do
+      -- No-Regrets Egret only reveals itself, so nothing leaves the hand and
+      -- the same entry comes back. The answerer takes it twice and then
+      -- declines, so THREE offers is the whole assertion: two would mean the
+      -- window stopped re-offering a repeatable action, four would mean the
+      -- decline was ignored. Neither reading can hang the case -- the answerer
+      -- bounds the loop, not a timeout.
+      egret <- S.printingOf s registry "No-Regrets Egret"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = egretGame egret mountain 20
+          ((_, after), offers) = State.runState (Engine.runGame (takeThenDecline 2) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
+      Spec.assertEqWith s "taken, taken, declined" (length offers) 3
+      Spec.assertEqWith s "each offering the one Egret" (fmap length offers) [1, 1, 1]
+      Spec.assertEqWith s "CR 701.20b: it never left her hand" (S.handSize S.alice after) 7
+      Spec.assertEqWith s "CR 701.20a: revealed once per taking, and the look revealed nothing" (revealedNames after) ["No-Regrets Egret", "No-Regrets Egret"]
+      -- 21 cards less the opening seven. CR 701.20e's look at the top two puts
+      -- nothing anywhere, so two takings leave the library exactly as the draw
+      -- left it.
+      Spec.assertEqWith s "and the look moved no card" (libSize S.alice after) 14
     Spec.it s "CR 103.5b: one card granting two actions offers both" $ do
       -- Nothing in CR 103 caps how many such actions a card grants, so the two
       -- are two offers with the same granting card and different indices. A
