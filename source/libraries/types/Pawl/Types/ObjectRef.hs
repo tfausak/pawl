@@ -32,8 +32,10 @@ data ObjectRef
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a
     -- set drawn from another zone is one of the arms below -- a graveyard's is
     -- EachCardInGraveyard, a hand's EachCardInYourHand, exile's
-    -- EachCardExiledWithSource -- and a FILTERED sweep of any zone but the
-    -- battlefield and a graveyard has no card in the pool (#1309).
+    -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
+    -- the arm for that zone: the battlefield's is here, a graveyard's and the
+    -- linked exile set's are on their own arms, and the stack, a hand and a
+    -- library still have none (#1309).
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then
@@ -53,8 +55,9 @@ data ObjectRef
     -- description in the stated zone".
     --
     -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, the shape
-    -- Pawl.Types.Pool.CardsInGraveyard takes one question over: no card in the
-    -- pool sweeps a filtered set out of any other zone, and the hidden ones (CR
+    -- Pawl.Types.Pool.CardsInGraveyard takes one question over: each zone whose
+    -- filtered sweep a card in the pool asks for gets its own arm --
+    -- EachCardExiledWithSource takes the exile one -- and the hidden zones (CR
     -- 400.2) would owe a visibility question a graveyard does not (#1309).
     --
     -- The PlayerScope is WHOSE, which CR 400.1 forces this arm to say and

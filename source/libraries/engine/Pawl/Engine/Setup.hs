@@ -271,7 +271,13 @@ startGameFromCards :: HandActionPerformer -> Set.Set ObjectId -> Game ()
 startGameFromCards perform exemptions = do
   gs <- State.get
   let owners = Game.stillPlayingInOrder gs
-      exempt = Set.intersection exemptions (GameState.exile gs)
+      -- Cards in exile, and nothing else: CR 727.2's "all Magic cards" is what
+      -- survives a rebuild at all, so an exemption is filtered by the same
+      -- `isCard` test the funnel below applies rather than being able to smuggle
+      -- a token or an emblem through it (CR 111.7).
+      exempt =
+        Map.keysSet
+          (Map.filter isCard (Map.restrictKeys (GameState.objects gs) (Set.intersection exemptions (GameState.exile gs))))
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
