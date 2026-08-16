@@ -78,7 +78,6 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.ModifyPowerToughness as ModifyPowerToughness
 import qualified Pawl.Types.Moved as Moved
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -101,7 +100,6 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
-import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSlot as TargetSlot
@@ -1409,35 +1407,6 @@ tappedCount pid gs =
 
 handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
-
--- LABELED SYNTHETIC: an emblem's characteristics are only its abilities (CR
--- 114.3), and no emblem in the pool has a STATIC one. Birthday Escape mints a
--- real emblem (CR 701.54c's The Ring), so the pool does not lack an emblem
--- PRODUCER -- but that emblem's four abilities have no carrier, so its static
--- ability list is empty; Ajani, Adversary of Tyrants' emblem does carry an
--- ability, and it is triggered. Neither can show that Projection.gather reads a
--- static one from the command zone. Hence this fixture -- an Elspeth-style anthem, "creatures you control get
--- +1/+1". Built by overriding a vanilla card's static abilities; the residual
--- printed fields are inert for a command-zone object (never projected as a
--- permanent). (#125)
-anthemEmblemCard :: Printing.Printing -> Card.Type.Card
-anthemEmblemCard piker =
-  let card = Printing.card piker
-      anthem face =
-        face
-          { Face.staticAbilities =
-              [ StaticAbility.MkStaticAbility
-                  { StaticAbility.affected =
-                      Affected.Matching
-                        (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
-                    StaticAbility.condition = Nothing,
-                    StaticAbility.lingers = Nothing,
-                    StaticAbility.modifications =
-                      NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)))
-                  }
-              ]
-          }
-   in card {Card.Type.faces = fmap anthem (Card.Type.faces card)}
 
 -- The cards M2a adds, paired with the single keyword each must carry. Named
 -- rather than loaded here so Pawl.Support stays pure: the caller loads them.
