@@ -27,9 +27,11 @@ data ActivatedAbility card = MkActivatedAbility
     -- speed is 4, this object has '[Ability]'". A grant whose grantee is the
     -- granting object itself and whose granted ability is printed right there is
     -- indistinguishable from the printed ability plus its own gate, so pawl
-    -- carries the gate on the ability rather than minting a layer-6 grant --
-    -- Pawl.Types.Modification has no arm that grants an activated ability, and
-    -- giving it one would make it parametric in `card`.
+    -- carries the gate on the ability rather than minting a layer-6 grant.
+    -- Pawl.Types.Modification's GainActivatedAbility is the layer-6 grant, and
+    -- it is for the OTHER case: an ability handed to a DIFFERENT object, which
+    -- is not indistinguishable from anything -- CR 113.7a moves the source and
+    -- CR 602.2b the controller.
     --
     -- The SAME shape as Pawl.Types.StaticAbility.condition, which spells CR
     -- 604.2's "as long as" for a continuous effect, and the same rule about what

@@ -17,9 +17,12 @@ import qualified Pawl.Types.Supertype as Supertype
 -- constructor -- the same standing Pawl.Engine.Resolve has over Effect.
 -- Pawl.CardSpec's lints also case on it, legitimately: a test-suite lint that
 -- walks the card pool is not rules core. GainKeyword carries a Keyword, a
--- closed-half CITATION, so casing on it is not an invariant violation. The P/T
--- arms carry records of signed Quantity. The layer-4 arms below reach card types,
--- subtypes and supertypes, which CR 205.4b keeps independent of one another.
+-- closed-half CITATION, so casing on it is not an invariant violation; and
+-- GainActivatedAbility carries a whole open-half ability that nothing cases on
+-- -- the projection appends it to a list, and every reader downstream treats it
+-- as any other ability. The P/T arms carry records of signed Quantity. The
+-- layer-4 arms below reach card types, subtypes and supertypes, which CR 205.4b
+-- keeps independent of one another.
 --
 -- Parametric in `ability` for GainActivatedAbility's sake alone, and parametric
 -- rather than concrete because this module cannot NAME an ability: an

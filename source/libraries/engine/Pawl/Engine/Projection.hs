@@ -2631,7 +2631,13 @@ removesAbilities m = case m of
   Modification.GainKeyword _ -> False
   -- The other direction of CR 613.1f: a grant is not a removal, so a creature
   -- given an ability and then Humility'd ends with none, while one Humility'd and
-  -- then given an ability keeps it. Timestamp order alone decides which.
+  -- then given an ability keeps it. Timestamp order alone decides which, and
+  -- Pawl.ActivateSpec's "Presence of Gond" pair proves it -- through the FOLD,
+  -- which is the caller that reads this function's answer as gModification. This
+  -- arm's own answer is a regression fence rather than proven: the other caller
+  -- is abilityRemovalAfter, whose reader is Pawl.Engine.CombatRestriction's rule
+  -- 701.60c, and no board in the pool reaches it holding a granted ability, so
+  -- flipping this to True leaves the suite green.
   Modification.GainActivatedAbility _ -> False
   -- CR 305.7 strips a land's rules text, which IS an ability loss -- but as a
   -- layer-4 type change performed by setLandSubtypeTo and liveGiven, never a
