@@ -64,9 +64,9 @@ data CastingRestriction
   | -- | CR 506.7b: "Cast this spell only during combat after blockers are
     -- declared" (Curtain of Light). Neither a step nor a phase, so DuringPhase
     -- above cannot say it and neither could a Pawl.Types.PhaseSelector: the
-    -- window runs from CR 509.1's declaration to the end of the combat phase,
-    -- taking the rest of the declare blockers step plus the combat damage and
-    -- end of combat steps.
+    -- window opens as the declare blockers step begins and runs to the end of
+    -- the combat phase, spanning that step, the combat damage step and the end
+    -- of combat step.
     --
     -- The mirror of Pawl.Types.ActivationRestriction's arm of this name, sharing
     -- Pawl.Engine.Combat.afterBlockersDeclared as its reader -- which is CR

@@ -85,8 +85,9 @@ data ActivationRestriction
     -- so the two arms share Pawl.Engine.Combat.afterBlockersDeclared verbatim,
     -- as AttackedThisStep above already does.
     --
-    -- No TurnScope beside it, unlike DuringPhase: CR 506.7c scopes the window by
-    -- COMBAT PHASE and the printed clause names no turn, so a second axis here
-    -- would be strictly narrower than the card.
+    -- No TurnScope beside it, unlike DuringPhase: the printed clause names no
+    -- turn, and CR 506.7c gives it every combat phase of one rather than a
+    -- chosen player's, so a second axis here would be strictly narrower than the
+    -- card.
     AfterBlockersDeclared
   deriving (Eq, Ord, Show)

@@ -5674,7 +5674,7 @@ becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
 -- omission: the pool's only route to a skipped declare blockers step is CR
 -- 508.8's empty attack, which leaves no attacking creature, and with no
 -- attacking creature Curtain of Light has no legal target -- so such a board
--- refuses the cast whatever the gate answers. The gate implements 506.7f all the
+-- refuses the cast whatever the gate answers. The gate implements CR 506.7f all the
 -- same, since it reads a record only the step itself writes.
 castingWindowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 castingWindowSpec s registry = Spec.describe s "CastingWindow" $ do

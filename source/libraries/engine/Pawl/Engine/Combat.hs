@@ -1740,6 +1740,12 @@ declareBlockers = do
   -- blockers are actually declared" -- an empty declaration, or a combat whose
   -- attackers were all removed after CR 508.8 asked its question, still passes
   -- the point the clause names. afterBlockersDeclared is the reader.
+  --
+  -- The PLACEMENT is a regression fence rather than a proved behaviour: moving
+  -- this line inside the guard below leaves the suite green, because no board in
+  -- the pool reaches this step with nothing attacking -- CR 508.8 skips the step
+  -- outright when nothing was declared, and removing an attacker afterwards
+  -- needs an effect no card here has.
   State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockersDeclared = True}}
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
