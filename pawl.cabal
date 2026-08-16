@@ -872,6 +872,7 @@ library types
     Pawl.Types.BlockPermission
     Pawl.Types.BlockRequirement
     Pawl.Types.BlocksDeclared
+    Pawl.Types.CandidateCost
     Pawl.Types.CandidateId
     Pawl.Types.CantBeBlockedBy
     Pawl.Types.Card

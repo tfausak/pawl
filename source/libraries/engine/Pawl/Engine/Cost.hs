@@ -44,6 +44,7 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Activations as Activations
 import qualified Pawl.Types.AlternativeCost as AlternativeCost
+import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Claim (Claim)
@@ -118,6 +119,12 @@ withoutPayingManaCost face =
       Cost.components = Face.additionalCosts face
     }
 
+-- A candidate no keyword ability offered: the card's own printed cost, one of
+-- its printed alternatives, or a cost an effect applied (CR 118.9). See
+-- candidateCostsFor for why the graveyard arm is the only one that tags.
+untagged :: Cost Keyword.Type.Keyword -> CandidateCost.CandidateCost
+untagged = CandidateCost.MkCandidateCost Nothing
+
 -- The first offered candidate, or `unpayable` when none was offered. The one
 -- total, documented answer every ChooseCost fallback uses.
 firstOffered :: [Cost Keyword.Type.Keyword] -> Cost Keyword.Type.Keyword
@@ -177,10 +184,34 @@ faceDownCost =
 -- zone from which you could play the card it's on" -- the zone question is
 -- Cast.castableZones's, and that gate reads the face-down face, which permits
 -- only the hand.
+--
+-- The COSTS ALONE, for every caller that only prices the cast.
+-- candidateCostsFor below is the same list with each candidate's offering
+-- keyword still attached, and this is defined in terms of that one so the two
+-- cannot drift: a cast that has to know WHICH cost it paid (CR 702.34a) reads
+-- the tagged list, and everything else reads this.
+--
+-- WHICH candidates carry a keyword is argued at candidateCostsFor.
 costsFor :: CardName.CardName -> ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
-costsFor name oid gs = case Game.lookupObject oid gs of
+costsFor name oid gs = fmap CandidateCost.cost (candidateCostsFor name oid gs)
+
+-- costsFor's list with CR 601.2b's other half recorded: WHICH ability offered
+-- each candidate, which is the fact CR 702.34a's "if the flashback cost was
+-- paid" and CR 702.133a's "if this spell was cast using its jump-start
+-- ability" are conditioned on.
+--
+-- THE GRAVEYARD ARM is the only one that tags, and the rules are what confine
+-- it there: those two abilities are the pool's only ones that ask which of a
+-- spell's candidate costs was the one paid, and both are graveyard costs. CR
+-- 702.127a's aftermath asks a different question -- "if this spell was cast
+-- from a graveyard" -- which is answered by the zone rather than by the cost,
+-- so its candidate is tagged for the record and no reader consults the tag.
+-- Rule 702.37a's morph cost and rule 702.143a's foretell cost have no such
+-- clause behind them, so tagging them would be a field nothing reads.
+candidateCostsFor :: CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
+candidateCostsFor name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
-  Just obj | Object.facing obj == Facing.FaceDown -> [faceDownCost]
+  Just obj | Object.facing obj == Facing.FaceDown -> [untagged faceDownCost]
   Just obj -> case Object.source obj of
     Source.OfCard printing ->
       let face = Game.resolveFace (Just name) (Printing.card printing)
@@ -268,12 +299,23 @@ costsFor name oid gs = case Game.lookupObject oid gs of
                   -- proposal through Pawl.Engine.Cast.asProposed first, and the
                   -- projection resolves that same stamp.
                   keywords = Map.keysSet (Projection.keywordsOf oid gs)
-               in fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost keywords))
-                    <> [printed | Keyword.hasAftermath keywords]
-                    <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
+                  -- The flashback keyword AS IT WAS READ, rebuilt from the
+                  -- cost the projected set carried: rule 702.34a's ability and
+                  -- its cost are one sentence, so the cost is the whole of what
+                  -- distinguishes one flashback instance from another.
+                  flashback cost = CandidateCost.MkCandidateCost (Just (Keyword.Type.Flashback cost)) (withAdditional cost)
+               in fmap flashback (Maybe.maybeToList (Keyword.flashbackCost keywords))
+                    <> [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed | Keyword.hasAftermath keywords]
+                    <> [ CandidateCost.MkCandidateCost
+                           (Just Keyword.Type.JumpStart)
+                           printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
                        | Keyword.hasJumpStart keywords
                        ]
-                    <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then printed : alternatives else [])
+                    -- UNTAGGED, and that is the whole of this issue's fix: an
+                    -- effect's permission states no cost, so the cost paid
+                    -- under it is the card's own and neither rule 702.34a's
+                    -- clause nor rule 702.133a's is satisfied by paying it.
+                    <> (if PlayerEffect.mayCastFromGraveyard (Object.owner obj) oid gs then fmap untagged (printed : alternatives) else [])
             -- CR 702.170d: a PLOTTED card is cast "without paying its mana
             -- cost", which is CR 118.9's alternative cost and so
             -- withoutPayingManaCost above -- the card's own additional costs
@@ -291,7 +333,7 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             -- list, and this arm falls back to it for an exiled card that is not
             -- plotted.
             Zone.Exile
-              | Maybe.isJust (Object.plotted obj) -> [withoutPayingManaCost face]
+              | Maybe.isJust (Object.plotted obj) -> [untagged (withoutPayingManaCost face)]
             -- CR 702.143a: a FORETOLD card is cast "by paying any foretell cost
             -- it has rather than paying that spell's mana cost", which is CR
             -- 118.9's alternative cost -- so the keyword's payload is wrapped by
@@ -308,8 +350,8 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             -- shape, which pawl cannot state (#1486).
             Zone.Exile
               | Maybe.isJust (Object.foretold obj) ->
-                  fmap withAdditional (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
-            _ -> printed : alternatives
+                  fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
+            _ -> fmap untagged (printed : alternatives)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
     Source.OfTrigger _ _ -> []

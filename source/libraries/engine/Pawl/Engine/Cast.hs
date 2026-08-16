@@ -2,6 +2,7 @@ module Pawl.Engine.Cast where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -25,6 +26,7 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.CandidateCost as CandidateCost
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
@@ -1038,7 +1040,15 @@ castSpellWith applied pid oid name facing = do
           -- -- and a cost reduction still applies to it, which is what rule
           -- 601.2f's order says and what Commander decks expect.
           taxed = Commander.taxCandidates pid oid before
-          candidates = fmap taxed (maybe (Cost.costsFor name oid proposed) pure applied)
+          -- CR 601.2b's candidates, each still carrying the keyword ability
+          -- that offered it (Cost.candidateCostsFor). The tag is what CR
+          -- 702.34a's "if the flashback cost was paid" is asked of once the
+          -- payment is made; a cost `applied` from another effect (CR 118.9)
+          -- carries none, because no keyword offered it.
+          candidates =
+            fmap
+              (\candidate -> candidate {CandidateCost.cost = taxed (CandidateCost.cost candidate)})
+              (maybe (Cost.candidateCostsFor name oid proposed) (pure . Cost.untagged) applied)
           -- CR 400.7 / 613.1: the keywords the card has WHERE IT LIES, read one
           -- step ahead of the move below for the reason `castFrom` is. The move
           -- mints a fresh incarnation on the stack, and an ability granting this
@@ -1089,10 +1099,11 @@ castSpellWith applied pid oid name facing = do
 -- `spending` is CR 118.14's permission as it stood before the move, and it is
 -- taken as a VALUE for the reason `candidates` and `keywordsBefore` are: the
 -- object it was a fact about no longer exists.
-castProposed :: ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [Cost Keyword] -> GameState -> Game ()
-castProposed spending pid sid face castFrom keywordsBefore candidates before = do
+castProposed :: ManaSpending -> PlayerId -> ObjectId -> Face.Face Card.Type.Card -> Maybe Zone.Zone -> Set Keyword -> [CandidateCost.CandidateCost] -> GameState -> Game ()
+castProposed spending pid sid face castFrom keywordsBefore candidateCosts before = do
   gs <- State.get
-  let decider = Decide.deciderFor pid gs
+  let candidates = fmap CandidateCost.cost candidateCosts
+      decider = Decide.deciderFor pid gs
       modal = Face.spell face
       legal = Target.fillableModes (Just pid) sid (Card.enchantSlotMap face) modal gs
       -- CR 601.2e: an illegal proposal returns the game to the moment before the
@@ -1200,7 +1211,17 @@ castProposed spending pid sid face castFrom keywordsBefore candidates before = d
       -- takes the stamp with it along with the spell.
       Monad.when (Maybe.isJust kicked) (State.modify' (stampKicked sid))
       let withKicker candidate = maybe candidate (Cost.plus candidate) kicked
-          payable = filter (payableCost spending pid sid gs) (fmap withKicker entwinedCandidates)
+          -- The announced additional costs are folded into each candidate's
+          -- COST and never into its keyword: CR 702.33a's kicker and CR
+          -- 702.42a's entwine are paid ON TOP of whichever candidate was
+          -- chosen, so a kicked flashback cast is still the flashback cost
+          -- being paid (CR 118.9d sends an additional cost through an
+          -- alternative one unchanged).
+          payableCandidates =
+            filter
+              (payableCost spending pid sid gs . CandidateCost.cost)
+              (fmap (\candidate -> candidate {CandidateCost.cost = withKicker (withEntwine (CandidateCost.cost candidate))}) candidateCosts)
+          payable = fmap CandidateCost.cost payableCandidates
       if null payable
         then reject
         else do
@@ -1212,6 +1233,23 @@ castProposed spending pid sid face castFrom keywordsBefore candidates before = d
             else do
               let slots = Card.modesTargetSlots chosenModes face
                   sets = Target.legalSets (Just pid) sid slots gs
+                  -- WHICH of CR 601.2b's candidates the player just chose, as
+                  -- the keyword ability that offered it -- the record CR
+                  -- 702.34a's "if the flashback cost was paid" reads once the
+                  -- cast is complete. Recovered by matching the answer against
+                  -- the offered list rather than carried through the prompt,
+                  -- so the tag and the cost cannot come from different
+                  -- candidates.
+                  --
+                  -- The FIRST match, and two candidates can only tie by being
+                  -- the same cost: a player choosing between two identical
+                  -- costs is making no choice pawl or the rules can tell apart
+                  -- (CR 601.2b announces a cost, not a candidate). Aftermath is
+                  -- the one shape that ties -- CR 702.127a's candidate is the
+                  -- printed cost, which a CR 601.3 permission offers again --
+                  -- and its exile is conditioned on the ZONE rather than on
+                  -- this tag, so the tie changes no answer.
+                  castFor = CandidateCost.keyword =<< List.find ((== chosenCost) . CandidateCost.cost) payableCandidates
               -- CR 601.2b's announcement is free -- any Natural -- but the player
               -- making it is told what the board can pay. The bound rides the
               -- CHOSEN cost, and nothing filters the answer against it: an
@@ -1299,10 +1337,16 @@ castProposed spending pid sid face castFrom keywordsBefore candidates before = d
                         -- and CR 601.2 returns the game to before it was proposed
                         -- -- which is what takes the spell back off the stack.
                         Payment.Unpaid -> reject
-                        -- WHICH of the candidate costs was paid is not recorded
-                        -- past this point (#101). CR 702.33d's kicker designation
-                        -- is not that record: it says an additional cost was
-                        -- announced, never which candidate carried it.
+                        -- WHICH of the candidate costs was paid is `castFor`
+                        -- above, and it lives no longer than this announcement:
+                        -- the one rule that asks (CR 702.34a) asks as the cast
+                        -- completes, and armCastFromGraveyard turns the answer
+                        -- into a replacement effect that outlives it. CR
+                        -- 702.33d's kicker designation is a different record --
+                        -- it says an additional cost was announced, never which
+                        -- candidate carried it -- and is stamped on the object,
+                        -- because "if this spell was kicked" is read at
+                        -- resolution.
                         Payment.Paid -> do
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement
@@ -1354,7 +1398,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidates before = d
                                         (GameState.objects g)
                                   }
                             )
-                          Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid keywordsBefore sid)
+                          Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid keywordsBefore castFor sid)
                           -- CR 903.8: the cast is now announced, so this is a
                           -- "previous time they cast it from the command zone"
                           -- for every later one. Here rather than at CR 601.2a's
@@ -1380,18 +1424,25 @@ castProposed spending pid sid face castFrom keywordsBefore candidates before = d
 --
 -- ARMED HERE rather than re-derived from the card while the spell sits on the
 -- stack because CR 702.34a conditions the ability on "if the flashback cost was
--- paid", and nothing downstream records which cost was paid (#101). This is the
--- one point in the engine that knows: castSpell read the proposing zone one step
--- ahead of CR 601.2a's move, and Pawl.Engine.Cost.costsFor offers no candidate but
--- the flashback cost from a graveyard, so for every card in this pool the two
--- facts coincide. NOT the general rule -- a card cast from a graveyard under some
--- other permission would be exiled here when CR 702.34a says it should not be,
--- which is #101's gap.
+-- paid": this is the one point in the engine that knows, and `castFor` is the
+-- answer -- the keyword that offered the candidate CR 601.2b's announcement
+-- settled on, matched to the cost CR 601.2h then paid. Casting the same card
+-- from the same graveyard under a CR 601.3 permission that states no cost of
+-- its own pays an untagged candidate, and rule 702.34a's clause is not
+-- satisfied by it.
+--
+-- The answer is turned into a replacement effect HERE rather than stored on the
+-- spell, and that is the whole of what has to survive: the record is read once,
+-- as the cast completes, and CR 614.3's row it installs is what the leave-the-
+-- stack move consults later. A spell countered on the stack still leaves it and
+-- is still exiled by the row, which is rule 702.34a's "any time it would leave
+-- the stack"; a COPY of the spell is put onto the stack rather than cast (CR
+-- 707.10), so it never reaches this line and carries no row.
 --
 -- CR 614.3's `uses` is Once and its expiry is Never: a spell leaves the stack
 -- exactly once, and the ability has no duration.
-armCastFromGraveyard :: PlayerId -> Set Keyword -> ObjectId -> Game ()
-armCastFromGraveyard caster keywords spellId =
+armCastFromGraveyard :: PlayerId -> Set Keyword -> Maybe Keyword -> ObjectId -> Game ()
+armCastFromGraveyard caster keywords castFor spellId =
   let arm re = State.modify' $ \gs ->
         let (ts, gs1) = Game.freshTimestamp gs
             active =
@@ -1414,4 +1465,4 @@ armCastFromGraveyard caster keywords spellId =
                   ActiveReplacement.rider = Nothing
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
-   in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf keywords)
+   in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf keywords castFor)
