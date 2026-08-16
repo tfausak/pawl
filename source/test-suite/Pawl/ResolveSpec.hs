@@ -204,7 +204,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     Spec.assertEqWith
       s
       "one slot, two players"
-      (Target.legalSets Nothing S.noSource slots gs)
+      (Target.legalSets Nothing Map.empty S.noSource slots gs)
       (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
   Spec.it s "CR 115.4 CreatureTarget offers creatures but no players" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -261,7 +261,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     let (wallId, base) = S.addCreature wallOfStone S.bob (Setup.emptyGame S.bothPlayers)
         (pikerId, gs) = S.addCreature piker S.alice base
         slot = SlotName.MkSlotName (Text.pack "target")
-        legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
+        legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing Map.empty S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
     Spec.assertBool s (Set.member (Recipient.ToCreature wallId) legal) "the Wall is legal"
     Spec.assertBool s (not (Set.member (Recipient.ToCreature pikerId) legal)) "the non-Wall creature is not legal"
   -- The same "target Wall", against a Wall that Ashaya animated into a land
@@ -278,7 +278,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         (_, g2) = S.addCreature ashaya S.alice g1
         (_, gs) = S.addCreature bloodMoon S.alice g2
         slot = SlotName.MkSlotName (Text.pack "target")
-        legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
+        legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing Map.empty S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
     Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf wallId gs)) "it really is a Mountain"
     Spec.assertBool s (Projection.isCreatureOf wallId gs) "and still a creature (CR 305.7 removes no card types)"
     Spec.assertBool s (Set.member (Recipient.ToCreature wallId) legal) "so \"target Wall\" still offers it"
@@ -429,7 +429,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     Spec.assertEqWith
       s
       "source excluded from its own set"
-      (Target.legalSets Nothing srcId slots gs)
+      (Target.legalSets Nothing Map.empty srcId slots gs)
       (Map.singleton slot (Set.singleton (Recipient.ToCreature otherId)))
   -- The other half of the same claim: a slot carrying no Not IsSource does
   -- not exclude, so Prodigal Sorcerer may still ping itself (CR 115.4).
@@ -442,7 +442,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     Spec.assertEqWith
       s
       "source is its own legal target"
-      (Target.legalSets Nothing srcId slots gs)
+      (Target.legalSets Nothing Map.empty srcId slots gs)
       (Map.singleton slot (Set.singleton (Recipient.ToCreature srcId)))
   -- Gate cards for P9 Task 5: Terror and Reprisal. Both cards' printed text
   -- ends "It can't be regenerated."; regeneration is not modelled (no
@@ -4232,7 +4232,7 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
     -- a candidate list nothing consumed proves nothing.
     let candidates = case Activate.abilitiesFor mirrorId board of
           [ability] -> case Seq.lookup 0 (Modal.modes (ActivatedAbility.modal ability)) of
-            Just mode -> Map.elems (Target.legalSets (Just S.alice) mirrorId (Mode.targetSlots mode) board)
+            Just mode -> Map.elems (Target.legalSets (Just S.alice) Map.empty mirrorId (Mode.targetSlots mode) board)
             Nothing -> []
           _ -> []
     Spec.assertEqWith s "both opponents are candidates, alice is not" candidates [Set.fromList [Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol]]

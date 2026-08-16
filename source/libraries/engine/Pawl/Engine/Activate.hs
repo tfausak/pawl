@@ -430,7 +430,7 @@ activatableGiven grants pcs pools sources pid srcId ability gs =
     && restrictionsOk pid ability gs
     && loyaltyOk pid srcId ability gs
     && Modal.selectionPossible
-      (Target.fillableModesGiven pcs grants pools (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
+      (Target.fillableModesGiven pcs grants pools (Just pid) Map.empty srcId Map.empty (ActivatedAbility.modal ability) gs)
       (Modal.Type.selection (ActivatedAbility.modal ability))
     && payableCostGiven sources pcs pid srcId gs (ActivatedAbility.cost ability)
 
@@ -529,7 +529,7 @@ activateAbility pid srcId ability = do
       -- one answer is FORCED, unprompted -- every single-mode ability is exactly
       -- {ModeIndex 0}. A real choice issues ChooseModes. Modal.forcedSelection is
       -- what tells the two apart, CR 700.2d's exception included.
-      legal = Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs
+      legal = Target.fillableModes (Just pid) Map.empty srcId Map.empty (ActivatedAbility.modal ability) gs
       selection = Modal.Type.selection (ActivatedAbility.modal ability)
   State.put onStack
   -- Sorted on the way in, for the reason Cast.castProposed gives: printed order
@@ -609,7 +609,7 @@ activateAbility pid srcId ability = do
           let gathered = Cost.activationAdjustments pid srcId gs
           announcedCost <- Cost.announce ManaSpending.AsProduced pid srcId (Cost.totalManas gathered) (Cost.plusComponents gathered announcedAtX)
           let slots = Modal.modesTargetSlots chosenModes (ActivatedAbility.modal ability)
-              sets = Target.legalSets (Just pid) srcId slots gs
+              sets = Target.legalSets (Just pid) Map.empty srcId slots gs
           chosen <- Target.chooseTargets decider pid abilId slots sets
           if not (Target.selectionLegal (Just pid) srcId slots sets chosen gs)
             then State.put before -- reject: the whole activation is a no-op

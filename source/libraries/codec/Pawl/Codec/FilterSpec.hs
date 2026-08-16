@@ -187,6 +187,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.IsBound (SlotName.MkSlotName (Text.pack "looked")))
       """ {"type":"IsBound","value":"looked"} """
+  Spec.it s "SameNameAsBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.SameNameAsBound (SlotName.MkSlotName (Text.pack "castSpell")))
+      """ {"type":"SameNameAsBound","value":"castSpell"} """
   Spec.it s "IsAttacking" $
     Common.assertCodec
       s

@@ -2990,6 +2990,9 @@ filterReads f = case f of
   -- characteristics and no CR 613 layer writes -- IsSource's answer, and for its
   -- reason.
   Filter.Type.IsBound _ -> Set.empty
+  -- Reads NAMES at both ends, which HasName above already declares no aspect for
+  -- and for that atom's reason: no Modification writes one.
+  Filter.Type.SameNameAsBound _ -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   -- Reads a CONTROLLER rather than a characteristic (CR 109.3 lists none), so it
   -- declares nothing -- IsPlayer's answer, and ControlledBy's.

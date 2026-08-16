@@ -5,6 +5,7 @@
 -- summoning sickness.
 module Pawl.CastSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -66,6 +67,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -1315,7 +1317,7 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
     Spec.assertEqWith
       s
       "its legal set is the one creature"
-      (Target.legalSets Nothing spellId slots gs)
+      (Target.legalSets Nothing Map.empty spellId slots gs)
       (Map.singleton Card.enchantSlot (Set.singleton (Recipient.ToCreature creature)))
   -- CR 601.2c: a spell whose required target has no legal choice cannot be
   -- cast at all. Reading only Mode.targetSlots would call this castable and
@@ -1614,12 +1616,13 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
 -- left off, and the rider is exactly why the pool's own printing cannot observe
 -- this: with it, the right answer and the wrong answer are both exile.
 --
--- The real printing is Harness the Storm ({2}{R} Enchantment, "Whenever you cast
--- an instant or sorcery spell from your hand, you may cast target card with the
--- same name as that spell from your graveyard"), and pawl cannot yet write it:
--- Pawl.Types.SpellCast has no zone axis for "from your hand" (#1613) and
--- Pawl.Types.Filter cannot compare names (#1614). It replaces this synthetic
--- when they land.
+-- Harness the Storm ({2}{R} Enchantment, "Whenever you cast an instant or sorcery
+-- spell from your hand, you may cast target card with the same name as that spell
+-- from your graveyard") is now in the pool and does NOT replace this synthetic,
+-- which is worth writing down because it reads as though it should. That card's
+-- clause is an Effect.OfferCast -- CR 601.3's "effect" giving ONE cast during a
+-- resolution -- so it never reaches PlayerEffect.CastFromGraveyard, the standing
+-- permission this group is about. See harnessTheStormSpec below.
 --
 -- The pair of boards is ONE board and two answerers, so mana, seats, timing and
 -- stock cannot be the difference: the permission and the flashback cost are both
@@ -1664,6 +1667,84 @@ graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
     Spec.assertEqWith s "the printed-cost cast dealt its 2 as well" (S.lifeOf S.alice boughtBack) (Just 18)
     Spec.assertEqWith s "and the card was NOT exiled, since the flashback cost was not paid" (boltsIn Zone.Exile boughtBack) 0
     Spec.assertEqWith s "it went to the graveyard" (boltsIn Zone.Graveyard boughtBack) 1
+
+-- Harness the Storm {2}{R} Enchantment (data/cards/harness-the-storm.json):
+-- "Whenever you cast an instant or sorcery spell from your hand, you may cast
+-- target card with the same name as that spell from your graveyard."
+--
+-- Two axes at once, and they are the two the card needs that nothing else in the
+-- pool asks for: CR 601.2a's ZONE on the trigger condition
+-- (Pawl.Types.SpellCast.zone) and CR 709.4a's name comparison against a bound
+-- object on the target slot (Filter.SameNameAsBound over Binding.castSpell).
+--
+-- ONE BOARD, TWO CASTS. Both cases below build exactly the same state -- six
+-- Mountains, the enchantment, two Firebolts and a Lightning Bolt in the
+-- graveyard, a third Firebolt in hand -- and differ only in WHICH Firebolt is
+-- cast, which is to say only in the zone it was cast from. So the negative
+-- cannot be turning on mana, timing, seats or an empty target set: the
+-- graveyard's other Firebolt would be a legal target if the trigger fired.
+--
+-- The Lightning Bolt is the name decoy: also alice's, also in the graveyard,
+-- also a one-mana red damage spell, so the ONLY axis separating it from a
+-- Firebolt is CR 201.2's name. Two Firebolts rather than one because a
+-- one-candidate slot is answered without a prompt at all, and because a set
+-- assertion over a single member cannot tell "matched by name" from "matched
+-- everything the pool held".
+harnessBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId])
+harnessBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  firebolt <- S.printingOf s registry "Firebolt"
+  bolt <- S.printingOf s registry "Lightning Bolt"
+  harness <- S.printingOf s registry "Harness the Storm"
+  let (_, g1) = S.addCreature harness S.alice (S.landsInPlay mountain 6)
+      (buried1, g2) = S.addGraveyardCard firebolt S.alice g1
+      (buried2, g3) = S.addGraveyardCard firebolt S.alice g2
+      (_, g4) = S.addGraveyardCard bolt S.alice g3
+      (inHand, g5) = S.addHandCard firebolt S.alice g4
+  pure (aliceOnTurn g5, inHand, buried1, [buried1, buried2])
+
+-- Records what Harness the Storm's own slot was offered and which casts it went
+-- on to offer, taking every offer. The recording is the point: what a cast FINDS
+-- cannot tell a candidate set computed by name from one that admitted every card
+-- in the graveyard.
+harnessAnswer :: Prompt.Prompt r -> State.State ([Set.Set Recipient.Recipient], [CardName.CardName]) r
+harnessAnswer p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> do
+    Monad.forM_
+      (Map.lookup (SlotName.MkSlotName (Text.pack "twin")) sets)
+      (\(_, rs) -> State.modify' (\(ts, os) -> (ts <> [rs], os)))
+    pure (S.identityAnswer p)
+  Prompt.OfferedCast _ _ _ name -> do
+    State.modify' (\(ts, os) -> (ts, os <> [name]))
+    pure OptionalDecision.Exercises
+  _ -> pure (S.identityAnswer p)
+
+runHarness :: GameState.GameState -> ObjectId.ObjectId -> ([Set.Set Recipient.Recipient], [CardName.CardName])
+runHarness gs oid = snd (State.runState (Engine.runGame harnessAnswer gs (do S.cast S.alice oid; Engine.priorityLoop)) ([], []))
+
+harnessTheStormSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+harnessTheStormSpec s registry = Spec.describe s "HarnessTheStorm" $ do
+  Spec.it s "CR 201.2 the trigger's slot offers the same-named graveyard cards and no other" $ do
+    (board, inHand, _, buried) <- harnessBoard s registry
+    let (offered, offers) = runHarness board inHand
+    Spec.assertEqWith s "alice's graveyard held three cards" (length (Game.zoneMembers Zone.Graveyard S.alice board)) 3
+    -- Identity, not count. The Lightning Bolt is in the same graveyard, is the
+    -- same colour and costs the same, so a filter reading anything but the name
+    -- puts it in this set.
+    Spec.assertEqWith s "both Firebolts, and not the Lightning Bolt" offered [Set.fromList (fmap Recipient.ToObject buried)]
+    -- CR 601.3: the offer IS the permission, so a Firebolt with no flashback
+    -- would be cast this way just the same -- and the cast it makes is from the
+    -- GRAVEYARD, which the trigger does not watch, so exactly one offer is made
+    -- rather than a chain.
+    Spec.assertEqWith s "one cast offered, of the named card" offers [CardName.MkCardName (Text.pack "Firebolt")]
+  Spec.it s "CR 601.2a the same board casting the same card from the GRAVEYARD does not trigger" $ do
+    -- The pair. Everything is the board above; only the cast Firebolt's zone
+    -- moves, and it is affordable there because rule 702.34a's flashback {4}{R}
+    -- is within the same six Mountains.
+    (board, _, fromGraveyard, _) <- harnessBoard s registry
+    let (offered, offers) = runHarness board fromGraveyard
+    Spec.assertEqWith s "the trigger's slot was never offered" offered []
+    Spec.assertEqWith s "and no cast was offered" offers []
 
 flashbackCardTypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
@@ -2838,6 +2919,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   flashbackCardTypeSpec s registry
   grantedFlashbackSpec s registry
   graveRecitalSpec s registry
+  harnessTheStormSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry

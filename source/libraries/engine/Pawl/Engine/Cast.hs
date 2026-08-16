@@ -189,7 +189,7 @@ targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
     let modal = Face.spell face
-     in Modal.selectionPossible (Target.fillableModes (Just pid) oid (Card.enchantSlotMap face) modal gs) (Modal.Type.selection modal)
+     in Modal.selectionPossible (Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs) (Modal.Type.selection modal)
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -311,7 +311,7 @@ entwineOffer spending pid oid candidates gs = case Game.faceOf oid gs of
   Just face -> do
     cost <- Keyword.entwineCost (Face.keywords face)
     let modal = Face.spell face
-        legal = Target.fillableModes (Just pid) oid (Card.enchantSlotMap face) modal gs
+        legal = Target.fillableModes (Just pid) Map.empty oid (Card.enchantSlotMap face) modal gs
     Monad.guard (Natural.length legal == Modal.modeCount modal)
     Monad.guard (any (\candidate -> payableCost spending pid oid gs (Cost.plus candidate cost)) candidates)
     pure cost
@@ -1105,7 +1105,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
   let candidates = fmap CandidateCost.cost candidateCosts
       decider = Decide.deciderFor pid gs
       modal = Face.spell face
-      legal = Target.fillableModes (Just pid) sid (Card.enchantSlotMap face) modal gs
+      legal = Target.fillableModes (Just pid) Map.empty sid (Card.enchantSlotMap face) modal gs
       -- CR 601.2e: an illegal proposal returns the game to the moment before the
       -- casting was proposed, which is the state before CR 601.2a's move. CR
       -- 601.6 says the same for a permission lost after the proposal completes.
@@ -1232,7 +1232,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
             then reject
             else do
               let slots = Card.modesTargetSlots chosenModes face
-                  sets = Target.legalSets (Just pid) sid slots gs
+                  sets = Target.legalSets (Just pid) Map.empty sid slots gs
                   -- WHICH of CR 601.2b's candidates the player just chose, as
                   -- the keyword ability that offered it -- the record CR
                   -- 702.34a's "if the flashback cost was paid" reads once the

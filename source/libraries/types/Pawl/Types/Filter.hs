@@ -302,6 +302,24 @@ data Filter keyword
     -- out of it, and a slot bound to a GROUP never enters it (#1532). That is
     -- the posture every context-relative atom here takes.
     IsBound SlotName.SlotName
+  | -- | CR 201.2 / 709.4a asked of TWO objects: the candidate shares a name with
+    -- the object the resolution bound in this slot -- Harness the Storm's "target
+    -- card with the same name as that spell", where the slot is the cast spell
+    -- the trigger bound.
+    --
+    -- HasName's context-relative sibling, standing to it as IsBound stands to
+    -- IsSource: that atom carries the name and this one reads it off
+    -- Pawl.Engine.Filter.Context, which is where the board-holding caller puts
+    -- the bound object's names.
+    --
+    -- SHARES A NAME, not "has the same set of names": CR 709.4a's test is
+    -- membership at both ends, so an object showing two names has the same name
+    -- as one showing either. Set INTERSECTION is that said once.
+    --
+    -- Vacuously False where the slot names no object, or where the bound object
+    -- has no name at all (CR 708.2a's face-down object) -- the posture IsBound
+    -- above takes, and the answer CR 709.4a itself gives for a nameless object.
+    SameNameAsBound SlotName.SlotName
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
     -- "target opponent". Context-relative like ControlledBy, but separate from it
     -- rather than a reuse, because ControlledBy asks who controls an OBJECT
