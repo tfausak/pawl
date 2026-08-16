@@ -2,6 +2,8 @@
 
 module Pawl.Codec.StaticAbility where
 
+import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Duration as Duration
@@ -23,12 +25,12 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 --
 -- The wire format is unchanged by the conversion to a bundle; what it adds is
 -- the schema.
-codec :: Codec.Codec StaticAbility.StaticAbility
-codec = Fields.object $ do
+codec :: (Typeable.Typeable card, Eq card) => Codec.Codec card -> Codec.Codec (StaticAbility.StaticAbility card)
+codec cardCodec = Fields.object $ do
   affected <- Fields.required "affected" Affected.codec StaticAbility.affected
   condition <- Fields.defaulted "condition" Nothing (Common.maybe Condition.codec) StaticAbility.condition
   lingers <- Fields.defaulted "lingers" Nothing (Common.maybe Duration.codec) StaticAbility.lingers
-  modifications <- Fields.required "modifications" (Common.nonEmpty Modification.codec) StaticAbility.modifications
+  modifications <- Fields.required "modifications" (Common.nonEmpty (Modification.codec (ActivatedAbility.codec cardCodec))) StaticAbility.modifications
   pure
     StaticAbility.MkStaticAbility
       { StaticAbility.affected = affected,

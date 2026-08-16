@@ -2579,7 +2579,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                         { ContinuousEffect.source = source,
                           ContinuousEffect.timestamp = ts,
                           ContinuousEffect.expiry = expiry,
-                          ContinuousEffect.modification = frozen,
+                          -- CR 611.2: what a resolution stores is the narrow
+                          -- (grantless) modification, widened to the type the
+                          -- projection reads. See Projection.widenModification.
+                          ContinuousEffect.modification = Projection.widenModification frozen,
                           ContinuousEffect.affected = Affected.TheseObjects (Set.fromList targets)
                         }
                  in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}

@@ -126,6 +126,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   unflooredActivationCostReductionSpec s registry
   activationCostAdditionSpec s registry
   goldenEggSpec s registry
+  presenceOfGondSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -2547,6 +2548,185 @@ activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition"
 -- with -- Pawl.CostSpec's asmorFoodSpec is where that cost is exercised, and
 -- this group is the Egg's own three clauses, so a transcription short of the
 -- printing fails here rather than passing unnoticed.
+-- CR 613.1f layer 6, the ability-GRANTING half: Presence of Gond ({2}{G}
+-- Enchantment -- Aura, "Enchant creature. Enchanted creature has '{T}: Create a
+-- 1/1 green Elf Warrior creature token.'", checked against Scryfall) is the
+-- smallest card that hands another object a whole quoted ability.
+--
+-- Three seats, and the two that matter are DIFFERENT players: alice controls the
+-- Aura, bob controls the enchanted Prodigal Sorcerer, carol is the third. So
+-- every claim about whose ability it is has a way to come out wrong. CR 303.4e
+-- is explicit about this exact case: "if the Aura grants an ability to the
+-- enchanted object (with 'gains' or 'has'), the enchanted object's controller is
+-- the only one who can activate that ability". CR 113.7 makes the enchanted
+-- creature the ability's source and CR 113.8 makes bob its controller, so the
+-- token is bob's.
+--
+-- The Sorcerer is the receiver because it PRINTS an activated ability of its own
+-- ("{T}: This creature deals 1 damage to any target"), so the granted one has to
+-- be told apart from an ability the creature already had, from the Aura's own,
+-- and from nothing at all.
+presenceOfGondSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+presenceOfGondSpec s registry = Spec.describe s "Presence of Gond" $ do
+  Spec.it s "CR 613.1f the enchanted creature has the granted ability ALONGSIDE its printed one" $ do
+    gond <- S.printingOf s registry "Presence of Gond"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (_, sorcererId, enchanted) = gondBoard gond sorcerer True
+        (_, unenchantedId, unenchanted) = gondBoard gond sorcerer False
+    Spec.assertEqWith s "unenchanted: the printed ability alone" (Projection.abilitiesOf unenchantedId unenchanted) [theAbility sorcerer]
+    Spec.assertEqWith s "enchanted: two abilities" (length (Projection.abilitiesOf sorcererId enchanted)) 2
+    Spec.assertBool s (elem (theAbility sorcerer) (Projection.abilitiesOf sorcererId enchanted)) "the printed one survives the grant"
+    Spec.assertBool s (grantedAbility sorcerer sorcererId enchanted /= Just (theAbility sorcerer)) "and the second one is not it"
+
+  -- CR 303.4e / 113.7: the Aura holds the TEXT, never the ability. Presence of
+  -- Gond prints no activated ability of its own, so tapping the Aura is not a
+  -- thing any player may do.
+  Spec.it s "CR 113.7 the Aura itself does not have the ability it grants" $ do
+    gond <- S.printingOf s registry "Presence of Gond"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (gondId, _, enchanted) = gondBoard gond sorcerer True
+    Spec.assertEqWith s "no ability on the granter" (Projection.abilitiesOf gondId enchanted) []
+    Spec.assertEqWith s "and none offered to its controller" (activationsOf gondId (Action.legalActions S.alice enchanted)) []
+
+  -- The gameplay-level proof. bob activates the granted ability and the stack
+  -- resolves: the token is bob's, and the {T} that paid for it tapped BOB'S
+  -- CREATURE rather than alice's Aura. Both are what make the ability the
+  -- receiver's rather than the granter's.
+  Spec.it s "CR 303.4e whole card: the granted {T} taps the enchanted creature and its controller gets the token" $ do
+    gond <- S.printingOf s registry "Presence of Gond"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (gondId, sorcererId, enchanted) = gondBoard gond sorcerer True
+    case grantedAbility sorcerer sorcererId enchanted of
+      Nothing -> Spec.assertFailure s "the fixture should have granted an ability"
+      Just granted -> do
+        let activated = snd (Engine.runGamePure S.identityAnswer enchanted (Activate.activateAbility S.bob sorcererId granted))
+            resolved = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+            tokens = S.tokensOf resolved
+        Spec.assertBool s (any (\a -> case a of A.Activate _ ab -> ab == granted; _ -> False) (activationsOf sorcererId (Action.legalActions S.bob enchanted))) "the granted ability is offered to bob"
+        Spec.assertEqWith s "and not to the Aura's controller" (activationsOf sorcererId (Action.legalActions S.alice enchanted)) []
+        Spec.assertEqWith s "one token" (length tokens) 1
+        mapM_ (\oid -> Spec.assertEqWith s "controlled by bob, not by the Aura's controller" (Projection.controllerOf oid resolved) (Just S.bob)) tokens
+        mapM_ (\oid -> Spec.assertEqWith s "a 1/1" (Projection.powerOf oid resolved, Projection.toughnessOf oid resolved) (Just 1, Just 1)) tokens
+        mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf oid resolved) (Set.fromList [Subtype.Elf, Subtype.Warrior])) tokens
+        mapM_ (\oid -> Spec.assertEqWith s "green" (Projection.colorsOf oid resolved) (Set.singleton Color.Green)) tokens
+        Spec.assertEqWith s "the enchanted creature paid the {T}" (fmap Object.tapped (Game.lookupObject sorcererId resolved)) (Just TapState.Tapped)
+        Spec.assertEqWith s "the Aura did not" (fmap Object.tapped (Game.lookupObject gondId resolved)) (Just TapState.Untapped)
+
+  -- CR 613.1f puts the grant and Humility's strip in the SAME layer, so CR 613.7
+  -- timestamp order alone decides. This is the pair, differing in nothing but
+  -- which permanent arrived first -- and the granted ability is what the two
+  -- boards disagree about, since Humility strips the Sorcerer's printed one
+  -- either way.
+  Spec.it s "CR 613.7 Humility BEFORE the Aura leaves the granted ability standing" $ do
+    gond <- S.printingOf s registry "Presence of Gond"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    humility <- S.printingOf s registry "Humility"
+    let (_, sorcererId, board) = gondBoardUnder (Just Before) gond sorcerer humility
+    Spec.assertEqWith s "the printed ability is gone, the granted one is not" (length (Projection.abilitiesOf sorcererId board)) 1
+    Spec.assertBool s (notElem (theAbility sorcerer) (Projection.abilitiesOf sorcererId board)) "and what is left is not the printed one"
+
+  Spec.it s "CR 613.7 Humility AFTER the Aura takes the granted ability with the rest" $ do
+    gond <- S.printingOf s registry "Presence of Gond"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    humility <- S.printingOf s registry "Humility"
+    let (_, sorcererId, board) = gondBoardUnder (Just After) gond sorcerer humility
+    Spec.assertEqWith s "no abilities at all" (Projection.abilitiesOf sorcererId board) []
+
+  -- CR 612.1/612.2a reaching INSIDE the quoted ability: the words are printed on
+  -- the Aura, so a text change affecting the AURA rewrites them, and the layer-3
+  -- swap runs before the layer-6 grant hands them over. Artificial Evolution's
+  -- "Change the text of target spell or permanent by replacing all instances of
+  -- one creature type with another" (checked against Scryfall) aimed at Presence
+  -- of Gond turns the Elf Warrior it mints into a Goblin Warrior -- name and
+  -- type line both, which is CR 612.2a's whole-card clause.
+  --
+  -- The unevolved half is the control, on the same board bar the Evolution.
+  Spec.it s "CR 612.2a an unevolved Presence of Gond's granted ability mints an Elf Warrior Token" $ do
+    (tokens, after) <- gondEvolvedChain s registry Nothing
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Elf, Subtype.Warrior])) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Elf Warrior Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Warrior Token")))) tokens
+
+  Spec.it s "CR 612.2a an evolved Presence of Gond's granted ability mints a Goblin Warrior Token" $ do
+    (tokens, after) <- gondEvolvedChain s registry (Just (Subtype.Elf, Subtype.Goblin))
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Goblin Warrior" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Goblin, Subtype.Warrior])) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Goblin Warrior Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Warrior Token")))) tokens
+
+-- alice's Aura, bob's settled Prodigal Sorcerer, carol as the third seat. The
+-- two boards this builds differ in exactly one thing: whether the Aura is
+-- attached (CR 303.4m is what Affected.Attached reads).
+gondBoard :: Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+gondBoard gond sorcerer attached =
+  let (sorcererId, g0) = S.addCreature sorcerer S.bob S.threePlayerGame
+      -- CR 302.6: bob's creature has to have settled before its {T} is payable,
+      -- and the granted ability's tap cost is the receiver's to pay.
+      settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
+      (gondId, g1) = S.addCreature gond S.alice settled
+      g2 = if attached then S.attach gondId sorcererId g1 else g1
+   in (gondId, sorcererId, g2 {GameState.priority = Just S.bob})
+
+-- Which side of the Aura's timestamp Humility lands on (CR 613.7).
+data HumilityOrder = Before | After
+
+-- gondBoard with a Humility, placed either side of the Aura. Nothing but the
+-- placement differs between the two boards.
+gondBoardUnder :: Maybe HumilityOrder -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+gondBoardUnder order gond sorcerer humility =
+  let (sorcererId, g0) = S.addCreature sorcerer S.bob S.threePlayerGame
+      settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
+      early = case order of
+        Just Before -> S.withHumility humility settled
+        _ -> settled
+      (gondId, g1) = S.addCreature gond S.alice early
+      late = case order of
+        Just After -> S.withHumility humility g1
+        _ -> g1
+   in (gondId, sorcererId, (S.attach gondId sorcererId late) {GameState.priority = Just S.bob})
+
+-- alice's Island and Presence of Gond, bob's settled Prodigal Sorcerer, the Aura
+-- attached; optionally an Artificial Evolution resolved AT THE AURA first. Then
+-- bob activates the granted ability and it resolves. Returns the tokens and the
+-- final state.
+gondEvolvedChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m ([ObjectId.ObjectId], GameState.GameState)
+gondEvolvedChain s registry swap = do
+  island <- S.printingOf s registry "Island"
+  gond <- S.printingOf s registry "Presence of Gond"
+  sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+  evolution <- S.printingOf s registry "Artificial Evolution"
+  let (sorcererId, g0) = S.addCreature sorcerer S.bob (S.landsFor island S.alice 1 S.threePlayerGame)
+      settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
+      (gondId, g1) = S.addCreature gond S.alice settled
+      (evolutionId, g2) = S.addHandCard evolution S.alice (S.attach gondId sorcererId g1)
+      evolved = case swap of
+        Nothing -> g2
+        Just (from, to) ->
+          S.runPure (evolveAt gondId from to) g2 $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      ready = evolved {GameState.priority = Just S.bob}
+      after = case grantedAbility sorcerer sorcererId ready of
+        Nothing -> ready
+        Just granted ->
+          S.runPure S.identityAnswer ready $ do
+            Activate.activateAbility S.bob sorcererId granted
+            Stack.resolveTop
+  pure (S.tokensOf after, after)
+
+-- Aims every target set at one object and answers the creature-type swap, the
+-- Pawl.ResolveSpec helper of the same name.
+evolveAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+evolveAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- The one ability on the object that the printing did not print: the grant.
+grantedAbility :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+grantedAbility printed oid gs = case filter (/= theAbility printed) (Projection.abilitiesOf oid gs) of
+  ability : _ -> Just ability
+  [] -> Nothing
+
 goldenEggSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 goldenEggSpec s registry = Spec.describe s "Golden Egg" $ do
   -- The clause every Food shares, and the one that makes the Egg a real card

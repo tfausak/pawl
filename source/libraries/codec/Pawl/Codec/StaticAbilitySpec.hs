@@ -3,6 +3,7 @@
 module Pawl.Codec.StaticAbilitySpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Text as Text
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
@@ -27,20 +28,26 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
+-- | The `card` parameter is instantiated at 'Text.Text', the posture
+-- 'Pawl.Codec.ActivatedAbilitySpec' takes: it is reached only through the
+-- supplied card codec, so any type proves the shape.
+codec :: Codec.Codec (StaticAbility.StaticAbility Text.Text)
+codec = StaticAbility.codec Common.text
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
   -- A single-part static ability, e.g. a keyword granter.
   Spec.it s "one part" $
     Common.assertCodec
       s
-      StaticAbility.codec
+      codec
       (StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
       """ {"affected":{"type":"Attached"},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- Humility's shape: several parts under one affected set (CR 613.6).
   Spec.it s "several parts" $
     Common.assertCodec
       s
-      StaticAbility.codec
+      codec
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           Nothing
@@ -55,7 +62,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
   Spec.it s "an as-long-as condition" $
     Common.assertCodec
       s
-      StaticAbility.codec
+      codec
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           ( Just
@@ -77,7 +84,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
   Spec.it s "a leaves-the-battlefield duration" $
     Common.assertCodec
       s
-      StaticAbility.codec
+      codec
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           Nothing
@@ -96,9 +103,9 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           (const True)
           (const False)
           ( Codec.decode
-              StaticAbility.codec
+              codec
               (Value.object [Value.pair "affected" (Common.tagged "Attached" Nothing), Value.pair "modifications" (Value.array [])])
           )
       )
       "an empty array does not decode"
-  Spec.it s "has a schema" $ Common.assertHasSchema s StaticAbility.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s codec

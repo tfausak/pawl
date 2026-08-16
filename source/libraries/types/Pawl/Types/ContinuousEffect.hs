@@ -1,5 +1,6 @@
 module Pawl.Types.ContinuousEffect where
 
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Modification as Modification
@@ -19,11 +20,16 @@ import qualified Pawl.Types.Timestamp as Timestamp
 -- Pawl.Engine.Event hands over as the permanent goes. Such an effect keeps the
 -- timestamp CR 613.7a gave it rather than taking a fresh one, since the card
 -- says it is the same effect continuing.
-data ContinuousEffect = MkContinuousEffect
+--
+-- Parametric in `card` for Pawl.Types.StaticAbility's reason, and instantiated at
+-- the SAME width: the lingers clause hands a static ability's own modification
+-- over here, so this position has to hold a granted ability. What a RESOLUTION
+-- stores arrives narrower (Pawl.Types.ModifyTarget) and is widened on the way in.
+data ContinuousEffect card = MkContinuousEffect
   { source :: ObjectId.ObjectId,
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
-    modification :: Modification.Modification,
+    modification :: Modification.Modification (ActivatedAbility.ActivatedAbility card),
     affected :: Affected.Affected
   }
   deriving (Eq, Ord, Show)

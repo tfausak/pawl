@@ -7,6 +7,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Daytime as Daytime
@@ -213,7 +214,7 @@ data GameState = MkGameState
     -- | CR 611.2: stored continuous effects from resolutions (Giant Growth,
     -- Serpent's Gift), each with an expiry the Pawl.Engine.Expiry sweeps consult.
     -- Static-ability effects are NOT here -- the projection re-derives those live.
-    continuousEffects :: [ContinuousEffect.ContinuousEffect],
+    continuousEffects :: [ContinuousEffect.ContinuousEffect Card.Card],
     -- | CR 614.3 / 615.3: floating replacement effects from resolutions (Fog's
     -- prevention, Drudge Skeletons' regeneration shield), each with an expiry the
     -- Pawl.Engine.Expiry sweeps consult (CR 514.2) and a use count (CR 614.3).

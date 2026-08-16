@@ -81,7 +81,7 @@ codec cardCodec = Fields.object $ do
   keywords <- Fields.defaulted "keywords" Set.empty (Common.set Keyword.codec) Face.keywords
   colorIndicator <- Fields.defaulted "colorIndicator" Set.empty (Common.set Color.codec) Face.colorIndicator
   spell <- Fields.defaulted "spell" Face.defaultSpell (Modal.codec cardCodec) Face.spell
-  staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list StaticAbility.codec) Face.staticAbilities
+  staticAbilities <- Fields.defaulted "staticAbilities" [] (Common.list (StaticAbility.codec cardCodec)) Face.staticAbilities
   activatedAbilities <- Fields.defaulted "activatedAbilities" [] (Common.list (ActivatedAbility.codec cardCodec)) Face.activatedAbilities
   replacementEffects <- Fields.defaulted "replacementEffects" [] (Common.list (PrintedReplacement.codec (Effect.codec cardCodec))) Face.replacementEffects
   triggeredAbilities <- Fields.defaulted "triggeredAbilities" [] (Common.list (TriggeredAbility.codec cardCodec)) Face.triggeredAbilities
