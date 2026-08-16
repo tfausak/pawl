@@ -1879,7 +1879,10 @@ prowess =
         TriggerCondition.SpellCast
           SpellCast.MkSpellCast
             { SpellCast.filter = Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Not (Filter.HasCardType CardType.Creature)],
-              SpellCast.scope = TurnScope.EachTurn
+              SpellCast.scope = TurnScope.EachTurn,
+              -- CR 702.108a names no zone: prowess triggers on a noncreature
+              -- spell cast from anywhere.
+              SpellCast.zone = Nothing
             },
       TriggeredAbility.modal =
         Modal.MkModal

@@ -1396,11 +1396,18 @@ data Effect card
     -- "then you may cast it transformed without paying its mana cost" is the
     -- producer, and the CastOffer is that sentence's two riders.
     --
-    -- The slot is a READ, not a definition, and the one it reads is normally
-    -- bound by a MoveToZone earlier in the same instruction list -- rule 310.12b's
-    -- "exile it, THEN you may cast it" is one sentence about two incarnations of
-    -- one card (CR 400.7). Resolve reads it off the resolving object's LIVE
-    -- bindings for that reason, the way Sacrifice reads a group slot.
+    -- The slot is a READ, not a definition, and it may be filled either way.
+    -- CR 310.12b's "exile it, THEN you may cast it" binds it with a MoveToZone
+    -- earlier in the same instruction list, one sentence about two incarnations
+    -- of one card (CR 400.7); Harness the Storm's "you may cast TARGET card ...
+    -- from your graveyard" fills it at CR 601.2c instead. Resolve reads it off
+    -- the resolving object's LIVE bindings either way, as Sacrifice reads a group
+    -- slot.
+    --
+    -- CR 601.3's permission comes from the offer ITSELF, which is what lets the
+    -- second of those reach a graveyard with no standing permission in sight:
+    -- Cast.castableWhenOffered asks the prohibitions and the cost and never asks
+    -- the zone.
     --
     -- An OFFER and not a cast: CR 601.2b's own announcements still belong to the
     -- player, and the "may" ahead of them is asked first (Prompt.OfferedCast).

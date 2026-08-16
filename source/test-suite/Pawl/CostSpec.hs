@@ -967,12 +967,10 @@ asmorBoard swamp asmorPrinting vultures =
 -- doesn't allow you to discard cards" -- which together are CR 118.6a's second
 -- sentence and nothing else.
 --
--- Not implemented: the enters-the-battlefield tutor, which needs a Filter that
--- names a card by name (#1228). That ability would only ever help the
--- controller, so pawl's card is stricter than the printing rather than weaker.
---
--- "Sacrifice two Foods: Target creature deals 6 damage to itself" IS
--- transcribed, and asmorFoodSpec below is what exercises it.
+-- Both of its other abilities are transcribed too: the enters-the-battlefield
+-- tutor, whose Filter.HasName is proved by Pawl.ResolveSpec's
+-- TheUnderworldCookbook group, and "Sacrifice two Foods: Target creature deals 6
+-- damage to itself", which asmorFoodSpec below exercises.
 asmorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 asmorSpec s registry =
   Spec.describe s "Asmoranomardicadaistinaculdacar" $ do

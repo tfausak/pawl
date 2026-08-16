@@ -353,7 +353,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Or [Filter.HasCardType CardType.Instant, Filter.HasCardType CardType.Sorcery]]) TurnScope.EachTurn))
+      (TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Or [Filter.HasCardType CardType.Instant, Filter.HasCardType CardType.Sorcery]]) TurnScope.EachTurn Nothing))
       """ {"type":"SpellCast","value":{"filter":{"type":"And","value":[{"type":"ControlledBy","value":{"type":"You"}},{"type":"Or","value":[{"type":"HasCardType","value":{"type":"Instant"}},{"type":"HasCardType","value":{"type":"Sorcery"}}]}]},"scope":{"type":"EachTurn"}}} """
   -- The other half moved on its own, over the plainest Filter there is: Brineborn
   -- Cutthroat's "during an opponent's turn", which no Filter could have said.
@@ -361,7 +361,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
     Common.assertCodec
       s
       TriggerCondition.codec
-      (TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.ControlledBy PlayerRelation.You) TurnScope.OpponentsTurn))
+      (TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.ControlledBy PlayerRelation.You) TurnScope.OpponentsTurn Nothing))
       """ {"type":"SpellCast","value":{"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"OpponentsTurn"}}} """
   -- CR 601.2i read off the spell itself, Desolation Twin's "when you cast this
   -- spell": nullary, since "this spell" needs neither Filter nor TurnScope.

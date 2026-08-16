@@ -1892,6 +1892,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasSupertype _ -> 0
   Filter.Type.HasColor _ -> 0
   Filter.Type.HasSubtype _ -> 0
+  Filter.Type.HasName _ -> 0
   Filter.Type.PowerAtLeast _ -> 0
   Filter.Type.PowerAtMost _ -> 0
   Filter.Type.PowerLessThanSource -> 0
@@ -1913,6 +1914,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsSource -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsBound _ -> 0
+  Filter.Type.SameNameAsBound _ -> 0
   Filter.Type.IsControllerOfBound _ -> 0
   Filter.Type.IsAttacking -> 0
   Filter.Type.IsBlocking -> 0
@@ -2360,7 +2362,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _) -> [f]
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _) -> [f]
   -- "This spell" names the bearer and needs no Filter to say so.
   TriggerCondition.SelfCast -> []
   -- Rule 702.21a names the bearer as well, and asks only a relation of the

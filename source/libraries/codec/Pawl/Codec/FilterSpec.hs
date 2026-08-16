@@ -8,6 +8,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -53,6 +54,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.HasSubtype Subtype.Mountain)
       """ {"type":"HasSubtype","value":{"type":"Mountain"}} """
+  Spec.it s "HasName" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.HasName (CardName.MkCardName (Text.pack "The Underworld Cookbook")))
+      """ {"type":"HasName","value":"The Underworld Cookbook"} """
   Spec.it s "HasKeyword" $
     Common.assertCodec
       s
@@ -180,6 +187,12 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       codec
       (Filter.IsBound (SlotName.MkSlotName (Text.pack "looked")))
       """ {"type":"IsBound","value":"looked"} """
+  Spec.it s "SameNameAsBound" $
+    Common.assertCodec
+      s
+      codec
+      (Filter.SameNameAsBound (SlotName.MkSlotName (Text.pack "castSpell")))
+      """ {"type":"SameNameAsBound","value":"castSpell"} """
   Spec.it s "IsAttacking" $
     Common.assertCodec
       s

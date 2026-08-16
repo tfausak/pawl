@@ -1,5 +1,6 @@
 module Pawl.Types.Filter where
 
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -37,6 +38,24 @@ data Filter keyword
   | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
   | HasColor Color.Color -- CR 105.2: the object's colours include this one.
   | HasSubtype Subtype.Subtype -- CR 205.3: the object's subtypes include this one.
+  | -- | CR 201.2: the object's names include this LITERAL one --
+    -- Asmoranomardicadaistinaculdacar's "search your library for a card named The
+    -- Underworld Cookbook". A name is a characteristic (CR 109.3 lists it first),
+    -- so this sits with the four atoms above rather than needing their defence.
+    --
+    -- MEMBERSHIP, exactly as CR 709.4a states the test: "an object has the chosen
+    -- name if one of its names is the chosen name". A split card off the stack
+    -- and a Room with both doors unlocked each show two names at once, and the
+    -- joined string they render as is not among them (see #650), so an atom that
+    -- compared to a single name would miss the halves it is spelling.
+    --
+    -- The PRINTED name, and not Pawl.Types.EntryRewrite.ChooseCardNames' chosen
+    -- one: that machinery answers "what did a player name?", read by
+    -- PlayerEffect.CantCastChosenName, where this is a name another card's own
+    -- text prints. The two are different questions and neither can express the
+    -- other -- a card cannot choose on the player's behalf, and a player cannot
+    -- be asked to name what a card already says.
+    HasName CardName.CardName
   | -- | The object HAS this keyword ability (CR 702.1) -- Plummet's "target
     -- creature with flying" (CR 702.9). Needs no defence like the atoms below,
     -- since CR 109.3 lists abilities among an object's characteristics.
@@ -283,6 +302,24 @@ data Filter keyword
     -- out of it, and a slot bound to a GROUP never enters it (#1532). That is
     -- the posture every context-relative atom here takes.
     IsBound SlotName.SlotName
+  | -- | CR 201.2 / 709.4a asked of TWO objects: the candidate shares a name with
+    -- the object this slot holds -- Harness the Storm's "target card with the
+    -- same name as that spell", where the slot is CR 603.2's own binding of the
+    -- cast spell, made as the trigger was gathered and read at CR 601.2c.
+    --
+    -- HasName's context-relative sibling, standing to it as IsBound stands to
+    -- IsSource: that atom carries the name and this one reads it off
+    -- Pawl.Engine.Filter.Context, which is where the board-holding caller puts
+    -- the bound object's names.
+    --
+    -- SHARES A NAME, not "has the same set of names": CR 709.4a's test is
+    -- membership at both ends, so an object showing two names has the same name
+    -- as one showing either. Set INTERSECTION is that said once.
+    --
+    -- Vacuously False where the slot names no object, or where the bound object
+    -- has no name at all (CR 708.2a's face-down object) -- the posture IsBound
+    -- above takes, and the answer CR 709.4a itself gives for a nameless object.
+    SameNameAsBound SlotName.SlotName
   | -- | CR 115.1: the candidate is a PLAYER who relates thus to the perspective --
     -- "target opponent". Context-relative like ControlledBy, but separate from it
     -- rather than a reuse, because ControlledBy asks who controls an OBJECT

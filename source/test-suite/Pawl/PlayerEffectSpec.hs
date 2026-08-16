@@ -255,7 +255,7 @@ ruleOfLawSpec s registry =
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (_, _, z, plain) = ruleOfLawBoard plains ruleOfLaw
           (rol, onBoard) = S.addCreature ruleOfLaw S.alice plain
-          castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics)] onBoard
+          castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand))] onBoard
           gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable [rol])
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell castOne) "prohibited while it stands"
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell gone)) "not prohibited once it is gone"
@@ -272,7 +272,7 @@ ruleOfLawSpec s registry =
       let base = S.landsInPlay forest 7
           (_, withRuleOfLaw) = S.addCreature ruleOfLaw S.alice base
           (_, gs) = S.addLibraryCard panglacialWurm S.alice withRuleOfLaw
-          castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics)] gs
+          castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand))] gs
       -- Positive control: without it, the negative assertion below
       -- could pass merely because the Wurm was never offered at all.
       Spec.assertEqWith
@@ -968,7 +968,7 @@ humilitySpec s registry =
           (_, withRuleOfLaw) = S.addCreature ruleOfLaw S.alice base
           withHumility = S.withHumility humility withRuleOfLaw
           (_, withOpalescence) = S.addCreature opalescence S.alice withHumility
-          castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics)]
+          castOne = S.withEvents [GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice S.noSource S.emptyCharacteristics (Just Zone.Hand))]
       Spec.assertBool
         s
         (PlayerEffect.prohibitsCasting S.alice anySpellId anySpell (castOne withHumility))

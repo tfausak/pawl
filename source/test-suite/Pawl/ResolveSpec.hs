@@ -204,7 +204,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     Spec.assertEqWith
       s
       "one slot, two players"
-      (Target.legalSets Nothing S.noSource slots gs)
+      (Target.legalSets Nothing Map.empty S.noSource slots gs)
       (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob]))
   Spec.it s "CR 115.4 CreatureTarget offers creatures but no players" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -261,7 +261,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     let (wallId, base) = S.addCreature wallOfStone S.bob (Setup.emptyGame S.bothPlayers)
         (pikerId, gs) = S.addCreature piker S.alice base
         slot = SlotName.MkSlotName (Text.pack "target")
-        legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
+        legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing Map.empty S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
     Spec.assertBool s (Set.member (Recipient.ToCreature wallId) legal) "the Wall is legal"
     Spec.assertBool s (not (Set.member (Recipient.ToCreature pikerId) legal)) "the non-Wall creature is not legal"
   -- The same "target Wall", against a Wall that Ashaya animated into a land
@@ -278,7 +278,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
         (_, g2) = S.addCreature ashaya S.alice g1
         (_, gs) = S.addCreature bloodMoon S.alice g2
         slot = SlotName.MkSlotName (Text.pack "target")
-        legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
+        legal = Map.findWithDefault Set.empty slot (Target.legalSets Nothing Map.empty S.noSource (Map.singleton slot (TargetSlot.required Pool.Creatures (Just (Filter.Type.HasSubtype Subtype.Wall)))) gs)
     Spec.assertBool s (Set.member Subtype.Mountain (Projection.subtypesOf wallId gs)) "it really is a Mountain"
     Spec.assertBool s (Projection.isCreatureOf wallId gs) "and still a creature (CR 305.7 removes no card types)"
     Spec.assertBool s (Set.member (Recipient.ToCreature wallId) legal) "so \"target Wall\" still offers it"
@@ -429,7 +429,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     Spec.assertEqWith
       s
       "source excluded from its own set"
-      (Target.legalSets Nothing srcId slots gs)
+      (Target.legalSets Nothing Map.empty srcId slots gs)
       (Map.singleton slot (Set.singleton (Recipient.ToCreature otherId)))
   -- The other half of the same claim: a slot carrying no Not IsSource does
   -- not exclude, so Prodigal Sorcerer may still ping itself (CR 115.4).
@@ -442,7 +442,7 @@ targetSpec s registry = Spec.describe s "Target" $ do
     Spec.assertEqWith
       s
       "source is its own legal target"
-      (Target.legalSets Nothing srcId slots gs)
+      (Target.legalSets Nothing Map.empty srcId slots gs)
       (Map.singleton slot (Set.singleton (Recipient.ToCreature srcId)))
   -- Gate cards for P9 Task 5: Terror and Reprisal. Both cards' printed text
   -- ends "It can't be regenerated."; regeneration is not modelled (no
@@ -4232,7 +4232,7 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
     -- a candidate list nothing consumed proves nothing.
     let candidates = case Activate.abilitiesFor mirrorId board of
           [ability] -> case Seq.lookup 0 (Modal.modes (ActivatedAbility.modal ability)) of
-            Just mode -> Map.elems (Target.legalSets (Just S.alice) mirrorId (Mode.targetSlots mode) board)
+            Just mode -> Map.elems (Target.legalSets (Just S.alice) Map.empty mirrorId (Mode.targetSlots mode) board)
             Nothing -> []
           _ -> []
     Spec.assertEqWith s "both opponents are candidates, alice is not" candidates [Set.fromList [Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol]]
@@ -9219,9 +9219,113 @@ jugglerAnswer victim fodder p = case p of
   Prompt.ChooseSacrifices {} -> sacrifices fodder p
   _ -> takingTargets 1 [victim] p
 
+-- The library alice searches, the ids of whichever of its cards the ability
+-- names, and every id in it. The last is what lets an assertion say which SUBSET
+-- the search offered rather than how many.
+data CookbookBoard = MkCookbookBoard
+  { cookbookState :: GameState.GameState,
+    cookbookIds :: [ObjectId.ObjectId],
+    cookbookLibrary :: [ObjectId.ObjectId]
+  }
+
+-- Asmoranomardicadaistinaculdacar on the battlefield with its CR 603.6a enters
+-- trigger pending, over a four-card library. Passing False for `withCookbooks`
+-- swaps the two copies of the named card for two more Golden Eggs and changes
+-- nothing else -- same library size, same card types, same seat, same phase --
+-- so the pair of boards differs in the NAME and in nothing that could make a
+-- search fail for another reason.
+--
+-- Two copies of the named card, not one: a set assertion over a single member
+-- cannot tell a filter that matched by name from one that admitted every card in
+-- the library. The Golden Egg is an ARTIFACT, as the Cookbook is, so the two are
+-- separated by the name alone; the Mountain is the card of another type the
+-- filter is also asked of.
+cookbookBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m CookbookBoard
+cookbookBoard s registry withCookbooks = do
+  mountain <- S.printingOf s registry "Mountain"
+  egg <- S.printingOf s registry "Golden Egg"
+  cookbook <- S.printingOf s registry "The Underworld Cookbook"
+  asmor <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+  let named = if withCookbooks then cookbook else egg
+      (mountainId, g1) = S.addLibraryCard mountain S.alice (Setup.emptyGame S.bothPlayers)
+      (eggId, g2) = S.addLibraryCard egg S.alice g1
+      (firstId, g3) = S.addLibraryCard named S.alice g2
+      (secondId, g4) = S.addLibraryCard named S.alice g3
+      (_, g5) = S.entersWithTrigger asmor S.alice g4
+  pure
+    MkCookbookBoard
+      { cookbookState = g5,
+        cookbookIds = if withCookbooks then [firstId, secondId] else [],
+        cookbookLibrary = [mountainId, eggId, firstId, secondId]
+      }
+
+-- Takes CR 603.5's "may", records every candidate set the search offered, and
+-- finds `wanted` -- PINNED, so an answerer cannot repair the assertion by going
+-- looking for a legal pick after a mutation. Finds nothing when nothing is
+-- pinned, which is the negative board's answer.
+cookbookAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+cookbookAnswer wanted p = case p of
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  Prompt.SearchLibrary _ _ matches _ -> do
+    State.modify' (\searches -> searches <> [matches])
+    pure wanted
+  Prompt.Shuffle library -> pure library
+  _ -> pure (S.identityAnswer p)
+
+-- Settle the pending enters trigger onto the stack and resolve it, keeping both
+-- the candidate sets the search offered and the board it left behind.
+runCookbook :: [ObjectId.ObjectId] -> CookbookBoard -> ([[ObjectId.ObjectId]], GameState.GameState)
+runCookbook wanted board =
+  let ((_, gs), searches) =
+        State.runState
+          (Engine.runGame (cookbookAnswer wanted) (cookbookState board) Engine.priorityLoop)
+          []
+   in (searches, gs)
+
+-- CR 201.2 makes a name a characteristic like any other, and CR 709.4a fixes the
+-- test as membership. Proved by Asmoranomardicadaistinaculdacar
+-- (data/cards/asmoranomardicadaistinaculdacar.json): "When
+-- Asmoranomardicadaistinaculdacar enters, you may search your library for a card
+-- named The Underworld Cookbook, reveal it, put it into your hand, then shuffle."
+-- The Underworld Cookbook (data/cards/the-underworld-cookbook.json) is the other
+-- half of the pair.
+cookbookSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cookbookSpec s registry = Spec.describe s "TheUnderworldCookbook" $ do
+  Spec.it s "CR 201.2 the search offers exactly the cards with the printed name" $ do
+    board <- cookbookBoard s registry True
+    let (searches, _) = runCookbook (take 1 (cookbookIds board)) board
+    Spec.assertEqWith s "the library holds four cards" (length (cookbookLibrary board)) 4
+    -- Identity, not count: BOTH Cookbooks and neither the Golden Egg nor the
+    -- Mountain. A filter that admitted every artifact, or every card, fails here
+    -- rather than at the find below.
+    Spec.assertEqWith s "one search, offering both Cookbooks and nothing else" (fmap Set.fromList searches) [Set.fromList (cookbookIds board)]
+  Spec.it s "CR 701.23e the found card is revealed and put into its owner's hand" $ do
+    board <- cookbookBoard s registry True
+    let (_, after) = runCookbook (take 1 (cookbookIds board)) board
+        cookbookName = CardName.MkCardName $ Text.pack "The Underworld Cookbook"
+    -- By NAME rather than by the id that was pinned: CR 400.7 mints a new object
+    -- when the card leaves the library, so the card in the hand is not the id the
+    -- search was answered with. The identity assertion is the candidate-set case
+    -- above; this one is about where the card ended up.
+    Spec.assertEqWith s "the named card, and only it, is in alice's hand" (namesIn Zone.Hand S.alice after) [Just cookbookName]
+    -- One Cookbook was taken and the other was not, which a "found everything the
+    -- filter admitted" reading would fail.
+    Spec.assertEqWith s "the other three cards stayed in the library" (length (namesIn Zone.Library S.alice after)) 3
+    Spec.assertEqWith s "one of them still the second Cookbook" (length (filter (== Just cookbookName) (namesIn Zone.Library S.alice after))) 1
+  Spec.it s "CR 701.23b nothing is offered when no card in the library has the name" $ do
+    -- The same board with the two Cookbooks swapped for Golden Eggs. The search
+    -- still happens -- the trigger resolves and the library is still read -- so
+    -- an empty offer is the filter's answer rather than a step that never ran.
+    board <- cookbookBoard s registry False
+    let (searches, after) = runCookbook [] board
+    Spec.assertEqWith s "the library holds four cards here too" (length (cookbookLibrary board)) 4
+    Spec.assertEqWith s "one search, offering nothing" searches [[]]
+    Spec.assertEqWith s "and alice's hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
+  cookbookSpec s registry
   plummetSpec s registry
   corrosiveGaleSpec s registry
   investigateSpec s registry
