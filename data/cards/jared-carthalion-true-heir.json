@@ -35,6 +35,64 @@
         "type": "Literal",
         "value": 3
       },
+      "replacementEffects": [
+        {
+          "condition": {
+            "type": "Compares",
+            "value": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "IsMonarch",
+                "value": {
+                  "type": "Relative",
+                  "value": {
+                    "type": "You"
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
+            }
+          },
+          "effect": {
+            "type": "DamageR",
+            "value": {
+              "matching": {
+                "whatRecipient": {
+                  "type": "IsSource"
+                }
+              },
+              "rewrite": {
+                "type": "PreventAll"
+              },
+              "riders": [
+                {
+                  "type": "PutCounters",
+                  "value": {
+                    "kind": {
+                      "type": "PlusOnePlusOne"
+                    },
+                    "quantity": {
+                      "type": "InSlot",
+                      "value": "thatMuch"
+                    },
+                    "ref": {
+                      "type": "EachMatching",
+                      "value": {
+                        "type": "IsSource"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
       "toughness": {
         "type": "Literal",
         "value": 3

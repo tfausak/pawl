@@ -1067,6 +1067,79 @@ stormwildCapridorSpec s registry = Spec.describe s "Stormwild Capridor (CR 615.5
     Spec.assertEqWith s "and no counters, since nothing was prevented" (countersOn CounterKind.PlusOnePlusOne capridor after) 0
     Spec.assertEqWith s "so it is still a 1/3" (S.powerToughnessOf capridor after) (Just (1, 3))
 
+-- CR 604.2's "as long as" clause on a PRINTED replacement ability, whose producer
+-- is Jared Carthalion, True Heir ({R}{G}{W} Legendary Creature -- Human Warrior
+-- 3/3): "If damage would be dealt to Jared Carthalion while you're the monarch,
+-- prevent that damage and put that many +1/+1 counters on it."
+--
+-- THREE SEATS, because CR 725.3 makes the monarch a designation exactly one
+-- player holds -- on a two-seat board "the monarch" and "your opponent" are the
+-- same player, and a gate reading either would pass. Jared is BOB's, the Firebolt
+-- is ALICE's, and the seat that is monarch on the negative board is CAROL's: a
+-- gate reading the damage's controller, or reading merely that a monarch exists,
+-- answers the same on both boards and so fails one of them.
+--
+-- Numbers distinct: the Firebolt is 2, the counters are 2 because CR 615.5's
+-- "that many" says so, and Jared's 3/3 becomes 5/5. A "one counter per event"
+-- reading would answer 1 and an unrun rider 0.
+jaredCarthalionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jaredCarthalionSpec s registry = Spec.describe s "Jared Carthalion, True Heir (CR 604.2)" $ do
+  -- alice holds `n` Firebolts over one Mountain apiece, bob's Jared is on the
+  -- battlefield, and carol is the third seat. Jared is placed rather than cast,
+  -- so his own CR 725.1 enters trigger never fires and each case names the
+  -- monarch itself.
+  let board n = do
+        mountain <- S.printingOf s registry "Mountain"
+        jaredPrinting <- S.printingOf s registry "Jared Carthalion, True Heir"
+        firebolt <- S.printingOf s registry "Firebolt"
+        let withLands = S.landsFor mountain S.alice n S.threePlayerGame
+            (jared, g1) = S.addCreature jaredPrinting S.bob withLands
+            addOne (ids, g) _ = let (oid, g') = S.addHandCard firebolt S.alice g in (ids <> [oid], g')
+            (bolts, g2) = List.foldl' addOne ([], g1) [1 .. n]
+        pure
+          ( jared,
+            bolts,
+            g2
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+          )
+  -- THE PROVING TEST. One board, two monarchs, and nothing else differs.
+  Spec.it s "CR 604.2 the clause is asked of the ability's controller, not of whoever the monarch is" $ do
+    (jared, bolts, g) <- board 1
+    let cast gs = case bolts of
+          [bolt] -> castAndResolve (aimCreature jared) gs bolt
+          _ -> gs
+        heldByBob = cast (S.withMonarch S.bob g)
+        heldByCarol = cast (S.withMonarch S.carol g)
+    Spec.assertEqWith s "setup: Jared is a 3/3" (S.powerToughnessOf jared g) (Just (3, 3))
+    -- CR 615.6: the prevented event never happened, so nothing is marked.
+    Spec.assertEqWith s "bob is the monarch, so no damage is marked" (S.damageOf jared heldByBob) (Just 0)
+    Spec.assertEqWith s "and CR 615.5's rider puts that many +1/+1 counters on" (countersOn CounterKind.PlusOnePlusOne jared heldByBob) 2
+    Spec.assertEqWith s "so Jared is a 5/5" (S.powerToughnessOf jared heldByBob) (Just (5, 5))
+    -- carol holds the crown on the other board: bob is no more Jared's monarch
+    -- than alice is, so the ability does not apply at all.
+    Spec.assertEqWith s "carol is the monarch, so the same 2 is marked in full" (S.damageOf jared heldByCarol) (Just 2)
+    Spec.assertEqWith s "and no counter is put on" (countersOn CounterKind.PlusOnePlusOne jared heldByCarol) 0
+    Spec.assertEqWith s "so Jared is still a 3/3" (S.powerToughnessOf jared heldByCarol) (Just (3, 3))
+  -- CR 604.1's "simply true", which is what makes the clause a live read rather
+  -- than a latch: the crown changes hands with no trigger and no resolution in
+  -- between, and the SAME permanent's ability stops applying. A gate snapshotted
+  -- when the ability was gathered -- or when the permanent entered -- would
+  -- prevent the second Firebolt too.
+  Spec.it s "CR 604.1 the clause is re-asked, so losing the crown turns the ability off" $ do
+    (jared, bolts, g) <- board 2
+    case bolts of
+      [first, second] -> do
+        let shielded = castAndResolve (aimCreature jared) (S.withMonarch S.bob g) first
+            dethroned = castAndResolve (aimCreature jared) (S.withMonarch S.carol shielded) second
+        Spec.assertEqWith s "the first Firebolt is prevented while bob wears the crown" (S.damageOf jared shielded) (Just 0)
+        Spec.assertEqWith s "leaving two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne jared shielded) 2
+        Spec.assertEqWith s "the second lands in full once carol has it" (S.damageOf jared dethroned) (Just 2)
+        Spec.assertEqWith s "and adds no third counter" (countersOn CounterKind.PlusOnePlusOne jared dethroned) 2
+      _ -> Spec.assertFailure s "fixture should hold two Firebolts"
+
 -- CR 615.12's damage that "can't be prevented", whose one producer in the pool
 -- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's
 -- Spider-Man 92), set against the pool's one COUNTDOWN shield, Mending Hands
@@ -2733,6 +2806,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   mendingHandsSpec s registry
   testOfFaithSpec s registry
   stormwildCapridorSpec s registry
+  jaredCarthalionSpec s registry
   spiderPunkSpec s registry
   apnapSpec s registry
   excruciatorSpec s registry
