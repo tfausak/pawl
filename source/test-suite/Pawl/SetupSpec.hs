@@ -287,7 +287,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = addMany mountain 8 S.alice g0
         g2 = addMany mountain 8 S.bob g1
-        after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.startGameFromCards S.performer))
+        after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.startGameFromCards S.performer Set.empty))
         libSize pid = length (Game.zoneMembers Zone.Library pid after)
     Spec.assertEqWith s "alice drew a 7-card opening hand" (S.handSize S.alice after) 7
     Spec.assertEqWith s "bob drew a 7-card opening hand" (S.handSize S.bob after) 7
@@ -311,7 +311,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     let g0 = Setup.emptyGame S.bothPlayers
         g1 = addMany mountain 8 S.bob (addMany mountain 8 S.alice g0)
         g2 = g1 {GameState.objects = Map.map (\o -> dirtied (Object.owner o) o) (GameState.objects g1)}
-        after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.startGameFromCards S.performer))
+        after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.startGameFromCards S.performer Set.empty))
     -- The discriminator: without this, an assertion over an already-clean pool
     -- would pass no matter what startGameFromCards does.
     Spec.assertEqWith s "the pool going in genuinely carried per-incarnation state" (not (all forgotten (Map.elems (GameState.objects g2)))) True
@@ -322,8 +322,8 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- active player and the head of the turn order follow the controller.
     mountain <- S.printingOf s registry "Mountain"
     let g0 = addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
-        byBob = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.bob))
-        byAlice = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.alice))
+        byBob = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer Set.empty S.bob))
+        byAlice = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer Set.empty S.alice))
     Spec.assertEqWith s "bob restarted: bob is the new active player" (GameState.activePlayer byBob) S.bob
     Spec.assertEqWith s "bob restarted: bob heads the turn order" (Maybe.listToMaybe (GameState.turnOrder byBob)) (Just S.bob)
     Spec.assertEqWith s "alice restarted: alice is the new active player" (GameState.activePlayer byAlice) S.alice
@@ -344,7 +344,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
         g3 = addMany mountain 7 S.alice (addMany mountain 7 S.bob g2)
         -- move bob's card to his graveyard, to prove zone-independence.
         g4 = snd (Engine.runGamePure S.identityAnswer g3 (Event.changeZone bId Zone.Graveyard))
-        after = snd (Engine.runGamePure S.identityAnswer g4 (Setup.restartGame S.performer S.alice))
+        after = snd (Engine.runGamePure S.identityAnswer g4 (Setup.restartGame S.performer Set.empty S.alice))
         ownedCount pid = length (filter (\o -> Object.owner o == pid) (Map.elems (GameState.objects after)))
         libHandCount pid = length (Game.zoneMembers Zone.Library pid after) + length (Game.zoneMembers Zone.Hand pid after)
     Spec.assertEqWith s "alice still owns all 8 of her cards" (ownedCount S.alice) 8
@@ -364,7 +364,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     let g0 = addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
         g1 = S.addPlayerCounter PlayerCounterKind.Poison 3 S.bob g0
         g2 = g1 {GameState.players = Map.adjust (\p -> p {Player.life = 5}) S.bob (GameState.players g1)}
-        after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.restartGame S.performer S.bob))
+        after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.restartGame S.performer Set.empty S.bob))
     Spec.assertEqWith s "phase is the first turn's untap step" (GameState.phase after) Turn.firstPhase
     Spec.assertEqWith s "no player holds priority" (GameState.priority after) Nothing
     Spec.assertEqWith s "it is turn 1" (GameState.turnNumber after) 1
@@ -381,7 +381,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     -- here it is asserted at the next explicit SBA check.)
     mountain <- S.printingOf s registry "Mountain"
     let g0 = addMany mountain 3 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.bothPlayers))
-        afterRestart = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer S.alice))
+        afterRestart = snd (Engine.runGamePure S.identityAnswer g0 (Setup.restartGame S.performer Set.empty S.alice))
         afterSba = snd (Engine.runGamePure S.identityAnswer afterRestart Engine.checkSba)
     Spec.assertEqWith s "bob drew from an empty library during the opening draw" (Set.member S.bob (GameState.drewFromEmpty afterRestart)) True
     Spec.assertEqWith s "CR 727.3: bob loses, alice wins at the SBA check" (GameState.result afterSba) (Just (Result.Won S.alice))
@@ -402,7 +402,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
             { GameState.players =
                 Map.adjust (\p -> p {Player.life = 3}) S.bob (Map.adjust (\p -> p {Player.life = 5}) S.alice (GameState.players g0))
             }
-        afterRestart = S.runPure S.identityAnswer g1 (Setup.restartGame S.performer S.alice)
+        afterRestart = S.runPure S.identityAnswer g1 (Setup.restartGame S.performer Set.empty S.alice)
         sub = Setup.subgameStateFrom S.alice g1
         statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
     Spec.assertEqWith s "restart: bob is still departed" (statusOf S.bob afterRestart) (Just (Status.Departed Departure.Type.Conceded))
@@ -421,7 +421,7 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     mountain <- S.printingOf s registry "Mountain"
     let g0 = addMany mountain 8 S.carol (addMany mountain 8 S.bob (addMany mountain 8 S.alice (Setup.emptyGame S.threePlayers)))
         g1 = Departure.depart Departure.Type.Conceded S.bob g0
-        after = snd (Engine.runGamePure S.identityAnswer g1 (Setup.restartGame S.performer S.alice))
+        after = snd (Engine.runGamePure S.identityAnswer g1 (Setup.restartGame S.performer Set.empty S.alice))
         libSizeOf pid = length (Game.zoneMembers Zone.Library pid after)
     Spec.assertEqWith s "two seats in the rebuilt order, in their seating order" (GameState.turnOrder after) [S.alice, S.carol]
     Spec.assertEqWith s "alice starts it (CR 727.1a)" (GameState.activePlayer after) S.alice
@@ -508,7 +508,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         -- irrelevant here, this test only checks funnelBack's bookkeeping,
         -- not the CR 727.3/729.3 short-deck loss.
         sub0 = Setup.subgameStateFrom S.alice parent
-        (_, finalSub) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer)
+        (_, finalSub) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
         after = Setup.funnelBack finalSub parent
         libCount pid = length (Game.zoneMembers Zone.Library pid after)
         battlefieldSurvivors = Set.size (GameState.battlefield after)
@@ -534,7 +534,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     let g0 = Setup.emptyGame S.threePlayers
         g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
         sub0 = Setup.subgameStateFrom S.alice g1
-        (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer)
+        (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
         departedSub = Departure.depart Departure.Type.Lost S.bob seated
         after = Setup.funnelBack departedSub g1
     Spec.assertEqWith s "the subgame really was multiplayer, so CR 800.4a's removal fired" (Departure.continuesAfterDeparture departedSub) True
@@ -560,7 +560,7 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
         dirtyPool gs = gs {GameState.objects = Map.map (\o -> dirtied (Object.owner o) o) (GameState.objects gs)}
         parent = dirtyPool g1
         sub0 = Setup.subgameStateFrom S.alice parent
-        (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer)
+        (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
         departedSub = dirtyPool (Departure.depart Departure.Type.Lost S.bob seated)
         after = Setup.funnelBack departedSub parent
         libraryObjects pid = Maybe.mapMaybe (`Game.lookupObject` after) (Game.zoneMembers Zone.Library pid after)
@@ -588,9 +588,9 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     let g0 = Setup.emptyGame S.threePlayers
         g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
         sub0 = Setup.subgameStateFrom S.alice g1
-        (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer)
+        (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
         departedSub = Departure.depart Departure.Type.Lost S.bob seated
-        (_, restarted) = Engine.runGamePure S.identityAnswer departedSub (Setup.restartGame S.performer S.alice)
+        (_, restarted) = Engine.runGamePure S.identityAnswer departedSub (Setup.restartGame S.performer Set.empty S.alice)
         after = Setup.funnelBack restarted g1
     Spec.assertEqWith s "the in-subgame restart really did shrink finalSub's own turnOrder to two" (length (GameState.turnOrder restarted)) 2
     Spec.assertEqWith s "so the naive seam-at-the-end reading would (wrongly) say it is not multiplayer any more" (Departure.continuesAfterDeparture restarted) False

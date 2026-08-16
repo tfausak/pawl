@@ -151,7 +151,19 @@ data Effect card
     ExileAllGraveyards
   | -- | CR 727.1/727.1a: restart the game. Targetless and game-wide; the starting
     -- player of the new game is the resolving controller, so no slot is needed.
-    RestartGame
+    --
+    -- The ObjectRef is CR 727.5's exemption -- "effects may exempt certain cards
+    -- from the procedure that restarts the game" -- and names the cards that skip
+    -- the rebuild, staying in exile rather than going into their owner's new
+    -- deck. Karn Liberated's "leaving in exile all non-Aura permanent cards
+    -- exiled with Karn" is the whole of the pool that states one, which is why it
+    -- is optional: a card saying nothing about it exempts nothing, the wire
+    -- convention Pawl.Types.MoveToZone's four absent keys already take.
+    --
+    -- WHICH cards is a ref rather than a Filter because the rule's only producer
+    -- picks by CR 607.2a linkage as well as by characteristics, and
+    -- ObjectRef.EachCardExiledWithSource is the arm that says so.
+    RestartGame (Maybe ObjectRef.ObjectRef)
   | -- | CR 723.1: you control target player during that player's next turn.
     -- Installs pending control keyed to the slot's chosen player, with the
     -- ability's controller as the decider. Mindslaver's exact shape.

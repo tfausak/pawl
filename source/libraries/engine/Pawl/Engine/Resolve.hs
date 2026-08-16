@@ -261,7 +261,7 @@ objectRefSlots ref = case ref of
   ObjectRef.EachMatching _ -> Map.empty
   ObjectRef.EachCardInGraveyard {} -> Map.empty
   ObjectRef.EachCardInYourHand -> Map.empty
-  ObjectRef.EachCardExiledWithSource -> Map.empty
+  ObjectRef.EachCardExiledWithSource {} -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> playerRefSlots player
   -- A PlayerScope names players by their relation to the effect's controller (CR
@@ -323,7 +323,9 @@ slotsOf effect = case effect of
   Effect.Venture -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot _ quantity) -> insertOne slot (quantitySlots quantity)
-  Effect.RestartGame -> Map.empty
+  -- CR 727.5's exemption is an ObjectRef like any other, so a card that named
+  -- its exempted cards out of a slot would read that slot here.
+  Effect.RestartGame exempt -> foldMap objectRefSlots exempt
   Effect.ControlPlayerNextTurn slot -> oneSlot slot
   -- The third field is a DEFINITION (how many this sweep destroyed), not a read,
   -- so it belongs to boundSlots below and must not appear here -- Create's and
@@ -576,7 +578,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Venture -> True
   Effect.ExileHandThenDraw -> True
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.slotsAreExhaustive quantity
-  Effect.RestartGame -> True
+  Effect.RestartGame _ -> True
   Effect.ControlPlayerNextTurn _ -> True
   Effect.Destroy {} -> True
   Effect.Sacrifice _ -> True
@@ -718,7 +720,7 @@ readsX = any effectReadsX
       Effect.Venture -> False
       Effect.ExileHandThenDraw -> False
       Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices _ _ quantity) -> Quantity.readsX quantity
-      Effect.RestartGame -> False
+      Effect.RestartGame _ -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
@@ -806,7 +808,7 @@ searchesLibrary effect = case effect of
   Effect.AddMana _ -> False
   Effect.ExileAllGraveyards -> False
   Effect.ExileHandThenDraw -> False
-  Effect.RestartGame -> False
+  Effect.RestartGame _ -> False
   Effect.ControlPlayerNextTurn _ -> False
   Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
@@ -980,7 +982,7 @@ boundSlots effect = case effect of
   Effect.Venture -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices {} -> Set.empty
-  Effect.RestartGame -> Set.empty
+  Effect.RestartGame _ -> Set.empty
   Effect.ControlPlayerNextTurn _ -> Set.empty
   Effect.Sacrifice _ -> Set.empty
   Effect.TurnFaceDown _ -> Set.empty
@@ -1857,9 +1859,12 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- so nothing observes it and nothing may depend on it.
   ObjectRef.EachCardInYourHand -> Game.zoneMembers Zone.Hand controller gs
   -- CR 607.2a's linked set: the cards in exile GameState.exiledWith files against
-  -- this effect's SOURCE. Not a filter and not a zone sweep -- the relation is the
-  -- membership test, so a card exiled by a second copy of the same printing is a
-  -- different entry and is not named here.
+  -- this effect's SOURCE. The relation, not a zone sweep, is the membership test,
+  -- so a card exiled by a second copy of the same printing is a different entry
+  -- and is not named here. A stated Filter then narrows that set -- Karn
+  -- Liberated's "all non-Aura permanent cards exiled with Karn" -- read exactly
+  -- as the EachMatching arm above reads its own, against each linked card's
+  -- projection wherever it sits.
   --
   -- `source` and not `resolving`, which is the whole point: rule 607.2a links two
   -- abilities of one OBJECT, and for a dies trigger the two ids differ (the
@@ -1873,10 +1878,14 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- Pawl.Engine.Game mints ids increasing. No APNAP sort, unlike the battlefield
   -- and graveyard arms: one shared zone has no seats to interleave, and CR 101.4
   -- asks for an order only where a per-player question is put.
-  ObjectRef.EachCardExiledWithSource ->
-    filter
-      (\oid -> Map.lookup oid (GameState.exiledWith gs) == Just source)
-      (Set.toList (GameState.exile gs))
+  ObjectRef.EachCardExiledWithSource mFilter ->
+    let context = Filter.contextFor (Just controller) (Just source)
+        stated oid = case mFilter of
+          Nothing -> True
+          Just filter_ -> Filter.matches context (Projection.viewOfObject oid gs) filter_
+     in filter
+          (\oid -> Map.lookup oid (GameState.exiledWith gs) == Just source && stated oid)
+          (Set.toList (GameState.exile gs))
   -- Names players and so no objects at all. Empty rather than an error: every
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
   -- empty answer is what a slot holding a player already gives them.
@@ -2058,7 +2067,7 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.EachCardInYourHand -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- Cards a third time, so Recipient.ToObject a third time: CR 607.2a's set is
   -- cards in exile, and which kind each one is stays the OPCODE's question.
-  ObjectRef.EachCardExiledWithSource -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  ObjectRef.EachCardExiledWithSource {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- A card, so it arrives as Recipient.ToObject for EachMatching's reason: what
   -- kind of object a library's top card is, is the OPCODE's question.
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -2824,9 +2833,21 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- inside a step -- and the rebuild replaces the game those frames are running.
   -- GameState.restartSignal is how they unwind to the rebuilt turn 1; see
   -- Pawl.Types.RestartSignal.
-  -- Not implemented: the CR 727.5/727.5a exemption + put-onto-battlefield rider
-  -- of full Karn Liberated (#135), which retires the synthetic-restart gate.
-  Effect.RestartGame -> Setup.restartGame performHandAction controller
+  -- CR 727.5: the exempted cards are swept BEFORE the rebuild, out of the game
+  -- that is ending -- which is the only state in which the exemption can be read
+  -- at all, since the rebuild is what clears exile and the CR 607.2a links.
+  -- Karn's "then put those cards onto the battlefield" is a SEPARATE effect of
+  -- the same ability, reading the same linked set back off the exile the rebuild
+  -- left standing (CR 727.4's additional instructions).
+  --
+  -- Not implemented: CR 727.5a's exempted commander, which needs a Commander game
+  -- to observe (#1627), and CR 727.6's restarted SUBGAME (#1628).
+  Effect.RestartGame exempt -> do
+    gs <- State.get
+    let exempted = case exempt of
+          Nothing -> Set.empty
+          Just ref -> Set.fromList (objectRefObjects legal resolving controller source gs ref)
+    Setup.restartGame performHandAction exempted controller
   -- CR 729.1/729.5: run the nested game to completion (the runner does the
   -- construction, play, funnel-back, and reshuffle); then bind its outcome.
   --
@@ -3208,7 +3229,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- above's reason (CR 608.2c, CR 608.2f). "Its owner's hand" needs
             -- nothing here for EachMatching's reason: CR 400.3 files a hand
             -- arrival under Object.owner.
-            ObjectRef.EachCardExiledWithSource -> do
+            ObjectRef.EachCardExiledWithSource {} -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- Players, and no card moves one to a zone. objectRefObjects' empty

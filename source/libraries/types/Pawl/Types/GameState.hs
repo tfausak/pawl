@@ -442,11 +442,13 @@ data GameState = MkGameState
     -- replacement's own object (#1536).
     --
     -- Cleaned up by KEY only, never by value, for `haunting`'s reason: an entry
-    -- whose value is gone is exactly the entry Hoarding Dragon reads. Two sweeps
+    -- whose value is gone is exactly the entry Hoarding Dragon reads. Three sweeps
     -- do it -- recordExiledWith drops the key of a card that has left exile,
     -- since CR 400.7 gives that card a new id and the old one can never be named
-    -- again, and Pawl.Engine.Departure drops the keys CR 800.4a takes out of the
-    -- game with their owner.
+    -- again, Pawl.Engine.Departure drops the keys CR 800.4a takes out of the
+    -- game with their owner, and Pawl.Engine.Setup.restartGame keeps only the
+    -- cards CR 727.5 exempted from the rebuild, which are the only ones still in
+    -- exile when the new game begins.
     exiledWith :: Map.Map ObjectId.ObjectId ObjectId.ObjectId,
     -- | CR 500.7: the extra turns that have been created and not yet taken, MOST
     -- RECENTLY CREATED FIRST. A stack, not a queue, and a list precisely because

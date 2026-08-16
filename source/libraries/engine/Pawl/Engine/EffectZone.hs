@@ -62,7 +62,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.EachMatching _ -> Nothing
     ObjectRef.EachCardInGraveyard {} -> Nothing
     ObjectRef.EachCardInYourHand -> Nothing
-    ObjectRef.EachCardExiledWithSource -> Nothing
+    ObjectRef.EachCardExiledWithSource {} -> Nothing
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing
@@ -80,7 +80,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Venture -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
-  Effect.RestartGame -> Nothing
+  Effect.RestartGame _ -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
