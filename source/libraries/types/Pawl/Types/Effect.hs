@@ -5,6 +5,7 @@ import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.Daytime as Daytime
@@ -802,9 +803,15 @@ data Effect card
     -- (CR 113.6g's and CR 613.11's), and recording for a SPELL a distinct "was
     -- countered" event the zone change alone could not be told apart from.
     --
-    -- A bare SlotName, so this counters ONE object: countering a swept set --
-    -- Swift Silence's "counter all other spells" -- is not implemented (#1397).
-    Counter SlotName.SlotName
+    -- An ObjectRef and not a bare slot, for PutCounters' reason: Swift Silence's
+    -- "counter all other spells" is a SET named by a description, which CR
+    -- 115.10a makes no target at all, and ObjectRef.EachSpell is CR 109.2b's
+    -- reading of it. Cancel's targeted slot is the same type's `InSlot`.
+    --
+    -- The optional slot is how many the funnel actually countered, for Swift
+    -- Silence's own "draw a card for each spell countered this way" to read back
+    -- as Quantity.InSlot. See Pawl.Types.Counter.
+    Counter Counter.Counter
   | -- | CR 122.6: put this many counters of this kind on the permanents the
     -- ObjectRef names. A counter is persistent object state, NOT a zone change --
     -- Resolve.applyEffect edits Object.counters in place, never through

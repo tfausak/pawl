@@ -34,8 +34,8 @@ data ObjectRef
     -- set drawn from another zone is one of the arms below -- a graveyard's is
     -- EachCardInGraveyard, a hand's EachCardInYourHand, exile's
     -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
-    -- the arm for that zone: the battlefield's is here, a graveyard's and the
-    -- linked exile set's are on their own arms, and the stack, a hand and a
+    -- the arm for that zone: the battlefield's is here, and a graveyard's, the
+    -- stack's and the linked exile set's are on their own arms. A hand and a
     -- library still have none (#1309).
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
@@ -127,6 +127,34 @@ data ObjectRef
     -- not a choice -- and swept when the effect executes (CR 608.2c), the two
     -- properties EachMatching above has.
     EachCardExiledWithSource (Maybe (Filter.Filter Keyword.Keyword))
+  | -- | Every SPELL ON THE STACK matching the Filter -- Swift Silence's "all
+    -- other spells". EachMatching's sibling with CR 109.2's battlefield default
+    -- switched off by the word "spell", which is CR 109.2b: a description
+    -- carrying that word "means a spell matching that description on the stack".
+    --
+    -- SPELLS ONLY, never the abilities that share the zone. That is not a
+    -- narrowing this arm chose: rule 109.2b's word is "spell", and CR 112.1
+    -- makes a spell a CARD on the stack, so an activated or triggered ability is
+    -- not one. The test is Pawl.Engine.Game.isSpell, a classification of the
+    -- object's kind and never of the card's identity. An arm for a swept set of
+    -- ABILITIES waits for a printing that names one; "counter all abilities"
+    -- is not implemented (#1397).
+    --
+    -- "Other" is written `Not IsSource`, the one spelling CR 601.2c's "another"
+    -- and Opalescence's "each other" already share -- the resolving spell is
+    -- still on the stack while its own instructions run (CR 608.2), so an arm
+    -- that dropped the source unasked would make "counter all spells" unsayable.
+    --
+    -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, which is
+    -- EachCardInGraveyard's reason and the shape #1309 fixed for every zone: a
+    -- card wanting a filtered sweep of one more zone gets one more arm.
+    --
+    -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
+    -- fizzle -- which is the whole difference between this and Cancel's targeted
+    -- Pool.Spells slot. Swept when the effect executes (CR 608.2c), so a spell
+    -- that has already left the stack is not in the set and one put there since
+    -- the countering spell was cast is.
+    EachSpell (Filter.Filter Keyword.Keyword)
   | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The one
     -- arm that names no object at all, and it is here rather than on
     -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:

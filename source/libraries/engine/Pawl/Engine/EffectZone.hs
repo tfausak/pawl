@@ -64,6 +64,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.EachCardInGraveyard {} -> Nothing
     ObjectRef.EachCardInYourHand -> Nothing
     ObjectRef.EachCardExiledWithSource {} -> Nothing
+    ObjectRef.EachSpell _ -> Nothing
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing
@@ -116,7 +117,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.PreventNextDamage {} -> Nothing
   Effect.PreventAllDamage {} -> Nothing
   Effect.RedirectDamage {} -> Nothing
-  Effect.Counter _ -> Nothing
+  Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing

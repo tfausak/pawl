@@ -58,6 +58,15 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       s
       (Either.isLeft (Common.parse (Text.pack """ {"type":"EachCardInGraveyard","value":[{"type":"EachPlayer"},{"type":"HasCardType","value":{"type":"Creature"}},{"type":"EachPlayer"}]} """) >>= Codec.decode ObjectRef.codec))
       "expected a decode failure"
+  -- CR 109.2b: the word "spell" switches CR 109.2's battlefield default to the
+  -- stack. Swift Silence's "all other spells" is the filter, and "other" is the
+  -- `Not IsSource` every "another" in the pool is already written as.
+  Spec.it s "EachSpell" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachSpell (Filter.Not Filter.IsSource))
+      """ {"type":"EachSpell","value":{"type":"Not","value":{"type":"IsSource"}}} """
   Spec.it s "EachPlayer" $
     Common.assertCodec
       s
@@ -158,10 +167,10 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
   -- collapse two of these. The two graveyard arms are the pair it really
   -- guards: they carry the SAME payload, so a copied tag would quietly turn one
   -- card's chosen return into a mass one.
-  Spec.it s "the nine arms carry nine distinct tags" $
+  Spec.it s "the ten arms carry ten distinct tags" $
     Spec.assertEqWith
       s
-      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the player sweep, a library's top card, a chosen graveyard card and a chosen card in hand all encode differently"
+      "a slot, a battlefield sweep, a graveyard sweep, the hand sweep, the linked exile sweep, the stack sweep, the player sweep, a library's top card, a chosen graveyard card and a chosen card in hand all encode differently"
       ( length
           ( List.nub
               [ Codec.encode ObjectRef.codec (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))),
@@ -169,6 +178,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourHand,
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
+                Codec.encode ObjectRef.codec (ObjectRef.EachSpell (Filter.Not Filter.IsSource)),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
@@ -176,7 +186,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
               ]
           )
       )
-      9
+      10
   -- A tag the decoder does not know is an error rather than a silent slot.
   Spec.it s "an unknown tag is rejected" $
     Spec.assertBool

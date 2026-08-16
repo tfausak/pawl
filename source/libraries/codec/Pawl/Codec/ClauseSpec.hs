@@ -14,10 +14,12 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
@@ -77,9 +79,9 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
                   PayGate.branch = PayBranch.IfNotPaid
                 }
           )
-          (Seq.singleton (Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))))
+          (Seq.singleton (Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing)))
       )
-      """ {"effects":[{"type":"Counter","value":"spell"}],"payGate":{"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfNotPaid"}}} """
+      """ {"effects":[{"type":"Counter","value":{"ref":{"type":"InSlot","value":"spell"}}}],"payGate":{"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfNotPaid"}}} """
   -- CR 701.46a: adapt's "if this permanent has no +1/+1 counters on it".
   Spec.it s "a clause carrying a condition writes the key" $
     Common.assertJsonCodec
