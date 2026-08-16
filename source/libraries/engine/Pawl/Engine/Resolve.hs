@@ -2174,10 +2174,7 @@ forEachOrder resolving controller recipients = do
   gs <- State.get
   let order = Game.apnapOrder gs
       last_ = length order
-      playerOf recipient = case recipient of
-        Recipient.ToPlayer pid -> Just pid
-        _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
-      seat recipient = maybe last_ (\pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)) (playerOf recipient)
+      seat recipient = maybe last_ (\pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)) (recipientSeat gs recipient)
       groups = List.groupBy (\a b -> seat a == seat b) (List.sortOn (\recipient -> (seat recipient, recipient)) recipients)
       pick group = case group of
         _ : _ : _ -> do
@@ -2185,6 +2182,21 @@ forEachOrder resolving controller recipients = do
           pure (Game.permute group answer)
         _ -> pure group
   fmap concat (traverse pick groups)
+
+-- WHOSE a recipient is: a player recipient is that seat, and an object's is its
+-- controller (CR 110.2). The one reading of "their" a recipient of either kind
+-- has, and it is already the reading CR 608.2f's APNAP grouping takes -- so the
+-- per-recipient amount below and the per-recipient order above cannot disagree
+-- about which seat a creature belongs to.
+--
+-- Nothing where the board no longer holds the object, which is reachable rather
+-- than defensive: a group binding names ids that may have moved since (CR
+-- 400.7). Each caller says what it does with that -- forEachOrder sorts it last,
+-- the DealDamage arm falls back to one evaluation for it.
+recipientSeat :: GameState -> Recipient -> Maybe PlayerId
+recipientSeat gs recipient = case recipient of
+  Recipient.ToPlayer pid -> Just pid
+  _ -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
 
 -- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
 -- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
@@ -2414,7 +2426,9 @@ effectContext controller source legal =
 -- where Vision Skeins' literal gives one number to the whole table. Every opcode
 -- naming a set of players and an amount evaluates through here, once per
 -- recipient, so what "their own" means is stated once rather than opted into arm
--- by arm.
+-- by arm. Effect.DealDamage too, whose set may hold OBJECTS as well as players
+-- (Acidic Soil): recipientSeat is what says whose an object's amount is, and the
+-- PlayerId this takes is the answer rather than the recipient itself.
 --
 -- Two spellings, because a card asks two different questions:
 --
@@ -2567,13 +2581,44 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         dealerId = case dealer of
           Nothing -> Just source
           Just slot -> Maybe.listToMaybe (objectRefObjects legal resolving controller source gs (ObjectRef.InSlot slot))
-    case (dealerId, Quantity.evaluateFor viewOf context gs resolving source quantity) of
+    case dealerId of
       -- No source, no damage: CR 608.2b's illegal dealer, above.
-      (Nothing, _) -> pure ()
-      -- An unevaluable quantity is a no-op, the powerOf posture.
-      (_, Nothing) -> pure ()
-      (Just dealt, Just n) ->
-        Monad.when (n > 0) $ do
+      Nothing -> pure ()
+      Just dealt -> do
+        -- HOW MUCH, read ONCE PER RECIPIENT through evaluateForRecipient, the
+        -- funnel every opcode taking a PlayerRef already reads its amount
+        -- through: Acidic Soil's "damage to each player equal to the number of
+        -- lands they control" is one amount per seat, not one for the set.
+        --
+        -- Not a departure from CR 608.2f. Every read is against the same
+        -- pre-effect GameState the arm already took, so a quantity naming
+        -- neither the recipient nor the candidate reads identically for the
+        -- whole set and the batch below is still one action.
+        --
+        -- BOTH KINDS of recipient get it, keyed to recipientSeat: an object's
+        -- "their" is its controller's, which is the reading forEachOrder
+        -- already takes for the same set of recipients. Not player recipients
+        -- alone -- Incite Rebellion's "each creature that player controls ...
+        -- equal to the number of creatures they control" is that sentence over
+        -- a creature, and it reaches this arm as two instructions rather than
+        -- one only because a mixed set has no single spelling (#1285).
+        --
+        -- An unevaluable amount drops that recipient, the powerOf posture, and
+        -- so does a zero: CR 120.8's "if a source would deal 0 damage, it does
+        -- not deal damage at all". Dropping a recipient is not dropping the
+        -- batch, which is the difference from reading the amount once.
+        let amountFor recipient = case recipientSeat gs recipient of
+              Nothing -> Quantity.evaluateFor viewOf context gs resolving source quantity
+              Just pid -> evaluateForRecipient viewOf context gs resolving source pid quantity
+            events =
+              Maybe.mapMaybe
+                ( \recipient -> do
+                    n <- amountFor recipient
+                    Monad.guard (n > 0)
+                    pure (Damage.damageEvent gs DamageKind.Noncombat dealt recipient (Integer.toNaturalSaturating n))
+                )
+                recipients
+        Monad.unless (null events) $ do
           -- The applied effect IS the event (the M3a spec, section 4):
           -- constructing these DamageEvents and funneling them is the whole
           -- application. CR 120.3e / 120.3a live in applyDamage.
@@ -2582,12 +2627,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- is processed simultaneously" is what Corrosive Gale's "each creature
           -- with flying" needs, and applyDamage is the funnel that keeps it (its
           -- haddock carries the CR 615/616 reading of a batch).
-          --
-          -- Not implemented: the amount is read once for that batch, so a number
-          -- that is each recipient's own -- Acidic Soil's "equal to the number of
-          -- lands they control", which evaluateForRecipient gives every opcode
-          -- taking a PlayerRef -- cannot be written here (#1658).
-          Damage.applyDamage (fmap (\recipient -> Damage.damageEvent gs DamageKind.Noncombat dealt recipient (Integer.toNaturalSaturating n)) recipients)
+          Damage.applyDamage events
           -- CR 615.5's "immediately afterward", for damage a resolution deals:
           -- a shield this damage spent runs its additional effect here, inside
           -- the same resolution, rather than waiting for the next SBA check.

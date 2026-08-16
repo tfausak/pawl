@@ -3983,7 +3983,7 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
     Spec.assertEqWith s "bob is at 0" (S.lifeOf S.bob after) (Just 0)
     Spec.assertEqWith s "and alice wins" (GameState.result (S.settleSba after)) (Just (Result.Won S.alice))
 
--- A per-player amount that is a number of the RECIPIENT'S OWN, on two opcodes
+-- A per-player amount that is a number of the RECIPIENT'S OWN, on three opcodes
 -- and through the two spellings of that reading:
 --
 --   * Stronghold Discipline, {2}{B}{B} Sorcery: "Each player loses 1 life for
@@ -3995,6 +3995,10 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
 --     the recipient's own graveyard -- PlayerRef.Candidate, substituted by
 --     Quantity.forCandidate, which is the half a nested Count used to be left out
 --     of.
+--   * Acidic Soil, {2}{R} Sorcery: "Acidic Soil deals damage to each player equal
+--     to the number of lands they control." Effect.DealDamage over Stronghold
+--     Discipline's spelling, and the case for CR 608.2f: the amount is read once
+--     per recipient and the damage is still dealt as ONE batch.
 --
 -- Three seats taking three DIFFERENT amounts in each case, because a board where
 -- two of them take the same number cannot tell a per-recipient reading from one
@@ -4002,8 +4006,8 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
 -- "each player" reaches her, and handing everyone the controller's number is
 -- exactly the error being excluded.
 --
--- Both cards are mandatory and targetless, so no prompt is raised during either
--- resolution and no answerer can repair a mutated reading.
+-- All three cards are mandatory and targetless, so no prompt is raised during
+-- any of the resolutions and no answerer can repair a mutated reading.
 perRecipientAmountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 perRecipientAmountSpec s registry =
   let castAndResolve spellId gs =
@@ -4041,6 +4045,20 @@ perRecipientAmountSpec s registry =
             stocked = List.foldl' (\board pid -> stockLibrary piker pid 8 board) withFiller [S.alice, S.bob, S.carol]
             (gs, spellId) = S.handOne resurgence stocked
         pure (spellId, gs)
+      -- alice controls 3 Mountains, bob 2 and carol 1, on life totals 20, 17 and
+      -- 13. alice's three are also the {2}{R}, and they are TAPPED by the time
+      -- the spell resolves -- "lands they control" counts a tapped land, so her
+      -- own answer is still 3.
+      acidicBoard = do
+        mountain <- S.printingOf s registry "Mountain"
+        soil <- S.printingOf s registry "Acidic Soil"
+        let withAlice = S.landsFor mountain S.alice 3 S.threePlayerGame
+            withBob = S.landsFor mountain S.bob 2 withAlice
+            (carolMountain, withCarol) = S.addCreature mountain S.carol withBob
+            lifed = withCarol {GameState.players = at S.alice 20 (at S.bob 17 (at S.carol 13 (GameState.players withCarol)))}
+            (gs, spellId) = S.handOne soil lifed
+        pure (carolMountain, spellId, gs)
+      damages gs = fmap (\ev -> (DamageEvent.target ev, DamageEvent.amount ev)) (S.damageEventsOf gs)
    in Spec.describe s "PerRecipientAmount" $ do
         Spec.it s "CR 119.3 Stronghold Discipline charges each player for their OWN creatures" $ do
           (_carolPiker, spellId, gs) <- disciplineBoard
@@ -4080,6 +4098,29 @@ perRecipientAmountSpec s registry =
           Spec.assertEqWith s "bob still drew 2" (S.handSize S.bob after) 2
           Spec.assertEqWith s "carol still drew 3" (S.handSize S.carol after) 3
           Spec.assertEqWith s "and the libraries agree" (fmap (\pid -> length (Game.zoneMembers Zone.Library pid after)) [S.alice, S.bob, S.carol]) [4, 6, 5]
+        Spec.it s "CR 120.3a Acidic Soil deals each player their OWN land count" $ do
+          (_carolMountain, spellId, gs) <- acidicBoard
+          let after = castAndResolve spellId gs
+          Spec.assertEqWith s "alice, controlling 3, went 20 -> 17" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "bob, controlling 2, went 17 -> 15 -- not alice's 3" (S.lifeOf S.bob after) (Just 15)
+          Spec.assertEqWith s "carol, controlling 1, went 13 -> 12" (S.lifeOf S.carol after) (Just 12)
+          -- Three events, and CR 608.2f's simultaneity is what the ONE
+          -- applyDamage call keeps: the amounts differ per seat while the batch
+          -- does not become three batches.
+          Spec.assertEqWith s "one batch of three, each the recipient's own count" (damages after) [(Recipient.ToPlayer S.alice, 3), (Recipient.ToPlayer S.bob, 2), (Recipient.ToPlayer S.carol, 1)]
+        -- The control twin, differing in ONE thing: carol's Mountain is under
+        -- bob's control. She still OWNS it, so an amount read off an
+        -- owner-sliced battlefield would leave both their answers where they
+        -- were; CR 110.2's control is what moves the 1 from carol to bob.
+        Spec.it s "CR 110.2 the control: a land carol owns but bob controls is charged to BOB" $ do
+          (carolMountain, spellId, gs0) <- acidicBoard
+          let gs = S.giveControl carolMountain S.bob gs0
+              after = castAndResolve spellId gs
+          Spec.assertEqWith s "alice is unmoved at 17" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "bob, now controlling 3, went 17 -> 14" (S.lifeOf S.bob after) (Just 14)
+          Spec.assertEqWith s "carol, controlling nothing, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "and CR 120.8 drops her recipient without dropping the batch" (damages after) [(Recipient.ToPlayer S.alice, 3), (Recipient.ToPlayer S.bob, 3)]
+          Spec.assertEqWith s "the Mountain is still carol's card" (fmap Object.owner (Game.lookupObject carolMountain after)) (Just S.carol)
 
 -- Mirror Universe (Legends) on alice's battlefield, in her own upkeep, with the
 -- three seats at three DIFFERENT life totals: "{T}, Sacrifice this artifact:
