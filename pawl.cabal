@@ -223,6 +223,8 @@ library codec
     Pawl.Codec.DestructionRewrite
     Pawl.Codec.DestructionRewriteSpec
     Pawl.Codec.Discard
+    Pawl.Codec.DiscardCards
+    Pawl.Codec.DiscardCardsSpec
     Pawl.Codec.DiscardCause
     Pawl.Codec.DiscardCauseSpec
     Pawl.Codec.Discarded
@@ -939,6 +941,7 @@ library types
     Pawl.Types.DestructionRewrite
     Pawl.Types.Desync
     Pawl.Types.Discard
+    Pawl.Types.DiscardCards
     Pawl.Types.DiscardCause
     Pawl.Types.Discarded
     Pawl.Types.Drew

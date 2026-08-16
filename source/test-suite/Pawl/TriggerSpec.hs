@@ -276,6 +276,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Discarded as Discarded
 import qualified Pawl.Types.Drew as Drew
@@ -2987,7 +2988,7 @@ cyclingTriggerSpec s registry =
           gs = g1 {GameState.priority = Just S.alice}
           -- The same card, the same graveyard, one component over: a cost that
           -- discards a card of the player's choice rather than this one.
-          discarded = S.runPure S.identityAnswer gs (Cost.payComponent S.alice S.noSource (CostComponent.DiscardCards 1))
+          discarded = S.runPure S.identityAnswer gs (Cost.payComponent S.alice S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
           after = S.runPure S.identityAnswer discarded Engine.settleForPriority
       Spec.assertEqWith s "the Aven really did reach the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice discarded)) 1
       Spec.assertEqWith s "nothing was put on the stack" (GameState.stack after) []
@@ -3088,7 +3089,7 @@ discardTriggerSpec s registry =
           (_, withAlicesCard) = S.addHandCard piker S.alice base
           (_, gs0) = S.addHandCard piker S.bob withAlicesCard
           gs = gs0 {GameState.priority = Just S.alice}
-          discardBy pid = S.runPure S.identityAnswer gs (Cost.payComponent pid S.noSource (CostComponent.DiscardCards 1))
+          discardBy pid = S.runPure S.identityAnswer gs (Cost.payComponent pid S.noSource (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))))
           byAlice = discardBy S.alice
           byBob = discardBy S.bob
           settle g = S.runPure S.identityAnswer g Engine.priorityLoop

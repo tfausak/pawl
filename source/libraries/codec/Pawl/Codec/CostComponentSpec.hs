@@ -9,6 +9,7 @@ import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -74,8 +75,8 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
     Common.assertCodec
       s
       codec
-      (CostComponent.DiscardCards 2)
-      """ {"type":"DiscardCards","value":2} """
+      (CostComponent.DiscardCards (DiscardCards.MkDiscardCards 2 (Filter.And [])))
+      """ {"type":"DiscardCards","value":{"count":2,"whichCards":{"type":"And","value":[]}}} """
   Spec.it s "DiscardThis" $
     Common.assertCodec
       s

@@ -10,7 +10,13 @@
               },
               {
                 "type": "DiscardCards",
-                "value": 1
+                "value": {
+                  "count": 1,
+                  "whichCards": {
+                    "type": "And",
+                    "value": []
+                  }
+                }
               }
             ],
             "mana": []

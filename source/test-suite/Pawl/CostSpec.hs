@@ -1585,6 +1585,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   headlessSkaabSpec s registry
   frailExhumationSpec s registry
   catharticReunionSpec s registry
+  magmaticInsightSpec s registry
   safeholdSentrySpec s registry
   fireblastSpec s registry
   asmorSpec s registry
@@ -1883,3 +1884,64 @@ catharticReunionSpec s registry =
       Spec.assertEqWith s "and the spell is on the stack" (length (GameState.stack paid)) 1
       Spec.assertEqWith s "[a,a] names one, so nothing is discarded" (length (Game.zoneMembers Zone.Graveyard S.alice unpaid)) 0
       Spec.assertEqWith s "and nothing reached the stack" (length (GameState.stack unpaid)) 0
+
+-- alice has one untapped Mountain, holds Magmatic Insight plus `second` plus a
+-- Goblin Piker, and has four cards in her library so the draw of two is never a
+-- CR 104.3c loss. The catharticBoard's shape with `second` as the only variable:
+-- a Forest makes the cost payable and a second Piker makes it unpayable, and the
+-- two boards agree on everything else -- one red source, one seat, the same
+-- phase, the same hand SIZE.
+magmaticBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+magmaticBoard mountain piker magmaticInsight second =
+  let base = S.landsInPlay mountain 1
+      (insight, gs1) = S.addHandCard magmaticInsight S.alice base
+      (held, gs2) = S.addHandCard second S.alice gs1
+      (other, gs3) = S.addHandCard piker S.alice gs2
+      withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) gs3 [1 .. (4 :: Int)]
+   in ( insight,
+        held,
+        other,
+        withLibrary
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Magmatic Insight {R} Sorcery: "As an additional cost to cast this spell,
+-- discard a land card. Draw two cards." The card the discard cost's criterion
+-- was waiting for (#1620) -- Cathartic Reunion's cost names no quality, so
+-- before this one the field had nothing to narrow.
+magmaticInsightSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+magmaticInsightSpec s registry =
+  Spec.describe s "Magmatic Insight" $ do
+    -- The criterion decides WHICH card pays, not just how many. The Piker is in
+    -- hand throughout and is never a candidate, so the elision holds (one
+    -- matching card for a count of one) and noDiscardAnswer proves it: were the
+    -- Piker offered, the prompt would be real and an answer of [] would leave
+    -- the whole cost unpaid.
+    Spec.it s "CR 118.8 whole card: the land is the card discarded, and two are drawn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      forest <- S.printingOf s registry "Forest"
+      magmaticInsight <- S.printingOf s registry "Magmatic Insight"
+      let (insight, _, other, gs) = magmaticBoard mountain piker magmaticInsight forest
+          cast = S.runPure noDiscardAnswer gs (S.cast S.alice insight)
+          resolved = S.runPure noDiscardAnswer cast Stack.resolveTop
+      -- By NAME, since CR 400.7 mints a fresh id for the discarded card.
+      Spec.assertEqWith s "the Forest, and only the Forest, paid the cost" (namesIn Zone.Graveyard cast) [Face.name (S.combinedFace forest)]
+      Spec.assertBool s (elem other (Game.zoneMembers Zone.Hand S.alice cast)) "and the Piker, which the criterion excludes, is still in hand"
+      Spec.assertEqWith s "the spell is on the stack" (length (GameState.stack cast)) 1
+      -- One card left in hand before the draw (the Piker), plus two drawn.
+      Spec.assertEqWith s "two cards drawn" (S.handSize S.alice resolved) 3
+    -- The negative, one card different: a hand with no land card at all. Same
+    -- Mountain, same hand size, same phase -- so an unpayable cost is the only
+    -- thing that can withhold the cast.
+    Spec.it s "CR 601.2f a landless hand cannot pay, however many cards it holds" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      magmaticInsight <- S.printingOf s registry "Magmatic Insight"
+      let (insight, _, _, gs) = magmaticBoard mountain piker magmaticInsight piker
+      Spec.assertEqWith s "the hand is the same size as the payable board's" (S.handSize S.alice gs) 3
+      Spec.assertBool s (not (any (\c -> Cost.canPay S.alice insight c gs) (Cost.costsFor (S.printingName magmaticInsight) insight gs))) "no offered cost is payable"
+      Spec.assertBool s (not (any (S.isCastOf insight) (Action.legalActions S.alice gs))) "and no Cast is offered"
