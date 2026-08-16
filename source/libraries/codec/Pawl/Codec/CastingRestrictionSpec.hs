@@ -33,5 +33,13 @@ spec s = Spec.describe s "Pawl.Codec.CastingRestriction" $ do
       CastingRestriction.codec
       CastingRestriction.AttackedThisStep
       """ {"type":"AttackedThisStep"} """
+  -- Curtain of Light's "only during combat after blockers are declared"
+  -- (CR 506.7b).
+  Spec.it s "AfterBlockersDeclared" $
+    Common.assertCodec
+      s
+      CastingRestriction.codec
+      CastingRestriction.AfterBlockersDeclared
+      """ {"type":"AfterBlockersDeclared"} """
   Spec.it s "has a schema" $
     Common.assertHasSchema s CastingRestriction.codec

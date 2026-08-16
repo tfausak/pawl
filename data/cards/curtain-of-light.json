@@ -3,13 +3,7 @@
     {
       "castingRestrictions": [
         {
-          "type": "DuringPhase",
-          "value": {
-            "type": "Combat",
-            "value": {
-              "type": "DeclareBlockers"
-            }
-          }
+          "type": "AfterBlockersDeclared"
         }
       ],
       "manaCost": [
