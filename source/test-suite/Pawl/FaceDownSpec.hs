@@ -420,7 +420,7 @@ castAndResolve morph facing gs oid =
 --
 -- ONE board carries every case. alice controls Ainok Tracker -- {5}{R} 3/3 Dog
 -- Scout with first strike and morph {4}{R} -- and Goblin Piker -- 2/1 Goblin,
--- no keywords -- with three Islands and five Mountains, and holds the
+-- no keywords -- with four Islands and five Mountains, and holds the
 -- Conversion and a Backslide. The Backslide is the CR 708.2b leg's first half:
 -- it lists nothing, so it is what puts a permanent face down with a list the
 -- Conversion would visibly overwrite.
@@ -510,6 +510,15 @@ listedSpec s registry = Spec.describe s "Listed characteristics" $ do
   -- default, and a Conversion that wrongly took effect would overwrite it with
   -- Cyberman. Two listings that differed in nothing could not tell "the rule
   -- stopped it" from "it happened again".
+  --
+  -- THE PAIR, and both halves run from the SAME post-Backslide board with the
+  -- same spell, the same mana and the same answerer -- only the target's facing
+  -- differs. A negative on its own board here would pass for want of the second
+  -- {U}{U} rather than for the rule, which is what the control leg rules out:
+  -- the Conversion demonstrably resolves against the face-up Piker off this very
+  -- state. The offered set is asserted EXACTLY as well, since a face-down
+  -- permanent that was never a legal target would make the case vacuous a second
+  -- way.
   Spec.it s "CR 708.2b Cyber Conversion does nothing to a permanent that is already face down" $ do
     island <- S.printingOf s registry "Island"
     mountain <- S.printingOf s registry "Mountain"
@@ -517,16 +526,29 @@ listedSpec s registry = Spec.describe s "Listed characteristics" $ do
     backslide <- S.printingOf s registry "Backslide"
     ainok <- S.printingOf s registry "Ainok Tracker"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (gs, spell, slide, victim, _) = cyberBoard island mountain cyber backslide ainok piker
+    let (gs, spell, slide, victim, bystander) = cyberBoard island mountain cyber backslide ainok piker
         down = S.runPure (aimAtByFiltering victim) gs (Cast.castSpell S.alice slide (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
     Spec.assertEqWith s "CR 708.2a Backslide's default list, no subtypes" (Projection.subtypesOf victim down) Set.empty
+    case S.spellTargetSlot cyber of
+      Nothing -> Spec.assertFailure s "Cyber Conversion declares no target slot"
+      Just theSlot ->
+        Spec.assertEqWith
+          s
+          "CR 115.4 both creatures are legal targets, the face-down one included"
+          (Target.legalRecipients (Just S.alice) spell theSlot down)
+          (Set.fromList [Recipient.ToCreature victim, Recipient.ToCreature bystander])
+    -- THE CONTROL: the same cast off the same state against the face-UP Piker.
+    let control = S.runPure (aimAtByFiltering bystander) down (Cast.castSpell S.alice spell (S.printingName cyber) Facing.FaceUp >> Stack.resolveTop)
+    Spec.assertEqWith s "the Conversion resolves off this board and lists its Cyberman" (Projection.subtypesOf bystander control) (Set.singleton Subtype.Cyberman)
+    -- THE CASE: one thing differs, and it is the target's facing.
     let after = S.runPure (aimAtByFiltering victim) down (Cast.castSpell S.alice spell (S.printingName cyber) Facing.FaceUp >> Stack.resolveTop)
     Spec.assertEqWith s "CR 708.2b still no subtypes, not Cyberman" (Projection.subtypesOf victim after) Set.empty
     Spec.assertEqWith s "CR 708.2b still creature alone, not artifact creature" (Projection.cardTypesOf victim after) (Set.singleton CardType.Creature)
     Spec.assertEqWith s "CR 708.2b the copiable values are untouched" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.faceDown)
 
--- alice with three untapped Islands -- {U}{U} for the Conversion and {1}{U} for
--- the Backslide -- five Mountains for the Tracker's {4}{R} morph cost, both
+-- alice with four untapped Islands -- {U}{U} for the Conversion and {1}{U} for
+-- the Backslide, whose generic the auto-tapper also pays in blue -- five
+-- Mountains for the Tracker's {4}{R} morph cost, both
 -- spells in hand, and the Tracker and the Piker on the battlefield. Returns the
 -- board, the Conversion, the Backslide, the victim and the bystander.
 --
@@ -534,7 +556,7 @@ listedSpec s registry = Spec.describe s "Listed characteristics" $ do
 -- want of mana.
 cyberBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
 cyberBoard island mountain cyber backslide ainok piker =
-  let (gs0, spell) = S.handOne cyber (S.landsFor mountain S.alice 5 (S.landsInPlay island 3))
+  let (gs0, spell) = S.handOne cyber (S.landsFor mountain S.alice 5 (S.landsInPlay island 4))
       (gs1, slide) = S.handOne backslide gs0
       (victim, gs2) = S.addCreature ainok S.alice gs1
       (bystander, gs3) = S.addCreature piker S.alice gs2
