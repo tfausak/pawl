@@ -107,6 +107,7 @@ import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
@@ -1629,7 +1630,8 @@ poisonous n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -1669,7 +1671,8 @@ ingest =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -1727,7 +1730,8 @@ annihilator n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -1771,7 +1775,8 @@ battleCry =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -1861,7 +1866,8 @@ evolve =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Just (Condition.Any [entrantExceeds Quantity.Power, entrantExceeds Quantity.Toughness])
+      TriggeredAbility.intervening = Just (Condition.Any [entrantExceeds Quantity.Power, entrantExceeds Quantity.Toughness]),
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect = Effect.Evolve Binding.triggerSource
@@ -1889,7 +1895,8 @@ prowess =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -1934,7 +1941,8 @@ melee =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     bonus = Quantity.OpponentsAttacked (PlayerRef.Relative PlayerRelation.You)
@@ -1980,7 +1988,8 @@ rampage n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     bonus = foldr (\a b -> Quantity.Plus (Plus.MkPlus a b)) (Quantity.Literal 0) (List.genericReplicate n Quantity.BlockersBeyondFirst)
@@ -2029,7 +2038,8 @@ flanking =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton flankingEffect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
 -- The -1/-1 rule 702.25a hands the blocker, read out of the slot CR 509.3d bound.
@@ -2078,7 +2088,8 @@ exalted =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -2130,7 +2141,8 @@ bushidoHalf condition n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -2171,7 +2183,8 @@ frenzy n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -2206,7 +2219,8 @@ afflict n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -2265,7 +2279,8 @@ mentor =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget slot)))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     slot = TargetSlot.required Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
@@ -2318,7 +2333,8 @@ training =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect = Effect.Train Binding.triggerSource
@@ -2357,7 +2373,8 @@ ward cost =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
@@ -2384,7 +2401,8 @@ decayed =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect =
@@ -2451,7 +2469,8 @@ decayedSacrifice =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect = Effect.Sacrifice Binding.triggerSource
@@ -2500,7 +2519,8 @@ provoke =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget slot)))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     slot = TargetSlot.required Pool.Creatures (Just Filter.ControlledByDefendingPlayer)
@@ -2559,7 +2579,8 @@ renown n =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
-        Just (Condition.Compares (Compares.MkCompares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0)))
+        Just (Condition.Compares (Compares.MkCompares (Quantity.HasDesignation Designation.Renowned) Comparison.AtMost (Quantity.Literal 0))),
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource))
@@ -2593,7 +2614,8 @@ dethrone =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     grow = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
@@ -2655,7 +2677,8 @@ returns kind =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton back))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
-        Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0)))
+        Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0))),
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     back =
@@ -2716,7 +2739,8 @@ afterlife n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton spawn))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     spawn =
@@ -2824,7 +2848,8 @@ fabricate n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton spawn)
@@ -2950,7 +2975,8 @@ soulshift n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget slot)))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     slot =
@@ -3013,7 +3039,8 @@ haunt =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton exile))) (Map.singleton hauntTarget slot)))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     slot = TargetSlot.required Pool.Creatures Nothing
@@ -3048,7 +3075,8 @@ miracle cost =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton offer))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     offer =
@@ -3132,7 +3160,8 @@ vanishingUpkeep =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
-        Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1)))
+        Just (Condition.Compares (Compares.MkCompares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1))),
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect = Effect.RemoveCounters (RemoveCounters.MkRemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource)
@@ -3159,7 +3188,8 @@ vanishingLastCounter =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     effect = Effect.Sacrifice Binding.triggerSource
@@ -3203,7 +3233,8 @@ fading =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.fromList [sacrificeClause, removeClause]) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     counted = Quantity.ObjectCounters CounterKind.Fade
@@ -3262,7 +3293,8 @@ modular =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton effect))) (Map.singleton modularTarget slot)))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
   where
     slot = TargetSlot.required Pool.Creatures (Just (Filter.HasCardType CardType.Artifact))

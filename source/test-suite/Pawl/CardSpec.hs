@@ -208,6 +208,7 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpR as TurnUpR
@@ -1507,7 +1508,8 @@ oneEffectTrigger condition effect =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
 -- oneEffectTrigger's ACTIVATED twin: a one-mode, targetless ability running one
@@ -1584,7 +1586,8 @@ modalTrigger condition modes =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
-      TriggeredAbility.intervening = Nothing
+      TriggeredAbility.intervening = Nothing,
+      TriggeredAbility.limit = TriggerLimit.Unlimited
     }
 
 -- Pawl.Engine.Binding's reserved slot names in full: the binding keys the engine
@@ -3621,7 +3624,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                       )
                   )
                   (ModeSelection.ChooseExactly 1),
-              TriggeredAbility.intervening = Nothing
+              TriggeredAbility.intervening = Nothing,
+              TriggeredAbility.limit = TriggerLimit.Unlimited
             }
         arm face = face {Face.triggeredAbilities = offending : Face.triggeredAbilities face}
         overModal f modal =
@@ -3729,7 +3733,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 [ TriggeredAbility.MkTriggeredAbility
                     { TriggeredAbility.condition = TriggerCondition.SelfDies,
                       TriggeredAbility.modal = declaring slot,
-                      TriggeredAbility.intervening = Nothing
+                      TriggeredAbility.intervening = Nothing,
+                      TriggeredAbility.limit = TriggerLimit.Unlimited
                     }
                 ]
             }

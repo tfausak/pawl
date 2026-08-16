@@ -39,6 +39,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.StepBegins as StepBegins
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
@@ -73,7 +74,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
               Modal.MkModal
                 (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Create (Create.MkCreate (Quantity.Literal 1) (Text.pack "Zombie Token") EntryRiders.defaultValue Nothing))))) Map.empty))
                 (ModeSelection.ChooseExactly 1),
-            TriggeredAbility.intervening = Nothing
+            TriggeredAbility.intervening = Nothing,
+            TriggeredAbility.limit = TriggerLimit.Unlimited
           }
       )
       """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Create","value":{"quantity":{"type":"Literal","value":1},"card":"Zombie Token"}}]}]}]}} """
@@ -98,7 +100,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                         Comparison.Exactly
                         (Quantity.Literal 0)
                     )
-                )
+                ),
+            TriggeredAbility.limit = TriggerLimit.Unlimited
           }
       )
       """ {"condition":{"type":"StepBegins","value":{"phase":{"type":"Beginning","value":{"type":"Upkeep"}},"scope":{"type":"ControllersTurn"}}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":{"ref":{"type":"InSlot","value":"you"},"quantity":{"type":"Literal","value":1}}}]}]}]},"intervening":{"type":"Compares","value":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":{"zone":{"type":"Battlefield"},"player":{"type":"EachPlayer"}}},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Members"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}}} """
@@ -119,7 +122,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                     Modal.MkModal
                       (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "token")))))) Map.empty))
                       (ModeSelection.ChooseExactly 1),
-                  TriggeredAbility.intervening = Nothing
+                  TriggeredAbility.intervening = Nothing,
+                  TriggeredAbility.limit = TriggerLimit.Unlimited
                 }
             ),
             ( AbilityName.MkAbilityName (Text.pack "each combat"),
@@ -129,7 +133,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                     Modal.MkModal
                       (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Untap (ObjectRef.EachMatching Filter.AttackedThisTurn))))) Map.empty))
                       (ModeSelection.ChooseExactly 1),
-                  TriggeredAbility.intervening = Nothing
+                  TriggeredAbility.intervening = Nothing,
+                  TriggeredAbility.limit = TriggerLimit.Unlimited
                 }
             )
           ]
@@ -148,6 +153,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
             Modal.MkModal
               (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
               (ModeSelection.ChooseExactly 1),
-          TriggeredAbility.intervening = Nothing
+          TriggeredAbility.intervening = Nothing,
+          TriggeredAbility.limit = TriggerLimit.Unlimited
         }
       """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{}]}} """
