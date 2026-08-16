@@ -1350,8 +1350,8 @@ affectsBase :: ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
 affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) gs
 
 -- CR 608.2h / 611.2d: evaluate a modification's quantities once and rewrite them
--- to literals. Called by Resolve when a spell's resolution stores a continuous
--- effect.
+-- to literals. Called by Resolve when a spell's or an ability's resolution stores
+-- a continuous effect.
 --
 -- TWO objects, neither of them the affected one. `source` is CR 113.7a's source,
 -- which the Filter context reads (IsSource, PowerLessThanSource) and whose

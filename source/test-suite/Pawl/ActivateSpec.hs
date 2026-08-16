@@ -1423,22 +1423,6 @@ cinderBoard s registry n = do
   let (srcId, g0) = S.addCreature cinder S.alice (S.landsInPlay mountain n)
   pure (cinder, srcId, g0 {GameState.priority = Just S.alice})
 
--- Announces X and aims every target slot at `who`.
-answerXAt :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
-answerXAt x who p = case p of
-  Prompt.ChooseX {} -> x
-  _ -> aimAt who p
-
--- Announces X and narrows every target slot to one object, by FILTERING the
--- offered set rather than building a recipient: the pool decides which flavour
--- of Recipient a candidate arrives as, and a hand-built one of another flavour
--- is stored, looks targeted, and is then dropped by CR 608.2b's re-read.
-answerXTargeting :: Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
-answerXTargeting x oid p = case p of
-  Prompt.ChooseX {} -> x
-  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just oid) . Recipient.objectOf) . snd) sets
-  _ -> S.identityAnswer p
-
 -- The name of Tovolar's back face, which is where the {X} ability is printed.
 tovolarBackName :: CardName.CardName
 tovolarBackName = CardName.MkCardName (Text.pack "Tovolar, the Midnight Scourge")
@@ -1474,6 +1458,22 @@ tovolarNightBoard s registry = do
       turnedOver o = o {Object.face = Just tovolarBackName}
       g2 = g1 {GameState.objects = Map.adjust turnedOver tovolarId (GameState.objects g1)}
   pure (tovolarId, wolfId, g2 {GameState.priority = Just S.alice})
+
+-- Announces X and aims every target slot at `who`.
+answerXAt :: Natural -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+answerXAt x who p = case p of
+  Prompt.ChooseX {} -> x
+  _ -> aimAt who p
+
+-- Announces X and narrows every target slot to one object, by FILTERING the
+-- offered set rather than building a recipient: the pool decides which flavour
+-- of Recipient a candidate arrives as, and a hand-built one of another flavour
+-- is stored, looks targeted, and is then dropped by CR 608.2b's re-read.
+answerXTargeting :: Natural -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+answerXTargeting x oid p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter ((== Just oid) . Recipient.objectOf) . snd) sets
+  _ -> S.identityAnswer p
 
 -- Answers Prompt.ChooseX with the affordability bound the prompt carries, and
 -- records that bound in the State -- the CastSpec answerer, aimed at a player.
