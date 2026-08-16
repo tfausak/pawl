@@ -3380,8 +3380,10 @@ pikerOn gs =
 -- symbol are independent, and the Defiler cycle already puts a 2-life additional
 -- cost onto spells that may carry the symbol -- Defiler of Vigor onto Birthing
 -- Pod ({3}{G/P}, a green permanent spell by CR 202.2d). What keeps that pairing
--- out of this spec is that the Defiler's cost is OPTIONAL (CR 118.8b, #102) and
--- its reduction is conditional on having paid it (#101).
+-- out of this spec is that the Defiler's cost is OPTIONAL (CR 118.8b) and its
+-- reduction is conditional on having paid it, so the board would have to answer
+-- a prompt before CR 118.3 was asked anything -- two questions where this spec
+-- wants one.
 --
 -- The board is phyrexianSpec's throughout -- a Goblin Piker to target, and the
 -- Toll in hand -- so the only thing that varies between these cases is alice's
