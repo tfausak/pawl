@@ -857,12 +857,13 @@ cardResolutionEffects card =
     -- CR 309.4c: a room ability's effects, which no other limb above reaches --
     -- Pawl.Types.Face.rooms is the fifth carrier.
     <> concatMap (Modal.allEffects . DungeonRoom.ability) (Face.rooms card)
-    -- CR 615.5: the additional effect a printed prevention carries
-    -- (DamageR.riders), the sixth carrier. Not a resolution's effect at all --
-    -- it runs from Resolve.runPreventionRiders when the shield applies -- but
-    -- it is a card-authored effect list, which is what every lint downstream of
-    -- this function is about.
-    <> concatMap (replacementEffectRiders . PrintedReplacement.effect) (Face.replacementEffects card)
+    -- The effects a printed replacement ability carries, the sixth carrier: CR
+    -- 615.5's additional effect beside a prevention (DamageR.riders) and CR
+    -- 614.1c's as-enters instruction (EntryRewrite.RunEffects). Neither is a
+    -- resolution's effect at all -- one runs from Resolve.runPreventionRiders and
+    -- the other from Resolve.runEntryEffects -- but both are card-authored effect
+    -- lists, which is what every lint downstream of this function is about.
+    <> concatMap (replacementPrintedEffects . PrintedReplacement.effect) (Face.replacementEffects card)
 
 -- CR 103.5b and CR 103.6: the actions a face grants from a HAND, one effect list
 -- per action. The two fields are exactly the two Pawl.Engine.Mulligan passes to
@@ -1029,6 +1030,30 @@ cardReplacementEffects card =
   fmap PrintedReplacement.effect (Face.replacementEffects card)
     <> concatMap effectReplacements (cardResolutionEffects card)
 
+-- Every effect a replacement PRINTS, on the two axes that carry one: CR 615.5's
+-- additional effect beside a prevention, and CR 614.1c's "as [this permanent]
+-- enters, [do something]". Swept as one list wherever a card's effects are, since
+-- what the lints downstream ask is whether a card authored the effect rather than
+-- which field it sat in.
+replacementPrintedEffects :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
+replacementPrintedEffects replacement = replacementEffectRiders replacement <> replacementEntryEffects replacement
+
+-- CR 614.1c: the effects an as-enters rewrite runs -- Monstrous War-Leech's mill.
+-- Kept apart from the riders below rather than folded in, because CR 615.5's
+-- rider is a lint's subject in its own right (riderWithoutPreventionOffends) and
+-- these are not one.
+replacementEntryEffects :: ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card) -> [Effect.Effect Card.Type.Card]
+replacementEntryEffects replacement = case replacement of
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects effects)) -> Foldable.toList effects
+  ReplacementEffect.EntryR {} -> []
+  ReplacementEffect.DamageR {} -> []
+  ReplacementEffect.CounterR {} -> []
+  ReplacementEffect.ZoneChangeR {} -> []
+  ReplacementEffect.DestructionR _ -> []
+  ReplacementEffect.TokenR {} -> []
+  ReplacementEffect.TurnUpR {} -> []
+  ReplacementEffect.PhaseR _ -> []
+
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
 -- nothing else, since no other arm has a field to carry one. The card-authored
 -- twin of Effect.PreventNextDamage's `riders`, and swept everywhere that one is.
@@ -1054,7 +1079,7 @@ replacementEffectRiders replacement = case replacement of
 -- the build breaks until it is.
 effectReplacements :: Effect.Effect Card.Type.Card -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card)]
 effectReplacements effect = case effect of
-  Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementEffectRiders replacement)
+  Effect.Replace (Replace.MkReplace _ _ _ _ replacement) -> replacement : concatMap effectReplacements (replacementPrintedEffects replacement)
   Effect.Create (Create.MkCreate _ token _ _) -> overFaces cardReplacementEffects token
   Effect.CreateCopy {} -> []
   Effect.CreateEmblem emblem -> overFaces cardReplacementEffects emblem
@@ -2604,7 +2629,7 @@ storedPlayerScope effect = case effect of
 -- reveal carries a third, over a CARD IN A HAND (Rustic Clachan's "a Kithkin
 -- card"). CR 707.5's copy choice carries a fourth, over permanents on the
 -- battlefield (Copy Enchantment's "any enchantment"). None of the four is framed.
-entryRewriteFilters :: EntryRewrite.EntryRewrite -> [Filter.Type.Filter Keyword.Keyword]
+entryRewriteFilters :: EntryRewrite.EntryRewrite (Effect.Effect Card.Type.Card) -> [Filter.Type.Filter Keyword.Keyword]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> [f]
   EntryRewrite.RevealOrTapped f -> [f]
@@ -2627,6 +2652,9 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.PayLifeOrTapped _ -> []
   EntryRewrite.EntersTransformed -> []
   EntryRewrite.SacrificeAnyNumber (SacrificeAnyNumber.MkSacrificeAnyNumber f _) -> [f]
+  -- CR 614.1c's as-enters effects hold no Filter of their own; the ones inside
+  -- them are reached as ordinary effect filters, through cardResolutionEffects.
+  EntryRewrite.RunEffects _ -> []
 
 -- The Filter a TurnUpRewrite carries. CR 303.4k's destination text -- Gift of
 -- Doom's "you may attach it to a creature" -- and NOT framed, even though an

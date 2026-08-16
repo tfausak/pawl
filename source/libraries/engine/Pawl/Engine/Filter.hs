@@ -249,11 +249,14 @@ data View = MkView
     -- CR 702.33d: has this candidate been kicked? Read off Object.kicked, and
     -- False where there is no object to read it off, both for the reasons
     -- `designations` above gives. Its one reader is Pawl.Engine.Quantity's WasKicked
-    -- arm, answering Burst Lightning's clause conditions.
+    -- arm, answering Burst Lightning's clause conditions and Monstrous War-Leech's
+    -- CR 604.2 clause on its entry replacement.
     --
     -- Not a designation of a PERMANENT as that field holds -- rule 702.33d
     -- designates the SPELL -- but it comes through the view for the same reason
-    -- those do: the reader holds a view and not a board.
+    -- those do: the reader holds a view and not a board. It is nonetheless True
+    -- for a permanent a kicked spell became, which is CR 400.7d's exception to
+    -- the forgetting (see Pawl.Types.Object).
     kicked :: Bool,
     -- CR 602.1 / 605.1a: does the candidate have an activated ability that isn't
     -- a mana ability? A Bool and not the ability list, because that is the whole

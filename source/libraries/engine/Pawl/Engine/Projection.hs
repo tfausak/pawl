@@ -1001,9 +1001,11 @@ viewOfCharacteristics oid pc controller counters gs =
       Filter.designations = maybe Set.empty Object.designations (Game.lookupObject oid gs),
       -- CR 702.33d: `designations` above in every respect -- read live off the object,
       -- so the CR 608.2h path answers False for a spell that has left the stack.
-      -- Nothing asks it there: the only reader is the kicked spell's own clause
+      -- Nothing asks it there: its two readers are the kicked spell's own clause
       -- condition, gated while it is still on the stack
-      -- (Pawl.Engine.Resolve.gateHolds).
+      -- (Pawl.Engine.Resolve.gateHolds), and CR 400.7d's ability of the PERMANENT
+      -- the spell became -- Monstrous War-Leech's entry replacement, asked of an
+      -- object on the battlefield.
       Filter.kicked = maybe False Object.kicked (Game.lookupObject oid gs),
       -- CR 602.1 / 605.1a, off the PROJECTION like `keywords` above: abilities are
       -- characteristics (CR 109.3) written by layer 6, so a land under Humility has

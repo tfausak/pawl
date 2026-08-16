@@ -2825,6 +2825,96 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   damageCountersSpec s registry
   entryCountersSpec s registry
   shieldCounterSpec s registry
+  warLeechSpec s registry
+
+-- Monstrous War-Leech {3}{B} Creature -- Leech Horror \*/*, whole text: "Kicker
+-- {U}. As this creature enters, if it was kicked, mill four cards. Monstrous
+-- War-Leech's power and toughness are each equal to the greatest mana value
+-- among cards in your graveyard." (oracle checked on Scryfall)
+--
+-- CR 614.1c's shape that RUNS AN EFFECT, gated on a condition (#1416) --
+-- EntryRewrite.RunEffects, with "if it was kicked" on CR 604.2's clause.
+--
+-- THE BOARD, one fixture in two states differing in exactly the condition: five
+-- lands (four Swamps and an Island, so {3}{B} is payable with or without the
+-- kicker {U}), the Leech in hand, SIX Lairwatch Giants in the library and ONE
+-- Lightning Bolt already in the graveyard.
+--
+-- The Bolt is what makes both halves observable at once. Without it the unkicked
+-- Leech is a 0/0 that CR 704.5f buries, and "no mill" would be told from "mill"
+-- by a permanent that is not there -- which is the confusion the issue's own bar
+-- rules out. Lightning Bolt's mana value is 1 and Lairwatch Giant's is 6
+-- (CR 202.3), so the Leech ENTERS AND SURVIVES on both boards and the two are
+-- told apart by what it is: a 1/1 unkicked, a 6/6 kicked.
+--
+-- Every number distinct: one Bolt, four milled, six in the library before and two
+-- after, five lands, and the two power/toughness readings 1 and 6.
+warLeechBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+warLeechBoard swamp island leech giant bolt =
+  let lands = S.landsFor island S.alice 1 (S.landsInPlay swamp 4)
+      (_, withBolt) = S.addGraveyardCard bolt S.alice lands
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard giant S.alice g)) withBolt [1 :: Int .. 6]
+   in S.handOne leech stocked
+
+-- Answers CR 702.33a's kicker question with `decision` and defers everything else,
+-- so the two boards below differ in this one answer and nothing else.
+kicks :: KickerDecision.KickerDecision -> Prompt.Prompt r -> r
+kicks decision p = case p of
+  Prompt.ChooseKicker {} -> decision
+  _ -> S.identityAnswer p
+
+-- How many cards are in alice's library, and in her graveyard.
+zoneSizes :: GameState.GameState -> (Int, Int)
+zoneSizes gs =
+  ( Seq.length (Map.findWithDefault Seq.empty S.alice (GameState.library gs)),
+    Seq.length (Map.findWithDefault Seq.empty S.alice (GameState.graveyard gs))
+  )
+
+-- The battlefield's Monstrous War-Leech, by name: CR 400.7 gives the permanent a
+-- new id, so the one the cast was handed names nothing here.
+leechOut :: GameState.GameState -> [ObjectId.ObjectId]
+leechOut gs = [o | o <- Set.toList (GameState.battlefield gs), Projection.hasName (CardName.MkCardName (Text.pack "Monstrous War-Leech")) o gs]
+
+-- Cast the Leech with this kicker answer and settle: the entry rewrite's effects
+-- are queued by Pawl.Engine.Event and drained by performSettle, so the mill has
+-- happened by the time the state-based action pass reads the Leech's toughness.
+castLeech :: KickerDecision.KickerDecision -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+castLeech decision gs leechId =
+  let cast = snd (Engine.runGamePure (kicks decision) gs (S.cast S.alice leechId))
+   in snd (Engine.runGamePure (kicks decision) cast (Stack.resolveTop >> Engine.settleForPriority))
+
+warLeechSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+warLeechSpec s registry = Spec.describe s "Monstrous War-Leech" $ do
+  -- CR 702.33d's designation survives the resolution (CR 400.7d), the CR 604.2
+  -- clause reads it off the entering permanent, and CR 614.1c's rewrite runs the
+  -- mill.
+  Spec.it s "CR 614.1c kicked, the as-enters mill runs: four cards leave the library and the Leech is a 6/6" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    leech <- S.printingOf s registry "Monstrous War-Leech"
+    giant <- S.printingOf s registry "Lairwatch Giant"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (board, leechId) = warLeechBoard swamp island leech giant bolt
+        settled = castLeech KickerDecision.Kicks board leechId
+    Spec.assertEqWith s "four cards were milled: six in the library became two, and the graveyard's one Bolt became five cards" (zoneSizes settled) (2, 5)
+    case leechOut settled of
+      [permId] -> Spec.assertEqWith s "the greatest mana value among them is Lairwatch Giant's 6" (S.powerToughnessOf permId settled) (Just (6, 6))
+      other -> Spec.assertFailure s ("expected one Leech, got " <> show (length other))
+  -- The same board and the same answerer but for the one answer. The Leech enters
+  -- HERE TOO, so what the two cases tell apart is whether the replacement ran and
+  -- not whether the permanent arrived.
+  Spec.it s "CR 614.1c unkicked, the rewrite does not apply: nothing is milled and the Leech is a 1/1" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    leech <- S.printingOf s registry "Monstrous War-Leech"
+    giant <- S.printingOf s registry "Lairwatch Giant"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (board, leechId) = warLeechBoard swamp island leech giant bolt
+        settled = castLeech KickerDecision.Declines board leechId
+    Spec.assertEqWith s "the library is untouched and the graveyard still holds only the Bolt" (zoneSizes settled) (6, 1)
+    case leechOut settled of
+      [permId] -> Spec.assertEqWith s "so the greatest mana value is Lightning Bolt's 1" (S.powerToughnessOf permId settled) (Just (1, 1))
+      other -> Spec.assertFailure s ("expected one Leech, got " <> show (length other))
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -4398,7 +4488,7 @@ castColdsteel mountain coldsteel pick =
 
 -- Take the candidate carrying `rewrite`. Total, falling back on the canonical
 -- first the way the engine's own out-of-range handling does.
-pickRewrite :: EntryRewrite.EntryRewrite -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
+pickRewrite :: EntryRewrite.EntryRewrite (Effect.Effect Card.Card) -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
 pickRewrite rewrite entries =
   let wanted e = ReplacementEntry.effect e == ReplacementEffect.EntryR (EntryR.MkEntryR Filter.Type.IsSource rewrite)
    in maybe 0 Int.toNaturalSaturating (List.findIndex wanted entries)

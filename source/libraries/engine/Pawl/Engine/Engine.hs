@@ -1076,6 +1076,14 @@ settleForPriority = Monad.void performSettle
 -- still gets the CR 514.3a round it is entitled to.
 performSettle :: Game Bool
 performSettle = do
+  -- CR 614.1c: an as-enters rewrite that ran an effect queued it, because
+  -- Pawl.Engine.Event cannot run one. Drained FIRST, so the effects land before
+  -- the SBA pass and before the trigger scan below -- Monstrous War-Leech's mill
+  -- decides the power and toughness CR 704.5f then reads. Reports nothing: it
+  -- runs a card's effects rather than performing a state-based action or placing
+  -- a trigger, which is what `cleanupException` asks about, and anything it
+  -- causes is seen by this pass regardless.
+  Resolve.runEntryEffects
   swept <- Expiry.sweepConditional
   returned <- Monarch.returnExiledForMonarch
   -- CR 702.145c/d/f/g, checked here for CR 704.3's reason and not because they are

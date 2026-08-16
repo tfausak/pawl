@@ -531,14 +531,19 @@ data Object = MkObject
     -- Stored for the designations' reason above: nothing a CR 613 layer computes
     -- may move it, since it records a choice rather than a characteristic. A Bool
     -- and not a member of Pawl.Types.Designation because it is a fact about a
-    -- SPELL, where every member of that type is a mark "only permanents can have",
-    -- so the field is False for every permanent: rule 702.33e's payoff on a
-    -- permanent card is a CR 614.1c entry replacement, which reads the SPELL on the
-    -- stack and not the permanent it becomes (Monstrous War-Leech, #610).
+    -- SPELL, where every member of that type is a mark "only permanents can have".
     --
     -- Per-incarnation, which CR 400.7 makes the whole of rule 702.33d's duration:
-    -- the designation belongs to the spell, and the permanent or the card in a
-    -- graveyard that the spell becomes is a new object with no memory of it.
+    -- the designation belongs to the spell, and the card in a graveyard or in
+    -- exile that the spell becomes is a new object with no memory of it.
+    --
+    -- THE ONE EXCEPTION is CR 400.7d, and the rule states it as one: "an ability
+    -- of a permanent can reference information about the spell that became that
+    -- permanent as it resolved, including what costs were paid". Monstrous
+    -- War-Leech's rule 702.33e payoff is a CR 614.1c entry replacement asked of
+    -- the PERMANENT, so the flag is carried across that one move by
+    -- Pawl.Engine.Event.changeZoneAttaching, `announcedX` below's route exactly.
+    -- It stays False for every permanent no kicked spell became.
     --
     -- A Bool and not a count: CR 702.33c's multikicker is payable "any number of
     -- times", and no card in the pool has two kicker costs either (#1234, #1235).

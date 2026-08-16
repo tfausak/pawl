@@ -111,6 +111,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.Onset (Onset)
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.PermanentBecomesDesignated as PermanentBecomesDesignated
@@ -1314,6 +1315,49 @@ apply batch candidate event =
       -- Card.turnedOver and CR 701.27d's refusal with it, so such a face would be
       -- shown on the battlefield rather than merely fail to reach the graveyard
       -- (#1547).
+      -- CR 614.1c: "As [this permanent] enters, [do something]" -- Monstrous
+      -- War-Leech's "mill four cards". The one entry rewrite that runs an EFFECT
+      -- rather than changing what the permanent is (#1416).
+      --
+      -- QUEUED, not run here, and the module boundary is the reason: this module
+      -- is below Pawl.Engine.Resolve and cannot run a card's effects, exactly as
+      -- Pawl.Engine.Damage cannot run CR 615.5's rider. So the effects go onto
+      -- GameState.pendingEntryEffects with the environment they need and
+      -- Resolve.runEntryEffects performs them; see that field for where it drains
+      -- and what the deferral costs.
+      --
+      -- CR 109.5's "you" is the ENTERING object's controller, read live off the
+      -- board rather than off the candidate -- Bloodthirst's and
+      -- SacrificeAnyNumber's posture, and what makes `readsApplier` answer False
+      -- for this arm. Read NOW rather than at the drain, because a later rewrite
+      -- in the same CR 616.1 loop may hand the permanent to someone else
+      -- (UnderSourceControl).
+      --
+      -- NO CONDITION asked here. Rule 702.54a's is Bloodthirst's and lives in
+      -- Replacement.admitsEntry; this arm's producer states its own on CR 604.2's
+      -- clause, which Projection.replacementsOf asked before the row was
+      -- collected.
+      EntryRewrite.RunEffects effects -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the reason riot's arm gives above: the
+          -- object is materialized on the battlefield before runEntry, so
+          -- controllerOf falls back to its owner. Runs nothing rather than
+          -- picking a performer.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            State.modify' $ \g ->
+              g
+                { GameState.pendingEntryEffects =
+                    GameState.pendingEntryEffects g
+                      Seq.|> PendingEntryEffect.MkPendingEntryEffect
+                        { PendingEntryEffect.object = oid,
+                          PendingEntryEffect.controller = controller,
+                          PendingEntryEffect.effects = effects
+                        }
+                }
+            pure (Just event)
       EntryRewrite.EntersTransformed -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         gs <- State.get
@@ -2426,7 +2470,26 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                     -- behaviour: the field's only reader is the entry
                     -- replacement mint, which asks it of a permanent, so
                     -- dropping the gate leaves the suite green.
-                    Object.announcedX = if dest == Zone.Battlefield then Binding.amountOf Binding.variableX (Object.bindings obj) else Nothing
+                    Object.announcedX = if dest == Zone.Battlefield then Binding.amountOf Binding.variableX (Object.bindings obj) else Nothing,
+                    -- CR 400.7d: "an ability of a permanent can reference
+                    -- information about the spell that became that permanent as
+                    -- it resolved, including WHAT COSTS WERE PAID to cast that
+                    -- spell." Rule 702.33d's designation is exactly such a cost
+                    -- record, and Monstrous War-Leech's CR 614.1c rewrite is the
+                    -- ability that references it -- asked of the PERMANENT, since
+                    -- the permanent is what enters.
+                    --
+                    -- So this is `announcedX` above's second instance rather than
+                    -- a new idea: `newIncarnation` has just cleared the flag with
+                    -- everything else CR 400.7 forgets, and the exception the rule
+                    -- names is written back here, off the departing object.
+                    --
+                    -- BATTLEFIELD ONLY, and here the gate carries weight where
+                    -- announcedX's does not: a kicked spell countered on its way
+                    -- to a graveyard becomes a card, and rule 400.7d speaks only
+                    -- about a permanent. Nothing else reads the flag off an object
+                    -- outside the stack.
+                    Object.kicked = Object.kicked obj && dest == Zone.Battlefield
                   }
               -- CR 604.2 ends a static ability's continuous effect the moment
               -- its permanent leaves the battlefield. A card whose own text
