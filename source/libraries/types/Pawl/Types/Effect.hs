@@ -880,6 +880,29 @@ data Effect card
     -- Assault's sweeps are `EachMatching`. ObjectRef for Destroy's reason -- one
     -- opcode rather than a sibling UntapAll to keep in step with it.
     Untap ObjectRef.ObjectRef
+  | -- | CR 502.3 / 611.2: the permanents the ObjectRef names don't untap during
+    -- their controller's NEXT untap step. Elvish Hunter's "{1}{G}, {T}: Target
+    -- creature doesn't untap during its controller's next untap step" is the
+    -- pool's printing; CR 701.43a's exert is the same sentence said of oneself.
+    --
+    -- NOT Tap above and not a rider on it. The two clauses are printed together
+    -- most of the time ("tap target creature. That creature doesn't untap ...")
+    -- and come apart on both sides: Elvish Hunter prohibits without tapping, and
+    -- Wall of Frost prohibits a creature that tapped itself by attacking. So this
+    -- is an opcode beside Tap, and a card printing both writes both.
+    --
+    -- An ObjectRef for Tap's reason -- one opcode rather than a sibling that
+    -- sweeps -- and it is what lets Frost Breath's "up to two target creatures"
+    -- and Curse of Marit Lage's board-wide shapes share this arm.
+    --
+    -- Stores NO duration, and owes none. What it writes is
+    -- Object.doesNotUntapNext on each victim, which CR 701.43b ends at the untap
+    -- step it applies in; see that field for why the flag rides the victim rather
+    -- than a Pawl.Types.Expiry carrier. The PRINTED static twin --
+    -- Pawl.Types.UntapRestriction, Tsabo's Web, "doesn't untap during its
+    -- controller's untap step" with no "next" -- is a face field and never
+    -- reached from here.
+    DoesNotUntapNext ObjectRef.ObjectRef
   | -- | CR 701.27a: turn the permanents the ObjectRef names over, so that each
     -- shows its other face. Thraben Gargoyle's "{6}: Transform this creature" is
     -- `InSlot` the ability's own source; Moonmist's "transform all Humans" is

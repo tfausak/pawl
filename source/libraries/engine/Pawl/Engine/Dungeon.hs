@@ -210,7 +210,8 @@ enter pid = do
                 Object.unlockedHalves = Set.empty,
                 Object.designations = Set.empty,
                 Object.kicked = False,
-                Object.announcedX = Nothing
+                Object.announcedX = Nothing,
+                Object.doesNotUntapNext = False
               }
           gs3 =
             Game.insertIntoZone
