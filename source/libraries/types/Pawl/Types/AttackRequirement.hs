@@ -8,12 +8,11 @@ import qualified Pawl.Types.Affected as Affected
 -- The FOURTH carrier of a printed static ability, and the twin of
 -- Pawl.Types.BlockRequirement, which argues why neither
 -- Pawl.Types.StaticAbility nor Pawl.Types.PlayerStaticAbility can hold a
--- requirement. The two collapse opposite axes, because the printings do:
--- BlockRequirement carries only the attacker to be blocked, its subject always
--- being "all creatures able to block" (#341), while this carries only the
--- subject, since no printing in the pool narrows CR 508.1b's announcement of
--- whom each attacker is attacking. A requirement naming its object ("attacks a
--- player other than you if able") is unrepresentable (#461).
+-- requirement. BlockRequirement carries BOTH of CR 509.1c's axes, because the
+-- printings use both; this one carries only the subject, since no printing in
+-- the pool narrows CR 508.1b's announcement of whom each attacker is attacking.
+-- A requirement naming its object ("attacks a player other than you if able")
+-- is unrepresentable (#461).
 --
 -- Gathered LIVE from the battlefield on every read and never captured, so a
 -- Curse leaving the battlefield lifts its requirement with nothing to unwind.

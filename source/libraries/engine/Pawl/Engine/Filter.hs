@@ -374,7 +374,8 @@ data Context = MkContext
     -- CR 508.5: the DEFENDING PLAYER for the source, for the one atom that asks
     -- (ControlledByDefendingPlayer, CR 702.39a). Supplied by the caller for
     -- sourcePower's reason -- this module holds no game state and cannot read the
-    -- combat record -- and by the same caller, Pawl.Engine.Target.admittedGiven.
+    -- combat record -- by Pawl.Engine.Target.admittedGiven for a target slot and
+    -- by Pawl.Engine.CombatRestriction.inForce for a CR 508.1c gate.
     --
     -- LAZY like sourcePower, and load-bearingly so: filling it costs a
     -- control-grant walk, and no filter that omits the atom ever forces it.
@@ -455,8 +456,10 @@ contextWithSlots p s m = (contextFor p s) {slotObjects = m}
 -- the field is: a Filter that never names the atom pays for no projection.
 --
 -- The defending player stays Nothing on both callers -- CR 702.149a's TRIGGER
--- match and CR 509.1b's blocking gate -- since rule 702.39a's atom lives only in a
--- target slot.
+-- match and CR 509.1b's pairwise blocking restriction. No filter reaching either
+-- position names the atom: rule 702.39a's writes it in a target slot, and the
+-- only card-written one is a CR 508.1c gate, which
+-- Pawl.Engine.CombatRestriction.inForce evaluates through contextFor instead.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
 contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty}
 

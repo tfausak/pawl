@@ -95,20 +95,37 @@ instances able candidates attackers gs =
       -- read against the FULL projection -- the opposite of
       -- Projection.affects's callers inside the layer fold, which read
       -- characteristics as of their own layer.
-      named source clause attacker =
+      -- Asked of both axes: an Affected is an Affected whether it names the
+      -- attacker to be blocked or the creatures required to block it.
+      named source clause creature =
         Projection.affects
           source
-          attacker
+          creature
           clause
-          (Projection.project attacker gs)
+          (Projection.project creature gs)
           gs
       -- CR 612.1: a hacked "all creatures able to block Swamps do so" lures
-      -- blockers onto Islands.
+      -- blockers onto Islands. Both of CR 509.1c's axes are rewritten, because
+      -- they are two halves of one sentence printed on the source's card --
+      -- CombatRestriction.cantBeBlockedBy makes the same argument for its pair.
+      --
+      -- An absent clause is UNRESTRICTED on that axis, not empty: Nothing on the
+      -- subject is Lure's "all creatures able to", and Nothing on the attacker is
+      -- Razorgrass Screen's "each combat", which mints one pair per attacker the
+      -- Screen may legally block. CR 509.1a caps how many of those it can obey at
+      -- one, so blocking either attains the maximum.
       fromRequirement source changes requirement =
-        let clause = BlockRequirement.attacker requirement
-            rewritten = if null changes then clause else Projection.rewriteAffected changes clause
-            pairsFor attacker = fmap (\blocker -> (blocker, attacker)) (filter (\blocker -> able blocker attacker) candidates)
-         in concatMap pairsFor (filter (named source rewritten) attackers)
+        let rewrite clause = if null changes then clause else Projection.rewriteAffected changes clause
+            narrow field these = case field requirement of
+              Nothing -> these
+              Just clause -> filter (named source (rewrite clause)) these
+            subjects = narrow BlockRequirement.subject candidates
+            wanted = narrow BlockRequirement.attacker attackers
+         in [ (blocker, attacker)
+            | attacker <- wanted,
+              blocker <- subjects,
+              able blocker attacker
+            ]
       -- CR 509.1c again, off the STORED carrier. No CR 305.7 or CR 604.2 gate and
       -- no CR 612.1 rewrite, which is the posture PlayerEffect.applying takes for
       -- its stored rows: those three ask what a permanent's TEXT still says, and a
@@ -127,7 +144,10 @@ instances able candidates attackers gs =
               attacker `elem` attackers,
               able blocker attacker
             ]
-   in Set.fromList
+   in -- NOT IMPLEMENTED: CR 509.1c counts REQUIREMENTS, and a Set counts pairs, so
+      -- two distinct requirements minting the same (blocker, attacker) pair
+      -- collapse into one (#1687).
+      Set.fromList
         ( concatMap fromPermanent (Set.toList (GameState.battlefield gs))
             <> concatMap fromStored (GameState.blockRequirements gs)
         )
