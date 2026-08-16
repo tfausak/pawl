@@ -858,6 +858,22 @@ cardResolutionEffects card =
     -- this function is about.
     <> concatMap replacementEffectRiders (Face.replacementEffects card)
 
+-- CR 103.5b and CR 103.6: the actions a face grants from a HAND, one effect list
+-- per action. The two fields are exactly the two Pawl.Engine.Mulligan hands to
+-- handWindow, and hand-maintained with cardResolutionEffects' caveat: a third
+-- pregame window would have to be added here.
+--
+-- A list of ACTIONS rather than one flat list, because each action is performed
+-- on its own (Pawl.Engine.Mulligan.handWindow performs one and asks again), so a
+-- slot one action defines is not there for another to read.
+--
+-- Deliberately NOT folded into cardResolutionEffects: that view answers what the
+-- card RESOLVES, a dozen lints read it, and widening it would change all of them
+-- at once for the sake of two fields only the sweeps below and ownBoundSlots
+-- care about.
+handActions :: Face.Face Card.Type.Card -> [[Effect.Effect Card.Type.Card]]
+handActions card = Face.mulliganActions card <> Face.openingHandActions card
+
 cardCounts :: Face.Face Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Face.characteristicPT card))
@@ -944,6 +960,35 @@ modalSlotsOffend abilityBound modal =
             wanted = Map.keysSet (Resolve.modeSlots mode)
          in Set.difference (Set.difference wanted defined) abilityBound /= Map.keysSet (Mode.targetSlots mode)
    in any modeOffends (Modal.modes modal)
+
+-- What performing a hand action binds, and the whole of it:
+-- Pawl.Engine.Resolve.performHandAction hands applyEffect an environment holding
+-- CR 113.7's `self` and nothing else.
+--
+-- NOT the whole reserved set, and `you` is the difference that matters: casting
+-- stamps CR 109.5's controller (Pawl.Engine.Cast.castSpell) and performing a hand
+-- action does not, so a hand action reading that name would read an empty binding
+-- and silently no-op. Subtracting it here would hide exactly the defect this lint
+-- is for.
+handActionBound :: Set.Set SlotName.SlotName
+handActionBound = Set.singleton Binding.triggerSource
+
+-- modalSlotsOffend's claim, asked of a hand action. The declared side is EMPTY by
+-- construction: CR 103.5b and CR 103.6 have the player PERFORM the action rather
+-- than cast or activate anything, so there is no CR 601.2c announcement and
+-- Pawl.Types.Face gives the two windows a bare effect list with no target slots to
+-- declare. The equality therefore degenerates to "what an action reads, less what
+-- that action defines, less what the performer binds, is nothing".
+--
+-- Per ACTION for modalSlotsOffend's per-mode reason: two actions never run as one,
+-- so a slot the first defines is not there for the second.
+handActionSlotsOffend :: Face.Face Card.Type.Card -> Bool
+handActionSlotsOffend card =
+  let offends effects =
+        let wanted = foldMap (Map.keysSet . Resolve.slotsOf) effects
+            defined = Resolve.definedSlots effects
+         in not (Set.null (Set.difference (Set.difference wanted defined) handActionBound))
+   in any offends (handActions card)
 
 -- CR 601.2c's OTHER dataflow question, asked of the same modes: a slot whose
 -- count may exceed one holds a set of recipients, and only a reader that takes a
@@ -1741,8 +1786,14 @@ reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 --
 -- The base case of boundSlots below, named so the self-test can hold it against
 -- the widened view.
+--
+-- The two pregame windows are here too, though cardResolutionEffects does not
+-- reach them: a hand action's effects run through the same
+-- Pawl.Engine.Resolve.applyEffect the resolution carriers do, so a MoveToZone in
+-- one that names CR 113.7's `self` as the incarnation it minted would overwrite
+-- the very binding Pawl.Engine.Resolve.performHandAction stamped, mid-action.
 ownBoundSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
-ownBoundSlots = Resolve.definedSlots . cardResolutionEffects
+ownBoundSlots card = Resolve.definedSlots (cardResolutionEffects card <> concat (handActions card))
 
 -- The same, over the card's own face AND every face it mints --
 -- declaredTargetSlots' recursion, for the same reason.
@@ -3051,6 +3102,60 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             (anyFace cardOffends . Printing.card)
             ps
     Spec.assertEqWith s "no dangling or unused slots" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The same equality over the two PREGAME windows, which the sweep above does not
+  -- reach: Card.allEffects is the spell's modes, and CR 103.5b's and CR 103.6's
+  -- actions hang off Pawl.Types.Face beside it. See handActionSlotsOffend for why
+  -- the declared side is empty and why only `self` comes off the read side.
+  Spec.it s "every hand action reads only what performing it binds" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace handActionSlotsOffend . Printing.card) ps
+        prints field = any (anyFace (not . null . field) . Printing.card) ps
+    -- The guards, because a sweep over an empty traversal passes saying nothing.
+    -- One per window, so the sweep cannot go quiet by the pool losing either, and
+    -- one for a hand action that actually READS a slot -- without that last the
+    -- subtraction above is never exercised and the lint would pass with any
+    -- `handActionBound` at all.
+    Spec.assertBool s (prints Face.mulliganActions) "the pool prints a mulligan action"
+    Spec.assertBool s (prints Face.openingHandActions) "the pool prints an opening-hand action"
+    Spec.assertBool
+      s
+      (any (anyFace (not . all (all (Map.null . Resolve.slotsOf)) . handActions) . Printing.card) ps)
+      "the pool has a hand action that reads a slot"
+    Spec.assertEqWith s "no hand action reads an unbound slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The REJECTING direction, against the printed card restated rather than a card
+  -- file, as the Room and repeated-face-name lints do it. Leyline of the Void is
+  -- the card that makes the trap concrete: its CR 103.6a action reads `self`, so a
+  -- sweep that did not subtract the performer's binding would demand a targetSlots
+  -- entry the reserved-name sweep below forbids, and the two would be mutually
+  -- unsatisfiable.
+  Spec.it s "the lint itself catches a hand action naming a slot nothing binds" $ do
+    leyline <- S.printingOf s registry "Leyline of the Void"
+    let face = S.combinedFace leyline
+        overActions f card = card {Face.openingHandActions = fmap (fmap f) (Face.openingHandActions card)}
+        readSlot slot effect = case effect of
+          Effect.MoveToZone move -> Effect.MoveToZone move {MoveToZone.ref = ObjectRef.InSlot slot}
+          other -> other
+        bindSlot slot effect = case effect of
+          Effect.MoveToZone move -> Effect.MoveToZone move {MoveToZone.slot = Just slot}
+          other -> other
+        stray = SlotName.MkSlotName (Text.pack "stray")
+    Spec.assertBool s (not (handActionSlotsOffend face)) "the real Leyline of the Void is accepted"
+    Spec.assertBool s (handActionSlotsOffend (overActions (readSlot stray) face)) "a slot nothing binds is rejected"
+    -- The dataflow the lint must NOT reject: an action that defines a slot and then
+    -- reads it back, which is Resolve.definedSlots' whole job on the resolution
+    -- carriers.
+    Spec.assertBool
+      s
+      (not (handActionSlotsOffend (overActions (bindSlot stray . readSlot stray) face)))
+      "a slot the action itself defines is accepted"
+    -- And the BINDING half, which ownBoundSlots now reaches through the same two
+    -- fields: writing CR 113.7's reserved name from inside the action clobbers what
+    -- performHandAction stamped.
+    Spec.assertEqWith
+      s
+      "CR 113.7 self bound by a hand action is caught, and the real card binds nothing"
+      (reservedBindings (overActions (bindSlot Binding.triggerSource) face), reservedBindings face)
+      (Set.singleton Binding.triggerSource, Set.empty)
   -- The D4 lint above is strictly per mode, so two modes of one card sharing a
   -- slot NAME pass it. This is the missing half, and the check both
   -- Modal.allTargetSlots and Modal.modesTargetSlots now name in their own
@@ -3925,7 +4030,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
   -- target and could never be cast; a non-Aura with enchant declares a restriction
   -- nothing reads. The D4 lint cannot see either, because it walks
-  -- Mode.targetSlots and the enchant slot is not there (#184's shape).
+  -- Mode.targetSlots and the enchant slot is not there -- the same shape the two
+  -- pregame windows had until the hand-action sweep above.
   --
   -- "AT LEAST one", since CR 702.5c lets an Aura have several -- the count is not
   -- what makes a card an Aura, only the presence.
