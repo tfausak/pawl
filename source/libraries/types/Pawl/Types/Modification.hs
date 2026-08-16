@@ -110,6 +110,27 @@ data Modification ability
     -- status), so Pawl.Engine.Projection.grantedDefiningParts mints this arm.
     AddEveryCreatureSubtype
   | AddCardType CardType.CardType -- layer 4 (Opalescence -> Creature)
+  | -- | layer 4, CR 613.1d / 205.1a set (Song of the Dryads -> land). The SET
+    -- beside the add above, standing to it as SetLandSubtype stands to
+    -- AddLandSubtype: the new card type REPLACES the ones the object had.
+    --
+    -- CR 205.1a keeps instant and sorcery through the replacement by name, and
+    -- carries the consequence for subtypes: a subtype whose family correlates
+    -- only with a card type just removed goes with it (Pawl.Engine.Subtype's
+    -- correlatedCardTypes). That is the one thing this arm does which the add
+    -- does not, and it is why Pawl.Engine.Projection.modificationWrites gives it
+    -- Subtypes as well as Types.
+    --
+    -- Carries one CardType, the narrowing every layer-4 set here already takes.
+    -- A card that set two ("becomes an artifact creature") is CR 205.1b's
+    -- retaining phrase instead, which is the ADD twice over -- rule 702.122a's
+    -- crew is written that way in Pawl.Engine.Keyword.
+    --
+    -- No REMOVAL arm beside it: no printed card takes a card type away without
+    -- naming the one it becomes, so a remove would be a capability no card
+    -- exercises. A Licid stops being a Creature by becoming an Enchantment
+    -- (#1586).
+    SetCardType CardType.CardType
   | -- | layer 4, CR 613.1d / 205.4b: this object gains a supertype (Leyline of
     -- Singularity's "All nonland permanents are legendary"). An ADD and never a
     -- set, because CR 205.4b says so outright -- "when an object gains or loses a

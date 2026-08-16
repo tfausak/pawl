@@ -628,8 +628,9 @@ battlefieldAbilitiesFor keyword count = case keyword of
 -- nothing, which is CR 205.1b naming this exact phrase: "some effects state that
 -- an object becomes an 'artifact creature'; these effects also allow the object
 -- to retain all of its prior card types and subtypes". So the Vehicle stays a
--- Vehicle, and Modification.AddCardType -- which adds and has no setting sibling
--- -- is the right opcode rather than a near miss. TWO of them, artifact and
+-- Vehicle, and Modification.AddCardType is the right opcode rather than a near
+-- miss -- deliberately not its sibling SetCardType, whose CR 205.1a replacement
+-- would take the artifact type and the Vehicle subtype away. TWO of them, artifact and
 -- creature being separate card types (CR 300.1), in one mode rather than one
 -- opcode over a set: AddCardType carries a single type by design, and CR 613.7b
 -- stamps both at the moment this one resolution creates them, so nothing in CR
