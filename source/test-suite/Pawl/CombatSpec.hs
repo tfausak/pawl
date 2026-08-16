@@ -3465,11 +3465,16 @@ combatLegalitySpec s registry = Spec.describe s "CombatLegality" $ do
                       Combat.Type.joinedUnder = Map.singleton oid S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      Combat.Type.blockersDeclared = True,
                       Combat.Type.defender = Just S.bob
                     }
               }
     Spec.assertEqWith s "starts empty" (Combat.Type.attackers (GameState.combat gs)) Map.empty
     Spec.assertEqWith s "clears" (Combat.Type.attackers (GameState.combat (Combat.clearCombat busy))) Map.empty
+    -- CR 506.7c: the CR 511.3 reset re-arms CR 506.7b's boundary, so a CR 500.8
+    -- second combat phase gets its own window rather than inheriting this one's.
+    Spec.assertBool s (Combat.afterBlockersDeclared busy) "CR 506.7b's boundary is up while combat is live"
+    Spec.assertBool s (not (Combat.afterBlockersDeclared (Combat.clearCombat busy))) "and down again once combat clears"
 
 keywordSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 keywordSpec s registry = Spec.describe s "Keyword" $ do
@@ -5573,11 +5578,9 @@ blockerWasDeclared e = case e of
 -- during combat after blockers are declared. Target unblocked attacking creature
 -- becomes blocked. Draw a card."
 --
--- pawl's card states its window as the declare blockers step, which is a SUBSET
--- of the printed one: CR 509.1 declares blockers as a turn-based action before
--- anyone gets priority, so every priority window in that step is already "after
--- blockers are declared", and what is lost is the combat damage and end of
--- combat steps. Stricter than printed, never weaker (#1557).
+-- Its window is CastingRestriction.AfterBlockersDeclared, read through
+-- Combat.afterBlockersDeclared; castingWindowSpec below is where CR 506.7b's
+-- boundary is proved step by step.
 --
 -- Sacred Prey ("Whenever this creature becomes blocked, you gain 1 life") is the
 -- observer for CR 509.3c, which says a "becomes blocked" ability triggers on the
@@ -5650,19 +5653,64 @@ becomesBlockedSpec s registry = Spec.describe s "BecomesBlocked" $ do
         Spec.assertBool s (not (Set.member (Recipient.ToCreature first) legal)) "Not IsBlocked refuses the blocked attacker"
         Spec.assertBool s (Set.member (Recipient.ToCreature second) legal) "and admits the unblocked one"
       _ -> Spec.assertFailure s "fixture should have two attackers and Curtain of Light a 'target' slot"
-  Spec.it s "CR 500.1 the printed window: castable in the declare blockers step, refused in a main phase" $ do
-    -- ONE board, read twice, differing only in GameState.phase -- the same mana,
-    -- the same hand and the same legal target both times, so the refusal is the
-    -- casting restriction and nothing else.
+
+-- CR 506.7b's window, "only during combat after blockers are declared", proved
+-- step by step on ONE board.
+--
+-- Every leg comes from the same curtainBoard: the same two seats, the same two
+-- Plains paying the same {1}{W}, the same empty stack, and the same unblocked
+-- attacking Prey standing as CR 601.2c's legal target. So no leg can refuse the
+-- cast for want of mana, of a target, or of a timing window -- the only thing
+-- that moves is where in the combat phase the board sits, which is exactly what
+-- CR 506.7b is about.
+--
+-- The pair that carries the rule is `beforeDeclaration` against `declared`:
+-- identical states but for CR 509.1's turn-based action having run. Everything
+-- after that pair moves GameState.phase on the DECLARED board, which is how the
+-- combat damage and end of combat steps -- the two the old transcription's
+-- declare-blockers-step window left out -- get read.
+--
+-- What is NOT provable here is CR 506.7f, and by construction rather than by
+-- omission: the pool's only route to a skipped declare blockers step is CR
+-- 508.8's empty attack, which leaves no attacking creature, and with no
+-- attacking creature Curtain of Light has no legal target -- so such a board
+-- refuses the cast whatever the gate answers. The gate implements 506.7f all the
+-- same, since it reads a record only the step itself writes.
+castingWindowSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+castingWindowSpec s registry = Spec.describe s "CastingWindow" $ do
+  Spec.it s "CR 506.7b the window opens at the declaration and runs to the end of the combat phase" $ do
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     prey <- S.printingOf s registry "Sacred Prey"
     curtain <- S.printingOf s registry "Curtain of Light"
-    let (gs, _, _, curtainId) = curtainBoard plains piker curtain [prey]
-        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
-        inMain = atBlockers {GameState.phase = Phase.PostcombatMain}
-    Spec.assertBool s (S.castable S.bob curtainId atBlockers) "castable during the declare blockers step"
-    Spec.assertBool s (not (S.castable S.bob curtainId inMain)) "and refused in a main phase"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (gs0, _, _, curtainId) = curtainBoard plains piker curtain [prey]
+        (boltId, gs) = S.addHandCard bolt S.bob (snd (S.addCreature mountain S.bob gs0))
+        -- The declare blockers step reached but not yet run: attackers are
+        -- declared, CR 509.1's turn-based action is not.
+        beforeDeclaration = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        -- That one action, and nothing else. Blocks are DECLINED so the Prey
+        -- stays an unblocked attacking creature and every later leg keeps the
+        -- same legal target.
+        declared = S.runPure declineBlocks beforeDeclaration Combat.declareBlockers
+        inStep step = declared {GameState.phase = Phase.Combat step}
+        -- The other side of CR 506.7b, on the board that has NOT declared: a
+        -- reachable priority window one step earlier.
+        atAttackers = beforeDeclaration {GameState.phase = Phase.Combat CombatStep.DeclareAttackers}
+    -- Anti-vacuity: bob's unrestricted instant is castable on every one of these
+    -- boards, so a leg that refuses the Curtain is refusing the Curtain.
+    Spec.assertBool s (all (S.castable S.bob boltId) [beforeDeclaration, declared, inStep CombatStep.CombatDamage, inStep CombatStep.EndOfCombat, atAttackers]) "bob can pay for and legally cast an unrestricted instant on every leg"
+    Spec.assertBool s (not (Combat.afterBlockersDeclared beforeDeclaration)) "the declaration has not happened yet"
+    Spec.assertBool s (Combat.afterBlockersDeclared declared) "and it has after CR 509.1's turn-based action"
+    -- Before the point CR 506.7b names.
+    Spec.assertBool s (not (S.castable S.bob curtainId atAttackers)) "refused in the declare attackers step"
+    Spec.assertBool s (not (S.castable S.bob curtainId beforeDeclaration)) "refused in the declare blockers step before blockers are declared"
+    -- After it. The first was already reachable under the declare-blockers-step
+    -- window this replaced; the last two are what that window lost.
+    Spec.assertBool s (S.castable S.bob curtainId declared) "castable once blockers are declared"
+    Spec.assertBool s (S.castable S.bob curtainId (inStep CombatStep.CombatDamage)) "castable in the combat damage step"
+    Spec.assertBool s (S.castable S.bob curtainId (inStep CombatStep.EndOfCombat)) "castable in the end of combat step"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
@@ -5694,6 +5742,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry
   becomesBlockedSpec s registry
+  castingWindowSpec s registry
   typeChangeRemovalSpec s registry
   effectRemovalSpec s registry
   putOntoBattlefieldAttackingSpec s registry

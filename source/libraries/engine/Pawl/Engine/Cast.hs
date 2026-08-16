@@ -631,6 +631,12 @@ restrictionMet pid gs restriction = case restriction of
   -- side's clause of the same name asks exactly it: one question about the combat
   -- record, two gates that differ in what ELSE they may read (CR 307.5).
   CastingRestriction.AttackedThisStep -> Combat.attackedThisStep pid gs
+  -- CR 506.7b, read off the combat record rather than off GameState.phase:
+  -- Combat.afterBlockersDeclared says why the record answers CR 506.7c and CR
+  -- 506.7f as well. Curtain of Light is the card; Trap Runner prints the same
+  -- clause on an activation, where CR 506.7g sends Pawl.Engine.Activate to this
+  -- same reader.
+  CastingRestriction.AfterBlockersDeclared -> Combat.afterBlockersDeclared gs
 
 -- CR 709.3a / 715.3a: the half being cast, RECORDED ON THE OBJECT, so that every
 -- characteristic read of it resolves through Game.resolveFace to that half alone

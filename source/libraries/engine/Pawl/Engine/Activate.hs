@@ -281,6 +281,11 @@ restrictionMet pid gs restriction = case restriction of
   -- casting side's clause of this name uses -- see Combat.attackedThisStep for
   -- why it is the declaration record and not Combat.attacked.
   ActivationRestriction.AttackedThisStep -> Combat.attackedThisStep pid gs
+  -- CR 506.7b through CR 506.7g, which says an "activate only" rider naming one
+  -- of CR 506.7's points is governed exactly as the same words on a cast are --
+  -- so this is Combat.afterBlockersDeclared verbatim, the reader
+  -- Pawl.Engine.Cast's arm of this name uses. Trap Runner is the card.
+  ActivationRestriction.AfterBlockersDeclared -> Combat.afterBlockersDeclared gs
 
 -- CR 606.3 (CR 306.5d says the same for planeswalkers): a loyalty ability may be
 -- activated only with priority and an empty stack during a main phase of its

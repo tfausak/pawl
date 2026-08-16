@@ -1978,6 +1978,10 @@ departedAttackerSpec s registry =
                       Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      -- CR 506.7b: the fixture stands after CR 509.1's
+                      -- declaration, which is what put the entry in
+                      -- Combat.blockers above.
+                      Combat.Type.blockersDeclared = True,
                       Combat.Type.defender = Just S.bob
                     }
               }
@@ -2041,6 +2045,9 @@ departedDefenderSpec s registry =
                       Combat.Type.joinedUnder = Map.singleton attacker S.alice,
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.bob),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.bob),
+                      -- CR 506.7b: attackers are declared and blockers are not,
+                      -- which is the moment the comment above describes.
+                      Combat.Type.blockersDeclared = False,
                       Combat.Type.defender = Just S.bob
                     }
               }
@@ -2083,6 +2090,7 @@ departedDefenderSpec s registry =
                       Combat.Type.joinedUnder = Map.fromList [(attacker, S.alice), (blocker, S.bob)],
                       Combat.Type.attacked = Set.singleton (AttackTarget.OfPlayer S.carol),
                       Combat.Type.declaredAttacked = Set.singleton (AttackTarget.OfPlayer S.carol),
+                      Combat.Type.blockersDeclared = True,
                       Combat.Type.defender = Just S.carol
                     }
               }

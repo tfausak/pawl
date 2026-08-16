@@ -78,4 +78,15 @@ data ActivationRestriction
     -- question about the combat record, and the two gates differ in what ELSE
     -- they may read rather than in what this asks.
     AttackedThisStep
+  | -- | CR 506.7b, through CR 506.7g: "Activate only during combat after
+    -- blockers are declared" (Trap Runner). CR 506.7g is what makes this the
+    -- same clause Pawl.Types.CastingRestriction prints under this name -- "rules
+    -- 506.7 and 506.7a-f apply to abilities ... just as they apply to spells" --
+    -- so the two arms share Pawl.Engine.Combat.afterBlockersDeclared verbatim,
+    -- as AttackedThisStep above already does.
+    --
+    -- No TurnScope beside it, unlike DuringPhase: CR 506.7c scopes the window by
+    -- COMBAT PHASE and the printed clause names no turn, so a second axis here
+    -- would be strictly narrower than the card.
+    AfterBlockersDeclared
   deriving (Eq, Ord, Show)

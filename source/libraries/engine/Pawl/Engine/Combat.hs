@@ -59,6 +59,7 @@ emptyCombat =
       Combat.joinedUnder = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
+      Combat.blockersDeclared = False,
       Combat.defender = Nothing
     }
 
@@ -220,6 +221,30 @@ attackableBattles defender gs =
 attackedThisStep :: PlayerId -> GameState -> Bool
 attackedThisStep pid gs =
   Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
+
+-- CR 506.7b: is the game past the point "only during combat after blockers are
+-- declared" names?
+--
+-- TWO readers and one question, exactly as attackedThisStep above:
+-- Pawl.Types.CastingRestriction.AfterBlockersDeclared (Curtain of Light) and
+-- Pawl.Types.ActivationRestriction.AfterBlockersDeclared (Trap Runner). Here the
+-- sharing is a RULE rather than an observation -- CR 506.7g says rules 506.7 and
+-- 506.7a-f govern such an activation just as they govern such a cast.
+--
+-- Asked of the game and not of a player: CR 506.7 describes a point in the turn,
+-- and neither printing narrows it by seat.
+--
+-- No conjunct about the current phase, which is CR 511.3 rather than an
+-- omission. Combat.blockersDeclared is written only by declareBlockers below and
+-- cleared only by clearCombat, so it is True for exactly the declare blockers,
+-- combat damage and end of combat steps of a combat phase whose declare blockers
+-- step ran -- CR 506.7f's skipped step and CR 506.7c's second combat phase both
+-- falling out of that. It inherits one caveat with the rest of the record: a
+-- combat phase whose end of combat STEP alone is skipped never reaches
+-- clearCombat, and Pawl.Engine.Engine.skipWholePhase's note is where that case
+-- is written down.
+afterBlockersDeclared :: GameState -> Bool
+afterBlockersDeclared = Combat.blockersDeclared . GameState.combat
 
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it
 -- been removed from combat since the declaration?
@@ -1710,6 +1735,12 @@ putOntoBattlefieldAttacking oid = do
 -- declareBlockers again.
 declareBlockers :: Game ()
 declareBlockers = do
+  -- CR 506.7b's boundary, raised BEFORE the short-circuit below and before any
+  -- prompt, because the rule opens the window "regardless of whether any
+  -- blockers are actually declared" -- an empty declaration, or a combat whose
+  -- attackers were all removed after CR 508.8 asked its question, still passes
+  -- the point the clause names. afterBlockersDeclared is the reader.
+  State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockersDeclared = True}}
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
   Monad.unless (null attacking) $ do

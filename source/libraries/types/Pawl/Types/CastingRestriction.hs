@@ -61,4 +61,28 @@ data CastingRestriction
     -- Eightfold Maze's ruling pins the interpretation: a creature needs to have
     -- attacked YOU, not merely a combat to have happened.
     AttackedThisStep
+  | -- | CR 506.7b: "Cast this spell only during combat after blockers are
+    -- declared" (Curtain of Light). Neither a step nor a phase, so DuringPhase
+    -- above cannot say it and neither could a Pawl.Types.PhaseSelector: the
+    -- window runs from CR 509.1's declaration to the end of the combat phase,
+    -- taking the rest of the declare blockers step plus the combat damage and
+    -- end of combat steps.
+    --
+    -- The mirror of Pawl.Types.ActivationRestriction's arm of this name, sharing
+    -- Pawl.Engine.Combat.afterBlockersDeclared as its reader -- which is CR
+    -- 506.7g, the rule that says CR 506.7's points govern an activation exactly
+    -- as they govern a cast.
+    --
+    -- NULLARY, rather than a before/after pair over the six points CR 506.7
+    -- enumerates. The pool prints one of them, and the vocabulary grows at the
+    -- card that needs the next: "only during combat before blockers are
+    -- declared" (Blaze of Glory) is a different window with no producer here.
+    --
+    -- Two clauses of CR 506.7 ride along rather than needing gates of their own,
+    -- because the reader asks about the combat record instead of about the phase
+    -- the game is in. CR 506.7f: a combat phase whose declare blockers step is
+    -- skipped admits the spell nowhere in that phase. CR 506.7c: the printed
+    -- "during combat" gives every combat phase of the turn its own window rather
+    -- than only the first (CR 506.7d).
+    AfterBlockersDeclared
   deriving (Eq, Ord, Show)

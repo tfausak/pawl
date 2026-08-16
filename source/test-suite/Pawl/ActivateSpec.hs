@@ -111,6 +111,7 @@ spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationRestrictionSpec s registry
   printedActivationConjunctionSpec s registry
+  printedActivationCombatPointSpec s registry
   printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
   variableActivationCostSpec s registry
@@ -2602,3 +2603,108 @@ lifeGainAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.T
 lifeGainAbility p = case Face.activatedAbilities (S.combinedFace p) of
   _ : ab : _ -> ab
   _ -> theAbility p
+
+-- CR 506.7g: "Rules 506.7 and 506.7a-f apply to abilities that state that they
+-- may be activated only at certain times with respect to combat just as they
+-- apply to spells." Trap Runner (Visions) is the pool's producer -- {2}{W}{W}
+-- 2/3 Human Soldier, "{T}: Target unblocked attacking creature becomes blocked.
+-- Activate only during combat after blockers are declared." -- and it prints the
+-- clause Curtain of Light prints on a cast, word for word. That is why
+-- ActivationRestriction.AfterBlockersDeclared and its casting twin share
+-- Combat.afterBlockersDeclared instead of each deriving the window.
+--
+-- alice attacks with one Goblin Piker; bob holds priority and controls the Trap
+-- Runner plus a Prodigal Sorcerer, the unrestricted {T} this module's other
+-- rider groups use as their control. Blocks are declined throughout, so the
+-- Piker stays an unblocked attacking creature and the ability keeps a legal
+-- target on every leg -- a board that lost the target would refuse the
+-- activation for a reason the rider has nothing to do with.
+trapRunnerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+trapRunnerBoard piker runner sorcerer =
+  let (gs0, ours, theirs) = S.combatBoardOf [piker] [runner, sorcerer]
+      declared = (S.runPure S.aggressiveAnswer gs0 (Combat.declareAttackers S.alice)) {GameState.priority = Just S.bob}
+   in case (ours, theirs) of
+        (attackerId : _, runnerId : sorcererId : _) -> (attackerId, runnerId, sorcererId, declared)
+        -- combatBoardOf returns one id per printing given, so this is
+        -- unreachable; bogus ids fail the assertions rather than the suite.
+        _ -> (S.noSource, S.noSource, S.noSource, declared)
+
+-- Decline every block, and otherwise answer as the aggressive interpreter does.
+-- Declining is what keeps the attacker unblocked, so the only route into CR
+-- 509.1h's blocked status is the Trap Runner's ability.
+noBlocks :: Prompt.Prompt r -> r
+noBlocks p = case p of
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- noBlocks, plus taking every activation the engine offers and aiming it at
+-- `victim` -- the interpreter the gameplay-level leg runs a whole combat phase
+-- with. The target is PINNED rather than searched for, so a broken gate cannot
+-- repair the assertion by finding some other legal creature.
+noBlocksActivating :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+noBlocksActivating victim p = case p of
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
+  Prompt.ChooseAction _ _ options -> case filter isActivate options of
+    a : _ -> a
+    [] -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+printedActivationCombatPointSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationCombatPointSpec s registry = Spec.describe s "PrintedActivationCombatPoint" $ do
+  -- One board, five readings, and the pair that carries the rule is
+  -- `beforeDeclaration` against `declared`: identical states but for CR 509.1's
+  -- turn-based action having run.
+  Spec.it s "CR 506.7b/g the rider opens at the declaration and runs to the end of the combat phase" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    runner <- S.printingOf s registry "Trap Runner"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (attackerId, runnerId, sorcererId, atAttackers) = trapRunnerBoard piker runner prodigalSorcerer
+        beforeDeclaration = atAttackers {GameState.phase = Phase.Combat CombatStep.DeclareBlockers}
+        declared = (S.runPure noBlocks beforeDeclaration Combat.declareBlockers) {GameState.priority = Just S.bob}
+        inStep step = declared {GameState.phase = Phase.Combat step}
+        offeredOn = Action.legalActions S.bob
+    -- Anti-vacuity: the attack is real, the attacker is unblocked, and bob's
+    -- unrestricted {T} is offered on every leg -- so a leg without the Trap
+    -- Runner's activation is withholding that one ability.
+    Spec.assertBool s (Map.member attackerId (Combat.Type.attackers (GameState.combat declared))) "the Piker is attacking"
+    Spec.assertBool s (not (Combat.isBlocked attackerId declared)) "and unblocked, so the ability has a legal target"
+    Spec.assertBool s (not (any (null . activationsOf sorcererId . offeredOn) [atAttackers, beforeDeclaration, declared, inStep CombatStep.CombatDamage, inStep CombatStep.EndOfCombat])) "bob's unrestricted {T} is offered on every leg"
+    Spec.assertBool s (not (Combat.afterBlockersDeclared beforeDeclaration)) "the declaration has not happened yet"
+    Spec.assertBool s (Combat.afterBlockersDeclared declared) "and it has after CR 509.1's turn-based action"
+    -- Before the point CR 506.7b names.
+    Spec.assertEqWith s "not offered in the declare attackers step" (activationsOf runnerId (offeredOn atAttackers)) []
+    Spec.assertEqWith s "nor in the declare blockers step before blockers are declared" (activationsOf runnerId (offeredOn beforeDeclaration)) []
+    -- After it, across all three steps the window spans.
+    Spec.assertEqWith s "offered once blockers are declared" (length (activationsOf runnerId (offeredOn declared))) 1
+    Spec.assertEqWith s "offered in the combat damage step" (length (activationsOf runnerId (offeredOn (inStep CombatStep.CombatDamage)))) 1
+    Spec.assertEqWith s "offered in the end of combat step" (length (activationsOf runnerId (offeredOn (inStep CombatStep.EndOfCombat)))) 1
+
+  -- The gameplay-level proof (design.md section 4), driven through the priority
+  -- loop rather than by calling Activate.activateAbility. bob's life is the
+  -- falsifier: the Piker is unblocked and declines to be blocked, so 2 damage is
+  -- what reaches bob unless the ability makes it a blocked creature with nothing
+  -- blocking it (CR 509.1h, then CR 510.1c assigning to no one).
+  --
+  -- Its own control is the same combat under the same declined blocks with no
+  -- activation, so what saves bob is the ability and not the fixture.
+  Spec.it s "CR 506.7b/g whole card: Trap Runner blocks the attacker in the declare blockers step" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    runner <- S.printingOf s registry "Trap Runner"
+    let (gs0, ours, theirs) = S.combatBoardOf [piker] [runner]
+    case (ours, theirs) of
+      ([attackerId], [runnerId]) -> do
+        -- Stopped at the end of combat step rather than run past it: CR 511.3
+        -- empties Combat as that step ENDS, and the blocked status is what these
+        -- assertions read. Combat damage (CR 510) has already been dealt by
+        -- here, so bob's life is settled.
+        let used = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (noBlocksActivating attackerId) gs0
+            idle = S.runToStep (Phase.Combat CombatStep.EndOfCombat) noBlocks gs0
+        Spec.assertBool s (Combat.isBlocked attackerId used) "CR 509.1h: the ability made the attacker a blocked creature"
+        Spec.assertEqWith s "with no creature blocking it" (Combat.blockersOf attackerId used) Set.empty
+        Spec.assertEqWith s "so bob took nothing" (S.lifeOf S.bob used) (Just 20)
+        Spec.assertEqWith s "and the Runner paid its {T}" (fmap Object.tapped (Game.lookupObject runnerId used)) (Just TapState.Tapped)
+        Spec.assertBool s (not (Combat.isBlocked attackerId idle)) "control: without the activation the attacker is unblocked"
+        Spec.assertEqWith s "control: so bob takes the Piker's 2" (S.lifeOf S.bob idle) (Just 18)
+        Spec.assertEqWith s "control: and the Runner is untapped" (fmap Object.tapped (Game.lookupObject runnerId idle)) (Just TapState.Untapped)
+      _ -> Spec.assertFailure s "fixture should have given alice an attacker and bob a Trap Runner"
