@@ -1350,14 +1350,17 @@ affectsBase :: ObjectId -> ObjectId -> Affected.Affected -> GameState -> Bool
 affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) gs
 
 -- CR 608.2h / 611.2d: evaluate a modification's quantities once and rewrite them
--- to literals. Called by Resolve when a spell's resolution stores a continuous
--- effect.
+-- to literals. Called by Resolve when a spell's or an ability's resolution stores
+-- a continuous effect.
 --
--- `oid` is the SOURCE, not the affected object: for a spell that is also where CR
--- 601.2b's chosen X was stamped, and `you` is its controller. Not the announcing
--- object for an activated ability, where the two differ -- an X-cost activation
--- storing a continuous effect measured by its X would freeze nothing here, and no
--- card in the pool does (#550).
+-- TWO objects, neither of them the affected one. `source` is CR 113.7a's source,
+-- which the Filter context reads (IsSource, PowerLessThanSource) and whose
+-- controller `you` is. `announcedOn` is the object CR 601.2b stamped the chosen X
+-- on: the spell's own stack incarnation, and for an ACTIVATED ability the ability
+-- object rather than the permanent, which never learned the value. Tovolar, the
+-- Midnight Scourge's "{X}{R}{G}: ... gets +X/+0" is the pool's producer, proved by
+-- Pawl.ActivateSpec's "an activated {X} pump freezes the announced X into the
+-- stored effect"; the same split Quantity.evaluateFor already carries.
 --
 -- Deliberately not applied to a static ability's effect: CR 611.2 scopes 611.2a-d
 -- to a spell or ability's resolution, while a static ability's effect (CR 604.2)
@@ -1376,11 +1379,11 @@ affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) 
 -- re-reading it live would be wrong rather than deferred, and Resolve stores
 -- nothing. Not Literal 0, which would invent an answer: CR 208.2a's "use 0
 -- instead" is scoped to a CDA, and this is not one.
-freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId.PlayerId -> Modification.Modification ability -> Maybe (Modification.Modification ability)
-freezeQuantities gs oid you m =
+freezeQuantities :: GameState -> ObjectId -> ObjectId -> Maybe PlayerId.PlayerId -> Modification.Modification ability -> Maybe (Modification.Modification ability)
+freezeQuantities gs announcedOn source you m =
   let viewOf = fullView gs
-      context = Filter.contextFor you (Just oid)
-      freeze q = fmap Quantity.Type.Literal (Quantity.evaluate viewOf context gs oid q)
+      context = Filter.contextFor you (Just source)
+      freeze q = fmap Quantity.Type.Literal (Quantity.evaluateFor viewOf context gs announcedOn source q)
    in case m of
         Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> fmap Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness <$> freeze p <*> freeze t)
         Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> fmap Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness <$> freeze p <*> freeze t)
