@@ -421,9 +421,9 @@ data Context = MkContext
     -- False in every position but a target slot -- the posture every
     -- context-relative atom here takes.
     --
-    -- Not implemented: a lint keeping a card from writing the atom into one of
-    -- those positions, where sourcePower's and defendingPlayer's siblings each
-    -- have one (#1617).
+    -- What keeps a card out of those positions is Pawl.CardSpec's
+    -- "CR 709.4a no card asks SameNameAsBound outside a mode's target slot",
+    -- the sweep sourcePower's and defendingPlayer's siblings each have.
     slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName)
   }
   deriving (Eq, Show)
