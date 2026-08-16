@@ -5,19 +5,17 @@
         {
           "type": "DiscardCards",
           "value": {
-            "count": 2,
+            "count": 1,
             "whichCards": {
-              "type": "And",
-              "value": []
+              "type": "HasCardType",
+              "value": {
+                "type": "Land"
+              }
             }
           }
         }
       ],
       "manaCost": [
-        {
-          "type": "Generic",
-          "value": 1
-        },
         {
           "type": "OfType",
           "value": {
@@ -28,7 +26,7 @@
           }
         }
       ],
-      "name": "Cathartic Reunion",
+      "name": "Magmatic Insight",
       "spell": {
         "modes": [
           {
@@ -46,7 +44,7 @@
                       },
                       "quantity": {
                         "type": "Literal",
-                        "value": 3
+                        "value": 2
                       }
                     }
                   }

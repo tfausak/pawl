@@ -107,6 +107,7 @@ import qualified Pawl.Types.Designate as Designate
 import qualified Pawl.Types.Destroy as Destroy
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Discard as Discard
+import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DungeonRoom as DungeonRoom
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.DurationRef as DurationRef
@@ -2160,12 +2161,13 @@ costComponentFilters component = case component of
   -- CR 406.2 again: Circling Vultures' "the top creature card of your
   -- graveyard".
   CostComponent.ExileTopFromGraveyard f -> [f]
+  -- CR 601.2f's discard as a cost: Magmatic Insight's "a land card".
+  CostComponent.DiscardCards (DiscardCards.MkDiscardCards _ f) -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
   CostComponent.PayLife _ -> []
   CostComponent.PayLifeX -> []
-  CostComponent.DiscardCards _ -> []
   CostComponent.DiscardThis -> []
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []

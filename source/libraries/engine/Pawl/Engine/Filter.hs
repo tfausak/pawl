@@ -13,6 +13,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Cycling as Cycling
 import qualified Pawl.Types.Designation as Designation
+import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -986,26 +987,28 @@ rewriteKeyword pairs keyword = case keyword of
 rewriteCost :: [(Subtype.Subtype, Subtype.Subtype)] -> Cost.Cost Keyword.Type.Keyword -> Cost.Cost Keyword.Type.Keyword
 rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (Cost.components cost)}
 
--- rewriteCost's per-component half. Four components carry a Filter and are the
--- four that descend; the rest name a number, or the object the cost is on, and
+-- rewriteCost's per-component half. Five components carry a Filter and are the
+-- five that descend; the rest name a number, or the object the cost is on, and
 -- CR 612.2 finds no word in them to swap.
 --
--- Of the four, only Sacrifice has a producer -- Dark Heart of the Wood. The
--- TapForTotalPower, ExileCardsFromGraveyard and ExileTopFromGraveyard arms are a
--- regression fence: no printing pairs any of them with a basic land type, so no
--- test can falsify them.
+-- Of the five, only Sacrifice has a producer -- Dark Heart of the Wood. The
+-- TapForTotalPower, DiscardCards, ExileCardsFromGraveyard and
+-- ExileTopFromGraveyard arms are a regression fence: no printing pairs any of
+-- them with a basic land type, so no test can falsify them. Magmatic Insight's
+-- "a land card" comes closest and is still not one -- CR 612.2 swaps a SUBTYPE
+-- word, and the land CARD TYPE is not one.
 rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
 rewriteComponent pairs component = case component of
   CostComponent.Sacrifice (Sacrifice.MkSacrifice n criterion) -> CostComponent.Sacrifice (Sacrifice.MkSacrifice n (rewrite pairs criterion))
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) -> CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n (rewrite pairs criterion))
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) -> CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n (rewrite pairs criterion))
   CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
+  CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> CostComponent.DiscardCards (DiscardCards.MkDiscardCards n (rewrite pairs criterion))
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component
   CostComponent.PayLife _ -> component
   CostComponent.PayLifeX -> component
-  CostComponent.DiscardCards _ -> component
   CostComponent.DiscardThis -> component
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component

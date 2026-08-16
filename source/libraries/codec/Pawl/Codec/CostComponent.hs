@@ -1,6 +1,7 @@
 module Pawl.Codec.CostComponent where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.DiscardCards as DiscardCards
 import qualified Pawl.Codec.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Sacrifice as Sacrifice
@@ -29,7 +30,7 @@ codec keywordCodec =
       Arm.nullary "PayLifeX" CostComponent.PayLifeX,
       Arm.payload "Sacrifice" (Sacrifice.codec keywordCodec) CostComponent.Sacrifice (\x -> case x of CostComponent.Sacrifice y -> Just y; _ -> Nothing),
       Arm.payload "TapForTotalPower" (TapForTotalPower.codec keywordCodec) CostComponent.TapForTotalPower (\x -> case x of CostComponent.TapForTotalPower y -> Just y; _ -> Nothing),
-      Arm.payload "DiscardCards" Common.natural CostComponent.DiscardCards (\x -> case x of CostComponent.DiscardCards y -> Just y; _ -> Nothing),
+      Arm.payload "DiscardCards" (DiscardCards.codec keywordCodec) CostComponent.DiscardCards (\x -> case x of CostComponent.DiscardCards y -> Just y; _ -> Nothing),
       Arm.nullary "DiscardThis" CostComponent.DiscardThis,
       Arm.payload "PayEnergy" Common.natural CostComponent.PayEnergy (\x -> case x of CostComponent.PayEnergy y -> Just y; _ -> Nothing),
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),

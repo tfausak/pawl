@@ -56,6 +56,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Face as Face
@@ -309,7 +310,9 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
                     <> [CandidateCost.MkCandidateCost (Just Keyword.Type.Aftermath) printed | Keyword.hasAftermath keywords]
                     <> [ CandidateCost.MkCandidateCost
                            (Just Keyword.Type.JumpStart)
-                           printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
+                           -- CR 702.133a's cost names no quality -- "discard a
+                           -- card" -- so the criterion admits everything.
+                           printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.Type.And []))]}
                        | Keyword.hasJumpStart keywords
                        ]
                     -- UNTAGGED, and that is the whole of this issue's fix: an
@@ -649,7 +652,7 @@ substituteXInComponent x component = case component of
   CostComponent.SacrificeThis -> component
   CostComponent.Sacrifice {} -> component
   CostComponent.TapForTotalPower {} -> component
-  CostComponent.DiscardCards _ -> component
+  CostComponent.DiscardCards {} -> component
   CostComponent.DiscardThis -> component
   CostComponent.PayEnergy _ -> component
   CostComponent.AddLoyaltyToThis _ -> component
@@ -687,7 +690,7 @@ componentHasVariable component = case component of
   CostComponent.SacrificeThis -> False
   CostComponent.Sacrifice {} -> False
   CostComponent.TapForTotalPower {} -> False
-  CostComponent.DiscardCards _ -> False
+  CostComponent.DiscardCards {} -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.AddLoyaltyToThis _ -> False
@@ -947,7 +950,7 @@ isLoyaltyComponent component = case component of
   CostComponent.PayLifeX -> False
   CostComponent.Sacrifice {} -> False
   CostComponent.TapForTotalPower {} -> False
-  CostComponent.DiscardCards _ -> False
+  CostComponent.DiscardCards {} -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
@@ -1007,7 +1010,7 @@ zoneOfComponent component = case component of
   -- ExileCardsFromGraveyard's answer for its reason: this too moves cards other
   -- than the object the cost is on, so CR 113.6m does not reach it.
   CostComponent.ExileTopFromGraveyard _ -> Nothing
-  CostComponent.DiscardCards _ -> Nothing
+  CostComponent.DiscardCards {} -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
@@ -1032,12 +1035,25 @@ removeLoyalty n obj =
    in obj {Object.counters = Map.insert CounterKind.Loyalty (Natural.minusSaturating have n) (Object.counters obj)}
 
 -- The cards this player may discard to pay a cost on `oid`: their hand, in its
--- own order, minus `oid` itself. See canPayComponent's DiscardCards arm for why
--- the exclusion is CR 601.2a and not a convenience. Hand order rather than
--- sorted, unlike Replacement.sacrificeCandidates: Game.zoneMembers already
--- returns a hand in a fixed order, which Prompt.ChooseDiscard offers it in.
-discardCandidates :: PlayerId -> ObjectId -> GameState -> [ObjectId]
-discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid gs)
+-- own order, narrowed by the criterion and minus `oid` itself. See
+-- canPayComponent's DiscardCards arm for why the exclusion is CR 601.2a and not
+-- a convenience. Hand order rather than sorted, unlike
+-- Replacement.sacrificeCandidates: Game.zoneMembers already returns a hand in a
+-- fixed order, which Prompt.ChooseDiscard offers it in.
+--
+-- Matched against the PRINTED card and never a projection, exileCandidates'
+-- reading below and its context -- the payer as perspective, no source -- for
+-- its reasons.
+--
+-- Not implemented: a card in a hand has a projection too, so a continuous effect
+-- that changed the axis this criterion reads is missed here (#160).
+discardCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+discardCandidates pid oid criterion gs =
+  let context = Filter.contextFor (Just pid) Nothing
+      matches candidate = case Game.faceOf candidate gs of
+        Nothing -> False
+        Just face -> Filter.matches context (Projection.viewOfCardIn gs candidate face) criterion
+   in filter (\candidate -> candidate /= oid && matches candidate) (Game.zoneMembers Zone.Hand pid gs)
 
 -- The cards this player may exile to pay an ExileCardsFromGraveyard component:
 -- their OWN graveyard, in its own order, narrowed by the criterion.
@@ -1176,8 +1192,8 @@ removalClaim pid oid component gs = case component of
           )
       )
       1
-  CostComponent.DiscardCards n ->
-    claim Zone.Hand (Set.fromList (discardCandidates pid oid gs)) n
+  CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
+    claim Zone.Hand (Set.fromList (discardCandidates pid oid criterion gs)) n
   CostComponent.DiscardThis -> claim Zone.Hand (itself (isOwnedIn Zone.Hand)) 1
   CostComponent.ExileCardsFromGraveyard (ExileCardsFromGraveyard.MkExileCardsFromGraveyard n criterion) ->
     claim Zone.Graveyard (Set.fromList (exileCandidates pid criterion gs)) n
@@ -1403,7 +1419,7 @@ uncountedCeiling component = case component of
   -- Counted by `objectCeiling`: every one of these has a removalClaim.
   CostComponent.Sacrifice {} -> Nothing
   CostComponent.SacrificeThis -> Nothing
-  CostComponent.DiscardCards _ -> Nothing
+  CostComponent.DiscardCards {} -> Nothing
   CostComponent.DiscardThis -> Nothing
   CostComponent.ExileCardsFromGraveyard {} -> Nothing
   CostComponent.ExileTopFromGraveyard _ -> Nothing
@@ -1543,7 +1559,7 @@ lifeOwedByComponent component = case component of
   CostComponent.SacrificeThis -> 0
   CostComponent.Sacrifice {} -> 0
   CostComponent.TapForTotalPower {} -> 0
-  CostComponent.DiscardCards _ -> 0
+  CostComponent.DiscardCards {} -> 0
   CostComponent.DiscardThis -> 0
   CostComponent.PayEnergy _ -> 0
   CostComponent.AddLoyaltyToThis _ -> 0
@@ -1622,7 +1638,9 @@ canPayComponent pid oid component gs = case component of
   -- simply does not need a special case.
   CostComponent.TapForTotalPower (TapForTotalPower.MkTapForTotalPower n criterion) ->
     sum (fmap (max 0 . (`tapPower` gs)) (tapCandidates pid oid criterion gs)) >= toInteger n
-  -- CR 601.2f: payable only if the hand holds at least that many cards.
+  -- CR 601.2f: payable only if the hand holds at least that many cards the
+  -- criterion admits -- Magmatic Insight is uncastable out of a landless hand
+  -- however many cards it holds.
   --
   -- `oid` is excluded, and that is CR 601.2a, not a convenience: the card moves
   -- to the stack at step (a), so by the time 601.2f determines the total cost the
@@ -1633,8 +1651,8 @@ canPayComponent pid oid component gs = case component of
   -- without this filter a hand of "Cathartic Reunion plus one other card" would
   -- read as payable and the Reunion would be offered on the strength of
   -- discarding itself.
-  CostComponent.DiscardCards n ->
-    Natural.length (discardCandidates pid oid gs) >= n
+  CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) ->
+    Natural.length (discardCandidates pid oid criterion gs) >= n
   -- CR 702.29a: payable only while the card is in the paying player's hand, which
   -- is where that rule's zone restriction is enforced for the COST half. Asked of
   -- the zone and the owner rather than of control, because CR 108.4 gives a card
@@ -1822,7 +1840,7 @@ orderSensitive :: CostComponent.CostComponent Keyword.Type.Keyword -> Bool
 orderSensitive component = case component of
   CostComponent.Sacrifice {} -> True
   CostComponent.SacrificeThis -> True
-  CostComponent.DiscardCards _ -> True
+  CostComponent.DiscardCards {} -> True
   CostComponent.DiscardThis -> True
   CostComponent.ExileCardsFromGraveyard {} -> True
   CostComponent.ExileTopFromGraveyard _ -> True
@@ -2165,8 +2183,10 @@ payComponent pid oid component = case component of
         pure Payment.Paid
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.
-  -- Elided only when forced -- exactly as many cards in hand as the count (the
-  -- same elision the Discard EFFECT makes, #63).
+  -- Elided only when forced -- exactly as many MATCHING cards in hand as the
+  -- count (the same elision the Discard EFFECT makes, #63). The criterion is what
+  -- decides that, not the hand's size: Magmatic Insight beside one land and three
+  -- other cards asks nothing, since only the land can pay.
   --
   -- Reject-not-repair, matching Sacrifice above and deliberately NOT matching the
   -- Discard effect, which after #245 completes an undersized answer: a cost may
@@ -2183,9 +2203,9 @@ payComponent pid oid component = case component of
   -- CR 701.9a's move is made through Event.discard, the shared discard funnel, so
   -- the card gets a CR 400.7 incarnation, Rest in Peace's redirect composes, and
   -- the discard is recorded for a CR 701.9a trigger to read.
-  CostComponent.DiscardCards n -> do
+  CostComponent.DiscardCards (DiscardCards.MkDiscardCards n criterion) -> do
     gs <- State.get
-    let held = discardCandidates pid oid gs
+    let held = discardCandidates pid oid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length held <= n
