@@ -1744,10 +1744,12 @@ canPayComponent pid oid component gs = case component of
   -- CR 701.68b: "if a player is given the choice to blight but is unable to put N
   -- -1/-1 counters on a creature they control (usually because they control no
   -- creatures), they can't choose to blight." Read here rather than at the
-  -- payment, so the refusal arrives where the rules put it -- an activated
-  -- ability with this cost is never OFFERED (Pawl.Engine.Activate.activatableGiven
-  -- has canPay as a conjunct), a spell with it as an additional cost is
-  -- uncastable, and CR 118.12's resolution offer is never raised.
+  -- payment, so the refusal arrives where the rules put it -- CR 601.2h's
+  -- "unpayable costs can't be paid", which CR 602.2b hands to an activation. An
+  -- activated ability with this cost is never OFFERED
+  -- (Pawl.Engine.Activate.activatableGiven has canPay as a conjunct), a spell with
+  -- it as an additional cost is uncastable, and CR 118.12's resolution offer is
+  -- never raised.
   --
   -- Nothing about `oid` and nothing about N. Rule 701.68a's candidate is qualified
   -- by CONTROL alone -- not by being the object the cost is on, which is the whole

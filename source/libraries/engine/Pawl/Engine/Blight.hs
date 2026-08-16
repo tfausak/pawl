@@ -49,8 +49,9 @@ candidates pid gs = List.sort (filter (\oid -> Projection.isCreatureOf oid gs) (
 --
 -- The CLASSIFICATION Pawl.Engine.Cost.canPayComponent reads, which is how a blight
 -- COST is unpayable rather than a no-op: an activated ability whose cost includes
--- one is never offered (CR 602.2a), and CR 118.12's resolution offer is never
--- raised (CR 118.3, and that rule's own "does, doesn't, or can't").
+-- one is never offered (CR 601.2h's "unpayable costs can't be paid", reaching an
+-- activation through CR 602.2b), and CR 118.12's resolution offer is never raised
+-- (CR 118.3, and rule 118.12's own "does, doesn't, or can't").
 --
 -- Control and not existence -- an opponent's creatures are not candidates -- and
 -- nothing here reads N. Rule 701.68b's "unable to put N counters" has only the one

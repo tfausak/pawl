@@ -202,8 +202,8 @@ data CostComponent keyword
     -- a cost: "if a player is given the choice to blight but is unable to put N
     -- -1\/-1 counters on a creature they control ... they can't choose to blight".
     -- Through Pawl.Engine.Cost.canPayComponent, so an activated ability with this
-    -- cost is never OFFERED (CR 602.2a) and CR 118.12's resolution offer is never
-    -- raised (CR 118.3).
+    -- cost is never OFFERED (CR 601.2h, reaching an activation through CR 602.2b)
+    -- and CR 118.12's resolution offer is never raised (CR 118.3).
     --
     -- A Natural and not a Quantity, for PayLife's reason -- nothing here is
     -- evaluated against a binding environment. Not implemented: Soul Immolation's
