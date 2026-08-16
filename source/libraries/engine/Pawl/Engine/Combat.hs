@@ -67,7 +67,10 @@ emptyCombat =
 -- planeswalkers are removed from combat -- which by CR 506.4 is what stops them
 -- being attacking and blocking creatures. Resetting `defender` alongside them is
 -- CR 506.2, not CR 511.3: the designation is scoped to the combat phase, so it
--- cannot survive the phase ending.
+-- cannot survive the phase ending. Combat.blockersDeclared is the same kind of
+-- passenger, on CR 506.7c's authority: "if a turn has multiple combat phases,
+-- such spells may be cast at an appropriate time during any of them", so the
+-- next combat phase has to ask CR 506.7b's question again from scratch.
 --
 -- Engine.runStep calls this as the end of combat step ENDS, alongside CR 500.5's
 -- mana emptying -- not from runTurnBasedActions, which is a step's opening and

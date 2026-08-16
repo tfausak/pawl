@@ -2606,8 +2606,8 @@ lifeGainAbility p = case Face.activatedAbilities (S.combinedFace p) of
 
 -- CR 506.7g: "Rules 506.7 and 506.7a-f apply to abilities that state that they
 -- may be activated only at certain times with respect to combat just as they
--- apply to spells." Trap Runner (Visions) is the pool's producer -- {2}{W}{W}
--- 2/3 Human Soldier, "{T}: Target unblocked attacking creature becomes blocked.
+-- apply to spells." Trap Runner (Mercadian Masques) is the pool's producer -- a
+-- {2}{W}{W} 2/3 Human Soldier, "{T}: Target unblocked attacking creature becomes blocked.
 -- Activate only during combat after blockers are declared." -- and it prints the
 -- clause Curtain of Light prints on a cast, word for word. That is why
 -- ActivationRestriction.AfterBlockersDeclared and its casting twin share
