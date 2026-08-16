@@ -117,6 +117,13 @@ data Response
     -- Prompt.ChooseExilesFromGraveyard already draws against
     -- Prompt.ChooseSacrifices.
     ChoseCardInGraveyard ObjectId.ObjectId
+  | -- | CR 608.2d: the card a player chose out of their own hand for an
+    -- Pawl.Types.ObjectRef.ChosenCardInHand. One of these per chooser.
+    --
+    -- Its own constructor rather than ChoseCardInGraveyard reused, for that
+    -- constructor's reason: the two prompts offer cards out of different zones,
+    -- and a transcript of one must not satisfy the other.
+    ChoseCardInHand ObjectId.ObjectId
   | -- | CR 309.5a: the room a venturing player chose to move their marker into.
     ChoseRoom RoomIndex.RoomIndex
   | -- | CR 704.5j: the legendary permanent its controller kept.

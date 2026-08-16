@@ -53,8 +53,9 @@ zoneFunctionedFrom effect = case effect of
   -- Only an InSlot naming the reserved source slot can be "the object it's on".
   -- A swept set is never one object, so no sweeping arm can be; a library's
   -- top card is one object, but it is named by POSITION rather than by that slot,
-  -- so it cannot be one either, and a chosen graveyard card is named by a CHOICE
-  -- among many, which is not "the object it's on" for the same reason. All of them answer Nothing however the card file states the origin --
+  -- so it cannot be one either, and a chosen card in a graveyard or a hand is
+  -- named by a CHOICE among many, which is not "the object it's on" for the same
+  -- reason. All of them answer Nothing however the card file states the origin --
   -- the same inert card-data error the note above describes for a move of
   -- somebody else's permanent.
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ origin _) -> case ref of
@@ -66,6 +67,7 @@ zoneFunctionedFrom effect = case effect of
     ObjectRef.EachPlayer -> Nothing
     ObjectRef.TopOfLibrary {} -> Nothing
     ObjectRef.ChosenCardInGraveyard {} -> Nothing
+    ObjectRef.ChosenCardInHand {} -> Nothing
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing

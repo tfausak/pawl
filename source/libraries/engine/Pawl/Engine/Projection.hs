@@ -1820,7 +1820,8 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- Chooser name players rather than subtypes. EachPlayer, TopOfLibrary and
 -- EachCardInYourHand carry no word at all -- CR 612.1 changes subtype words, and
 -- "each player", "the top card of your library" and "all cards from your hand"
--- have none. EachCardExiledWithSource carries one only where a printing narrows
+-- have none, and neither does ChosenCardInHand, whose PlayerRef names a player
+-- and which carries no Filter. EachCardExiledWithSource carries one only where a printing narrows
 -- the linked set with its own words (Karn Liberated's "non-Aura"): CR 607.2a's
 -- set is named by which object exiled the cards, so the bare arm has no subtype
 -- to change.
@@ -1834,6 +1835,7 @@ rewriteObjectRef pairs ref = case ref of
   ObjectRef.EachPlayer -> ref
   ObjectRef.TopOfLibrary {} -> ref
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))
+  ObjectRef.ChosenCardInHand _ -> ref
 
 -- CR 612.2a through the CARD a Create defines its token with. Two fields.
 --
