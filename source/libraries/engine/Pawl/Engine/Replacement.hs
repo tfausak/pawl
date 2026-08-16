@@ -722,7 +722,8 @@ sacrificeCandidates pid source filter_ gs =
 -- candidate IS the effect's source (Clone, Primal Plasma, CR 306.5b's loyalty,
 -- and CR 702.34a's "exile THIS card" on the zone-change side), and CR 614.1d's
 -- `ControlledBy Opponent` asks who the candidate's controller is relative to CR
--- 109.5's "you" (Gather Specimens). The perspective is the CANDIDATE's
+-- 109.5's "you" (Gather Specimens as a floating row, Kismet as printed static
+-- text). The perspective is the CANDIDATE's
 -- controller, which for a floating row is the baked one -- deriving it from the
 -- source here would answer Nothing for every row whose spell has resolved, and a
 -- Nothing perspective makes ControlledBy vacuously False.
