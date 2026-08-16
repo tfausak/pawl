@@ -1,6 +1,7 @@
 module Pawl.Types.CostComponent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.ExileCardsFromGraveyard as ExileCardsFromGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Sacrifice as Sacrifice
@@ -98,25 +99,33 @@ data CostComponent keyword
     --
     -- A Natural and not a Quantity, for PayLife's reason above.
     TapForTotalPower (TapForTotalPower.TapForTotalPower keyword)
-  | -- | CR 601.2f: discard this many cards from hand (Cathartic Reunion's two).
+  | -- | CR 601.2f: discard this many cards matching the Filter from hand
+    -- (Cathartic Reunion's two of any card, Magmatic Insight's one land card).
     -- CR 701.9b gives the choice to the discarding player, so this is a prompt
     -- and never an engine pick -- the same shape Sacrifice above has.
     --
-    -- No Filter, unlike Sacrifice: "discard a card" names no quality, and the one
-    -- card in the pool that prints this cost narrows nothing. A filtered discard
-    -- cost would add the field when a card needs it.
+    -- A count plus a criterion, Sacrifice's shape and
+    -- ExileCardsFromGraveyard's: the cards are chosen, so the criterion narrows
+    -- what may be offered rather than picking anything.
     --
-    -- A Natural and not a Quantity, for PayLife's reason.
-    DiscardCards Natural.Natural
+    -- The Filter is matched against the PRINTED card and never a projection,
+    -- ExileCardsFromGraveyard's reading below and for its reason -- see
+    -- Pawl.Engine.Cost.discardCandidates for what that misses (#160).
+    -- DiscardThis below states the rest of what reading a hand costs, for both
+    -- of the components that do.
+    DiscardCards (DiscardCards.DiscardCards keyword)
   | -- | CR 702.29a's "Discard this card": discard the card the cost is on, from
     -- the hand it is in.
     --
-    -- Deliberately NOT `DiscardCards 1`, and the distinction is the one
-    -- SacrificeThis draws against Sacrifice: CR 701.9b gives the discarding
+    -- Deliberately NOT a one-card DiscardCards above, and the distinction is the
+    -- one SacrificeThis draws against Sacrifice: CR 701.9b gives the discarding
     -- player the choice of WHICH card, so DiscardCards prompts -- while this
-    -- names one card and offers nothing to choose. Paying with DiscardCards 1
+    -- names one card and offers nothing to choose. Paying with a DiscardCards
     -- would invent a prompt the rules do not have, and would let the player
-    -- discard some other card to cycle this one.
+    -- discard some other card to cycle this one. Narrowing that component's
+    -- Filter cannot close the gap either: a criterion states a QUALITY, and no
+    -- quality names one card (CR 201.2's name comes closest and two copies share
+    -- it).
     --
     -- One of the two components that read a HAND rather than the battlefield
     -- (DiscardCards is the other), so its payability asks about a zone rather

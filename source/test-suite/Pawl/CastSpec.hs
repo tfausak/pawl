@@ -50,10 +50,12 @@ import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KickerDecision as KickerDecision
@@ -1847,7 +1849,7 @@ jumpStartSpec s registry = Spec.describe s "JumpStart" $ do
       s
       "from the graveyard, the same {1}{R}{R} plus one discard"
       (costsOf fromGraveyard graveyardBoard)
-      [(printed, [CostComponent.DiscardCards 1])]
+      [(printed, [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.And []))])]
   -- Rule 702.133a's "if the resulting spell is an instant or sorcery spell",
   -- flashback's clause word for word. No printing can reach the failing side --
   -- jump-start appears only on instants and sorceries -- so this is asserted at

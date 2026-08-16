@@ -10,6 +10,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.DamagePattern as DamagePattern
+import qualified Pawl.Types.DiscardCards as DiscardCards
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.IncreaseSpellCost as IncreaseSpellCost
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -106,8 +107,8 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
     Common.assertCodec
       s
       PlayerEffect.codec
-      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) [CostComponent.DiscardCards 1, CostComponent.PayLife 2]))
-      """ {"type":"AddActivationCost","value":{"whichAbilities":{"type":"And","value":[]},"components":[{"type":"DiscardCards","value":1},{"type":"PayLife","value":2}]}} """
+      (PlayerEffect.AddActivationCost (AddActivationCost.MkAddActivationCost (Filter.And []) [CostComponent.DiscardCards (DiscardCards.MkDiscardCards 1 (Filter.And [])), CostComponent.PayLife 2]))
+      """ {"type":"AddActivationCost","value":{"whichAbilities":{"type":"And","value":[]},"components":[{"type":"DiscardCards","value":{"count":1,"whichCards":{"type":"And","value":[]}}},{"type":"PayLife","value":2}]}} """
   -- CR 305.2 / Exploration.
   Spec.it s "PlayAdditionalLands, Exploration's one" $
     Common.assertCodec
