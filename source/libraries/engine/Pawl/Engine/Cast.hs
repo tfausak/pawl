@@ -1426,7 +1426,7 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
 -- stack because CR 702.34a conditions the ability on "if the flashback cost was
 -- paid": this is the one point in the engine that knows, and `castFor` is the
 -- answer -- the keyword that offered the candidate CR 601.2b's announcement
--- settled on, matched to the cost CR 601.2h then paid. Casting the same card
+-- settled on, which CR 601.2f then totals and CR 601.2h pays. Casting the same card
 -- from the same graveyard under a CR 601.3 permission that states no cost of
 -- its own pays an untagged candidate, and rule 702.34a's clause is not
 -- satisfied by it.
