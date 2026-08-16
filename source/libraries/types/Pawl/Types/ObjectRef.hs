@@ -4,6 +4,7 @@ import qualified Pawl.Types.ChosenCardInGraveyard as ChosenCardInGraveyard
 import qualified Pawl.Types.EachCardInGraveyard as EachCardInGraveyard
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
@@ -89,11 +90,10 @@ data ObjectRef
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
     -- properties EachMatching above has.
     --
-    -- Not implemented, recorded here because the card's JSON cannot carry a
-    -- comment: a card CHOSEN out of a hidden zone by that zone's owner -- Karn
-    -- Liberated's "+4: Target player exiles a card from their hand", the clause
-    -- data/cards/karn-liberated.json is written without -- has no spelling here
-    -- (#1626).
+    -- ONE card chosen out of a hand rather than all of them is ChosenCardInHand
+    -- below, which does reach another player's hand -- it answers the visibility
+    -- question this arm avoids rather than dodging it, by asking that hand's own
+    -- owner (CR 402.3).
     EachCardInYourHand
   | -- | CR 607.2a's linked set: every card in exile that an instruction in an
     -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
@@ -226,4 +226,39 @@ data ObjectRef
     -- permanent (Pawl.Engine.EffectZone's note), and gets no lint for the same
     -- reason: nothing reaches the wire and no rule is misread.
     ChosenCardInGraveyard ChosenCardInGraveyard.ChosenCardInGraveyard
+  | -- | A card in a HAND, chosen as the effect runs -- Karn Liberated's "+4:
+    -- target player exiles a card from their hand". ChosenCardInGraveyard's
+    -- sibling over the hidden zone CR 400.2 makes a hand, and the hidden half is
+    -- the whole difference between them.
+    --
+    -- ONE PlayerRef, where the graveyard arm needs a Pawl.Types.Chooser beside a
+    -- Pawl.Types.PlayerScope, because for a hand those two questions have one
+    -- answer: CR 402.3 lets a player look at their own hand and at nobody else's,
+    -- so the player who chooses IS the player whose hand is looked in. The ref
+    -- therefore names the choosers and the hands at once, and the pair the
+    -- graveyard arm can legitimately split -- "target opponent chooses a card in
+    -- YOUR graveyard" -- has no legal spelling here to keep apart. EachPlayer is
+    -- one choice each, in APNAP order (CR 608.2e, CR 101.4); an InSlot is Karn's
+    -- one targeted seat; `Relative You` is the resolving controller choosing in
+    -- their own hand.
+    --
+    -- UNFILTERED, where the graveyard arm carries a Filter: EachCardInYourHand
+    -- above gives the reason a filtered hand is a harder question than a filtered
+    -- graveyard, and "a card from their hand" needs no filter to say (#1309).
+    --
+    -- NOT A TARGET, and here the zone settles what CR 115.1 settles for the
+    -- graveyard arm: a hand's cards cannot be targeted at all, since they are not
+    -- visible to the player who would announce the target (#559). The PLAYER is
+    -- the target Karn's text names, and the card is chosen while the effect is
+    -- applied (CR 608.2d).
+    --
+    -- ONE card per chooser, with CR 609.3 covering the shortfall exactly as it
+    -- does for the graveyard arm: an empty hand yields nothing and that share of
+    -- the instruction is ignored (CR 101.3).
+    --
+    -- Read when the effect executes (CR 608.2c), and a QUESTION rather than a
+    -- read, so only Pawl.Engine.Resolve's MoveToZone arm can carry it out --
+    -- ChosenCardInGraveyard's note above describes what a card writing it under
+    -- any other opcode gets, and why that inert answer earns no lint.
+    ChosenCardInHand PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)

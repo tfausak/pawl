@@ -44,6 +44,7 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
@@ -678,15 +679,74 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         g2 = S.addCounter CounterKind.Loyalty 14 karnId g1
         (pikerId, g3) = S.addCreature piker S.carol g2
         gStart = g3 {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
-    case Face.activatedAbilities (S.combinedFace karn) of
-      minusThree : _ -> do
+    case filter ((==) (Just (-3)) . loyaltyChange) (Face.activatedAbilities (S.combinedFace karn)) of
+      [minusThree] -> do
         let after = S.runPure (aimingAt pikerId) gStart (do Activate.activateAbility S.bob karnId minusThree; Stack.resolveTop)
             exiled = Game.zoneMembers Zone.Exile S.carol after
         case exiled of
           [exiledPiker] ->
             Spec.assertEqWith s "CR 607.2a: the exiled card is filed against Karn" (Map.lookup exiledPiker (GameState.exiledWith after)) (Just karnId)
           _ -> Spec.assertFailure s "Karn's -3 did not exile carol's Piker"
-      [] -> Spec.assertFailure s "Karn has no activated abilities"
+      _ -> Spec.assertFailure s "Karn does not have exactly one ability costing three loyalty"
+
+  -- Karn's +4 (CR 608.2d) on three seats, so "target player" is not collapsed
+  -- onto the only opponent: BOB's Karn targets CAROL, and the card that goes is
+  -- one carol chose out of her own hidden hand (CR 400.2, CR 402.3).
+  --
+  -- carol and bob hold two cards each, and the pair differs in exactly one
+  -- thing -- whose hand it is. The answer NAMES carol's Wolves outright rather
+  -- than searching the offer, so an engine that asked the controller instead
+  -- would be offered a set the pinned card is not in, fall back to bob's first
+  -- card, and fail every assertion below. Two cards each is also what keeps the
+  -- prompt real: a one-card hand is elided.
+  --
+  -- The second leg is the "the engine does not pick" control: the same board and
+  -- the same activation, answered by the default, exiles carol's OTHER card.
+  --
+  -- Driven through the single activation rather than the priority loop, which is
+  -- the narrowest path that shows the choice.
+  Spec.it s "CR 608.2d gameplay: Karn's +4 exiles the card its target chose out of their own hand" $ do
+    karn <- S.printingOf s registry "Karn Liberated"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    pacifism <- S.printingOf s registry "Pacifism"
+    mountain <- S.printingOf s registry "Mountain"
+    let g0 = Setup.emptyGame S.threePlayers
+        (karnId, g1a) = S.addCreature karn S.bob g0
+        g1 = S.addCounter CounterKind.Loyalty 6 karnId g1a
+        (carolPiker, g2) = S.addHandCard piker S.carol g1
+        (_, g3) = S.addHandCard wolves S.carol g2
+        (_, g4) = S.addHandCard pacifism S.bob g3
+        (_, g5) = S.addHandCard mountain S.bob g4
+        gStart = g5 {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+        atCarol :: Prompt.Prompt r -> r
+        atCarol p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring (Recipient.ToPlayer S.carol ==) sets
+          Prompt.ChooseCardInHand {} -> carolPiker
+          _ -> S.identityAnswer p
+        -- The control leg keeps the targeting and drops only the hand answer.
+        defaulting :: Prompt.Prompt r -> r
+        defaulting p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> S.preferring (Recipient.ToPlayer S.carol ==) sets
+          _ -> S.identityAnswer p
+        -- Read by NAME, not by id: CR 400.7 mints a new object for the card that
+        -- reaches exile, so the id the fixture pinned the answer to is gone.
+        named z pid gs = List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers z pid gs))
+        card n = CardName.MkCardName (Text.pack n)
+    case filter ((==) (Just 4) . loyaltyChange) (Face.activatedAbilities (S.combinedFace karn)) of
+      [plusFour] -> do
+        let after = S.runPure atCarol gStart (do Activate.activateAbility S.bob karnId plusFour; Stack.resolveTop)
+            control = S.runPure defaulting gStart (do Activate.activateAbility S.bob karnId plusFour; Stack.resolveTop)
+        Spec.assertEqWith s "CR 608.2d: the card carol named is the card that left" (named Zone.Exile S.carol after) [card "Goblin Piker"]
+        Spec.assertEqWith s "the card she did not name is still in her hand" (named Zone.Hand S.carol after) [card "Russet Wolves"]
+        Spec.assertEqWith s "CR 402.3: the controller's own hand is not touched" (named Zone.Hand S.bob after) (List.sort [card "Mountain", card "Pacifism"])
+        Spec.assertEqWith s "the third seat is not touched either" (S.handSize S.alice after) 0
+        Spec.assertEqWith s "CR 606.4: the +4 was paid, so Karn is on 10" (S.counterOf CounterKind.Loyalty karnId after) 10
+        -- The pair: only the answer differs, and the other card goes.
+        Spec.assertEqWith s "the engine does not pick: the default answer exiles her OTHER card instead" (named Zone.Exile S.carol control) [card "Russet Wolves"]
+        Spec.assertEqWith s "and leaves the one the pinned answer took" (named Zone.Hand S.carol control) [card "Goblin Piker"]
+        Spec.assertEqWith s "bob's hand is untouched on the control leg too" (named Zone.Hand S.bob control) (List.sort [card "Mountain", card "Pacifism"])
+      _ -> Spec.assertFailure s "Karn does not have exactly one ability adding four loyalty"
 
   -- CR 727.5 plus Karn's rider, on three seats so "under your control" is not
   -- collapsed onto the only other player: the exempted card is CAROL's, and it
@@ -1959,10 +2019,22 @@ aimingAt oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just oid) sets
   _ -> S.identityAnswer p
 
+-- CR 606.4: what this loyalty ability's cost does to its source's loyalty, or
+-- Nothing for an ability that is not one. Karn Liberated has three of them and
+-- pawl now writes all three, so an ability taken BY POSITION out of the
+-- printing's list is whichever one the card file happens to list first -- the
+-- cost is the thing that actually tells them apart.
+loyaltyChange :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Maybe Integer
+loyaltyChange ability = Maybe.listToMaybe (Maybe.mapMaybe change (Cost.Type.components (ActivatedAbility.cost ability)))
+  where
+    change c = case c of
+      CostComponent.AddLoyaltyToThis n -> Just (toInteger n)
+      CostComponent.RemoveLoyaltyFromThis n -> Just (negate (toInteger n))
+      _ -> Nothing
+
 -- Does this Activate action fire a restart? Karn Liberated has three loyalty
--- abilities and pawl writes two of them, so "the first Activate" would be its
--- -3 rather than its ultimate -- the answer has to be PINNED to the ability
--- under test, not taken by position.
+-- abilities, so "the first Activate" would be its +4 rather than its ultimate --
+-- the answer has to be PINNED to the ability under test, not taken by position.
 isRestartActivation :: A.Action -> Bool
 isRestartActivation a = case a of
   A.Activate _ ability -> any isRestart (foldMap Mode.allEffects (Modal.modes (ActivatedAbility.modal ability)))

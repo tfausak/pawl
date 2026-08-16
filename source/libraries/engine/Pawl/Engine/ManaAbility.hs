@@ -231,6 +231,7 @@ movesLibraryCard effect = case effect of
       ObjectRef.EachCardExiledWithSource {} -> False
       ObjectRef.EachPlayer -> False
       ObjectRef.ChosenCardInGraveyard {} -> False
+      ObjectRef.ChosenCardInHand {} -> False
   Effect.AddMana _ -> False
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> False
   Effect.ModifyTarget {} -> False

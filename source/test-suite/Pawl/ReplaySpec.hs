@@ -863,6 +863,18 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseCardInGraveyard decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 608.2d again, out of a hidden zone: which card Karn's target took
+        -- out of their own hand is a decision, and its transcript must not be
+        -- interchangeable with the graveyard one -- the two prompts are the same
+        -- SHAPE and differ only in the zone the cards came from.
+        Spec.it s "ChooseCardInHand round-trips and does not decode as a graveyard choice" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseCardInHand decider S.alice oid (a NonEmpty.:| [b])
+          Spec.assertEqWith s "returning the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          Spec.assertEqWith s "returning the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+          Spec.assertEqWith s "a graveyard answer does not satisfy it" (Replay.decode p (Response.ChoseCardInGraveyard a)) Nothing
+          Spec.assertEqWith s "and a short transcript takes the head" (Replay.defaultAnswer p) a
         -- CR 508.1b: what each attacking creature was announced as attacking is
         -- a decision, so it has to survive a transcript like any other -- and
         -- both arms of AttackTarget have to survive it, since a transcript that
