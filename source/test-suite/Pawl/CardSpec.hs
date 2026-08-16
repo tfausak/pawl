@@ -14,6 +14,8 @@ import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
+import qualified Pawl.Codec.Filter as Filter.Codec
+import qualified Pawl.Codec.Keyword as Keyword.Codec
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -2705,13 +2707,41 @@ blockPermissionFilters permission =
     <> foldMap quantityFilters (BlockPermission.additional permission)
     <> foldMap conditionFilters (BlockPermission.while permission)
 
--- Tag a Filter position as UNFRAMED -- one no attach supplies a subject for,
--- which is every position in the type except the one below.
-unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
-unframed = fmap ((,) False)
+-- WHICH position of a card's text a Filter sits in, for the two lints that are
+-- about position rather than about the atom. Each atom they police is answered
+-- off a field that exactly one caller fills -- a Filter.View's for CR 701.3a, a
+-- Filter.Context's for CR 709.4a -- so the position IS the soundness question.
+--
+--   * AttachDestination -- Effect.AttachTarget's destination, the one position
+--     evaluated against a view whose `canHostSubject` is filled in
+--     (Pawl.Engine.Attach.hostsFor). CR 701.3a's atom belongs here and nowhere
+--     else.
+--   * InTargetSlot -- a MODE's target slot filter, the one position matched by
+--     Pawl.Engine.Target.admittedGiven, which is the one site that fills
+--     Filter.Context.slotNames. CR 709.4a's Filter.SameNameAsBound belongs here
+--     and nowhere else.
+--   * Unframed -- everything else.
+--
+-- CR 303.4a's enchant slot (Face.enchant) is Unframed rather than InTargetSlot,
+-- and that is the load-bearing call: it is a TargetSlot, but two of its readers
+-- reach Target.admittedRecipients, which passes NO bindings, so slotNames is
+-- empty there -- Pawl.Engine.Attach.attachmentFor's CR 303.4j move and
+-- Pawl.Engine.Sba.stillLegalEnchant's CR 303.4c check. A SameNameAsBound written
+-- into an enchant ability would answer one way at CR 601.2c and another way at
+-- every later reading.
+data Framing
+  = Unframed
+  | AttachDestination
+  | InTargetSlot
+  deriving (Eq, Show)
 
--- Every Filter one effect carries, paired with whether an ATTACH frames it.
--- Exactly one arm answers True: Effect.AttachTarget's destination, which is the
+-- Tag a Filter position as UNFRAMED -- one neither an attach nor a target slot
+-- frames, which is every position in the type except the two named above.
+unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
+unframed = fmap ((,) Unframed)
+
+-- Every Filter one effect carries, paired with its Framing. Exactly one arm
+-- answers AttachDestination: Effect.AttachTarget's destination, which is the
 -- only CARD-AUTHORED Filter position evaluated against a view whose
 -- `canHostSubject` is filled in (Pawl.Engine.Attach.hostsFor, from
 -- attachmentFor). TurnUpRewrite.MayAttachTo reaches the same evaluator and is
@@ -2724,12 +2754,13 @@ unframed = fmap ((,) False)
 -- subject for CR 701.3a to be about. Widening the subject so that another
 -- position could answer is #572; until a card asks for it, the framed side of
 -- this traversal is exactly this one arm.
-effectFilters :: Effect.Effect Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+effectFilters :: Effect.Effect Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 effectFilters effect = case effect of
-  -- THE one framed position. CR 701.3a: "An Aura, Equipment, or Fortification
-  -- can't be attached to an object or player it couldn't enchant, equip, or
-  -- fortify, respectively." Aura Graft's "another permanent it can enchant".
-  Effect.AttachTarget (AttachTarget.MkAttachTarget _ f) -> [(True, f)]
+  -- THE one attach-framed position. CR 701.3a: "An Aura, Equipment, or
+  -- Fortification can't be attached to an object or player it couldn't enchant,
+  -- equip, or fortify, respectively." Aura Graft's "another permanent it can
+  -- enchant".
+  Effect.AttachTarget (AttachTarget.MkAttachTarget _ f) -> [(AttachDestination, f)]
   -- The dealer is a SlotName and carries no Filter.
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity _) -> unframed (objectRefFilters ref <> quantityFilters quantity)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
@@ -2851,17 +2882,19 @@ effectFilters effect = case effect of
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
 -- below counts occurrences, and a collapse there would read as a Filter this
 -- traversal cannot see.
-modalFilters :: Modal.Modal Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+modalFilters :: Modal.Modal Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 modalFilters modal =
   concatMap
     ( \mode ->
         concatMap effectFilters (Mode.allEffects mode)
           <> unframed (concatMap conditionFilters (modeClauseConditions mode))
-          <> unframed (concatMap targetSlotFilters (Map.elems (Mode.targetSlots mode)))
+          -- THE target-slot-framed position: a mode's own slot, matched by
+          -- Pawl.Engine.Target.admittedGiven at both of CR 115's moments.
+          <> fmap ((,) InTargetSlot) (concatMap targetSlotFilters (Map.elems (Mode.targetSlots mode)))
     )
     (Modal.modes modal)
 
-triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =
   unframed
     ( triggerConditionFilters (TriggeredAbility.condition ability)
@@ -2869,7 +2902,7 @@ triggeredAbilityFilters ability =
     )
     <> modalFilters (TriggeredAbility.modal ability)
 
-activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 activatedAbilityFilters ability =
   unframed
     ( costFilters (ActivatedAbility.cost ability)
@@ -2923,7 +2956,7 @@ activatedAbilityFilters ability =
 -- record fold is the exception, exactly as cardCounts' own caveat says: a NEW
 -- Face field that can hold a Filter would bypass it silently. That is what the
 -- codec cross-check in canHostSubjectOffends is for.
-cardFilters :: Face.Face Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
+cardFilters :: Face.Face Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 cardFilters card =
   unframed
     ( concatMap keywordFilters (Set.toList (Face.keywords card))
@@ -2959,7 +2992,7 @@ cardFilters card =
 -- offence; the first is what Aura Graft legitimately has one of.
 canHostSubjectCounts :: Face.Face Card.Type.Card -> (Int, Int)
 canHostSubjectCounts card =
-  let total wanted = sum [canHostSubjects f | (framed, f) <- cardFilters card, framed == wanted]
+  let total wanted = sum [canHostSubjects f | (framing, f) <- cardFilters card, (framing == AttachDestination) == wanted]
    in (total True, total False)
 
 -- Every occurrence of one atom's codec tag in an ENCODED face. The completeness
@@ -2974,9 +3007,9 @@ canHostSubjectCounts card =
 -- a card's encoding is that tag (a card NAMED "CanHostSubject" would be a false
 -- positive, and a loud one rather than a silent miss).
 --
--- Parameterized because two atoms want it: CR 701.3a's, counted here for the
--- traversal cross-check, and CR 702.134a's Filter.PowerLessThanSource, which no
--- card may carry at all.
+-- Parameterized because several atoms want it: CR 701.3a's and CR 709.4a's,
+-- counted here for their traversal cross-checks, and CR 702.134a's
+-- Filter.PowerLessThanSource, which no card may carry at all.
 jsonAtoms :: Text.Text -> Value.Value -> Int
 jsonAtoms tag value = case value of
   Value.String s -> if String.unwrap s == tag then 1 else 0
@@ -3009,6 +3042,54 @@ canHostSubjectOffends :: Face.Face Card.Type.Card -> Bool
 canHostSubjectOffends card =
   let (framed, unframedCount) = canHostSubjectCounts card
    in unframedCount /= 0 || framed + unframedCount /= jsonAtoms (Text.pack "CanHostSubject") (Codec.encode (Face.Codec.codec Card.codec) card)
+
+-- jsonAtoms narrowed from a whole face to ONE Filter position of it. The atom
+-- this is asked about carries a payload (a SlotName), so counting the tag by hand
+-- would mean a second copy of canHostSubjects' whole recursion; Pawl.Codec.Filter
+-- already walks every arm of it, including the ones a hand-written recursion has
+-- dropped before (landwalk's Subtype, now a Filter).
+--
+-- Sound as a per-position count because a TargetSlot's codec embeds its Filter's
+-- encoding verbatim, so the sum over cardFilters' positions and jsonAtoms over
+-- the whole encoded face are counting the same occurrences.
+filterAtoms :: Text.Text -> Filter.Type.Filter Keyword.Keyword -> Int
+filterAtoms tag = jsonAtoms tag . Codec.encode (Filter.Codec.codec Keyword.Codec.codec)
+
+-- The CR 709.4a tag, spelled once.
+sameNameAsBoundTag :: Text.Text
+sameNameAsBoundTag = Text.pack "SameNameAsBound"
+
+-- How many CR 709.4a atoms this card carries inside a MODE's target slot filter,
+-- and how many anywhere else. The second number is the offence; the first is what
+-- Harness the Storm legitimately has one of.
+sameNameAsBoundCounts :: Face.Face Card.Type.Card -> (Int, Int)
+sameNameAsBoundCounts card =
+  let total wanted = sum [filterAtoms sameNameAsBoundTag f | (framing, f) <- cardFilters card, (framing == InTargetSlot) == wanted]
+   in (total True, total False)
+
+-- CR 709.4a's bound-name comparison is answerable only where
+-- Filter.Context.slotNames is filled, and Pawl.Engine.Target.admittedGiven --
+-- the one site that matches a MODE's target slot Filter -- is the one site that
+-- fills it. Filter.contextFor and Filter.contextComparingPower leave it empty, so
+-- Filter.SameNameAsBound in a Count filter, an affected set, a search filter or a
+-- cost criterion is a silent False rather than a rejected card. This is where that
+-- is made loud.
+--
+-- Two offences under one name, for canHostSubjectOffends' two reasons: the
+-- traversal found the atom outside a target slot, or the traversal and the codec
+-- disagree about how many the card holds -- the second being a blind spot in
+-- cardFilters, in which an atom would be reported as zero rather than as an
+-- offence.
+--
+-- The second disjunct is a REGRESSION FENCE rather than a proved behaviour, as
+-- canHostSubjectOffends' is: every position a fixture can reach today is caught by
+-- the first, so neutralizing the cross-check leaves the suite green. What would
+-- observe it is a future Face field cardFilters forgets, which is the thing that
+-- cannot be written down yet.
+sameNameAsBoundOffends :: Face.Face Card.Type.Card -> Bool
+sameNameAsBoundOffends card =
+  let (slotted, elsewhere) = sameNameAsBoundCounts card
+   in elsewhere /= 0 || slotted + elsewhere /= jsonAtoms sameNameAsBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)
 
 -- A lint fixture built as a FACE, put back into the one-face card an
 -- Effect.Create's token payload has to be.
@@ -4744,10 +4825,39 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool
       s
       ( elem
-          (False, Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic])
+          (Unframed, Filter.Type.And [Filter.Type.HasCardType CardType.Land, Filter.Type.HasSupertype Supertype.Basic])
           (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
+  -- CR 709.4a's Filter.SameNameAsBound is in CR 701.3a's position one axis over:
+  -- answerable only where Filter.Context.slotNames is filled, which is a MODE's
+  -- target slot and nothing else. See sameNameAsBoundOffends for the two offences
+  -- and Framing for why CR 303.4a's enchant slot is not one of the safe positions.
+  Spec.it s "CR 709.4a no card asks SameNameAsBound outside a mode's target slot" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace sameNameAsBoundOffends . Printing.card) ps
+    Spec.assertEqWith s "the atom sits only in a target slot's filter" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous, the way the sibling sweeps would be alone: the pool authors the
+    -- atom, and the one card that does is ACCEPTED here rather than skipped.
+    harness <- S.printingOf s registry "Harness the Storm"
+    Spec.assertEqWith
+      s
+      "Harness the Storm's one atom is in its trigger's target slot"
+      (sameNameAsBoundCounts (S.combinedFace harness))
+      (1, 0)
+    Spec.assertEqWith
+      s
+      "and it is the pool's only one"
+      (sum (fmap (uncurry (+) . sameNameAsBoundCounts . S.combinedFace) ps))
+      1
+    -- Both sides of the split, with room to spare under the pool's real figures:
+    -- a traversal that had stopped walking, or a Framing that had stopped marking
+    -- target slots, would fail here rather than pass the sweep above by iterating
+    -- over nothing. Without the second, "elsewhere" would be every occurrence and
+    -- this would silently become the sibling atoms' "no card writes it at all".
+    let positions = concatMap (cardFilters . S.combinedFace) ps
+    Spec.assertBool s (length positions > 100) "the pool gives the traversal Filter positions to walk"
+    Spec.assertBool s (length (filter ((== InTargetSlot) . fst) positions) > 10) "and target slot filters for the accepted side to be about"
   -- The two source-power comparisons are answerable only where the CONTEXT
   -- supplies a source power: Filter.Context.sourcePower is filled by
   -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a), by
@@ -5060,6 +5170,151 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       "and the ungrafted base card carries no atom at all"
       (canHostSubjectOffends base, canHostSubjectCounts base)
+      (False, (0, 0))
+  -- The rejecting direction for CR 709.4a, for the reason the test above gives:
+  -- Harness the Storm only exercises the ACCEPTING one, and a card that offends a
+  -- lint must not be loadable, so the offenders are hand-built rather than filed.
+  --
+  -- Every fixture buries the atom under all three combinators, so an
+  -- implementation reading only the top of a Filter would accept all of them, and
+  -- each is asserted through sameNameAsBoundCounts as well as the predicate -- the
+  -- counts say the TRAVERSAL put it in that position, where the predicate alone is
+  -- also satisfied by the codec half noticing an atom the traversal missed.
+  Spec.it s "the lint itself catches SameNameAsBound outside a mode's target slot" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    harness <- S.printingOf s registry "Harness the Storm"
+    let base = S.combinedFace piker
+        slot = SlotName.MkSlotName (Text.pack "target")
+        atom = Filter.Type.SameNameAsBound (SlotName.MkSlotName (Text.pack "thatSpell"))
+        buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
+        spellOf effects slots =
+          Modal.MkModal
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) slots))
+            (ModeSelection.ChooseExactly 1)
+        boostedBy quantity =
+          StaticAbility.MkStaticAbility
+            (Affected.Matching Filter.Type.IsSource)
+            Nothing
+            Nothing
+            (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness quantity (Quantity.Type.Literal 0))))
+        planted =
+          [ -- THE one that separates this lint from a copy of the sibling: an
+            -- enchant slot is a TargetSlot, and is still not a position that can
+            -- answer -- Attach.attachmentFor (CR 303.4j) and
+            -- Sba.stillLegalEnchant (CR 303.4c) both re-ask it through
+            -- Target.admittedRecipients, which binds nothing.
+            ( "CR 303.4a's enchant ability",
+              base {Face.enchant = [TargetSlot.required Pool.Permanents (Just buried)]}
+            ),
+            ( "a static ability's affected set",
+              base
+                { Face.staticAbilities =
+                    [ StaticAbility.MkStaticAbility
+                        (Affected.Matching buried)
+                        Nothing
+                        Nothing
+                        (NonEmpty.singleton (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))))
+                    ]
+                }
+            ),
+            ( "a Count's filter",
+              base
+                { Face.staticAbilities =
+                    [ boostedBy
+                        ( Quantity.Type.Count
+                            (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                        )
+                    ]
+                }
+            ),
+            ( "a Search filter",
+              base {Face.spell = spellOf [Effect.Search Search.MkSearch {Search.searcher = PlayerRef.Relative PlayerRelation.You, Search.owner = PlayerRef.Relative PlayerRelation.You, Search.quantity = Quantity.Type.Literal 1, Search.filter = buried, Search.destination = SearchDestination.RevealThenHand}] Map.empty}
+            ),
+            ( "an ObjectRef.EachMatching set",
+              base {Face.spell = spellOf [Effect.Destroy (Destroy.MkDestroy (ObjectRef.EachMatching buried) Regenerability.Regenerable Nothing)] Map.empty}
+            ),
+            ( "CR 603.6a's trigger condition",
+              base
+                { Face.triggeredAbilities =
+                    [ oneEffectTrigger
+                        (TriggerCondition.PermanentEnters buried)
+                        (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot Binding.you) (Quantity.Type.Literal 1)))
+                    ]
+                }
+            ),
+            ( "CR 601.2f's sacrifice cost component",
+              (S.combinedFace sorcerer)
+                { Face.activatedAbilities =
+                    fmap
+                      (\a -> a {ActivatedAbility.cost = (ActivatedAbility.cost a) {Cost.Type.components = [CostComponent.Sacrifice (Sacrifice.MkSacrifice 1 buried)]}})
+                      (Face.activatedAbilities (S.combinedFace sorcerer))
+                }
+            ),
+            ( "CR 702.29e's typecycling predicate",
+              base {Face.keywords = Set.singleton (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Just buried)))}
+            ),
+            ( "a created token's own static ability",
+              base
+                { Face.spell =
+                    spellOf
+                      [ Effect.Create
+                          Create.MkCreate
+                            { Create.quantity = Quantity.Type.Literal 1,
+                              Create.card = oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}),
+                              Create.riders = EntryRiders.defaultValue,
+                              Create.slot = Nothing
+                            }
+                      ]
+                      Map.empty
+                }
+            )
+          ]
+        report (label, card) = (label, sameNameAsBoundOffends card, sameNameAsBoundCounts card)
+    Spec.assertEqWith
+      s
+      "every position that cannot answer is rejected, and the traversal is what finds it"
+      (fmap report planted)
+      (fmap (\(label, _) -> (label, True, (0, 1))) planted)
+    Spec.assertEqWith
+      s
+      "and the codec counts exactly the atoms the traversal does"
+      (fmap (\(_, card) -> jsonAtoms sameNameAsBoundTag (Codec.encode (Face.Codec.codec Card.codec) card)) planted)
+      (fmap (const 1) planted)
+    -- The nesting, stated on its own: a top-level-only check would score every one
+    -- of these zero but the first.
+    Spec.assertEqWith
+      s
+      "the atom is found at every nesting depth"
+      ( fmap
+          (filterAtoms sameNameAsBoundTag)
+          [ atom,
+            Filter.Type.And [atom],
+            Filter.Type.Or [atom],
+            Filter.Type.Not atom,
+            buried,
+            Filter.Type.HasKeyword (Keyword.Cycling (Cycling.MkCycling (Cost.Type.MkCost Nothing []) (Just atom)))
+          ]
+      )
+      [1, 1, 1, 1, 1, 1]
+    -- The ACCEPTING direction, twice: the real card, and the buried atom in a mode
+    -- target slot grafted onto a card that declares none of its own -- so the
+    -- acceptance is about the POSITION and not about Harness the Storm.
+    Spec.assertEqWith
+      s
+      "Harness the Storm is accepted"
+      (sameNameAsBoundOffends (S.combinedFace harness), sameNameAsBoundCounts (S.combinedFace harness))
+      (False, (1, 0))
+    let slotted = base {Face.spell = spellOf [] (Map.singleton slot (TargetSlot.required Pool.Permanents (Just buried)))}
+    Spec.assertEqWith
+      s
+      "a buried atom in a mode's target slot is accepted"
+      (sameNameAsBoundOffends slotted, sameNameAsBoundCounts slotted)
+      (False, (1, 0))
+    Spec.assertEqWith
+      s
+      "and the ungrafted base card carries no atom at all"
+      (sameNameAsBoundOffends base, sameNameAsBoundCounts base)
       (False, (0, 0))
 
 m2bCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
