@@ -36,6 +36,7 @@ codec keywordCodec =
       Arm.payload "AddLoyaltyToThis" Common.natural CostComponent.AddLoyaltyToThis (\x -> case x of CostComponent.AddLoyaltyToThis y -> Just y; _ -> Nothing),
       Arm.payload "RemoveLoyaltyFromThis" Common.natural CostComponent.RemoveLoyaltyFromThis (\x -> case x of CostComponent.RemoveLoyaltyFromThis y -> Just y; _ -> Nothing),
       Arm.payload "PutPlusOneCountersOnThis" Common.natural CostComponent.PutPlusOneCountersOnThis (\x -> case x of CostComponent.PutPlusOneCountersOnThis y -> Just y; _ -> Nothing),
+      Arm.payload "Blight" Common.natural CostComponent.Blight (\x -> case x of CostComponent.Blight y -> Just y; _ -> Nothing),
       Arm.nullary "ExileThisFromGraveyard" CostComponent.ExileThisFromGraveyard,
       Arm.payload "ExileCardsFromGraveyard" (ExileCardsFromGraveyard.codec keywordCodec) CostComponent.ExileCardsFromGraveyard (\x -> case x of CostComponent.ExileCardsFromGraveyard y -> Just y; _ -> Nothing),
       Arm.payload "ExileTopFromGraveyard" (Filter.codec keywordCodec) CostComponent.ExileTopFromGraveyard (\x -> case x of CostComponent.ExileTopFromGraveyard y -> Just y; _ -> Nothing)

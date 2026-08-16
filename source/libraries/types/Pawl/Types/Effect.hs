@@ -1298,8 +1298,9 @@ data Effect card
     -- Bolster's pool narrowed by least toughness is the contrast. Only N varies,
     -- and it is a Quantity for Bolster's and Amass's shape rather than because a
     -- card demands one: every N printed in an EFFECT position is a literal, and the
-    -- one non-literal (Soul Immolation's "blight X") is a cost, which is a separate
-    -- axis (#1493).
+    -- one non-literal (Soul Immolation's "blight X") is a COST, which is
+    -- Pawl.Types.CostComponent.Blight's axis and carries a Natural there -- so that
+    -- X has no spelling on either side (gap #1646).
     --
     -- The blighter is the resolving controller, so no PlayerRef. Champion of the
     -- Weird's "target opponent blights 2" is the other reading, and is not

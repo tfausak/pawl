@@ -25,6 +25,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Blight as Blight
 import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
@@ -658,6 +659,9 @@ substituteXInComponent x component = case component of
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
+  -- Not this arm's X: Soul Immolation's "blight X" is announced under a bound
+  -- rule 701.68a does not state, so it has no spelling here at all (gap #1646).
+  CostComponent.Blight _ -> component
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileCardsFromGraveyard {} -> component
   CostComponent.ExileTopFromGraveyard _ -> component
@@ -696,6 +700,7 @@ componentHasVariable component = case component of
   CostComponent.AddLoyaltyToThis _ -> False
   CostComponent.RemoveLoyaltyFromThis _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.Blight _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
@@ -954,6 +959,7 @@ isLoyaltyComponent component = case component of
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.PutPlusOneCountersOnThis _ -> False
+  CostComponent.Blight _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard {} -> False
   CostComponent.ExileTopFromGraveyard _ -> False
@@ -1017,6 +1023,9 @@ zoneOfComponent component = case component of
   -- CR 122.6 puts counters on a permanent already where it is, so nothing moves
   -- out of any zone and CR 113.6m does not reach this either.
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
+  -- PutPlusOneCountersOnThis's answer for its reason: CR 122.6 puts the counters
+  -- on a creature already on the battlefield, so nothing moves out of any zone.
+  CostComponent.Blight _ -> Nothing
 
 -- CR 306.5c: a planeswalker's loyalty is the number of loyalty counters on it.
 -- Zero for an object with none, which CR 704.5i then reads as loyalty 0 -- so
@@ -1212,6 +1221,11 @@ removalClaim pid oid component gs = case component of
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
   CostComponent.PutPlusOneCountersOnThis _ -> Nothing
+  -- Nothing, though this one DOES pick an object out of a pool: a claim is what a
+  -- component takes OUT of a zone, and CR 701.68a takes nothing -- the chosen
+  -- creature stays where it is. Two blights in one cost may therefore choose the
+  -- same creature, which is right: CR 122.6 stacks counters.
+  CostComponent.Blight _ -> Nothing
   where
     claim z p n = Just (Claim.Type.MkClaim {Claim.Type.zone = z, Claim.Type.pool = p, Claim.Type.count = n})
     itself condition = if condition then Set.singleton oid else Set.empty
@@ -1438,6 +1452,9 @@ uncountedCeiling component = case component of
   CostComponent.AddLoyaltyToThis _ -> Just 1
   CostComponent.RemoveLoyaltyFromThis _ -> Just 1
   CostComponent.PutPlusOneCountersOnThis _ -> Just 1
+  -- An UNDERSTATEMENT, PutPlusOneCountersOnThis's: a player controlling a creature
+  -- can blight as often as they can pay the rest of the cost.
+  CostComponent.Blight _ -> Just 1
 
 -- This player's life total as an amount that could be PAID (CR 119.4), which is
 -- to say floored at zero: a player at or below 0 life can pay nothing but CR
@@ -1565,6 +1582,7 @@ lifeOwedByComponent component = case component of
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.PutPlusOneCountersOnThis _ -> 0
+  CostComponent.Blight _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileCardsFromGraveyard {} -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
@@ -1723,6 +1741,21 @@ canPayComponent pid oid component gs = case component of
   -- lets counters go onto a permanent whoever controls it by the time that
   -- ability resolves.
   CostComponent.PutPlusOneCountersOnThis _ -> Set.member oid (GameState.battlefield gs)
+  -- CR 701.68b: "if a player is given the choice to blight but is unable to put N
+  -- -1/-1 counters on a creature they control (usually because they control no
+  -- creatures), they can't choose to blight." Read here rather than at the
+  -- payment, so the refusal arrives where the rules put it -- CR 601.2h's
+  -- "unpayable costs can't be paid", which CR 602.2b hands to an activation. An
+  -- activated ability with this cost is never OFFERED
+  -- (Pawl.Engine.Activate.activatableGiven has canPay as a conjunct), a spell with
+  -- it as an additional cost is uncastable, and CR 118.12's resolution offer is
+  -- never raised.
+  --
+  -- Nothing about `oid` and nothing about N. Rule 701.68a's candidate is qualified
+  -- by CONTROL alone -- not by being the object the cost is on, which is the whole
+  -- difference from PutPlusOneCountersOnThis above -- and CR 122.6 puts any number
+  -- of counters on any creature, so no N is too large for a candidate that exists.
+  CostComponent.Blight _ -> Blight.canBlight pid gs
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. The order the
 -- components are paid in is the PAYER'S, and payComponents below is where it is
@@ -1851,6 +1884,7 @@ orderSensitive component = case component of
   CostComponent.AddLoyaltyToThis _ -> True
   CostComponent.RemoveLoyaltyFromThis _ -> True
   CostComponent.PutPlusOneCountersOnThis _ -> True
+  CostComponent.Blight _ -> True
   CostComponent.PayLife _ -> False
   CostComponent.PayLifeX -> False
   CostComponent.PayEnergy _ -> False
@@ -2288,6 +2322,24 @@ payComponent pid oid component = case component of
     -- for a cost paid during a resolution is the player paying it.
     Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne n)
     pure Payment.Paid
+  -- CR 701.68a's whole procedure, which Pawl.Engine.Blight owns -- this arm knows
+  -- only that a cost asked for it. Unpaid on rule 701.68b's board, which
+  -- canPayComponent has already refused, so reaching it means the creature left
+  -- between the check and the payment.
+  --
+  -- ByEffect, and the one place this module's CR 614.16 story is not exact.
+  -- CR 118.12 pays a blight during a resolution, where the cause is right --
+  -- PutPlusOneCountersOnThis's argument just above, unchanged. CR 601.2h pays one
+  -- while a spell is being cast or an ability activated, where CR 609.1 has no
+  -- resolution for the placement to be the effect of, so CR 614.16's rows should
+  -- not reach it and here they do. Unobservable in the pool: rule 614.16's
+  -- effect-grain patterns in `data/cards` (Doubling Season, Hardened Scales) all
+  -- name +1/+1 counters, and Vorinclex, Monstrous Raider's name a PLAYER, which
+  -- CR 614.16 does not gate and which applies to a cost payment either way
+  -- (gap #1647).
+  CostComponent.Blight n -> do
+    blighted <- Blight.blight pid oid n
+    pure (if blighted then Payment.Paid else Payment.Unpaid)
   -- CR 406.2's move, through Event.changeZone -- the shared zone-change funnel, so
   -- the card gets a CR 400.7 incarnation and anything watching a graveyard-to-exile
   -- move sees it. No prompt: the cost names this card, exactly as DiscardThis does.

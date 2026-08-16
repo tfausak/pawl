@@ -15,6 +15,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Amass as Amass
 import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Blight as Blight
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -4968,18 +4969,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
       Just n -> Amass.amass controller source resolving subtype (Integer.toNaturalSaturating n)
   -- CR 701.68a: "blight N" -- put N -1/-1 counters on a creature you control.
+  -- The whole keyword action is Pawl.Engine.Blight.blight's, which is where rule
+  -- 701.68's text lives -- this arm knows only that some effect asked for it,
+  -- exactly as the Amass arm above knows only that some effect asked for that.
+  -- Rule 701.68b's "they can't choose to blight" reaches the same procedure
+  -- through Pawl.Engine.Cost, where CR 118.12 makes the optional reading a cost.
   --
-  -- Bolster's arm above with its narrowing removed, which is the whole of the
-  -- difference: rule 701.68a qualifies its candidate by CONTROL and nothing else,
-  -- where rule 701.39a goes on to take the least toughness. So the prompt is
-  -- raised for two or more creatures rather than for a tie, and no toughness is
-  -- read at all -- a creature the projection gives no toughness is still a
-  -- candidate here.
-  --
-  -- CR 101.3 covers the empty pool: a player controlling no creature blights
-  -- nothing. That is the MANDATORY reading, the only one a card in the pool
-  -- reaches today. CR 701.68b's "they can't choose to blight" is the OPTIONAL one
-  -- and is not implemented (#1490).
+  -- MANDATORY here, so the empty pool is CR 101.3's no-op rather than rule
+  -- 701.68b's refusal, and the answer is discarded.
   --
   -- Not implemented: nothing records which creature was blighted, so CR 701.68c's
   -- "blighted creature" cannot be named by a later effect and CR 701.68d's trigger
@@ -4991,31 +4988,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
-        -- Ascending, so both the single-candidate shortcut and a transcript are
-        -- deterministic -- Bolster's posture, and Ring.tempt's before it.
-        creatures = List.sort (filter (\oid -> Projection.isCreatureOf oid gs) (Projection.controls controller gs))
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
-      Just n -> case creatures of
-        -- CR 101.3: a player controlling no creature blights nothing.
-        [] -> pure ()
-        first : rest -> do
-          blighted <- case rest of
-            -- One creature is the whole of rule 701.68a's candidate set, and the
-            -- instruction is mandatory -- where the rules leave nothing to ask,
-            -- don't prompt.
-            [] -> pure first
-            second : more -> do
-              let offered = first NonEmpty.:| (second : more)
-              answer <- Game.choose (Prompt.ChooseBlight (Decide.deciderFor controller gs) controller resolving offered)
-              -- FILTERED, NOT TRUSTED, the ChooseBolster posture: an answer naming
-              -- something never offered falls back to the first candidate, since
-              -- the action is mandatory and must put its counters on someone.
-              pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-          -- CR 122.6: through the single funnel, so CR 614.16's counter
-          -- replacements (Vorinclex, Monstrous Raider) get their opportunity.
-          Monad.when (n > 0) . Monad.void $
-            Event.putCounters (CounterCause.ByEffect controller) blighted CounterKind.MinusOneMinusOne (Integer.toNaturalSaturating n)
+      Just n -> Monad.void (Blight.blight controller resolving (Integer.toNaturalSaturating n))
   -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
   -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
   -- this arm knows only that some effect asked for it, exactly as the arms around
