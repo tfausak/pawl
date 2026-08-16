@@ -85,6 +85,12 @@ data ObjectRef
     -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
     -- properties EachMatching above has.
+    --
+    -- Not implemented, recorded here because the card's JSON cannot carry a
+    -- comment: a card CHOSEN out of a hidden zone by that zone's owner -- Karn
+    -- Liberated's "+4: Target player exiles a card from their hand", the clause
+    -- data/cards/karn-liberated.json is written without -- has no spelling here
+    -- (#1626).
     EachCardInYourHand
   | -- | CR 607.2a's linked set: every card in exile that an instruction in an
     -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
@@ -94,10 +100,16 @@ data ObjectRef
     -- refers only to cards in the exile zone that were put there as a result of
     -- an instruction to exile them in the first ability."
     --
-    -- Nullary. NO PLAYER: exile is a public zone (CR 400.2) and the set is
-    -- defined by which object exiled the card, not by whose it is. NO FILTER: a
-    -- linked reference names the whole set it is linked to, and every printing in
-    -- the pool takes all of it.
+    -- NO PLAYER: exile is a public zone (CR 400.2) and the set is defined by
+    -- which object exiled the card, not by whose it is.
+    --
+    -- The Filter is OPTIONAL because a linked reference usually names the whole
+    -- set it is linked to -- Hoarding Dragon, Promise of Tomorrow and Savior of
+    -- Ollenbock each take all of it, and write no filter. Karn Liberated is the
+    -- printing that narrows the set with its own words, "all non-Aura PERMANENT
+    -- CARDS exiled with Karn", so the subset has to be sayable; a stated filter
+    -- is read exactly as EachMatching's is, against each linked card's
+    -- projection.
     --
     -- Singular and plural are ONE arm, which is CR 607.3: an ability referring to
     -- "the exiled card" whose linked ability exiled several "performs that action
@@ -111,7 +123,7 @@ data ObjectRef
     -- Not a target and never one (CR 115.10a) -- the reference is a definition,
     -- not a choice -- and swept when the effect executes (CR 608.2c), the two
     -- properties EachMatching above has.
-    EachCardExiledWithSource
+    EachCardExiledWithSource (Maybe (Filter.Filter Keyword.Keyword))
   | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The one
     -- arm that names no object at all, and it is here rather than on
     -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:

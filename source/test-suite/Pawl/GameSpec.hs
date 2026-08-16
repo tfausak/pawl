@@ -15,6 +15,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Decide as Decide
@@ -43,6 +44,7 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
@@ -564,18 +566,23 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "CR 723.5a: alice's hand is untouched" (S.handSize S.alice after) 0
 
   Spec.it s "CR 727.1/727.2/727.4 gameplay: bob activates a restart and the game rebuilds from its own cards" $ do
-    -- bob controls the synthetic restart artifact and owns 8 cards total;
-    -- alice owns 8. Both start with reduced life on a populated board. bob
-    -- activates the artifact through the priority loop; it resolves, restarts
-    -- the game, and the result is a valid new game with bob as starter.
-    syntheticRestart <- S.printingOf s registry "Synthetic Restart"
+    -- bob controls Karn Liberated and owns 8 cards total; alice owns 8. Both
+    -- start with reduced life on a populated board. bob activates Karn's
+    -- ultimate through the priority loop; it resolves, restarts the game, and
+    -- the result is a valid new game with bob as starter. Karn exiled nothing
+    -- here, so CR 727.5 exempts nothing and its rider moves nothing -- which is
+    -- what leaves the battlefield assertion below meaning what it says.
+    karn <- S.printingOf s registry "Karn Liberated"
     piker <- S.printingOf s registry "Goblin Piker"
     mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers
-        (_restartId, g1) = S.addCreature syntheticRestart S.bob g0
+        (karnId, g1a) = S.addCreature karn S.bob g0
+        -- CR 606.5: the -14 is only activatable with 14 loyalty to remove, and a
+        -- planeswalker a fixture places gets none of CR 306.5b's counters.
+        g1 = S.addCounter CounterKind.Loyalty 14 karnId g1a
         (_aPiker, g2) = S.addCreature piker S.alice g1
         -- fill each owner's pool to >= 7 cards so opening hands draw without a
-        -- CR 727.3 loss (the restart artifact + 7 mountains = 8 for bob).
+        -- CR 727.3 loss (Karn + 7 mountains = 8 for bob).
         g3 = addManyG mountain 7 S.bob (addManyG mountain 7 S.alice g2)
         gStart =
           g3
@@ -608,10 +615,10 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- white, which is all this needs: WHICH colour it chose does not matter,
     -- only that it chose one.
     --
-    -- Then bob activates the synthetic restart and CR 727.2 rebuilds every
-    -- library from the existing cards. The Servant is a new object in that
+    -- Then bob restarts the game with Karn's ultimate and CR 727.2 rebuilds
+    -- every library from the existing cards. The Servant is a new object in that
     -- library (CR 400.7), so the colour it chose is gone.
-    syntheticRestart <- S.printingOf s registry "Synthetic Restart"
+    karn <- S.printingOf s registry "Karn Liberated"
     paintersServant <- S.printingOf s registry "Painter's Servant"
     mountain <- S.printingOf s registry "Mountain"
     let base = S.landsInPlay mountain 2
@@ -630,7 +637,8 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         bulked = addManyG mountain 24 S.alice inHand
         castServant = snd (Engine.runGamePure S.identityAnswer bulked (S.cast S.alice handId))
         painted = snd (Engine.runGamePure S.identityAnswer castServant Stack.resolveTop)
-        (_restartId, withRestart) = S.addCreature syntheticRestart S.bob painted
+        (karnId, withKarn) = S.addCreature karn S.bob painted
+        withRestart = S.addCounter CounterKind.Loyalty 14 karnId withKarn
         filled = addManyG mountain 7 S.bob withRestart
         gStart =
           filled
@@ -657,6 +665,87 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
       _ -> Spec.assertFailure s "Painter's Servant did not reach the battlefield"
     Spec.assertEqWith s "CR 727.2: the restart really ran (the battlefield is empty)" (Set.null (GameState.battlefield after)) True
     Spec.assertEqWith s "the game did not end, so the rebuild is the live state" (GameState.result after) Nothing
+
+  -- The other half of the Karn pair below: the exemption reads CR 607.2a's
+  -- linkage, and this is the ability that files one. Driven through the single
+  -- activation rather than the priority loop, which is the narrowest path that
+  -- shows it.
+  Spec.it s "CR 607.2a: Karn's -3 files the permanent it exiles against Karn" $ do
+    karn <- S.printingOf s registry "Karn Liberated"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let g0 = Setup.emptyGame S.threePlayers
+        (karnId, g1) = S.addCreature karn S.bob g0
+        g2 = S.addCounter CounterKind.Loyalty 14 karnId g1
+        (pikerId, g3) = S.addCreature piker S.carol g2
+        gStart = g3 {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.bob}
+    case Face.activatedAbilities (S.combinedFace karn) of
+      minusThree : _ -> do
+        let after = S.runPure (aimingAt pikerId) gStart (do Activate.activateAbility S.bob karnId minusThree; Stack.resolveTop)
+            exiled = Game.zoneMembers Zone.Exile S.carol after
+        case exiled of
+          [exiledPiker] ->
+            Spec.assertEqWith s "CR 607.2a: the exiled card is filed against Karn" (Map.lookup exiledPiker (GameState.exiledWith after)) (Just karnId)
+          _ -> Spec.assertFailure s "Karn's -3 did not exile carol's Piker"
+      [] -> Spec.assertFailure s "Karn has no activated abilities"
+
+  -- CR 727.5 plus Karn's rider, on three seats so "under your control" is not
+  -- collapsed onto the only other player: the exempted card is CAROL's, and it
+  -- has to end up under BOB's control.
+  --
+  -- Three cards sit in exile, and the board tells all three apart:
+  --   * carol's Goblin Piker -- a non-Aura permanent card exiled with Karn, so
+  --     CR 727.5 exempts it and Karn's rider then plays it;
+  --   * alice's Pacifism -- exiled with Karn, but an Aura, so Karn's own words
+  --     leave it out of the exemption and the rebuild shuffles it away;
+  --   * alice's Russet Wolves -- a non-Aura permanent card in exile that Karn
+  --     did NOT exile, which is the decoy: it differs from the Piker in the
+  --     linkage and in nothing else.
+  --
+  -- The mountains are minted BEFORE the exiled cards so the two shuffled-back
+  -- cards sit behind alice's opening seven (startGameFromCards orders each
+  -- library by object id and identityAnswer's shuffle is the identity), which is
+  -- what lets the assertion say "in a library" rather than "somewhere else".
+  Spec.it s "CR 727.5/727.4 gameplay: Karn's ultimate leaves its own exiles in exile and then plays them" $ do
+    karn <- S.printingOf s registry "Karn Liberated"
+    piker <- S.printingOf s registry "Goblin Piker"
+    pacifism <- S.printingOf s registry "Pacifism"
+    wolves <- S.printingOf s registry "Russet Wolves"
+    mountain <- S.printingOf s registry "Mountain"
+    let g0 = addManyG mountain 7 S.carol (addManyG mountain 7 S.bob (addManyG mountain 7 S.alice (Setup.emptyGame S.threePlayers)))
+        (karnId, g1a) = S.addCreature karn S.bob g0
+        g1 = S.addCounter CounterKind.Loyalty 14 karnId g1a
+        (pikerId, g2) = S.addExiledCard piker S.carol g1
+        (pacifismId, g3) = S.addExiledCard pacifism S.alice g2
+        (wolvesId, g4) = S.addExiledCard wolves S.alice g3
+        gStart =
+          g4
+            { -- CR 607.2a's linkage, which Karn's own -3 files in the case above.
+              GameState.exiledWith = Map.fromList [(pikerId, karnId), (pacifismId, karnId)],
+              GameState.activePlayer = S.bob,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.bob
+            }
+        after = snd (Engine.runGamePure restartAnswer gStart Engine.priorityLoop)
+        zoneOf oid = fmap Object.zone (Game.lookupObject oid after)
+        nameOf oid = fmap Face.name (Game.faceOf oid after)
+    -- The new game really is a new game, not the old one with a board wiped.
+    Spec.assertEqWith s "CR 727.1a: bob is the starting player" (GameState.activePlayer after) S.bob
+    Spec.assertEqWith s "CR 727.1: the rebuilt game is on turn 1" (GameState.turnNumber after) 1
+    Spec.assertEqWith s "CR 727.4: settled at the first untap step" (GameState.phase after) Turn.firstPhase
+    Spec.assertEqWith s "CR 103.5: carol drew a fresh opening hand" (S.handSize S.carol after) 7
+    Spec.assertEqWith s "the game did not end -- the new game is live" (GameState.result after) Nothing
+    -- CR 727.5: the exemption, and only the exemption.
+    Spec.assertEqWith s "CR 727.2: the Aura Karn exiled went back into its owner's deck" (zoneOf pacifismId) (Just Zone.Library)
+    Spec.assertEqWith s "CR 727.2: the card Karn did NOT exile went back into its owner's deck" (zoneOf wolvesId) (Just Zone.Library)
+    -- Karn's rider (CR 727.4): the exempted card, and it alone, is on the
+    -- battlefield -- under bob, though carol owns it.
+    case Set.toList (GameState.battlefield after) of
+      [only] -> do
+        Spec.assertEqWith s "the exempted card is what is on the battlefield" (nameOf only) (Just (CardName.MkCardName (Text.pack "Goblin Piker")))
+        Spec.assertEqWith s "CR 110.2a: it entered under Karn's controller" (Projection.controllerOf only after) (Just S.bob)
+        Spec.assertEqWith s "CR 727.2: ownership did not change" (fmap Object.owner (Game.lookupObject only after)) (Just S.carol)
+      other -> Spec.assertFailure s ("expected exactly the exempted card on the battlefield, got " <> show (length other))
+    Spec.assertEqWith s "the exempted card left exile for the battlefield, and nothing else stayed" (Set.null (GameState.exile after)) True
 
   Spec.it s "CR 729.2/729.3/729.5: playSubgame runs a nested game, bob decks, cards funnel back" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1819,17 +1908,36 @@ gateAnswer p = case p of
           else A.Pass
   _ -> slaveAnswer p
 
--- CR 727 gate strategy. Whoever has priority activates the only activation on the
--- board -- the synthetic restart artifact (bob controls it) -- and otherwise
--- passes. Once the artifact is sacrificed as a cost there is no further
--- activation, so this fires exactly once; after the restart the artifact is in a
--- library, so no player can activate anything and everyone passes to termination.
--- Non-ChooseAction prompts (Shuffle during the rebuild, etc.) delegate to
--- identityAnswer.
+-- Take every target offered at one object. Karn's -3 can exile any permanent,
+-- Karn included, so a fixture that means carol's Piker has to say so.
+aimingAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> Recipient.objectOf r == Just oid) sets
+  _ -> S.identityAnswer p
+
+-- Does this Activate action fire a restart? Karn Liberated has three loyalty
+-- abilities and pawl writes two of them, so "the first Activate" would be its
+-- -3 rather than its ultimate -- the answer has to be PINNED to the ability
+-- under test, not taken by position.
+isRestartActivation :: A.Action -> Bool
+isRestartActivation a = case a of
+  A.Activate _ ability -> any isRestart (foldMap Mode.allEffects (Modal.modes (ActivatedAbility.modal ability)))
+  _ -> False
+  where
+    isRestart e = case e of
+      Effect.RestartGame _ -> True
+      _ -> False
+
+-- CR 727 gate strategy. Whoever has priority activates the restart -- Karn
+-- Liberated's ultimate, which only bob's Karn offers -- and otherwise passes.
+-- Karn's loyalty pays for it exactly once, and after the restart Karn is a card
+-- in a library, so no player can activate anything and everyone passes to
+-- termination. Non-ChooseAction prompts (Shuffle during the rebuild, etc.)
+-- delegate to identityAnswer.
 restartAnswer :: Prompt.Prompt r -> r
 restartAnswer p = case p of
   Prompt.ChooseAction _ _ actions ->
-    case filter isActivateAction actions of
+    case filter isRestartActivation actions of
       activation : _ -> activation
       [] -> A.Pass
   _ -> S.identityAnswer p
@@ -1973,7 +2081,7 @@ restartOnStack mountain =
               Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton Effect.RestartGame))) Map.empty))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.RestartGame Nothing)))) Map.empty))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.restrictions = [],
             ActivatedAbility.condition = Nothing

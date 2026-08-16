@@ -19,6 +19,7 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -72,14 +73,24 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
       ObjectRef.codec
       ObjectRef.EachCardInYourHand
       """ {"type":"EachCardInYourHand"} """
-  -- Nullary for a rule too: CR 607.2a's set is defined by which object exiled the
-  -- card, so there is no player to name and no filter to narrow it by.
+  -- No player, for a rule: CR 607.2a's set is defined by which object exiled the
+  -- card. The bare tag is the whole linked set, which is what three of the four
+  -- printings that read one take.
   Spec.it s "EachCardExiledWithSource" $
     Common.assertCodec
       s
       ObjectRef.codec
-      ObjectRef.EachCardExiledWithSource
+      (ObjectRef.EachCardExiledWithSource Nothing)
       """ {"type":"EachCardExiledWithSource"} """
+  -- And the narrowed set, Karn Liberated's "non-Aura permanent cards": an absent
+  -- key and a stated filter are different refs, so the optional payload has to
+  -- survive the trip rather than being dropped to the bare tag.
+  Spec.it s "EachCardExiledWithSource narrowed by a filter" $
+    Common.assertCodec
+      s
+      ObjectRef.codec
+      (ObjectRef.EachCardExiledWithSource (Just (Filter.Not (Filter.HasSubtype Subtype.Aura))))
+      """ {"type":"EachCardExiledWithSource","value":{"type":"Not","value":{"type":"HasSubtype","value":{"type":"Aura"}}}} """
   -- The other two-payload arm: whose library, and how deep. A depth ABOVE ONE,
   -- since a 1 is what a decoder that dropped the field would answer anyway.
   Spec.it s "TopOfLibrary" $
@@ -148,7 +159,7 @@ spec s = Spec.describe s "Pawl.Codec.ObjectRef" $ do
                 Codec.encode ObjectRef.codec (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)),
                 Codec.encode ObjectRef.codec (ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature))),
                 Codec.encode ObjectRef.codec ObjectRef.EachCardInYourHand,
-                Codec.encode ObjectRef.codec ObjectRef.EachCardExiledWithSource,
+                Codec.encode ObjectRef.codec (ObjectRef.EachCardExiledWithSource Nothing),
                 Codec.encode ObjectRef.codec ObjectRef.EachPlayer,
                 Codec.encode ObjectRef.codec (ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary (PlayerRef.Relative PlayerRelation.You) 3)),
                 Codec.encode ObjectRef.codec (ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard Chooser.TheController PlayerScope.EachPlayer (Filter.HasCardType CardType.Creature)))

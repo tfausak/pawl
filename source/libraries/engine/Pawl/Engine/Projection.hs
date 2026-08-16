@@ -1696,7 +1696,9 @@ rewriteEffect pairs effect = case effect of
   Effect.Venture -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot filter_ quantity) -> Effect.PlayerSacrifices (PlayerSacrifices.MkPlayerSacrifices slot (Filter.rewrite pairs filter_) quantity)
-  Effect.RestartGame -> effect
+  -- CR 612.1 reaches the exemption's ref for the reason ForEach's does: which
+  -- cards a restart leaves in exile is this card's own text.
+  Effect.RestartGame exempt -> Effect.RestartGame (fmap (rewriteObjectRef pairs) exempt)
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy (Destroy.MkDestroy ref regenerability mSlot) -> Effect.Destroy (Destroy.MkDestroy (rewriteObjectRef pairs ref) regenerability mSlot)
   Effect.Sacrifice _ -> effect
@@ -1816,15 +1818,17 @@ swapWordIn family pairs word = List.foldl' step word pairs
 -- Chooser name players rather than subtypes. EachPlayer, TopOfLibrary and
 -- EachCardInYourHand carry no word at all -- CR 612.1 changes subtype words, and
 -- "each player", "the top card of your library" and "all cards from your hand"
--- have none. Nor does EachCardExiledWithSource: CR 607.2a's set is named by which
--- object exiled the cards, so "the exiled card" carries no subtype either.
+-- have none. EachCardExiledWithSource carries one only where a printing narrows
+-- the linked set with its own words (Karn Liberated's "non-Aura"): CR 607.2a's
+-- set is named by which object exiled the cards, so the bare arm has no subtype
+-- to change.
 rewriteObjectRef :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ObjectRef.ObjectRef -> ObjectRef.ObjectRef
 rewriteObjectRef pairs ref = case ref of
   ObjectRef.InSlot _ -> ref
   ObjectRef.EachMatching f -> ObjectRef.EachMatching (Filter.rewrite pairs f)
   ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s f) -> ObjectRef.EachCardInGraveyard (EachCardInGraveyard.MkEachCardInGraveyard s (Filter.rewrite pairs f))
   ObjectRef.EachCardInYourHand -> ref
-  ObjectRef.EachCardExiledWithSource -> ref
+  ObjectRef.EachCardExiledWithSource f -> ObjectRef.EachCardExiledWithSource (fmap (Filter.rewrite pairs) f)
   ObjectRef.EachPlayer -> ref
   ObjectRef.TopOfLibrary {} -> ref
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s f) -> ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard c s (Filter.rewrite pairs f))

@@ -223,8 +223,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      Effect.RestartGame
+      (Effect.RestartGame Nothing)
       """ {"type":"RestartGame"} """
+  -- CR 727.5's exemption, the shape Karn Liberated writes.
+  Spec.it s "RestartGame exempting cards" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RestartGame (Just (ObjectRef.EachCardExiledWithSource Nothing)))
+      """ {"type":"RestartGame","value":{"type":"EachCardExiledWithSource"}} """
   Spec.it s "ControlPlayerNextTurn" $
     Common.assertJsonCodec
       s
