@@ -2543,9 +2543,9 @@ activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition"
 -- Sacrifice this artifact: You gain 3 life." The pool's first permanent with CR
 -- 205.3g's Food artifact type, added so that
 -- Asmoranomardicadaistinaculdacar's "Sacrifice two Foods" has something to pay
--- with -- Pawl.CostSpec's asmorSpec is where that cost is exercised, and this
--- group is the Egg's own three clauses, so a transcription short of the printing
--- fails here rather than passing unnoticed.
+-- with -- Pawl.CostSpec's asmorFoodSpec is where that cost is exercised, and
+-- this group is the Egg's own three clauses, so a transcription short of the
+-- printing fails here rather than passing unnoticed.
 goldenEggSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 goldenEggSpec s registry = Spec.describe s "Golden Egg" $ do
   -- The clause every Food shares, and the one that makes the Egg a real card
@@ -2564,9 +2564,10 @@ goldenEggSpec s registry = Spec.describe s "Golden Egg" $ do
     Spec.assertEqWith s "alice was at 20 while the ability was on the stack" (S.lifeOf S.alice activated) (Just 20)
     Spec.assertEqWith s "and gains three when it resolves" (S.lifeOf S.alice resolved) (Just 23)
   -- The other activated clause. CR 605.1a classifies it -- it adds mana, needs no
-  -- target and is not a loyalty ability -- so it never reaches the stack, and the
-  -- pair of answers here is what pins the two abilities apart rather than
-  -- assuming an order.
+  -- target, is not a loyalty ability, and neither its cost nor its effect moves a
+  -- card to or from a library -- which is what keeps it off the stack (CR
+  -- 605.3b). Both abilities are classified here, so the pair pins them apart
+  -- rather than assuming an order.
   Spec.it s "CR 605.1a/105.4 the {1}, {T}, Sacrifice ability is a mana ability offering the five colours" $ do
     goldenEgg <- S.printingOf s registry "Golden Egg"
     let (eggId, gs) = S.addCreature goldenEgg S.alice (Setup.emptyGame S.bothPlayers)

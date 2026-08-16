@@ -1105,8 +1105,8 @@ asmorFoodSpec s registry =
     -- The whole card. THREE Eggs, so which two pay is a real choice; the pair is
     -- pinned, and both halves are asserted -- how many Foods left, and that they
     -- were the two named. The damage is read through the Child of Night's own
-    -- lifelink first, because the marked damage alone would pass whichever object
-    -- the engine credited.
+    -- lifelink BEFORE the marked damage, because the marked damage alone would
+    -- pass whichever object the engine credited.
     Spec.it s "CR 701.21a/120.2b whole card: two Foods pay, and the target deals itself 6" $ do
       asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
       goldenEgg <- S.printingOf s registry "Golden Egg"
