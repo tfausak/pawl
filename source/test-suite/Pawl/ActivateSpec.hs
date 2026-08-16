@@ -2629,6 +2629,27 @@ presenceOfGondSpec s registry = Spec.describe s "Presence of Gond" $ do
     let (_, sorcererId, board) = gondBoardUnder (Just After) gond sorcerer humility
     Spec.assertEqWith s "no abilities at all" (Projection.abilitiesOf sorcererId board) []
 
+  -- CR 612.1/612.2a reaching INSIDE the quoted ability: the words are printed on
+  -- the Aura, so a text change affecting the AURA rewrites them, and the layer-3
+  -- swap runs before the layer-6 grant hands them over. Artificial Evolution's
+  -- "Change the text of target spell or permanent by replacing all instances of
+  -- one creature type with another" (checked against Scryfall) aimed at Presence
+  -- of Gond turns the Elf Warrior it mints into a Goblin Warrior -- name and
+  -- type line both, which is CR 612.2a's whole-card clause.
+  --
+  -- The unevolved half is the control, on the same board bar the Evolution.
+  Spec.it s "CR 612.2a an unevolved Presence of Gond's granted ability mints an Elf Warrior Token" $ do
+    (tokens, after) <- gondEvolvedChain s registry Nothing
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Elf Warrior" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Elf, Subtype.Warrior])) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Elf Warrior Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Elf Warrior Token")))) tokens
+
+  Spec.it s "CR 612.2a an evolved Presence of Gond's granted ability mints a Goblin Warrior Token" $ do
+    (tokens, after) <- gondEvolvedChain s registry (Just (Subtype.Elf, Subtype.Goblin))
+    Spec.assertEqWith s "one token" (length tokens) 1
+    mapM_ (\oid -> Spec.assertEqWith s "Creature -- Goblin Warrior" (Projection.subtypesOf oid after) (Set.fromList [Subtype.Goblin, Subtype.Warrior])) tokens
+    mapM_ (\oid -> Spec.assertEqWith s "named Goblin Warrior Token" (Projection.namesOf oid after) (Set.singleton (CardName.MkCardName (Text.pack "Goblin Warrior Token")))) tokens
+
 -- alice's Aura, bob's settled Prodigal Sorcerer, carol as the third seat. The
 -- two boards this builds differ in exactly one thing: whether the Aura is
 -- attached (CR 303.4m is what Affected.Attached reads).
@@ -2659,6 +2680,43 @@ gondBoardUnder order gond sorcerer humility =
         Just After -> S.withHumility humility g1
         _ -> g1
    in (gondId, sorcererId, (S.attach gondId sorcererId late) {GameState.priority = Just S.bob})
+
+-- alice's Island and Presence of Gond, bob's settled Prodigal Sorcerer, the Aura
+-- attached; optionally an Artificial Evolution resolved AT THE AURA first. Then
+-- bob activates the granted ability and it resolves. Returns the tokens and the
+-- final state.
+gondEvolvedChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Maybe (Subtype.Subtype, Subtype.Subtype) -> m ([ObjectId.ObjectId], GameState.GameState)
+gondEvolvedChain s registry swap = do
+  island <- S.printingOf s registry "Island"
+  gond <- S.printingOf s registry "Presence of Gond"
+  sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+  evolution <- S.printingOf s registry "Artificial Evolution"
+  let (sorcererId, g0) = S.addCreature sorcerer S.bob (S.landsFor island S.alice 1 S.threePlayerGame)
+      settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
+      (gondId, g1) = S.addCreature gond S.alice settled
+      (evolutionId, g2) = S.addHandCard evolution S.alice (S.attach gondId sorcererId g1)
+      evolved = case swap of
+        Nothing -> g2
+        Just (from, to) ->
+          S.runPure (evolveAt gondId from to) g2 $ do
+            S.cast S.alice evolutionId
+            Stack.resolveTop
+      ready = evolved {GameState.priority = Just S.bob}
+      after = case grantedAbility sorcerer sorcererId ready of
+        Nothing -> ready
+        Just granted ->
+          S.runPure S.identityAnswer ready $ do
+            Activate.activateAbility S.bob sorcererId granted
+            Stack.resolveTop
+  pure (S.tokensOf after, after)
+
+-- Aims every target set at one object and answers the creature-type swap, the
+-- Pawl.ResolveSpec helper of the same name.
+evolveAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+evolveAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
 
 -- The one ability on the object that the printing did not print: the grant.
 grantedAbility :: Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
