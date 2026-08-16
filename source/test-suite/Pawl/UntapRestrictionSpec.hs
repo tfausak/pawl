@@ -10,13 +10,14 @@
 -- claim that a reinforce ability "continues to exist while the object is on the
 -- battlefield and in all other zones".
 --
--- Tsabo's Web and Rustic Clachan are the fixtures, and the pairing is the whole
+-- Tsabo's Web and Rustic Clachan are the PRINTED carrier's fixtures, and the
+-- pairing is the whole
 -- point: rule 702.77b is unobservable without an effect that depends on an object
 -- having an activated ability, and Tsabo's Web is that effect. Rustic Clachan is
 -- the one printing that is a LAND with reinforce, which is what puts the two
 -- cards on the same board at all.
 --
--- THE BOARD SHAPE that makes every case here discriminating: two of alice's
+-- THE BOARD SHAPE that makes those cases discriminating: two of alice's
 -- lands, both tapped, differing in exactly one thing. Seat of the Synod's only
 -- activated ability is "{T}: Add {U}", which CR 605.1a excludes; Rustic Clachan
 -- has that same shape of mana ability PLUS reinforce. So the Clachan staying
@@ -28,7 +29,7 @@
 -- land" conjunct is proved rather than assumed.
 --
 -- Rustic Clachan's CR 614.1c "you may reveal a Kithkin card from your hand" plays
--- no part here: every board in this file starts the land already on the
+-- no part here: every board in that group starts the land already on the
 -- battlefield, so no entry replacement runs. Pawl.ReplacementSpec is where that
 -- sentence is proved.
 module Pawl.UntapRestrictionSpec where
@@ -57,7 +58,8 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 
 -- The untap step's turn-based actions, run for whoever the game state says is
--- active (CR 502.3). The one door Pawl.Engine.UntapRestriction is read through.
+-- active (CR 502.3). The one door both untap prohibitions are read through --
+-- Pawl.Engine.UntapRestriction's printed set and Object.doesNotUntapNext.
 untapStep :: GameState.GameState -> GameState.GameState
 untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
 
@@ -80,7 +82,7 @@ webBoard s registry web = do
 -- Alice's board for the ONE-SHOT prohibition: an Elvish Hunter, a tapped Goblin
 -- Piker and a tapped Hill Giant, with two Forests to pay the Hunter's {1}{G}.
 -- `atGiant` decides which of the two tapped creatures the ability aims at, and
--- decides NOTHING else -- the two boards this builds are the same seven
+-- decides NOTHING else -- the two boards this builds are the same five
 -- permanents, the same mana spent and the same tap states, so a creature that
 -- stays tapped on one board and untaps on the other did so because of the target.
 --
