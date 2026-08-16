@@ -5715,7 +5715,7 @@ bindPlayerSlot holder slot player gs =
 --
 -- `holder` is the effect's `source`, NOT `resolving`, and that asymmetry with
 -- bindSlot above is about where each is READ rather than about what each means:
--- an amount is read back by Quantity.evaluate, which every arm calls aimed at
+-- an amount is read back by Quantity.evaluateFor, which every arm calls aimed at
 -- `source` (CR 608.2h's "information from a specific object ... including the
 -- source of the ability itself"), while an object binding is read back by
 -- ArmDelayedTrigger off the stack object. Bane of Progress binds and reads one
