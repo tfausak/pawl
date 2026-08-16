@@ -96,10 +96,10 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
     Common.assertCodec
       s
       GameEvent.codec
-      (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) ProjectedCharacteristicsSpec.testCharacteristics))
+      (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) ProjectedCharacteristicsSpec.testCharacteristics (Just Zone.Hand)))
       ( "{\"type\":\"SpellCast\",\"value\":{\"player\":0,\"spell\":7,\"characteristics\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> "}}"
+          <> ",\"zone\":{\"type\":\"Hand\"}}}"
       )
   Spec.it s "BecameMonarch" $
     Common.assertCodec

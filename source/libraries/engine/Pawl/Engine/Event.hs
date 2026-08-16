@@ -4919,11 +4919,16 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- cast happened in -- so the active player standing now is the one the cast
   -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
   -- 603.3a), exactly as the StepBegins arm above reads its own.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope) -> case event of
-    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _) -> case Game.lookupObject spell gs of
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone) -> case event of
+    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
         turnScopeAdmits scope (GameState.activePlayer gs) you
+          -- CR 601.2a's zone, read off the EVENT and not off the spell: rule
+          -- 400.7 left the stack incarnation with no memory of it. A condition
+          -- that names no zone admits every cast, which is what almost every
+          -- printing writes.
+          && maybe True (\z -> castFrom == Just z) fromZone
           && Filter.matches (Filter.contextFor (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
@@ -4969,7 +4974,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- carries: CR 601.2a puts the card on the stack as it is cast and leaves it
   -- there, so eventTriggers' `spellCast` source offers exactly that incarnation.
   TriggerCondition.SelfCast -> case event of
-    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast _ spell _) -> spell == bearer
+    GameEvent.SpellCast (SpellWasCast.MkSpellWasCast _ spell _ _) -> spell == bearer
     GameEvent.Discarded {} -> False
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
@@ -5977,7 +5982,7 @@ eventBindings cond event = case (cond, event) of
   -- Filter in hand, so a slot it names has to hold for every cast the condition
   -- can match. Both do: GameEvent.SpellCast carries an ObjectId and a PlayerId
   -- unconditionally, so no shape of the event withholds either.
-  (TriggerCondition.SpellCast {}, GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _)) ->
+  (TriggerCondition.SpellCast {}, GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _)) ->
     Binding.setTriggerPlayer caster (Binding.setCastSpell spell Map.empty)
   -- CR 702.21a's "that spell or ability": the object whose announcement fired
   -- this, which ward counters and whose controller ward offers the cost to.
@@ -6916,7 +6921,7 @@ eventTriggers events gs =
       --
       -- Abilities come from the PRINTED card, for `cycledCard`'s reason (#160).
       spellCast event = case event of
-        GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _) -> case Game.faceOf spell gs of
+        GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ _) -> case Game.faceOf spell gs of
           Nothing -> Map.empty
           Just face -> case filter (functionsIn Zone.Stack) (Face.triggeredAbilities face) of
             [] -> Map.empty
@@ -7478,9 +7483,9 @@ controllerTurnScoped cond = case cond of
   -- StepBegins' arms one more time, and for its reason (CR 603.3a, CR 109.5).
   -- Brineborn Cutthroat's OpponentsTurn is turn-scoped and is not the
   -- CONTROLLER's turn, which is the only thing this classification asks.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.ControllersTurn) -> True
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.EachTurn) -> False
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.OpponentsTurn) -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.ControllersTurn _) -> True
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.EachTurn _) -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.OpponentsTurn _) -> False
   -- The same rule with no TurnScope to read: a spell can be cast on anybody's
   -- turn, so its own cast trigger is not the controller's-turn kind either.
   TriggerCondition.SelfCast -> False

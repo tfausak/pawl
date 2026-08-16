@@ -5,6 +5,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
@@ -36,7 +37,23 @@ import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 -- with the zone, since CR 108.3 and CR 202.3 both name facts a card carries
 -- everywhere; each field says so.
 data View = MkView
-  { cardTypes :: Set.Set CardType.CardType,
+  { -- CR 201.1 / 709.4a: the candidate's names, plural because an object does
+    -- not have one -- the axis Pawl.Types.ProjectedCharacteristics.names already
+    -- carries, brought across unchanged so that HasName asks the MEMBERSHIP rule
+    -- 709.4a asks ("an object has the chosen name if one of its names is the
+    -- chosen name") rather than comparing to a string.
+    --
+    -- Read off the CR 613 projection wherever there is an object, in any zone --
+    -- rule 613.1 names none -- and off the printed face where the builder holds
+    -- only a face. That is what lets a library search answer for a card that is
+    -- not a permanent, which is where the pool's first reader looks
+    -- (Asmoranomardicadaistinaculdacar).
+    --
+    -- EMPTY where there is nothing named to read: a player view, an ability on
+    -- the stack (CR 113.7a), and a face-down object, whose CR 708.2a "no name"
+    -- an empty set is the honest spelling of.
+    names :: Set.Set CardName.CardName,
+    cardTypes :: Set.Set CardType.CardType,
     supertypes :: Set.Set Supertype.Supertype,
     colors :: Set.Set Color.Color,
     subtypes :: Set.Set Subtype.Subtype,
@@ -263,7 +280,10 @@ data View = MkView
 playerView :: PlayerId.PlayerId -> View
 playerView pid =
   MkView
-    { cardTypes = Set.empty,
+    { -- CR 201.1 gives a name to an OBJECT, and CR 109.1's list of what an
+      -- object is has no player in it.
+      names = Set.empty,
+      cardTypes = Set.empty,
       supertypes = Set.empty,
       colors = Set.empty,
       subtypes = Set.empty,
@@ -373,14 +393,37 @@ data Context = MkContext
     recipient :: Maybe PlayerId.PlayerId,
     -- The objects the surrounding resolution's LEGAL slots name, for
     -- Quantity.AgainstSlot to aim an evaluation at one (CR 608.2b keeps an
-    -- illegal slot out). No Filter atom reads it -- it rides here because this
-    -- record is already the evaluation context every Quantity is handed, and a
-    -- slot map is exactly the part of a resolution the evaluator cannot derive.
+    -- illegal slot out), and for the IsBound atom above. It rides here because
+    -- this record is already the evaluation context every Quantity is handed,
+    -- and a slot map is exactly the part of a resolution the evaluator cannot
+    -- derive.
     --
     -- EMPTY everywhere but a resolution, which is the honest answer rather than a
     -- forgotten filler: outside one there are no slots. Pawl.Engine.Resolve's
     -- effectContext is the sole non-empty producer.
-    slotObjects :: Map.Map SlotName.SlotName ObjectId.ObjectId
+    slotObjects :: Map.Map SlotName.SlotName ObjectId.ObjectId,
+    -- CR 201.1 / 709.4a: the NAMES of the objects the surrounding announcement's
+    -- slots hold, for the one atom that compares a candidate's against them
+    -- (SameNameAsBound, Harness the Storm). Supplied by the caller for
+    -- sourcePower's reason -- this module holds no game state and cannot read an
+    -- object's names -- and by one caller, Pawl.Engine.Target.admittedGiven,
+    -- which is where a target slot's Filter is matched.
+    --
+    -- Separate from `slotObjects` above rather than derived from it, and that is
+    -- the same division sourcePower makes against `source`: an id is not a name
+    -- until a board has been asked.
+    --
+    -- LAZY, and load-bearingly so: filling it costs one projection per bound
+    -- object, and no filter that omits the atom ever forces it.
+    --
+    -- EMPTY in contextFor and contextWithSlots below, so the atom is vacuously
+    -- False in every position but a target slot -- the posture every
+    -- context-relative atom here takes.
+    --
+    -- Not implemented: a lint keeping a card from writing the atom into one of
+    -- those positions, where sourcePower's and defendingPlayer's siblings each
+    -- have one (#1617).
+    slotNames :: Map.Map SlotName.SlotName (Set.Set CardName.CardName)
   }
   deriving (Eq, Show)
 
@@ -398,7 +441,7 @@ data Context = MkContext
 -- type over rather than a hole -- an evaluation that has reached no recipient has
 -- no honest player to substitute.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty}
 
 -- contextFor with the resolution's slot objects supplied. The one caller is
 -- Pawl.Engine.Resolve.effectContext; see slotObjects above.
@@ -412,7 +455,7 @@ contextWithSlots p s m = (contextFor p s) {slotObjects = m}
 -- match and CR 509.1b's blocking gate -- since rule 702.39a's atom lives only in a
 -- target slot.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, recipient = Nothing, slotObjects = Map.empty, slotNames = Map.empty}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -423,6 +466,9 @@ matches context view predicate = case predicate of
   Filter.HasSupertype s -> Set.member s (supertypes view)
   Filter.HasColor c -> Set.member c (colors view)
   Filter.HasSubtype s -> Set.member s (subtypes view)
+  -- CR 709.4a's own test, said the way that rule says it: membership, so an
+  -- object showing several names matches on any one of them.
+  Filter.HasName n -> Set.member n (names view)
   -- CR 702.1 / CR 109.3: abilities ARE a characteristic, so this is the same kind
   -- of read HasCardType is -- off the projection where there is one, which is what
   -- makes "target creature with flying" (Plummet, CR 702.9) track a grant and a
@@ -535,6 +581,11 @@ matches context view predicate = case predicate of
   Filter.IsBound slot -> case (identity view, Map.lookup slot (slotObjects context)) of
     (Just oid, Just bound) -> oid == bound
     _ -> False
+  -- CR 709.4a at both ends: the candidate has the bound object's name if one of
+  -- its names is one of that object's, which is a non-empty INTERSECTION. A slot
+  -- naming nothing, and a bound object with no name (CR 708.2a), each leave the
+  -- other side empty and answer False without a case of their own.
+  Filter.SameNameAsBound slot -> not (Set.disjoint (names view) (Map.findWithDefault Set.empty slot (slotNames context)))
   -- CR 115.1's "target opponent". Same "every other player is an opponent"
   -- reading the ControlledBy arm above argues for, and wrong for the same one
   -- case (CR 102.3's teams, #175). Vacuously False for an object candidate,
@@ -666,6 +717,11 @@ rewrite pairs predicate = case predicate of
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
+  -- Untouched, and CR 612.2 says so outright: "an effect that changes a color
+  -- word or a subtype can't change a card name, even if that name contains a
+  -- word ... that is the same as a Magic color word, basic land type, or
+  -- creature type". This function's pairs are exactly such a subtype swap.
+  Filter.HasName _ -> predicate
   -- CR 702.14a: a keyword can hold a land-type word too, so "creature with
   -- swampwalk" is text a swap reaches exactly as "creature that's a Swamp" is.
   -- rewriteKeyword below is the descent, shared with the two sites that rewrite
@@ -704,6 +760,7 @@ rewrite pairs predicate = case predicate of
   Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
   Filter.IsBound _ -> predicate
+  Filter.SameNameAsBound _ -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched for IsPlayer's reason: CR 612.1 swaps a WORD in the text, and this
   -- atom names a slot rather than a subtype.
@@ -998,6 +1055,7 @@ bakeBound players predicate = case predicate of
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
   Filter.HasSubtype _ -> predicate
+  Filter.HasName _ -> predicate
   Filter.HasKeyword _ -> predicate
   Filter.HasKeywordFamily _ -> predicate
   Filter.PowerAtLeast _ -> predicate
@@ -1014,6 +1072,7 @@ bakeBound players predicate = case predicate of
   -- CR 603.2's binding map holds PLAYERS and this atom names a slot holding an
   -- OBJECT. Pawl.Engine.Filter.matches answers it as it stands.
   Filter.IsBound _ -> predicate
+  Filter.SameNameAsBound _ -> predicate
   Filter.IsPlayer _ -> predicate
   -- Untouched: CR 603.2's binding map holds PLAYERS, and this atom names a slot
   -- holding an OBJECT -- there is nothing here to substitute.
@@ -1071,6 +1130,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
   Filter.HasSubtype _ -> []
+  Filter.HasName _ -> []
   Filter.HasKeyword _ -> []
   Filter.HasKeywordFamily _ -> []
   Filter.PowerAtLeast _ -> []
@@ -1085,6 +1145,7 @@ manaValueThresholds predicate = case predicate of
   Filter.OwnedBy _ -> []
   Filter.IsSource -> []
   Filter.IsBound _ -> []
+  Filter.SameNameAsBound _ -> []
   Filter.IsPlayer _ -> []
   Filter.IsControllerOfBound _ -> []
   Filter.IsAttacking -> []
@@ -1142,6 +1203,10 @@ statesAQuality predicate = case predicate of
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True
   Filter.HasSubtype _ -> True
+  -- CR 701.23b's "stated quality" at its sharpest -- a named card is the most
+  -- specific description a search can give -- so the searcher may decline to
+  -- find one that is there, and CR 701.23d's "must find" does not apply.
+  Filter.HasName _ -> True
   Filter.HasKeyword _ -> True
   Filter.HasKeywordFamily _ -> True
   Filter.PowerAtLeast _ -> True
@@ -1156,6 +1221,7 @@ statesAQuality predicate = case predicate of
   Filter.OwnedBy _ -> True
   Filter.IsSource -> True
   Filter.IsBound _ -> True
+  Filter.SameNameAsBound _ -> True
   Filter.IsPlayer _ -> True
   Filter.IsControllerOfBound _ -> True
   Filter.IsAttacking -> True
@@ -1196,6 +1262,9 @@ boundSlots predicate = case predicate of
   -- same sense the atom above is -- here rather than one module over, off the
   -- Context `matches` is already handed.
   Filter.IsBound slot -> Set.singleton slot
+  -- Reported for the atom above's reason, and answerable in the same place: it
+  -- reads the Context too, one field over.
+  Filter.SameNameAsBound slot -> Set.singleton slot
   Filter.And fs -> foldMap boundSlots fs
   Filter.Or fs -> foldMap boundSlots fs
   Filter.Not f -> boundSlots f

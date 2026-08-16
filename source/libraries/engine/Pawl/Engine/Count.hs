@@ -182,6 +182,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasSupertype _ -> predicate
   Filter.Type.HasColor _ -> predicate
   Filter.Type.HasSubtype _ -> predicate
+  Filter.Type.HasName _ -> predicate
   Filter.Type.HasKeyword _ -> predicate
   Filter.Type.HasKeywordFamily _ -> predicate
   Filter.Type.PowerAtLeast _ -> predicate
@@ -198,6 +199,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.OwnedBy _ -> predicate
   Filter.Type.IsSource -> predicate
   Filter.Type.IsBound _ -> predicate
+  Filter.Type.SameNameAsBound _ -> predicate
   Filter.Type.IsPlayer _ -> predicate
   Filter.Type.IsAttacking -> predicate
   Filter.Type.IsBlocking -> predicate
@@ -391,7 +393,7 @@ snapshotView gs shape event = case event of
   -- that spell has resolved or been countered, so the live object is gone.
   -- TriggerCondition.SpellCast is the other reader and does read it live, which
   -- it can -- CR 601.2i's trigger is checked while the spell is still there.
-  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster _spell snapshot) -> case shape of
+  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster _spell snapshot _) -> case shape of
     -- CR 601.2a: "that player becomes its controller", so the caster the event
     -- recorded IS the view's controller and Filter.ControlledBy You answers "a
     -- spell you've cast". The spell's id is deliberately left out of the view
@@ -459,7 +461,10 @@ snapshotView gs shape event = case event of
 viewOfSnapshot :: Maybe PlayerId -> Bool -> PC.ProjectedCharacteristics -> Filter.View
 viewOfSnapshot mController isToken snapshot =
   Filter.MkView
-    { Filter.cardTypes = PC.cardTypes snapshot,
+    { -- CR 201.1 off the snapshot, which carries the set: this reads what the
+      -- object's names were AT THE EVENT, which is the whole point of a snapshot.
+      Filter.names = PC.names snapshot,
+      Filter.cardTypes = PC.cardTypes snapshot,
       Filter.supertypes = Set.empty,
       Filter.colors = PC.colors snapshot,
       Filter.subtypes = PC.subtypes snapshot,

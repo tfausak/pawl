@@ -195,10 +195,31 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
             -- lives in an effect's QUANTITY, which is evaluated later and
             -- elsewhere.
             Filter.recipient = Nothing,
-            -- Empty: no Filter atom reads it, and a slot's own filter is matched
-            -- while the slots are still being CHOSEN (CR 601.2c), so there is no
-            -- resolution's slot map to hand over yet.
-            Filter.slotObjects = Map.empty
+            -- Empty: a slot's own filter is matched while the slots are still
+            -- being CHOSEN (CR 601.2c), so there is no resolution's slot map to
+            -- hand over yet, and IsBound is vacuously False here.
+            Filter.slotObjects = Map.empty,
+            -- THE one site that fills it, alongside sourcePower and
+            -- defendingPlayer above and for the same reason: SameNameAsBound
+            -- lives in a target slot's Filter, and this is where one is matched.
+            --
+            -- Off `bindings`, which is what the announcement already holds --
+            -- CR 603.2's own bindings for a triggered ability (Harness the Storm's
+            -- cast spell) plus whatever sibling slots the first pass answered.
+            -- A slot holding several recipients contributes all of their names,
+            -- which is CR 709.4a's membership read once more: the candidate has
+            -- "the same name as" the slot if it shares a name with any of them.
+            --
+            -- Through CR 608.2h's last-known reader rather than a live
+            -- projection, because the bound object is NOT the target and the two
+            -- rules differ: CR 608.2b blanks a departed TARGET, while "that
+            -- spell" is a reference the ability already made and rule 608.2h
+            -- keeps answerable. Harness the Storm whose spell was countered in
+            -- response still knows the name it named.
+            --
+            -- A THUNK, like the two above: one projection per bound object, paid
+            -- for only by a filter that names the atom.
+            Filter.slotNames = fmap (foldMap (foldMap (foldMap Filter.names . Projection.viewWithLastKnownAnywhere gs) . Recipient.objectOf)) bindings
           }
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
@@ -716,10 +737,16 @@ stillAdmitted perspective source recipient slot gs = Set.member recipient (admit
 -- (CR 115.4). CR 115.5's self-exclusion is
 -- a DIFFERENT rule: unconditional, and firing only where its own words do, for a
 -- source that is itself on the stack -- see legalRecipients.
-legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
-legalSets perspective source slots gs =
+--
+-- `seed` is what the announcement ALREADY has bound before any target is chosen
+-- -- empty for a cast and for an activation, and CR 603.2's trigger bindings for
+-- a triggered ability being placed (Harness the Storm's cast spell). It joins the
+-- per-slot bindings the two passes below build, so an atom that reads a slot
+-- cannot tell the two apart.
+legalSets :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
+legalSets perspective seed source slots gs =
   let pcs = Projection.projectAll gs
-   in legalSetsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective source slots gs
+   in legalSetsGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source slots gs
 
 -- The same map on a board the caller already walked -- see legalRecipientsGiven.
 --
@@ -739,11 +766,15 @@ legalSets perspective source slots gs =
 -- Ordinary cards pay nothing: `dependent` is empty for every slot map with no
 -- slot-scoped pool in it, so the second pass is a Map.filter over a map with at
 -- most a handful of keys.
-legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
-legalSetsGiven pcs grants pools perspective source slots gs =
+legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Map SlotName TargetSlot -> GameState -> Map SlotName (Set Recipient)
+legalSetsGiven pcs grants pools perspective seed source slots gs =
   let answer bindings slot = legalRecipientsGiven pcs grants pools perspective bindings source slot gs
-      independent = fmap (answer Map.empty) slots
-      dependent = fmap (answer independent) (Map.filter (dependsOnSlot . TargetSlot.pool) slots)
+      -- The FIRST pass sees the seed alone, which is the only thing bound before
+      -- CR 601.2c chooses anything; the second sees it under the first pass's
+      -- answers. Map.union is left-biased, so a target slot's own answer wins over
+      -- a seed entry that happened to share its name.
+      independent = fmap (answer seed) slots
+      dependent = fmap (answer (Map.union independent seed)) (Map.filter (dependsOnSlot . TargetSlot.pool) slots)
    in -- Map.union is left-biased, so the second pass wins wherever it answered.
       Map.union dependent independent
 
@@ -865,21 +896,21 @@ selectionLegal perspective source slots sets chosen gs =
 -- enchant slot, declared by the card rather than by a mode, which castability
 -- must see or an Aura with no legal creature would be castable and then countered
 -- on resolution (CR 601.2c). An ability has no enchant slot and passes Map.empty.
-fillableModes :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card -> GameState -> Set ModeIndex
-fillableModes perspective source extra modal gs =
+fillableModes :: Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModes perspective seed source extra modal gs =
   let pcs = Projection.projectAll gs
-   in fillableModesGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective source extra modal gs
+   in fillableModesGiven pcs (Projection.controlGrants gs) (poolsGiven pcs gs) perspective seed source extra modal gs
 
 -- The same set on a board the caller already walked -- see legalRecipientsGiven.
 -- This is the half Action.legalActions' activation gate wants: it asks this
 -- question once per permanent, and the wrapper above takes a whole-board sweep
 -- apiece to answer it (#716).
-fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card -> GameState -> Set ModeIndex
-fillableModesGiven pcs grants pools perspective source extra modal gs =
+fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Pools -> Maybe PlayerId -> Map SlotName (Set Recipient) -> ObjectId -> Map SlotName TargetSlot -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModesGiven pcs grants pools perspective seed source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)
       fillable i m =
         let slots = Map.union extra (Mode.targetSlots m)
-            sets = legalSetsGiven pcs grants pools perspective source slots gs
+            sets = legalSetsGiven pcs grants pools perspective seed source slots gs
          in -- CR 115.6 / 601.2c: a slot is unfillable when the board cannot supply
             -- the MINIMUM its count demands. An "up to one" slot with no legal
             -- recipient demands none, and is answered with zero targets.

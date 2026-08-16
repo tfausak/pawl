@@ -634,7 +634,17 @@ viewOfCard :: Face.Face Card.Type.Card -> Filter.View
 viewOfCard face =
   let typeLine = Face.typeLine face
    in Filter.MkView
-        { Filter.cardTypes = TypeLine.types typeLine,
+        { -- CR 201.1 off the printed FACE, which is all this builder holds. A face
+          -- has one name by construction, and for a multi-faced card's combined
+          -- view that name is the halves joined for rendering (Engine.Card.merge2)
+          -- rather than a name the card has -- so viewOfCardIn below, which holds
+          -- an object id, overwrites this with Game.namesOf's CR 709.4a set, and
+          -- viewOfCharacteristics reads the projection's own. The one reader left
+          -- on the joined string is candidateView below, whose candidates are what
+          -- a characteristic-defining count sweeps off the battlefield -- and no
+          -- CDA in the pool counts by name at all.
+          Filter.names = Set.singleton (Face.name face),
+          Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,
           -- CR 604.3 / 702.114a: a CDA functions in all zones, and this view is
           -- built from a face rather than folded through CR 613, so devoid is
@@ -751,7 +761,10 @@ viewOfCard face =
 viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
 viewOfCardIn gs oid face =
   (viewOfCard face)
-    { Filter.power = characteristicPowerIn gs oid face,
+    { -- CR 709.4a's set, which the face-only view above cannot give: holding an
+      -- id is what lets the object's own halves be read.
+      Filter.names = Game.namesOf oid gs,
+      Filter.power = characteristicPowerIn gs oid face,
       Filter.toughness = characteristicToughnessIn gs oid face,
       Filter.milledThisTurn = any (milledIt oid . snd) (GameState.events gs)
     }
@@ -883,7 +896,11 @@ milledIt oid event = case event of
 viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> GameState -> Filter.View
 viewOfCharacteristics oid pc controller counters gs =
   Filter.MkView
-    { Filter.cardTypes = PC.cardTypes pc,
+    { -- CR 201.1 / 709.4a off the PROJECTION, beside cardTypes: names are copiable
+      -- (CR 707.2), so a Clone answers to what it copied and a face-down object
+      -- (CR 708.2a) to nothing.
+      Filter.names = PC.names pc,
+      Filter.cardTypes = PC.cardTypes pc,
       -- CR 205.4 / 613.1d off the PROJECTION, beside cardTypes rather than off
       -- the printed type line: layer 4 writes supertypes too, so a permanent
       -- Leyline of Singularity made legendary matches "legendary permanent".
@@ -1950,7 +1967,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- a subtype word, and "during an opponent's turn" holds no subtype -- so a
   -- rebuild that forgot the field would silently reset a text-changed Brineborn
   -- Cutthroat to firing on every turn.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope)
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope fromZone)
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins {} -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> condition
@@ -2919,6 +2936,13 @@ filterReads f = case f of
   Filter.Type.HasSupertype _ -> Set.singleton Supertypes
   Filter.Type.HasColor _ -> Set.singleton Colors
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
+  -- Reads NOTHING a Modification writes, so it declares no aspect. CR 201.1's
+  -- names are seeded by baseCharacteristics and touched by no layer -- see
+  -- ProjectedCharacteristics.names, whose own note says the same -- and CR 613.8a's
+  -- clause (b) needs a WRITER to hang a dependency on. The copy layer replaces
+  -- the whole seed rather than writing this field, and rule 613.1a puts it
+  -- before every layer an affected set could be re-read at.
+  Filter.Type.HasName _ -> Set.empty
   -- CR 613.1f: layer 6 adds and removes abilities, so this atom's answer moves
   -- under the fold as HasCardType's moves under layer 4.
   Filter.Type.HasKeyword _ -> Set.singleton Keywords
@@ -2968,6 +2992,9 @@ filterReads f = case f of
   -- characteristics and no CR 613 layer writes -- IsSource's answer, and for its
   -- reason.
   Filter.Type.IsBound _ -> Set.empty
+  -- Reads NAMES at both ends, which HasName above already declares no aspect for
+  -- and for that atom's reason: no Modification writes one.
+  Filter.Type.SameNameAsBound _ -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   -- Reads a CONTROLLER rather than a characteristic (CR 109.3 lists none), so it
   -- declares nothing -- IsPlayer's answer, and ControlledBy's.

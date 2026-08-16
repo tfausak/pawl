@@ -87,6 +87,7 @@ import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import Pawl.Types.Prompt (Prompt)
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
@@ -835,7 +836,14 @@ placeBorne srcId pending = do
       -- object keeps the printed ability, and CR 608.2b's re-check bakes again
       -- from the same bindings.
       modal = Target.bakeModal (Binding.playerSlots (PendingTrigger.bindings pending)) (TriggeredAbility.modal ability)
-      legal = Target.fillableModes (Just controller) srcId Map.empty modal gs
+      -- The OBJECT half of the same sentence. bakeModal above substitutes the
+      -- players the event named; a slot that reads a bound OBJECT (Harness the
+      -- Storm's "the same name as that spell") cannot be baked, since the answer
+      -- depends on the candidate -- so the bindings are handed to the matcher
+      -- instead, and to the mode gate as well as the target prompt, both of which
+      -- would otherwise see an empty map and admit nothing.
+      bound = fmap (Set.singleton . Recipient.ToObject) (Binding.objectSlots (PendingTrigger.bindings pending))
+      legal = Target.fillableModes (Just controller) bound srcId Map.empty modal gs
       selection = Modal.Type.selection modal
       obj =
         Object.MkObject
@@ -886,7 +894,7 @@ placeBorne srcId pending = do
       -- is placed. A mode with no target slots (Create, or a Draw that names its
       -- drawer without targeting) asks nothing.
       let slots = Modal.modesTargetSlots chosenModes modal
-          sets = Target.legalSets (Just controller) srcId slots gs
+          sets = Target.legalSets (Just controller) bound srcId slots gs
       chosen <- Target.chooseTargets decider controller abilId slots sets
       -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
       -- placed, so "this creature" resolves as an ordinary slot read even after
