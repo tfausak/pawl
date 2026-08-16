@@ -2577,6 +2577,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- is processed simultaneously" is what Corrosive Gale's "each creature
           -- with flying" needs, and applyDamage is the funnel that keeps it (its
           -- haddock carries the CR 615/616 reading of a batch).
+          --
+          -- Not implemented: the amount is read once for that batch, so a number
+          -- that is each recipient's own -- Acidic Soil's "equal to the number of
+          -- lands they control", which evaluateForRecipient gives every opcode
+          -- taking a PlayerRef -- cannot be written here (#1658).
           Damage.applyDamage (fmap (\recipient -> Damage.damageEvent gs DamageKind.Noncombat dealt recipient (Integer.toNaturalSaturating n)) recipients)
           -- CR 615.5's "immediately afterward", for damage a resolution deals:
           -- a shield this damage spent runs its additional effect here, inside
