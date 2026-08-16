@@ -65,17 +65,19 @@
       "name": "Rustic Clachan",
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "RevealOrTapped",
-              "value": {
-                "type": "HasSubtype",
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "RevealOrTapped",
                 "value": {
-                  "type": "Kithkin"
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Kithkin"
+                  }
                 }
               }
             }

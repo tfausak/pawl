@@ -32,25 +32,27 @@
       },
       "replacementEffects": [
         {
-          "type": "CounterR",
-          "value": {
-            "matching": {
-              "onWhat": {
-                "type": "HasCardType",
-                "value": {
-                  "type": "Creature"
+          "effect": {
+            "type": "CounterR",
+            "value": {
+              "matching": {
+                "onWhat": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                "whichKind": {
+                  "type": "PlusOnePlusOne"
+                },
+                "whose": {
+                  "type": "Yours"
                 }
               },
-              "whichKind": {
-                "type": "PlusOnePlusOne"
-              },
-              "whose": {
-                "type": "Yours"
+              "scaling": {
+                "type": "Multiply",
+                "value": 2
               }
-            },
-            "scaling": {
-              "type": "Multiply",
-              "value": 2
             }
           }
         }

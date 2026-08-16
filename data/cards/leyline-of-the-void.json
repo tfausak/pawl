@@ -44,17 +44,19 @@
       ],
       "replacementEffects": [
         {
-          "type": "ZoneChangeR",
-          "value": {
-            "destination": {
-              "type": "Exile"
-            },
-            "matching": {
-              "whenDestination": {
-                "type": "Graveyard"
+          "effect": {
+            "type": "ZoneChangeR",
+            "value": {
+              "destination": {
+                "type": "Exile"
               },
-              "whoseObject": {
-                "type": "Opponents"
+              "matching": {
+                "whenDestination": {
+                  "type": "Graveyard"
+                },
+                "whoseObject": {
+                  "type": "Opponents"
+                }
               }
             }
           }

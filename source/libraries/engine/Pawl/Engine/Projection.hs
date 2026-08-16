@@ -98,6 +98,7 @@ import qualified Pawl.Types.PlayerSacrifices as PlayerSacrifices
 import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
+import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import Pawl.Types.ProjectedCharacteristics (ProjectedCharacteristics)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -3900,10 +3901,26 @@ abilitiesFromCharacteristics pc oid gs =
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none --
 -- except the shield pair, which no layer can reach; see shieldOf.
+--
+-- CR 604.2's "as long as" clause is asked HERE, the same place and the same way
+-- abilitiesFromCharacteristics asks an activated ability's (CR 702.178a): against
+-- the board handed in, with the source's own controller for CR 109.5's "you".
+-- Nothing is latched -- every caller re-derives this list, and the CR 616.1 loop
+-- re-collects on each iteration -- so Jared Carthalion's shield goes away the
+-- moment the monarchy does, with no trigger and no resolution in between.
+--
+-- Neither the intrinsic effects nor the shield pair takes a clause: both are
+-- minted by a rule rather than printed on a card, and a rule that gated itself
+-- would say so where it is minted.
 replacementsOf :: ObjectId -> GameState -> [ReplacementEffect (Effect.Effect Card.Type.Card)]
 replacementsOf oid gs =
   let pc = project oid gs
-   in PC.replacementEffects pc <> intrinsicReplacementsOf (announcedXOf oid gs) pc <> shieldOf oid gs
+      lives pr = case PrintedReplacement.condition pr of
+        Nothing -> True
+        Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
+   in fmap PrintedReplacement.effect (filter lives (PC.replacementEffects pc))
+        <> intrinsicReplacementsOf (announcedXOf oid gs) pc
+        <> shieldOf oid gs
 
 -- CR 107.3m: the value of X for this object's enters-the-battlefield replacement
 -- effects -- the value chosen for the spell that became it (Object.announcedX),

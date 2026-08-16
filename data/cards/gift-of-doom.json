@@ -64,17 +64,19 @@
       "name": "Gift of Doom",
       "replacementEffects": [
         {
-          "type": "TurnUpR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "MayAttachTo",
-              "value": {
-                "type": "HasCardType",
+          "effect": {
+            "type": "TurnUpR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "MayAttachTo",
                 "value": {
-                  "type": "Creature"
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
                 }
               }
             }

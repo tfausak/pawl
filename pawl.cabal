@@ -410,6 +410,8 @@ library codec
     Pawl.Codec.PowerSpec
     Pawl.Codec.PreventNextDamage
     Pawl.Codec.PreventNextDamageSpec
+    Pawl.Codec.PrintedReplacement
+    Pawl.Codec.PrintedReplacementSpec
     Pawl.Codec.Printing
     Pawl.Codec.PrintingSpec
     Pawl.Codec.ProjectedCharacteristics
@@ -1065,6 +1067,7 @@ library types
     Pawl.Types.Prevention
     Pawl.Types.PreventionRider
     Pawl.Types.PreventNextDamage
+    Pawl.Types.PrintedReplacement
     Pawl.Types.Printing
     Pawl.Types.ProductionTag
     Pawl.Types.Program

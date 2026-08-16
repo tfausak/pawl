@@ -40,43 +40,47 @@
       },
       "replacementEffects": [
         {
-          "type": "CounterR",
-          "value": {
-            "matching": {
-              "byWhom": {
-                "type": "Yours"
+          "effect": {
+            "type": "CounterR",
+            "value": {
+              "matching": {
+                "byWhom": {
+                  "type": "Yours"
+                },
+                "onWhat": {
+                  "type": "And",
+                  "value": []
+                },
+                "onWho": {
+                  "type": "Anyones"
+                }
               },
-              "onWhat": {
-                "type": "And",
-                "value": []
-              },
-              "onWho": {
-                "type": "Anyones"
+              "scaling": {
+                "type": "Multiply",
+                "value": 2
               }
-            },
-            "scaling": {
-              "type": "Multiply",
-              "value": 2
             }
           }
         },
         {
-          "type": "CounterR",
-          "value": {
-            "matching": {
-              "byWhom": {
-                "type": "Opponents"
+          "effect": {
+            "type": "CounterR",
+            "value": {
+              "matching": {
+                "byWhom": {
+                  "type": "Opponents"
+                },
+                "onWhat": {
+                  "type": "And",
+                  "value": []
+                },
+                "onWho": {
+                  "type": "Anyones"
+                }
               },
-              "onWhat": {
-                "type": "And",
-                "value": []
-              },
-              "onWho": {
-                "type": "Anyones"
+              "scaling": {
+                "type": "Halve"
               }
-            },
-            "scaling": {
-              "type": "Halve"
             }
           }
         }

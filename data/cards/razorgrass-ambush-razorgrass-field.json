@@ -108,14 +108,16 @@
       "name": "Razorgrass Field",
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "PayLifeOrTapped",
-              "value": 3
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "PayLifeOrTapped",
+                "value": 3
+              }
             }
           }
         }

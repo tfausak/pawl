@@ -114,6 +114,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -967,7 +968,7 @@ declining fodder p = case p of
 giftDestinationFilter :: Printing.Printing -> Maybe (Filter.Type.Filter Keyword.Keyword)
 giftDestinationFilter printing =
   case Face.replacementEffects (S.combinedFace printing) of
-    [ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo f))] -> Just f
+    [PrintedReplacement.MkPrintedReplacement _ (ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR _ (TurnUpRewrite.MayAttachTo f)))] -> Just f
     _ -> Nothing
 
 -- CR 701.40a / 708.3: a permanent PUT onto the battlefield face down, which is

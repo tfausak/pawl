@@ -37,14 +37,16 @@
       "name": "Furnace of Rath",
       "replacementEffects": [
         {
-          "type": "DamageR",
-          "value": {
-            "matching": {},
-            "rewrite": {
-              "type": "Scale",
-              "value": {
-                "type": "Multiply",
-                "value": 2
+          "effect": {
+            "type": "DamageR",
+            "value": {
+              "matching": {},
+              "rewrite": {
+                "type": "Scale",
+                "value": {
+                  "type": "Multiply",
+                  "value": 2
+                }
               }
             }
           }

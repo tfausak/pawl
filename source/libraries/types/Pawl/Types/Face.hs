@@ -40,8 +40,8 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Quantity as Quantity
-import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
@@ -121,8 +121,9 @@ data Face card = MkFace
     activatedAbilities :: [ActivatedAbility.ActivatedAbility card],
     -- | CR 614: this face's replacement effects, active while it is on the
     -- battlefield. Read through Pawl.Engine.Projection.replacementsOf (never
-    -- directly) so layer 6 LoseAllAbilities strips them uniformly.
-    replacementEffects :: [ReplacementEffect.ReplacementEffect (Effect.Effect card)],
+    -- directly) so layer 6 LoseAllAbilities strips them uniformly, and so CR
+    -- 604.2's "as long as" clause on each is asked against the live board.
+    replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect card)],
     -- | CR 603: this face's triggered abilities, read through
     -- Pawl.Engine.Projection.triggeredAbilitiesOf.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility card],

@@ -31,17 +31,19 @@
       },
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "WithCounters",
-              "value": {
-                "amount": 1,
-                "kind": {
-                  "type": "Shield"
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "WithCounters",
+                "value": {
+                  "amount": 1,
+                  "kind": {
+                    "type": "Shield"
+                  }
                 }
               }
             }

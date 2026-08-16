@@ -23,20 +23,22 @@
       },
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "SacrificeAnyNumber",
-              "value": {
-                "filter": {
-                  "type": "And",
-                  "value": []
-                },
-                "kind": {
-                  "type": "PlusOnePlusOne"
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "SacrificeAnyNumber",
+                "value": {
+                  "filter": {
+                    "type": "And",
+                    "value": []
+                  },
+                  "kind": {
+                    "type": "PlusOnePlusOne"
+                  }
                 }
               }
             }

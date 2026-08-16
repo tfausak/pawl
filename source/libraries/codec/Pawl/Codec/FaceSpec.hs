@@ -52,6 +52,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
@@ -214,7 +215,7 @@ populatedFace =
     { Face.keywords = Set.singleton Keyword.Deathtouch,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
       Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing],
-      Face.replacementEffects = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [])))],
+      Face.replacementEffects = [PrintedReplacement.MkPrintedReplacement Nothing (ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) []))))],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
       Face.loyalty = Just (Loyalty.Literal 3),
@@ -250,7 +251,7 @@ populatedFaceJson =
     <> "\"staticAbilities\":[{\"affected\":{\"type\":\"Attached\"},\"modifications\":[{\"type\":\"LoseAllAbilities\"}]}],"
     <> "\"activatedAbilities\":[{\"cost\":{\"mana\":[]},"
     <> "\"modal\":{\"modes\":[{}]}}],"
-    <> "\"replacementEffects\":[{\"type\":\"EntryR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"AsCopy\",\"value\":{\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}}}],"
+    <> "\"replacementEffects\":[{\"effect\":{\"type\":\"EntryR\",\"value\":{\"matching\":{\"type\":\"IsSource\"},\"rewrite\":{\"type\":\"AsCopy\",\"value\":{\"eligible\":{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}}}}}}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"
