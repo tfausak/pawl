@@ -1315,9 +1315,20 @@ apply batch candidate event =
       -- Card.turnedOver and CR 701.27d's refusal with it, so such a face would be
       -- shown on the battlefield rather than merely fail to reach the graveyard
       -- (#1547).
+      EntryRewrite.EntersTransformed -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case fmap Face.name (Game.cardOf oid gs >>= Card.backFace) of
+          -- Unreachable: Replacement.admitsEntry admits this rewrite only where
+          -- Card.backFace answers. Defensive: leave the front face up.
+          Nothing -> pure (Just event)
+          Just name -> do
+            State.modify' $ \g ->
+              g {GameState.objects = Map.adjust (\obj -> obj {Object.face = Just name}) oid (GameState.objects g)}
+            pure (Just event)
       -- CR 614.1c: "As [this permanent] enters, [do something]" -- Monstrous
       -- War-Leech's "mill four cards". The one entry rewrite that runs an EFFECT
-      -- rather than changing what the permanent is (#1416).
+      -- rather than changing what the permanent is; see #1416.
       --
       -- QUEUED, not run here, and the module boundary is the reason: this module
       -- is below Pawl.Engine.Resolve and cannot run a card's effects, exactly as
@@ -1357,17 +1368,6 @@ apply batch candidate event =
                           PendingEntryEffect.effects = effects
                         }
                 }
-            pure (Just event)
-      EntryRewrite.EntersTransformed -> do
-        Replacement.consume (ReplacementCandidate.identity candidate)
-        gs <- State.get
-        case fmap Face.name (Game.cardOf oid gs >>= Card.backFace) of
-          -- Unreachable: Replacement.admitsEntry admits this rewrite only where
-          -- Card.backFace answers. Defensive: leave the front face up.
-          Nothing -> pure (Just event)
-          Just name -> do
-            State.modify' $ \g ->
-              g {GameState.objects = Map.adjust (\obj -> obj {Object.face = Just name}) oid (GameState.objects g)}
             pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR {}, _) -> pure (Just event)

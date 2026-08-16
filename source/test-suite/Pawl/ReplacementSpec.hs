@@ -2832,7 +2832,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
 -- War-Leech's power and toughness are each equal to the greatest mana value
 -- among cards in your graveyard." (oracle checked on Scryfall)
 --
--- CR 614.1c's shape that RUNS AN EFFECT, gated on a condition (#1416) --
+-- CR 614.1c's shape that RUNS AN EFFECT, gated on a condition (see #1416) --
 -- EntryRewrite.RunEffects, with "if it was kicked" on CR 604.2's clause.
 --
 -- THE BOARD, one fixture the cases below take in three states: five lands (four
@@ -2843,7 +2843,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
 -- ONE Lightning Bolt is what the first two pass, and it is what makes both halves
 -- observable at once. Without it the unkicked Leech is a 0/0 that CR 704.5f
 -- buries, and "no mill" would be told from "mill" by a permanent that is not
--- there -- the confusion #1416's own bar rules out. Lightning Bolt's mana value is
+-- there -- the confusion that issue's own bar rules out. Lightning Bolt's mana value is
 -- 1 and Lairwatch Giant's is 6 (CR 202.3), so the Leech ENTERS AND SURVIVES on
 -- both boards and the two are told apart by what it is: a 1/1 unkicked, a 6/6
 -- kicked. The third case passes NONE, which is how it sees the ordering the other

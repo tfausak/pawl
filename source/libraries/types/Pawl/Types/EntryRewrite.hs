@@ -337,7 +337,7 @@ data EntryRewrite effect
   | -- | CR 614.1c: "As [this permanent] enters, [do something]" -- Monstrous
     -- War-Leech's "as this creature enters, if it was kicked, mill four cards".
     -- The one arm that RUNS AN EFFECT, where every arm above changes WHAT THE
-    -- PERMANENT IS as it enters (#1416).
+    -- PERMANENT IS as it enters; see #1416.
     --
     -- NO CONDITION HERE, and Bloodthirst's arm two over is the contrast that
     -- explains why. Rule 702.54a's condition is a RULE's, so nothing on a card
