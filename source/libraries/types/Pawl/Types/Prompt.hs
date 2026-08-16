@@ -309,19 +309,23 @@ data Prompt r where
   -- recorded answer satisfy another.
   ChooseAmass :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 701.68a: which creature a blighting player puts the -1\/-1 counters on.
-  -- The ObjectId is the spell or ability being resolved; the NonEmpty is the
-  -- creatures they control, UNNARROWED -- rule 701.68a qualifies its candidate by
-  -- control and nothing else, which is the whole difference from ChooseBolster.
+  -- The ObjectId is the object the blight was asked for -- the spell or ability
+  -- being resolved, or the one whose cost is being paid, since
+  -- Pawl.Types.CostComponent.Blight raises this too; the NonEmpty is the creatures
+  -- they control, UNNARROWED -- rule 701.68a qualifies its candidate by control and
+  -- nothing else, which is the whole difference from ChooseBolster.
   --
   -- CHOOSE, not target, ChooseRingBearer's posture: rule 701.68a names "a creature
   -- you control" rather than a target, so nothing is declared on the stack (CR
   -- 601.2c) and nothing is re-checked at resolution (CR 608.2b).
   --
   -- Raised only for TWO OR MORE candidates, ChooseRingBearer's shape and reason: a
-  -- lone creature is the whole of the rule's candidate set and the instruction is
-  -- mandatory, so performing it decides nothing. Not raised for zero, where CR
-  -- 101.3 ignores the instruction -- a player who controls no creature blights
-  -- nothing.
+  -- lone creature is the whole of the rule's candidate set and the action is
+  -- already committed to by the time this is asked, so performing it decides
+  -- nothing. Not raised for zero either, and which rule says so depends on the
+  -- caller: CR 101.3 ignores a mandatory instruction, while CR 701.68b keeps a
+  -- blight COST from being offered at all (Pawl.Engine.Cost.canPayComponent), so
+  -- neither reaches this with an empty pool.
   --
   -- Its own constructor though its candidate set is ChooseRingBearer's exactly --
   -- every creature its chooser controls. What separates them is not the pool but
