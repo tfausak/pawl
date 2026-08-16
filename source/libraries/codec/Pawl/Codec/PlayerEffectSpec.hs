@@ -276,4 +276,18 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.codec
       PlayerEffect.PlayLandsFromGraveyard
       """ {"type":"PlayLandsFromGraveyard"} """
+  -- CR 118.9 / Omniscience, whose sentence names no quality of the spell.
+  Spec.it s "CastFromHandWithoutPayingManaCost, an empty filter" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.And []))
+      """ {"type":"CastFromHandWithoutPayingManaCost","value":{"type":"And","value":[]}} """
+  -- The same grant narrowed, which is the axis a second printing would use.
+  Spec.it s "CastFromHandWithoutPayingManaCost, a filter that names qualities" $
+    Common.assertCodec
+      s
+      PlayerEffect.codec
+      (PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.HasCardType CardType.Creature))
+      """ {"type":"CastFromHandWithoutPayingManaCost","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
   Spec.it s "has a schema" $ Common.assertHasSchema s PlayerEffect.codec

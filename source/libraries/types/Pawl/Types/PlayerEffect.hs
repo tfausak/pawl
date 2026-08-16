@@ -487,4 +487,38 @@ data PlayerEffect
     -- per-player zone and both printings say "your graveyard", which is the pile
     -- Pawl.Engine.Action.playableLands hands the permission.
     PlayLandsFromGraveyard
+  | -- | CR 118.9 / Omniscience: this player may cast a matching spell from their
+    -- hand without paying its mana cost.
+    --
+    -- CR 118.9's "or applied to it from another effect", on the PLAYER axis. Not
+    -- a permission and so not a sibling of CastFromGraveyard above, whatever the
+    -- shared prefix suggests: a card in a hand is already castable, and this
+    -- adds one more CR 601.2b candidate beside the ones the card itself offers.
+    -- The one-shot half of the same rule is Pawl.Types.CastOffer's
+    -- `withoutPayingManaCost`, which an Effect.OfferCast hands to ONE object it
+    -- has already chosen; this is the standing grant, which no per-card list can
+    -- hold because the effect never names the cards it will apply to.
+    --
+    -- BESIDE the card's own candidates rather than instead of them (CR 118.9a
+    -- lets the controller announce which one), which is why
+    -- Pawl.Engine.Cost.candidateCostsFor appends it: a flashback card cast free
+    -- from hand still has flashback in the graveyard later, and a Fireblast
+    -- under this grant may still sacrifice two Mountains instead.
+    --
+    -- THE HAND is in the constructor and not in the Filter, for the reason
+    -- CastFromGraveyard names its zone: Pawl.Types.Filter has no zone atom, and
+    -- a grant read in every zone would make Yawgmoth's Will's graveyard casts
+    -- free -- WEAKER than either printing, which is the disqualifying direction.
+    --
+    -- CR 107.3b's "the only legal choice for X is 0" needs no clause here. The
+    -- cost this grant offers is Pawl.Engine.Cost.withoutPayingManaCost, an empty
+    -- ManaCost carrying no variable at all, so Pawl.Engine.Cast.castProposed
+    -- never reaches its Prompt.ChooseX and the spell resolves with X unset.
+    --
+    -- The Filter is the axis that separates the producers, as it is for
+    -- CastFromGraveyard: Omniscience says "spells" and so matches everything
+    -- (`And []`), while a narrowing printing would name the quality here. What a
+    -- narrowing filter would see of a card in a hand is unobserved (#160, the
+    -- same gap the graveyard arm records).
+    CastFromHandWithoutPayingManaCost (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

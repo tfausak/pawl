@@ -231,8 +231,11 @@ data Face card = MkFace
     -- taxable {0}, not Nothing, and Asmoranomardicadaistinaculdacar pays a {B/R}
     -- for a printed cost that is Nothing.
     --
-    -- Printed-only: an effect that GRANTS an alternative cost has no carrier here
-    -- (#103). CR 118.9 is about SPELLS, so this lives on a face and never on
+    -- Printed-only, and deliberately so: an effect that APPLIES an alternative
+    -- cost to a spell carries it elsewhere -- one-shot in Pawl.Types.CastOffer,
+    -- standing in Pawl.Types.PlayerEffect's CastFromHandWithoutPayingManaCost --
+    -- and Pawl.Engine.Cost.candidateCostsFor offers all three side by side. CR
+    -- 118.9 is about SPELLS, so this lives on a face and never on
     -- ActivatedAbility -- a rules fact, not an elision.
     --
     -- CONDITIONED only where the card states a condition (CR 604.2), which is
