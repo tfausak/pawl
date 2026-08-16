@@ -5,7 +5,10 @@
 -- CR 903.8's permission and tax, CR 903.9a's state-based action), the
 -- Player.commander and Player.commanderCasts fields, Deck's commander, the
 -- Zone.Command arm of Pawl.Engine.Cast.castableZones, and the CR 903.8 increase
--- Pawl.Engine.Cost.allAdjustments folds into CR 601.2f.
+-- Pawl.Engine.Cost.allAdjustments folds into CR 601.2f. Also the commander half
+-- of Pawl.Engine.Setup's subgame pair -- CR 729.2c in and CR 729.5c out -- which
+-- lives here rather than in Pawl.SetupSpec because it needs a designated
+-- commander and this is the file that builds one.
 --
 -- Shimatsu the Bloodcloaked is the card pool for every group but CR 903.10a's,
 -- which needs a commander that can attack and says why it uses its own: {3}{R}
@@ -101,6 +104,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Commander" $ do
   castSpec s registry
   taxSpec s registry
   commanderDamageSpec s registry
+  subgameSpec s registry
 
 designationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 designationSpec s registry = Spec.describe s "Designation" $ do
@@ -386,3 +390,96 @@ castAndSettle answer oid gs =
   let cast = S.runPure answer gs (S.cast S.alice oid)
       resolved = S.runPure answer cast Stack.resolveTop
    in S.runPure answer resolved Engine.settleForPriority
+
+-- Alice's board with her LIBRARY stocked, which commanderBoard's is not: its
+-- deck holds nothing but the commander, so every library count below would
+-- compare 0 to 0 and pass vacuously. Five Mountains in the deck and two on the
+-- battlefield make the library the other destination this group tells apart
+-- from the command zone, and give the parent non-library survivors besides.
+subgameParent :: Printing.Printing -> Printing.Printing -> GameState.GameState
+subgameParent mountain shimatsu =
+  let deck = Deck.MkDeck {Deck.cards = Map.singleton mountain 5, Deck.commander = Just shimatsu, Deck.dungeon = Nothing}
+   in S.runPure S.identityAnswer (S.landsInPlay mountain 2) (Setup.createDeck S.alice deck)
+
+-- The subgame as playSubgame builds it: CR 729.2 / 729.2c's move in, then CR
+-- 103's setup. Both halves, because startGameFromCards is what would funnel a
+-- commander that entered the subgame's command zone straight into a library.
+playedSubgame :: GameState.GameState -> GameState.GameState
+playedSubgame parent =
+  snd (Engine.runGamePure S.identityAnswer (Setup.subgameStateFrom S.alice parent) (Setup.startGameFromCards S.performer Set.empty))
+
+-- Take the commander out of the subgame's command zone and put it in alice's
+-- subgame graveyard, which is CR 729.5c's "(if it's there)" being false. Written
+-- by hand rather than cast and killed: what rule 729.5 reads is the ZONE the
+-- card is in as the subgame ends, and a subgame cast is a different unit's path.
+outOfCommandZone :: GameState.GameState -> GameState.GameState
+outOfCommandZone gs = case inCommandZone gs of
+  [] -> gs
+  oid : _ ->
+    gs
+      { GameState.command = Set.delete oid (GameState.command gs),
+        GameState.graveyard = Map.insertWith (<>) S.alice (Seq.singleton oid) (GameState.graveyard gs),
+        GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Graveyard}) oid (GameState.objects gs)
+      }
+
+subgameSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+subgameSpec s registry = Spec.describe s "Subgame" $ do
+  -- CR 729.2c: "as a subgame of a Commander game starts, each player moves their
+  -- commander from the main-game command zone (if it's there) to the subgame
+  -- command zone". CR 729.2's pool is the library cards, so the commander is the
+  -- one card that enters a subgame from anywhere else.
+  Spec.it s "CR 729.2c the commander enters the subgame's command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let parent = subgameParent mountain shimatsu
+        sub = playedSubgame parent
+    -- Pins the fixture: an empty parent command zone or an empty library would
+    -- make everything below pass for the wrong reason.
+    Spec.assertEqWith s "the parent really has one commander in its command zone" (length (inCommandZone parent)) 1
+    Spec.assertEqWith s "and a five-card library to tell it apart from" (length (Game.zoneMembers Zone.Library S.alice parent)) 5
+    Spec.assertEqWith s "the subgame's command zone holds one card too" (length (inCommandZone sub)) 1
+    Spec.assertEqWith s "the subgame knows it as alice's commander" (fmap (\oid -> Commander.isCommander oid sub) (inCommandZone sub)) [True]
+    Spec.assertEqWith s "and it sits in the subgame's command zone, not a library" (fmap (\oid -> fmap Object.zone (Game.lookupObject oid sub)) (inCommandZone sub)) [Just Zone.Command]
+    -- CR 729.1a: the parent is untouched while the subgame runs, so the move in
+    -- is a copy at this point; funnelBack is what settles where the card ends up.
+    Spec.assertEqWith s "the main-game command zone is unchanged by the subgame" (inCommandZone parent) (inCommandZone (subgameParent mountain shimatsu))
+  -- CR 729.5c: "at the end of a subgame of a Commander game, each player moves
+  -- their commander from the subgame command zone (if it's there) to the
+  -- main-game command zone" -- and CR 729.5's first sentence excludes it from the
+  -- cards that go to the library. The library is the destination the old code
+  -- chose, so the two counts together are what discriminate.
+  Spec.it s "CR 729.5/729.5c a commander in the subgame command zone comes back to the main-game command zone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let parent = subgameParent mountain shimatsu
+        sub = playedSubgame parent
+        after = Setup.funnelBack sub parent
+    Spec.assertEqWith s "it really ended the subgame in the subgame command zone" (length (inCommandZone sub)) 1
+    Spec.assertEqWith s "one card in the main-game command zone" (length (inCommandZone after)) 1
+    Spec.assertEqWith s "and it is still alice's commander" (fmap (\oid -> Commander.isCommander oid after) (inCommandZone after)) [True]
+    Spec.assertEqWith
+      s
+      "alice's library is exactly the size it was, so the commander is not in it"
+      (length (Game.zoneMembers Zone.Library S.alice after))
+      (length (Game.zoneMembers Zone.Library S.alice parent))
+    Spec.assertEqWith s "the parent's two battlefield lands survived (CR 729.5's untouched main game)" (Set.size (GameState.battlefield after)) 2
+    Spec.assertEqWith s "and no object id collides: the card is in exactly one zone" (Map.size (GameState.objects after)) (2 + 5 + 1)
+  -- CR 729.5c's "(if it's there)" is a real condition, not a licence to spare
+  -- every commander: one that ended the subgame anywhere else is an ordinary
+  -- traditional card and CR 729.5's first sentence puts it in the main-game
+  -- library. The board differs from the case above in the subgame ZONE alone.
+  Spec.it s "CR 729.5 a commander that left the subgame command zone goes to the main-game library" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let parent = subgameParent mountain shimatsu
+        sub = outOfCommandZone (playedSubgame parent)
+        after = Setup.funnelBack sub parent
+    Spec.assertEqWith s "it really left the subgame's command zone" (length (inCommandZone sub)) 0
+    Spec.assertEqWith s "nothing is left in the main-game command zone" (length (inCommandZone after)) 0
+    Spec.assertEqWith
+      s
+      "alice's library is one card bigger: the commander came back to it instead"
+      (length (Game.zoneMembers Zone.Library S.alice after))
+      (length (Game.zoneMembers Zone.Library S.alice parent) + 1)
+    Spec.assertEqWith s "she is still designated it (CR 903.3 survives the subgame)" (fmap Player.commander (Map.lookup S.alice (GameState.players after))) (Just (Just shimatsu))
+    Spec.assertEqWith s "and no copy is left behind" (Map.size (GameState.objects after)) (2 + 5 + 1)

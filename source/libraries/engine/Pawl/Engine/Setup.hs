@@ -269,7 +269,8 @@ newGame perform matchup = do
 -- because that is where every card CR 727.5 reaches sits: the rule's only
 -- producer leaves cards in exile, and an exemption naming a permanent would have
 -- to say which of the zones this function empties it survives in. A subgame
--- exempts nothing (CR 729.2 moves every library card in).
+-- exempts nothing (CR 729.2 moves every library card in, and CR 729.2c each
+-- commander).
 startGameFromCards :: HandActionPerformer -> Set.Set ObjectId -> Game ()
 startGameFromCards perform exemptions = do
   gs <- State.get
@@ -289,18 +290,38 @@ startGameFromCards perform exemptions = do
       -- through the same Object.newIncarnation, so that a field added later
       -- cannot be forgotten on one path and reset on the other.
       toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
-      cards = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys (GameState.objects gs) exempt))
+      toCommandCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Command}
+      rebuilt = Map.filter isCard (Map.withoutKeys (GameState.objects gs) exempt)
+      -- CR 903.6: "each player puts their commander from their deck face up into
+      -- the command zone". Both callers start a new game following rule 103 (CR
+      -- 727.1, CR 729.2), so rule 903.6 applies to each of them, and CR 729.2c
+      -- names the subgame case outright. Held back BEFORE the libraries are built,
+      -- because rule 903.6 shuffles "the remaining cards of their deck".
+      --
+      -- CR 727.5a -- an exempted commander does not begin the new game in the
+      -- command zone -- is satisfied by the ordering rather than by a second test:
+      -- `rebuilt` already drops `exempt`, so an exempted commander stays in exile.
+      --
+      -- One object per player, by Commander.isCommander's CR 903.5 argument: the
+      -- designation is a printing and a legal deck holds one copy of it, so at
+      -- most one object can answer here. Pawl enforces no deck legality (#940), so
+      -- a deck with two copies would have this take the lower id.
+      commanderOf pid =
+        Maybe.listToMaybe (Map.keys (Map.filterWithKey (\oid obj -> Object.owner obj == pid && Commander.isCommander oid gs) rebuilt))
+      commanderIds = Set.fromList (Maybe.mapMaybe commanderOf owners)
+      commanders = fmap toCommandCard (Map.restrictKeys rebuilt commanderIds)
+      cards = fmap toLibraryCard (Map.withoutKeys rebuilt commanderIds)
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
   State.put
     gs
-      { GameState.objects = Map.union (Map.restrictKeys (GameState.objects gs) exempt) cards,
+      { GameState.objects = Map.unions [Map.restrictKeys (GameState.objects gs) exempt, cards, commanders],
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.hand = Map.empty,
         GameState.graveyard = Map.empty,
         GameState.battlefield = mempty,
         GameState.phasedOut = mempty,
         GameState.exile = exempt,
-        GameState.command = mempty,
+        GameState.command = commanderIds,
         GameState.stack = []
       }
   Monad.forM_ owners Mulligan.shuffleLibrary
@@ -441,10 +462,11 @@ restartGame perform exempt starter = do
           }
   startGameFromCards perform exempt
 
--- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards only;
--- no other main-game zone enters. The object pool is restricted to those
--- library objects; startGameFromCards (called by playSubgame) then rebuilds
--- each subgame library from that pool, shuffles, and draws opening hands (CR
+-- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards, plus
+-- CR 729.2c's commanders; no other main-game zone enters. The object pool is
+-- restricted to those objects; startGameFromCards (called by playSubgame) then
+-- rebuilds each subgame library from that pool, puts each commander back in the
+-- subgame's command zone (CR 903.6), shuffles, and draws opening hands (CR
 -- 103). Every transient field is cleared as restartGame does, EXCEPT the
 -- object/timestamp id supplies, which are inherited from the parent so every
 -- object the subgame mints (CR 400.7) gets an id above every parent id --
@@ -459,9 +481,23 @@ subgameStateFrom starter parent =
   let libIds =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
-      libObjects = Map.restrictKeys (GameState.objects parent) libIds
+      -- CR 729.2c: "as a subgame of a Commander game starts, each player moves
+      -- their commander from the main-game command zone (if it's there) to the
+      -- subgame command zone". Nothing ELSE in the main-game command zone moves --
+      -- CR 729.2's "no other cards in a main-game zone are moved" -- and its two
+      -- siblings have no format here: supplementary decks (CR 729.2a) and
+      -- vanguards (CR 729.2b) are not implemented, nor is any other command-zone
+      -- resident (#933, #934, #935, #936, #937).
+      --
+      -- The parent's own copy is deliberately left where it is: the parent is
+      -- untouched while the subgame runs (CR 729.1a), and funnelBack drops these
+      -- ids from it and refunds them from the subgame, exactly as it does for
+      -- `libIds`.
+      cmdIds = Set.filter (\oid -> Commander.isCommander oid parent) (GameState.command parent)
+      movedObjects = Map.restrictKeys (GameState.objects parent) (Set.union libIds cmdIds)
       -- Invariant: `libIds` here and funnelBack's `oldLibIds` MUST compute the
-      -- identical id set. Both draw from the parent's FULL roster
+      -- identical id set, and so must `cmdIds` and funnelBack's `oldCmdIds`.
+      -- Both draw from the parent's FULL roster
       -- (GameState.turnOrder), never narrowed to Game.stillPlayingInOrder --
       -- `order` below does narrow to the seated players (CR 729.4), but this
       -- pool must not. funnelBack drops every id in that set from the parent's
@@ -477,7 +513,7 @@ subgameStateFrom starter parent =
       order = rotateTo starter (Game.stillPlayingInOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
    in parent
-        { GameState.objects = libObjects,
+        { GameState.objects = movedObjects,
           GameState.turnOrder = order,
           GameState.players = resetPlayers (GameState.players parent),
           GameState.library = Map.empty,
@@ -486,7 +522,9 @@ subgameStateFrom starter parent =
           GameState.battlefield = mempty,
           GameState.phasedOut = mempty,
           GameState.exile = mempty,
-          GameState.command = mempty,
+          -- CR 729.2c, above. startGameFromCards keeps them here rather than
+          -- funnelling them into a library, which is CR 903.6 for the subgame.
+          GameState.command = cmdIds,
           GameState.stack = [],
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
@@ -542,18 +580,21 @@ subgameStateFrom starter parent =
         }
 
 -- CR 729.5: at the end of a subgame, each player takes all traditional cards
--- (Source.OfCard) they own anywhere in the subgame into their main-game library
--- and reshuffles (the reshuffle is playSubgame's Prompt.Shuffle step).
--- "Anywhere" is literal, and covers rule 729.5's second sentence -- "including
--- phased-out permanents" -- for free: `returned` filters GameState.objects, and
--- CR 702.26d leaves a phased-out permanent in that map with its zone unchanged,
--- so nothing here has to know phasing exists. All
+-- (Source.OfCard) they own in the subgame other than those in the subgame
+-- command zone into their main-game library and reshuffles (the reshuffle is
+-- playSubgame's Prompt.Shuffle step). Every other zone is in scope, which covers
+-- rule 729.5's second sentence -- "including phased-out permanents" -- for free:
+-- `returned` filters GameState.objects, and CR 702.26d leaves a phased-out
+-- permanent in that map with its zone unchanged, so nothing here has to know
+-- phasing exists. The command zone is the rule's own exclusion, and CR 729.5c
+-- moves the commanders sitting in it back to the main-game command zone; all
 -- other subgame objects and zones simply are not carried over. The parent's
--- non-library objects are untouched -- the main game continues from where it
--- was discontinued -- and the old parent library objects are dropped, having
--- moved into the subgame. `oldLibIds` spans the parent's full seating roster,
--- matching subgameStateFrom's `libIds`; see there for why the two must stay
--- identical. Returned cards keep their subgame ids, all above the parent
+-- objects are untouched except for the ones CR 729.2 / 729.2c moved into the
+-- subgame -- the main game continues from where it was discontinued -- and those
+-- are dropped and refunded from what the subgame ended with. `oldLibIds` and
+-- `oldCmdIds` span the parent's full seating roster, matching
+-- subgameStateFrom's `libIds` and `cmdIds`; see there for why the two sides must
+-- stay identical. Returned cards keep their subgame ids, all above the parent
 -- supply, so Map.union cannot collide; the supplies advance to the subgame
 -- high-water mark.
 --
@@ -561,12 +602,12 @@ subgameStateFrom starter parent =
 -- when its departing player has only two opponents in the PARENT, so a
 -- departure inside it reaches CR 800.4a's Departure.objectsLeaveWith and
 -- deletes every object that player owned in the subgame -- leaving `returned`
--- nothing to funnel back for them. `recovered` restores exactly that set from
--- the parent's pre-subgame copies.
+-- nothing to funnel back for them. `recovered` and `recoveredCmd` restore
+-- exactly that set from the parent's pre-subgame copies.
 --
 -- The guard is on the card's OWNER, not on the id merely being missing from
 -- `finalSub`: CR 400.7 mints a fresh id on every zone change, including the
--- opening-hand draws, so a missing `oldLibIds` id is the ordinary case for a
+-- opening-hand draws, so a missing `movedIds` id is the ordinary case for a
 -- card that is alive under a new id. Nothing but objectsLeaveWith deletes a
 -- real card's object outright (Sba's `ceaseToExist` guards on Source.OfToken),
 -- so its firing is the only thing that can need recovering.
@@ -592,21 +633,51 @@ funnelBack finalSub parent =
       -- hand-written zone move outside Event.changeZone, performing that
       -- funnel's per-incarnation reset through the one shared function.
       toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
-      returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))
+      toCommandCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Command}
+      -- CR 729.5's own exclusion: "all traditional cards they own that are in the
+      -- subgame OTHER THAN those in the subgame command zone". So the library
+      -- funnel skips the subgame's command zone wholesale, and CR 729.5c takes
+      -- back out of it exactly the commanders. Anything else that ended there is
+      -- covered by rule 729.5's "all other objects in the subgame cease to exist"
+      -- -- nothing in pawl can reach that zone but a commander (CR 903.9a).
+      subCmdIds = GameState.command finalSub
+      returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys (GameState.objects finalSub) subCmdIds))
+      backFromSub =
+        fmap
+          toCommandCard
+          (Map.filterWithKey (\oid obj -> isCard obj && Commander.isCommander oid finalSub) (Map.restrictKeys (GameState.objects finalSub) subCmdIds))
       oldLibIds =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
+      -- The same expression as subgameStateFrom's `cmdIds`; see the invariant note
+      -- there. These are the ids CR 729.2c moved out of the parent's command zone,
+      -- so they are dropped from the parent and refunded from the subgame -- into
+      -- the command zone by `backFromSub` if the commander is still there (CR
+      -- 729.5c's "if it's there"), and into the library by `returned` if it ended
+      -- the subgame anywhere else (CR 729.5's first sentence).
+      oldCmdIds = Set.filter (\oid -> Commander.isCommander oid parent) (GameState.command parent)
+      movedIds = Set.union oldLibIds oldCmdIds
       ownersPresentInSub = Set.fromList (fmap Object.owner (Map.elems (GameState.objects finalSub)))
       removedByDeparture oid = case Map.lookup oid (GameState.objects parent) of
         Nothing -> False
         Just obj -> Set.notMember (Object.owner obj) ownersPresentInSub
-      recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.filter removedByDeparture oldLibIds))
+      recoveredIds = Set.filter removedByDeparture movedIds
+      recovered = fmap toLibraryCard (Map.restrictKeys (GameState.objects parent) (Set.difference recoveredIds oldCmdIds))
+      -- A commander whose owner departed INSIDE the subgame is recovered to the
+      -- zone it left the parent from, not to a library: CR 729.1b keeps the
+      -- subgame's departure from meaning anything in the main game, where that
+      -- player is still playing and their commander is still in the command zone.
+      recoveredCmd = fmap toCommandCard (Map.restrictKeys (GameState.objects parent) (Set.intersection recoveredIds oldCmdIds))
       allReturned = Map.union returned recovered
+      toCommand = Map.union backFromSub recoveredCmd
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) allReturned))
-      keptParentObjects = Map.withoutKeys (GameState.objects parent) oldLibIds
+      keptParentObjects = Map.withoutKeys (GameState.objects parent) movedIds
    in parent
-        { GameState.objects = Map.union allReturned keptParentObjects,
+        { GameState.objects = Map.unions [allReturned, toCommand, keptParentObjects],
           GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
+          -- CR 729.5c. The parent's other command-zone residents are untouched:
+          -- CR 729.2c moved only the commanders, so only they can come back.
+          GameState.command = Set.union (Set.difference (GameState.command parent) oldCmdIds) (Map.keysSet toCommand),
           GameState.nextObjectId = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub),
           GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub),
           -- CR 104.4b: the subgame's events are not a stretch during which the
