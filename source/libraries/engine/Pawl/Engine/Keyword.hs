@@ -39,6 +39,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Create as Create
@@ -2382,7 +2383,7 @@ ward cost =
   where
     clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton effect)
     gate = PayGate.MkPayGate {PayGate.payer = Binding.targetingObject, PayGate.cost = cost, PayGate.branch = PayBranch.IfNotPaid}
-    effect = Effect.Counter Binding.targetingObject
+    effect = Effect.Counter (Counter.MkCounter (ObjectRef.InSlot Binding.targetingObject) Nothing)
 
 -- CR 702.147a's TRIGGERED half: "When this creature attacks, sacrifice it at end
 -- of combat." CR 508.3a is what "attacks" means, so the condition is mentor's and

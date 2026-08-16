@@ -34,7 +34,12 @@
                 "effects": [
                   {
                     "type": "Counter",
-                    "value": "spell"
+                    "value": {
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "spell"
+                      }
+                    }
                   }
                 ],
                 "payGate": {

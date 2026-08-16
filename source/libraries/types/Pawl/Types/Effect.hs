@@ -5,6 +5,7 @@ import qualified Pawl.Types.Amass as Amass
 import qualified Pawl.Types.ArmDelayedTrigger as ArmDelayedTrigger
 import qualified Pawl.Types.AttachTarget as AttachTarget
 import qualified Pawl.Types.ChangeText as ChangeText
+import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Create as Create
 import qualified Pawl.Types.CreateCopy as CreateCopy
 import qualified Pawl.Types.Daytime as Daytime
@@ -182,11 +183,13 @@ data Effect card
     -- ObjectRef is what lets ONE opcode be both Murder's "destroy target creature"
     -- and Day of Judgment's "destroy all creatures"; a sibling DestroyAll would
     -- have needed its own copy of the CR 702.12b gate, the CR 616.1 funnel and the
-    -- CR 701.19c rider. Tap, Untap, Detain, Transform, ModifyTarget, GainControl,
-    -- DealDamage, PreventNextDamage, PreventAllDamage and MoveToZone have since
-    -- taken the parameter for that reason, the two storing opcodes additionally
-    -- owing CR 611.2c a frozen set; the rest still take a bare SlotName, none of
-    -- them having a card that names a set.
+    -- CR 701.19c rider. Every opcode a card has since asked to name a set with
+    -- has taken the parameter for that reason -- Counter is the latest, so that
+    -- Swift Silence's "all other spells" and Cancel's targeted slot stay one
+    -- opcode -- and the storing ones additionally owe CR 611.2c a frozen set. The
+    -- rest still take a bare SlotName, none of them having a card that names a
+    -- set. Not enumerated here: a list of arm names goes stale silently, and the
+    -- field itself is the record.
     --
     -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
     -- destroyed into the effect source's live bindings, for a later effect of the
@@ -802,9 +805,15 @@ data Effect card
     -- (CR 113.6g's and CR 613.11's), and recording for a SPELL a distinct "was
     -- countered" event the zone change alone could not be told apart from.
     --
-    -- A bare SlotName, so this counters ONE object: countering a swept set --
-    -- Swift Silence's "counter all other spells" -- is not implemented (#1397).
-    Counter SlotName.SlotName
+    -- An ObjectRef and not a bare slot, for PutCounters' reason: Swift Silence's
+    -- "counter all other spells" is a SET named by a description, which CR
+    -- 115.10a makes no target at all, and ObjectRef.EachSpell is CR 109.2b's
+    -- reading of it. Cancel's targeted slot is the same type's `InSlot`.
+    --
+    -- The optional slot is how many the funnel actually countered, for Swift
+    -- Silence's own "draw a card for each spell countered this way" to read back
+    -- as Quantity.InSlot. See Pawl.Types.Counter.
+    Counter Counter.Counter
   | -- | CR 122.6: put this many counters of this kind on the permanents the
     -- ObjectRef names. A counter is persistent object state, NOT a zone change --
     -- Resolve.applyEffect edits Object.counters in place, never through

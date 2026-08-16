@@ -30,6 +30,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
@@ -39,6 +40,7 @@ import qualified Pawl.Types.InZone as InZone
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Moved as Moved
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -122,7 +124,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
         s
         "effects"
         (Card.allEffects card)
-        [Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))]
+        [Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing)]
       Spec.assertEqWith
         s
         "target slot"
@@ -144,7 +146,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
         s
         "effects"
         (Card.allEffects card)
-        [Effect.Counter (SlotName.MkSlotName (Text.pack "ability"))]
+        [Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "ability"))) Nothing)]
       Spec.assertEqWith
         s
         "target slot"

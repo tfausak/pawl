@@ -70,6 +70,7 @@ import qualified Pawl.Types.Compares as Compares
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Create as Create
@@ -265,6 +266,7 @@ objectRefSlots ref = case ref of
   ObjectRef.EachCardInGraveyard {} -> Map.empty
   ObjectRef.EachCardInYourHand -> Map.empty
   ObjectRef.EachCardExiledWithSource {} -> Map.empty
+  ObjectRef.EachSpell _ -> Map.empty
   ObjectRef.EachPlayer -> Map.empty
   ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player _) -> playerRefSlots player
   -- A PlayerScope names players by their relation to the effect's controller (CR
@@ -402,7 +404,9 @@ slotsOf effect = case effect of
   -- target unread and pass the reads-equal-declares lint on a card that fizzles.
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ srcRef destRef) ->
     joinSlots [durationSlots duration, objectRefSlots srcRef, objectRefSlots destRef]
-  Effect.Counter slot -> oneSlot slot
+  -- The bound slot is a DEFINITION (how many this sweep countered), not a read,
+  -- so it belongs to boundSlots below -- Destroy's posture.
+  Effect.Counter (Counter.MkCounter ref _) -> objectRefSlots ref
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity ref) -> joinTwo (objectRefSlots ref) (quantitySlots quantity)
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity slot) -> insertOne slot (quantitySlots quantity)
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters ref _ quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
@@ -626,7 +630,7 @@ slotsAreExhaustive effect = case effect of
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
   Effect.PreventAllDamage (DurationRef.MkDurationRef duration _) -> durationSlotsAreExhaustive duration
   Effect.RedirectDamage (RedirectDamage.MkRedirectDamage duration _ _ _) -> durationSlotsAreExhaustive duration
-  Effect.Counter _ -> True
+  Effect.Counter {} -> True
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.slotsAreExhaustive quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -767,7 +771,7 @@ readsX = any effectReadsX
       Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ quantity rider) -> Quantity.readsX quantity || readsX (Foldable.toList rider)
       Effect.PreventAllDamage {} -> False
       Effect.RedirectDamage {} -> False
-      Effect.Counter _ -> False
+      Effect.Counter {} -> False
       Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> Quantity.readsX quantity
       Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> Quantity.readsX quantity
       Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> Quantity.readsX quantity
@@ -865,7 +869,7 @@ searchesLibrary effect = case effect of
   Effect.PreventNextDamage {} -> False
   Effect.PreventAllDamage {} -> False
   Effect.RedirectDamage {} -> False
-  Effect.Counter _ -> False
+  Effect.Counter {} -> False
   Effect.PutCounters {} -> False
   Effect.RemoveCounters {} -> False
   Effect.GainPlayerCounters {} -> False
@@ -1027,7 +1031,9 @@ boundSlots effect = case effect of
   Effect.PreventNextDamage (PreventNextDamage.MkPreventNextDamage _ _ _ rider) -> foldMap boundSlots rider
   Effect.PreventAllDamage {} -> Set.empty
   Effect.RedirectDamage {} -> Set.empty
-  Effect.Counter _ -> Set.empty
+  -- How many spells or abilities this countering ACTUALLY countered, for Swift
+  -- Silence's "for each spell countered this way" to read as a Quantity.
+  Effect.Counter (Counter.MkCounter _ mSlot) -> foldMap Set.singleton mSlot
   Effect.PutCounters {} -> Set.empty
   Effect.RemoveCounters {} -> Set.empty
   Effect.GainPlayerCounters {} -> Set.empty
@@ -1843,9 +1849,13 @@ playerRefPlayers legal controller gs ref = case ref of
 -- Nothing here enforces that; it is stated so a third storing caller does not
 -- reach for Affected.Matching, which is a STATIC ability's dynamic set.
 --
--- ORDER: APNAP (CR 608.2f's "APNAP order is used to make the primary
+-- ORDER, for the arms that fold over the per-player zones CR 400.1 gives each
+-- seat: APNAP (CR 608.2f's "APNAP order is used to make the primary
 -- determination of the order of those actions"), then ascending ObjectId within
--- a controller. That second key is the ENGINE's, and rule 608.2f's secondary
+-- a controller. The arms over a SHARED zone -- exile's, and the stack's -- keep
+-- that zone's own order instead, since CR 101.4 fixes an order only where a
+-- per-player question is put; each arm below says which it takes and why. The
+-- second key above is the ENGINE's, and rule 608.2f's secondary
 -- sentence does not take it away: that sentence is guarded by "if the action
 -- can't be processed simultaneously", and every reader of this function hands its
 -- whole answer to a funnel as ONE simultaneous batch. `forEachOrder` is where the
@@ -1915,6 +1925,26 @@ objectRefObjects legal resolving controller source gs ref = case ref of
      in filter
           (\oid -> Map.lookup oid (GameState.exiledWith gs) == Just source && stated oid)
           (Set.toList (GameState.exile gs))
+  -- Swift Silence's "all other spells": CR 109.2b's reading of a description
+  -- carrying the word "spell" -- the stack, not the battlefield. Game.isSpell is
+  -- what keeps the abilities that share the zone out (CR 112.1), and it is a
+  -- classification of the object's kind, never of the card's identity.
+  --
+  -- In the STACK's own order, top first, which is the order GameState.stack
+  -- keeps (CR 405.2's ordered pile). Not APNAP, unlike the battlefield and
+  -- graveyard arms: those fold over per-player zones CR 400.1 gives each seat,
+  -- and CR 101.4 fixes the order only where a per-player question is put. The
+  -- stack is one shared zone with an order of its own that the rules already
+  -- read, so imposing a second one would be the engine overwriting it.
+  --
+  -- Read LIVE off GameState, which is CR 608.2c: a spell that has already left
+  -- the stack is not here, and one put on it after this effect's source was cast
+  -- is.
+  ObjectRef.EachSpell filter_ ->
+    let context = Filter.contextFor (Just controller) (Just source)
+     in filter
+          (\oid -> Game.isSpell oid gs && Filter.matches context (Projection.viewOfObject oid gs) filter_)
+          (GameState.stack gs)
   -- Names players and so no objects at all. Empty rather than an error: every
   -- ObjectRef-taking opcode but DealDamage reads objects only, and the same
   -- empty answer is what a slot holding a player already gives them.
@@ -2121,6 +2151,10 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- A card, so it arrives as Recipient.ToObject for EachMatching's reason: what
   -- kind of object a library's top card is, is the OPCODE's question.
   ObjectRef.TopOfLibrary {} -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
+  -- Spells, so Recipient.ToObject a fourth time: CR 112.1 makes a spell a card
+  -- on the stack, and which kind of object each one is stays the OPCODE's
+  -- question.
+  ObjectRef.EachSpell _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
   -- CR 120.3a: a player is a damage recipient, and this is the arm
   -- objectRefObjects has nothing to say about. APNAP (CR 608.2f) for
   -- objectRefObjects' reason, and Game.apnapOrder is the turn order rotated to
@@ -3377,6 +3411,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- nothing here for EachMatching's reason: CR 400.3 files a hand
             -- arrival under Object.owner.
             ObjectRef.EachCardExiledWithSource {} -> do
+              gs <- State.get
+              pure (objectRefObjects legal resolving controller source gs ref)
+            -- No printing moves a swept set of spells to a zone with the general
+            -- opcode -- countering is Effect.Counter, which is CR 701.6a's own
+            -- keyword action and carries the two gates a bare move does not. The
+            -- sweep is the same one all the same, so a printing that does ask
+            -- gets the right set rather than nothing.
+            ObjectRef.EachSpell _ -> do
               gs <- State.get
               pure (objectRefObjects legal resolving controller source gs ref)
             -- Players, and no card moves one to a zone. objectRefObjects' empty
@@ -4920,22 +4962,35 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
               Monad.forM_ mNew $ \newId ->
                 State.modify' (\g -> g {GameState.haunting = Map.insert newId haunted (GameState.haunting g)})
       _ -> pure ()
-  Effect.Counter slot ->
-    case legalOne slot legal of
-      -- CR 701.6a: the slot's target is a spell or an ability on the stack;
-      -- counter it through the single funnel, which picks that rule's ending
-      -- from the object's own kind (the graveyard for a spell, CR 608.2n's cease
-      -- for an ability). A player recipient / illegal slot (CR 608.2b): no-op.
-      --
-      -- The funnel is handed THIS effect's source and controller, which is what
-      -- Baral, Chief of Compliance's "whenever a spell or ability you control
-      -- counters a spell" reads off the event it records: the countering object,
-      -- and CR 405.4's controller of it, compared against CR 109.5's "you".
-      -- Passed rather than left to be re-derived, because by the time the CR
-      -- 117.5 trigger scan runs the controller can no longer be asked for
-      -- exactly -- see Pawl.Types.Countering, which sets out the two cases.
-      Just recipient -> mapM_ (Event.counter source controller) $ Recipient.objectOf recipient
-      _ -> pure ()
+  Effect.Counter (Counter.MkCounter ref mSlot) -> do
+    gs <- State.get
+    -- CR 701.6a: each named object is a spell or an ability on the stack;
+    -- counter them through the single funnel, which picks that rule's ending
+    -- from each object's own kind (the graveyard for a spell, CR 608.2n's cease
+    -- for an ability). Cancel's targeted slot arrives through ObjectRef.InSlot,
+    -- so a player recipient or an illegal target (CR 608.2b) is the empty list
+    -- and counters nothing -- one path, as Destroy's is.
+    --
+    -- The whole set goes to the funnel as ONE batch, which is CR 608.2f: Swift
+    -- Silence's "all other spells" is one action, and the gates each victim is
+    -- judged against are the funnel's.
+    --
+    -- The funnel is handed THIS effect's source and controller, which is what
+    -- Baral, Chief of Compliance's "whenever a spell or ability you control
+    -- counters a spell" reads off the event it records: the countering object,
+    -- and CR 405.4's controller of it, compared against CR 109.5's "you".
+    -- Passed rather than left to be re-derived, because by the time the CR
+    -- 117.5 trigger scan runs the controller can no longer be asked for
+    -- exactly -- see Pawl.Types.Countering, which sets out the two cases.
+    countered <- Event.counterReturning source controller (objectRefObjects legal resolving controller source gs ref)
+    -- CR 701.6a's "countered this way" is what the funnel COUNTERED, never what
+    -- the sweep named: a spell CR 113.6g or CR 613.11 protects was named and was
+    -- not countered, and CR 101.2 makes that the whole story. Destroy's rider,
+    -- for Destroy's reason -- bound onto this effect's SOURCE so a later effect
+    -- of the same resolution reads it as Quantity.InSlot, and bound even at zero,
+    -- since "for each spell countered this way" of nothing is no cards.
+    Monad.forM_ mSlot $ \slot ->
+      State.modify' (bindAmountSlot source slot (Natural.length countered))
   Effect.PutCounters (PutCounters.MkPutCounters kind quantity ref) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

@@ -4,7 +4,16 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
         },
         {
           "type": "OfType",
@@ -25,7 +34,7 @@
           }
         }
       ],
-      "name": "Cancel",
+      "name": "Swift Silence",
       "spell": {
         "modes": [
           {
@@ -36,21 +45,35 @@
                     "type": "Counter",
                     "value": {
                       "ref": {
+                        "type": "EachSpell",
+                        "value": {
+                          "type": "Not",
+                          "value": {
+                            "type": "IsSource"
+                          }
+                        }
+                      },
+                      "slot": "countered"
+                    }
+                  },
+                  {
+                    "type": "Draw",
+                    "value": {
+                      "player": {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      "quantity": {
                         "type": "InSlot",
-                        "value": "spell"
+                        "value": "countered"
                       }
                     }
                   }
                 ]
               }
-            ],
-            "targetSlots": {
-              "spell": {
-                "pool": {
-                  "type": "Spells"
-                }
-              }
-            }
+            ]
           }
         ]
       },

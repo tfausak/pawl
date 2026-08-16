@@ -41,7 +41,12 @@
                     "effects": [
                       {
                         "type": "Counter",
-                        "value": "thatSpell"
+                        "value": {
+                          "ref": {
+                            "type": "InSlot",
+                            "value": "thatSpell"
+                          }
+                        }
                       }
                     ]
                   }

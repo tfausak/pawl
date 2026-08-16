@@ -21,7 +21,12 @@
                 "effects": [
                   {
                     "type": "Counter",
-                    "value": "ability"
+                    "value": {
+                      "ref": {
+                        "type": "InSlot",
+                        "value": "ability"
+                      }
+                    }
                   }
                 ]
               }
