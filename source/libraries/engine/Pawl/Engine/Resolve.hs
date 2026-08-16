@@ -1849,9 +1849,13 @@ playerRefPlayers legal controller gs ref = case ref of
 -- Nothing here enforces that; it is stated so a third storing caller does not
 -- reach for Affected.Matching, which is a STATIC ability's dynamic set.
 --
--- ORDER: APNAP (CR 608.2f's "APNAP order is used to make the primary
+-- ORDER, for the arms that fold over the per-player zones CR 400.1 gives each
+-- seat: APNAP (CR 608.2f's "APNAP order is used to make the primary
 -- determination of the order of those actions"), then ascending ObjectId within
--- a controller. That second key is the ENGINE's, and rule 608.2f's secondary
+-- a controller. The arms over a SHARED zone -- exile's, and the stack's -- keep
+-- that zone's own order instead, since CR 101.4 fixes an order only where a
+-- per-player question is put; each arm below says which it takes and why. The
+-- second key above is the ENGINE's, and rule 608.2f's secondary
 -- sentence does not take it away: that sentence is guarded by "if the action
 -- can't be processed simultaneously", and every reader of this function hands its
 -- whole answer to a funnel as ONE simultaneous batch. `forEachOrder` is where the
