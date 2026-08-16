@@ -178,6 +178,7 @@ inForce gs =
       -- both unforced until some permanent actually declares a restriction.
       setEffs = Projection.setLandSubtypeEffects gs
       removed = Projection.abilityRemoval gs
+      removedAfter = Projection.abilityRemovalAfter gs
       -- CR 508.1c / CR 509.1b's second clause. A gate that HOLDS lifts the
       -- restriction, so it is dropped here; one that does not leaves it in
       -- force, which is why an ungated restriction is False here.
@@ -254,26 +255,44 @@ inForce gs =
       -- menace half is a characteristic, and lives in
       -- Pawl.Engine.Projection.designationGathered.
       --
-      -- Outside `anyMinted`, which asks about keywords, but INSIDE `keepsAbilities`
-      -- below: rule 701.60c states the restriction as quoted text, so what the
-      -- designation gives the permanent is an ABILITY, and CR 305.7's strip and a
-      -- CR 613.1f layer-6 removal both reach it.
+      -- Outside `anyMinted`, which asks about keywords, and it takes one half of
+      -- `keepsAbilities` below rather than the pair the printed rows take. Rule
+      -- 701.60c states the restriction as quoted text, so what the designation
+      -- gives the permanent is an ABILITY -- but an ability the RULES grant, which
+      -- the two halves of that gate stand differently towards:
       --
-      -- Not implemented: CR 613.1f's ordering between the two. A removal with an
-      -- EARLIER timestamp than the permanent's own leaves the ability in place,
-      -- and this gate drops it anyway (#1216). The menace half has no such hole,
-      -- going through the layer fold itself.
+      --   * CR 613.1f's layer-6 removal reaches it, in CR 613.7 TIMESTAMP ORDER.
+      --     The grant's timestamp is the permanent's own, which is what
+      --     Pawl.Engine.Projection.designationGathered stamps the menace half with,
+      --     so both halves of rule 701.60c's one sentence are ordered alike: a
+      --     Humility already on the battlefield when the permanent arrived is
+      --     earlier and leaves both in place, and one that arrived later wipes
+      --     both. `keepsAbilities`'s blanket removal question cannot tell the two
+      --     apart, which is what CombatSpec's pair of boards proves.
+      --   * CR 305.7's layer-4 strip is asked, as `keepsRulesText`. Not
+      --     implemented: that rule reaches "all abilities generated from its rules
+      --     text" and says outright that it "doesn't remove any abilities that were
+      --     granted to the land by other effects", so it should not reach this one
+      --     at all -- and the menace half, which no layer-4 strip touches, already
+      --     does not (#1606).
       designationRows source = case Game.lookupObject source gs of
-        Just obj | Set.member Designation.Suspected (Object.designations obj) -> [(source, [], CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.Type.IsSource) Nothing))]
+        Just obj
+          | Set.member Designation.Suspected (Object.designations obj),
+            keepsRulesText source,
+            not (removedAfter (Object.timestamp obj) source) ->
+              [(source, [], CombatRestriction.CantBlock (AffectedUnless.MkAffectedUnless (Affected.Matching Filter.Type.IsSource) Nothing))]
         _ -> []
-      -- The two ability losses the printed rows below check for, named because the
-      -- designation row above asks the same question: CR 305.7's basic-land
-      -- subtype set, and CR 604.2 against a CR 613.1f layer-6 removal.
-      keepsAbilities source = (null setEffs || Projection.liveAfterLayers setEffs source gs) && not (removed source)
+      -- The two ability losses the printed rows below check for: CR 305.7's
+      -- basic-land subtype set, and CR 604.2 against a CR 613.1f layer-6 removal.
+      -- Split, because the designation row above asks the first and not the second:
+      -- what a layer-6 removal costs a RULES-granted ability is a timestamp
+      -- question, and only the printed rows can settle it with a bare bit.
+      keepsRulesText source = null setEffs || Projection.liveAfterLayers setEffs source gs
+      keepsAbilities source = keepsRulesText source && not (removed source)
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
         Just face ->
-          (if keepsAbilities source then designationRows source else []) <> mintedRows source <> case Face.combatRestrictions face of
+          designationRows source <> mintedRows source <> case Face.combatRestrictions face of
             -- Every permanent in almost every game.
             [] -> []
             restrictions ->
