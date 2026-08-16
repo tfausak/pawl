@@ -1,9 +1,14 @@
 # The drain loop
 
-The prompt below is meant to be copy-pasted into a `/goal`. It is kept here
-because it is tightly coupled to `docs/agents/implementing.md` and
-`docs/agents/researching.md` --- changing a role file usually means changing
-this.
+The goal string below is meant to be pasted into a `/goal`; the procedure
+under it is what the orchestrator reads from this file once it starts. Both
+are kept here because they are tightly coupled to
+`docs/agents/implementing.md` and `docs/agents/researching.md` --- changing a
+role file usually means changing this.
+
+`/goal` caps its condition at 4000 characters, which is why the procedure is
+not the goal: one revision put the whole thing in the string and it was
+rejected at 4684. Keep the goal short and let it point here.
 
 ## Shape
 
@@ -42,7 +47,7 @@ and a standing staleness sweep alongside the dispatches.
 When the build lane's queue empties, that is a signal, not a gap. The answer is
 a design question for the owner, not a speculative dispatch.
 
-## Setting the goal
+## Bounding the goal
 
 "Until there are no issues left" is not reachable and should not be used.
 Across one 51-unit run the backlog went 299 -> 300, because closing a unit
@@ -55,13 +60,22 @@ is the best convergence signal --- when the readily-dispatchable tier depletes,
 the loop starts returning decompositions instead of PRs, and three of the final
 four dispatches in that run did exactly that.
 
-## The prompt
+## The goal string
 
-Copy from here.
+Paste this, with the bound filled in:
 
 ---
 
-Work the backlog autonomously until <BOUND>.
+Work the pawl issue backlog autonomously until <BOUND>. First `git fetch` and
+read `git show origin/main:docs/agents/drain-loop.md`; follow its "Procedure"
+section exactly --- it is the standing procedure for this loop and carries the
+dispatch, research, merging and scheduling rules; do not improvise around it.
+Re-read it whenever a merged PR touches it. Derive everything against
+`origin/main`, never the working checkout.
+
+---
+
+## Procedure
 
 **Dispatch.** Pick an unassigned issue with no `blocked` label, preferring
 `priority-high`, then the issue with the most open dependents (`gh api
@@ -138,7 +152,3 @@ worktrees are for. Derive against `origin/main`, never the working checkout.
 should add the `blocked` label, link the blocker as a GitHub dependency the way
 `CLAUDE.md` says --- not as a `Blocked by #N` comment --- and report that. A
 decomposition beats a half-landed unit.
-
----
-
-Copy to here.
