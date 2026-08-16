@@ -5,7 +5,20 @@ PR. `CLAUDE.md` and `CONTRIBUTING.md` still apply and override anything here;
 this file is the standing procedure a dispatch brief would otherwise repeat, so
 the brief carries only what is specific to your unit.
 
-You hold the build. Nothing else is building while you are.
+You hold the build. The one other thing that may be building is the previous
+unit, if its PR went red on CI and its agent was sent back; the GHC semaphore
+shares the machine between you and that is fine. Nothing else is.
+
+## Start from the brief
+
+If you were handed a brief, it was written to spare you the re-derivation: the
+producer's Oracle text, its card JSON, the edit sites, a drafted red test, the
+mutations. Start there rather than from the issue. What you owe it is
+verification, not repetition --- `curl` the Oracle text and diff it against the
+brief's JSON, grep the sibling to confirm the edit sites are complete, run the
+drafted test and watch it go red for the reason the brief predicts. A brief has
+carried a wrong mana cost before; the check is a minute, redoing the search is
+ten.
 
 ## Before you plan
 
@@ -35,6 +48,19 @@ silently ran unpedantic until CI caught it.
 ## Running the suite
 
     cabal test --test-options '--timeout 5s --hide-successes'
+
+While iterating, run only the subtree you are working in --- `--test-options
+'--timeout 5s --hide-successes -p Detain'`, a tasty pattern over the group
+names, which are the spec's `Spec.describe` strings rather than module names
+--- and the whole suite before each commit and before the push. The subtree
+answers in seconds, and its failures are the ones you are chasing rather than
+a page to sift; the full run before commit is not optional, since a change in
+the engine reaches specs you did not open.
+
+Do not reach for `optimization: False` to shorten the compile. It was
+measured: the cold build drops from ~2.5 to ~1.7 minutes, and the suite then
+blows the 5s budget on cases that take 0.02s at `-O1`. The subtree pattern is
+the speedup; the optimizer stays on.
 
 The timeout catches infinite loops. It is not an assertion about speed, so a
 case that sits near the budget is not a regression to chase --- and 2s, the
@@ -222,10 +248,11 @@ These have each shipped a green-but-meaningless test in this repository:
 ## Cards
 
 Verify Oracle text with `curl` against `api.scryfall.com` --- WebFetch gets
-403s here, and the vendored dumps under `_scratch/` are stale. Never transcribe
-a card's printed values from a brief OR from an issue body; both have carried a
-wrong mana cost --- `{3}{R}` for a card printed `{3}{R}{R}` --- and a card
-claimed to be in the pool that was not.
+403s here, and the vendored dumps under `_scratch/` are stale. Never take a
+card's printed values on trust from a brief OR from an issue body; both have
+carried a wrong mana cost --- `{3}{R}` for a card printed `{3}{R}{R}` --- and a
+card claimed to be in the pool that was not. A brief's card JSON is a draft to
+diff against the fetched text, not a source.
 
 If a clause cannot be expressed, say which, and say whether the omission leaves
 pawl's card **stricter** or **weaker** than printed. Weaker in the controller's
@@ -281,6 +308,23 @@ more candidates make it a real choice. Read those constructors and their
 comments first, and follow them unless the rule you are implementing says
 otherwise, in which case say so in the PR. Four units in one run each had to be
 told this separately.
+
+## Follow-ups: fold in or file
+
+Working a unit surfaces the next one. The rule for what to do with it:
+
+- **Fold it in** when it lives in files you already have open, is small (a
+  clause on the card you are adding, a sibling arm, a lint, a comment made
+  wrong), needs no design call and no new card, and its proof fits in the same
+  spec. Say in the PR body what you folded in and why it belongs. A PR that
+  closes two adjacent issues is fine, not scope creep.
+- **File it** when it needs its own card, its own design decision, or touches
+  files outside your unit --- and cite it inline where the code elides it, per
+  `CLAUDE.md`.
+
+The backlog is filed at roughly the rate it is closed, and each filed leaf
+costs a whole unit's fixed overhead later. A follow-up that would take ten
+minutes now and forty as its own dispatch is folded in.
 
 ## Git and the PR
 

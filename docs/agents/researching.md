@@ -54,6 +54,38 @@ the card that could sat in the same tree. That sentence made an issue look
 unreachable for weeks. When an issue looks blocked because a comment says so,
 check the comment.
 
+## The staleness sweep
+
+The tracker rots faster than anyone re-reads it. Issue bodies are written once
+and left; blockers land under other names; a capability an issue calls missing
+gets built by a PR that never cites the issue. 2026-08-15/16 closed 51 issues
+by PR and one by any other route --- against a backlog whose oldest
+open issues predate hundreds of merges. That ratio says the re-derivation is
+not happening, not that the bodies are all still right.
+
+When dispatched to sweep, take the oldest untouched issues first
+(`gh api 'repos/tfausak/pawl/issues?state=open&sort=updated&direction=asc'`)
+and re-derive each body against `origin/main`: is the gap still a gap, is the
+blocker still missing, does a test already prove the behaviour, has a sibling
+issue absorbed the concern. Verdicts are **still open**, **closed by PR #N**
+(name it), **superseded by #N**, or **narrowed** (say what remains). Report
+them for the dispatcher to act on; you may not close or comment yourself. A
+close by re-derivation is a few thousand read-only tokens and no build, which
+makes it the cheapest close there is.
+
+## Clusters
+
+The dispatcher wants clusters as well as single briefs: two to four open issues
+in the same area that touch the same files and that one person would work in
+one sitting --- the sub-clauses of one card, a family of filters, a capability
+plus the issues that exist only because it was missing. One dispatch, one
+worktree, one PR closing them all. That amortizes the fixed cost of a unit and
+removes the conflicts the issues would have had with each other.
+
+A cluster brief is one brief with a shared producer and edit-site list and a
+per-issue proving test and mutation. Name the issues it closes and the order to
+work them in. Do not force one: an issue that stands alone is a single brief.
+
 ## What a finding is
 
 Rank these above a dispatchable unit, not below it:
@@ -77,6 +109,11 @@ be expressible costs a dispatch cycle.
 for someone to retype --- every citation error in one 51-unit run entered at
 the retyping step.
 
+The brief is where the implementer's re-derivation goes. Everything you can
+settle here --- the producer, its JSON, the edit sites, the red test --- costs
+the same tokens on your lane as on theirs, and only theirs is the critical
+path. Do the settling here.
+
 A brief is dispatch-ready when it carries:
 
 - the **verdict**: dispatchable, or blocked with the missing capability named
@@ -89,9 +126,18 @@ A brief is dispatch-ready when it carries:
   already in `data/cards/`, and a clause-by-clause expressibility check naming
   the opcode for each. If a clause must be omitted, say whether the omission
   runs stricter or weaker than printed
+- the **card JSON**, written out in full in the brief when the producer is not
+  yet in `data/cards/`, in the wire spelling a neighbouring card uses ---
+  transcribed from the Oracle text you fetched, never from the issue
 - the **edit sites**, with `-Werror`-forced ones enumerated by grepping a
   sibling, and every `{}` or `_` site flagged separately
-- the **proving test** at gameplay level, with the exact assertions
+- the **proving test** at gameplay level, drafted as code against the fixtures
+  in `Pawl.Support` and the spec module it belongs in, with the exact
+  assertions. You cannot run it; say so, and expect the implementer to. The
+  point is that the implementer starts at "make it red, then green" rather
+  than at "which spec, which fixture, which board"
+- the **files it touches**, listed --- the dispatcher schedules by this and
+  will not overlap two units on one file
 - the **falsifying mutation** for each, and what it must break. If you cannot
   name one that goes red, say the site is unproven rather than proposing a
   vacuous test
