@@ -63,6 +63,7 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggerLimit as TriggerLimit
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
@@ -97,7 +98,7 @@ minimalModal =
 -- is a well-typed TriggeredAbility Card.
 minimalTriggeredAbility :: TriggeredAbility.TriggeredAbility Card.Card
 minimalTriggeredAbility =
-  TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters minimalModal Nothing
+  TriggeredAbility.MkTriggeredAbility TriggerCondition.SelfEnters minimalModal Nothing TriggerLimit.Unlimited
 
 -- | Every required field set to a simple value, 'manaCost', 'power' and
 -- 'toughness' set to non-default values, and every other defaulted field left at
