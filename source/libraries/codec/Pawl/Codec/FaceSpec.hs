@@ -217,7 +217,7 @@ populatedFace =
       Face.replacementEffects = [ReplacementEffect.EntryR (EntryR.MkEntryR Filter.IsSource (EntryRewrite.AsCopy (AsCopy.MkAsCopy (Filter.HasCardType CardType.Creature) [])))],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],
-      Face.loyalty = Just (Loyalty.MkLoyalty 3),
+      Face.loyalty = Just (Loyalty.Literal 3),
       Face.colorIndicator = Set.singleton Color.White,
       Face.characteristicPT = Just Quantity.ManaValue,
       Face.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility,
@@ -254,7 +254,7 @@ populatedFaceJson =
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}],"
     <> "\"castingPermissions\":[{\"type\":\"CastFromLibraryWhileSearching\"}],"
-    <> "\"loyalty\":3,\"colorIndicator\":[{\"type\":\"White\"}],\"characteristicPT\":{\"type\":\"ManaValue\"},"
+    <> "\"loyalty\":{\"type\":\"Literal\",\"value\":3},\"colorIndicator\":[{\"type\":\"White\"}],\"characteristicPT\":{\"type\":\"ManaValue\"},"
     <> "\"delayedAbilities\":{\"trigger\":{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}},"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
@@ -367,8 +367,8 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.loyalty = Just (Loyalty.MkLoyalty 3)}
-        (init baseFaceJson <> ",\"loyalty\":3}")
+        baseFace {Face.loyalty = Just (Loyalty.Literal 3)}
+        (init baseFaceJson <> ",\"loyalty\":{\"type\":\"Literal\",\"value\":3}}")
     Spec.it s "colorIndicator" $
       Common.assertJsonCodec
         s

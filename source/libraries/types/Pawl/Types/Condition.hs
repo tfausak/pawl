@@ -14,9 +14,9 @@ import qualified Pawl.Types.Compares as Compares
 -- keeps them apart: the duration ENDS a stored effect once, while the static
 -- ability's clause gates one that is re-derived every projection.
 --
--- ONE comparison plus a disjunction of them, and no other escape hatch. CR
--- 611.2b's "for as long as you control this creature" is a source-restricted
--- count of one (Filter.IsSource), not a special arm.
+-- ONE comparison plus a disjunction and a conjunction of them, and no other
+-- escape hatch. CR 611.2b's "for as long as you control this creature" is a
+-- source-restricted count of one (Filter.IsSource), not a special arm.
 --
 -- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
 -- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. Such a
@@ -33,8 +33,17 @@ data Condition
     -- characteristics and so cannot be folded into one Compares.
     --
     -- Filter's Or, transplanted: a flat sibling arm rather than a wrapper type,
-    -- so it nests. There is no And and no Not, those being arms no rule in the
-    -- pool asks for. `Any []` is False, which is the fold's unit and not a
-    -- trivial-truth arm -- Filter's `And []` spells that.
+    -- so it nests. `Any []` is False, which is the fold's unit and not a
+    -- trivial-truth arm -- `All []` below spells that.
     Any [Condition]
+  | -- | True when EVERY one of these is -- the conjunction inside one arm of a
+    -- printed disjunction, which is the shape Nissa, Steward of Elements' second
+    -- ability has: "if it's a land card or a creature card with mana value less
+    -- than or equal to the number of loyalty counters on Nissa". The second
+    -- disjunct is two tests of two different quantities -- a card type and a mana
+    -- value -- so it folds into neither one Compares nor an Any.
+    --
+    -- `All []` is True, the fold's unit, which is Filter's `And []` one type over.
+    -- There is still no Not: no rule in the pool asks for one.
+    All [Condition]
   deriving (Eq, Ord, Show)

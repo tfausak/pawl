@@ -15,12 +15,13 @@ import qualified Pawl.Types.Condition as Condition
 -- to name (#1305); the wire format is unchanged by either step, since the
 -- record's field names are the keys the payload already carried.
 --
--- @Any@ recurses on 'codec' itself, which terminates for
+-- @Any@ and @All@ recurse on 'codec' itself, which terminates for
 -- 'Pawl.Codec.Quantity''s reason: 'Pawl.JsonSchema.Define.define' registers the
 -- name before running the body, so re-entry emits a @$ref@.
 codec :: Codec.Codec Condition.Condition
 codec =
   Arm.tagged
     [ Arm.payload "Compares" Compares.codec Condition.Compares (\x -> case x of Condition.Compares y -> Just y; _ -> Nothing),
-      Arm.payload "Any" (Common.list codec) Condition.Any (\x -> case x of Condition.Any y -> Just y; _ -> Nothing)
+      Arm.payload "Any" (Common.list codec) Condition.Any (\x -> case x of Condition.Any y -> Just y; _ -> Nothing),
+      Arm.payload "All" (Common.list codec) Condition.All (\x -> case x of Condition.All y -> Just y; _ -> Nothing)
     ]
