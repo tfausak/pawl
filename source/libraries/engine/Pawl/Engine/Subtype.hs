@@ -10,6 +10,7 @@ module Pawl.Engine.Subtype where
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 
@@ -397,3 +398,242 @@ isCreatureType = Maybe.isJust . creatureTypeWord
 -- where CR 205.3m names hundreds and pawl already holds the list once.
 everyCreatureType :: Set.Set Subtype.Subtype
 everyCreatureType = Set.fromList (filter isCreatureType [minBound ..])
+
+-- | CR 205.3: the card types whose subtype list this subtype belongs to. CR
+-- 205.1a's removal clause is the caller -- a subtype stays with an object only
+-- while the object still has one of the card types its family correlates with
+-- -- and CR 205.3d's rejection clause is the other direction of the same
+-- question (#530).
+--
+-- A SET rather than one card type, because two families are shared: CR 205.3m
+-- gives the creature types to creatures and kindreds alike, and CR 205.3k the
+-- spell types to instants and sorceries. A single answer would have to pick one
+-- and would strip a Kindred permanent's creature types.
+--
+-- The two big families delegate rather than restate. isCreatureType and
+-- isLandType already hold CR 205.3m's and CR 205.3i's lists, and everyCreatureType
+-- makes the point in the other direction: a second hand-kept copy is free to
+-- drift.
+--
+-- The fallthrough answers with the EMPTY set, which the caller reads as "no
+-- family known, so no card type can strip it" -- the conservative direction, and
+-- isLandType's own posture toward a subtype it does not name. Unreachable today:
+-- CR 205.3g through 205.3q partition Pawl.Types.Subtype, and the arms below plus
+-- the two guards cover every constructor.
+correlatedCardTypes :: Subtype.Subtype -> Set.Set CardType.CardType
+correlatedCardTypes subtype
+  | isCreatureType subtype = Set.fromList [CardType.Creature, CardType.Kindred]
+  | isLandType subtype = Set.singleton CardType.Land
+  | otherwise = case subtype of
+      -- CR 205.3g's artifact types.
+      Subtype.Attraction -> Set.singleton CardType.Artifact
+      Subtype.Blood -> Set.singleton CardType.Artifact
+      Subtype.Bobblehead -> Set.singleton CardType.Artifact
+      Subtype.Book -> Set.singleton CardType.Artifact
+      Subtype.Clue -> Set.singleton CardType.Artifact
+      Subtype.Contraption -> Set.singleton CardType.Artifact
+      Subtype.Equipment -> Set.singleton CardType.Artifact
+      Subtype.Food -> Set.singleton CardType.Artifact
+      Subtype.Fortification -> Set.singleton CardType.Artifact
+      Subtype.Gold -> Set.singleton CardType.Artifact
+      Subtype.Incubator -> Set.singleton CardType.Artifact
+      Subtype.Infinity -> Set.singleton CardType.Artifact
+      Subtype.Junk -> Set.singleton CardType.Artifact
+      Subtype.Lander -> Set.singleton CardType.Artifact
+      Subtype.Map -> Set.singleton CardType.Artifact
+      Subtype.Mutagen -> Set.singleton CardType.Artifact
+      Subtype.Powerstone -> Set.singleton CardType.Artifact
+      Subtype.Spacecraft -> Set.singleton CardType.Artifact
+      Subtype.Stone -> Set.singleton CardType.Artifact
+      Subtype.Treasure -> Set.singleton CardType.Artifact
+      Subtype.Vehicle -> Set.singleton CardType.Artifact
+      Subtype.Vibranium -> Set.singleton CardType.Artifact
+      -- CR 205.3h's enchantment types.
+      Subtype.Aura -> Set.singleton CardType.Enchantment
+      Subtype.Background -> Set.singleton CardType.Enchantment
+      Subtype.Cartouche -> Set.singleton CardType.Enchantment
+      Subtype.Case -> Set.singleton CardType.Enchantment
+      Subtype.Class -> Set.singleton CardType.Enchantment
+      Subtype.Curse -> Set.singleton CardType.Enchantment
+      Subtype.Plan -> Set.singleton CardType.Enchantment
+      Subtype.Role -> Set.singleton CardType.Enchantment
+      Subtype.Room -> Set.singleton CardType.Enchantment
+      Subtype.Rune -> Set.singleton CardType.Enchantment
+      Subtype.Saga -> Set.singleton CardType.Enchantment
+      Subtype.Shard -> Set.singleton CardType.Enchantment
+      Subtype.Shrine -> Set.singleton CardType.Enchantment
+      -- CR 205.3j's planeswalker types.
+      Subtype.Ajani -> Set.singleton CardType.Planeswalker
+      Subtype.Aminatou -> Set.singleton CardType.Planeswalker
+      Subtype.Angrath -> Set.singleton CardType.Planeswalker
+      Subtype.Arlinn -> Set.singleton CardType.Planeswalker
+      Subtype.Ashiok -> Set.singleton CardType.Planeswalker
+      Subtype.Bahamut -> Set.singleton CardType.Planeswalker
+      Subtype.Basri -> Set.singleton CardType.Planeswalker
+      Subtype.Bolas -> Set.singleton CardType.Planeswalker
+      Subtype.Calix -> Set.singleton CardType.Planeswalker
+      Subtype.Chandra -> Set.singleton CardType.Planeswalker
+      Subtype.Comet -> Set.singleton CardType.Planeswalker
+      Subtype.Dack -> Set.singleton CardType.Planeswalker
+      Subtype.Dakkon -> Set.singleton CardType.Planeswalker
+      Subtype.Daretti -> Set.singleton CardType.Planeswalker
+      Subtype.Davriel -> Set.singleton CardType.Planeswalker
+      Subtype.Dellian -> Set.singleton CardType.Planeswalker
+      Subtype.Dihada -> Set.singleton CardType.Planeswalker
+      Subtype.Domri -> Set.singleton CardType.Planeswalker
+      Subtype.Dovin -> Set.singleton CardType.Planeswalker
+      Subtype.Ellywick -> Set.singleton CardType.Planeswalker
+      Subtype.Elminster -> Set.singleton CardType.Planeswalker
+      Subtype.Elspeth -> Set.singleton CardType.Planeswalker
+      Subtype.Estrid -> Set.singleton CardType.Planeswalker
+      Subtype.Freyalise -> Set.singleton CardType.Planeswalker
+      Subtype.Garruk -> Set.singleton CardType.Planeswalker
+      Subtype.Gideon -> Set.singleton CardType.Planeswalker
+      Subtype.Grist -> Set.singleton CardType.Planeswalker
+      Subtype.Guff -> Set.singleton CardType.Planeswalker
+      Subtype.Huatli -> Set.singleton CardType.Planeswalker
+      Subtype.Jace -> Set.singleton CardType.Planeswalker
+      Subtype.Jared -> Set.singleton CardType.Planeswalker
+      Subtype.Jaya -> Set.singleton CardType.Planeswalker
+      Subtype.Jeska -> Set.singleton CardType.Planeswalker
+      Subtype.Kaito -> Set.singleton CardType.Planeswalker
+      Subtype.Karn -> Set.singleton CardType.Planeswalker
+      Subtype.Kasmina -> Set.singleton CardType.Planeswalker
+      Subtype.Kaya -> Set.singleton CardType.Planeswalker
+      Subtype.Kiora -> Set.singleton CardType.Planeswalker
+      Subtype.Koth -> Set.singleton CardType.Planeswalker
+      Subtype.Liliana -> Set.singleton CardType.Planeswalker
+      Subtype.Lolth -> Set.singleton CardType.Planeswalker
+      Subtype.Lukka -> Set.singleton CardType.Planeswalker
+      Subtype.Minsc -> Set.singleton CardType.Planeswalker
+      Subtype.Mordenkainen -> Set.singleton CardType.Planeswalker
+      Subtype.Nahiri -> Set.singleton CardType.Planeswalker
+      Subtype.Narset -> Set.singleton CardType.Planeswalker
+      Subtype.Niko -> Set.singleton CardType.Planeswalker
+      Subtype.Nissa -> Set.singleton CardType.Planeswalker
+      Subtype.Nixilis -> Set.singleton CardType.Planeswalker
+      Subtype.Oko -> Set.singleton CardType.Planeswalker
+      Subtype.Quintorius -> Set.singleton CardType.Planeswalker
+      Subtype.Ral -> Set.singleton CardType.Planeswalker
+      Subtype.Rowan -> Set.singleton CardType.Planeswalker
+      Subtype.Saheeli -> Set.singleton CardType.Planeswalker
+      Subtype.Samut -> Set.singleton CardType.Planeswalker
+      Subtype.Sarkhan -> Set.singleton CardType.Planeswalker
+      Subtype.Serra -> Set.singleton CardType.Planeswalker
+      Subtype.Sivitri -> Set.singleton CardType.Planeswalker
+      Subtype.Sorin -> Set.singleton CardType.Planeswalker
+      Subtype.Szat -> Set.singleton CardType.Planeswalker
+      Subtype.Tamiyo -> Set.singleton CardType.Planeswalker
+      Subtype.Tasha -> Set.singleton CardType.Planeswalker
+      Subtype.Teferi -> Set.singleton CardType.Planeswalker
+      Subtype.Teyo -> Set.singleton CardType.Planeswalker
+      Subtype.Tezzeret -> Set.singleton CardType.Planeswalker
+      Subtype.Tibalt -> Set.singleton CardType.Planeswalker
+      Subtype.Tyvar -> Set.singleton CardType.Planeswalker
+      Subtype.Ugin -> Set.singleton CardType.Planeswalker
+      Subtype.Urza -> Set.singleton CardType.Planeswalker
+      Subtype.Venser -> Set.singleton CardType.Planeswalker
+      Subtype.Vivien -> Set.singleton CardType.Planeswalker
+      Subtype.Vraska -> Set.singleton CardType.Planeswalker
+      Subtype.Vronos -> Set.singleton CardType.Planeswalker
+      Subtype.Will -> Set.singleton CardType.Planeswalker
+      Subtype.Windgrace -> Set.singleton CardType.Planeswalker
+      Subtype.Wrenn -> Set.singleton CardType.Planeswalker
+      Subtype.Xenagos -> Set.singleton CardType.Planeswalker
+      Subtype.Yanggu -> Set.singleton CardType.Planeswalker
+      Subtype.Yanling -> Set.singleton CardType.Planeswalker
+      Subtype.Zariel -> Set.singleton CardType.Planeswalker
+      -- CR 205.3n's planar types.
+      Subtype.TheAbyss -> Set.singleton CardType.Plane
+      Subtype.Alara -> Set.singleton CardType.Plane
+      Subtype.AlfavaMetraxis -> Set.singleton CardType.Plane
+      Subtype.Amonkhet -> Set.singleton CardType.Plane
+      Subtype.AndrozaniMinor -> Set.singleton CardType.Plane
+      Subtype.Antausia -> Set.singleton CardType.Plane
+      Subtype.Apalapucia -> Set.singleton CardType.Plane
+      Subtype.Arcavios -> Set.singleton CardType.Plane
+      Subtype.Arkhos -> Set.singleton CardType.Plane
+      Subtype.Avishkar -> Set.singleton CardType.Plane
+      Subtype.Azgol -> Set.singleton CardType.Plane
+      Subtype.Belenon -> Set.singleton CardType.Plane
+      Subtype.BolassMeditationRealm -> Set.singleton CardType.Plane
+      Subtype.Capenna -> Set.singleton CardType.Plane
+      Subtype.Cridhe -> Set.singleton CardType.Plane
+      Subtype.TheDalekAsylum -> Set.singleton CardType.Plane
+      Subtype.Darillium -> Set.singleton CardType.Plane
+      Subtype.Dominaria -> Set.singleton CardType.Plane
+      Subtype.Earth -> Set.singleton CardType.Plane
+      Subtype.Echoir -> Set.singleton CardType.Plane
+      Subtype.Eldraine -> Set.singleton CardType.Plane
+      Subtype.Equilor -> Set.singleton CardType.Plane
+      Subtype.Ergamon -> Set.singleton CardType.Plane
+      Subtype.Fabacin -> Set.singleton CardType.Plane
+      Subtype.Fiora -> Set.singleton CardType.Plane
+      Subtype.Gallifrey -> Set.singleton CardType.Plane
+      Subtype.Gargantikar -> Set.singleton CardType.Plane
+      Subtype.Gobakhan -> Set.singleton CardType.Plane
+      Subtype.HorseheadNebula -> Set.singleton CardType.Plane
+      Subtype.Ikoria -> Set.singleton CardType.Plane
+      Subtype.Innistrad -> Set.singleton CardType.Plane
+      Subtype.Iquatana -> Set.singleton CardType.Plane
+      Subtype.Ir -> Set.singleton CardType.Plane
+      Subtype.Ixalan -> Set.singleton CardType.Plane
+      Subtype.Kaldheim -> Set.singleton CardType.Plane
+      Subtype.Kamigawa -> Set.singleton CardType.Plane
+      Subtype.Kandoka -> Set.singleton CardType.Plane
+      Subtype.Karsus -> Set.singleton CardType.Plane
+      Subtype.Kephalai -> Set.singleton CardType.Plane
+      Subtype.Kinshala -> Set.singleton CardType.Plane
+      Subtype.Kolbahan -> Set.singleton CardType.Plane
+      Subtype.Kylem -> Set.singleton CardType.Plane
+      Subtype.Kyneth -> Set.singleton CardType.Plane
+      Subtype.TheLibrary -> Set.singleton CardType.Plane
+      Subtype.Lorwyn -> Set.singleton CardType.Plane
+      Subtype.Luvion -> Set.singleton CardType.Plane
+      Subtype.Mars -> Set.singleton CardType.Plane
+      Subtype.Mercadia -> Set.singleton CardType.Plane
+      Subtype.Mirrodin -> Set.singleton CardType.Plane
+      Subtype.Moag -> Set.singleton CardType.Plane
+      Subtype.Mongseng -> Set.singleton CardType.Plane
+      Subtype.Moon -> Set.singleton CardType.Plane
+      Subtype.Muraganda -> Set.singleton CardType.Plane
+      Subtype.Necros -> Set.singleton CardType.Plane
+      Subtype.NewEarth -> Set.singleton CardType.Plane
+      Subtype.NewPhyrexia -> Set.singleton CardType.Plane
+      Subtype.OutsideMuttersSpiral -> Set.singleton CardType.Plane
+      Subtype.Phyrexia -> Set.singleton CardType.Plane
+      Subtype.Pyrulea -> Set.singleton CardType.Plane
+      Subtype.Rabiah -> Set.singleton CardType.Plane
+      Subtype.Rath -> Set.singleton CardType.Plane
+      Subtype.Ravnica -> Set.singleton CardType.Plane
+      Subtype.Regatha -> Set.singleton CardType.Plane
+      Subtype.Segovia -> Set.singleton CardType.Plane
+      Subtype.SerrasRealm -> Set.singleton CardType.Plane
+      Subtype.Shadowmoor -> Set.singleton CardType.Plane
+      Subtype.Shandalar -> Set.singleton CardType.Plane
+      Subtype.Shenmeng -> Set.singleton CardType.Plane
+      Subtype.Skaro -> Set.singleton CardType.Plane
+      Subtype.Tarkir -> Set.singleton CardType.Plane
+      Subtype.Theros -> Set.singleton CardType.Plane
+      Subtype.Time -> Set.singleton CardType.Plane
+      Subtype.Trenzalore -> Set.singleton CardType.Plane
+      Subtype.Ulgrotha -> Set.singleton CardType.Plane
+      Subtype.UnknownPlanet -> Set.singleton CardType.Plane
+      Subtype.Valla -> Set.singleton CardType.Plane
+      Subtype.Vryn -> Set.singleton CardType.Plane
+      Subtype.Wildfire -> Set.singleton CardType.Plane
+      Subtype.Xerex -> Set.singleton CardType.Plane
+      Subtype.Zendikar -> Set.singleton CardType.Plane
+      Subtype.Zhalfir -> Set.singleton CardType.Plane
+      -- CR 205.3p's one dungeon type.
+      Subtype.Undercity -> Set.singleton CardType.Dungeon
+      -- CR 205.3q's one battle type.
+      Subtype.Siege -> Set.singleton CardType.Battle
+      -- CR 205.3k: instants and sorceries SHARE the spell types, so a spell
+      -- type answers with both.
+      Subtype.Adventure -> Set.fromList [CardType.Instant, CardType.Sorcery]
+      Subtype.Arcane -> Set.fromList [CardType.Instant, CardType.Sorcery]
+      Subtype.Lesson -> Set.fromList [CardType.Instant, CardType.Sorcery]
+      Subtype.Omen -> Set.fromList [CardType.Instant, CardType.Sorcery]
+      Subtype.Trap -> Set.fromList [CardType.Instant, CardType.Sorcery]
+      _ -> Set.empty
