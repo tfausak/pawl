@@ -3957,8 +3957,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- the whole table. Which recipient the evaluation has reached rides in
   -- Filter.Context's `recipient`, and Filter.ControlledByRecipient is the one atom
   -- that reads it; a quantity naming no such atom cannot tell the loop from a
-  -- single evaluation. Through evaluateForRecipient, which is where that reading
-  -- now lives -- this arm was the only one that had it.
+  -- single evaluation. Through evaluateForRecipient, which every per-player arm
+  -- shares -- this one was where the reading started.
   --
   -- Every evaluation and every delta is read off `gs`, the state BEFORE any life
   -- moves (CR 608.2f) -- ExchangeLifeTotals' posture -- so the deltas cannot see
@@ -5099,10 +5099,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
         recipients = playerRefPlayers legal controller gs ref
-    -- CR 122 / 107.14: the amount per recipient (evaluateForRecipient, off the one
-    -- pre-effect `gs`), then CR 122.6's funnel per recipient -- PutCounters'
-    -- posture above, so a counter-scaling replacement (Vorinclex, Monstrous
-    -- Raider) gets its CR 614 opportunity against each player's gain.
+    -- CR 122 / 107.14: the amount read per recipient (evaluateForRecipient, off
+    -- the one pre-effect `gs`), then CR 122.6's funnel per recipient -- the second
+    -- half is PutCounters' posture above, so a counter-scaling replacement
+    -- (Vorinclex, Monstrous Raider) gets its CR 614 opportunity against each
+    -- player's gain. The first half is not: PutCounters places on OBJECTS, which
+    -- no reference names one of the way a recipient names a player.
     Monad.forM_ recipients $ \pid ->
       case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
