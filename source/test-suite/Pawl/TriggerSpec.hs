@@ -4910,6 +4910,154 @@ trainingSpec s registry =
             (fmap TriggeredAbility.condition abilities)
             [expected, expected]
 
+-- CR 702.149c's second trigger form: "when this creature trains" means "when a
+-- resolving training ability puts one or more +1/+1 counters on this creature".
+--
+-- Savior of Ollenbock {1}{W}{W} Creature -- Human Soldier 1/2 is the only paper
+-- printing, and the whole card is here: training, "whenever this creature trains,
+-- exile up to one other target creature from the battlefield or creature card
+-- from a graveyard", and "when this creature leaves the battlefield, put the
+-- exiled cards onto the battlefield under their owners' control".
+--
+-- The exile clause is what makes the trigger OBSERVABLE at gameplay level: rule
+-- 702.149c's marker is otherwise invisible, the counter it rides being an
+-- ordinary +1/+1 counter. So every case below reads the exile rather than the
+-- counter, and the counter assertions are there to prove the training half
+-- happened at all.
+--
+-- The pair of boards differs in exactly one thing: the companion's POWER, moved
+-- across rule 702.149a's threshold by a continuous effect rather than by swapping
+-- the card, so seats, timing, stock and the declaration are identical.
+--
+-- The other-source case is Battlegrowth's counter, which is the discrimination
+-- this whole unit exists for: a +1/+1 counter arriving from anything but a
+-- resolving training ability trains nobody.
+saviorOfOllenbockSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+saviorOfOllenbockSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- CR 508.1's declaration narrowed to the named creatures, trainingSpec's.
+      plan :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      plan attackers p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        _ -> S.aggressiveAnswer p
+      -- CR 601.2c's announcement for the trained creature's trigger: one target,
+      -- PINNED rather than searched. An answerer that picked a legal option would
+      -- find another one after a mutation and repair the assertion; this one hands
+      -- back the recipient the case names, tag and all -- ToCreature for the
+      -- battlefield half of the pool, ToObject for the graveyard half.
+      aimingAt :: Recipient.Recipient -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      aimingAt recipient attackers p = case p of
+        Prompt.AnnounceTargets _ _ _ offers -> fmap (const 1) offers
+        Prompt.ChooseTargets _ _ _ asked -> fmap (const (Set.singleton recipient)) asked
+        _ -> plan attackers p
+      atBlockers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+      nameOf oid gs = fmap Face.name (Game.faceOf oid gs)
+      -- Exile is one shared zone (CR 400.1), so this is everything in it whoever
+      -- owns it. By NAME, because CR 400.7 mints the exiled card a fresh id.
+      exiledNames gs = List.sort (Maybe.mapMaybe (`nameOf` gs) (Set.toList (GameState.exile gs)))
+      controlledNames pid gs =
+        List.sort (Maybe.mapMaybe (\oid -> if Projection.controllerOf oid gs == Just pid then nameOf oid gs else Nothing) (Set.toList (GameState.battlefield gs)))
+      graveyardNames pid gs = List.sort (Maybe.mapMaybe (`nameOf` gs) (Game.zoneMembers Zone.Graveyard pid gs))
+      -- Destroy the Savior (CR 701.8a), settle so the CR 117.5 boundary scans the
+      -- departure and places the leaves-the-battlefield trigger, then resolve it --
+      -- promiseOfTomorrowReturnSpec's killIt, and BOTH states come back for its
+      -- reason: "the ability triggered" is only readable at the placement.
+      killIt oid gs =
+        let killed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [oid])
+            placed = S.runPure S.identityAnswer killed Engine.settleForPriority
+         in (placed, S.runPure S.identityAnswer placed Stack.resolveTop)
+      named = CardName.MkCardName . Text.pack
+      -- Rule 702.149a's threshold crossed from below by a continuous effect: the
+      -- Piker's 2 power becomes 1, which is the Savior's own, and CR 702.149a's
+      -- "greater" is strict.
+      shrink oid = S.withEffect oid (Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness (Quantity.Type.Literal (-1)) (Quantity.Type.Literal 0)))
+   in Spec.describe s "CR 702.149c a trigger on training" $ do
+        -- The proving test. The Piker's 2 clears the Savior's 1, the training
+        -- ability resolves and puts the counter, and rule 702.149c's trigger then
+        -- exiles the creature it targeted.
+        Spec.it s "CR 702.149c whole card: training exiles the targeted creature" $ do
+          (gs, mine, theirs) <- board ["Savior of Ollenbock", "Goblin Piker"] ["Hill Giant"]
+          case (mine, theirs) of
+            ([savior, piker], [giant]) -> do
+              let after = atBlockers (aimingAt (Recipient.ToCreature giant) [savior, piker]) gs
+              Spec.assertEqWith
+                s
+                "the counter landed on the Savior and not on its companion"
+                (countersOn savior after, countersOn piker after)
+                (Map.singleton CounterKind.PlusOnePlusOne 1, Map.empty)
+              Spec.assertEqWith s "and the trigger exiled the Giant" (exiledNames after) [named "Hill Giant"]
+              Spec.assertEqWith s "which bob no longer controls" (controlledNames S.bob after) []
+            _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker, and bob a Giant"
+        -- The one-difference control: the same board with the companion's power
+        -- one lower, so rule 702.149a's strict "greater" is not met, nothing
+        -- trains, and rule 702.149c's trigger never fires.
+        Spec.it s "CR 702.149a a companion whose power is only equal exiles nothing" $ do
+          (gs, mine, theirs) <- board ["Savior of Ollenbock", "Goblin Piker"] ["Hill Giant"]
+          case (mine, theirs) of
+            ([savior, piker], [giant]) -> do
+              let weakened = shrink piker gs
+                  after = atBlockers (aimingAt (Recipient.ToCreature giant) [savior, piker]) weakened
+              Spec.assertEqWith s "the companion really is a 1/1 now" (S.powerToughnessOf piker weakened) (Just (1, 1))
+              Spec.assertEqWith s "no counter was put" (countersOn savior after) Map.empty
+              Spec.assertEqWith s "and nothing was exiled" (exiledNames after) []
+              Spec.assertBool s (S.onBattlefield giant after) "the Giant is where it was"
+            _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker, and bob a Giant"
+        -- The pool's OTHER half, and the tag that goes with it: a creature card in
+        -- a graveyard is ToObject, where the battlefield half is ToCreature. Bob's
+        -- graveyard, so "a graveyard" is not read as the controller's own.
+        Spec.it s "CR 404.1 whole card: the same slot reaches a creature card in a graveyard" $ do
+          (gs, mine, _) <- board ["Savior of Ollenbock", "Goblin Piker"] []
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          case mine of
+            [savior, piker] -> do
+              let (card, stocked) = S.addGraveyardCard sentry S.bob gs
+                  after = atBlockers (aimingAt (Recipient.ToObject card) [savior, piker]) stocked
+              Spec.assertEqWith s "the Savior trained" (countersOn savior after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+              Spec.assertEqWith s "and the graveyard card is in exile" (exiledNames after) [named "Ogre Sentry"]
+              Spec.assertEqWith s "out of bob's graveyard" (graveyardNames S.bob after) []
+            _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker"
+        -- CR 607.2a's linked set read back by the card's third ability. The victim
+        -- is BOB's card, so "under their owners' control" is observable: the
+        -- ability's controller is alice, and an owner-blind return would hand her
+        -- the Sentry.
+        Spec.it s "CR 607.2a whole card: the Savior leaving the battlefield returns what it exiled, to its owner" $ do
+          (gs, mine, _) <- board ["Savior of Ollenbock", "Goblin Piker"] []
+          sentry <- S.printingOf s registry "Ogre Sentry"
+          case mine of
+            [savior, piker] -> do
+              let (card, stocked) = S.addGraveyardCard sentry S.bob gs
+                  exiled = atBlockers (aimingAt (Recipient.ToObject card) [savior, piker]) stocked
+                  (placed, after) = killIt savior exiled
+              Spec.assertEqWith s "the premise: the Sentry is in exile" (exiledNames exiled) [named "Ogre Sentry"]
+              Spec.assertEqWith s "the departure placed one trigger" (length (GameState.stack placed)) 1
+              Spec.assertEqWith s "exile is empty again" (exiledNames after) []
+              Spec.assertEqWith s "and bob controls the Sentry" (controlledNames S.bob after) [named "Ogre Sentry"]
+              Spec.assertEqWith s "while alice keeps only her Piker" (controlledNames S.alice after) [named "Goblin Piker"]
+            _ -> Spec.assertFailure s "fixture should give alice a Savior and a Piker"
+        -- The discrimination rule 702.149c is FOR: a +1/+1 counter arriving from
+        -- Battlegrowth ({G} Instant, "put a +1/+1 counter on target creature") is
+        -- the same counter the training ability would have put, and it trains
+        -- nobody. Nothing attacks, so nothing else could.
+        Spec.it s "CR 702.149c a +1/+1 counter from another source is not training" $ do
+          savior <- S.printingOf s registry "Savior of Ollenbock"
+          giant <- S.printingOf s registry "Hill Giant"
+          forest <- S.printingOf s registry "Forest"
+          battlegrowth <- S.printingOf s registry "Battlegrowth"
+          let (saviorId, withSavior) = S.addCreature savior S.alice (S.landsInPlay forest 1)
+              (giantId, withGiant) = S.addCreature giant S.bob withSavior
+              (handed, spellId) = S.handOne battlegrowth withGiant
+              cast = snd (Engine.runGamePure (aimingAt (Recipient.ToCreature saviorId) []) handed (S.cast S.alice spellId))
+              after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+          Spec.assertEqWith s "the counter really arrived" (countersOn saviorId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+          Spec.assertEqWith s "no trigger was placed" (length (GameState.stack after)) 0
+          Spec.assertEqWith s "and nothing was exiled" (exiledNames after) []
+          Spec.assertBool s (S.onBattlefield giantId after) "the Giant bob controls is untouched"
+
 -- CR 702.147a's decayed: a combat restriction and a triggered ability that arms
 -- a CR 603.7 DELAYED one -- the first minted ability to arm anything, and so the
 -- first Effect.ArmDelayedTrigger whose name is on no face
@@ -8815,6 +8963,10 @@ representativeEvents cond =
         -- Whether the pair matches on the board below does not matter, eventBindings
         -- reading the event rather than the attachment.
         TriggerCondition.AttachedCreatureMentors -> one (GameEvent.Mentored (Mentored.MkMentored departed arrived))
+        -- CR 702.149c's own event, and the only one this condition admits, on
+        -- `departed` for SelfEvolves' reason: the pair does not match, which pins
+        -- the floor for a matching pair too, this arm binding nothing either way.
+        TriggerCondition.SelfTrains -> one (GameEvent.Trained departed)
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- payload is arbitrary: the condition compares nothing, so any sacrifice
         -- matches and the floor is the same for all of them.
@@ -8911,6 +9063,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentBecomesDesignated (PermanentBecomesDesignated.MkPermanentBecomesDesignated Designation.Renowned (Filter.Type.And [])),
     TriggerCondition.SelfEvolves,
     TriggerCondition.AttachedCreatureMentors,
+    TriggerCondition.SelfTrains,
     TriggerCondition.PermanentSacrificed,
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
     -- BOTH relations, on the SpellCast pair's reasoning above: an eventBindings
@@ -11913,6 +12066,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   mentorSpec s registry
   mentorsTriggerSpec s registry
   trainingSpec s registry
+  saviorOfOllenbockSpec s registry
   decayedSpec s registry
   provokeSpec s registry
   trygonPredatorSpec s registry

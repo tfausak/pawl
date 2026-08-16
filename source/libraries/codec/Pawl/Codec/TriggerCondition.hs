@@ -77,6 +77,7 @@ codec =
       Arm.payload "PermanentBecomesDesignated" PermanentBecomesDesignated.codec TriggerCondition.PermanentBecomesDesignated (\x -> case x of TriggerCondition.PermanentBecomesDesignated y -> Just y; _ -> Nothing),
       Arm.nullary "SelfEvolves" TriggerCondition.SelfEvolves,
       Arm.nullary "AttachedCreatureMentors" TriggerCondition.AttachedCreatureMentors,
+      Arm.nullary "SelfTrains" TriggerCondition.SelfTrains,
       Arm.nullary "PermanentSacrificed" TriggerCondition.PermanentSacrificed,
       Arm.payload "SagaFinalChapterTriggers" PlayerRelation.codec TriggerCondition.SagaFinalChapterTriggers (\x -> case x of TriggerCondition.SagaFinalChapterTriggers y -> Just y; _ -> Nothing),
       Arm.payload "PlayerBecomesMonarch" PlayerRelation.codec TriggerCondition.PlayerBecomesMonarch (\x -> case x of TriggerCondition.PlayerBecomesMonarch y -> Just y; _ -> Nothing),

@@ -1091,6 +1091,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Mentor (SlotName.MkSlotName (Text.pack "mentored")))
       """ {"type":"Mentor","value":"mentored"} """
+  -- CR 702.149a's counter and CR 702.149c's marker. Back to Evolve's "self": rule
+  -- 702.149a puts its counter on the training creature itself.
+  Spec.it s "Train" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Train (SlotName.MkSlotName (Text.pack "self")))
+      """ {"type":"Train","value":"self"} """
   Spec.it s "ItBecomes" $
     Common.assertJsonCodec
       s

@@ -21,5 +21,6 @@ codec =
       Arm.payload "CardsInGraveyard" GraveyardScope.codec Pool.CardsInGraveyard (\x -> case x of Pool.CardsInGraveyard y -> Just y; _ -> Nothing),
       -- Nullary: CR 400.1's shared zones have no per-player copy for a payload
       -- to select among.
-      Arm.nullary "CardsInExile" Pool.CardsInExile
+      Arm.nullary "CardsInExile" Pool.CardsInExile,
+      Arm.payload "CreaturesAndCardsInGraveyard" GraveyardScope.codec Pool.CreaturesAndCardsInGraveyard (\x -> case x of Pool.CreaturesAndCardsInGraveyard y -> Just y; _ -> Nothing)
     ]

@@ -1080,6 +1080,21 @@ data Effect card
     -- the pair: this one names rule 702.134a's chosen TARGET, the mentor being the
     -- resolving ability's own source.
     Mentor SlotName.SlotName
+  | -- | CR 702.149a and CR 702.149c together: put a +1/+1 counter on the slot's
+    -- creature, and record that it TRAINED -- rule 702.149c's marker, which Savior
+    -- of Ollenbock's "whenever this creature trains" reads. The whole payload of
+    -- the ability Pawl.Engine.Keyword.training mints, and its only producer.
+    --
+    -- Evolve's shape and Evolve's reason for being one opcode rather than a
+    -- PutCounters beside a marker: rule 702.149c makes the marker CONDITIONAL on
+    -- counters having been put ("puts one or more +1/+1 counters on this
+    -- creature"), and two effects in a clause cannot state that dependency.
+    --
+    -- The counter's kind and count are the rule's, not the card's, so neither is a
+    -- payload. A SlotName for Evolve's reason, and the SAME slot it names: rule
+    -- 702.149a's "this creature" is Binding.triggerSource, one object -- unlike
+    -- Mentor above, whose slot is a chosen target.
+    Train SlotName.SlotName
   | -- | CR 731.1: "it becomes day" / "it becomes night" -- the GAME gains that
     -- designation. Tovolar, Dire Overlord's upkeep trigger is `ItBecomes Night`.
     --

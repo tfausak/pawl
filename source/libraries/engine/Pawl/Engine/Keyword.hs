@@ -2282,9 +2282,10 @@ mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 -- active player's.
 --
 -- A COUNTER and not ModifyTarget, again for mentor's reasons -- CR 122.6's funnel,
--- and CR 613.4c's reading every projection. The plain Effect.PutCounters where
--- mentor has an opcode of its own: rule 702.149a marks nothing for a trigger to
--- read, so nothing has to tell this placement from any other.
+-- and CR 613.4c's reading every projection. Through Effect.Train, evolve's opcode
+-- one rule over: rule 702.149c makes "when this creature trains" mean "when a
+-- resolving training ability puts one or more +1/+1 counters on this creature", so
+-- the placement has to be distinguishable from any other +1/+1 counter arriving.
 training :: TriggeredAbility Card
 training =
   TriggeredAbility.MkTriggeredAbility
@@ -2298,7 +2299,7 @@ training =
       TriggeredAbility.intervening = Nothing
     }
   where
-    effect = Effect.PutCounters (PutCounters.MkPutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource))
+    effect = Effect.Train Binding.triggerSource
 
 -- CR 702.21a: ward [cost]. "Whenever this permanent becomes the target of a spell
 -- or ability an opponent controls, counter that spell or ability unless that

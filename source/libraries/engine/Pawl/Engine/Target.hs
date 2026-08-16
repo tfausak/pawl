@@ -447,6 +447,12 @@ basePoolGiven pools context bindings pool gs = case pool of
   Pool.SpellsAndPermanents -> spellsAndPermanentsPool pools
   Pool.CardsInGraveyard scope -> graveyardRecipients context bindings scope gs
   Pool.CardsInExile -> exilePool pools
+  -- The union of the two arms above, built HERE rather than hoisted into Pools for
+  -- the graveyard arm's reason: half of it is per-slot. The battlefield half is the
+  -- shared thunk, so a slot naming this pool pays the creature walk once with every
+  -- other slot that names one.
+  Pool.CreaturesAndCardsInGraveyard scope ->
+    Set.union (creaturePool pools) (graveyardRecipients context bindings scope gs)
 
 -- CR 115.2 (only permanents are legal targets, save for the exceptions the
 -- graveyard, exile, spell and player arms above are) with CR 109.2 (an
@@ -755,6 +761,10 @@ dependsOnSlot pool = case pool of
     GraveyardScope.Scoped _ -> False
     GraveyardScope.InSlot _ -> True
   Pool.CardsInExile -> False
+  -- Its graveyard half carries the same axis, so the answer is that half's.
+  Pool.CreaturesAndCardsInGraveyard scope -> case scope of
+    GraveyardScope.Scoped _ -> False
+    GraveyardScope.InSlot _ -> True
 
 -- CR 601.2c: the range of numbers this slot may be answered with on this board
 -- -- the printed count, narrowed by how many legal recipients there actually

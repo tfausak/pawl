@@ -70,4 +70,12 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       Pool.codec
       Pool.CardsInExile
       """ {"type":"CardsInExile"} """
+  -- CR 115.1a and CR 404.1 in one slot, so the graveyard half's scope is what the
+  -- payload carries.
+  Spec.it s "CreaturesAndCardsInGraveyard" $
+    Common.assertCodec
+      s
+      Pool.codec
+      (Pool.CreaturesAndCardsInGraveyard (GraveyardScope.Scoped PlayerScope.EachPlayer))
+      """ {"type":"CreaturesAndCardsInGraveyard","value":{"type":"Scoped","value":{"type":"EachPlayer"}}} """
   Spec.it s "has a schema" $ Common.assertHasSchema s Pool.codec

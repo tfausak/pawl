@@ -82,4 +82,23 @@ data Pool
     -- redundant rather than vacuous: Ignorant Bliss really does put cards into
     -- exile that Riftsweeper may not name.
     CardsInExile
+  | -- | CR 115.1a and CR 404.1 in ONE slot -- Savior of Ollenbock's "up to one
+    -- other target creature from the battlefield or creature card from a
+    -- graveyard". SpellsAndPermanents' shape across two zones instead of two
+    -- kinds: the union of Creatures and CardsInGraveyard above, tagged as each of
+    -- those pools tags its own members (ToCreature on the battlefield, ToObject in
+    -- a graveyard).
+    --
+    -- ONE slot and not two, because the printed count covers both halves at once:
+    -- two slots would let a card exile one of each where the card allows one
+    -- altogether, and CR 601.2c fixes a count per slot.
+    --
+    -- The Filter is asked of both halves, which is what the printed words do too
+    -- -- "creature" of the battlefield half under CR 109.2, "creature card" of the
+    -- graveyard half under CR 109.2a. A filter that can only hold of one zone's
+    -- members simply empties the other half.
+    --
+    -- Carries CardsInGraveyard's GraveyardScope for that pool's reason (CR 400.1's
+    -- per-player graveyards) and for no other: the battlefield half needs none.
+    CreaturesAndCardsInGraveyard GraveyardScope.GraveyardScope
   deriving (Eq, Ord, Show)

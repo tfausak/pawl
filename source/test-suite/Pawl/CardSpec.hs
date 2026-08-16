@@ -572,6 +572,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfEvolves -> []
   -- CR 702.134c's is nullary too, so it holds no Quantity.
   TriggerCondition.AttachedCreatureMentors -> []
+  -- Nor does CR 702.149c's, for the same reason.
+  TriggerCondition.SelfTrains -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
   TriggerCondition.PermanentSacrificed -> []
   -- CR 603.3b's carries a PlayerRelation, which holds no Count.
@@ -728,6 +730,7 @@ effectCounts effect = case effect of
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
+  Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
@@ -1060,6 +1063,7 @@ effectReplacements effect = case effect of
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
+  Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
@@ -1635,6 +1639,7 @@ effectMintedFaces effect = case effect of
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
+  Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
@@ -2232,6 +2237,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.134c's carries none either: "equipped creature" is CR 301.5f's one
   -- permanent rather than a class of them, and "a creature" narrows by nothing.
   TriggerCondition.AttachedCreatureMentors -> []
+  -- CR 702.149c's carries none either: it names "this creature" and nothing about
+  -- it to narrow by.
+  TriggerCondition.SelfTrains -> []
   -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
   -- PermanentDies below there is no Filter to sweep.
   TriggerCondition.PermanentSacrificed -> []
@@ -2734,6 +2742,7 @@ effectFilters effect = case effect of
   Effect.Unsuspect ref -> unframed (objectRefFilters ref)
   Effect.Evolve _ -> []
   Effect.Mentor _ -> []
+  Effect.Train _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.ExileHaunting {} -> []
