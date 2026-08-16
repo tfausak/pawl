@@ -192,7 +192,10 @@
 -- total moved" trigger, with Exquisite Blood -- `lifeLossTriggerSpec`. That
 -- event read for BOTH the halves CR 603.2 makes part of it -- the amount and the
 -- player who lost it -- on a three-seat board where "that player" and "an
--- opponent" come apart, with Mindcrank -- `mindcrankSpec`. CR 601.2i's cast
+-- opponent" come apart, with Mindcrank -- `mindcrankSpec`, and that same sentence
+-- with the relation widened to CR 102.1's bare "a player", which admits the
+-- ability's own controller, with The Master of Lake-town --
+-- `masterOfLaketownSpec`. CR 601.2i's cast
 -- trigger again, this time with a payload that aims at a TARGET PLAYER and the
 -- keyword half of the spell filter (CR 702.90 infect), which is the pool's first
 -- poison counter given to someone chosen rather than derived, with Hand of the
@@ -11310,6 +11313,91 @@ mindcrankSpec s registry =
             Spec.assertEqWith s "alice, who controls Mindcrank, milled nothing" (sizeOf Zone.Graveyard S.alice settled) 1
             Spec.assertEqWith s "and lost no life either" (S.lifeOf S.alice settled) (Just 20)
 
+-- CR 102.1's bare "a player" -- every player in the game, the ability's own
+-- controller included. The Master of Lake-town, {1}{B}{B} Legendary Creature --
+-- Human Advisor 3/2, "Deathtouch. Whenever a player loses life, that player mills
+-- that many cards." Mindcrank's sentence above with the relation widened, and the
+-- pool's first printing that neither PlayerRelation.You nor PlayerRelation.Opponent
+-- states: the two partition the table, so either is observably narrower than what
+-- is printed.
+--
+-- The card's third ability -- "when The Master of Lake-town dies, draw a card for
+-- each graveyard with seven or more cards in it" -- is not implemented and the
+-- card file omits it (#1656). A Scope.OverPlayers count admits only
+-- Filter.IsPlayer and Filter.ControlsMoreThanYou over its player candidates, and
+-- neither asks how big a graveyard is. The omission is in the STRICTER direction:
+-- the missing clause draws its controller cards.
+--
+-- THREE SEATS, for the reason Mindcrank's fixture gives and one more. On a
+-- two-seat board "a player" is "you and your opponent", so the widened relation is
+-- indistinguishable from a card that spelled both out; and the seat an "each
+-- opponent" misreading DROPS is the controller's own, which only a case aimed at
+-- her can catch. So the three cases below aim Magister Sphinx's entry trigger at
+-- alice, at bob and at carol in turn, and each asserts all three graveyards.
+--
+-- The three seats start at 23, 19 and 27 against the Sphinx's 10, so the loss is
+-- 13, 9 and 17 -- distinct from each other, from every starting total, and from
+-- the number of players, so no two readings of the rule produce the same mill.
+-- The boards are otherwise identical: the ONE thing the cases differ in is which
+-- seat the trigger names.
+--
+-- Every library is stocked past the deepest mill, so CR 104.3c never decides a
+-- case before its assertion runs.
+masterOfLaketownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+masterOfLaketownSpec s registry =
+  let -- Cast, then settle-and-resolve until the stack runs dry: the Sphinx, its CR
+      -- 603.6a entry trigger, and the life-loss trigger that one causes. NOT
+      -- Engine.priorityLoop, which advances the turn and clears the event log the
+      -- second trigger is scanned against.
+      castAndTrigger :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+      castAndTrigger answer spellId gs =
+        let step g = S.runPure answer (S.runPure answer g Engine.settleForPriority) Stack.resolveTop
+         in List.foldl' (\g _ -> step g) (S.runPure answer gs (S.cast S.alice spellId)) [1 .. 6 :: Int]
+      -- FILTERED out of the offered set rather than built from the seat: CR 115.1's
+      -- pool of players offers the recipients, and a slot answered with anything
+      -- the offer did not contain is dropped at CR 608.2b with no error to read.
+      -- Pinned, too -- an answerer that took whatever was legal would find another
+      -- seat after a mutation and keep the case green.
+      aimedAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      aimedAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (Set.filter (== Recipient.ToPlayer who) . snd) sets
+        _ -> S.identityAnswer p
+      graveyardSize pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
+      board master sphinx plains island swamp =
+        let withLands = S.landsFor swamp S.alice 1 (S.landsFor island S.alice 1 (S.landsFor plains S.alice 5 S.threePlayerGame))
+            (_, withMaster) = S.addCreature master S.alice withLands
+            stock pid g = List.foldl' (\b _ -> snd (S.addLibraryCard swamp pid b)) g [1 .. (20 :: Int)]
+            stocked = List.foldl' (flip stock) withMaster [S.alice, S.bob, S.carol]
+            at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+            lifed = stocked {GameState.players = at S.alice 23 (at S.bob 19 (at S.carol 27 (GameState.players stocked)))}
+         in S.handOne sphinx lifed
+      -- (label, the seat the Sphinx names, what that seat loses reaching 10).
+      cases :: [(String, PlayerId.PlayerId, Int)]
+      cases =
+        [ ("alice, who controls the Master", S.alice, 13),
+          ("bob", S.bob, 9),
+          ("carol", S.carol, 17)
+        ]
+   in Spec.describe s "The Master of Lake-town watches every player's life total"
+        . Foldable.for_ cases
+        $ \(label, victim, loss) ->
+          Spec.it s ("CR 102.1 \"a player\" admits " <> label <> ", who mills exactly what they lost") $ do
+            master <- S.printingOf s registry "The Master of Lake-town"
+            sphinx <- S.printingOf s registry "Magister Sphinx"
+            plains <- S.printingOf s registry "Plains"
+            island <- S.printingOf s registry "Island"
+            swamp <- S.printingOf s registry "Swamp"
+            let (gs, spellId) = board master sphinx plains island swamp
+                after = castAndTrigger (aimedAt victim) spellId gs
+            Spec.assertEqWith s "the named seat really came down to 10" (S.lifeOf victim after) (Just 10)
+            Spec.assertEqWith s "and milled exactly the life they lost" (graveyardSize victim after) loss
+            -- The other two seats, asserted every time rather than only where a
+            -- reading would touch them: the trigger fires once per recorded loss,
+            -- so a mill anywhere else is a second fire nobody asked for.
+            Foldable.for_ (List.filter (/= victim) [S.alice, S.bob, S.carol]) $ \bystander -> do
+              Spec.assertEqWith s "an untouched seat lost no life" (S.lifeOf bystander after) (S.lifeOf bystander gs)
+              Spec.assertEqWith s "and milled nothing" (graveyardSize bystander after) 0
+
 -- CR 508.3a / 603.3d: Anafenza, the Foremost's OTHER ability -- "whenever this
 -- creature attacks, put a +1/+1 counter on another target tapped creature you
 -- control". Here because the card was added for its CR 614.1a redirect
@@ -12131,6 +12219,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lifeGainAmountSpec s registry
   lifeLossTriggerSpec s registry
   mindcrankSpec s registry
+  masterOfLaketownSpec s registry
   anafenzaAttackSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
