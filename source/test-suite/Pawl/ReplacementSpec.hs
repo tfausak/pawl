@@ -2835,25 +2835,27 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
 -- CR 614.1c's shape that RUNS AN EFFECT, gated on a condition (#1416) --
 -- EntryRewrite.RunEffects, with "if it was kicked" on CR 604.2's clause.
 --
--- THE BOARD, one fixture in two states differing in exactly the condition: five
--- lands (four Swamps and an Island, so {3}{B} is payable with or without the
--- kicker {U}), the Leech in hand, SIX Lairwatch Giants in the library and ONE
--- Lightning Bolt already in the graveyard.
+-- THE BOARD, one fixture the cases below take in three states: five lands (four
+-- Swamps and an Island, so {3}{B} is payable with or without the kicker {U}), the
+-- Leech in hand, SIX Lairwatch Giants in the library, and whatever `buried` names
+-- already in the graveyard.
 --
--- The Bolt is what makes both halves observable at once. Without it the unkicked
--- Leech is a 0/0 that CR 704.5f buries, and "no mill" would be told from "mill"
--- by a permanent that is not there -- which is the confusion the issue's own bar
--- rules out. Lightning Bolt's mana value is 1 and Lairwatch Giant's is 6
--- (CR 202.3), so the Leech ENTERS AND SURVIVES on both boards and the two are
--- told apart by what it is: a 1/1 unkicked, a 6/6 kicked.
+-- ONE Lightning Bolt is what the first two pass, and it is what makes both halves
+-- observable at once. Without it the unkicked Leech is a 0/0 that CR 704.5f
+-- buries, and "no mill" would be told from "mill" by a permanent that is not
+-- there -- the confusion #1416's own bar rules out. Lightning Bolt's mana value is
+-- 1 and Lairwatch Giant's is 6 (CR 202.3), so the Leech ENTERS AND SURVIVES on
+-- both boards and the two are told apart by what it is: a 1/1 unkicked, a 6/6
+-- kicked. The third case passes NONE, which is how it sees the ordering the other
+-- two cannot.
 --
 -- Every number distinct: one Bolt, four milled, six in the library before and two
 -- after, five lands, and the two power/toughness readings 1 and 6.
-warLeechBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
-warLeechBoard swamp island leech giant bolt =
+warLeechBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (GameState.GameState, ObjectId.ObjectId)
+warLeechBoard swamp island leech giant buried =
   let lands = S.landsFor island S.alice 1 (S.landsInPlay swamp 4)
-      (_, withBolt) = S.addGraveyardCard bolt S.alice lands
-      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard giant S.alice g)) withBolt [1 :: Int .. 6]
+      withBuried = List.foldl' (\g p -> snd (S.addGraveyardCard p S.alice g)) lands buried
+      stocked = List.foldl' (\g _ -> snd (S.addLibraryCard giant S.alice g)) withBuried [1 :: Int .. 6]
    in S.handOne leech stocked
 
 -- Answers CR 702.33a's kicker question with `decision` and defers everything else,
@@ -2894,7 +2896,7 @@ warLeechSpec s registry = Spec.describe s "Monstrous War-Leech" $ do
     leech <- S.printingOf s registry "Monstrous War-Leech"
     giant <- S.printingOf s registry "Lairwatch Giant"
     bolt <- S.printingOf s registry "Lightning Bolt"
-    let (board, leechId) = warLeechBoard swamp island leech giant bolt
+    let (board, leechId) = warLeechBoard swamp island leech giant [bolt]
         settled = castLeech KickerDecision.Kicks board leechId
     Spec.assertEqWith s "four cards were milled: six in the library became two, and the graveyard's one Bolt became five cards" (zoneSizes settled) (2, 5)
     case leechOut settled of
@@ -2909,11 +2911,31 @@ warLeechSpec s registry = Spec.describe s "Monstrous War-Leech" $ do
     leech <- S.printingOf s registry "Monstrous War-Leech"
     giant <- S.printingOf s registry "Lairwatch Giant"
     bolt <- S.printingOf s registry "Lightning Bolt"
-    let (board, leechId) = warLeechBoard swamp island leech giant bolt
+    let (board, leechId) = warLeechBoard swamp island leech giant [bolt]
         settled = castLeech KickerDecision.Declines board leechId
     Spec.assertEqWith s "the library is untouched and the graveyard still holds only the Bolt" (zoneSizes settled) (6, 1)
     case leechOut settled of
       [permId] -> Spec.assertEqWith s "so the greatest mana value is Lightning Bolt's 1" (S.powerToughnessOf permId settled) (Just (1, 1))
+      other -> Spec.assertFailure s ("expected one Leech, got " <> show (length other))
+  -- WHEN the effects run, which the two cases above cannot see: the Bolt keeps the
+  -- Leech alive whatever the mill does. With an EMPTY graveyard the Leech's CDA
+  -- determines nothing and CR 208.2a makes it 0, so the mill is the only thing
+  -- between it and CR 704.5f -- and it survives, which says the drain happens
+  -- before the state-based action pass rather than after it.
+  --
+  -- Pawl.PowerToughnessSpec's "CR 704.5f the 0/0 Leech dies" is this board's other
+  -- half: no blue mana there, so no kicker is offered, nothing is milled and the
+  -- Leech is buried.
+  Spec.it s "CR 704.5f kicked with an EMPTY graveyard, the mill beats the SBA pass: the Leech lives as a 6/6" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    island <- S.printingOf s registry "Island"
+    leech <- S.printingOf s registry "Monstrous War-Leech"
+    giant <- S.printingOf s registry "Lairwatch Giant"
+    let (board, leechId) = warLeechBoard swamp island leech giant []
+        settled = castLeech KickerDecision.Kicks board leechId
+    Spec.assertEqWith s "four cards were milled into an empty graveyard" (zoneSizes settled) (2, 4)
+    case leechOut settled of
+      [permId] -> Spec.assertEqWith s "and the Leech is a 6/6 rather than a buried 0/0" (S.powerToughnessOf permId settled) (Just (6, 6))
       other -> Spec.assertFailure s ("expected one Leech, got " <> show (length other))
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
