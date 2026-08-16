@@ -1015,11 +1015,11 @@ data TriggerCondition
     --
     -- NO PAYLOAD, and the omission is deliberate. Mayhem Devil says "whenever a
     -- PLAYER sacrifices a permanent" -- any player, its own controller included --
-    -- and PlayerRelation offers only You and Opponent, so neither arm states the
-    -- printed sentence. Widening that type for one card would be speculative; the
-    -- card that prints "whenever you sacrifice" is the one that earns a relation
-    -- here. Nothing about the sacrificed PERMANENT is asked either: Mayhem Devil
-    -- says "a permanent", so there is no Filter to carry.
+    -- which is exactly PlayerRelation.AnyPlayer, so a relation here would carry
+    -- that one value on every printing in the pool and say nothing. The card that
+    -- prints "whenever you sacrifice" is still the one that earns it. Nothing
+    -- about the sacrificed PERMANENT is asked either: Mayhem Devil says "a
+    -- permanent", so there is no Filter to carry.
     --
     -- Not self-scoped: the bearer watches every sacrifice on the board, so it
     -- contributes neither an identity nor CR 109.5's perspective.
