@@ -174,13 +174,42 @@ data CostComponent keyword
     -- it. A CounterKind payload would also pull a Keyword -- and through it a
     -- Filter -- into every traversal of this type, for a kind no card asks for.
     --
-    -- RESOLUTION-TIME only, unlike every other component here, and that is what
-    -- decides CR 614.16 -- see Pawl.Engine.Cost.payComponent for why this one
-    -- goes through the counter funnel as an effect while AddLoyaltyToThis does
-    -- not.
+    -- RESOLUTION-TIME only, which Blight below is not, and that is what decides
+    -- CR 614.16 -- see Pawl.Engine.Cost.payComponent for why this one goes
+    -- through the counter funnel as an effect while AddLoyaltyToThis does not.
     --
     -- A Natural and not a Quantity, for PayLife's reason.
     PutPlusOneCountersOnThis Natural.Natural
+  | -- | CR 701.68a as a COST: "blight N" -- the paying player puts N -1\/-1
+    -- counters on a creature they control, choosing which as the cost is paid.
+    -- CR 601.2f demands it as an additional cost to cast (Bogslither's Embrace),
+    -- CR 602.1b as part of an activation cost (Dawnhand Dissident's "{T}, Blight
+    -- 1:"), and CR 118.12 as a cost paid on resolution (Boggart Mischief's "you
+    -- may blight 1. If you do, ...").
+    --
+    -- The one component paid at BOTH times, which every other one here is not:
+    -- PutPlusOneCountersOnThis above is resolution-time alone and the rest are
+    -- announcement-time alone. Pawl.Engine.Cost.payComponent says what that costs
+    -- on CR 614.16.
+    --
+    -- NOT PutPlusOneCountersOnThis with a different kind, and the difference is
+    -- not the counter: that component names the object the cost is ON and offers
+    -- nothing to choose, where rule 701.68a names "a creature you control" and the
+    -- payer picks one out of however many they have -- SacrificeThis's distinction
+    -- from Sacrifice, drawn again.
+    --
+    -- UNPAYABLE when the payer controls no creature, which is CR 701.68b read for
+    -- a cost: "if a player is given the choice to blight but is unable to put N
+    -- -1\/-1 counters on a creature they control ... they can't choose to blight".
+    -- Through Pawl.Engine.Cost.canPayComponent, so an activated ability with this
+    -- cost is never OFFERED (CR 602.2a) and CR 118.12's resolution offer is never
+    -- raised (CR 118.3).
+    --
+    -- A Natural and not a Quantity, for PayLife's reason -- nothing here is
+    -- evaluated against a binding environment. Not implemented: Soul Immolation's
+    -- "blight X", whose X is announced at CR 601.2b under a bound rule 701.68a
+    -- does not state, so it is neither this nor PayLifeX's shape (#1646).
+    Blight Natural.Natural
   | -- | CR 406.2 as a cost: exile the card the cost is on, from the graveyard it
     -- is in. Loxodon Surveyor's "{3}, Exile this card from your graveyard: Draw a
     -- card" is the printing. CR 601.2f's list of what a cost may include ends in

@@ -2211,6 +2211,7 @@ costComponentFilters component = case component of
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
   CostComponent.PutPlusOneCountersOnThis _ -> []
+  CostComponent.Blight _ -> []
   CostComponent.ExileThisFromGraveyard -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with

@@ -583,6 +583,7 @@ library engine
     Pawl.Engine.AttackRequirement
     Pawl.Engine.Battle
     Pawl.Engine.Binding
+    Pawl.Engine.Blight
     Pawl.Engine.BlockPermission
     Pawl.Engine.BlockRequirement
     Pawl.Engine.Card

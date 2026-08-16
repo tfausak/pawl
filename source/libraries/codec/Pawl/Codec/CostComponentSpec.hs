@@ -109,6 +109,13 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       codec
       (CostComponent.PutPlusOneCountersOnThis 1)
       """ {"type":"PutPlusOneCountersOnThis","value":1} """
+  -- CR 701.68a as a cost, CR 601.2f/602.1b/118.12's three positions for it.
+  Spec.it s "Blight" $
+    Common.assertCodec
+      s
+      codec
+      (CostComponent.Blight 2)
+      """ {"type":"Blight","value":2} """
   -- CR 406.2's two halves: the one that names the object the cost is on, and
   -- the one that names a count and a criterion.
   Spec.it s "ExileThisFromGraveyard" $

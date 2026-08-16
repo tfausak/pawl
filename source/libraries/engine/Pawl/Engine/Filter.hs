@@ -1017,6 +1017,7 @@ rewriteComponent pairs component = case component of
   CostComponent.AddLoyaltyToThis _ -> component
   CostComponent.RemoveLoyaltyFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
+  CostComponent.Blight _ -> component
   CostComponent.ExileThisFromGraveyard -> component
 
 -- CR 603.2: replace every ControlledByBound atom whose slot this environment
