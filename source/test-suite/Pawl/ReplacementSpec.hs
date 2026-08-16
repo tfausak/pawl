@@ -3435,7 +3435,7 @@ kismetBoard land pikerPrinting kismet spell =
 -- the second case is the discriminating twin that shows the recorder can see one.
 kismetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 kismetSpec s registry =
-  Spec.describe s "Kismet (CR 616.1c)" $ do
+  Spec.describe s "Kismet (CR 616.1c/616.1d)" $ do
     -- THE PROVING CASE. Collapse CopyOnEntry into Other and the same board raises
     -- a CR 616.1e race the rules do not have.
     --
@@ -3477,9 +3477,11 @@ kismetSpec s registry =
     -- is nothing to ask. Same convergence as the copy case: the werewolf ends up
     -- transformed AND tapped either way, so the prompt is the observable.
     --
-    -- Forests, not Islands: Infestation Expert is {4}{G}. Its faces are 3/4 and
-    -- 4/5, which is what tells "entered transformed" from "entered and then
-    -- transformed by something else".
+    -- Forests, not Islands: Infestation Expert is {4}{G}, and its faces are 3/4
+    -- and 4/5. The power reading 4 says the werewolf is back face up; it does NOT
+    -- say the entry rewrite is what put it there, since CR 702.145c would
+    -- transform it a moment later anyway. Like the tap, it is a non-vacuity
+    -- guard. The prompt is the assertion.
     Spec.it s "CR 616.1d the back-face bucket outranks Kismet's, so no order is asked" $ do
       forest <- S.printingOf s registry "Forest"
       pikerPrinting <- S.printingOf s registry "Goblin Piker"

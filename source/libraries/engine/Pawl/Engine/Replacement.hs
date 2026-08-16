@@ -723,8 +723,8 @@ sacrificeCandidates pid source filter_ gs =
 -- and CR 702.34a's "exile THIS card" on the zone-change side), and CR 614.1d's
 -- `ControlledBy Opponent` asks who the candidate's controller is relative to CR
 -- 109.5's "you" (Gather Specimens as a floating row, Kismet as printed static
--- text). The perspective is the CANDIDATE's
--- controller, which for a floating row is the baked one -- deriving it from the
+-- text). The perspective is the CANDIDATE's controller, which for a floating row
+-- is the baked one -- deriving it from the
 -- source here would answer Nothing for every row whose spell has resolved, and a
 -- Nothing perspective makes ControlledBy vacuously False.
 --
@@ -797,8 +797,8 @@ bucketOfEffect re = case re of
   -- opponent's Kismet -- proved by Pawl.ReplacementSpec's "the copy bucket
   -- outranks Kismet's, so no order is asked", on the absence of the prompt, since
   -- CR 616.1f makes the two orders converge on one board. An entering Clone on
-  -- its own does not exercise it: AsCopy is the only applicable candidate on the first
-  -- iteration, and what carries the rest is CR 616.1f's re-collection plus CR
+  -- its own does not exercise it: AsCopy is the only applicable candidate on the
+  -- first iteration, and what carries the rest is CR 616.1f's re-collection plus CR
   -- 614.5's identity being keyed on the effect VALUE rather than a list
   -- position, which keeps the newly-acquired ChoiceOf distinct from the
   -- already-applied AsCopy. Gather Specimens racing an entering Clone is a real
