@@ -2163,6 +2163,94 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     let (gs, _, _) = attacking [piker] [piker]
         withAura = snd (S.addCreature lure S.alice gs)
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty withAura) "no blocks is legal"
+  -- CR 509.1c's SUBJECT axis, and the SUBJECTLESS shape: Razorgrass Screen ({1}
+  -- Artifact Creature -- Wall 2/1, "Defender. This creature blocks each combat if
+  -- able." -- checked against Scryfall, 2026-08-16) prints a requirement on
+  -- ITSELF that names no attacker, where every card above prints an attacker and
+  -- leaves the subject at "all creatures able to".
+  Spec.it s "CR 509.1c a Razorgrass Screen must block, though nothing names an attacker" $ do
+    -- The requirement mints one pair per attacker the Screen may block, so
+    -- declining obeys zero and is illegal.
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [screen]
+    case (mine, theirs) of
+      (a : _, [wall]) -> do
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "no blocks is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton wall (Set.singleton a)) gs) "the Screen blocking is legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a Screen"
+  Spec.it s "CR 509.1 the same board with a plain Wall lets the defender decline" $ do
+    -- The control, and the reason the case above is not vacuous: swap the Screen
+    -- for a defender creature carrying no requirement and declining is legal
+    -- again.
+    ogreSentry <- S.printingOf s registry "Ogre Sentry"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = attacking [piker] [ogreSentry]
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "no blocks is legal"
+  Spec.it s "CR 509.1c the SUBJECT axis: only the Screen is required, not everything bob controls" $ do
+    -- THE AXIS UNDER TEST. Lure's requirement is over all creatures able; this
+    -- one is over ITSELF, so a Piker beside the Screen carries none and cannot
+    -- attain the maximum in the Screen's place. Fails against a reader that
+    -- ignores the subject field.
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [screen, piker]
+    case (mine, theirs) of
+      (a : _, [wall, bystander]) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton wall (Set.singleton a)) gs) "the Screen alone attains the maximum"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton bystander (Set.singleton a)) gs)) "the Piker blocking instead does not"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "and declining does not"
+      _ -> Spec.assertFailure s "fixture should have a Screen and a bystander"
+  Spec.it s "CR 509.1c 'if able': an attacker the Screen cannot block requires nothing" $ do
+    -- The `able` prune on the new axis. Bird Maiden has flying (CR 702.9b) and
+    -- the Screen has no reach, so no pair is minted, the maximum is zero and
+    -- declining is legal.
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    let (gs, _, _) = attacking [birdMaiden] [screen]
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "no blocks is legal"
+  Spec.it s "CR 509.1a two attackers, one Screen: blocking EITHER attains the maximum" $ do
+    -- "each combat", not "each attacker" -- the assertion that pins the absent
+    -- attacker axis. Two pairs are minted, but CR 509.1a lets the Screen block
+    -- one attacker, so the maximum is one and both single blocks are legal while
+    -- declining is not.
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker] [screen]
+    case (mine, theirs) of
+      ([first, second], [wall]) -> do
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton wall (Set.singleton first)) gs) "blocking the first is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton wall (Set.singleton second)) gs) "so is blocking the second"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "declining is not"
+      _ -> Spec.assertFailure s "fixture should have two attackers and a Screen"
+  Spec.it s "CR 702.3b the Screen still can't attack" $ do
+    -- The card's other line, and the control that keeps the new axis from being
+    -- read as a permission to attack.
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    let (gs, mine, _) = S.combatBoardOf [screen] []
+    case mine of
+      [wall] -> Spec.assertBool s (not (Combat.canAttack S.alice wall gs)) "defender forbids the attack"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 509.1c whole cards: the Screen blocks a real declare blockers step" $ do
+    -- Gameplay level, under an answerer that DECLINES, so the block is CR
+    -- 509.1c's degradation to the forced declaration rather than the answerer
+    -- choosing it. The control board swaps the Screen for an Ogre Sentry, which
+    -- is a defender with no requirement, so the two boards differ only in the
+    -- requirement and every assertion below differs between them.
+    screen <- S.printingOf s registry "Razorgrass Screen"
+    piker <- S.printingOf s registry "Goblin Piker"
+    ogreSentry <- S.printingOf s registry "Ogre Sentry"
+    let declining :: Prompt.Prompt r -> r
+        declining p = case p of
+          Prompt.DeclareBlockers {} -> Map.empty
+          _ -> S.aggressiveAnswer p
+        run theirs = S.settleSba (S.fightWith declining (let (gs, _, _) = S.combatBoardOf [piker] theirs in gs))
+        blocked = run [screen]
+        unblocked = run [ogreSentry]
+    Spec.assertEqWith s "the Screen was forced to block, so bob took nothing" (S.lifeOf S.bob blocked) (Just 20)
+    Spec.assertEqWith s "and the 2/1 Piker killed the 2/1 Screen" (S.creaturesInPlay S.bob blocked) 0
+    Spec.assertEqWith s "an Ogre Sentry with no requirement declines, so bob takes two" (S.lifeOf S.bob unblocked) (Just 18)
+    Spec.assertEqWith s "and it survives, having blocked nothing" (S.creaturesInPlay S.bob unblocked) 1
 
 -- A combat board that has NOT yet declared attackers, with Curse of the Nightly
 -- Hunt on the battlefield attached to `who`. The attacking twin of `luring`, and
@@ -2607,10 +2695,10 @@ suspectedAbilityRemovalSpec s registry = Spec.describe s "SuspectedAbilityRemova
 -- here is only that the gate is read, and read afresh.
 --
 -- The card is the right prover on three counts. Its condition reads YOUR OWN
--- board rather than the defending player's, which is the one thing a condition
--- still cannot name (#620), and it gates on a FACT rather than on a cost, which
--- rides Pawl.Types.AttackCost instead for the reason CR 508.1d's third sentence
--- gives. It prints BOTH arms from one line, as Pacifism does. And "ANOTHER
+-- board rather than the defending player's, which is the other reading and is
+-- defendingPlayerRestrictionSpec's below, and it gates on a FACT rather than on a
+-- cost, which rides Pawl.Types.AttackCost instead for the reason CR 508.1d's
+-- third sentence gives. It prints BOTH arms from one line, as Pacifism does. And "ANOTHER
 -- Giant" makes it self-excluding, which the two directions below are about: a
 -- lone Blind-Spot Giant does not count itself, while a second one counts the
 -- first.
@@ -2717,6 +2805,96 @@ conditionalCombatRestrictionSpec s registry = Spec.describe s "Conditional Comba
         Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
       _ -> Spec.assertFailure s "fixture should have two creatures"
 
+-- CR 508.1c's gate naming the DEFENDING PLAYER (CR 508.5). Armored Galleon
+-- ({4}{U} Creature -- Human Pirate 5/4, "This creature can't attack unless
+-- defending player controls an Island." -- checked against Scryfall, 2026-08-16)
+-- is the pool's first card whose "unless" clause is about the player being
+-- attacked rather than about the source's controller;
+-- conditionalCombatRestrictionSpec's Blind-Spot Giant is the other reading.
+--
+-- Three seats in the last case but two in the rest, and the split is deliberate:
+-- a two-player board cannot tell "the defending player" from "an opponent", so
+-- the discriminator lives on the three-seat board while the cheaper cases prove
+-- the gate is read at all.
+defendingPlayerRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+defendingPlayerRestrictionSpec s registry = Spec.describe s "DefendingPlayerCombatRestriction" $ do
+  Spec.it s "CR 508.1c the Galleon can't attack a defender with no Island" $ do
+    -- The NEGATIVE, paired with the positive below on a board differing only in
+    -- who controls the Island. The Piker beside it is the control on the other
+    -- axis: it carries no restriction, so a blanket "nothing may attack" bug
+    -- cannot pass here.
+    galleon <- S.printingOf s registry "Armored Galleon"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [galleon, piker] []
+    case mine of
+      [ship, other] -> do
+        Spec.assertBool s (not (Combat.canAttack S.alice ship gs)) "the Galleon cannot attack"
+        Spec.assertBool s (Combat.canAttack S.alice other gs) "the Piker beside it can"
+        Spec.assertEqWith s "and only the Piker is offered" (Combat.legalAttackers S.alice gs) [other]
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1c an Island the DEFENDER controls lifts it" $ do
+    -- THE POSITIVE. Without it the negative above passes on any board at all --
+    -- a combat restriction assertion is false for summoning sickness, for
+    -- tapped-ness and for five other conjuncts of canAttackGiven.
+    galleon <- S.printingOf s registry "Armored Galleon"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _) = S.combatBoardOf [galleon] []
+        defended = withPermanents S.bob [island] gs
+    case mine of
+      [ship] -> do
+        Spec.assertBool s (not (Combat.canAttack S.alice ship gs)) "without an Island it may not"
+        Spec.assertBool s (Combat.canAttack S.alice ship defended) "with bob's Island it may"
+        Spec.assertEqWith s "and it is offered" (Combat.legalAttackers S.alice defended) [ship]
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [ship] defended) "declaring it is legal"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 508.5 the Island must be the DEFENDING player's, not the attacker's" $ do
+    -- Discriminates ControlledByDefendingPlayer from a bare "an Island is on the
+    -- battlefield" (Glacial Crasher's actual shape, already in the pool) and from
+    -- CR 109.5's "you". Same card count as the positive above.
+    galleon <- S.printingOf s registry "Armored Galleon"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _) = S.combatBoardOf [galleon] []
+        mineOnly = withPermanents S.alice [island] gs
+    case mine of
+      [ship] -> Spec.assertBool s (not (Combat.canAttack S.alice ship mineOnly)) "alice's own Island does not free it"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 508.5a three seats: a NON-defending opponent's Island does not free it" $ do
+    -- CR 508.5a names ONE defending player, so "an opponent controls an Island"
+    -- is the wrong reading, and a two-player board cannot tell the two apart.
+    -- threePlayerCombat sits at the beginning of combat with no defender, so the
+    -- step is stated here rather than derived: one board, two seats defending in
+    -- turn, and carol holds the only Island.
+    galleon <- S.printingOf s registry "Armored Galleon"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _, _) = S.threePlayerCombat [galleon] [] [island]
+        defendedBy who =
+          gs
+            { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+              GameState.combat = (GameState.combat gs) {Combat.Type.defender = Just who}
+            }
+    case mine of
+      [ship] -> do
+        Spec.assertBool s (not (Combat.canAttack S.alice ship (defendedBy S.bob))) "carol's Island does not free an attack on bob"
+        Spec.assertBool s (Combat.canAttack S.alice ship (defendedBy S.carol)) "but it does free an attack on carol"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 508.1c whole cards: the gate decides a real declare attackers step" $ do
+    -- Gameplay level, through CR 703.4i's turn-based action rather than a direct
+    -- call. The Galleon is 5/4 and alone on its side, so the life delta is its
+    -- own and no other creature's.
+    galleon <- S.printingOf s registry "Armored Galleon"
+    island <- S.printingOf s registry "Island"
+    let (gs, mine, _) = S.combatBoardOf [galleon] []
+        defended = withPermanents S.bob [island] gs
+        after = S.runCombat S.aggressiveAnswer defended
+        control = S.runCombat S.aggressiveAnswer gs
+    case mine of
+      [ship] -> do
+        Spec.assertEqWith s "with the Island, bob takes five" (S.lifeOf S.bob after) (Just 15)
+        Spec.assertEqWith s "and the Galleon was declared" (S.attackerDeclarationsOf after) [ship]
+        Spec.assertEqWith s "without it, bob takes nothing" (S.lifeOf S.bob control) (Just 20)
+        Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
+      _ -> Spec.assertFailure s "fixture should have one creature"
+
 -- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
 -- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
 -- a Mountain on the battlefield." -- checked against Scryfall, 2026-08-05) is the
@@ -2725,9 +2903,10 @@ conditionalCombatRestrictionSpec s registry = Spec.describe s "Conditional Comba
 --
 -- Why this card and not one of the two dozen "can't attack unless defending player
 -- controls an Island" printings, which are the same sentence in a commoner shape:
--- their condition is about the player being attacked, which a Condition cannot
--- name (#620). Glacial Crasher asks the same question of the WHOLE battlefield,
--- so it needs no capability pawl lacks. A sweep of the full Oracle corpus
+-- their condition is about the player being attacked, so it would test CR 508.5's
+-- read (defendingPlayerRestrictionSpec's Armored Galleon) alongside CR 612.1's
+-- swap. Glacial Crasher asks the same question of the WHOLE battlefield, so the
+-- swap is the only thing under test. A sweep of the full Oracle corpus
 -- (2026-08-05) for a combat requirement or restriction whose clause names a basic
 -- land type returns this card, Harbor Serpent's five-Island count -- the same
 -- shape with a bigger threshold -- Leviathan's "unless you sacrifice two
@@ -2838,7 +3017,8 @@ castHackPaying island hackId target from to gs =
 -- every one of them puts the land type somewhere OTHER than the affected set:
 -- landwalk reminder text, which is a keyword's own word and is covered by
 -- textChangedLandwalkSpec above (#523); "can't attack unless defending player
--- controls an Island", which is the gate (#620); Leviathan's "unless you
+-- controls an Island", which is the gate rather than the affected set (Armored
+-- Galleon, defendingPlayerRestrictionSpec); Leviathan's "unless you
 -- sacrifice two Islands", which is a cost; and Kraken of the Straits, where the
 -- type sits inside a count in a pairwise clause Pawl.Types.CombatRestriction's
 -- header argues is not representable. No printing in Magic names a basic land
@@ -5735,6 +5915,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatRestrictionSpec s registry
   suspectedAbilityRemovalSpec s registry
   conditionalCombatRestrictionSpec s registry
+  defendingPlayerRestrictionSpec s registry
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
   attacksAloneSpec s registry

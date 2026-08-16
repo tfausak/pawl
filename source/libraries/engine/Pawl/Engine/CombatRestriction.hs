@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AffectedUnless as AffectedUnless
 import qualified Pawl.Types.CantBeBlockedBy as CantBeBlockedBy
+import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Designation as Designation
@@ -219,12 +220,36 @@ inForce gs =
       -- counts Islands. The clause is words printed on the source's card, which
       -- is what CR 612.1 reaches, and rewriteCondition is the same descent
       -- gatherStatic applies to a static ability's CR 604.2 "as long as" gate.
+      --
+      -- CR 508.5: the gate may also name the DEFENDING PLAYER rather than the
+      -- source's controller (Armored Galleon, "can't attack unless defending
+      -- player controls an Island"), so the combat record's defender is supplied
+      -- to Filter.ControlledByDefendingPlayer here. ONE read for the whole
+      -- combat rather than one per (creature, attack target) pair: CR 508.5a
+      -- determines the defending player individually for each attacking
+      -- creature, and the two readings coincide on every board pawl can build,
+      -- since Combat.attackTargets is derived from that single defender and
+      -- Defender.playerOf answers it on all three arms -- the OfPlayer arm IS
+      -- the defender, the OfPlaneswalker arm reads the record, and
+      -- Combat.attackableBattles admits only battles that player protects. CR
+      -- 802's attack-multiple-players option is what would separate them, and
+      -- pawl has no options concept to read it from (#175).
+      --
+      -- Nothing outside combat, which leaves the atom False (Filter.matches) and
+      -- so leaves the restriction in force -- the honest answer, there being no
+      -- attack to make and no defending player to name. Filled uniformly across
+      -- the arms rather than only on CantAttack: CR 508.5 pins one defending
+      -- player per combat, so a block-side gate naming that player would read
+      -- the same seat.
+      defending = Combat.defender (GameState.combat gs)
       lifted source changes restriction = case gate restriction of
         Nothing -> False
         Just condition ->
           Condition.holds
             (Projection.fullView gs)
             (Filter.contextFor (Projection.controllerOf source gs) (Just source))
+              { Filter.defendingPlayer = defending
+              }
             gs
             source
             (if null changes then condition else Projection.rewriteCondition changes condition)

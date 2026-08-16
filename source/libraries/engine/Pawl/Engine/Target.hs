@@ -174,11 +174,14 @@ admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.Control
 admittedGiven pcs grants pools perspective bindings source slot gs =
   let pool = TargetSlot.pool slot
       narrowing = TargetSlot.filter slot
-      -- THE one site that fills Filter.sourcePower and Filter.defendingPlayer,
-      -- because it is the one site that matches a TARGET SLOT's Filter -- both of
-      -- CR 115's moments (CR 601.2c's choosing and CR 608.2b's re-check) reach
-      -- those atoms through here, and CR 702.134a and CR 702.39a are the only
-      -- clauses that write them. Both are thunks, like `pcs` above: a slot whose
+      -- THE one site that fills Filter.sourcePower, and one of the two that fill
+      -- Filter.defendingPlayer, because it is the one site that matches a TARGET
+      -- SLOT's Filter -- both of CR 115's moments (CR 601.2c's choosing and CR
+      -- 608.2b's re-check) reach those atoms through here, and CR 702.134a and CR
+      -- 702.39a are the only clauses that write them in a slot. CR 508.1c's gate
+      -- is where the other defending-player read is
+      -- (Pawl.Engine.CombatRestriction.inForce, Armored Galleon), and no target
+      -- slot can reach it. Both are thunks, like `pcs` above: a slot whose
       -- filter never names an atom pays for neither the source's projection nor
       -- the combat lookup.
       context =

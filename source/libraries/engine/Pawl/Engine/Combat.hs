@@ -326,8 +326,9 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- legal. That shape is asked in attackDeclarationAllowed and never here; taking
 -- it off the candidate list would forbid the declaration CR 508.1c's own Example
 -- calls legal. So CR 508.1c is answered in two places, one per shape -- the
--- split canBlockGiven describes for CR 509.1b, without its middle PAIRWISE case,
--- which on the attacking side is the missing object axis (#620).
+-- split canBlockGiven describes for CR 509.1b, without its middle PAIRWISE case:
+-- NOT IMPLEMENTED on the attacking side, where a restriction naming what the
+-- attack is aimed at (Blazing Archon) has no carrier (#1686).
 --
 -- NOT IMPLEMENTED: CR 508.1a's "they can't also be battles". The creature test
 -- below already excludes every battle in the pool, since none is also a creature
