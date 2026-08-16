@@ -1601,6 +1601,70 @@ grantedFlashbackSpec s registry = Spec.describe s "GrantedFlashback" $ do
     Spec.assertEqWith s "the flashed-back Bolt did not return to the graveyard" (Game.zoneMembers Zone.Graveyard S.alice resolved) []
     Spec.assertEqWith s "it was exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
 
+-- CR 702.34a's OTHER conditional, the one on its second static ability: "IF THE
+-- FLASHBACK COST WAS PAID, exile this card instead of putting it anywhere else
+-- any time it would leave the stack." A card that has flashback and is cast
+-- from a graveyard for some other cost is not exiled, and the clause is the
+-- only thing that says so.
+--
+-- The producer is a LABELED SYNTHETIC, "Synthetic Grave Recital" {2}{B} Sorcery:
+-- "Until end of turn, you may cast instant and sorcery cards from your
+-- graveyard." That is Yawgmoth's Will's first sentence with its second one --
+-- the rider that exiles everything of yours heading for a graveyard this turn --
+-- left off, and the rider is exactly why the pool's own printing cannot observe
+-- this: with it, the right answer and the wrong answer are both exile.
+--
+-- The real printing is Harness the Storm ({2}{R} Enchantment, "Whenever you cast
+-- an instant or sorcery spell from your hand, you may cast target card with the
+-- same name as that spell from your graveyard"), and pawl cannot yet write it:
+-- Pawl.Types.SpellCast has no zone axis for "from your hand" (#1613) and
+-- Pawl.Types.Filter cannot compare names (#1614). It replaces this synthetic
+-- when they land.
+--
+-- The pair of boards is ONE board and two answerers, so mana, seats, timing and
+-- stock cannot be the difference: the permission and the flashback cost are both
+-- available and both payable, and the only thing that varies is which candidate
+-- CR 601.2b's announcement settles on.
+graveRecitalSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+graveRecitalSpec s registry = Spec.describe s "GraveRecital" $ do
+  Spec.it s "CR 702.34a the flashback cost exiles the card; the permission's printed cost does not" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    firebolt <- S.printingOf s registry "Firebolt"
+    recital <- S.printingOf s registry "Synthetic Grave Recital"
+    let base = S.landsFor swamp S.alice 3 (S.landsInPlay mountain 7)
+        (inGraveyard, gs1) = S.addGraveyardCard firebolt S.alice base
+        (inHand, gs2) = S.addHandCard recital S.alice gs1
+        board = aliceOnTurn gs2
+        permitted = S.runPure S.identityAnswer (S.runPure S.identityAnswer board (S.cast S.alice inHand)) Stack.resolveTop
+        -- CR 601.2b's announcement, answered by naming a cost rather than an
+        -- index: the flashback {4}{R} and the printed {R} share no reading.
+        paying :: [ManaSymbol.ManaSymbol] -> Prompt.Prompt r -> r
+        paying wanted p = case p of
+          Prompt.ChooseCost _ _ _ candidates ->
+            Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost wanted)) . Cost.Type.mana) candidates)
+          _ -> S.identityAnswer p
+        payingFlashback, payingPrinted :: Prompt.Prompt r -> r
+        payingFlashback = paying [ManaSymbol.Generic 4, theRed]
+        payingPrinted = paying [theRed]
+        castFor, resolveWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+        castFor answer = S.runPure answer permitted (S.cast S.alice inGraveyard)
+        resolveWith answer = S.runPure answer (castFor answer) Stack.resolveTop
+        flashedBack = resolveWith payingFlashback
+        boughtBack = resolveWith payingPrinted
+        boltsIn zone gs = length (filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (S.printingName firebolt)) (Game.zoneMembers zone S.alice gs))
+    Spec.assertEqWith
+      s
+      "both costs are on offer from the graveyard"
+      (fmap Cost.Type.mana (Cost.costsFor (S.printingName firebolt) inGraveyard permitted))
+      [Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, theRed]), Just (ManaCost.MkManaCost [theRed])]
+    Spec.assertEqWith s "the flashback cast dealt its 2" (S.lifeOf S.alice flashedBack) (Just 18)
+    Spec.assertEqWith s "and the card was exiled (CR 702.34a)" (boltsIn Zone.Exile flashedBack) 1
+    Spec.assertEqWith s "not put into the graveyard" (boltsIn Zone.Graveyard flashedBack) 0
+    Spec.assertEqWith s "the printed-cost cast dealt its 2 as well" (S.lifeOf S.alice boughtBack) (Just 18)
+    Spec.assertEqWith s "and the card was NOT exiled, since the flashback cost was not paid" (boltsIn Zone.Exile boughtBack) 0
+    Spec.assertEqWith s "it went to the graveyard" (boltsIn Zone.Graveyard boughtBack) 1
+
 flashbackCardTypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
   Spec.it s "CR 702.34a a creature card with flashback is not castable from the graveyard" $ do
@@ -2773,6 +2837,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   fireboltSpec s registry
   flashbackCardTypeSpec s registry
   grantedFlashbackSpec s registry
+  graveRecitalSpec s registry
   jumpStartSpec s registry
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry

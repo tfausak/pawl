@@ -1102,31 +1102,49 @@ foretellCost keywords =
 -- only place a spell leaves the stack for in this pool (CR 608.2n, the CR 608.2b
 -- fizzle, CR 701.6a's counter) (#293).
 --
--- Not gated on the clause each of the three rules puts in front of it -- rule
--- 702.34a's "if the flashback cost was paid", rule 702.133a's "if this spell was
--- cast using its jump-start ability": nothing here can see which cost was paid
--- (#101). Pawl.Engine.Cast installs this only for a spell cast FROM THE
--- GRAVEYARD, where the two coincide.
+-- GATED on the clause each of the three rules puts in front of it, and the
+-- three clauses are not the same question. `castFor` is the keyword whose
+-- candidate cost the cast was announced for (Pawl.Engine.Cost.candidateCostsFor,
+-- settled by Pawl.Engine.Cast.castProposed), which is what rule 702.34a's "if
+-- the flashback cost was paid" and rule 702.133a's "if this spell was cast using
+-- its jump-start ability" each ask about; rule 702.127a's aftermath asks only
+-- whether the cast came from a graveyard, which the caller has established
+-- before it calls at all.
 --
 -- The door Pawl.Engine.Cast uses, so that module installs a REPLACEMENT EFFECT
 -- it never inspects rather than asking which of the three keywords a card has.
-castFromGraveyardReplacementsOf :: Set Keyword -> [ReplacementEffect (Effect.Effect Card)]
-castFromGraveyardReplacementsOf keywords =
-  [castFromGraveyardExile | Maybe.isJust (flashbackCost keywords)]
-    -- CR 702.127a's THIRD static ability: "if this spell was cast from a
-    -- graveyard, exile it instead of putting it anywhere else any time it would
-    -- leave the stack" -- word for word CR 702.34a's second ability, so it is the
-    -- same effect and not a sibling. Both are installed by Pawl.Engine.Cast on the
-    -- stack incarnation, and only when the cast really came from a graveyard,
-    -- which is the "if this spell was cast from a graveyard" condition.
-    <> [castFromGraveyardExile | Set.member Keyword.Aftermath keywords]
-    -- CR 702.133a's SECOND static ability, "if this spell was cast using its
-    -- jump-start ability, exile this card instead of putting it anywhere else any
-    -- time it would leave the stack" -- the third rule to print that sentence, so
-    -- the third to share the one effect. Its "using its jump-start ability" is
-    -- flashback's "if the flashback cost was paid" under another name and carries
-    -- flashback's gap (#101) with it.
-    <> [castFromGraveyardExile | hasJumpStart keywords]
+castFromGraveyardReplacementsOf :: Set Keyword -> Maybe Keyword -> [ReplacementEffect (Effect.Effect Card)]
+castFromGraveyardReplacementsOf keywords castFor =
+  let paidFor keyword = castFor == Just keyword
+   in -- The cost the cast PAID FOR, and not merely a flashback the card has:
+      -- Pawl.Engine.Cost offers the flashback cost from the same graveyard that
+      -- a CR 601.3 permission offers the printed cost from, and paying the
+      -- latter leaves rule 702.34a's clause unsatisfied.
+      --
+      -- Compared against the cost-bearing keyword itself, which is how a card
+      -- with two flashback abilities (#294) answers for the one it was cast
+      -- for rather than for both.
+      [castFromGraveyardExile | any paidFor (Maybe.maybeToList (fmap Keyword.Flashback (flashbackCost keywords)))]
+        -- CR 702.127a's THIRD static ability: "if this spell was cast from a
+        -- graveyard, exile it instead of putting it anywhere else any time it would
+        -- leave the stack" -- word for word CR 702.34a's second ability, so it is the
+        -- same effect and not a sibling. Both are installed by Pawl.Engine.Cast on the
+        -- stack incarnation, and only when the cast really came from a graveyard,
+        -- which is the "if this spell was cast from a graveyard" condition.
+        --
+        -- The one of the three that does NOT read `castFor`: rule 702.127a
+        -- conditions its exile on the zone alone, so an aftermath half cast
+        -- from a graveyard for any cost is exiled.
+        <> [castFromGraveyardExile | Set.member Keyword.Aftermath keywords]
+        -- CR 702.133a's SECOND static ability, "if this spell was cast using its
+        -- jump-start ability, exile this card instead of putting it anywhere else any
+        -- time it would leave the stack" -- the third rule to print that sentence, so
+        -- the third to share the one effect. Its "using its jump-start ability" is
+        -- flashback's "if the flashback cost was paid" under another name, and reads
+        -- the same record: the jump-start candidate is the printed cost plus rule
+        -- 702.133a's discard, which a permission offering the printed cost alone is
+        -- not.
+        <> [castFromGraveyardExile | hasJumpStart keywords, paidFor Keyword.JumpStart]
 
 castFromGraveyardExile :: ReplacementEffect (Effect.Effect Card)
 castFromGraveyardExile =
