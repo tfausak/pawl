@@ -26,34 +26,45 @@ import qualified Pawl.Types.Affected as Affected
 -- it: after the layer system has run, never inside it. Pawl.Engine.BlockRequirement is
 -- the only module that reads it; Pawl.Engine.Projection never sees it.
 --
--- ONE requirement shape, which is the one the pool prints as a STATIC ability:
--- "all creatures able to block X do so". The two axes CR 509.1c implies -- WHICH
--- creatures are required, and WHAT they must block -- are collapsed to the
--- second, because "all creatures" is the only subject any static printing here
--- has. A static requirement with a narrower subject, and the subjectless "blocks
--- each combat if able" shape, are unrepresentable (#341).
+-- BOTH axes CR 509.1c implies -- WHICH creatures are required, and WHAT they
+-- must block -- each optional, Nothing being "unrestricted on that axis". Lure
+-- and Nemesis Mask print the object alone ("all creatures able to block
+-- enchanted creature do so"); Razorgrass Screen prints the subject alone ("this
+-- creature blocks each combat if able"), naming no attacker at all.
 --
--- Pawl.Types.ActiveBlockRequirement is the sibling that carries both axes, and it
--- is not a widening of this one: it is the RESOLUTION-created carrier (CR 702.39a's
--- provoke), where the creature is named by targeting and so is one object rather
--- than an affected set.
+-- Pawl.Types.ActiveBlockRequirement is the sibling that carries both axes as
+-- bare ObjectIds, and it is still not a widening of this one: it is the
+-- RESOLUTION-created carrier (CR 702.39a's provoke), where the creature is named
+-- by targeting and so is one object rather than an affected set. Reshaping this
+-- carrier to ObjectIds would freeze a set CR 611.2c keeps dynamic; reshaping
+-- that one to Affecteds would fabricate a set where targeting chose one object.
 --
 -- Gathered LIVE from the battlefield on every read and never captured, the
 -- posture both siblings take -- so a Lure leaving the battlefield lifts its
 -- requirement with nothing to unwind.
-newtype BlockRequirement = MkBlockRequirement
-  { -- | Which attacking creature every able creature must block. An Affected, and
-    -- not a bare ObjectId, because two printings in the pool already name that
-    -- creature two different ways: an Aura's requirement names Affected.Attached
-    -- (CR 303.4m) -- Lure -- while a creature's names its own source,
-    -- Affected.Matching Filter.IsSource -- Prized Unicorn.
+data BlockRequirement = MkBlockRequirement
+  { -- | CR 509.1c's SUBJECT axis: which creatures are required to block. Nothing
+    -- is "all creatures able to", which is what Lure, Nemesis Mask, Alluring
+    -- Scent and Prized Unicorn print. Just names a narrower set -- Razorgrass
+    -- Screen's requirement is on ITSELF, Affected.Matching Filter.IsSource.
+    subject :: Maybe Affected.Affected,
+    -- | CR 509.1c's OBJECT axis: which attacking creature they must block.
+    -- Nothing is "each combat", naming no attacker: the requirement instantiates
+    -- one pair per attacker the subject may legally block, and CR 509.1a is what
+    -- makes obeying ONE of them the maximum, since a creature blocks one
+    -- attacker unless something says otherwise.
     --
-    -- Neither is ever frozen, and CR 611.2c is why a resolution-created
+    -- An Affected, and not a bare ObjectId, because two printings in the pool
+    -- already name that creature two different ways: an Aura's requirement names
+    -- Affected.Attached (CR 303.4m) -- Lure -- while a creature's names its own
+    -- source, Affected.Matching Filter.IsSource -- Prized Unicorn.
+    --
+    -- Neither axis is ever frozen, and CR 611.2c is why a resolution-created
     -- requirement would not be either: a continuous effect that modifies the
     -- rules rather than any object's characteristics can affect objects that were
     -- not affected when it began, and CR 613.11 classifies a requirement as
-    -- exactly that. So Affected.TheseObjects is the one arm this field has no use
-    -- for.
-    attacker :: Affected.Affected
+    -- exactly that. So Affected.TheseObjects is the one arm these fields have no
+    -- use for.
+    attacker :: Maybe Affected.Affected
   }
   deriving (Eq, Ord, Show)

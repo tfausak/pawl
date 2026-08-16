@@ -35,7 +35,7 @@ data ActiveBlockRequirement = MkActiveBlockRequirement
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
     -- | The creature that must block -- CR 509.1c's subject axis, which the
-    -- printed carrier collapses to "all creatures" (#341).
+    -- printed carrier states as an Affected for the reason given above.
     blocker :: ObjectId.ObjectId,
     -- | The attacking creature it must block.
     attacker :: ObjectId.ObjectId

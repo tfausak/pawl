@@ -71,11 +71,15 @@ import qualified Pawl.Types.LimitUnless as LimitUnless
 -- PAID rather than a fact to be read, and CR 508.1d makes paying it optional, so
 -- it could not be a Condition either.
 --
--- One axis is still missing rather than collapsed, and the missing capability is
--- named: an attacking restriction with an object (Crown-Hunter Hireling, Armored
--- Galleon) is one whose CONDITION is about the player CR 508.1b names per
--- creature, and the condition below cannot name that player (#620). The blocking
--- side's object is CantBeBlockedBy, whose own comment says why a keyword on the
+-- A restriction whose CONDITION is about the DEFENDING PLAYER (Armored Galleon,
+-- Crown-Hunter Hireling) needs no arm of its own: the condition below says it,
+-- through Pawl.Types.Filter.ControlledByDefendingPlayer, and
+-- Pawl.Engine.CombatRestriction.inForce is what supplies CR 508.5's answer.
+--
+-- NOT IMPLEMENTED: an attacking restriction naming WHAT the attack is aimed at
+-- (Blazing Archon, "creatures can't attack you"), which is CR 508.1b's
+-- per-creature announcement rather than a condition (#1686). The blocking side's
+-- object is CantBeBlockedBy, whose own comment says why a keyword on the
 -- attacker could not have carried CR 701.54c's clause.
 --
 -- Open-half card data, classified rather than identified:

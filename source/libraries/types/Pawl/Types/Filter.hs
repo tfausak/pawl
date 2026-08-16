@@ -195,7 +195,9 @@ data Filter keyword
     -- Context-relative like PowerLessThanSource, and the same machinery: the
     -- answer depends on the combat record rather than on the candidate, so
     -- Pawl.Engine.Filter.Context's defendingPlayer is where it arrives, filled by
-    -- Pawl.Engine.Target.admittedGiven and Nothing everywhere else. Vacuously
+    -- Pawl.Engine.Target.admittedGiven for a target slot and by
+    -- Pawl.Engine.CombatRestriction.inForce for a CR 508.1c gate (Armored
+    -- Galleon), and Nothing everywhere else. Vacuously
     -- False when either player is absent -- a source that is not attacking has no
     -- defending player.
     ControlledByDefendingPlayer

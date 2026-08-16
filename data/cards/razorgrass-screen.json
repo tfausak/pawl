@@ -1,0 +1,51 @@
+{
+  "faces": [
+    {
+      "blockRequirements": [
+        {
+          "subject": {
+            "type": "Matching",
+            "value": {
+              "type": "IsSource"
+            }
+          }
+        }
+      ],
+      "keywords": [
+        {
+          "type": "Defender"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        }
+      ],
+      "name": "Razorgrass Screen",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Wall"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
