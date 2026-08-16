@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -123,6 +124,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   activationCostReductionSpec s registry
   unflooredActivationCostReductionSpec s registry
   activationCostAdditionSpec s registry
+  goldenEggSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -2535,3 +2537,67 @@ activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition"
     Spec.assertEqWith s "the nontoken Rebel is taxed and cannot pay" (activationsOf reclusId actions) []
     Spec.assertBool s (not (null (activationsOf sorcererId actions))) "the nonRebel is untaxed"
     Spec.assertBool s (not (null (activationsOf tokenId actions))) "and so is the token Rebel"
+
+-- Golden Egg ({2} Artifact -- Food): "When this artifact enters, draw a card. /
+-- {1}, {T}, Sacrifice this artifact: Add one mana of any color. / {2}, {T},
+-- Sacrifice this artifact: You gain 3 life." The pool's first permanent with CR
+-- 205.3g's Food artifact type, added so that
+-- Asmoranomardicadaistinaculdacar's "Sacrifice two Foods" has something to pay
+-- with -- Pawl.CostSpec's asmorSpec is where that cost is exercised, and this
+-- group is the Egg's own three clauses, so a transcription short of the printing
+-- fails here rather than passing unnoticed.
+goldenEggSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+goldenEggSpec s registry = Spec.describe s "Golden Egg" $ do
+  -- The clause every Food shares, and the one that makes the Egg a real card
+  -- rather than a bare type line: {2} from two Islands, CR 107.5's tap and CR
+  -- 701.21a's sacrifice, then three life.
+  Spec.it s "CR 701.21a whole card: {2}, {T}, Sacrifice this artifact: You gain 3 life" $ do
+    goldenEgg <- S.printingOf s registry "Golden Egg"
+    island <- S.printingOf s registry "Island"
+    let (eggId, g0) = S.addCreature goldenEgg S.alice (S.landsInPlay island 2)
+        gs = g0 {GameState.priority = Just S.alice}
+        activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice eggId (lifeGainAbility goldenEgg))
+        resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+    Spec.assertBool s (Set.member Subtype.Food (Projection.subtypesOf eggId gs)) "CR 205.3g it is a Food"
+    Spec.assertBool s (not (Set.member eggId (GameState.battlefield activated))) "the cost sacrificed it"
+    Spec.assertEqWith s "and both Islands paid the {2}" (S.tappedCount S.alice activated) 2
+    Spec.assertEqWith s "alice was at 20 while the ability was on the stack" (S.lifeOf S.alice activated) (Just 20)
+    Spec.assertEqWith s "and gains three when it resolves" (S.lifeOf S.alice resolved) (Just 23)
+  -- The other activated clause. CR 605.1a classifies it -- it adds mana, needs no
+  -- target and is not a loyalty ability -- so it never reaches the stack, and the
+  -- pair of answers here is what pins the two abilities apart rather than
+  -- assuming an order.
+  Spec.it s "CR 605.1a/105.4 the {1}, {T}, Sacrifice ability is a mana ability offering the five colours" $ do
+    goldenEgg <- S.printingOf s registry "Golden Egg"
+    let (eggId, gs) = S.addCreature goldenEgg S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith
+      s
+      "the mana ability first, the life gain second"
+      (fmap ManaAbility.isManaAbility (Face.activatedAbilities (S.combinedFace goldenEgg)))
+      [True, False]
+    Spec.assertEqWith
+      s
+      "CR 105.4 five colours, never colourless"
+      (Set.fromList (Mana.manaTypesOf eggId gs))
+      (Set.fromList (fmap ManaType.Colored [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]))
+  -- And the triggered clause, off the same enters event Pawl.ModalSpec's fixture
+  -- uses. The card is drawn when the trigger RESOLVES, not when it is placed.
+  Spec.it s "CR 603.2 its enters trigger draws a card" $ do
+    goldenEgg <- S.printingOf s registry "Golden Egg"
+    island <- S.printingOf s registry "Island"
+    let (_, g0) = S.entersWithTrigger goldenEgg S.alice (Setup.emptyGame S.bothPlayers)
+        (_, gs) = S.addLibraryCard island S.alice g0
+        placed = S.runPure S.identityAnswer gs Engine.placePendingTriggers
+        resolved = S.runPure S.identityAnswer placed Stack.resolveTop
+    Spec.assertEqWith s "the trigger is on the stack" (length (GameState.stack placed)) 1
+    Spec.assertEqWith s "and nothing is drawn yet" (S.handSize S.alice placed) 0
+    Spec.assertEqWith s "one card drawn when it resolves" (S.handSize S.alice resolved) 1
+    Spec.assertEqWith s "out of her library" (length (Game.zoneMembers Zone.Library S.alice resolved)) 0
+
+-- Golden Egg's SECOND activated ability -- the life gain, not the mana ability
+-- theAbility above would pick. Total: the fallback is unreachable for a printing
+-- with two.
+lifeGainAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
+lifeGainAbility p = case Face.activatedAbilities (S.combinedFace p) of
+  _ : ab : _ -> ab
+  _ -> theAbility p
