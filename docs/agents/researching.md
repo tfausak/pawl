@@ -23,6 +23,11 @@ You do not hold the build. Another agent does, and it is building right now.
   repos/tfausak/pawl/issues/N` and `.../issues/N/comments`.
 - WebFetch gets 403s from Scryfall. Use `curl` against `api.scryfall.com`.
 - The vendored dumps under `_scratch/` are stale. Never read a card from them.
+  The permissive prior art there (`phase`, `mtgish`, `argentum-engine`) is
+  still worth a grep for a candidate producer or a field shape --- see
+  `docs/agents/implementing.md`. It is a lead, never a citation: verify against
+  `docs/rules.txt` and Scryfall before a finding rests on it. Any of it may be
+  absent, since `_scratch/` is gitignored.
 
 ## Distrust the issue body, and the comments
 
