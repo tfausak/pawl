@@ -2426,7 +2426,9 @@ effectContext controller source legal =
 -- where Vision Skeins' literal gives one number to the whole table. Every opcode
 -- naming a set of players and an amount evaluates through here, once per
 -- recipient, so what "their own" means is stated once rather than opted into arm
--- by arm.
+-- by arm. Effect.DealDamage too, whose set may hold OBJECTS as well as players
+-- (Acidic Soil): recipientSeat is what says whose an object's amount is, and the
+-- PlayerId this takes is the answer rather than the recipient itself.
 --
 -- Two spellings, because a card asks two different questions:
 --

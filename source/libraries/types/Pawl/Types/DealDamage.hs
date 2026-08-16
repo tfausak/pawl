@@ -7,6 +7,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- | CR 120.1: deal this much damage to the objects or players the ObjectRef names.
 data DealDamage = MkDealDamage
   { ref :: ObjectRef.ObjectRef,
+    -- | HOW MUCH, read once per recipient rather than once for the set: Acidic
+    -- Soil's "each player equal to the number of lands they control" is a
+    -- different number per seat. Still one CR 608.2f batch -- see
+    -- Pawl.Engine.Resolve's arm, which reads every recipient's amount off the
+    -- same pre-effect state.
     quantity :: Quantity.Quantity,
     -- | WHICH OBJECT DEALS IT -- CR 120.1's "an object that deals damage is the
     -- source of that damage", which CR 120.2b lets a spell or ability name for
