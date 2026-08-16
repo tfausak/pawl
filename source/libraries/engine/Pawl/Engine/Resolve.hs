@@ -2856,12 +2856,18 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- and a Drawn subgame binds nothing. Shahrazad's rider then says "each player
   -- who doesn't win" as PlayerRef.EachPlayerExcept over that slot, and gets the
   -- drawn case for free: no winner is bound, so nobody is excluded and the whole
-  -- table pays (#138's proving cases in Pawl.GameSpec).
+  -- table pays. Pawl.GameSpec's two Shahrazad cases prove both halves; they are
+  -- one board differing only in alice's library size, which is what decides
+  -- whether the subgame has a winner.
   --
   -- Binding the winner rather than deriving a loser is what makes the set
   -- available at all. A derived loser is one seat, and CR 729.1b's customer asks
   -- about the complement of one seat -- a set the roster answers and a binding
-  -- cannot, since a slot holds one recipient.
+  -- cannot, since a slot holds one recipient. The roster the complement is taken
+  -- against is Game.stillPlaying's (playerRefPlayers), which is the set
+  -- Setup.subgameStateFrom seated: a player who left the main game before this
+  -- resolved never played the subgame, and GameState.turnOrder would still name
+  -- them.
   --
   -- Not implemented: an ability-driven subgame -- this arm runs only on the SPELL
   -- path (#137).
@@ -3682,11 +3688,9 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     -- the reading per-player, and it changes nothing for a quantity that does not
     -- name PlayerRef.Candidate -- every other LoseLife in the pool.
     --
-    -- All of them read the SAME `gs`, so the numbers are the life totals as the
-    -- effect began rather than as the previous payer left them. That is the
-    -- unordered footing the comment above states: CR 704.3 checks state-based
-    -- actions only as a player would get priority, so nothing observes a total
-    -- between one adjustment and the next.
+    -- Every payer's number is read off the SAME `gs`, so the amounts are the life
+    -- totals as the effect began rather than as the previous payer left them --
+    -- which is the unordered footing the comment above already rests on.
     Monad.forM_ losers $ \pid ->
       case Quantity.evaluateFor viewOf context gs resolving source (Quantity.forCandidate pid quantity) of
         Just n

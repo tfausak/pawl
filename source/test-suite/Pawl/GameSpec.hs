@@ -844,7 +844,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- incarnation is not lingering in her hand's member list.
     Spec.assertEqWith s "the subgame spell's original id no longer sits in alice's hand (cast)" (notElem spellId (Game.zoneMembers Zone.Hand S.alice after)) True
 
-  -- #138, CR 729.1b, real Shahrazad: "each player who doesn't win the subgame
+  -- CR 729.1b, real Shahrazad: "each player who doesn't win the subgame
   -- loses half their life, rounded up". Three seats, because at two the
   -- non-winner set and "the loser" coincide; three distinct life totals, because
   -- the amount is read against each payer's own; three distinct library sizes,
@@ -2344,7 +2344,7 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
     Spec.assertEqWith s "and another cleanup step began" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)
     Spec.assertEqWith s "with the turn not yet handed off" (GameState.activePlayer after) S.alice
 
--- #138's board: three seats on distinct life totals, alice holding Shahrazad and
+-- Shahrazad's board: three seats on distinct life totals, alice holding Shahrazad and
 -- two untapped Plains to cast it with, and libraries of `aliceLibrary`, 6 and 4
 -- Mountains. Runs one pass of the priority loop -- long enough for alice to cast
 -- and the spell to resolve -- and hands back the main game afterwards.
