@@ -100,6 +100,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -133,6 +134,7 @@ spec s registry = Spec.describe s "FaceDown" $ do
   turnFaceUpSpec s registry
   turnUpAttachSpec s registry
   turnFaceDownSpec s registry
+  listedSpec s registry
   manifestSpec s registry
 
 -- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
@@ -315,7 +317,7 @@ turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
     Spec.assertEqWith s "the printed 3/3 before" (S.powerToughnessOf morphling gs) (Just (3, 3))
     Spec.assertEqWith s "face up before" (fmap Object.facing (Game.lookupObject morphling gs)) (Just Facing.FaceUp)
     let after = S.runPure (aimAtCreature morphling) gs (Cast.castSpell S.alice spell (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
-    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceDown)
+    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.faceDown)
     Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 3/3" (S.powerToughnessOf morphling after) (Just (2, 2))
     Spec.assertEqWith s "CR 708.2a no name" (Projection.namesOf morphling after) noNames
     Spec.assertEqWith s "CR 708.2a no subtypes, not Dog Scout" (Projection.subtypesOf morphling after) Set.empty
@@ -345,7 +347,7 @@ turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
         gs = tap morphling (S.addCounter CounterKind.PlusOnePlusOne 1 morphling (S.markDamage morphling 1 base))
     Spec.assertEqWith s "the printed 3/3 plus a counter before" (S.powerToughnessOf morphling gs) (Just (4, 4))
     let after = S.runPure (aimAtCreature morphling) gs (Cast.castSpell S.alice spell (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
-    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceDown)
+    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.faceDown)
     Spec.assertEqWith s "CR 708.2a the marked damage survives" (S.damageOf morphling after) (Just 1)
     Spec.assertEqWith s "CR 708.2a the +1/+1 counter survives" (S.counterOf CounterKind.PlusOnePlusOne morphling after) 1
     Spec.assertEqWith s "CR 708.2a it is still tapped" (fmap Object.tapped (Game.lookupObject morphling after)) (Just TapState.Tapped)
@@ -406,6 +408,146 @@ castAndResolve morph facing gs oid =
           (Cast.castSpell S.alice oid (S.printingName morph) facing >> Stack.resolveTop)
    in (after, enteredOne gs after)
 
+-- CR 708.2's real shape: an effect that LISTS characteristics for the permanent
+-- it turns face down, so what the object becomes is neither its printed self nor
+-- CR 708.2a's default.
+--
+-- Cyber Conversion is the card, and the only printing that turns a creature face
+-- down without naming a morph ability: {U}{U} Instant, "Turn target creature
+-- face down. It's a 2/2 Cyberman artifact creature." Transcribed whole -- there
+-- is no clause of it pawl cannot express.
+--
+-- ONE board carries every case. alice controls Ainok Tracker -- {5}{R} 3/3 Dog
+-- Scout with first strike and morph {4}{R} -- and Goblin Piker -- 2/1 Goblin,
+-- no keywords -- with three Islands and five Mountains, and holds the
+-- Conversion and a Backslide. The Backslide is the CR 708.2b leg's first half:
+-- it lists nothing, so it is what puts a permanent face down with a list the
+-- Conversion would visibly overwrite.
+--
+-- THE TRACKER IS THE VICTIM because the listing has to be told apart from TWO
+-- other readings at once, and it differs from both on every axis the rule names:
+--
+--   * against the PRINTED values -- 3/3 to the listed 2/2, Dog Scout to
+--     Cyberman, creature to artifact creature, first strike to no text, a name
+--     to none, red to colourless, mana value 6 to 0;
+--   * against CR 708.2a's DEFAULTS -- no subtypes to Cyberman, creature alone to
+--     artifact creature. The 2/2 is the same either way and proves nothing
+--     against the defaults, which is why the subtype and the card type carry the
+--     case.
+--
+-- The Piker is the untouched control on the same board, and the turn-face-up leg
+-- is the same permanent differing in one thing: CR 708.8 reverts the copiable
+-- values, so the listing has to disappear as cleanly as it arrived.
+listedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+listedSpec s registry = Spec.describe s "Listed characteristics" $ do
+  -- THE PROVING TEST.
+  Spec.it s "CR 708.2 Cyber Conversion's listed characteristics replace both the printed ones and CR 708.2a's defaults" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    backslide <- S.printingOf s registry "Backslide"
+    let (gs, spell, _, victim, bystander) = cyberBoard island mountain cyber backslide ainok piker
+    -- THE BEFORE control: the Tracker is its printed self, so every assertion
+    -- below is about the resolution rather than about the fixture.
+    Spec.assertEqWith s "the printed 3/3 before" (S.powerToughnessOf victim gs) (Just (3, 3))
+    Spec.assertEqWith s "the printed subtypes before" (Projection.subtypesOf victim gs) (Set.fromList [Subtype.Dog, Subtype.Scout])
+    Spec.assertEqWith s "the printed card types before" (Projection.cardTypesOf victim gs) (Set.singleton CardType.Creature)
+    let after = S.runPure (aimAtByFiltering victim) gs (Cast.castSpell S.alice spell (S.printingName cyber) Facing.FaceUp >> Stack.resolveTop)
+    Spec.assertBool s (maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject victim after)) "CR 708.2 it is face down"
+    -- The two axes the listing wins on, and neither reading of the rule produces
+    -- the other's answer.
+    Spec.assertEqWith s "CR 708.2 the listed subtype, not Dog Scout and not CR 708.2a's none" (Projection.subtypesOf victim after) (Set.singleton Subtype.Cyberman)
+    Spec.assertEqWith s "CR 708.2 the listed card types, not CR 708.2a's creature alone" (Projection.cardTypesOf victim after) (Set.fromList [CardType.Artifact, CardType.Creature])
+    -- The listing's own 2/2, which is also CR 708.2a's, so it discriminates
+    -- against the printed 3/3 alone.
+    Spec.assertEqWith s "CR 708.2 the listed 2/2, not the printed 3/3" (S.powerToughnessOf victim after) (Just (2, 2))
+    -- Everything the listing does NOT name is still CR 708.2's "no
+    -- characteristics other than those listed".
+    Spec.assertEqWith s "CR 708.2 no name" (Projection.namesOf victim after) noNames
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike victim after)) "CR 708.2 no text, so no first strike"
+    Spec.assertEqWith s "CR 708.2 no mana cost, so colourless" (Projection.colorsOf victim after) Set.empty
+    Spec.assertEqWith s "CR 202.3a no mana cost, so mana value 0" (Filter.manaValue (Projection.viewOfObject victim after)) (Just 0)
+    -- CR 115.1: one target, one victim.
+    Spec.assertEqWith s "the Piker is still face up" (fmap Object.facing (Game.lookupObject bystander after)) (Just Facing.FaceUp)
+    Spec.assertEqWith s "and still the printed 2/1 Goblin" (S.powerToughnessOf bystander after) (Just (2, 1))
+    Spec.assertEqWith s "and no Cyberman" (Projection.subtypesOf bystander after) (Set.fromList [Subtype.Goblin, Subtype.Warrior])
+
+  -- CR 708.8: "as a face-down permanent is turned face up, its copiable values
+  -- revert to its normal copiable values". The SAME permanent differing in one
+  -- thing, which is what makes the case above about the facing: the listed set
+  -- goes away entire and the printed one comes back entire.
+  --
+  -- CR 702.37e is what licenses the turn-up at all -- the Tracker's morph cost is
+  -- what it "WOULD BE if it were face up", and the rule does not ask how the
+  -- permanent came to be face down.
+  Spec.it s "CR 708.8 turning it face up reverts the listed characteristics to the printed ones" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    backslide <- S.printingOf s registry "Backslide"
+    let (gs, spell, _, victim, _) = cyberBoard island mountain cyber backslide ainok piker
+        down = S.runPure (aimAtByFiltering victim) gs (Cast.castSpell S.alice spell (S.printingName cyber) Facing.FaceUp >> Stack.resolveTop)
+    Spec.assertEqWith s "the listed subtype while face down" (Projection.subtypesOf victim down) (Set.singleton Subtype.Cyberman)
+    let up = S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.alice victim)
+    Spec.assertEqWith s "CR 708.8 face up again" (fmap Object.facing (Game.lookupObject victim up)) (Just Facing.FaceUp)
+    Spec.assertEqWith s "CR 708.8 the printed 3/3 is back" (S.powerToughnessOf victim up) (Just (3, 3))
+    Spec.assertEqWith s "CR 708.8 the printed subtypes are back, and no Cyberman" (Projection.subtypesOf victim up) (Set.fromList [Subtype.Dog, Subtype.Scout])
+    Spec.assertEqWith s "CR 708.8 the printed card types are back" (Projection.cardTypesOf victim up) (Set.singleton CardType.Creature)
+    Spec.assertEqWith s "CR 708.8 the printed name is back" (Projection.namesOf victim up) (Set.singleton (S.printingName ainok))
+    Spec.assertBool s (Projection.hasKeyword Keyword.FirstStrike victim up) "CR 708.8 and first strike"
+
+  -- CR 708.2b: "a face-down permanent can't be turned face down ... nothing
+  -- happens and that effect doesn't change any of its characteristics or their
+  -- copiable values".
+  --
+  -- Backslide FIRST, and that ordering is the whole discriminator: it lists
+  -- nothing, so the Tracker goes face down with CR 708.2a's subtype-less
+  -- default, and a Conversion that wrongly took effect would overwrite it with
+  -- Cyberman. Two listings that differed in nothing could not tell "the rule
+  -- stopped it" from "it happened again".
+  Spec.it s "CR 708.2b Cyber Conversion does nothing to a permanent that is already face down" $ do
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    cyber <- S.printingOf s registry "Cyber Conversion"
+    backslide <- S.printingOf s registry "Backslide"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, spell, slide, victim, _) = cyberBoard island mountain cyber backslide ainok piker
+        down = S.runPure (aimAtByFiltering victim) gs (Cast.castSpell S.alice slide (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 708.2a Backslide's default list, no subtypes" (Projection.subtypesOf victim down) Set.empty
+    let after = S.runPure (aimAtByFiltering victim) down (Cast.castSpell S.alice spell (S.printingName cyber) Facing.FaceUp >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 708.2b still no subtypes, not Cyberman" (Projection.subtypesOf victim after) Set.empty
+    Spec.assertEqWith s "CR 708.2b still creature alone, not artifact creature" (Projection.cardTypesOf victim after) (Set.singleton CardType.Creature)
+    Spec.assertEqWith s "CR 708.2b the copiable values are untouched" (fmap Object.facing (Game.lookupObject victim after)) (Just Facing.faceDown)
+
+-- alice with three untapped Islands -- {U}{U} for the Conversion and {1}{U} for
+-- the Backslide -- five Mountains for the Tracker's {4}{R} morph cost, both
+-- spells in hand, and the Tracker and the Piker on the battlefield. Returns the
+-- board, the Conversion, the Backslide, the victim and the bystander.
+--
+-- Every leg is stocked for the LONGEST of them, so no negative here can pass for
+-- want of mana.
+cyberBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+cyberBoard island mountain cyber backslide ainok piker =
+  let (gs0, spell) = S.handOne cyber (S.landsFor mountain S.alice 5 (S.landsInPlay island 3))
+      (gs1, slide) = S.handOne backslide gs0
+      (victim, gs2) = S.addCreature ainok S.alice gs1
+      (bystander, gs3) = S.addCreature piker S.alice gs2
+   in (gs3, spell, slide, victim, bystander)
+
+-- A target slot answered by FILTERING the offered set down to the named
+-- permanent. Never by building a Recipient: the pool decides which constructor
+-- the offer wears, and a hand-built one of another shape is a different
+-- recipient that CR 608.2b's re-read at resolution drops silently.
+aimAtByFiltering :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtByFiltering oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, offered) -> Set.filter (\r -> Recipient.objectOf r == Just oid) offered) sets
+  _ -> S.identityAnswer p
+
 -- CR 702.37d: "You can't normally cast a card face down. A morph ability allows
 -- you to do so." Two casts of one card, offered side by side and gated apart.
 offerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -421,7 +563,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     let (gs, oid) = morphBoard mountain ainok 3
         offered = Action.legalActions S.alice gs
         name = S.printingName ainok
-    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.FaceDown) offered) "the face-down cast is offered"
+    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.faceDown) offered) "the face-down cast is offered"
     Spec.assertBool s (notElem (Action.Type.Cast oid name Facing.FaceUp) offered) "the {5}{R} cast is not"
 
   -- Six Mountains pay either, so both actions stand on the menu at once and the
@@ -433,7 +575,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     let (gs, oid) = morphBoard mountain ainok 6
         offered = Action.legalActions S.alice gs
         name = S.printingName ainok
-    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.FaceDown) offered) "the face-down cast is offered"
+    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.faceDown) offered) "the face-down cast is offered"
     Spec.assertBool s (elem (Action.Type.Cast oid name Facing.FaceUp) offered) "and so is the {5}{R} one"
 
   -- A card with no morph ability offers no face-down cast at all: the offer
@@ -444,7 +586,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
     let (gs, oid) = morphBoard mountain piker 6
         offered = Action.legalActions S.alice gs
     Spec.assertBool s (elem (Action.Type.Cast oid (S.printingName piker) Facing.FaceUp) offered) "the ordinary cast is offered"
-    Spec.assertBool s (notElem (Action.Type.Cast oid (S.printingName piker) Facing.FaceDown) offered) "and no face-down one is"
+    Spec.assertBool s (notElem (Action.Type.Cast oid (S.printingName piker) Facing.faceDown) offered) "and no face-down one is"
 
   -- CR 708.4: "effects that care about the characteristics of a spell will see
   -- only the face-down spell's characteristics", and CR 702.37c says the same of
@@ -470,7 +612,7 @@ offerSpec s registry = Spec.describe s "Offer" $ do
         offered = Action.legalActions S.alice gs
         name = S.printingName ainok
     Spec.assertBool s (notElem (Action.Type.Cast oid name Facing.FaceUp) offered) "the named card cannot be cast face up"
-    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.FaceDown) offered) "but the morph cast is nameless and still offered"
+    Spec.assertBool s (elem (Action.Type.Cast oid name Facing.faceDown) offered) "but the morph cast is nameless and still offered"
 
 -- Put a set of chosen card names onto a permanent (CR 201.4 / 614.1c).
 withChosenNames :: ObjectId.ObjectId -> Set.Set CardName.CardName -> GameState.GameState -> GameState.GameState
@@ -487,7 +629,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     mountain <- S.printingOf s registry "Mountain"
     ainok <- S.printingOf s registry "Ainok Tracker"
     let (gs, oid) = morphBoard mountain ainok 3
-        (after, entered) = castAndResolve ainok Facing.FaceDown gs oid
+        (after, entered) = castAndResolve ainok Facing.faceDown gs oid
     case entered of
       Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
       Just permanent -> do
@@ -498,7 +640,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
         -- CR 110.5 / 708.4's last sentence: the permanent the spell becomes is a
         -- face-down permanent, so the status survived the stack-to-battlefield
         -- move CR 400.7 would otherwise forget.
-        Spec.assertEqWith s "CR 708.4 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceDown)
+        Spec.assertEqWith s "CR 708.4 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.faceDown)
     -- CR 702.37a: {3} was paid, not {5}{R}. Three Mountains were in play and all
     -- three are tapped, which is the whole board.
     Spec.assertEqWith s "CR 702.37a three mana paid" (S.tappedCount S.alice after) 3
@@ -510,7 +652,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     mountain <- S.printingOf s registry "Mountain"
     ainok <- S.printingOf s registry "Ainok Tracker"
     let (gs, oid) = morphBoard mountain ainok 3
-        (after, entered) = castAndResolve ainok Facing.FaceDown gs oid
+        (after, entered) = castAndResolve ainok Facing.faceDown gs oid
     case entered of
       Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
       Just permanent ->
@@ -555,7 +697,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
       (Just (shortGs, shortId), Just (enoughGs, enoughId)) -> do
         -- Both boards really do carry a face-down permanent, so the empty
         -- answer below is the COST failing and not the permanent missing.
-        Spec.assertEqWith s "the short board has a face-down permanent" (fmap Object.facing (Game.lookupObject shortId shortGs)) (Just Facing.FaceDown)
+        Spec.assertEqWith s "the short board has a face-down permanent" (fmap Object.facing (Game.lookupObject shortId shortGs)) (Just Facing.faceDown)
         Spec.assertEqWith s "four untapped Mountains cannot pay {4}{R}" (FaceDown.turnableFaceUp S.alice shortGs) []
         Spec.assertEqWith s "five can" (FaceDown.turnableFaceUp S.alice enoughGs) [enoughId]
       _ -> Spec.assertFailure s "the morph cast did not reach the battlefield"
@@ -705,7 +847,7 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
       Just (before, permanent) -> do
         Spec.assertEqWith s "two Mountains cannot pay {2}{R}" (FaceDown.turnableFaceUp S.alice before) []
         let after = S.runPure (aimAt S.bob) before (FaceDown.turnFaceUp S.alice permanent >> Engine.priorityLoop)
-        Spec.assertEqWith s "CR 702.37e it is still face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceDown)
+        Spec.assertEqWith s "CR 702.37e it is still face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.faceDown)
         Spec.assertEqWith s "and bob took nothing" (S.lifeOf S.bob after) (Just 20)
 
   -- CR 603.2 through the bearer: the ability fires for the permanent it is ON and
@@ -724,8 +866,8 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
     marauder <- S.printingOf s registry "Skirk Marauder"
     let (base, firstCard) = S.handOne marauder (S.landsInPlay mountain 12)
         (secondCard, both) = S.addHandCard marauder S.alice base
-        (afterFirst, firstEntered) = castAndResolve marauder Facing.FaceDown both firstCard
-        (afterSecond, secondEntered) = castAndResolve marauder Facing.FaceDown afterFirst secondCard
+        (afterFirst, firstEntered) = castAndResolve marauder Facing.faceDown both firstCard
+        (afterSecond, secondEntered) = castAndResolve marauder Facing.faceDown afterFirst secondCard
     case (firstEntered, secondEntered) of
       (Just one, Just two) -> do
         let flippedOne = S.runPure (aimAt S.bob) afterSecond (FaceDown.turnFaceUp S.alice one >> Engine.priorityLoop)
@@ -905,7 +1047,7 @@ farseerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> I
 farseerBoard land farseer morph n =
   let (gs0, card) = morphBoard land morph n
       (watcher, gs1) = S.addCreature farseer S.alice gs0
-      (after, entered) = castAndResolve morph Facing.FaceDown gs1 card
+      (after, entered) = castAndResolve morph Facing.faceDown gs1 card
    in fmap (\permanent -> (after, watcher, permanent)) entered
 
 -- The one target slot of Skirk Marauder's ability, answered with `who` rather
@@ -936,7 +1078,7 @@ giftBoard land piker mammoth gift =
       (fodder, gs1) = S.addCreature piker S.alice gs0
       (mine, gs2) = S.addCreature mammoth S.alice gs1
       (theirs, gs3) = S.addCreature piker S.bob gs2
-      (after, entered) = castAndResolve gift Facing.FaceDown gs3 card
+      (after, entered) = castAndResolve gift Facing.faceDown gs3 card
    in fmap (\aura -> (after, fodder, mine, theirs, aura)) entered
 
 -- Both of Gift of Doom's turn-up questions: the morph cost's CR 701.21a
@@ -989,7 +1131,7 @@ manifestSpec s registry = Spec.describe s "Manifest" $ do
         Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 5/3" (S.powerToughnessOf permanent after) (Just (2, 2))
         Spec.assertEqWith s "CR 708.2a no name, not Thragtusk" (Projection.namesOf permanent after) noNames
         Spec.assertEqWith s "CR 708.2a no subtypes, not Beast" (Projection.subtypesOf permanent after) Set.empty
-        Spec.assertEqWith s "CR 110.5 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceDown)
+        Spec.assertEqWith s "CR 110.5 it is face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.faceDown)
         -- CR 400.7: the card that left the library is gone, and the permanent is
         -- a new incarnation of it rather than the same object relabelled.
         Spec.assertBool s (permanent /= topId) "the permanent is a new incarnation (CR 400.7)"
@@ -1073,5 +1215,5 @@ putOntoBattlefield faceDown oid gs =
 faceDownWith :: Printing.Printing -> Printing.Printing -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId)
 faceDownWith land morph n =
   let (gs, oid) = morphBoard land morph n
-      (after, entered) = castAndResolve morph Facing.FaceDown gs oid
+      (after, entered) = castAndResolve morph Facing.faceDown gs oid
    in fmap (\permanent -> (after, permanent)) entered

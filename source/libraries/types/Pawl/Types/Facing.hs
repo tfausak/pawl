@@ -1,5 +1,7 @@
 module Pawl.Types.Facing where
 
+import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
+
 -- | CR 110.5: one of the four status categories a permanent always has a value
 -- for -- face up or face down. TapState's sibling, and deliberately a second
 -- type rather than more constructors on it: CR 110.5 makes the four categories
@@ -19,5 +21,22 @@ module Pawl.Types.Facing where
 -- is that other thing, and its own haddock has the rest of the distinction.
 data Facing
   = FaceUp
-  | FaceDown
+  | -- | CR 708.2: the FaceDown arm carries the characteristics the ability or
+    -- rules that allowed the object to be face down LISTED for it, because that
+    -- list is the whole of what the object is and nothing else in the game state
+    -- records what turned it over. Morph and the rest list nothing and carry
+    -- FaceDownCharacteristics.defaultValue.
+    FaceDown FaceDownCharacteristics.FaceDownCharacteristics
   deriving (Eq, Ord, Show)
+
+-- | CR 708.2a's face-down status -- what every producer that lists no
+-- characteristics writes.
+faceDown :: Facing
+faceDown = FaceDown FaceDownCharacteristics.defaultValue
+
+-- | Whether an object is face down at all, for a reader that wants the CR 110.5
+-- STATUS rather than the list on it.
+isFaceDown :: Facing -> Bool
+isFaceDown x = case x of
+  FaceUp -> False
+  FaceDown _ -> True

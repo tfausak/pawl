@@ -108,6 +108,7 @@ import qualified Pawl.Codec.ExileCardsFromGraveyardSpec
 import qualified Pawl.Codec.ExileHauntingSpec
 import qualified Pawl.Codec.ExpirySpec
 import qualified Pawl.Codec.ExtraPhaseSpec
+import qualified Pawl.Codec.FaceDownCharacteristicsSpec
 import qualified Pawl.Codec.FaceSpec
 import qualified Pawl.Codec.FilterSpec
 import qualified Pawl.Codec.ForEachSpec
@@ -236,6 +237,7 @@ import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
 import qualified Pawl.Codec.TriggerLimitSpec
 import qualified Pawl.Codec.TriggeredAbilitySpec
+import qualified Pawl.Codec.TurnFaceDownSpec
 import qualified Pawl.Codec.TurnScopeSpec
 import qualified Pawl.Codec.TurnUpRSpec
 import qualified Pawl.Codec.TurnUpRewriteSpec
@@ -495,6 +497,7 @@ spec s registry = do
   Pawl.Codec.ExileHauntingSpec.spec s
   Pawl.Codec.ExpirySpec.spec s
   Pawl.Codec.ExtraPhaseSpec.spec s
+  Pawl.Codec.FaceDownCharacteristicsSpec.spec s
   Pawl.Codec.FaceSpec.spec s
   Pawl.Codec.FilterSpec.spec s
   Pawl.Codec.ForEachSpec.spec s
@@ -627,6 +630,7 @@ spec s registry = do
   Pawl.Codec.TurnUpRSpec.spec s
   Pawl.Codec.TurnUpRewriteSpec.spec s
   Pawl.Codec.TurnWindowSpec.spec s
+  Pawl.Codec.TurnFaceDownSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
   Pawl.Codec.UntapRestrictionSpec.spec s
   Pawl.Codec.UsesSpec.spec s

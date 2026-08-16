@@ -1,0 +1,15 @@
+Build profile: -w ghc-9.14.1 -O1
+In order, the following will be built (use -v for more details):
+ - pawl-0.2026.8.15 (test:pawl-test-suite) (file source/test-suite/Pawl/FaceDownSpec.hs changed)
+Preprocessing test suite 'pawl-test-suite' for pawl-0.2026.8.15...
+Building test suite 'pawl-test-suite' for pawl-0.2026.8.15...
+[27 of 62] Compiling Pawl.FaceDownSpec ( source/test-suite/Pawl/FaceDownSpec.hs, dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.8.15/t/pawl-test-suite/build/pawl-test-suite/pawl-test-suite-tmp/Pawl/FaceDownSpec.o ) [Source file changed]
+[63 of 63] Linking dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.8.15/t/pawl-test-suite/build/pawl-test-suite/pawl-test-suite [Objects changed]
+Running 1 test suites...
+Test suite pawl-test-suite: RUNNING...
+
+All 5425 tests passed (36.26s)
+Test suite pawl-test-suite: PASS
+Test suite logged to:
+/Volumes/nvme/Developer/pawl/.claude/worktrees/agent-ab8f9a122e2b4fe85/./dist-newstyle/build/aarch64-osx/ghc-9.14.1/pawl-0.2026.8.15/t/pawl-test-suite/test/pawl-0.2026.8.15-pawl-test-suite.log
+1 of 1 test suites (1 of 1 test cases) passed.

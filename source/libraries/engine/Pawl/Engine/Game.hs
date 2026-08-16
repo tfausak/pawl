@@ -395,7 +395,7 @@ namesFor mObj card = case mObj of
 -- controlled by another player" is unimplemented (#682).
 faceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just Facing.FaceDown -> Just Card.faceDownFace
+  Just (Facing.FaceDown listed) -> Just (Card.faceDownFace listed)
   _ -> faceUpFaceOf oid gs
 
 -- CR 201.1 / 709.4a: the names of the object an id names -- `faceOf`'s plural
@@ -407,7 +407,7 @@ faceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- object with no card behind it (CR 113.7a: an ability on the stack).
 namesOf :: ObjectId -> GameState -> Set.Set CardName.CardName
 namesOf oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just Facing.FaceDown -> Set.empty
+  Just (Facing.FaceDown _) -> Set.empty
   _ -> maybe Set.empty (namesFor (lookupObject oid gs)) (cardOf oid gs)
 
 -- `faceOf` IGNORING CR 708.2's substitution: what the object's own card shows,
@@ -445,7 +445,7 @@ faceUpFaceOf oid gs = do
 -- mana value that falls out is CR 202.3a's 0.
 manaCostFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just Facing.FaceDown -> Just Card.faceDownFace
+  Just (Facing.FaceDown listed) -> Just (Card.faceDownFace listed)
   _ -> do
     card <- cardOf oid gs
     Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
@@ -464,7 +464,7 @@ manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 -- revealed to all players as it goes.
 faceOfWithLastKnown :: ObjectId -> GameState -> Maybe (Face Card)
 faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
-  Just Facing.FaceDown -> Just Card.faceDownFace
+  Just (Facing.FaceDown listed) -> Just (Card.faceDownFace listed)
   _ -> do
     card <- cardOfWithLastKnown oid gs
     Just (resolveFaceFor (lookupObject oid gs) card)

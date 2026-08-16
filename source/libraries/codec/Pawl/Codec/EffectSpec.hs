@@ -51,6 +51,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExileHaunting as ExileHaunting
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
+import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ForEach as ForEach
 import qualified Pawl.Types.GrantPlayFromExile as GrantPlayFromExile
@@ -102,6 +103,7 @@ import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TakeExtraTurn as TakeExtraTurn
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
+import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -933,15 +935,16 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Transform (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       """ {"type":"Transform","value":{"type":"EachMatching","value":{"type":"HasCardType","value":{"type":"Creature"}}}} """
-  -- CR 708.2a. One slot and no ObjectRef, since Backslide names a target and
-  -- nothing in the pool sweeps a set face down.
+  -- CR 708.2. One slot and no ObjectRef, since Backslide names a target and
+  -- nothing in the pool sweeps a set face down; the listed characteristics are
+  -- CR 708.2a's here, so that key is absent.
   Spec.it s "TurnFaceDown" $
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.TurnFaceDown (SlotName.MkSlotName (Text.pack "target")))
-      """ {"type":"TurnFaceDown","value":"target"} """
+      (Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown (SlotName.MkSlotName (Text.pack "target")) FaceDownCharacteristics.defaultValue))
+      """ {"type":"TurnFaceDown","value":{"slot":"target"}} """
   Spec.it s "RemoveFromCombat" $
     Common.assertJsonCodec
       s

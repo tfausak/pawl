@@ -4329,7 +4329,7 @@ brineArmed brine gs savorId brineId =
         S.runPure
           S.identityAnswer
           withSavor
-          (Cast.castSpell S.bob brineId (S.printingName brine) Facing.FaceDown >> Stack.resolveTop)
+          (Cast.castSpell S.bob brineId (S.printingName brine) Facing.faceDown >> Stack.resolveTop)
    in do
         permanent <- arrivedOne withSavor down
         pure (S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.bob permanent >> Engine.priorityLoop), permanent)

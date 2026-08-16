@@ -188,6 +188,7 @@ import qualified Pawl.Types.TargetSlot as TargetSlot
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TopOfLibrary as TopOfLibrary
 import qualified Pawl.Types.Toughness as Toughness
+import qualified Pawl.Types.TurnFaceDown as TurnFaceDown
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -339,7 +340,7 @@ slotsOf effect = case effect of
   -- PlaySubgame's slots take the same posture.
   Effect.Destroy (Destroy.MkDestroy ref _ _) -> objectRefSlots ref
   Effect.Sacrifice slot -> oneSlot slot
-  Effect.TurnFaceDown slot -> oneSlot slot
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot _) -> oneSlot slot
   Effect.RemoveFromCombat slot -> oneSlot slot
   Effect.BecomesBlocked slot -> oneSlot slot
   Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ _ _ _) -> objectRefSlots ref
@@ -3114,46 +3115,48 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           Just target -> Event.sacrifice controller target
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> pure ()
-  Effect.TurnFaceDown slot ->
+  Effect.TurnFaceDown (TurnFaceDown.MkTurnFaceDown slot listed) ->
     State.modify' $ \gs ->
       case legalOne slot legal of
         Just recipient -> case Recipient.objectOf recipient of
           Nothing -> gs -- a player is not a permanent and has no face
-          -- CR 708.2a: ONE assignment to Object.facing, and that is the whole
-          -- effect. The rule fixes what the permanent becomes -- "a 2/2 face-down
-          -- creature with no text, no name, no subtypes, and no mana cost" -- and
-          -- calls those "the COPIABLE values of that object's characteristics",
-          -- so this is a copiable swap rather than a CR 613 layer. The swap
-          -- already exists: Pawl.Engine.Game.faceOf answers with
-          -- Pawl.Engine.Card.faceDownFace for any object whose facing says
-          -- FaceDown, and every characteristic read in the engine starts there.
+          -- CR 708.2: ONE assignment to Object.facing, and that is the whole
+          -- effect. What the permanent becomes is the list the effect carries --
+          -- CR 708.2a's 2/2 for Backslide, which lists nothing, and "a 2/2
+          -- Cyberman artifact creature" for Cyber Conversion, which does -- and
+          -- the rule calls those "the COPIABLE values of that object's
+          -- characteristics", so this is a copiable swap rather than a CR 613
+          -- layer. The swap itself lives elsewhere: Pawl.Engine.Game.faceOf
+          -- answers with Pawl.Engine.Card.faceDownFace of whatever list the
+          -- facing carries, and every characteristic read in the engine starts
+          -- there.
           --
-          -- What is NOT written is everything CR 708.2a does not list. No CR
+          -- What is NOT written is everything the list does not name. No CR
           -- 400.7 incarnation is minted -- the permanent keeps its object id --
           -- so marked damage, counters, attachments, the tapped and attacking
           -- statuses and the CR 613.7d timestamp all ride through untouched. The
           -- exact mirror of Pawl.Engine.FaceDown.turnFaceUp, which reverts the
           -- same field for CR 708.8.
           --
-          -- CR 708.2b needs no branch HERE: "a face-down permanent can't be
-          -- turned face down ... nothing happens and that effect doesn't change
-          -- any of its characteristics or their copiable values", and writing
-          -- FaceDown onto a permanent that is already FaceDown leaves the map
-          -- equal to what it was. It is not reachable in any case -- a face-down
-          -- permanent has no keywords (CR 708.2a), so no "with a morph ability"
-          -- filter admits it as a target. An effect that LISTS characteristics
-          -- would change them and does owe the guard; no such opcode exists
-          -- (#957).
+          -- CR 708.2b is the guard below: "a face-down permanent can't be turned
+          -- face down ... nothing happens and that effect doesn't change any of
+          -- its characteristics or their copiable values". It was unnecessary
+          -- while every effect listed the same values, since the write left the
+          -- map equal to what it was; an effect that LISTS its own would
+          -- otherwise overwrite the list already there, which is exactly the
+          -- change the rule forbids.
           --
           -- No event is recorded, so nothing triggers on the turning-over --
           -- the mirror of FaceDown.turnFaceUp's GameEvent.TurnedFaceUp is
           -- absent (#984). CR 701.27b is what keeps it from being borrowed from
           -- Transform: turning a permanent face down is its own game action.
-          Just target ->
-            gs
-              { GameState.objects =
-                  Map.adjust (\o -> o {Object.facing = Facing.FaceDown}) target (GameState.objects gs)
-              }
+          Just target
+            | maybe False (Facing.isFaceDown . Object.facing) (Map.lookup target (GameState.objects gs)) -> gs
+            | otherwise ->
+                gs
+                  { GameState.objects =
+                      Map.adjust (\o -> o {Object.facing = Facing.FaceDown listed}) target (GameState.objects gs)
+                  }
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> gs
   Effect.RemoveFromCombat slot ->
