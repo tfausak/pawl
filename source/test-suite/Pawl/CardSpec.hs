@@ -3077,6 +3077,12 @@ sameNameAsBoundCounts card =
 -- disagree about how many the card holds -- the second being a blind spot in
 -- cardFilters, in which an atom would be reported as zero rather than as an
 -- offence.
+--
+-- The second disjunct is a REGRESSION FENCE rather than a proved behaviour, as
+-- canHostSubjectOffends' is: every position a fixture can reach today is caught by
+-- the first, so neutralizing the cross-check leaves the suite green. What would
+-- observe it is a future Face field cardFilters forgets, which is the thing that
+-- cannot be written down yet.
 sameNameAsBoundOffends :: Face.Face Card.Type.Card -> Bool
 sameNameAsBoundOffends card =
   let (slotted, elsewhere) = sameNameAsBoundCounts card
