@@ -19,18 +19,20 @@
       "name": "Copy Enchantment",
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "AsCopy",
-              "value": {
-                "eligible": {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Enchantment"
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "AsCopy",
+                "value": {
+                  "eligible": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Enchantment"
+                    }
                   }
                 }
               }

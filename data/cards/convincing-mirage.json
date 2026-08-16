@@ -32,13 +32,15 @@
       "name": "Convincing Mirage",
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "ChooseBasicLandType"
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "ChooseBasicLandType"
+              }
             }
           }
         }

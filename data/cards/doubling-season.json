@@ -19,34 +19,38 @@
       "name": "Doubling Season",
       "replacementEffects": [
         {
-          "type": "TokenR",
-          "value": {
-            "matching": {
-              "whose": {
-                "type": "Yours"
+          "effect": {
+            "type": "TokenR",
+            "value": {
+              "matching": {
+                "whose": {
+                  "type": "Yours"
+                }
+              },
+              "scaling": {
+                "type": "Multiply",
+                "value": 2
               }
-            },
-            "scaling": {
-              "type": "Multiply",
-              "value": 2
             }
           }
         },
         {
-          "type": "CounterR",
-          "value": {
-            "matching": {
-              "onWhat": {
-                "type": "And",
-                "value": []
+          "effect": {
+            "type": "CounterR",
+            "value": {
+              "matching": {
+                "onWhat": {
+                  "type": "And",
+                  "value": []
+                },
+                "whose": {
+                  "type": "Yours"
+                }
               },
-              "whose": {
-                "type": "Yours"
+              "scaling": {
+                "type": "Multiply",
+                "value": 2
               }
-            },
-            "scaling": {
-              "type": "Multiply",
-              "value": 2
             }
           }
         }

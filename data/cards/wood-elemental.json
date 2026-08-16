@@ -26,32 +26,34 @@
       },
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "SacrificeAnyNumber",
-              "value": {
-                "filter": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "HasSubtype",
-                      "value": {
-                        "type": "Forest"
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "SacrificeAnyNumber",
+                "value": {
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Forest"
+                        }
+                      },
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "IsTapped"
+                        }
                       }
-                    },
-                    {
-                      "type": "Not",
-                      "value": {
-                        "type": "IsTapped"
-                      }
-                    }
-                  ]
-                },
-                "kind": null
+                    ]
+                  },
+                  "kind": null
+                }
               }
             }
           }

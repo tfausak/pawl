@@ -2,17 +2,21 @@ module Pawl.Types.Condition where
 
 import qualified Pawl.Types.Compares as Compares
 
--- | A predicate over game STATE rather than over an event, with four customers
--- and one vocabulary: a state trigger's condition (CR 603.8, checked at every
+-- | A predicate over game STATE rather than over an event, with one vocabulary
+-- and several customers: a state trigger's condition (CR 603.8, checked at every
 -- CR 117.5 boundary), an intervening "if" (CR 603.4 when the trigger event
 -- occurs, CR 608.2a again on resolution), a "for as long as" duration
 -- (CR 611.2b, Pawl.Engine.Expiry.arm and Pawl.Engine.Expiry.sweepConditional),
--- and a printed static ability's "as long as" clause (CR 604.2,
--- Pawl.Types.StaticAbility.condition and Pawl.Engine.Projection.gatherStatic).
+-- a printed static ability's "as long as" clause (CR 604.2,
+-- Pawl.Types.StaticAbility.condition and Pawl.Engine.Projection.gatherStatic),
+-- that same clause on a printed REPLACEMENT ability
+-- (Pawl.Types.PrintedReplacement.condition and
+-- Pawl.Engine.Projection.replacementsOf), and CR 614.15's one-shot gate on
+-- installing a floating row (Pawl.Types.Replace.condition).
 --
--- The last two are the pair most easily confused, and CR 611.2c's parenthetical
--- keeps them apart: the duration ENDS a stored effect once, while the static
--- ability's clause gates one that is re-derived every projection.
+-- The duration and the "as long as" clauses are the pair most easily confused,
+-- and CR 611.2c's parenthetical keeps them apart: the duration ENDS a stored
+-- effect once, while the clause gates one that is re-derived every read.
 --
 -- ONE comparison plus a disjunction and a conjunction of them, and no other
 -- escape hatch. CR 611.2b's "for as long as you control this creature" is a

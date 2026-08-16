@@ -14,7 +14,7 @@ import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
-import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -125,7 +125,7 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     activatedAbilities :: [ActivatedAbility.ActivatedAbility Card.Card],
     -- | CR 614 layer 6: the object's replacement effects after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two.
-    replacementEffects :: [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Card)],
+    replacementEffects :: [PrintedReplacement.PrintedReplacement (Effect.Effect Card.Card)],
     -- | CR 603 layer 6: the object's triggered abilities after the layer system,
     -- the same projection posture as activatedAbilities, emptied by the same two.
     triggeredAbilities :: [TriggeredAbility.TriggeredAbility Card.Card],

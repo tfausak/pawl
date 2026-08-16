@@ -32,29 +32,31 @@
       },
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "AsCopy",
-              "value": {
-                "eligible": {
-                  "type": "HasCardType",
-                  "value": {
-                    "type": "Creature"
-                  }
-                },
-                "exceptions": [
-                  {
-                    "type": "SetPowerToughness",
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "AsCopy",
+                "value": {
+                  "eligible": {
+                    "type": "HasCardType",
                     "value": {
-                      "power": 7,
-                      "toughness": 7
+                      "type": "Creature"
                     }
-                  }
-                ]
+                  },
+                  "exceptions": [
+                    {
+                      "type": "SetPowerToughness",
+                      "value": {
+                        "power": 7,
+                        "toughness": 7
+                      }
+                    }
+                  ]
+                }
               }
             }
           }

@@ -19,14 +19,16 @@
       "name": "Rest in Peace",
       "replacementEffects": [
         {
-          "type": "ZoneChangeR",
-          "value": {
-            "destination": {
-              "type": "Exile"
-            },
-            "matching": {
-              "whenDestination": {
-                "type": "Graveyard"
+          "effect": {
+            "type": "ZoneChangeR",
+            "value": {
+              "destination": {
+                "type": "Exile"
+              },
+              "matching": {
+                "whenDestination": {
+                  "type": "Graveyard"
+                }
               }
             }
           }

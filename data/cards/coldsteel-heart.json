@@ -40,24 +40,28 @@
       "name": "Coldsteel Heart",
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "Tapped"
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "Tapped"
+              }
             }
           }
         },
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "ChooseColor"
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "ChooseColor"
+              }
             }
           }
         }

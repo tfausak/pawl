@@ -37,34 +37,36 @@
       },
       "replacementEffects": [
         {
-          "type": "ZoneChangeR",
-          "value": {
-            "destination": {
-              "type": "Exile"
-            },
-            "matching": {
-              "whatObject": {
-                "type": "And",
-                "value": [
-                  {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
-                  },
-                  {
-                    "type": "Not",
-                    "value": {
-                      "type": "IsToken"
-                    }
-                  }
-                ]
+          "effect": {
+            "type": "ZoneChangeR",
+            "value": {
+              "destination": {
+                "type": "Exile"
               },
-              "whenDestination": {
-                "type": "Graveyard"
-              },
-              "whoseObject": {
-                "type": "Opponents"
+              "matching": {
+                "whatObject": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "Not",
+                      "value": {
+                        "type": "IsToken"
+                      }
+                    }
+                  ]
+                },
+                "whenDestination": {
+                  "type": "Graveyard"
+                },
+                "whoseObject": {
+                  "type": "Opponents"
+                }
               }
             }
           }

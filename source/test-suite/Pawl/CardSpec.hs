@@ -165,6 +165,7 @@ import qualified Pawl.Types.Plus as Plus
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.PreventNextDamage as PreventNextDamage
+import qualified Pawl.Types.PrintedReplacement as PrintedReplacement
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.PutCounters as PutCounters
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -859,7 +860,7 @@ cardResolutionEffects card =
     -- it runs from Resolve.runPreventionRiders when the shield applies -- but
     -- it is a card-authored effect list, which is what every lint downstream of
     -- this function is about.
-    <> concatMap replacementEffectRiders (Face.replacementEffects card)
+    <> concatMap (replacementEffectRiders . PrintedReplacement.effect) (Face.replacementEffects card)
 
 -- CR 103.5b and CR 103.6: the actions a face grants from a HAND, one effect list
 -- per action. The two fields are exactly the two Pawl.Engine.Mulligan passes to
@@ -883,6 +884,9 @@ cardCounts card =
     <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.power card))
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
     <> concatMap staticAbilityCounts (Face.staticAbilities card)
+    -- CR 604.2's "as long as" clause on a printed replacement ability, the
+    -- staticAbilityCounts treatment of the same clause one field over.
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . PrintedReplacement.condition) (Face.replacementEffects card)
     <> concatMap effectCounts (Card.allEffects card)
     <> concatMap conditionCounts (modalClauseConditions (Face.spell card))
     <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
@@ -1020,7 +1024,7 @@ modalCountsOffend modal =
 -- through a Card and is not swept here.
 cardReplacementEffects :: Face.Face Card.Type.Card -> [ReplacementEffect.ReplacementEffect (Effect.Effect Card.Type.Card)]
 cardReplacementEffects card =
-  Face.replacementEffects card
+  fmap PrintedReplacement.effect (Face.replacementEffects card)
     <> concatMap effectReplacements (cardResolutionEffects card)
 
 -- CR 615.5: the additional effect a replacement PRINTS -- DamageR's riders, and
@@ -2662,6 +2666,15 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.TurnUpR (TurnUpR.MkTurnUpR turnUpPattern turnUpRewrite) -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.PhaseR _ -> []
 
+-- A face's printed replacement ability reaches a Filter on a second axis beside
+-- the rewrite's: CR 604.2's "as long as" clause counts objects, exactly as the
+-- gate on Effect.Replace does (effectFilters' Replace arm) and as a static
+-- ability's does (staticAbilityFilters).
+printedReplacementFilters :: PrintedReplacement.PrintedReplacement (Effect.Effect Card.Type.Card) -> [Filter.Type.Filter Keyword.Keyword]
+printedReplacementFilters printedReplacement =
+  foldMap conditionFilters (PrintedReplacement.condition printedReplacement)
+    <> replacementEffectFilters (PrintedReplacement.effect printedReplacement)
+
 -- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
 -- Giant's gate carries `Not IsSource`, which is as much card data as the affected
 -- set beside it.
@@ -2872,7 +2885,8 @@ activatedAbilityFilters ability =
 --     through a Count.
 --   * `staticAbilities` -- the affected set, CR 604.2's "as long as" condition,
 --     and the layer-6/7 modifications' own keywords and Counts.
---   * `replacementEffects` -- CR 614.1's counter-placement pattern.
+--   * `replacementEffects` -- CR 614.1's counter-placement pattern, plus CR
+--     604.2's "as long as" condition gating the ability that prints it.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSlot.
 --   * `additionalCosts` -- CR 601.2f's sacrifice component.
 --   * `alternativeCosts` -- that same component, plus CR 604.2's "as long as"
@@ -2914,7 +2928,7 @@ cardFilters card =
         <> concatMap (\(Power.MkPower quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.power card))
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap staticAbilityFilters (Face.staticAbilities card)
-        <> concatMap replacementEffectFilters (Face.replacementEffects card)
+        <> concatMap printedReplacementFilters (Face.replacementEffects card)
         <> concatMap targetSlotFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
         <> concatMap alternativeCostFilters (Face.alternativeCosts card)
@@ -4320,7 +4334,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ReplacementEffect.PhaseR phasePattern ->
             ReplacementEffect.PhaseR phasePattern {PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)}
           other -> other
-        baked = card {Face.replacementEffects = fmap bake (Face.replacementEffects card)}
+        baked = card {Face.replacementEffects = fmap (\pr -> pr {PrintedReplacement.effect = bake (PrintedReplacement.effect pr)}) (Face.replacementEffects card)}
     Spec.assertBool s (not (any phasePatternOffends (cardReplacementEffects card))) "the real Eon Hub is symmetric and accepted"
     Spec.assertBool s (any phasePatternOffends (cardReplacementEffects baked)) "and the same card naming a seat is rejected"
   -- The same lint one event class over, for the OTHER fields the codec accepts and
@@ -4944,7 +4958,29 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 614.1's counter-placement pattern",
               base
                 { Face.replacementEffects =
-                    [ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1))]
+                    [ PrintedReplacement.MkPrintedReplacement
+                        Nothing
+                        (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)))
+                    ]
+                }
+            ),
+            ( "CR 604.2's clause gating a printed replacement ability",
+              base
+                { Face.replacementEffects =
+                    [ PrintedReplacement.MkPrintedReplacement
+                        ( Just
+                            ( Condition.Type.Compares
+                                ( Compares.MkCompares
+                                    ( Quantity.Type.Count
+                                        (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                                    )
+                                    Comparison.AtLeast
+                                    (Quantity.Type.Literal 1)
+                                )
+                            )
+                        )
+                        (ReplacementEffect.DestructionR DestructionRewrite.Regenerate)
+                    ]
                 }
             ),
             ( "a created token's own static ability",

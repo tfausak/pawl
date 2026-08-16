@@ -10,14 +10,16 @@
       "name": "Eon Hub",
       "replacementEffects": [
         {
-          "type": "PhaseR",
-          "value": {
-            "whichPhase": {
-              "type": "Step",
-              "value": {
-                "type": "Beginning",
+          "effect": {
+            "type": "PhaseR",
+            "value": {
+              "whichPhase": {
+                "type": "Step",
                 "value": {
-                  "type": "Upkeep"
+                  "type": "Beginning",
+                  "value": {
+                    "type": "Upkeep"
+                  }
                 }
               }
             }

@@ -19,6 +19,11 @@ data Replace effect = MkReplace
     -- | CR 614.15's gate on whether the row is installed at all, checked on
     -- resolution. Nothing is the unconditional case, which is most of them, so
     -- the key is elided rather than written null.
+    --
+    -- Asked ONCE and never again, which is what separates it from
+    -- Pawl.Types.PrintedReplacement.condition: a permanent's static ability is
+    -- CR 604.1's "simply true" and its clause is re-asked at every read, while
+    -- this row exists or does not from the moment the resolution ends.
     condition :: Maybe Condition.Condition,
     effect :: ReplacementEffect.ReplacementEffect effect
   }

@@ -37,31 +37,33 @@
       ],
       "replacementEffects": [
         {
-          "type": "EntryR",
-          "value": {
-            "matching": {
-              "type": "IsSource"
-            },
-            "rewrite": {
-              "type": "ChooseCardNames",
-              "value": {
-                "type": "Not",
+          "effect": {
+            "type": "EntryR",
+            "value": {
+              "matching": {
+                "type": "IsSource"
+              },
+              "rewrite": {
+                "type": "ChooseCardNames",
                 "value": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "HasSupertype",
-                      "value": {
-                        "type": "Basic"
+                  "type": "Not",
+                  "value": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasSupertype",
+                        "value": {
+                          "type": "Basic"
+                        }
+                      },
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Land"
+                        }
                       }
-                    },
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Land"
-                      }
-                    }
-                  ]
+                    ]
+                  }
                 }
               }
             }
