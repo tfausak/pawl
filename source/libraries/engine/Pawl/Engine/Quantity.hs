@@ -440,6 +440,7 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
       PlayerRef.ControllerOfBound slot ->
         fmap pure (Map.lookup slot (Filter.slotObjects context) >>= viewOf >>= Filter.controller)
       PlayerRef.EachPlayer -> Count.playersFor context gs ref
+      PlayerRef.EachPlayerExcept _ -> Count.playersFor context gs ref
       PlayerRef.Relative _ -> Count.playersFor context gs ref
       PlayerRef.InSlot _ -> Count.playersFor context gs ref
       PlayerRef.Specific _ -> Count.playersFor context gs ref
@@ -659,6 +660,9 @@ slotsAreExhaustive quantity = case quantity of
 playerRefIsSlotless :: PlayerRef.PlayerRef -> Bool
 playerRefIsSlotless ref = case ref of
   PlayerRef.EachPlayer -> True
+  -- The exclusion names a slot, so this reads one -- InSlot's answer, even though
+  -- the slot decides who is left OUT rather than who is in.
+  PlayerRef.EachPlayerExcept _ -> False
   PlayerRef.Relative _ -> True
   PlayerRef.InSlot _ -> False
   -- The baked half names its player outright, so it reads no slot at all. A card
@@ -687,28 +691,72 @@ playerRefIsSlotless ref = case ref of
 -- never starts -- rather than starting on a reference nothing can resolve.
 --
 -- Exhaustive, `slots`' posture: a new arm carrying a PlayerRef must fail to
--- compile here rather than silently keep an unbaked one.
+-- compile here rather than silently keep an unbaked one -- which is what
+-- mapPlayerRefs below is, and this is one instance of it.
 bakeBound :: Map.Map SlotName PlayerId.PlayerId -> Quantity -> Quantity
-bakeBound players quantity = case quantity of
-  Quantity.LifeTotal ref -> Quantity.LifeTotal (bakePlayerRef players ref)
-  Quantity.Speed ref -> Quantity.Speed (bakePlayerRef players ref)
-  Quantity.IsMonarch ref -> Quantity.IsMonarch (bakePlayerRef players ref)
-  Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (bakePlayerRef players ref) kind)
-  Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (bakePlayerRef players ref)
-  Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (bakePlayerRef players ref)
-  Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (bakePlayerRef players ref)
-  Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = bakePlayerRef players (ManaCount.Type.player c)}
-  -- Both halves: the Scope says whose zone or which players, and an
-  -- Aggregation.Greatest's per-member quantity may hide a reference of its own.
-  -- Terminating for evaluate's reason -- a Greatest's payload is a strictly
-  -- smaller subterm.
-  Quantity.Count c ->
-    let baked = Count.mapQuantity (bakeBound players) c
-     in Quantity.Count baked {Count.Type.scope = bakeScope players (Count.Type.scope c)}
-  Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (bakeBound players a) (bakeBound players b))
-  Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (bakeBound players inner))
-  Quantity.Negate a -> Quantity.Negate (bakeBound players a)
-  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (bakeBound players inner))
+bakeBound players =
+  mapPlayerRefs
+    (bakePlayerRef players)
+    -- Both halves: the Scope says whose zone or which players, and an
+    -- Aggregation.Greatest's per-member quantity may hide a reference of its own.
+    -- Terminating for evaluate's reason -- a Greatest's payload is a strictly
+    -- smaller subterm.
+    (\c -> (Count.mapQuantity (bakeBound players) c) {Count.Type.scope = bakeScope players (Count.Type.scope c)})
+
+-- The player a per-player instruction is CURRENTLY applying to, substituted for
+-- Pawl.Types.PlayerRef.Candidate -- Shahrazad's "each player who doesn't win the
+-- subgame loses half THEIR life", where the number is read against each payer's
+-- own life total as the effect resolves rather than computed once and shared.
+--
+-- Candidate is the reference a card writes for "whichever player this reading is
+-- aimed at", and Pawl.Engine.Count answers it inside a Scope.OverPlayers fold off
+-- the candidate's view. An effect applying to a set of players is the same
+-- question with no view to hand, so it is answered by substitution instead --
+-- which is exactly bakeBound's move, one reference over.
+--
+-- A NESTED Count IS LEFT ALONE, unlike bakeBound's, and that is the point of the
+-- parameter: a Scope.OverPlayers fold supplies its own candidate, so substituting
+-- this one inside would make "the highest life total among your opponents" read
+-- the payer's life in every member.
+forCandidate :: PlayerId.PlayerId -> Quantity -> Quantity
+forCandidate pid = mapPlayerRefs substitute id
+  where
+    substitute ref = case ref of
+      PlayerRef.Candidate -> PlayerRef.Specific pid
+      PlayerRef.EachPlayer -> ref
+      PlayerRef.EachPlayerExcept _ -> ref
+      PlayerRef.Relative _ -> ref
+      PlayerRef.InSlot _ -> ref
+      PlayerRef.Specific _ -> ref
+      PlayerRef.ControllerOfBound _ -> ref
+
+-- Every PlayerRef this quantity names, rewritten -- the traversal bakeBound and
+-- forCandidate share, so the arm list is written once and a new arm carrying a
+-- PlayerRef fails to compile HERE rather than silently keeping an old reference
+-- in one of them.
+--
+-- `intoCount` is the one arm the two callers disagree about, so it is a parameter
+-- rather than a recursive call: a Count is read against an environment of its own
+-- (see forCandidate).
+mapPlayerRefs ::
+  (PlayerRef.PlayerRef -> PlayerRef.PlayerRef) ->
+  (Count.Type.Count Quantity -> Count.Type.Count Quantity) ->
+  Quantity ->
+  Quantity
+mapPlayerRefs f intoCount quantity = case quantity of
+  Quantity.LifeTotal ref -> Quantity.LifeTotal (f ref)
+  Quantity.Speed ref -> Quantity.Speed (f ref)
+  Quantity.IsMonarch ref -> Quantity.IsMonarch (f ref)
+  Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally ref kind) -> Quantity.PlayerCounters (PlayerCounterTally.MkPlayerCounterTally (f ref) kind)
+  Quantity.OpponentsAttacked ref -> Quantity.OpponentsAttacked (f ref)
+  Quantity.CardsDiscardedThisTurn ref -> Quantity.CardsDiscardedThisTurn (f ref)
+  Quantity.PlayersDealtDamageThisTurn ref -> Quantity.PlayersDealtDamageThisTurn (f ref)
+  Quantity.ManaCount c -> Quantity.ManaCount c {ManaCount.Type.player = f (ManaCount.Type.player c)}
+  Quantity.Count c -> Quantity.Count (intoCount c)
+  Quantity.Plus (Plus.MkPlus a b) -> Quantity.Plus (Plus.MkPlus (recur a) (recur b))
+  Quantity.Halved (Halved.MkHalved rounding inner) -> Quantity.Halved (Halved.MkHalved rounding (recur inner))
+  Quantity.Negate a -> Quantity.Negate (recur a)
+  Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot inner) -> Quantity.AgainstSlot (AgainstSlot.MkAgainstSlot slot (recur inner))
   -- Every arm below holds no PlayerRef and no Quantity. InSlot names an AMOUNT
   -- slot rather than a player one, so nothing here substitutes it -- an amount an
   -- earlier effect bound is not a seat.
@@ -723,6 +771,8 @@ bakeBound players quantity = case quantity of
   Quantity.WasKicked -> quantity
   Quantity.EnteredThisTurn -> quantity
   Quantity.BlockersBeyondFirst -> quantity
+  where
+    recur = mapPlayerRefs f intoCount
 
 -- One reference, baked. The whole of the substitution: every arm above funnels
 -- through this, so what a slot means is stated once.
@@ -730,6 +780,12 @@ bakePlayerRef :: Map.Map SlotName PlayerId.PlayerId -> PlayerRef.PlayerRef -> Pl
 bakePlayerRef players ref = case ref of
   PlayerRef.InSlot slot -> maybe ref PlayerRef.Specific (Map.lookup slot players)
   PlayerRef.EachPlayer -> ref
+  -- LEFT STANDING, ControllerOfBound's posture below, and here there is nothing
+  -- to bake TO: PlayerRef.Specific names one seat and this names the rest of the
+  -- table. It costs nothing either way, since every scalar this function
+  -- traverses reads exactly one player (see the LifeTotal arm above) and so
+  -- answers Nothing for this reference baked or not.
+  PlayerRef.EachPlayerExcept _ -> ref
   PlayerRef.Relative _ -> ref
   PlayerRef.Specific _ -> ref
   -- Nothing to bake: the candidate is supplied by whichever fold is running when

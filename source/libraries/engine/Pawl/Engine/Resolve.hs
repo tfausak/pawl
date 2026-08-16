@@ -217,6 +217,9 @@ quantitySlots = Map.fromSet (const SlotArity.One) . Quantity.slots
 playerRefSlots :: PlayerRef -> Map.Map SlotName SlotArity
 playerRefSlots ref = case ref of
   PlayerRef.EachPlayer -> Map.empty
+  -- One slot, read singly: the excluded seat is one player, and a slot naming
+  -- several excludes nobody rather than several (playerRefPlayers' legalOne).
+  PlayerRef.EachPlayerExcept slot -> Map.singleton slot SlotArity.One
   PlayerRef.Relative _ -> Map.empty
   PlayerRef.InSlot slot -> Map.singleton slot SlotArity.One
   -- InSlot's baked half names a seat, not a slot. Unreachable from card data,
@@ -429,8 +432,8 @@ slotsOf effect = case effect of
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) -> joinSlots [oneSlot card, oneSlot slot]
   Effect.Attach slot -> oneSlot slot
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
-  -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
-  -- bound once the subgame ends), not a read -- same shape as Create's slot.
+  -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the subgame's winner,
+  -- bound once it ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Map.empty
   -- A DEFINITION too, PlaySubgame's exactly: the opponent is chosen as this
   -- effect is applied (CR 608.2d) and bound, never read.
@@ -922,7 +925,7 @@ definedSlots = foldMap boundSlots
 -- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads -- a
 -- Create that names what it mints, one token or every one of them, a MoveToZone
 -- that names the incarnation CR 400.7 minted at the destination, a PlaySubgame
--- that names its loser, a Destroy that names how many it destroyed. Every
+-- that names its winner, a Destroy that names how many it destroyed. Every
 -- position in the DSL at which a card AUTHORS a name the engine will later
 -- write a binding to, which is what makes it the set Pawl.CardSpec's
 -- reserved-name sweep ranges over.
@@ -949,10 +952,10 @@ boundSlots effect = case effect of
   Effect.Create (Create.MkCreate _ _ _ mSlot) -> foldMap Set.singleton mSlot
   -- Binds nothing: no card in the pool names the token copy it minted.
   Effect.CreateCopy {} -> Set.empty
-  -- CR 729.1b: the subgame's loser, derived rather than chosen.
+  -- CR 729.1b: the subgame's winner, reported by the nested game rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
   -- CR 608.2d: the opponent this effect chose, so a later effect naming the slot
-  -- passes the dataflow lint -- PlaySubgame's loser, chosen rather than derived.
+  -- passes the dataflow lint -- PlaySubgame's winner, chosen rather than reported.
   Effect.ChooseOpponent slot -> Set.singleton slot
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
   -- each ... destroyed this way" to read as a Quantity.
@@ -1230,7 +1233,7 @@ resolveSpellWith runSubgame oid = do
                   let idx = ModeInstance.index mi
                       applyOne eff = do
                         -- Re-read the live bindings for THIS effect: a prior
-                        -- PlaySubgame may have bound its loser slot.
+                        -- PlaySubgame may have bound its winner slot.
                         bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalNow = Map.mapWithKey legalSlot chosenNow
@@ -1744,6 +1747,12 @@ playerRefPlayers legal controller gs ref = case ref of
   PlayerRef.Relative PlayerRelation.You -> [controller]
   PlayerRef.Relative PlayerRelation.Opponent -> filter (/= controller) everyone
   PlayerRef.EachPlayer -> everyone
+  -- EachPlayer minus the seat the slot names. A slot that is unfilled, illegal,
+  -- names several, or names an object excludes NOBODY -- see the type, where the
+  -- widening is the producer's reading rather than a fallback.
+  PlayerRef.EachPlayerExcept slot ->
+    let excluded = legalOne slot legal >>= Recipient.playerOf
+     in filter (\pid -> Just pid /= excluded) everyone
   -- The baked seat, named outright -- InSlot's answer with the lookup already
   -- done, and unreachable from card data. Not filtered against the roster, the
   -- reason InSlot is not: it names one specific player who arrived from
@@ -2848,27 +2857,31 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     Setup.restartGame performHandAction exempted controller
   -- CR 729.1/729.5: run the nested game to completion (the runner does the
   -- construction, play, funnel-back, and reshuffle); then bind its outcome.
-  -- CR 729.1b: the loser is the 2-player derivation from the Result; a Drawn
-  -- subgame binds nothing (the follow-on then no-ops). Multi-player "each
-  -- player who doesn't win" and a widened Result are deferred (#138); this
-  -- arm runs only on the SPELL path -- an ability-driven subgame is deferred
-  -- (#137). The fixed follow-on stands in for Shahrazad's half-life rider
-  -- (#139), which retires the synthetic gate.
-  -- Shahrazad's Oracle text scopes the loser to "each player who doesn't win
-  -- the subgame" -- so the roster the loser is drawn from is the players who
-  -- were actually seated for the subgame, i.e. Game.stillPlayingInOrder,
-  -- not the main game's full seating (GameState.turnOrder). A player who
-  -- departed the main game before this effect resolved never played the
-  -- subgame -- Setup.subgameStateFrom seats only stillPlayingInOrder -- so
-  -- turnOrder can name a non-participant as "the loser" even though nothing
-  -- about them ever touched the subgame.
+  --
+  -- CR 729.1b: the outcome the main game may read is the subgame's WINNER, which
+  -- is the whole of what Pawl.Types.Result carries -- so the slot holds a winner
+  -- and a Drawn subgame binds nothing. Shahrazad's rider then says "each player
+  -- who doesn't win" as PlayerRef.EachPlayerExcept over that slot, and gets the
+  -- drawn case for free: no winner is bound, so nobody is excluded and the whole
+  -- table pays. Pawl.GameSpec's two Shahrazad cases prove both halves; they are
+  -- one board differing only in alice's library size, which is what decides
+  -- whether the subgame has a winner.
+  --
+  -- Binding the winner rather than deriving a loser is what makes the set
+  -- available at all. A derived loser is one seat, and CR 729.1b's customer asks
+  -- about the complement of one seat -- a set the roster answers and a binding
+  -- cannot, since a slot holds one recipient. The roster the complement is taken
+  -- against is Game.stillPlaying's (playerRefPlayers), which is the set
+  -- Setup.subgameStateFrom seated: a player who left the main game before this
+  -- resolved never played the subgame, and GameState.turnOrder would still name
+  -- them.
+  --
+  -- Not implemented: an ability-driven subgame -- this arm runs only on the SPELL
+  -- path (#137).
   Effect.PlaySubgame slot -> do
     result <- runSubgame
-    order <- State.gets Game.stillPlayingInOrder
     case result of
-      Result.Won winner -> case List.find (/= winner) order of
-        Just loser -> State.modify' (bindPlayerSlot source slot loser)
-        Nothing -> pure ()
+      Result.Won winner -> State.modify' (bindPlayerSlot source slot winner)
       Result.Drawn -> pure ()
   -- CR 608.2d: "choose an opponent", announced by the resolving controller as
   -- this effect is applied, and bound so the sentence AFTER it can say "that
@@ -3695,24 +3708,37 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- state-based actions only as a player would get priority, so no life
         -- total is observable between one adjustment and the next.
         losers = playerRefPlayers legal controller gs ref
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n
-        | n > 0 ->
-            -- CR 119.3: the life total is simply adjusted, directly on the
-            -- player record. Not through Pawl.Engine.Damage: CR 119.2 makes damage a
-            -- CAUSE of life loss, not a synonym for it (the opcode's own
-            -- comment has the consequences). A direct subtraction is what
-            -- CostComponent.PayLife does for CR 119.4's cost side, and the CR
-            -- 704.5a state-based action that may follow is the existing one in
-            -- Pawl.Engine.Sba.
-            Monad.forM_ losers (\pid -> changeLife pid (negate n))
-      _ -> pure ()
+    -- PER PAYER, not once: Shahrazad's "each player who doesn't win the subgame
+    -- loses half THEIR life, rounded up" reads a different number for each of
+    -- them, off that player's own life total. Quantity.forCandidate is what makes
+    -- the reading per-player, and it changes nothing for a quantity that does not
+    -- name PlayerRef.Candidate -- every other LoseLife in the pool.
+    --
+    -- Every payer's number is read off the SAME `gs`, so the amounts are the life
+    -- totals as the effect began rather than as the previous payer left them --
+    -- which is the unordered footing the comment above already rests on.
+    Monad.forM_ losers $ \pid ->
+      case Quantity.evaluateFor viewOf context gs resolving source (Quantity.forCandidate pid quantity) of
+        Just n
+          | n > 0 ->
+              -- CR 119.3: the life total is simply adjusted, directly on the
+              -- player record. Not through Pawl.Engine.Damage: CR 119.2 makes damage a
+              -- CAUSE of life loss, not a synonym for it (the opcode's own
+              -- comment has the consequences). A direct subtraction is what
+              -- CostComponent.PayLife does for CR 119.4's cost side, and the CR
+              -- 704.5a state-based action that may follow is the existing one in
+              -- Pawl.Engine.Sba.
+              changeLife pid (negate n)
+        _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror in every respect but the sign. The
   -- comments above apply verbatim: same `viewWithLastKnown` reading, same
   -- unordered adjustment, same direct write to the player record, and the same CR
-  -- 608.2i record appended alongside it. The one difference is that nothing in CR
-  -- 704.5 follows a gain -- CR 704.5a fires on "0 or less life", which a gain
-  -- cannot reach.
+  -- 608.2i record appended alongside it. Two differences: nothing in CR 704.5
+  -- follows a gain -- CR 704.5a fires on "0 or less life", which a gain cannot
+  -- reach -- and the quantity is evaluated ONCE for the whole set rather than per
+  -- gainer, since no card in the pool writes a gain whose amount is read against
+  -- each gainer (PlayerRef.Candidate). Shahrazad is what asks that of the loss
+  -- side; the two arms should converge at the first card that asks it here.
   --
   -- The `n > 0` guard is CR 119.9's in as many words: "if a player gains 0 life,
   -- no life gain event has occurred". Here it is load-bearing rather than tidy --
@@ -5279,7 +5305,7 @@ performHandAction source player =
 -- the same mechanism: resolveSpellWith and resolveModes each re-read
 -- Object.bindings before EACH effect (CR 608.2c), so a later
 -- Sacrifice/Destroy/ModifyTarget reading this slot sees the mid-fold value. That
--- is what lets PlaySubgame's derived loser reach a follow-on DealDamage on the
+-- is what lets PlaySubgame's reported winner reach a follow-on LoseLife on the
 -- spell path, and Harried Dronesmith's "It gains haste until end of turn" reach
 -- the token its own trigger just minted on the ability path (proved by
 -- Pawl.TriggerSpec's "CR 702.10b \"it gains haste\" reaches the one token").
@@ -5309,9 +5335,16 @@ bindObjectsSlot holder slot targets gs =
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- The default runner for every resolution that is NOT a subgame-bearing spell:
--- there is no nested game, so a PlaySubgame effect resolves as a draw and binds
+-- there is no nested game, so a PlaySubgame effect reports a draw and binds
 -- nothing. The ability path (resolveEffects) and every direct test caller take
--- this; a subgame played from an ABILITY is deferred (no gate card needs one).
+-- this.
+--
+-- Not implemented: a subgame played from an ABILITY (#137). Until that lands the
+-- default is unreachable from card data -- no card in the pool puts PlaySubgame
+-- in an ability -- which matters more than it used to: a follow-on reading the
+-- slot through PlayerRef.EachPlayerExcept now charges the WHOLE TABLE for a
+-- draw, so a stand-in draw here would be a live wrong answer rather than the
+-- silent no-op it once was.
 noSubgame :: Game Result
 noSubgame = pure Result.Drawn
 
@@ -5321,7 +5354,7 @@ noSubgame = pure Result.Drawn
 --
 -- TWO CALLERS, and each passes the holder its own READER looks at:
 --
---   * CR 729.1b's derived subgame loser, held on the effect's `source`. The
+--   * CR 729.1b's subgame winner, held on the effect's `source`. The
 --     follow-on reads it through resolveSpellWith's re-read of the resolving
 --     SPELL's bindings, and only a spell can play a subgame (an ability-driven
 --     one is deferred, see noSubgame), so for every producer that can exist the

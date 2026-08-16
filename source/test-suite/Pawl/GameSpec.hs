@@ -816,11 +816,11 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "and carol's" (length (Game.zoneMembers Zone.Library S.carol after)) 7
     Spec.assertEqWith s "the main game is not decided by the subgame" (GameState.result after) Nothing
 
-  Spec.it s "CR 729.1b/729.3 gameplay: alice casts a subgame spell, bob decks, bob takes 3" $ do
+  Spec.it s "CR 729.1b/729.3 gameplay: alice casts a subgame spell, bob decks, bob loses 3" $ do
     -- alice has the {0} subgame sorcery in hand and an 8-card library; bob has
     -- a 3-card library (decks in the subgame, CR 729.3). alice casts through
     -- the priority loop; the subgame resolves alice the winner; the follow-on
-    -- DealDamage hits bob (the loser) for 3.
+    -- LoseLife charges bob, the one player who did not win, 3.
     mountain <- S.printingOf s registry "Mountain"
     syntheticSubgame <- S.printingOf s registry "Synthetic Subgame"
     let g0 = Setup.emptyGame S.bothPlayers
@@ -833,7 +833,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
               GameState.priority = Just S.alice
             }
         after = snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
-    Spec.assertEqWith s "CR 729.1b: bob (the subgame loser) took 3 from the follow-on DealDamage" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "CR 729.1b: bob (the one player who did not win) lost 3 to the follow-on LoseLife" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "alice, the winner, is untouched" (S.lifeOf S.alice after) (Just 20)
     Spec.assertEqWith s "the subgame spell resolved and left the stack" (GameState.stack after) []
     Spec.assertEqWith s "the main game did not end" (GameState.result after) Nothing
@@ -843,6 +843,50 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- alice's hand. The load-bearing check is that spellId's old
     -- incarnation is not lingering in her hand's member list.
     Spec.assertEqWith s "the subgame spell's original id no longer sits in alice's hand (cast)" (notElem spellId (Game.zoneMembers Zone.Hand S.alice after)) True
+
+  -- CR 729.1b, real Shahrazad: "each player who doesn't win the subgame
+  -- loses half their life, rounded up". Three seats, because at two the
+  -- non-winner set and "the loser" coincide; three distinct life totals, because
+  -- the amount is read against each payer's own; three distinct library sizes,
+  -- because who wins the subgame is decided by them (CR 729.3) and equal sizes
+  -- would make two readings agree.
+  --
+  -- 20, 13 and 9 halve to 10, 7 and 5, so alice's is exact and the other two both
+  -- round UP -- a truncating halve leaves bob on 7 and carol on 5 rather than 6
+  -- and 4, which no other error produces.
+  --
+  -- The two cases below are the SAME board with exactly one thing different:
+  -- alice's library holds 8 cards in one and 3 in the other. That decides whether
+  -- she survives the subgame's opening hand (CR 729.3) and so whether the subgame
+  -- has a winner at all.
+  Spec.it s "CR 729.1b gameplay: Shahrazad's non-winners each lose half their own life, rounded up" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    let after = castShahrazad mountain plains shahrazad 8
+    Spec.assertEqWith s "alice's 8-card library survives the opening hand, so she wins and pays nothing" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "bob did not win: 13 halves to 7 rounded up, leaving 6" (S.lifeOf S.bob after) (Just 6)
+    Spec.assertEqWith s "carol did not win either, and pays her OWN half: 9 halves to 5, leaving 4" (S.lifeOf S.carol after) (Just 4)
+    Spec.assertEqWith s "Shahrazad resolved and left the stack" (GameState.stack after) []
+    Spec.assertEqWith s "the main game did not end" (GameState.result after) Nothing
+    Spec.assertEqWith s "CR 729.5: alice's cards funnelled back" (length (Game.zoneMembers Zone.Library S.alice after)) 8
+    Spec.assertEqWith s "and bob's" (length (Game.zoneMembers Zone.Library S.bob after)) 6
+    Spec.assertEqWith s "and carol's" (length (Game.zoneMembers Zone.Library S.carol after)) 4
+
+  Spec.it s "CR 729.1b gameplay: a DRAWN Shahrazad subgame is won by nobody, so every player pays" $ do
+    -- alice's library drops to 3, so all three deck on the subgame's opening hand
+    -- (CR 729.3) and leave together -- CR 104.4a's draw, which
+    -- Departure.outcomeAfterLeaving reports as Result.Drawn. Nobody won, so
+    -- nobody is excluded and alice pays her own half alongside the other two.
+    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
+    shahrazad <- S.printingOf s registry "Shahrazad"
+    let after = castShahrazad mountain plains shahrazad 3
+    Spec.assertEqWith s "alice won nothing this time: 20 halves to 10" (S.lifeOf S.alice after) (Just 10)
+    Spec.assertEqWith s "bob pays exactly what he paid when alice won" (S.lifeOf S.bob after) (Just 6)
+    Spec.assertEqWith s "and so does carol" (S.lifeOf S.carol after) (Just 4)
+    Spec.assertEqWith s "the drawn SUBGAME did not decide the main game (CR 729.1a)" (GameState.result after) Nothing
+    Spec.assertEqWith s "Shahrazad resolved and left the stack" (GameState.stack after) []
 
   Spec.it s "CR 729.1a #153: a question names the game it came from, so a subgame's is not a main-game one" $ do
     -- The same cast-a-subgame fixture as the two cases around this one, run
@@ -962,7 +1006,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
         shuffles = length (filter isShuffled log_)
     -- If nesting had not terminated, runGamePure/Replay.record would not return.
     Spec.assertEqWith s "CR 729.6: the top-level main game resumed with no result" (GameState.result after) Nothing
-    Spec.assertEqWith s "CR 729.1b: bob took 3 from the level-1 subgame's follow-on" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "CR 729.1b: bob lost 3 to the level-1 subgame's follow-on" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "the top-level subgame spell left the stack" (GameState.stack after) []
     Spec.assertEqWith s "CR 729.6: two nested subgame levels each shuffle on setup and funnel-back (measured; a flat gate yields 4)" shuffles 8
 
@@ -2299,3 +2343,29 @@ cleanupStepSpec s registry = Spec.describe s "extra cleanup step (CR 514.3a)" $ 
     Spec.assertEqWith s "nothing triggered, so the SBA alone bought the priority round" asked 2
     Spec.assertEqWith s "and another cleanup step began" (GameState.phase after) (Phase.Ending EndingStep.Cleanup)
     Spec.assertEqWith s "with the turn not yet handed off" (GameState.activePlayer after) S.alice
+
+-- Shahrazad's board: three seats on distinct life totals, alice holding Shahrazad and
+-- two untapped Plains to cast it with, and libraries of `aliceLibrary`, 6 and 4
+-- Mountains. Runs one pass of the priority loop -- long enough for alice to cast
+-- and the spell to resolve -- and hands back the main game afterwards.
+--
+-- bob's 6 and carol's 4 are both under seven, so both deck on the subgame's
+-- opening hand (CR 729.3); `aliceLibrary` is the one dial, and it decides whether
+-- the subgame has a survivor. The Plains go on AFTER poolToLibraryG, which sweeps
+-- every object a player owns into their library.
+castShahrazad :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+castShahrazad mountain plains shahrazad aliceLibrary =
+  let g0 = Setup.emptyGame S.threePlayers
+      g1 = addManyG mountain aliceLibrary S.alice (addManyG mountain 6 S.bob (addManyG mountain 4 S.carol g0))
+      g2 = poolToLibraryG S.carol (poolToLibraryG S.bob (poolToLibraryG S.alice g1))
+      g3 = S.landsFor plains S.alice 2 g2
+      (_spellId, g4) = S.addHandCard shahrazad S.alice g3
+      atLife pid n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) pid (GameState.players gs)}
+      g5 = atLife S.carol 9 (atLife S.bob 13 (atLife S.alice 20 g4))
+      gStart =
+        g5
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.PrecombatMain,
+            GameState.priority = Just S.alice
+          }
+   in snd (Engine.runGamePure subgameAnswer gStart Engine.priorityLoop)
