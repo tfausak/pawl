@@ -85,9 +85,9 @@ data Pool
     -- redundant rather than vacuous: Ignorant Bliss really does put cards into
     -- exile that Riftsweeper may not name.
     CardsInExile
-  | -- | CR 115.1a and CR 404.1 in ONE slot -- Savior of Ollenbock's "up to one
-    -- other target creature from the battlefield or creature card from a
-    -- graveyard". SpellsAndPermanents' shape across two zones instead of two
+  | -- | CR 115.2 clause (a) exercised TWICE in one slot -- Savior of Ollenbock's
+    -- "up to one other target creature from the battlefield or creature card from
+    -- a graveyard". SpellsAndPermanents' shape across two zones instead of two
     -- kinds: the union of Creatures and CardsInGraveyard above, tagged as each of
     -- those pools tags its own members (ToCreature on the battlefield, ToObject in
     -- a graveyard).
