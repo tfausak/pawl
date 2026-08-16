@@ -1,31 +1,15 @@
 {
   "faces": [
     {
-      "keywords": [
-        {
-          "type": "Cycling",
-          "value": {
-            "cost": {
-              "mana": [
-                {
-                  "type": "OfType",
-                  "value": {
-                    "type": "Colored",
-                    "value": {
-                      "type": "Blue"
-                    }
-                  }
-                }
-              ]
-            },
-            "searchFor": null
-          }
-        }
-      ],
       "manaCost": [
         {
-          "type": "Generic",
-          "value": 1
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
         },
         {
           "type": "OfType",
@@ -37,7 +21,7 @@
           }
         }
       ],
-      "name": "Backslide",
+      "name": "Cyber Conversion",
       "spell": {
         "modes": [
           {
@@ -47,6 +31,23 @@
                   {
                     "type": "TurnFaceDown",
                     "value": {
+                      "characteristics": {
+                        "typeLine": {
+                          "subtypes": [
+                            {
+                              "type": "Cyberman"
+                            }
+                          ],
+                          "types": [
+                            {
+                              "type": "Artifact"
+                            },
+                            {
+                              "type": "Creature"
+                            }
+                          ]
+                        }
+                      },
                       "slot": "target"
                     }
                   }
@@ -55,12 +56,6 @@
             ],
             "targetSlots": {
               "target": {
-                "filter": {
-                  "type": "HasKeywordFamily",
-                  "value": {
-                    "type": "Morph"
-                  }
-                },
                 "pool": {
                   "type": "Creatures"
                 }

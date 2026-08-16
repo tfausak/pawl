@@ -269,6 +269,8 @@ library codec
     Pawl.Codec.ExtraPhase
     Pawl.Codec.ExtraPhaseSpec
     Pawl.Codec.Face
+    Pawl.Codec.FaceDownCharacteristics
+    Pawl.Codec.FaceDownCharacteristicsSpec
     Pawl.Codec.FaceSpec
     Pawl.Codec.Filter
     Pawl.Codec.FilterSpec
@@ -524,6 +526,8 @@ library codec
     Pawl.Codec.TriggerFrequencySpec
     Pawl.Codec.TriggerLimit
     Pawl.Codec.TriggerLimitSpec
+    Pawl.Codec.TurnFaceDown
+    Pawl.Codec.TurnFaceDownSpec
     Pawl.Codec.TurnScope
     Pawl.Codec.TurnScopeSpec
     Pawl.Codec.TurnUpR
@@ -976,6 +980,7 @@ library types
     Pawl.Types.ExtraPhase
     Pawl.Types.ExtraTurn
     Pawl.Types.Face
+    Pawl.Types.FaceDownCharacteristics
     Pawl.Types.Facing
     Pawl.Types.Filter
     Pawl.Types.ForEach
@@ -1148,6 +1153,7 @@ library types
     Pawl.Types.TriggerFrequency
     Pawl.Types.TriggerLimit
     Pawl.Types.TriggerSource
+    Pawl.Types.TurnFaceDown
     Pawl.Types.TurnScope
     Pawl.Types.TurnUpR
     Pawl.Types.TurnUpRewrite

@@ -92,7 +92,7 @@ morphCostOf oid gs = do
 -- asked only of the priority holder, exactly as CR 116.2a's land play relies on.
 canTurnFaceUp :: PlayerId -> ObjectId -> GameState -> Bool
 canTurnFaceUp pid oid gs =
-  fmap Object.facing (Game.lookupObject oid gs) == Just Facing.FaceDown
+  maybe False (Facing.isFaceDown . Object.facing) (Game.lookupObject oid gs)
     && Projection.controllerOf oid gs == Just pid
     && case morphCostOf oid gs of
       Nothing -> False

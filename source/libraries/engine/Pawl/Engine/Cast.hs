@@ -123,7 +123,7 @@ timingOk pid oid name gs = case proposedFace oid name gs of
 proposedFace :: ObjectId -> CardName.CardName -> GameState -> Maybe (Face.Face Card.Type.Card)
 proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
   Nothing -> Nothing
-  Just Facing.FaceDown -> Just Card.faceDownFace
+  Just (Facing.FaceDown listed) -> Just (Card.faceDownFace listed)
   Just Facing.FaceUp -> fmap (Game.resolveFace (Just name)) (Game.cardOf oid gs)
 
 -- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
@@ -765,7 +765,7 @@ castableSpells :: PlayerId -> GameState -> [(ObjectId, CardName.CardName, Facing
 castableSpells pid gs =
   let facings face =
         Facing.FaceUp
-          : [Facing.FaceDown | Maybe.isJust (Keyword.morphCost (Face.keywords face))]
+          : [Facing.faceDown | Maybe.isJust (Keyword.morphCost (Face.keywords face))]
       proposals oid =
         [ (oid, Face.name face, facing)
         | face <- foldMap Card.castableFaces (Game.cardOf oid gs),

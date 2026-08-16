@@ -215,7 +215,7 @@ costsFor name oid gs = fmap CandidateCost.cost (candidateCostsFor name oid gs)
 candidateCostsFor :: CardName.CardName -> ObjectId -> GameState -> [CandidateCost.CandidateCost]
 candidateCostsFor name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
-  Just obj | Object.facing obj == Facing.FaceDown -> [untagged faceDownCost]
+  Just obj | Facing.isFaceDown (Object.facing obj) -> [untagged faceDownCost]
   Just obj -> case Object.source obj of
     Source.OfCard printing ->
       let face = Game.resolveFace (Just name) (Printing.card printing)

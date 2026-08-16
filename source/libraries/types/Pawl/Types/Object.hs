@@ -67,11 +67,14 @@ data Object = MkObject
     --
     -- WHAT IT DOES, and it is not a characteristic (CR 110.5a): FaceDown
     -- SUBSTITUTES the object's printed characteristics wholesale, at
-    -- Pawl.Engine.Game.faceOf, for CR 708.2a's 2/2 creature with no name, no
-    -- text, no subtypes and no mana cost (Pawl.Engine.Card.faceDownFace). CR
-    -- 708.2 is why that is a substitution and not a CR 613 layer: the listed
-    -- characteristics ARE the object's copiable values, so they belong where the
-    -- fold starts rather than anywhere inside it.
+    -- Pawl.Engine.Game.faceOf, for the ones the FaceDown arm carries
+    -- (Pawl.Engine.Card.faceDownFace) -- CR 708.2's "those listed by the ability
+    -- or rules that allowed the spell or permanent to be face down", which is CR
+    -- 708.2a's 2/2 with no name, no text, no subtypes and no mana cost for
+    -- everything that lists none. CR 708.2 is why that is a substitution and not
+    -- a CR 613 layer: the listed characteristics ARE the object's copiable
+    -- values, so they belong where the fold starts rather than anywhere inside
+    -- it.
     --
     -- Reaches a SPELL as well as a permanent, though CR 110.5d gives only
     -- permanents status: CR 708.4 turns an object face down before it is put

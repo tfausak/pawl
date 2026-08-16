@@ -24,6 +24,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Counterability as Counterability
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.FaceDownCharacteristics as FaceDownCharacteristics
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -31,42 +32,33 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeInstance as ModeInstance
-import qualified Pawl.Types.Power as Power
-import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import Pawl.Types.TargetSlot (TargetSlot)
 import qualified Pawl.Types.TargetSlot as TargetSlot
-import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TypeLine as TypeLine
 
--- CR 708.2a: what a face-down object's characteristics ARE -- "a 2/2 face-down
--- creature with no text, no name, no subtypes, and no mana cost". CR 702.37a
--- words the morph cast's version identically, so one value serves both.
+-- CR 708.2: what a face-down object's characteristics ARE -- "no characteristics
+-- other than those LISTED by the ability or rules that allowed the spell or
+-- permanent to be face down". The list is the argument, and CR 708.2a is the
+-- list for an ability that names none: "a 2/2 face-down creature with no text,
+-- no name, no subtypes, and no mana cost". CR 702.37a words the morph cast's
+-- version identically, so FaceDownCharacteristics.defaultValue serves both.
 --
--- A SUBSTITUTION and not a layer, which is CR 708.2's own reading: "face-down
--- spells and face-down permanents have no characteristics other than those
--- listed ... Any listed characteristics are the COPIABLE VALUES of that object's
--- characteristics." Copiable values are where the CR 613 fold starts, so this
--- replaces the printed face at Pawl.Engine.Game.faceOf and every layer then runs
--- on top of it. CR 708.10 says as much from the other side -- a face-down
--- permanent that becomes a copy of another permanent still has these
--- characteristics.
+-- A SUBSTITUTION and not a layer, which is CR 708.2's own reading: "Any listed
+-- characteristics are the COPIABLE VALUES of that object's characteristics."
+-- Copiable values are where the CR 613 fold starts, so this replaces the printed
+-- face at Pawl.Engine.Game.faceOf and every layer then runs on top of it. CR
+-- 708.10 says as much from the other side -- a face-down permanent that becomes
+-- a copy of another permanent still has these characteristics.
 --
--- A CONSTANT and not a function of the card underneath, which is the whole point
--- of the rule: nothing about Ainok Tracker survives into what the face-down
--- permanent is. That is also why nothing here can leak the card's identity.
---
--- A constant is also all rule 708.2 needs while nothing that turns an object
--- face down LISTS characteristics, and neither way in does: morph lists nothing
--- and CR 708.2a fixes the default, and the rule's other producer -- a spell that
--- turns a FACE-UP permanent face down, Effect.TurnFaceDown -- lists nothing
--- either. An ability or effect that DOES list them would make this a function of
--- what allowed the object to be face down: disguise's and cloak's ward {2} is
--- not implemented (#922), nor is Cyber Conversion's "it's a 2/2 Cyberman
--- artifact creature" (#957).
+-- A function of the LIST and never of the card underneath, which is the whole
+-- point of the rule: nothing about Ainok Tracker survives into what the
+-- face-down permanent is. That is also why nothing here can leak the card's
+-- identity -- the argument comes from Object.facing, which records what allowed
+-- the object to be face down rather than what it was.
 --
 -- "No characteristics other than those listed" reaches past the fields rule
 -- 708.2a names: no colour (the empty colour indicator and absent mana cost make
@@ -74,6 +66,8 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- casting permissions and no additional or alternative costs. Every field below
 -- is that reading, written out rather than inherited, so a field added to
 -- Pawl.Types.Face has to be decided here rather than defaulting to the card's.
+-- The three the argument reaches are the ones a printing lists -- see
+-- Pawl.Types.FaceDownCharacteristics for which listings pawl cannot yet carry.
 --
 -- The one field that is not empty besides the type line and the P/T is `spell`:
 -- a face-down creature spell still has to RESOLVE, and Face.defaultSpell is
@@ -83,23 +77,18 @@ import qualified Pawl.Types.TypeLine as TypeLine
 --
 -- The empty name is CR 708.2a's "no name" and is the same value
 -- Pawl.Engine.Projection.baseCharacteristics gives an object with no card behind
--- it. It matches no printed card, which is what makes CR 708.4's "effects that
--- care about the characteristics of a spell will see only the face-down spell's
--- characteristics" true for a prohibition that names a card
--- (Pawl.Engine.PlayerEffect.prohibitsCasting).
-faceDownFace :: Face.Face Card.Card
-faceDownFace =
+-- it. No listing in the pool names one. It matches no printed card, which is
+-- what makes CR 708.4's "effects that care about the characteristics of a spell
+-- will see only the face-down spell's characteristics" true for a prohibition
+-- that names a card (Pawl.Engine.PlayerEffect.prohibitsCasting).
+faceDownFace :: FaceDownCharacteristics.FaceDownCharacteristics -> Face.Face Card.Card
+faceDownFace listed =
   Face.MkFace
     { Face.name = CardName.MkCardName Text.empty,
       Face.manaCost = Nothing,
-      Face.typeLine =
-        TypeLine.MkTypeLine
-          { TypeLine.supertypes = Set.empty,
-            TypeLine.types = Set.singleton CardType.Creature,
-            TypeLine.subtypes = Set.empty
-          },
-      Face.power = Just (Power.MkPower (Quantity.Literal 2)),
-      Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
+      Face.typeLine = FaceDownCharacteristics.typeLine listed,
+      Face.power = FaceDownCharacteristics.power listed,
+      Face.toughness = FaceDownCharacteristics.toughness listed,
       Face.loyalty = Nothing,
       Face.defense = Nothing,
       Face.keywords = Set.empty,

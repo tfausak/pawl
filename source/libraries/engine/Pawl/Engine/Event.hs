@@ -2110,7 +2110,7 @@ changeZoneEntering oid requestedDest position riders under = do
       -- (CR 708.4, changeZoneCasting), so the gate cannot live there. A card
       -- stating the rider on a move anywhere else says something no rule reads,
       -- which Pawl.CardSpec lints.
-      facing = if onto && EntryRiders.faceDown riders then Facing.FaceDown else Facing.FaceUp
+      facing = if onto && EntryRiders.faceDown riders then Facing.faceDown else Facing.FaceUp
   if refused
     then pure Nothing
     else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown facing (EntryRiders.exiledFaceDown riders)
@@ -2172,7 +2172,7 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requ
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceDown False
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.faceDown False
 
 -- CR 601.2a's move: the card goes onto the stack and "that player becomes its
 -- controller". The caster is carried BY THE MOVE, for the reason CR 709.3a
@@ -5284,9 +5284,9 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- normal copiable values restored, so there is nothing for CR 603.10a's
   -- look-back to recover and the live read is what CR 603.10's first sentence
   -- asks for. It is also the only read that can answer a narrowed form correctly
-  -- -- CR 708.2a gives a face-down permanent no subtypes and no name, so a Filter
-  -- applied to the pre-turning object would decline every "a Dragon is turned
-  -- face up" there is.
+  -- -- CR 708.2 gives a face-down permanent only the characteristics its listing
+  -- names and never the card's, so a Filter applied to the pre-turning object
+  -- would decline every "a Dragon is turned face up" there is.
   --
   -- viewWithLastKnown rather than viewOfObject for PermanentEnters' reason: a
   -- permanent turned face up and gone again before the CR 117.5 boundary is still
