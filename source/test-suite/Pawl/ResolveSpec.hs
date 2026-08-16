@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Engine.Resolve and Pawl.Engine.Target: targeting legality, spell resolution, and
--- the CR 608.2b fizzle.
+-- Covers Pawl.Engine.Resolve, Pawl.Engine.Target and Pawl.Engine.Blight: targeting legality,
+-- spell resolution, the CR 608.2b fizzle, and CR 701.68 in both its effect and its cost position.
 module Pawl.ResolveSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -9250,6 +9250,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   bolsterSpec s registry
   amassSpec s registry
   blightSpec s registry
+  blightCostSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
   soulfireEruptionSpec s registry
@@ -9710,6 +9711,193 @@ blighting oid p = case p of
 -- object is gone, which is what keeps "took none" apart from "is not there".
 minusCountersOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
 minusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject oid gs)
+
+-- CR 701.68 blight as a COST (CostComponent.Blight), which is the position most of
+-- the pool prints it in and the one CR 701.68b's "they can't choose to blight"
+-- decides. Two cards, one for each of the two moments a cost is paid:
+--
+--   * Dawnhand Dissident {B} 1/2 Creature -- Elf Warlock
+--     (data/cards/dawnhand-dissident.json): "{T}, Blight 1: Surveil 1." CR 602.1b
+--     and CR 601.2h -- paid as the ability is ACTIVATED, which is what the first
+--     case reads off a board whose stack has not resolved yet. (A third printed
+--     ability, casting creature spells exiled with it by removing counters, is not
+--     transcribed -- #1648. Omitting a permission leaves pawl's card STRICTER than
+--     printed.)
+--
+--   * Boggart Mischief {2}{B} Kindred Enchantment -- Goblin
+--     (data/cards/boggart-mischief.json): "When this enchantment enters, you may
+--     blight 1. If you do, create two 1/1 black and red Goblin creature tokens."
+--     CR 118.12's "[A player] may [do something]. If [that player] does, [effect]"
+--     -- a cost paid on RESOLUTION, so rule 701.68b's refusal arrives as CR 118.3's
+--     unpayable cost and the offer is never made.
+--
+-- (Both cards' names, costs, type lines, P/T and oracle text checked against
+-- Scryfall.)
+--
+-- WHY BOGGART MISCHIEF and not one of the six creatures printing the same "you may
+-- blight": an ENCHANTMENT can enter while its controller controls no creature, and
+-- a creature cannot. The negative board below would be unreachable with any of
+-- them.
+--
+-- The negative is the positive board with the two creatures moved to bob's seat --
+-- same printings, same lands, same stock, same trigger, and bob's Typhoid Rats
+-- sitting on the battlefield either way, so "controls no creature" is what differs
+-- and not "no creature exists".
+blightCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blightCostSpec s registry = Spec.describe s "BlightCost" $ do
+  let mischiefBoard pid = do
+        swamp <- S.printingOf s registry "Swamp"
+        mischief <- S.printingOf s registry "Boggart Mischief"
+        piker <- S.printingOf s registry "Goblin Piker"
+        wall <- S.printingOf s registry "Wall of Stone"
+        rats <- S.printingOf s registry "Typhoid Rats"
+        pure (mischiefEnters swamp mischief piker wall rats pid)
+      dissidentBoard pid = do
+        swamp <- S.printingOf s registry "Swamp"
+        dissident <- S.printingOf s registry "Dawnhand Dissident"
+        piker <- S.printingOf s registry "Goblin Piker"
+        wall <- S.printingOf s registry "Wall of Stone"
+        pure (dissidentOnBoard swamp dissident piker wall pid)
+  -- CR 602.1b / CR 601.2h: the counters are on the board with the ability still
+  -- ON THE STACK. No effect-position blight can pass this case -- an
+  -- Effect.Blight puts its counters as the ability RESOLVES -- and the untouched
+  -- library beside it is what says the resolution has not happened.
+  Spec.it s "CR 601.2h whole card: Dawnhand Dissident's blight is paid as the ability is activated" $ do
+    (dissidentId, pikerId, wallId, board) <- dissidentBoard S.alice
+    activated <- activateBlighting s wallId dissidentId board
+    Spec.assertEqWith s "the Wall, whom alice named, took the counter" (minusCountersOn wallId activated) (Just 1)
+    Spec.assertEqWith s "the Piker took none" (minusCountersOn pikerId activated) (Just 0)
+    Spec.assertEqWith s "nor did the Dissident itself" (minusCountersOn dissidentId activated) (Just 0)
+    Spec.assertEqWith s "the {T} beside it was paid too" (fmap Object.tapped (Game.lookupObject dissidentId activated)) (Just TapState.Tapped)
+    Spec.assertEqWith s "and the ability is still on the stack: nothing has resolved" (length (GameState.stack activated)) 1
+    Spec.assertEqWith s "so the surveil has not happened -- both cards are still in the library" (length (Game.zoneMembers Zone.Library S.alice activated)) 2
+  -- The same board and the same activation, differing only in the answer: the
+  -- engine makes no choice, so the Dissident is as reachable as the Wall.
+  Spec.it s "CR 701.68a the same activation answered another way counters that creature" $ do
+    (dissidentId, pikerId, wallId, board) <- dissidentBoard S.alice
+    activated <- activateBlighting s dissidentId dissidentId board
+    Spec.assertEqWith s "the Dissident blighted itself" (minusCountersOn dissidentId activated) (Just 1)
+    Spec.assertEqWith s "the Wall took none" (minusCountersOn wallId activated) (Just 0)
+    Spec.assertEqWith s "nor did the Piker" (minusCountersOn pikerId activated) (Just 0)
+  -- CR 701.68a's "a creature YOU CONTROL", read through the cost. The same four
+  -- printings with the other two creatures on bob's seat, and the answer names
+  -- bob's Piker on both boards: it is never offered, so the Dissident -- alice's
+  -- only creature, and therefore no choice at all -- pays.
+  Spec.it s "CR 701.68a an opponent's creature cannot pay your blight cost" $ do
+    (dissidentId, pikerId, wallId, board) <- dissidentBoard S.bob
+    activated <- activateBlighting s pikerId dissidentId board
+    Spec.assertEqWith s "the Dissident, alice's only creature, took the counter" (minusCountersOn dissidentId activated) (Just 1)
+    Spec.assertEqWith s "bob's Piker, whom the answer named, took none" (minusCountersOn pikerId activated) (Just 0)
+    Spec.assertEqWith s "nor did his Wall" (minusCountersOn wallId activated) (Just 0)
+  -- CR 118.12's positive branch over a blight: paying it makes the tokens.
+  Spec.it s "CR 118.12 whole card: paying Boggart Mischief's blight creates the two Goblins" $ do
+    (pikerId, wallId, ratsId, onStack) <- mischiefBoard S.alice
+    let ((_, after), transcript) = Replay.record (paysBlighting wallId) onStack Stack.resolveTop
+    Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    Spec.assertEqWith s "the Wall, whom she named, took the counter" (minusCountersOn wallId after) (Just 1)
+    Spec.assertEqWith s "her Piker took none" (minusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "nor did bob's Rats" (minusCountersOn ratsId after) (Just 0)
+    Spec.assertEqWith s "and the two Goblins arrived" (length (S.tokensOf after)) 2
+  -- The same board and the same trigger, differing in NOTHING but the answer.
+  -- alice COULD pay, so the empty board below is her refusal rather than CR 118.3's.
+  Spec.it s "CR 118.12 declining Boggart Mischief's blight makes no token and no counter" $ do
+    (pikerId, wallId, _, onStack) <- mischiefBoard S.alice
+    let ((_, after), transcript) = Replay.record S.identityAnswer onStack Stack.resolveTop
+    Spec.assertEqWith s "alice was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    Spec.assertEqWith s "the Wall took nothing" (minusCountersOn wallId after) (Just 0)
+    Spec.assertEqWith s "nor did the Piker" (minusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "and no token was created" (length (S.tokensOf after)) 0
+  -- CR 701.68b, the whole point of the pair: a player who controls no creature
+  -- "can't choose to blight", so the option is NOT OFFERED rather than offered and
+  -- declined. Proved by the transcript under the interpreter that WOULD have paid,
+  -- on a board that still holds a creature -- bob's Rats -- so nothing here passes
+  -- for want of a creature on the battlefield.
+  Spec.it s "CR 701.68b whole card: a controller with no creature is never offered the blight" $ do
+    (pikerId, wallId, ratsId, onStack) <- mischiefBoard S.bob
+    let ((_, after), transcript) = Replay.record (paysBlighting ratsId) onStack Stack.resolveTop
+    Spec.assertEqWith s "alice was never asked" (payResponses transcript) []
+    Spec.assertEqWith s "bob's Rats, whom the answer named, took nothing" (minusCountersOn ratsId after) (Just 0)
+    Spec.assertEqWith s "nor did his Piker" (minusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "nor his Wall" (minusCountersOn wallId after) (Just 0)
+    Spec.assertEqWith s "and no token was created" (length (S.tokensOf after)) 0
+
+-- Boggart Mischief cast from alice's hand off three Swamps and resolved, with its
+-- CR 603.6a enters trigger settled onto the stack but NOT resolved --
+-- kinGuardOnStack's shape. Goblin Piker and Wall of Stone go to `pid`; Typhoid
+-- Rats always to bob. Returns the three creatures and that state.
+--
+-- The seat is the ONLY parameter, so the two boards below are the same five
+-- printings, the same three Swamps and the same trigger.
+--
+-- Toughnesses 1, 8 and 1 across the three, and the two that can be candidates are
+-- 1 and 8, so which creature took a counter is readable off the board rather than
+-- inferred.
+mischiefEnters ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+mischiefEnters swamp mischief piker wall rats pid =
+  let (pikerId, g1) = S.addCreature piker pid (S.landsInPlay swamp 3)
+      (wallId, g2) = S.addCreature wall pid g1
+      (ratsId, g3) = S.addCreature rats S.bob g2
+      (g4, spellId) = S.handOne mischief g3
+      cast = S.runPure S.identityAnswer g4 (S.cast S.alice spellId)
+   in (pikerId, wallId, ratsId, S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
+
+-- Dawnhand Dissident on alice's battlefield, Goblin Piker and Wall of Stone on
+-- `pid`'s, and two Swamps in alice's library for the surveil to move. Returns the
+-- three creatures and that state.
+--
+-- Two library cards, so the surveil neither empties the library (CR 104.3c) nor
+-- leaves "the resolution has not happened" and "there was nothing to surveil"
+-- looking alike.
+dissidentOnBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+dissidentOnBoard swamp dissident piker wall pid =
+  let (dissidentId, g1) = S.addCreature dissident S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g2) = S.addCreature piker pid g1
+      (wallId, g3) = S.addCreature wall pid g2
+      (_, g4) = S.addLibraryCard swamp S.alice g3
+      (_, g5) = S.addLibraryCard swamp S.alice g4
+   in (dissidentId, pikerId, wallId, g5 {GameState.priority = Just S.alice})
+
+-- alice activates the Dissident's FIRST projected ability -- "{T}, Blight 1:
+-- Surveil 1" -- naming `wanted` for the blight, and the stack is left alone. The
+-- Activate.activatable assertion is what keeps the case honest: without it, a
+-- board where the ability could not legally have been activated at all would still
+-- show the counters, since Activate.activateAbility trusts its caller.
+activateBlighting ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  m GameState.GameState
+activateBlighting s wanted oid gs = case Projection.abilitiesOf oid gs of
+  surveil : _ -> do
+    Spec.assertBool s (Activate.activatable S.alice oid surveil gs) "the ability is activatable"
+    pure (S.runPure (blighting wanted) gs (Activate.activateAbility S.alice oid surveil))
+  [] -> do
+    Spec.assertFailure s "expected the permanent to carry an activated ability"
+    pure gs
+
+-- Answers Prompt.ChooseBlight with a named creature and Prompt.ChooseToPay with
+-- Pays, deferring everything else to S.identityAnswer. Both halves are PINNED, so
+-- a mutation cannot be repaired by an answerer that goes looking for a legal
+-- option.
+paysBlighting :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+paysBlighting oid p = case p of
+  Prompt.ChooseBlight {} -> oid
+  _ -> paysFor S.alice p
 
 -- Answers Prompt.ChooseAmass with a named Army, deferring everything else to
 -- S.identityAnswer. PINNED BY ID rather than picked by searching the candidates, so

@@ -115,6 +115,23 @@ doorSpec s registry =
       Spec.assertBool s (Cost.canPayComponent S.alice onField CostComponent.SacrificeThis gs1) "a controlled permanent pays"
       Spec.assertBool s (not (Cost.canPayComponent S.alice inHand CostComponent.SacrificeThis gs1)) "a card in hand does not"
       Spec.assertBool s (not (Cost.canPayComponent S.bob onField CostComponent.SacrificeThis gs1)) "another player's permanent does not"
+    -- CR 701.68b: "if a player is given the choice to blight but is unable to
+    -- put N -1/-1 counters on a creature they control (usually because they
+    -- control no creatures), they can't choose to blight."
+    --
+    -- The one component whose payability asks about the payer's WHOLE
+    -- battlefield rather than about the object the cost is on -- which is why
+    -- `oid` is the same Piker in all four readings and only the SEATS move. The
+    -- Piker is on the battlefield throughout, so nothing here answers False for
+    -- want of a permanent.
+    Spec.it s "CR 701.68b Blight is payable only by a player who controls a creature" $ do
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (oid, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+      Spec.assertBool s (Cost.canPayComponent S.alice oid (CostComponent.Blight 1) gs) "a creature its payer controls pays"
+      Spec.assertBool s (not (Cost.canPayComponent S.bob oid (CostComponent.Blight 1) gs)) "an opponent's creature does not"
+      -- CR 122.6 puts any number of counters on any creature, so no N outruns a
+      -- 2/1 -- rule 701.68b's "unable" has only the cause the rule itself names.
+      Spec.assertBool s (Cost.canPayComponent S.alice oid (CostComponent.Blight 9) gs) "and no N is too large for a candidate that exists"
     -- CR 702.29a's "Discard this card", the exact mirror of SacrificeThis
     -- above: one names a permanent its controller owns the choice of, the other
     -- names a card in a hand. Asked of the ZONE and the OWNER, because CR 108.4
