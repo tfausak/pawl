@@ -4984,8 +4984,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- APNAP for the order several blighters are asked in (CR 101.4), Scry's and
   -- Surveil's reading and for their reason: rule 701.68 states no order of its
-  -- own. Each blighter's counters land before the next is asked, which CR 122.6
-  -- makes unobservable across seats -- no player's pool holds another's creature.
+  -- own.
+  --
+  -- Not implemented: rule 101.4's actions then happen SIMULTANEOUSLY, and each
+  -- blighter's counters are placed before the next is asked instead (#1651).
   --
   -- MANDATORY here, so the empty pool is CR 101.3's no-op rather than rule
   -- 701.68b's refusal, and the answer is discarded.
