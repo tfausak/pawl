@@ -10,7 +10,9 @@
 -- mandatory spell-side additional cost), Headless Skaab (an additional cost paid
 -- out of a zone that is not the battlefield), Fireblast (an alternative cost
 -- with no mana in it at all) and Asmoranomardicadaistinaculdacar (an alternative
--- cost applied to an unpayable one, CR 118.6a).
+-- cost applied to an unpayable one, CR 118.6a). Asmoranomardicadaistinaculdacar
+-- carries a sixth gate on its other ability: a Sacrifice component with a count
+-- and a criterion, paid with Golden Eggs.
 module Pawl.CostSpec where
 
 import qualified Control.Monad as Monad
@@ -48,6 +50,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
@@ -73,6 +76,7 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sacrifice as Sacrifice
 import qualified Pawl.Types.Scope as Scope
@@ -964,12 +968,11 @@ asmorBoard swamp asmorPrinting vultures =
 -- sentence and nothing else.
 --
 -- Not implemented: the enters-the-battlefield tutor, which needs a Filter that
--- names a card by name (#1228), and "Sacrifice two Foods: Target creature deals 6
--- damage to itself", whose every part is now sayable -- Effect.DealDamage's
--- `dealer` names the same slot its `ref` does -- but which no board can pay,
--- since no card in the pool is a Food (#1603). Both are abilities that
--- would only ever help the controller, so pawl's card is stricter than the
--- printing rather than weaker.
+-- names a card by name (#1228). That ability would only ever help the
+-- controller, so pawl's card is stricter than the printing rather than weaker.
+--
+-- "Sacrifice two Foods: Target creature deals 6 damage to itself" IS
+-- transcribed, and asmorFoodSpec below is what exercises it.
 asmorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 asmorSpec s registry =
   Spec.describe s "Asmoranomardicadaistinaculdacar" $ do
@@ -1033,6 +1036,135 @@ asmorSpec s registry =
       Spec.assertEqWith s "one spell on the stack" (length (GameState.stack cast)) 1
       Spec.assertEqWith s "the Swamp paid for it" (S.tappedCount S.alice cast) 1
       Spec.assertEqWith s "and it resolved as a 3/3" (entered >>= \oid -> S.powerToughnessOf oid resolved) (Just (3, 3))
+
+-- alice controls Asmoranomardicadaistinaculdacar and, beside it, `foods` Golden
+-- Eggs ({2} Artifact -- Food) and `others` Chromatic Spheres ({1} Artifact, no
+-- subtype at all). The two counts are what a paired board varies: keeping
+-- `foods + others` fixed leaves the boards identical in seats, phase, priority,
+-- stack and artifact count, so the only thing left to flip a gate is CR 205.3g's
+-- subtype.
+--
+-- bob controls the Child of Night -- a 2/1 with lifelink, and the OBSERVER: CR
+-- 120.3f pays the damage source's controller, so bob's life total answers only
+-- if the creature dealt the damage. alice's ability has no lifelink, and alice
+-- is not bob.
+--
+-- No mana anywhere on the board, deliberately: "Sacrifice two Foods" has no mana
+-- part, so a negative built on this board cannot be failing for want of mana.
+asmorFoodBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Int ->
+  Int ->
+  (ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight foods others =
+  let addEach printing n gs0 =
+        List.foldl'
+          (\(oids, g) _ -> let (oid, g') = S.addCreature printing S.alice g in (oids <> [oid], g'))
+          ([], gs0)
+          (replicate n ())
+      (asmor, gs1) = S.addCreature asmorPrinting S.alice (Setup.emptyGame S.bothPlayers)
+      (eggs, gs2) = addEach goldenEgg foods gs1
+      (_, gs3) = addEach sphere others gs2
+      (victim, gs4) = S.addCreature childOfNight S.bob gs3
+   in ( asmor,
+        eggs,
+        victim,
+        gs4
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Both choices Asmor's Food ability raises, PINNED rather than searched: an
+-- answerer that hunted for a legal option would repair a mutation by finding
+-- another one, and the test would stay green while the engine's own choice was
+-- broken.
+asmorFoodAnswer :: Set.Set ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+asmorFoodAnswer eggs victim p = case p of
+  Prompt.ChooseSacrifices {} -> eggs
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature victim))) sets
+  _ -> S.identityAnswer p
+
+-- An Activate of this source, among the actions on offer.
+isActivateOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isActivateOf oid action = case action of
+  Action.Type.Activate src _ -> src == oid
+  _ -> False
+
+-- "Sacrifice two Foods: Target creature deals 6 damage to itself" -- CR 701.21a
+-- as a cost with a count and a criterion, and CR 120.2b as the effect ("the
+-- spell or ability will specify which object deals that damage"), on the one
+-- printing that writes both.
+asmorFoodSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+asmorFoodSpec s registry =
+  Spec.describe s "AsmoranomardicadaistinaculdacarFood" $ do
+    -- The whole card. THREE Eggs, so which two pay is a real choice; the pair is
+    -- pinned, and both halves are asserted -- how many Foods left, and that they
+    -- were the two named. The damage is read through the Child of Night's own
+    -- lifelink BEFORE the marked damage, because the marked damage alone would
+    -- pass whichever object the engine credited.
+    Spec.it s "CR 701.21a/120.2b whole card: two Foods pay, and the target deals itself 6" $ do
+      asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+      goldenEgg <- S.printingOf s registry "Golden Egg"
+      sphere <- S.printingOf s registry "Chromatic Sphere"
+      childOfNight <- S.printingOf s registry "Child of Night"
+      let (asmor, eggs, victim, gs) = asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight 3 0
+          pick = Set.fromList (take 2 eggs)
+          answer :: Prompt.Prompt r -> r
+          answer = asmorFoodAnswer pick victim
+          activated = S.runPure answer gs (Activate.activateAbility S.alice asmor (theAbility asmorPrinting))
+          resolved = S.runPure answer activated Stack.resolveTop
+          eggName = CardName.MkCardName (Text.pack "Golden Egg")
+      Spec.assertEqWith s "exactly two of the three Foods were sacrificed" (S.countOnBattlefieldByName eggName S.alice activated) 1
+      Spec.assertEqWith s "and they are the two she named" (Set.intersection pick (GameState.battlefield activated)) Set.empty
+      Spec.assertEqWith s "the ability is on the stack, so the sacrifice was a COST" (length (GameState.stack activated)) 1
+      Spec.assertEqWith s "CR 120.3f bob gained six off his own creature's lifelink" (S.lifeOf S.bob resolved) (Just 26)
+      Spec.assertEqWith s "and alice, who controls the ability, gained nothing" (S.lifeOf S.alice resolved) (Just 20)
+      Spec.assertEqWith s "the Child of Night dealt it, not the ability" (fmap DamageEvent.source (S.damageEventsOf resolved)) [victim]
+      Spec.assertEqWith s "six marked on itself" (S.damageOf victim resolved) (Just 6)
+      Spec.assertBool s (not (S.onBattlefield victim (S.settleSba resolved))) "CR 704.5g the 2/1 dies to its own six"
+    -- CR 701.21a's prompt, on the same fixture: three candidates for two make it
+    -- a real choice, and exactly two elide it. The boards carry three artifacts
+    -- either way.
+    Spec.it s "CR 701.21a three Foods raise ChooseSacrifices; exactly two elide it" $ do
+      asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+      goldenEgg <- S.printingOf s registry "Golden Egg"
+      sphere <- S.printingOf s registry "Chromatic Sphere"
+      childOfNight <- S.printingOf s registry "Child of Night"
+      let (asmorThree, _, _, three) = asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight 3 0
+          (asmorTwo, _, _, two) = asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight 2 1
+          ability = theAbility asmorPrinting
+          askedThree = answersFor S.identityAnswer three (Activate.activateAbility S.alice asmorThree ability)
+          askedTwo = answersFor S.identityAnswer two (Activate.activateAbility S.alice asmorTwo ability)
+      Spec.assertBool s (wasAskedToSacrifice askedThree) "asked with three"
+      Spec.assertBool s (not (wasAskedToSacrifice askedTwo)) "not asked with exactly two"
+    -- The negative, as a pair differing in exactly one thing: three Golden Eggs
+    -- against one Golden Egg and two Chromatic Spheres. Same seats, same phase,
+    -- same priority, same empty stack, three artifacts under alice either way --
+    -- and the cost, asserted here, has an EMPTY mana part, so the gate cannot be
+    -- turning on mana. What is left is how many of those artifacts are Foods.
+    Spec.it s "CR 118.3 one Food cannot pay 'Sacrifice two Foods'; three can" $ do
+      asmorPrinting <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+      goldenEgg <- S.printingOf s registry "Golden Egg"
+      sphere <- S.printingOf s registry "Chromatic Sphere"
+      childOfNight <- S.printingOf s registry "Child of Night"
+      let (asmorThree, _, _, three) = asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight 3 0
+          (asmorOne, _, _, one) = asmorFoodBoard asmorPrinting goldenEgg sphere childOfNight 1 2
+          ability = theAbility asmorPrinting
+          component = CostComponent.Sacrifice (Sacrifice.MkSacrifice 2 (Filter.Type.HasSubtype Subtype.Food))
+      Spec.assertEqWith s "the cost is two Foods and no mana at all" (ActivatedAbility.cost ability) (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [component])
+      Spec.assertEqWith s "both boards have an empty stack" (GameState.stack three, GameState.stack one) ([], [])
+      Spec.assertEqWith s "and alice has priority on both" (GameState.priority three, GameState.priority one) (Just S.alice, Just S.alice)
+      Spec.assertBool s (Cost.canPayComponent S.alice asmorThree component three) "three Foods pay the component"
+      Spec.assertBool s (not (Cost.canPayComponent S.alice asmorOne component one)) "one Food beside two non-Foods does not"
+      Spec.assertBool s (Activate.activatable S.alice asmorThree ability three) "so the ability is activatable with three"
+      Spec.assertBool s (not (Activate.activatable S.alice asmorOne ability one)) "and is not with one"
+      Spec.assertBool s (any (isActivateOf asmorThree) (Action.legalActions S.alice three)) "and it is menued with three"
+      Spec.assertBool s (not (any (isActivateOf asmorOne) (Action.legalActions S.alice one))) "and not menued with one"
 
 -- The two cross-checks: Fireblast's alternative cost against the projection
 -- (Blood Moon, CR 613 layer 4) and against P7's cost modification (Thalia, CR
@@ -1458,6 +1590,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   safeholdSentrySpec s registry
   fireblastSpec s registry
   asmorSpec s registry
+  asmorFoodSpec s registry
   crossCheckSpec s registry
   longtuskCubSpec s registry
   thrastaSpec s registry
