@@ -85,7 +85,7 @@ canBlight pid gs = not (null (candidates pid gs))
 -- N of zero still chooses, and CR 122.6 is why the choice is made anyway: rule
 -- 701.68a's process is "put N -1\/-1 counters on a creature you control", so the
 -- creature is chosen whatever N is, and CR 701.68c's "blighted creature" is that
--- creature. Nothing records it yet (#1492).
+-- creature. Nothing records it yet (gap #1492).
 blight :: PlayerId -> ObjectId -> Natural -> Game Bool
 blight pid resolving n = do
   gs <- State.get

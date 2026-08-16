@@ -9721,8 +9721,8 @@ minusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOn
 --     and CR 601.2h -- paid as the ability is ACTIVATED, which is what the first
 --     case reads off a board whose stack has not resolved yet. (A third printed
 --     ability, casting creature spells exiled with it by removing counters, is not
---     transcribed -- #1648. Omitting a permission leaves pawl's card STRICTER than
---     printed.)
+--     transcribed -- gap #1648. Omitting a permission leaves pawl's card STRICTER
+--     than printed.)
 --
 --   * Boggart Mischief {2}{B} Kindred Enchantment -- Goblin
 --     (data/cards/boggart-mischief.json): "When this enchantment enters, you may

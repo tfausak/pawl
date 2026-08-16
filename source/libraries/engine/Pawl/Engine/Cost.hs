@@ -660,7 +660,7 @@ substituteXInComponent x component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> component
   CostComponent.PutPlusOneCountersOnThis _ -> component
   -- Not this arm's X: Soul Immolation's "blight X" is announced under a bound
-  -- rule 701.68a does not state, so it has no spelling here at all (#1646).
+  -- rule 701.68a does not state, so it has no spelling here at all (gap #1646).
   CostComponent.Blight _ -> component
   CostComponent.ExileThisFromGraveyard -> component
   CostComponent.ExileCardsFromGraveyard {} -> component
@@ -2336,7 +2336,7 @@ payComponent pid oid component = case component of
   -- effect-grain patterns in `data/cards` (Doubling Season, Hardened Scales) all
   -- name +1/+1 counters, and Vorinclex, Monstrous Raider's name a PLAYER, which
   -- CR 614.16 does not gate and which applies to a cost payment either way
-  -- (#1647).
+  -- (gap #1647).
   CostComponent.Blight n -> do
     blighted <- Blight.blight pid oid n
     pure (if blighted then Payment.Paid else Payment.Unpaid)
