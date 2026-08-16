@@ -68,4 +68,12 @@ spec s = Spec.describe s "Pawl.Codec.ActivationRestriction" $ do
       ActivationRestriction.codec
       ActivationRestriction.AttackedThisStep
       """ {"type":"AttackedThisStep"} """
+  -- Trap Runner's "activate only during combat after blockers are declared"
+  -- (CR 506.7b through CR 506.7g).
+  Spec.it s "AfterBlockersDeclared" $
+    Common.assertCodec
+      s
+      ActivationRestriction.codec
+      ActivationRestriction.AfterBlockersDeclared
+      """ {"type":"AfterBlockersDeclared"} """
   Spec.it s "has a schema" $ Common.assertHasSchema s ActivationRestriction.codec

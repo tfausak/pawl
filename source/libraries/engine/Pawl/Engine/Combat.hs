@@ -59,6 +59,7 @@ emptyCombat =
       Combat.joinedUnder = Map.empty,
       Combat.attacked = Set.empty,
       Combat.declaredAttacked = Set.empty,
+      Combat.blockersDeclared = False,
       Combat.defender = Nothing
     }
 
@@ -66,7 +67,10 @@ emptyCombat =
 -- planeswalkers are removed from combat -- which by CR 506.4 is what stops them
 -- being attacking and blocking creatures. Resetting `defender` alongside them is
 -- CR 506.2, not CR 511.3: the designation is scoped to the combat phase, so it
--- cannot survive the phase ending.
+-- cannot survive the phase ending. Combat.blockersDeclared is the same kind of
+-- passenger, on CR 506.7c's authority: "if a turn has multiple combat phases,
+-- such spells may be cast at an appropriate time during any of them", so the
+-- next combat phase has to ask CR 506.7b's question again from scratch.
 --
 -- Engine.runStep calls this as the end of combat step ENDS, alongside CR 500.5's
 -- mana emptying -- not from runTurnBasedActions, which is a step's opening and
@@ -220,6 +224,30 @@ attackableBattles defender gs =
 attackedThisStep :: PlayerId -> GameState -> Bool
 attackedThisStep pid gs =
   Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
+
+-- CR 506.7b: is the game past the point "only during combat after blockers are
+-- declared" names?
+--
+-- TWO readers and one question, exactly as attackedThisStep above:
+-- Pawl.Types.CastingRestriction.AfterBlockersDeclared (Curtain of Light) and
+-- Pawl.Types.ActivationRestriction.AfterBlockersDeclared (Trap Runner). Here the
+-- sharing is a RULE rather than an observation -- CR 506.7g says rules 506.7 and
+-- 506.7a-f govern such an activation just as they govern such a cast.
+--
+-- Asked of the game and not of a player: CR 506.7 describes a point in the turn,
+-- and neither printing narrows it by seat.
+--
+-- No conjunct about the current phase, which is CR 511.3 rather than an
+-- omission. Combat.blockersDeclared is written only by declareBlockers below and
+-- cleared only by clearCombat, so it is True for exactly the declare blockers,
+-- combat damage and end of combat steps of a combat phase whose declare blockers
+-- step ran -- CR 506.7f's skipped step and CR 506.7c's second combat phase both
+-- falling out of that. It inherits one caveat with the rest of the record: a
+-- combat phase whose end of combat STEP alone is skipped never reaches
+-- clearCombat, and Pawl.Engine.Engine.skipWholePhase's note is where that case
+-- is written down.
+afterBlockersDeclared :: GameState -> Bool
+afterBlockersDeclared = Combat.blockersDeclared . GameState.combat
 
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it
 -- been removed from combat since the declaration?
@@ -1710,6 +1738,18 @@ putOntoBattlefieldAttacking oid = do
 -- declareBlockers again.
 declareBlockers :: Game ()
 declareBlockers = do
+  -- CR 506.7b's boundary, raised BEFORE the short-circuit below and before any
+  -- prompt, because the rule opens the window "regardless of whether any
+  -- blockers are actually declared" -- an empty declaration, or a combat whose
+  -- attackers were all removed after CR 508.8 asked its question, still passes
+  -- the point the clause names. afterBlockersDeclared is the reader.
+  --
+  -- The PLACEMENT is a regression fence rather than a proved behaviour: moving
+  -- this line inside the guard below leaves the suite green, because no board in
+  -- the pool reaches this step with nothing attacking -- CR 508.8 skips the step
+  -- outright when nothing was declared, and removing an attacker afterwards
+  -- needs an effect no card here has.
+  State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockersDeclared = True}}
   start <- State.get
   let attacking = Map.keys (Combat.attackers (GameState.combat start))
   Monad.unless (null attacking) $ do
