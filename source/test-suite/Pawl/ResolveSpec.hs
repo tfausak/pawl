@@ -9258,6 +9258,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   bolsterSpec s registry
   amassSpec s registry
   blightSpec s registry
+  blightPlayerSpec s registry
   blightCostSpec s registry
   countOnLuckSpec s registry
   actOnImpulseSpec s registry
@@ -9587,8 +9588,10 @@ resolveFor pid answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast pid spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
--- CR 701.68 blight, which is an opcode: Effect.Blight over a Quantity, whose
--- candidate pool and counter kind are rule 701.68a's rather than the card's.
+-- CR 701.68 blight, which is an opcode: Effect.Blight over a PlayerRef and a
+-- Quantity, whose candidate pool and counter kind are rule 701.68a's rather than
+-- the card's. A bare printed "blight N" is CR 109.5's `Relative You`, which is
+-- what every case here reads; blightPlayerSpec below is the other reading.
 --
 -- Sinister Gnarlbark {2}{B} 0/4 Creature -- Treefolk Warlock
 -- (data/cards/sinister-gnarlbark.json): "At the beginning of your end step, draw a
@@ -9719,6 +9722,128 @@ blighting oid p = case p of
 -- object is gone, which is what keeps "took none" apart from "is not there".
 minusCountersOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
 minusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject oid gs)
+
+-- CR 701.68a's "you" is whoever the instruction ADDRESSES, which need not be the
+-- resolving controller -- the axis Effect.Blight's PlayerRef adds.
+--
+-- High Perfect Morcant {2}{B}{G} 4/4 Legendary Creature -- Elf Noble
+-- (data/cards/high-perfect-morcant.json): "Whenever High Perfect Morcant or
+-- another Elf you control enters, each opponent blights 1." (Name, cost, type
+-- line, P/T and oracle text checked against Scryfall.) Its second printed ability,
+-- "Tap three untapped Elves you control: Proliferate", is not transcribed: no cost
+-- component taps a COUNT of creatures matching a filter -- CostComponent's
+-- TapForTotalPower states an aggregate power threshold instead -- gap #1650.
+-- Omitting a permission leaves pawl's card STRICTER than printed.
+--
+-- WHY MORCANT and not Champion of the Weird, which #1491's body nominates: that
+-- card's "As an additional cost to cast this spell, behold a Goblin and exile it"
+-- is CR 701.4's keyword action, which pawl does not have (gap #876). Dropping an
+-- additional cost would leave pawl's card WEAKER than printed, which disqualifies
+-- it.
+--
+-- THREE SEATS, because "each opponent" and "every player but you" and "the one
+-- other seat" are the same set on a two-player board. alice is the active player,
+-- so APNAP order is alice, bob, carol.
+--
+-- Every seat holds a 1-toughness creature and an 0/8, so each blighter faces a
+-- real choice and which creature took the counter is readable off the toughness.
+-- The pinned answer is each seat's SECOND creature, which is never
+-- Pawl.Engine.Blight.candidates' ascending head -- so an answerer that ignored the
+-- seat, or a prompt raised for the wrong seat, cannot land on it by accident.
+blightPlayerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blightPlayerSpec s registry = Spec.describe s "BlightPlayer" $ do
+  -- The blighters are the CONTROLLER'S opponents, and the controller is not among
+  -- them: both of alice's creatures and the Morcant itself end at zero, on a board
+  -- where alice controls three of the seven creatures in play.
+  Spec.it s "CR 701.68a whole card: each opponent blights and the trigger's controller does not" $ do
+    (morcantId, (aPiker, aWall), (bRats, bWall), (cPiker, cWall), gs) <- morcantBoard s registry S.alice
+    let after = S.runPure (blightingFor [(S.bob, bWall), (S.carol, cWall)]) gs Stack.resolveTop
+    Spec.assertEqWith s "bob's Wall, whom he named, took one" (minusCountersOn bWall after) (Just 1)
+    Spec.assertEqWith s "carol's Wall, whom she named, took one" (minusCountersOn cWall after) (Just 1)
+    Spec.assertEqWith s "bob's Rats took none" (minusCountersOn bRats after) (Just 0)
+    Spec.assertEqWith s "nor did carol's Piker" (minusCountersOn cPiker after) (Just 0)
+    Spec.assertEqWith s "alice, who controls the trigger, blights nothing: her Piker took none" (minusCountersOn aPiker after) (Just 0)
+    Spec.assertEqWith s "nor did her Wall" (minusCountersOn aWall after) (Just 0)
+    Spec.assertEqWith s "nor the Morcant itself" (minusCountersOn morcantId after) (Just 0)
+  -- The same seven printings, the same six creatures, the same trigger: the ONE
+  -- difference is which seat the Morcant entered under. The set that blights moves
+  -- with it, which is what tells `Relative Opponent` apart from any fixed seat.
+  Spec.it s "CR 701.68a the same board with the Morcant under another seat blights the other two" $ do
+    (morcantId, (aPiker, aWall), (bRats, bWall), (_, cWall), gs) <- morcantBoard s registry S.bob
+    let after = S.runPure (blightingFor [(S.alice, aWall), (S.carol, cWall)]) gs Stack.resolveTop
+    Spec.assertEqWith s "alice's Wall, whom she named, took one" (minusCountersOn aWall after) (Just 1)
+    Spec.assertEqWith s "carol's Wall, whom she named, took one" (minusCountersOn cWall after) (Just 1)
+    Spec.assertEqWith s "alice's Piker took none" (minusCountersOn aPiker after) (Just 0)
+    Spec.assertEqWith s "bob, who now controls the trigger, blights nothing: his Rats took none" (minusCountersOn bRats after) (Just 0)
+    Spec.assertEqWith s "nor did his Wall" (minusCountersOn bWall after) (Just 0)
+    Spec.assertEqWith s "nor the Morcant itself" (minusCountersOn morcantId after) (Just 0)
+  -- Rule 701.68a's "a creature YOU control" is read per BLIGHTER and not once for
+  -- the resolution: bob's answer names carol's Wall, which was never offered to
+  -- him, so the head of his own pool takes the counter instead -- and carol's Wall
+  -- stays clean, which is what says his answer did not reach across the table.
+  Spec.it s "CR 701.68a each blighter's pool is their own creatures" $ do
+    (_, (aPiker, aWall), (bRats, bWall), (cPiker, cWall), gs) <- morcantBoard s registry S.alice
+    let after = S.runPure (blightingFor [(S.bob, cWall), (S.carol, cPiker)]) gs Stack.resolveTop
+    Spec.assertEqWith s "bob's Rats, the head of his own pool, took the counter" (minusCountersOn bRats after) (Just 1)
+    Spec.assertEqWith s "his Wall took none" (minusCountersOn bWall after) (Just 0)
+    Spec.assertEqWith s "carol's Piker, whom she named, took one" (minusCountersOn cPiker after) (Just 1)
+    Spec.assertEqWith s "carol's Wall, whom BOB named, took none" (minusCountersOn cWall after) (Just 0)
+    Spec.assertEqWith s "alice's Piker took none" (minusCountersOn aPiker after) (Just 0)
+    Spec.assertEqWith s "nor did her Wall" (minusCountersOn aWall after) (Just 0)
+  -- Who was ASKED, rather than what the counters say: the prompt is raised for each
+  -- blighter and for nobody else, in APNAP order (CR 101.4) off alice's turn.
+  Spec.it s "CR 101.4 the prompt is raised for each blighter in APNAP order" $ do
+    (_, _, _, _, underAlice) <- morcantBoard s registry S.alice
+    (_, _, _, _, underBob) <- morcantBoard s registry S.bob
+    let asking :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+        asking p = case p of
+          Prompt.ChooseBlight _ pid _ _ -> do
+            State.modify (<> [pid])
+            pure (S.identityAnswer p)
+          _ -> pure (S.identityAnswer p)
+        asked g = State.execState (Engine.runGame asking g Stack.resolveTop) []
+    Spec.assertEqWith s "alice's Morcant asks her two opponents, in turn order" (asked underAlice) [S.bob, S.carol]
+    Spec.assertEqWith s "bob's asks his, which APNAP puts the active player first" (asked underBob) [S.alice, S.carol]
+
+-- Six creatures -- Goblin Piker and Wall of Stone for alice, Typhoid Rats and Wall
+-- of Stone for bob, Goblin Piker and Wall of Stone for carol -- and High Perfect
+-- Morcant entering under `pid` with its CR 603.6a trigger settled onto the stack
+-- but NOT resolved. Returns the Morcant, the three pairs and that state.
+--
+-- The seat is the ONLY parameter, so the board and its counterpart are the same
+-- seven printings on the same three seats.
+--
+-- Each pair is added lowest-toughness first, so Pawl.Engine.Blight.candidates'
+-- ascending head is the 1-toughness creature and the pinned 0/8 is the other one.
+morcantBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  m (ObjectId.ObjectId, (ObjectId.ObjectId, ObjectId.ObjectId), (ObjectId.ObjectId, ObjectId.ObjectId), (ObjectId.ObjectId, ObjectId.ObjectId), GameState.GameState)
+morcantBoard s registry pid = do
+  morcant <- S.printingOf s registry "High Perfect Morcant"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  let (aPiker, g1) = S.addCreature piker S.alice S.threePlayerGame
+      (aWall, g2) = S.addCreature wall S.alice g1
+      (bRats, g3) = S.addCreature rats S.bob g2
+      (bWall, g4) = S.addCreature wall S.bob g3
+      (cPiker, g5) = S.addCreature piker S.carol g4
+      (cWall, g6) = S.addCreature wall S.carol g5
+      (morcantId, g7) = S.entersWithTrigger morcant pid g6
+  pure (morcantId, (aPiker, aWall), (bRats, bWall), (cPiker, cWall), snd (Engine.runGamePure S.identityAnswer g7 Engine.settleForPriority))
+
+-- Answers Prompt.ChooseBlight with the creature pinned for the SEAT the prompt
+-- names, deferring everything else to S.identityAnswer. Keyed by seat rather than
+-- by a single object, which is what makes "the prompt was raised for that player"
+-- observable off the counters: a prompt carrying the wrong seat falls through to
+-- the identity answer and lands somewhere the assertions read as zero.
+blightingFor :: [(PlayerId.PlayerId, ObjectId.ObjectId)] -> Prompt.Prompt r -> r
+blightingFor pins p = case p of
+  Prompt.ChooseBlight _ pid _ _ | Just oid <- List.lookup pid pins -> oid
+  _ -> S.identityAnswer p
 
 -- CR 701.68 blight as a COST (CostComponent.Blight), which is the position most of
 -- the pool prints it in and the one CR 701.68b's "they can't choose to blight"

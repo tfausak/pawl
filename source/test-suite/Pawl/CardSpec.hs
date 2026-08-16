@@ -674,7 +674,7 @@ effectCounts effect = case effect of
   Effect.Amass (Amass.MkAmass quantity _) -> quantityCounts quantity
   -- Blight's N is a Quantity like bolster's above, so its Counts are reachable
   -- from here.
-  Effect.Blight quantity -> quantityCounts quantity
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []
@@ -2819,8 +2819,9 @@ effectFilters effect = case effect of
   -- Filter on the card names it.
   Effect.Amass (Amass.MkAmass quantity _) -> unframed (quantityFilters quantity)
   -- Only the count's Filters: rule 701.68a describes the candidate pool, so no
-  -- Filter on the card names it.
-  Effect.Blight quantity -> unframed (quantityFilters quantity)
+  -- Filter on the card names it, and a PlayerRef carries none either -- Draw's
+  -- arm below answers the same way.
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.TemptWithTheRing -> []
   Effect.Venture -> []
   Effect.ExileHandThenDraw -> []

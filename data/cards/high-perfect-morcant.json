@@ -14,12 +14,21 @@
               "type": "Black"
             }
           }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
       ],
-      "name": "Sinister Gnarlbark",
+      "name": "High Perfect Morcant",
       "power": {
         "type": "Literal",
-        "value": 0
+        "value": 4
       },
       "toughness": {
         "type": "Literal",
@@ -28,18 +37,38 @@
       "triggeredAbilities": [
         {
           "condition": {
-            "type": "StepBegins",
-            "value": {
-              "phase": {
-                "type": "Ending",
-                "value": {
-                  "type": "EndStep"
-                }
+            "type": "AnyOf",
+            "value": [
+              {
+                "type": "SelfEnters"
               },
-              "scope": {
-                "type": "ControllersTurn"
+              {
+                "type": "PermanentEnters",
+                "value": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Elf"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    },
+                    {
+                      "type": "Not",
+                      "value": {
+                        "type": "IsSource"
+                      }
+                    }
+                  ]
+                }
               }
-            }
+            ]
           },
           "modal": {
             "modes": [
@@ -48,27 +77,12 @@
                   {
                     "effects": [
                       {
-                        "type": "Draw",
-                        "value": {
-                          "player": {
-                            "type": "Relative",
-                            "value": {
-                              "type": "You"
-                            }
-                          },
-                          "quantity": {
-                            "type": "Literal",
-                            "value": 1
-                          }
-                        }
-                      },
-                      {
                         "type": "Blight",
                         "value": {
                           "player": {
                             "type": "Relative",
                             "value": {
-                              "type": "You"
+                              "type": "Opponent"
                             }
                           },
                           "quantity": {
@@ -88,10 +102,15 @@
       "typeLine": {
         "subtypes": [
           {
-            "type": "Treefolk"
+            "type": "Elf"
           },
           {
-            "type": "Warlock"
+            "type": "Noble"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
           }
         ],
         "types": [

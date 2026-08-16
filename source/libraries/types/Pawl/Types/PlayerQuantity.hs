@@ -5,9 +5,9 @@ import qualified Pawl.Types.Quantity as Quantity
 
 -- | "These players, this many" -- the payload of every Pawl.Types.Effect arm
 -- whose whole instruction is a PlayerRef and a Quantity: Draw, Scry, Surveil,
--- Fateseal, LoseLife, GainLife and IncreaseSpeed.
+-- Fateseal, LoseLife, GainLife, IncreaseSpeed and Blight.
 --
--- SHARED FOR EXPEDIENCY, and not because those seven mean the same thing. The
+-- SHARED FOR EXPEDIENCY, and not because those arms mean the same thing. The
 -- name says the shape rather than a concept precisely because there is no shared
 -- concept: drawing and losing life coincide in what they need to be told, and
 -- nothing more. A domain noun here would claim an equality that does not hold.
