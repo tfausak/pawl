@@ -407,9 +407,9 @@ defaultAnswer p = case p of
   -- so this cannot tell a source that makes a colour the cost still wants from
   -- one that does not. A cost like {G}{U} answered this way taps every source
   -- sorted ahead of the wanted colour on the way to it: legal, and wasteful in
-  -- exactly the way "least eventful" above does not promise against. Pawl.ManaSpec's
-  -- nine-land case pins both halves -- the taps are these answers, and an
-  -- answerer that can see the board taps two.
+  -- exactly the way "least eventful" above does not promise against.
+  -- Pawl.ManaSpec's nine-land case pins both halves -- the taps are these
+  -- answers, and an answerer that can see the board taps two.
   Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
   -- The cost is already covered, so floating more is the eventful answer and
   -- closing the window is the quiet one.

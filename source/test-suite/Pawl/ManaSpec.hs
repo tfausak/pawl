@@ -544,7 +544,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertEqWith s "and no Forest was tapped in its name" (S.tappedCount S.alice after) 0
 
   -- Paying {0}{G}{U} against three Islands and six Forests was observed to tap
-  -- FOUR lands where two suffice (#1610). The payer is not over-tapping. CR
+  -- FOUR lands where two suffice, see #1610. The payer is not over-tapping. CR
   -- 601.2g's window asks on every pass and taps exactly what the answer names,
   -- which is the first assertion: name the LAST Island and the LAST Forest --
   -- the two a head-taking payer would never reach -- and those two are the only
@@ -575,7 +575,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         tappedLands g = Set.fromList (filter (\oid -> fmap Object.tapped (Game.lookupObject oid g) == Just TapState.Tapped) lands)
         lastNamed nm = case reverse (filter (named nm) lands) of
           oid : _ -> oid
-          [] -> ObjectId.MkObjectId 9999
+          [] -> S.noSource
         theIsland = lastNamed "Island"
         theForest = lastNamed "Forest"
         naming :: Prompt.Prompt r -> r
