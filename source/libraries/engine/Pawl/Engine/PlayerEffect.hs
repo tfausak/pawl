@@ -367,8 +367,8 @@ rewritePlayerEffect pairs effect = case effect of
   -- word can hide. Thalia's "noncreature spells", Vedalken Orrery's "spells",
   -- Prowling Serpopard's "creature spells", Heartstone's "activated abilities of
   -- creatures", Damping Engine's "artifact, creature, or enchantment spells" and
-  -- Yawgmoth's Will's "spells" name none today; Edgewalker's "Cleric spells"
-  -- does, and Haakon's "Knight spells" would.
+  -- Yawgmoth's Will's "spells" and Omniscience's "spells" name none today;
+  -- Edgewalker's "Cleric spells" does, and Haakon's "Knight spells" would.
   PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost f n) -> PlayerEffect.IncreaseSpellCost (IncreaseSpellCost.MkIncreaseSpellCost (Filter.rewrite pairs f) n)
   PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost f cost) -> PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost (Filter.rewrite pairs f) cost)
   PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost f cost floor_) -> PlayerEffect.ReduceActivationCost (ReduceActivationCost.MkReduceActivationCost (Filter.rewrite pairs f) cost floor_)
@@ -381,6 +381,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
   PlayerEffect.CantCastMatching f -> PlayerEffect.CantCastMatching (Filter.rewrite pairs f)
   PlayerEffect.CastFromGraveyard f -> PlayerEffect.CastFromGraveyard (Filter.rewrite pairs f)
+  PlayerEffect.CastFromHandWithoutPayingManaCost f -> PlayerEffect.CastFromHandWithoutPayingManaCost (Filter.rewrite pairs f)
   -- The rest name no word a subtype pair could reach. The two chosen-name arms
   -- carry nothing at all -- CR 201.4's names are read off the source's
   -- Object.chosenNames -- and CR 612.2's second sentence says a subtype swap
@@ -528,6 +529,7 @@ prohibitsCasting pid oid name gs =
         -- where it is read.
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -601,6 +603,10 @@ prohibitsPlayingLand pid names gs =
         -- however its Filter reads -- which is exactly why its one printed
         -- sentence declares two abilities.
         PlayerEffect.CantCastMatching _ -> False
+        -- CR 118.9's alternative cost says what a SPELL pays, and a land is
+        -- never cast (CR 305.1) -- so this permission neither allows nor
+        -- prohibits a land play, whatever its Filter reads.
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 701.23: does any effect prohibit `pid` from searching a library?
@@ -641,6 +647,7 @@ prohibitsSearching pid gs =
         PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 725 / 101.2: is `pid` forbidden from becoming the monarch? CR 725.4 asks the
@@ -690,6 +697,7 @@ prohibitsBecomingMonarch pid gs =
         PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
@@ -831,6 +839,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost (ReduceSpellCost.MkReduceSpellCost criterion amount) -> matching criterion amount
         PlayerEffect.IncreaseSpellCost {} -> Nothing
@@ -857,6 +866,7 @@ spellCostAdjustments pid oid gs =
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
       effects = fmap snd (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = Maybe.mapMaybe increaseOf effects,
@@ -925,6 +935,7 @@ activationCostAdjustments pid srcId gs =
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
       -- CR 601.2f's "plus all additional costs", the non-mana half: Brutal
       -- Suppression's "Sacrifice a land". Gathered against the SAME criterion
       -- reading the reductions use -- the ability's source permanent -- and
@@ -954,6 +965,7 @@ activationCostAdjustments pid srcId gs =
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
       effects = fmap snd (applying pid gs)
    in CostAdjustments.MkCostAdjustments
         { CostAdjustments.increases = [],
@@ -1023,6 +1035,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         -- card in a graveyard still waits for its own window.
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 601.3: may `pid` cast `oid` from a graveyard because an EFFECT says so?
@@ -1083,6 +1096,70 @@ mayCastFromGraveyard pid oid gs =
         -- lands from a graveyard permits no cast (Crucible of Worlds lets nobody
         -- cast anything).
         PlayerEffect.PlayLandsFromGraveyard -> False
+        -- A COST and not a permission at all: Omniscience says what a spell
+        -- pays, never where it may be cast from, so it opens no graveyard.
+        -- mayCastFromHandWithoutPayingManaCost below is its one reader, and CR
+        -- 601.3's permission is still owed separately.
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
+   in any (allows . snd) (applying pid gs)
+
+-- CR 118.9 / Omniscience: may `pid` cast `oid` from their hand without paying
+-- its mana cost, because an EFFECT applies that alternative cost to it?
+--
+-- The typed question Pawl.Engine.Cost.candidateCostsFor asks in its hand arm, so
+-- that module never sees a PlayerEffect constructor. NOT a permission and so not
+-- asked beside the two above: a card in a hand is already castable, and what
+-- this adds is one more CR 601.2b candidate. Answering True where CR 601.3
+-- forbids the cast anyway changes nothing, because Pawl.Engine.Cast.castable
+-- demands a permission alongside an affordable candidate.
+--
+-- A DISJUNCTION, for mayCastFromGraveyard's reason: an alternative cost is
+-- OFFERED rather than imposed (CR 118.9b), so two effects offering the same
+-- {0} give the player the same one choice and CR 613.11's timestamp order has
+-- nothing to order. CR 118.9a's "only one alternative cost" is not this
+-- function's to enforce -- it is CR 601.2b's announcement picking one candidate
+-- from the list.
+--
+-- Takes the OBJECT and reaches the half through the STATE, exactly as the two
+-- above do: the caller has stamped the proposal through
+-- Pawl.Engine.Cast.asProposed, so matchesObject reads the half being cast.
+mayCastFromHandWithoutPayingManaCost :: PlayerId -> ObjectId -> GameState -> Bool
+mayCastFromHandWithoutPayingManaCost pid oid gs =
+  let allows effect = case effect of
+        PlayerEffect.CastFromHandWithoutPayingManaCost criterion -> matchesObject criterion oid gs
+        -- The CR 601.3 permissions, which say WHERE a spell may be cast from and
+        -- WHEN. Neither states a cost, which is the whole reason this arm is its
+        -- own: Yawgmoth's Will's cast pays the card's printed cost.
+        PlayerEffect.CastFromGraveyard _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        -- CR 118.7's increases and reductions, which change what a cost COMES
+        -- TO; this arm supplies a different cost to start from (CR 118.9c). The
+        -- two compose at Pawl.Engine.Cost.total, which is handed whichever
+        -- candidate CR 601.2b settled on -- so a reduction applied to {0} still
+        -- floors at {0} and neither reader knows of the other.
+        PlayerEffect.IncreaseSpellCost {} -> False
+        PlayerEffect.ReduceSpellCost {} -> False
+        PlayerEffect.ReduceActivationCost {} -> False
+        PlayerEffect.AddActivationCost {} -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.SetMaximumHandSize _ -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantBecomeMonarch -> False
+        -- The PROHIBITIONS, read at their own gate (prohibitsCasting above): CR
+        -- 101.2 makes a "can't" beat any cost this offers, and folding them here
+        -- would let a permission outvote one.
+        PlayerEffect.CantCastMatching _ -> False
+        PlayerEffect.CantPlayLands -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 305.1: may `pid` play a land from their graveyard because an EFFECT says
@@ -1135,6 +1212,9 @@ mayPlayLandsFromGraveyard pid gs =
         -- separate gates so that neither can outvote the other by accident.
         PlayerEffect.CantCastMatching _ -> False
         PlayerEffect.CantPlayLands -> False
+        -- A cost, not a zone: CR 118.9's grant says what a spell PAYS and
+        -- widens no pile a land may be played from.
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -1197,6 +1277,7 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -1253,6 +1334,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -1304,6 +1386,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantPlayLands -> current
         PlayerEffect.CastFromGraveyard _ -> current
         PlayerEffect.PlayLandsFromGraveyard -> current
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> current
    in List.foldl' (\current row -> apply current (snd row)) (Just defaultMaximumHandSize) (applying pid gs)
 
 -- CR 500.5 / 106.4 / 613.11: which of the unspent mana in this player's pool do
@@ -1355,6 +1438,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
@@ -1417,6 +1501,7 @@ cantBeCountered pid oid gs =
         PlayerEffect.CantPlayLands -> False
         PlayerEffect.CastFromGraveyard _ -> False
         PlayerEffect.PlayLandsFromGraveyard -> False
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
@@ -1470,6 +1555,7 @@ unpreventable gs =
         PlayerEffect.CantPlayLands -> Nothing
         PlayerEffect.CastFromGraveyard _ -> Nothing
         PlayerEffect.PlayLandsFromGraveyard -> Nothing
+        PlayerEffect.CastFromHandWithoutPayingManaCost _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
