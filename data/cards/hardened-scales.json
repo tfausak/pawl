@@ -15,25 +15,27 @@
       "name": "Hardened Scales",
       "replacementEffects": [
         {
-          "type": "CounterR",
-          "value": {
-            "matching": {
-              "onWhat": {
-                "type": "HasCardType",
-                "value": {
-                  "type": "Creature"
+          "effect": {
+            "type": "CounterR",
+            "value": {
+              "matching": {
+                "onWhat": {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                "whichKind": {
+                  "type": "PlusOnePlusOne"
+                },
+                "whose": {
+                  "type": "Yours"
                 }
               },
-              "whichKind": {
-                "type": "PlusOnePlusOne"
-              },
-              "whose": {
-                "type": "Yours"
+              "scaling": {
+                "type": "AddMore",
+                "value": 1
               }
-            },
-            "scaling": {
-              "type": "AddMore",
-              "value": 1
             }
           }
         }

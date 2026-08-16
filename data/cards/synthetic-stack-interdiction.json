@@ -19,20 +19,22 @@
       "name": "Synthetic Stack Interdiction",
       "replacementEffects": [
         {
-          "type": "ZoneChangeR",
-          "value": {
-            "destination": {
-              "type": "Exile"
-            },
-            "matching": {
-              "whatObject": {
-                "type": "HasColor",
-                "value": {
-                  "type": "Green"
-                }
+          "effect": {
+            "type": "ZoneChangeR",
+            "value": {
+              "destination": {
+                "type": "Exile"
               },
-              "whenDestination": {
-                "type": "Stack"
+              "matching": {
+                "whatObject": {
+                  "type": "HasColor",
+                  "value": {
+                    "type": "Green"
+                  }
+                },
+                "whenDestination": {
+                  "type": "Stack"
+                }
               }
             }
           }

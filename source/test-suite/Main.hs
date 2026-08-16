@@ -180,6 +180,7 @@ import qualified Pawl.Codec.PlusSpec
 import qualified Pawl.Codec.PoolSpec
 import qualified Pawl.Codec.PowerSpec
 import qualified Pawl.Codec.PreventNextDamageSpec
+import qualified Pawl.Codec.PrintedReplacementSpec
 import qualified Pawl.Codec.PrintingSpec
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec
 import qualified Pawl.Codec.PutCountersSpec
@@ -564,6 +565,7 @@ spec s registry = do
   Pawl.Codec.PoolSpec.spec s
   Pawl.Codec.PowerSpec.spec s
   Pawl.Codec.PreventNextDamageSpec.spec s
+  Pawl.Codec.PrintedReplacementSpec.spec s
   Pawl.Codec.PrintingSpec.spec s
   Pawl.Codec.ProjectedCharacteristicsSpec.spec s
   Pawl.Codec.PutCountersSpec.spec s

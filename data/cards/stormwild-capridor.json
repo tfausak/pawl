@@ -28,39 +28,41 @@
       },
       "replacementEffects": [
         {
-          "type": "DamageR",
-          "value": {
-            "matching": {
-              "whatRecipient": {
-                "type": "IsSource"
+          "effect": {
+            "type": "DamageR",
+            "value": {
+              "matching": {
+                "whatRecipient": {
+                  "type": "IsSource"
+                },
+                "whichKind": {
+                  "type": "Noncombat"
+                }
               },
-              "whichKind": {
-                "type": "Noncombat"
-              }
-            },
-            "rewrite": {
-              "type": "PreventAll"
-            },
-            "riders": [
-              {
-                "type": "PutCounters",
-                "value": {
-                  "kind": {
-                    "type": "PlusOnePlusOne"
-                  },
-                  "quantity": {
-                    "type": "InSlot",
-                    "value": "thatMuch"
-                  },
-                  "ref": {
-                    "type": "EachMatching",
-                    "value": {
-                      "type": "IsSource"
+              "rewrite": {
+                "type": "PreventAll"
+              },
+              "riders": [
+                {
+                  "type": "PutCounters",
+                  "value": {
+                    "kind": {
+                      "type": "PlusOnePlusOne"
+                    },
+                    "quantity": {
+                      "type": "InSlot",
+                      "value": "thatMuch"
+                    },
+                    "ref": {
+                      "type": "EachMatching",
+                      "value": {
+                        "type": "IsSource"
+                      }
                     }
                   }
                 }
-              }
-            ]
+              ]
+            }
           }
         }
       ],
