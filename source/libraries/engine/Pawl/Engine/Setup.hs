@@ -637,9 +637,11 @@ funnelBack finalSub parent =
       -- CR 729.5's own exclusion: "all traditional cards they own that are in the
       -- subgame OTHER THAN those in the subgame command zone". So the library
       -- funnel skips the subgame's command zone wholesale, and CR 729.5c takes
-      -- back out of it exactly the commanders. Anything else that ended there is
-      -- covered by rule 729.5's "all other objects in the subgame cease to exist"
-      -- -- nothing in pawl can reach that zone but a commander (CR 903.9a).
+      -- back out of it exactly the commanders. Any other CARD that ended there is
+      -- covered by rule 729.5's "except as specified in rules 729.5a-c, all other
+      -- objects in the subgame cease to exist", which is the literal reading; a
+      -- commander is the only card a subgame can put in that zone anyway
+      -- (CR 903.9a), and an emblem there is not a card and never was in scope.
       subCmdIds = GameState.command finalSub
       returned = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys (GameState.objects finalSub) subCmdIds))
       backFromSub =

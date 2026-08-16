@@ -37,6 +37,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -85,7 +86,8 @@ commanderBoard mountain shimatsu lands =
           }
    in S.runPure S.identityAnswer board (Setup.createDeck S.alice deck)
 
--- The one object in the command zone.
+-- What is in the command zone, in id order -- one object on most boards here,
+-- two where a second player is designated one.
 inCommandZone :: GameState.GameState -> [ObjectId.ObjectId]
 inCommandZone = Set.toAscList . GameState.command
 
@@ -412,15 +414,25 @@ playedSubgame parent =
 -- subgame graveyard, which is CR 729.5c's "(if it's there)" being false. Written
 -- by hand rather than cast and killed: what rule 729.5 reads is the ZONE the
 -- card is in as the subgame ends, and a subgame cast is a different unit's path.
+--
+-- Under a FRESH id, because CR 400.7 mints one on every zone change and a
+-- commander that really left would have crossed two of them. That is the shape
+-- funnelBack has to survive: the id the parent's command zone still names no
+-- longer exists in the subgame, so keeping the parent's copy would leave a
+-- second object for one card.
 outOfCommandZone :: GameState.GameState -> GameState.GameState
 outOfCommandZone gs = case inCommandZone gs of
   [] -> gs
-  oid : _ ->
-    gs
-      { GameState.command = Set.delete oid (GameState.command gs),
-        GameState.graveyard = Map.insertWith (<>) S.alice (Seq.singleton oid) (GameState.graveyard gs),
-        GameState.objects = Map.adjust (\o -> o {Object.zone = Zone.Graveyard}) oid (GameState.objects gs)
-      }
+  oid : _ -> case Game.lookupObject oid gs of
+    Nothing -> gs
+    Just obj ->
+      let (new, gs1) = Game.freshObjectId gs
+          dead = (Object.newIncarnation obj) {Object.zone = Zone.Graveyard}
+       in gs1
+            { GameState.command = Set.delete oid (GameState.command gs1),
+              GameState.graveyard = Map.insertWith (<>) S.alice (Seq.singleton new) (GameState.graveyard gs1),
+              GameState.objects = Map.insert new dead (Map.delete oid (GameState.objects gs1))
+            }
 
 subgameSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 subgameSpec s registry = Spec.describe s "Subgame" $ do
@@ -432,11 +444,17 @@ subgameSpec s registry = Spec.describe s "Subgame" $ do
     mountain <- S.printingOf s registry "Mountain"
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     let parent = subgameParent mountain shimatsu
+        moved = Setup.subgameStateFrom S.alice parent
         sub = playedSubgame parent
     -- Pins the fixture: an empty parent command zone or an empty library would
     -- make everything below pass for the wrong reason.
     Spec.assertEqWith s "the parent really has one commander in its command zone" (length (inCommandZone parent)) 1
     Spec.assertEqWith s "and a five-card library to tell it apart from" (length (Game.zoneMembers Zone.Library S.alice parent)) 5
+    -- The move itself, before CR 103's setup runs: subgameStateFrom is the half
+    -- of playSubgame that rule 729.2c names, and it has to leave the subgame
+    -- state self-consistent -- the object in the pool AND in the zone set.
+    Spec.assertEqWith s "the moved-in state already has it in the subgame command zone" (inCommandZone moved) (inCommandZone parent)
+    Spec.assertEqWith s "and the object came with it" (fmap (`Map.member` GameState.objects moved) (inCommandZone parent)) [True]
     Spec.assertEqWith s "the subgame's command zone holds one card too" (length (inCommandZone sub)) 1
     Spec.assertEqWith s "the subgame knows it as alice's commander" (fmap (\oid -> Commander.isCommander oid sub) (inCommandZone sub)) [True]
     Spec.assertEqWith s "and it sits in the subgame's command zone, not a library" (fmap (\oid -> fmap Object.zone (Game.lookupObject oid sub)) (inCommandZone sub)) [Just Zone.Command]
@@ -472,8 +490,13 @@ subgameSpec s registry = Spec.describe s "Subgame" $ do
     mountain <- S.printingOf s registry "Mountain"
     shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
     let parent = subgameParent mountain shimatsu
-        sub = outOfCommandZone (playedSubgame parent)
+        played = playedSubgame parent
+        sub = outOfCommandZone played
         after = Setup.funnelBack sub parent
+    -- The pair: `played` and `sub` differ in the commander's subgame zone and in
+    -- nothing else, so the first assertion is what keeps the second from holding
+    -- because there was never a commander there to move.
+    Spec.assertEqWith s "it was in the subgame's command zone to begin with" (length (inCommandZone played)) 1
     Spec.assertEqWith s "it really left the subgame's command zone" (length (inCommandZone sub)) 0
     Spec.assertEqWith s "nothing is left in the main-game command zone" (length (inCommandZone after)) 0
     Spec.assertEqWith
@@ -483,3 +506,22 @@ subgameSpec s registry = Spec.describe s "Subgame" $ do
       (length (Game.zoneMembers Zone.Library S.alice parent) + 1)
     Spec.assertEqWith s "she is still designated it (CR 903.3 survives the subgame)" (fmap Player.commander (Map.lookup S.alice (GameState.players after))) (Just (Just shimatsu))
     Spec.assertEqWith s "and no copy is left behind" (Map.size (GameState.objects after)) (2 + 5 + 1)
+  -- CR 729.1b: nothing that happened in the subgame means anything in the main
+  -- game, so a player who LOST the subgame is still playing the main one and
+  -- their commander is still in its command zone. Three seats, because CR 800.1
+  -- makes only a multiplayer subgame reach CR 800.4a's object removal -- which
+  -- deletes bob's subgame commander outright, leaving funnelBack nothing to move
+  -- back and the parent's own copy as the only source.
+  Spec.it s "CR 729.5c a commander whose owner departed inside a multiplayer subgame is still in the main-game command zone" $ do
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    let parent = designating [(S.alice, shimatsu), (S.bob, jedit)] (Setup.emptyGame S.threePlayers)
+        sub0 = Setup.subgameStateFrom S.alice parent
+        (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer Set.empty)
+        departed = Departure.depart Departure.Type.Lost S.bob seated
+        after = Setup.funnelBack departed parent
+    Spec.assertEqWith s "two commanders went in" (length (inCommandZone parent)) 2
+    Spec.assertEqWith s "the subgame really was multiplayer, so CR 800.4a's removal fired" (Departure.continuesAfterDeparture departed) True
+    Spec.assertEqWith s "and bob has nothing left in the subgame" (Map.keys (Map.filter (\o -> Object.owner o == S.bob) (GameState.objects departed))) []
+    Spec.assertEqWith s "both are back in the main-game command zone" (fmap (\oid -> fmap Object.owner (Game.lookupObject oid after)) (inCommandZone after)) [Just S.alice, Just S.bob]
+    Spec.assertEqWith s "and neither was funnelled into a library" (length (Game.zoneMembers Zone.Library S.alice after) + length (Game.zoneMembers Zone.Library S.bob after)) 0
