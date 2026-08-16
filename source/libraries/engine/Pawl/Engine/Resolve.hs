@@ -269,6 +269,10 @@ objectRefSlots ref = case ref of
   -- none. WHO CHOOSES may: Skullwinder's chosen opponent is read out of the slot
   -- an earlier effect bound.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard chooser _ _) -> chooserSlots chooser
+  -- The choosers, who are also the hands' owners (CR 402.3), so the one
+  -- PlayerRef is the whole read -- Karn Liberated's "+4: TARGET player exiles a
+  -- card from their hand" names its seat with a target slot.
+  ObjectRef.ChosenCardInHand player -> playerRefSlots player
 
 -- The slots a MonarchTarget reads: only the targeted arm names one. Written out
 -- rather than routed through playerRefSlots because MonarchTarget is its own
@@ -1922,6 +1926,10 @@ objectRefObjects legal resolving controller source gs ref = case ref of
   -- opcode gets this empty answer, which is the inert card-data error
   -- Pawl.Types.ObjectRef's own note describes.
   ObjectRef.ChosenCardInGraveyard {} -> []
+  -- A card somebody chooses out of their own hand: the graveyard arm's answer
+  -- above, for the graveyard arm's reason, and answered for real by the
+  -- MoveToZone arm over the seats handChoosers below names.
+  ObjectRef.ChosenCardInHand {} -> []
 
 -- The players a graveyard scope names, in APNAP order: the seat half of
 -- graveyardCards, shared with ObjectRef.ChosenCardInGraveyard's EachInScope
@@ -1975,6 +1983,23 @@ graveyardCardsOf controller source gs pid filter_ =
 graveyardCards :: PlayerId -> ObjectId -> GameState -> PlayerScope.PlayerScope -> Filter.Type.Filter Keyword.Type.Keyword -> [ObjectId]
 graveyardCards controller source gs scope filter_ =
   concatMap (\pid -> graveyardCardsOf controller source gs pid filter_) (graveyardPlayers controller gs scope)
+
+-- The seats an ObjectRef.ChosenCardInHand asks, in APNAP order: graveyardPlayers
+-- one type over, with the PlayerScope replaced by the ref's own PlayerRef.
+--
+-- ONE list, where the graveyard arm needs a chooser and a scope: CR 402.3 lets a
+-- player look at their own hand and no other, so these seats are the choosers
+-- AND the hands, and there is no second question for a scope to answer.
+--
+-- Through playerRefPlayers, so a slot is read exactly as every other slot read
+-- is (CR 608.2b): an unfilled, illegal or non-player slot names nobody and CR
+-- 101.3 ignores that share of the instruction. Ordered by Game.apnapOrder for
+-- graveyardPlayers' reason -- CR 608.2e puts the choices in CR 101.4's order --
+-- which also drops a player CR 800.4 has taken out of the game.
+handChoosers :: Map.Map SlotName (Set Recipient) -> PlayerId -> GameState -> PlayerRef -> [PlayerId]
+handChoosers legal controller gs player =
+  let named = playerRefPlayers legal controller gs player
+   in filter (`elem` named) (Game.apnapOrder gs)
 
 -- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
 -- moving object arrives at, and hand back the batch in the order the moves must
@@ -2089,6 +2114,9 @@ objectRefRecipients legal resolving controller source gs ref = case ref of
   -- answer is made, and why an opcode that is not MoveToZone reading this ref is
   -- an inert card-data error.
   ObjectRef.ChosenCardInGraveyard {} -> []
+  -- No recipients either, and for the arm above's reason: the answer needs the
+  -- chooser asked, and only the MoveToZone gather can ask.
+  ObjectRef.ChosenCardInHand {} -> []
 
 -- CR 608.2f's order for the per-object loop: APNAP first ("APNAP order is used
 -- to make the primary determination of the order of those actions"), reading a
@@ -3328,6 +3356,40 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                   case playerRefPlayers legal controller gs (PlayerRef.InSlot slot) of
                     [pid] | List.elem pid (graveyardPlayers controller gs scope) -> ask pid (graveyardCardsOf controller source gs pid filter_)
                     _ -> pure []
+            -- Karn Liberated's "+4: target player exiles a card from their
+            -- hand": the arm above over the hidden zone CR 400.2 makes a hand,
+            -- and everything that arm says about WHEN the candidates are read
+            -- (CR 608.2c, from the pre-move state), about the per-player asks
+            -- running in APNAP order before anything moves (CR 608.2e, CR
+            -- 101.4), and about the answer being FILTERED rather than TRUSTED
+            -- holds here unchanged.
+            --
+            -- What the hidden zone changes is WHO may be asked: CR 402.3 gives a
+            -- hand's cards to its owner alone to look at, so each seat is offered
+            -- its OWN hand and no other, and the ref carries one PlayerRef rather
+            -- than a chooser beside a scope. Karn's is a target slot, so the
+            -- opponent it names does the choosing -- the controller never sees
+            -- the hand, and pawl's engine never picks for them.
+            --
+            -- Unfiltered, so the candidates are the whole hand: Game.zoneMembers
+            -- in the zone's own order, which is the order the EachCardInYourHand
+            -- sweep takes and which no rule reads (CR 400.5).
+            --
+            -- Elided at one card and skipped at none, ChooseCardInGraveyard's
+            -- rule (CR 101.3, CR 609.3): a one-card hand leaves nothing to decide
+            -- and an empty one nothing to do. Neither elision leaks anything --
+            -- the card was going to a public zone either way.
+            ObjectRef.ChosenCardInHand player -> do
+              gs <- State.get
+              let ask asked candidates = case candidates of
+                    [] -> pure []
+                    [only] -> pure [only]
+                    first : second : more -> do
+                      let offered = first NonEmpty.:| (second : more)
+                      answer <- Game.choose (Prompt.ChooseCardInHand (Decide.deciderFor asked gs) asked source offered)
+                      pure [if List.elem answer (NonEmpty.toList offered) then answer else first]
+              fmap concat . Monad.mapM (\pid -> ask pid (Game.zoneMembers Zone.Hand pid gs)) $
+                handChoosers legal controller gs player
           arrived <- Monad.mapM moveOne =<< settleArrivals zone placement targets
           Monad.mapM_ (\slot -> bindArrivals slot (Maybe.catMaybes arrived)) mSlot
   -- CR 701.24: shuffle the objects the ref names into their OWNERS' libraries.

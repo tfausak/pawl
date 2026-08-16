@@ -2227,6 +2227,9 @@ objectRefFilters ref = case ref of
   -- its Chooser name players, so the Filter is the whole of what there is to
   -- lint, exactly as for the graveyard sweep above.
   ObjectRef.ChosenCardInGraveyard (ChosenCardInGraveyard.MkChosenCardInGraveyard _ _ f) -> [f]
+  -- Karn Liberated's "a card from their hand": one PlayerRef and no Filter at
+  -- all, so there is nothing here to lint.
+  ObjectRef.ChosenCardInHand _ -> []
 
 -- The Filter a Count folds over (CR 608.2h). Delegated to the *Counts family
 -- above rather than re-walked: those traversals are already the project's answer
@@ -4190,24 +4193,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- linked ability exiled several performs its action on each of them.
           ObjectRef.EachCardExiledWithSource {} -> False
           ObjectRef.EachPlayer -> False
-          ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) ->
-            depth <= 1 && case player of
-              PlayerRef.Relative PlayerRelation.You -> True
-              PlayerRef.Relative PlayerRelation.Opponent -> False
-              PlayerRef.InSlot _ -> True
-              PlayerRef.EachPlayer -> False
-              -- The whole table but one seat, so several libraries -- EachPlayer's
-              -- answer, and for its reason.
-              PlayerRef.EachPlayerExcept _ -> False
-              -- One seat, so one library -- InSlot's answer. Unreachable from
-              -- card data, which the sweep below is what enforces.
-              PlayerRef.Specific _ -> True
-              -- NO library at all: an ObjectRef is read by a resolution, where
-              -- no fold supplies a candidate, so this names nobody and moves
-              -- nothing -- which is at most one.
-              PlayerRef.Candidate -> True
-              -- One seat, so one library -- InSlot's answer, one indirection out.
-              PlayerRef.ControllerOfBound _ -> True
+          ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> depth <= 1 && namesOneSeat player
           -- One card per CHOOSER: the resolving controller chooses once however
           -- many graveyards the scope draws candidates from, where Exhume's
           -- "each player" is one choice each and so several cards on any board
@@ -4218,6 +4204,31 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             -- One seat, so one graveyard and one card -- TheController's answer
             -- with the chooser named by a slot instead of by CR 608.2c.
             Chooser.BoundInSlot _ -> True
+          -- One card per CHOOSER again, and here the PlayerRef names the
+          -- choosers: Karn Liberated's targeted seat exiles one card, and "each
+          -- player" would be one each. The same per-seat count TopOfLibrary
+          -- takes of its own PlayerRef, which is why they share namesOneSeat.
+          ObjectRef.ChosenCardInHand player -> namesOneSeat player
+        -- Does this PlayerRef name at most ONE seat? A per-player count over it
+        -- -- a library's top card, a card chosen out of a hand -- moves at most
+        -- one object exactly when it does.
+        namesOneSeat player = case player of
+          PlayerRef.Relative PlayerRelation.You -> True
+          PlayerRef.Relative PlayerRelation.Opponent -> False
+          PlayerRef.InSlot _ -> True
+          PlayerRef.EachPlayer -> False
+          -- The whole table but one seat -- EachPlayer's answer, and for its
+          -- reason.
+          PlayerRef.EachPlayerExcept _ -> False
+          -- One seat -- InSlot's answer. Unreachable from card data, which the
+          -- sweep below is what enforces.
+          PlayerRef.Specific _ -> True
+          -- NO seat at all: an ObjectRef is read by a resolution, where no fold
+          -- supplies a candidate, so this names nobody and moves nothing --
+          -- which is at most one.
+          PlayerRef.Candidate -> True
+          -- One seat -- InSlot's answer, one indirection out.
+          PlayerRef.ControllerOfBound _ -> True
         boundPlurally effect = case effect of
           Effect.MoveToZone (MoveToZone.MkMoveToZone ref _ _ mSlot _ _) | not (movesAtMostOne ref) -> Maybe.maybeToList mSlot
           _ -> []
