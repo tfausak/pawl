@@ -34,7 +34,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 data FaceDownCharacteristics = MkFaceDownCharacteristics
   { typeLine :: TypeLine.TypeLine,
     -- | Absent for a listing that names no creature -- Yedora's "Forest land"
-    -- has no power to list, and CR 208.1 gives a noncreature permanent none.
+    -- has no power to list, and CR 208.3 gives a noncreature permanent none.
     power :: Maybe Power.Power,
     toughness :: Maybe Toughness.Toughness
   }

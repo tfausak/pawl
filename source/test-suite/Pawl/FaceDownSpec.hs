@@ -534,7 +534,7 @@ listedSpec s registry = Spec.describe s "Listed characteristics" $ do
       Just theSlot ->
         Spec.assertEqWith
           s
-          "CR 115.4 both creatures are legal targets, the face-down one included"
+          "CR 115.2 both creatures are legal targets, the face-down one included"
           (Target.legalRecipients (Just S.alice) spell theSlot down)
           (Set.fromList [Recipient.ToCreature victim, Recipient.ToCreature bystander])
     -- THE CONTROL: the same cast off the same state against the face-UP Piker.
