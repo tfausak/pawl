@@ -164,7 +164,43 @@ to agents as written. What it doesn't say:
   "no such card exists"; Goblin Plate Mail is absent from the dump and real.
   When grepping the dump, note there is no space after the colon (`"name":"Foo"`)
   and that `rulings` sorts before `text`, so a hit near a name is usually
-  ruling boilerplate rather than oracle text.
+  ruling boilerplate rather than oracle text. It lives in gitignored
+  `_scratch/`, so it may simply be absent --- fall back to Scryfall.
+
+- Three permissively licensed corpora cover ground pawl is still crossing, so
+  consulting them is ordinary work rather than a detour. Do it AFTER you have
+  read the rule in `docs/rules.txt` and know the shape you want, never before
+  --- reading someone else's model first imports it, and both of theirs are
+  parser-shaped where pawl's is AST-shaped. Each is one grep, so it is cheap
+  enough to try on any issue and cheap enough to skip:
+
+  - **`_scratch/phase`** (Rust, MIT) --- for FINDING THE CARD. Its
+    `crates/engine/tests/integration/` holds a thousand-plus test files named
+    for the card and the rule (`abundance_optional_draw_replacement.rs`), plus
+    rule-keyed files under `rules/`. `ls` it with a grep for the mechanic and
+    you get candidate producers without a pool search. Not a design reference:
+    its parser is the truth and its core still carries identity checks
+    (`docs/prior-art-lessons.md` section 11.1).
+  - **`_scratch/mtgish`** (Rust, MIT) --- for THE EFFECT'S SHAPE. The whole
+    pool as first-order typed ASTs (`data/mtgish.lines.json`), vocabulary in
+    `rust_syntax/src/mtg_types.rs`. Closest published thing to pawl's open
+    half. Also a pool-wide query surface: "which cards use this construct" is
+    a grep over one file.
+  - **`_scratch/argentum-engine`** (Kotlin, MIT) --- for MODELING QUESTIONS.
+    Same base/projected split, same no-escape-hatch bet. Worth reading when
+    the issue is "how should this be represented," not when it is card
+    plumbing.
+
+  The CR wins every disagreement, and a green test elsewhere is evidence
+  someone considered the case, never evidence of the answer --- argentum's own
+  Blood Moon test asserts a simplified wrong outcome and says so in a comment.
+  Facts travel freely (which card exercises a rule, how often an opcode
+  appears); ported code carries the MIT notice, and card text is Wizards IP
+  whatever the engine's license says.
+
+  `_scratch/` is gitignored, so none of these is guaranteed to be present. A
+  missing clone makes this a skipped step, never a blocked one --- the loop
+  above stands on its own.
 
 - When no printing can reach the rule, write a synthetic card as
   `data/cards/synthetic-*.json`. A real card wins whenever one exists, and "I

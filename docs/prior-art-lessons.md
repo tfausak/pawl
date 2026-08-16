@@ -8,6 +8,8 @@
 
 *§10 adds a **third wave** (2026-07-17): code-level studies of the two Haskell engines — **mtg-pure** and **MedeaMelana's Magic**, both BSD-3 — plus deeper reads of Magarena's layer/AI internals and ygopro-core's suspension protocol. Method matches the first wave: agents interrogating source, claims traced to `path:line`.*
 
+*§11 adds a **fourth wave** (2026-08-16), asking a different question — not what pawl's architecture should be, but whether the permissive prior art can speed up an ordinary backlog issue. It reclassifies **phase** (§8.7 had it wrong) and covers **mtgish**, which no earlier wave saw. The corpora it reads live in the gitignored `_scratch/`, so treat every one as possibly absent.*
+
 ---
 
 ## 0. The seven findings that change what you do
@@ -174,6 +176,8 @@ Tail (rank 61→190) = 130 opcodes sharing <8% of usage — the long cheap tail 
 | **XMage** | (per-repo; verify before reuse) | Studied here for architecture lessons only — nothing to port. |
 | **mtg-pure** | **BSD-3** | Permissive. Study and port freely with the notice. **The other permissive MTG-specific source besides Argentum.** |
 | **MedeaMelana's Magic** | **BSD-3** | Permissive — the third portable source (© 2012–2016 Martijn van Steenbergen). Free-monad `Interact` + layers-as-data are directly relevant; effects are closures (§10.2). |
+| **mtgish** | **MIT** | Permissive. The whole card pool as first-order typed ASTs, plus the vocabulary that expresses them — the most directly comparable artifact to pawl's open half in the field. Derive freely with the notice. |
+| **phase** | **MIT / Apache-2.0** (dual) | Permissive. Its architecture is not a model for pawl (§8.7), but its per-card test corpus is a card-finding oracle, and facts drawn from it are not derivative works. |
 | **jinteki.net** | **MIT** | Permissive — safe to read freely, unlike Forge. Not MTG, so lessons are structural only. |
 | **ygopro-core** | **AGPL-3** | **Reference only** — same posture as Forge, and AGPL is stricter (network use triggers it). Read for the core/data seam; do not copy structure. |
 | **Magarena** | **GPL-3** | **Reference only.** The `requires_groovy_code` ratio (§8.8) is a fact, not a derivative work — safe to cite. |
@@ -182,7 +186,9 @@ Tail (rank 61→190) = 130 opcodes sharing <8% of usage — the long cheap tail 
 
 *(Card names/text are Wizards IP regardless of engine license — orthogonal, relevant before redistributing any card data.)*
 
-**Posture:** Argentum (MIT), mtg-pure (BSD-3), and MedeaMelana's Magic (BSD-3) are the only sources pawl may *derive from*. Everything else in §8 is a read-only oracle.
+**Posture:** Argentum (MIT), mtgish (MIT), phase (MIT/Apache-2.0), mtg-pure (BSD-3), and MedeaMelana's Magic (BSD-3) are the sources pawl may *derive from*. Everything else in §8 is a read-only oracle.
+
+*(Card names, oracle text and rulings are Wizards IP whatever the engine's license says, and that is the binding constraint on redistributing card data — not the MIT notice.)*
 
 ---
 
@@ -275,7 +281,9 @@ Surveyed; nothing here displaces Argentum as the primary reference, but three ar
 | [**jinteki.net**](https://github.com/mtgred/netrunner) | Clojure / **MIT** | Netrunner, ~1,650 cards. `defcard` bodies are **plain data maps**; the engine dispatches on keys (`:cost`, `:choices`, `:events`). MIT, so unlike Forge it is safe to read freely. Then leaks: `:effect` bottoms out in arbitrary state-mutating Clojure. |
 | [**Magarena**](https://github.com/magarena/magarena) | Java / GPL-3 | Dormant since 2023-04. Key-value card scripts with an **explicit `requires_groovy_code` flag** — the escape hatch, made countable. See §8.8. |
 | [**SabberStone**](https://github.com/HearthSim/SabberStone) / [**Fireplace**](https://github.com/jleclanche/fireplace) | C# / Python, AGPL | Hearthstone. SabberStone's `SimpleTask`/`ComplexTask` algebra is a first-order effect vocabulary composed as data — read the namespace for *how few primitives cover how many cards*. Fireplace merges declarative action trees with Blizzard's own `CardDefs.xml` at init — the closed/open seam, at full coverage. |
-| **phase-rs**, **manabrew**, **mtg-python-engine**, **mtghub-engine**, **Wagic**, **Incantus**, **corrosion** | various | Surveyed, nothing architecturally novel. `phase-rs` is a useful **control group**: code-per-card in the engine, LLM-assisted contribution pipeline, big card-count badge. Cockatrice is a client with no rules engine (Oracle XML DB only). |
+| [**mtgish**](https://github.com/mtgish/mtgish) | Rust / **MIT** | **Not an engine — a card *representation*.** Parses oracle English into a first-order typed AST for the whole pool (`data/mtgish.lines.json`, ~33.5k cards; vocabulary in `rust_syntax/src/mtg_types.rs`). The closest published analogue to pawl's open half, and permissive. See §11. |
+| [**phase**](https://github.com/phase-rs/phase) | Rust / **MIT+Apache-2.0** | Data effects (a ~230-variant `Effect` enum) fed by a large oracle-text parser, i.e. Magarena's shape in Rust — **not** the code-per-card control group earlier waves called it. Its distinguishing asset is a per-card regression corpus of over a thousand integration tests. See §11. |
+| **manabrew**, **mtg-python-engine**, **mtghub-engine**, **Wagic**, **Incantus**, **corrosion** | various | Surveyed, nothing architecturally novel. Cockatrice is a client with no rules engine (Oracle XML DB only). |
 
 **The universal pattern, and the decision it forces on pawl.** Every engine in this field that gets the *classification* half right then leaks at the *leaves*: ygopro's `SetOperation`, jinteki's `:effect`, Magarena's `requires_groovy_code`, Forge's `SVar`, DotP's runtime Lua globals. **Argentum (§2.7) is the sole exception — zero escape hatches, and its own docs proposed ones that were never built.** A first-order DSL with *no* escape hatch would be genuinely novel. The corollary is that pressure to add one is empirically universal, and **pawl should decide now what the answer is when card #400 doesn't fit** — because every other project answered it under duress and answered it the same way.
 
@@ -303,8 +311,9 @@ That 84.3% is a strikingly close independent match to Arena's GRP "**80% or so**
 | **Forge** | ~95% | `SVar`, plus `*Effect.java` for the residue |
 | **Magarena** | **84.3%** | `requires_groovy_code` (15.7%), + 5,293 never attempted |
 | **Arena GRP** | ~80% | hand-written CLIPS for the other 20% |
+| **phase** | high, but parser-mediated | no per-card hatch; the residue is `Effect::Unimplemented`, and the *core* keeps a few identity checks (§11) |
 | **ygopro / EDOPro** | **~5.6%** | `SetOperation` — 94.4% of cards |
-| **MTGO / Manalink / phase-rs** | 0% | code *is* the card |
+| **MTGO / Manalink** | 0% | code *is* the card |
 
 **What this settles.** The "everyone leaks" story is true but too flat — the leak ranges from 0% to 94%, and that range *is* the architecture. pawl's target sits above Forge, next to Argentum, in territory only Argentum occupies and only at ~1/10th Forge's corpus. **The open question is not whether a first-order DSL can express 80% — three independent systems say yes. It is whether pawl can hold the last 20% without a hatch, at a corpus size where Argentum has not yet been tested.** That is the honest statement of the bet, and it belongs in `design.md` next to the M4 vocabulary plan.
 
@@ -323,6 +332,7 @@ Recorded because §9's meta-lesson applies to *research about* engines as much a
 - **No GDC/Unite talk on Arena's engine exists**; the two Werner dev diaries are the entire public technical record. **No WotC/Hasbro patent** on a rules engine, card scripting, or card-text parsing exists (the 1994 "tapping" patent expired 2014) — **no patent exposure for pawl's design**.
 - **Never discussed publicly by WotC:** determinism, replay, server authority, mana-pool representation. M0 already replays deterministically, so pawl is *ahead of the published record* here, not behind it.
 - **"SLED" / rules-engine-as-a-service:** no evidence, likely misremembered.
+- **This section's own phase entry was wrong**, and the fourth wave caught it — §8.7 and §8.8 both had phase as code-per-card at 0% declarative. Corrected in place; see §11.1. The survey rows above are graded no more highly than their method allows, and a project surveyed but not read at code level is a hypothesis.
 
 ---
 
@@ -374,3 +384,35 @@ The most valuable thing in Argentum is not a mechanism — it's the **gap betwee
 **ygopro's effect decomposition: Condition / Cost / Target / Operation as four separate slots** — with the target callback doing triple duty (`chk==0` pure legality probe / candidate validation / actual selection, e.g. c5318639.lua). The discipline of a *legality probe separate from resolution* is directly relevant to pawl's action-enumeration risk (design §7: enumeration is a peer of the resolver, and it needs exactly these can-this-happen predicates without side effects).
 
 **Caution:** ygopro has **no layer system** — continuous effects are `UPDATE/SET/FINAL` value modifiers sorted by application id (effect.cpp:14, field.cpp:1484), because Yu-Gi-Oh has no CR 613. Layer machinery is MTG-specific; there is no generic card-game substrate to borrow it from.
+
+---
+
+## 11. Fourth wave — the two permissive siblings, and what they are actually good for
+
+*(2026-08-16. Occasioned by a different question than the earlier waves: not "what should pawl's architecture be," which is settled, but "can prior art speed up an ordinary backlog issue." The answer is yes, asymmetrically, and it corrects a claim the second wave got wrong. Line references are to the repositories as read on this date; both move.)*
+
+### 11.1 phase — misclassified, and useful for something other than what §8.7 assumed
+
+§8.7 listed `phase-rs` as a control group — "code-per-card in the engine" — and §8.8's table put it at 0% declarative alongside MTGO and Manalink. **That is wrong.** phase parses oracle English into typed data: `crates/engine/src/types/ability.rs` holds an `Effect` enum of ~230 variants, fed by an oracle-text parser spanning ~90 files under `crates/engine/src/parser/`. Structurally it is Magarena's design in Rust — parser-as-truth over a data effect vocabulary — not Manalink's.
+
+Its own `CLAUDE.md` forbids the fusion pawl's §1 invariant forbids, in nearly the same words ("NEVER match on verbatim Oracle text strings… handles exactly one card and poisons the parser architecture permanently"). It mostly holds. It does not hold absolutely: a copy-shortcut path in the engine gates on `source.name == "Witherbloom Apprentice"` (`crates/engine/src/game/precast_copy_shortcut.rs`). One identity check in a fast path is a far cry from Manalink's per-card function table, and the honest reading is *a rule enforced by discipline, leaking at the rate discipline leaks* — which is §8.1's point about Arena, observed a second time. pawl's claim remains the one nobody else makes: enforcement by construction.
+
+**So it is not a design reference.** What it has that nothing else in this survey does is a **per-card regression corpus**: over a thousand integration test files under `crates/engine/tests/integration/`, named for the card and often the issue that motivated them (`abundance_optional_draw_replacement.rs`, `anax_instead_branch_not_chain.rs`), plus rule-keyed files (`rules/layers.rs`, `rules/replacement.rs`, `rules/sba.rs`, `rules/stack.rs`). Those filenames answer *which printed card exercises this rule* — which is the slow half of pawl's card-driven work, already searched a thousand times over. That is the use: a card-finding index, not an implementation to copy.
+
+### 11.2 mtgish — the whole pool as a first-order AST, and no wave had looked at it
+
+[mtgish](https://github.com/mtgish/mtgish) (MIT) is not an engine. It is an alternate card syntax "designed for rules engines and AI," with a parser from oracle English into it. `data/mtgish.lines.json` carries roughly 33,500 cards as typed ASTs; `rust_syntax/src/mtg_types.rs` is the vocabulary. Shivan Dragon's activated ability lands as `Activated(PayMana([ManaCostR]), ActionList([CreatePermanentLayerEffectUntil(ThisPermanent, [AdjustPT(1, 0)], UntilEndOfTurn)]))`.
+
+**This is the closest published artifact to pawl's open half**, and it is permissive, which Forge's cardsfolder is not. Two distinct uses:
+
+- **Vocabulary evidence.** §6's Forge frequency table says which opcodes are common; mtgish says what an opcode's *fields* have to be to cover the pool, in a first-order form with no escape hatch. When an issue is "what shape should this effect take," mtgish has an answer that survived contact with every printed card, and disagreement with it is worth understanding before overriding.
+- **A pool-wide query surface.** Because it is one JSON file of ASTs rather than 33,000 scripts, "which cards use this construct" is a grep. That is the same card-finding job as §11.1, reached from the vocabulary side instead of the test side.
+
+Unchecked, and worth checking before leaning on it hard: how it represents what its parser cannot express. There is no `Unparsed`/`Unimplemented` marker in the emitted data, so the residue is not countable the way Magarena's `requires_groovy_code` is (§8.8) — which means a card's presence in the file is not by itself evidence its rules text came through whole.
+
+### 11.3 The caveats that make this safe to use
+
+- **The CR is ground truth; these are not.** §9's meta-lesson applies with full force. Argentum's `LayerSystemTest.kt` asserts a *simplified wrong* Blood Moon outcome and says so in a comment. A green test in another engine is evidence someone thought about the case, never evidence of the answer.
+- **Consult after deriving, not before.** Reading another engine's model before working the rule out from `docs/rules.txt` imports that model, and phase's and mtgish's are both parser-shaped where pawl's is AST-shaped.
+- **Facts travel; code needs the notice.** Which card exercises a rule, and how often an opcode appears, are facts. Ported code and card data carry MIT/BSD obligations, and card text is Wizards IP regardless (§7).
+- **None of it is guaranteed present.** `_scratch/` is gitignored, so every clone named here may be absent. A missing corpus makes this a skipped step, never a blocked one.
