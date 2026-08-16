@@ -28,7 +28,6 @@ import qualified Pawl.Engine.Projection as Projection
 -- aliased Subtype.Type below for the same reason, against Pawl.Engine.Subtype.
 
 import qualified Pawl.Engine.Replacement as Replacement
-import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Subtype as Subtype
@@ -429,6 +428,49 @@ abominationAcrossNexus forest abomination nexus stocked =
       cast = snd (Engine.runGamePure S.identityAnswer g4 (S.cast S.alice nexusId))
       resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
    in (Projection.powerOf abominationId cast, Projection.powerOf abominationId resolved)
+
+-- Elspeth, Sun's Champion {4}{W}{W} Legendary Planeswalker -- Elspeth, loyalty
+-- 4. "-7: You get an emblem with \"Creatures you control get +2/+2 and have
+-- flying.\"" (Name, cost, type line, loyalty and oracle text checked against
+-- Scryfall.) The pool's first emblem with a STATIC ability, and what proves
+-- CR 114.4 -- "abilities of emblems function in the command zone" -- for the
+-- layer fold: the modifications are layer 7c and layer 6, and their only bearer
+-- is an object CR 114.1 keeps in the command zone.
+--
+-- One board, read twice; the Bool is the single difference, whether the
+-- ultimate was activated. Everything else -- seats, creatures, Elspeth's
+-- loyalty -- is held equal, so a reading that came from the planeswalker's own
+-- presence rather than from the emblem it minted would move both halves.
+--
+-- Three seats, and three creatures of two printed sizes: alice's Goblin Piker
+-- (2/1), bob's Hill Giant (3/3) and carol's Piker. "Creatures you control" is
+-- CR 114.2's controller, so a fold that took the active player, the emblem's
+-- owner-as-everyone, or the whole battlefield would buff one of the other two.
+-- The sizes keep the numbers apart: the buffed Piker is 4/3, which no unbuffed
+-- creature on the board reads as.
+--
+-- The loyalty is a fixture rather than seven turns of +1: CR 306.5b's counters
+-- are what the ability's cost pays, and how they got there is no part of this.
+elspethEmblemBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  Bool ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+elspethEmblemBoard s registry ultimate = do
+  elspeth <- S.printingOf s registry "Elspeth, Sun's Champion"
+  piker <- S.printingOf s registry "Goblin Piker"
+  giant <- S.printingOf s registry "Hill Giant"
+  let (elspethId, g1) = S.addCreature elspeth S.alice S.threePlayerGame
+      (mine, g2) = S.addCreature piker S.alice g1
+      (theirs, g3) = S.addCreature giant S.bob g2
+      (carols, g4) = S.addCreature piker S.carol g3
+      armed = S.addCounter CounterKind.Loyalty 7 elspethId g4
+      -- The third loyalty ability, in printed order: +1, -3, -7.
+      used = case (ultimate, drop 2 (Face.activatedAbilities (S.combinedFace elspeth))) of
+        (True, ability : _) -> S.runPure S.identityAnswer armed (do Activate.activateAbility S.alice elspethId ability; Stack.resolveTop)
+        _ -> armed
+  pure (mine, theirs, carols, used)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
@@ -2604,27 +2646,43 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "the Abomination alone, before" before (Just 1)
     Spec.assertEqWith s "the Abomination alone, after" after (Just 1)
 
-  Spec.it s "CR 114.4 an emblem's anthem buffs the controller's creatures from the command zone" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (creature, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature creature S.alice Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
-    Spec.assertEqWith s "piker is 2/1 -> 3/2" (Projection.powerOf creature withEmblem) (Just 3)
+  -- The premise, asserted rather than assumed: CR 114.2 put one emblem in the
+  -- command zone, and only the ultimate put it there.
+  Spec.it s "CR 114.2 Elspeth's ultimate puts one emblem in the command zone" $ do
+    (_, _, _, gs) <- elspethEmblemBoard s registry True
+    (_, _, _, without) <- elspethEmblemBoard s registry False
+    Spec.assertEqWith s "one emblem" (Set.size (GameState.command gs)) 1
+    Spec.assertEqWith s "and none without the ultimate" (Set.size (GameState.command without)) 0
 
-  Spec.it s "CR 114.4 the anthem is scoped to the controller's creatures" $ do
-    piker <- S.printingOf s registry "Goblin Piker"
-    let (mine, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        (theirs, gs1) = S.addCreature piker S.bob gs0
-        withEmblem = S.runPure S.identityAnswer gs1 (Resolve.applyEffect mine mine S.alice Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
-    Spec.assertEqWith s "alice's creature buffed" (Projection.powerOf mine withEmblem) (Just 3)
-    Spec.assertEqWith s "bob's creature untouched" (Projection.powerOf theirs withEmblem) (Just 2)
+  Spec.it s "CR 114.4 the emblem's static ability reaches the layer fold from the command zone" $ do
+    (mine, _, _, gs) <- elspethEmblemBoard s registry True
+    Spec.assertEqWith s "the Piker is 2/1 -> 4/3, layer 7c" (Projection.powerOf mine gs, Projection.toughnessOf mine gs) (Just 4, Just 3)
+    Spec.assertEqWith s "and has flying, layer 6" (Projection.hasKeyword Keyword.Flying mine gs) True
 
-  Spec.it s "CR 114.5 the emblem survives a battlefield wipe and buffs a fresh token" $ do
+  -- The negative half of that pair: the same board with the ultimate not
+  -- activated. Elspeth is still there, still at seven loyalty, so what changes
+  -- is only whether the emblem exists.
+  Spec.it s "CR 114.4 without the emblem the same Piker is its printed 2/1" $ do
+    (mine, _, _, gs) <- elspethEmblemBoard s registry False
+    Spec.assertEqWith s "printed size" (Projection.powerOf mine gs, Projection.toughnessOf mine gs) (Just 2, Just 1)
+    Spec.assertEqWith s "and no flying" (Projection.hasKeyword Keyword.Flying mine gs) False
+
+  Spec.it s "CR 114.2 the emblem's \"you\" is its controller, not every seat" $ do
+    (_, theirs, carols, gs) <- elspethEmblemBoard s registry True
+    Spec.assertEqWith s "bob's Hill Giant is untouched" (Projection.powerOf theirs gs, Projection.toughnessOf theirs gs) (Just 3, Just 3)
+    Spec.assertEqWith s "carol's Piker is untouched" (Projection.powerOf carols gs, Projection.toughnessOf carols gs) (Just 2, Just 1)
+    Spec.assertEqWith s "neither gains flying" (fmap (\oid -> Projection.hasKeyword Keyword.Flying oid gs) [theirs, carols]) [False, False]
+
+  -- CR 114.5 makes the emblem neither a card nor a permanent, and CR 408.1 puts
+  -- it in a zone whose objects cannot be destroyed -- so nothing that clears the
+  -- battlefield reaches it, and a creature arriving afterwards is still buffed.
+  Spec.it s "CR 408.1 the emblem survives a battlefield wipe and buffs a fresh creature" $ do
     piker <- S.printingOf s registry "Goblin Piker"
-    let (creature, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        withEmblem = S.runPure S.identityAnswer gs0 (Resolve.applyEffect creature creature S.alice Map.empty Map.empty (Effect.CreateEmblem (S.anthemEmblemCard piker)))
-        wiped = withEmblem {GameState.battlefield = mempty, GameState.objects = Map.filterWithKey (\oid _ -> Set.member oid (GameState.command withEmblem)) (GameState.objects withEmblem)}
-        (token, afterToken) = S.addCreature piker S.alice wiped
-    Spec.assertEqWith s "emblem still buffs the new creature" (Projection.powerOf token afterToken) (Just 3)
+    (_, _, _, gs) <- elspethEmblemBoard s registry True
+    let wiped = gs {GameState.battlefield = mempty, GameState.objects = Map.filterWithKey (\oid _ -> Set.member oid (GameState.command gs)) (GameState.objects gs)}
+        (fresh, afterFresh) = S.addCreature piker S.alice wiped
+    Spec.assertEqWith s "the emblem is still in the command zone" (Set.size (GameState.command wiped)) 1
+    Spec.assertEqWith s "and buffs the new creature" (Projection.powerOf fresh afterFresh, Projection.toughnessOf fresh afterFresh) (Just 4, Just 3)
 
   Spec.it s "CR 613.1 projectUpTo stops before the bound layer" $ do
     -- A layer-7c modification is invisible to a projection bounded at
