@@ -1337,7 +1337,7 @@ cardSlotNamesCollide card =
 --     `became`, CR 702.70a's `thatPlayer` -- and is the whole point of this
 --     lint.
 --   * Resolve.definedSlots covers a slot the ability's own effects MINT rather
---     than read: a Create's token (CR 603.7c's "it"), a PlaySubgame's loser.
+--     than read: a Create's token (CR 603.7c's "it"), a PlaySubgame's winner.
 --     The same exemption every carrier takes.
 --   * the ability's own declared target slots (CR 601.2c / 700.2c) are the
 --     ordinary chosen targets -- the side modalSlotsOffend compares AGAINST, one
@@ -1782,7 +1782,7 @@ reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 --
 -- ownDeclaredTargetSlots' sibling and the other half of the same question.
 -- Declaring a target slot is not the only way a card names a slot: MoveToZone and Create
--- name the incarnation CR 400.7 mints, PlaySubgame names CR 729.1b's loser, and
+-- name the incarnation CR 400.7 mints, PlaySubgame names CR 729.1b's winner, and
 -- Destroy names how many it destroyed.
 --
 -- The base case of boundSlots below, named so the self-test can hold it against
@@ -4177,6 +4177,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               PlayerRef.Relative PlayerRelation.Opponent -> False
               PlayerRef.InSlot _ -> True
               PlayerRef.EachPlayer -> False
+              -- The whole table but one seat, so several libraries -- EachPlayer's
+              -- answer, and for its reason.
+              PlayerRef.EachPlayerExcept _ -> False
               -- One seat, so one library -- InSlot's answer. Unreachable from
               -- card data, which the sweep below is what enforces.
               PlayerRef.Specific _ -> True

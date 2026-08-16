@@ -1,0 +1,73 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Shahrazad",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "PlaySubgame",
+                    "value": "winner"
+                  },
+                  {
+                    "type": "LoseLife",
+                    "value": {
+                      "player": {
+                        "type": "EachPlayerExcept",
+                        "value": "winner"
+                      },
+                      "quantity": {
+                        "type": "Halved",
+                        "value": {
+                          "quantity": {
+                            "type": "LifeTotal",
+                            "value": {
+                              "type": "Candidate"
+                            }
+                          },
+                          "rounding": {
+                            "type": "Up"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

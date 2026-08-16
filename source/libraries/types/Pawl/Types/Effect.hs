@@ -1144,12 +1144,15 @@ data Effect card
     -- rescue bound -- Pawl.Engine.Binding.became -- read live off the resolving
     -- object. Only the second is a target (CR 115.10a); the first is a definition.
     ExileHaunting ExileHaunting.ExileHaunting
-  | -- | CR 729.1/729.1b: play a Magic subgame, then bind its outcome (the derived
-    -- loser) into this slot for a later effect to read. DEFINED here, like
-    -- Create's minted-token slot, not a cast-time target -- the loser is known
-    -- only when the subgame ends, so the following effect reads it through the
-    -- per-effect binding re-read in resolveSpellWith. Generic: the engine reaches
-    -- subgames through this opcode, never Shahrazad's identity.
+  | -- | CR 729.1/729.1b: play a Magic subgame, then bind its outcome -- the
+    -- WINNER -- into this slot for a later effect to read. Nothing is bound when
+    -- the subgame is a draw, which is what lets Shahrazad's
+    -- PlayerRef.EachPlayerExcept read "each player who doesn't win" as the whole
+    -- table. DEFINED here, like Create's minted-token slot, not a cast-time target
+    -- -- the winner is known only when the subgame ends, so the following effect
+    -- reads it through the per-effect binding re-read in resolveSpellWith.
+    -- Generic: the engine reaches subgames through this opcode, never Shahrazad's
+    -- identity.
     PlaySubgame SlotName.SlotName
   | -- | CR 608.2d: the resolving controller chooses one of their opponents, and the
     -- player chosen is bound into this slot for a LATER EFFECT of the same
@@ -1167,7 +1170,7 @@ data Effect card
     -- fizzle anything.
     --
     -- The slot is a DEFINITION and never a target (CR 115.10a), PlaySubgame's
-    -- loser slot one opcode over: both bind a player the resolution derives, and
+    -- winner slot one opcode over: both bind a player the resolution derives, and
     -- both are read back through the per-effect binding re-read. Pawl.CardSpec's
     -- dataflow lint sees it through Pawl.Engine.Resolve.definedSlots for that
     -- reason.

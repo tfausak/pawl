@@ -257,13 +257,17 @@ data GameState = MkGameState
     -- still IN the game is Game.stillPlaying, and every departure-aware read
     -- filters through that on top of this.
     --
-    -- Three rules depend on a departed player keeping their seat:
+    -- Two rules depend on a departed player keeping their seat:
     --   * CR 800.4m -- the seat is how the handoff knows when a departed player's
     --     turn WOULD have begun.
     --   * CR 800.4a -- finding the departed player's successor in turn order
     --     needs their own position.
-    --   * CR 729.1b, whose real customer is Shahrazad's "each player who doesn't
-    --     win the subgame": the full starting roster minus the winner (#138).
+    --
+    -- CR 729.1b is NOT a third, though it used to be listed as one. Shahrazad's
+    -- "each player who doesn't win the subgame" is the set who PLAYED it, and CR
+    -- 729.4 puts a player who is not in the subgame outside it -- so the roster
+    -- there is Game.stillPlaying's, the same set Setup.subgameStateFrom seats,
+    -- and this field would name a seat that never played.
     turnOrder :: [PlayerId.PlayerId],
     activePlayer :: PlayerId.PlayerId,
     phase :: Phase.Phase,

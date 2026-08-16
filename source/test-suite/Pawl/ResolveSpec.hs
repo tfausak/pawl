@@ -1319,188 +1319,43 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "the game restarted with bob as the starting player (CR 727.1a)" (GameState.activePlayer after) S.bob
     Spec.assertEqWith s "alice's 8 cards all survived the restart, still hers (CR 727.2)" (length (filter (\o -> Object.owner o == S.alice) (Map.elems (GameState.objects after)))) 8
     Spec.assertEqWith s "the resolving ability object ceased to exist (not a card)" (Game.lookupObject abilId after) Nothing
-  Spec.it s "CR 729.1b: PlaySubgame binds the loser, a later DealDamage reads it (mid-resolution binding visible)" $ do
+  Spec.it s "CR 729.1b: PlaySubgame binds the winner, a later LoseLife reads it (mid-resolution binding visible)" $ do
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let g0 = Setup.emptyGame S.bothPlayers
-        slot = SlotName.MkSlotName (Text.pack "loser")
-        -- a stub runner: no real subgame, just report alice won -> loser = bob.
+        -- a stub runner: no real subgame, just report alice won.
         stubRunner :: Game Result.Result
         stubRunner = pure (Result.Won S.alice)
-        -- hand-build alice's spell on the stack: one chosen mode (index 0),
-        -- effects [PlaySubgame slot, DealDamage slot (Literal 3)], no targets.
-        (spellId, g1) = Game.freshObjectId g0
-        (ts, g2) = Game.freshTimestamp g1
-        -- a minimal synthetic card whose spell has the two effects above;
-        -- mirrors the file's existing synthetic-card idiom (CR 612 test above).
-        card = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
-        face =
-          Face.MkFace
-            { Face.name = CardName.MkCardName $ Text.pack "Subgame Test Spell",
-              Face.manaCost = Nothing,
-              Face.typeLine = Face.typeLine (S.combinedFace lightningBolt),
-              Face.power = Nothing,
-              Face.toughness = Nothing,
-              Face.loyalty = Nothing,
-              Face.defense = Nothing,
-              Face.keywords = Set.empty,
-              Face.colorIndicator = Set.empty,
-              Face.staticAbilities = [],
-              Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3) Nothing)]))) Map.empty))
-                  (ModeSelection.ChooseExactly 1),
-              Face.activatedAbilities = [],
-              Face.replacementEffects = [],
-              Face.triggeredAbilities = [],
-              Face.delayedAbilities = Map.empty,
-              Face.rooms = Seq.empty,
-              Face.castingPermissions = [],
-              Face.castingRestrictions = [],
-              Face.characteristicPT = Nothing,
-              Face.playerAbilities = [],
-              Face.blockRequirements = [],
-              Face.blockPermissions = [],
-              Face.attackRequirements = [],
-              Face.combatRestrictions = [],
-              Face.sacrificeRestrictions = [],
-              Face.untapRestrictions = [],
-              Face.attackCosts = [],
-              Face.mulliganActions = [],
-              Face.openingHandActions = [],
-              Face.specialActions = [],
-              Face.additionalCosts = [],
-              Face.alternativeCosts = [],
-              Face.costReductions = [],
-              Face.enchant = [],
-              Face.counterability = Counterability.Counterable
-            }
-        spellObj =
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.enteredUnder = Nothing,
-              Object.source = Source.OfToken card,
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.exiledFaceDown = False,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-              Object.counters = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColor = Nothing,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.timestamp = ts,
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.kicked = False,
-              Object.announcedX = Nothing
-            }
-        g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
-        after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
-    Spec.assertEqWith s "bob (the derived loser) lost 3 life to the follow-on DealDamage" (S.lifeOf S.bob after) (Just 17)
-  Spec.it s "CR 729.1b: PlaySubgame's derived loser is drawn from the subgame roster, not the full main-game seating (a departed seat is never the loser)" $ do
+        (spellId, g1) = subgameSpellOn lightningBolt "Subgame Test Spell" nonWinnersLose3 g0
+        after = snd (Engine.runGamePure S.identityAnswer g1 (Resolve.resolveSpellWith stubRunner spellId))
+    Spec.assertEqWith s "bob, the one player who did not win, lost 3 to the follow-on" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "alice won, so the exclusion kept her out of the set" (S.lifeOf S.alice after) (Just 20)
+  Spec.it s "CR 729.1b: a DRAWN subgame binds no winner, so the whole table is in the non-winner set" $ do
+    -- The won board one line over with EXACTLY ONE thing changed -- the stub's
+    -- Result -- so what the two cases differ by is who won and nothing else.
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let g0 = Setup.emptyGame S.bothPlayers
+        stubRunner :: Game Result.Result
+        stubRunner = pure Result.Drawn
+        (spellId, g1) = subgameSpellOn lightningBolt "Subgame Test Spell" nonWinnersLose3 g0
+        after = snd (Engine.runGamePure S.identityAnswer g1 (Resolve.resolveSpellWith stubRunner spellId))
+    Spec.assertEqWith s "bob did not win a drawn subgame, so he pays" (S.lifeOf S.bob after) (Just 17)
+    Spec.assertEqWith s "and neither did alice -- a draw punishes everybody, not nobody" (S.lifeOf S.alice after) (Just 17)
+  Spec.it s "CR 729.1b: the non-winner set is the players still in the game, so a departed seat is not in it" $ do
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     -- bob departed the MAIN game before this effect resolves, so bob was never
     -- seated for the subgame (Setup.subgameStateFrom seats only
-    -- Game.stillPlayingInOrder) -- only alice and carol played it. The
-    -- stub reports alice won, so the derived loser must be carol; bob still
-    -- appears in the raw seating roster (GameState.turnOrder) and is the
-    -- non-participant a roster bug would wrongly name.
+    -- Game.stillPlayingInOrder) -- only alice and carol played it. The stub
+    -- reports alice won, so carol is the whole non-winner set; bob still appears
+    -- in the raw seating roster (GameState.turnOrder) and is the non-participant
+    -- a roster bug would wrongly charge.
     let g0 = Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame
-        slot = SlotName.MkSlotName (Text.pack "loser")
         stubRunner :: Game Result.Result
         stubRunner = pure (Result.Won S.alice)
-        (spellId, g1) = Game.freshObjectId g0
-        (ts, g2) = Game.freshTimestamp g1
-        card = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
-        face =
-          Face.MkFace
-            { Face.name = CardName.MkCardName $ Text.pack "Subgame Test Spell (Three Seats, One Departed)",
-              Face.manaCost = Nothing,
-              Face.typeLine = Face.typeLine (S.combinedFace lightningBolt),
-              Face.power = Nothing,
-              Face.toughness = Nothing,
-              Face.loyalty = Nothing,
-              Face.defense = Nothing,
-              Face.keywords = Set.empty,
-              Face.colorIndicator = Set.empty,
-              Face.staticAbilities = [],
-              Face.spell =
-                Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3) Nothing)]))) Map.empty))
-                  (ModeSelection.ChooseExactly 1),
-              Face.activatedAbilities = [],
-              Face.replacementEffects = [],
-              Face.triggeredAbilities = [],
-              Face.delayedAbilities = Map.empty,
-              Face.rooms = Seq.empty,
-              Face.castingPermissions = [],
-              Face.castingRestrictions = [],
-              Face.characteristicPT = Nothing,
-              Face.playerAbilities = [],
-              Face.blockRequirements = [],
-              Face.blockPermissions = [],
-              Face.attackRequirements = [],
-              Face.combatRestrictions = [],
-              Face.sacrificeRestrictions = [],
-              Face.untapRestrictions = [],
-              Face.attackCosts = [],
-              Face.mulliganActions = [],
-              Face.openingHandActions = [],
-              Face.specialActions = [],
-              Face.additionalCosts = [],
-              Face.alternativeCosts = [],
-              Face.costReductions = [],
-              Face.enchant = [],
-              Face.counterability = Counterability.Counterable
-            }
-        spellObj =
-          Object.MkObject
-            { Object.owner = S.alice,
-              Object.enteredUnder = Nothing,
-              Object.source = Source.OfToken card,
-              Object.zone = Zone.Stack,
-              Object.tapped = TapState.Untapped,
-              Object.facing = Facing.FaceUp,
-              Object.exiledFaceDown = False,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
-              Object.counters = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColor = Nothing,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.timestamp = ts,
-              Object.face = Nothing,
-              Object.turnedOverAt = Nothing,
-              Object.worldSince = Nothing,
-              Object.playableFromExile = Nothing,
-              Object.plotted = Nothing,
-              Object.foretold = Nothing,
-              Object.ringBearerFor = Nothing,
-              Object.protector = Nothing,
-              Object.ventureRoom = Nothing,
-              Object.unlockedHalves = Set.empty,
-              Object.designations = Set.empty,
-              Object.kicked = False,
-              Object.announcedX = Nothing
-            }
-        g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
-        after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
-    Spec.assertEqWith s "carol (a genuine subgame participant) lost 3 life to the follow-on DealDamage" (S.lifeOf S.carol after) (Just 17)
-    Spec.assertEqWith s "bob (departed before the subgame; never played it) was not named the loser and took no damage" (S.lifeOf S.bob after) (Just 20)
+        (spellId, g1) = subgameSpellOn lightningBolt "Subgame Test Spell (Three Seats, One Departed)" nonWinnersLose3 g0
+        after = snd (Engine.runGamePure S.identityAnswer g1 (Resolve.resolveSpellWith stubRunner spellId))
+    Spec.assertEqWith s "carol, a genuine subgame participant who did not win, lost 3" (S.lifeOf S.carol after) (Just 17)
+    Spec.assertEqWith s "bob departed before the subgame and never played it, so he pays nothing" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "alice won" (S.lifeOf S.alice after) (Just 20)
   Spec.it s "CR 111 Dragon Fodder creates two 1/1 Goblin tokens" $ do
     mountain <- S.printingOf s registry "Mountain"
     dragonFodder <- S.printingOf s registry "Dragon Fodder"
@@ -10461,3 +10316,100 @@ aimingAtEveryPlayer n p = case p of
       Recipient.ToPlaneswalker _ -> False
       Recipient.ToBattle _ -> False
       Recipient.ToObject _ -> False
+
+-- CR 729.1b's plumbing, as a card face would write it: run the subgame, then make
+-- every player who did not win lose 3. A flat 3 rather than Shahrazad's half-life
+-- rider because what these three cases pin is WHO is in the set, and a per-player
+-- amount would let a wrong set and a wrong amount cancel out.
+nonWinnersLose3 :: [Effect.Effect Card.Type.Card]
+nonWinnersLose3 =
+  let slot = SlotName.MkSlotName (Text.pack "winner")
+   in [ Effect.PlaySubgame slot,
+        Effect.LoseLife (PlayerQuantity.MkPlayerQuantity (PlayerRef.EachPlayerExcept slot) (Quantity.Literal 3))
+      ]
+
+-- A hand-built {0} sorcery of alice's on the stack, one chosen mode holding
+-- `effects` and no target slots. The NARROWEST path to the Effect.PlaySubgame arm:
+-- Resolve.resolveSpellWith takes the subgame runner as an argument, so a stub
+-- Result decides the outcome outright and no nested game runs -- which is what
+-- lets a test name a DRAWN subgame at all. `borrowed` supplies the type line, so
+-- the object is a spell like any other.
+subgameSpellOn :: Printing.Printing -> String -> [Effect.Effect Card.Type.Card] -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+subgameSpellOn borrowed name effects gs0 =
+  let (spellId, gs1) = Game.freshObjectId gs0
+      (ts, gs2) = Game.freshTimestamp gs1
+      card = Card.Type.MkCard {Card.Type.layout = Layout.Normal, Card.Type.faces = NonEmpty.singleton face}
+      face =
+        Face.MkFace
+          { Face.name = CardName.MkCardName $ Text.pack name,
+            Face.manaCost = Nothing,
+            Face.typeLine = Face.typeLine (S.combinedFace borrowed),
+            Face.power = Nothing,
+            Face.toughness = Nothing,
+            Face.loyalty = Nothing,
+            Face.defense = Nothing,
+            Face.keywords = Set.empty,
+            Face.colorIndicator = Set.empty,
+            Face.staticAbilities = [],
+            Face.spell =
+              Modal.MkModal
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) Map.empty))
+                (ModeSelection.ChooseExactly 1),
+            Face.activatedAbilities = [],
+            Face.replacementEffects = [],
+            Face.triggeredAbilities = [],
+            Face.delayedAbilities = Map.empty,
+            Face.rooms = Seq.empty,
+            Face.castingPermissions = [],
+            Face.castingRestrictions = [],
+            Face.characteristicPT = Nothing,
+            Face.playerAbilities = [],
+            Face.blockRequirements = [],
+            Face.blockPermissions = [],
+            Face.attackRequirements = [],
+            Face.combatRestrictions = [],
+            Face.sacrificeRestrictions = [],
+            Face.untapRestrictions = [],
+            Face.attackCosts = [],
+            Face.mulliganActions = [],
+            Face.openingHandActions = [],
+            Face.specialActions = [],
+            Face.additionalCosts = [],
+            Face.alternativeCosts = [],
+            Face.costReductions = [],
+            Face.enchant = [],
+            Face.counterability = Counterability.Counterable
+          }
+      spellObj =
+        Object.MkObject
+          { Object.owner = S.alice,
+            Object.enteredUnder = Nothing,
+            Object.source = Source.OfToken card,
+            Object.zone = Zone.Stack,
+            Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
+            Object.exiledFaceDown = False,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled S.alice,
+            Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
+            Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
+            Object.timestamp = ts,
+            Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
+            Object.worldSince = Nothing,
+            Object.playableFromExile = Nothing,
+            Object.plotted = Nothing,
+            Object.foretold = Nothing,
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing,
+            Object.ventureRoom = Nothing,
+            Object.unlockedHalves = Set.empty,
+            Object.designations = Set.empty,
+            Object.kicked = False,
+            Object.announcedX = Nothing
+          }
+   in (spellId, gs2 {GameState.objects = Map.insert spellId spellObj (GameState.objects gs2), GameState.stack = spellId : GameState.stack gs2})

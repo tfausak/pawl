@@ -296,6 +296,19 @@ playersFor context gs ref =
   let everyone = Game.stillPlaying gs
    in case ref of
         PlayerRef.EachPlayer -> Just everyone
+        -- EachPlayer minus the seat the slot names, read off the source's
+        -- bindings as InSlot below reads them. DEFINED rather than Nothing where
+        -- that read comes up empty -- a slot naming nobody excludes nobody, which
+        -- is the type's stated reading and the opposite of InSlot's collapse. A
+        -- reference with no source at all is still unanswerable, since without one
+        -- there are no bindings to have excluded anybody.
+        PlayerRef.EachPlayerExcept name -> do
+          src <- Filter.source context
+          obj <- Game.lookupObject src gs
+          let excluded = do
+                recipient <- Binding.onlyOne =<< Map.lookup name (Binding.targetsOf (Object.bindings obj))
+                Recipient.playerOf recipient
+          Just (filter (\pid -> Just pid /= excluded) everyone)
         PlayerRef.Relative relation -> do
           you <- Filter.perspective context
           case relation of
