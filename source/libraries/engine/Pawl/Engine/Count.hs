@@ -182,6 +182,7 @@ bakePerspective viewOf context gs candidate predicate = case predicate of
   Filter.Type.HasSupertype _ -> predicate
   Filter.Type.HasColor _ -> predicate
   Filter.Type.HasSubtype _ -> predicate
+  Filter.Type.HasName _ -> predicate
   Filter.Type.HasKeyword _ -> predicate
   Filter.Type.HasKeywordFamily _ -> predicate
   Filter.Type.PowerAtLeast _ -> predicate
@@ -459,7 +460,10 @@ snapshotView gs shape event = case event of
 viewOfSnapshot :: Maybe PlayerId -> Bool -> PC.ProjectedCharacteristics -> Filter.View
 viewOfSnapshot mController isToken snapshot =
   Filter.MkView
-    { Filter.cardTypes = PC.cardTypes snapshot,
+    { -- CR 201.1 off the snapshot, which carries the set: this reads what the
+      -- object's names were AT THE EVENT, which is the whole point of a snapshot.
+      Filter.names = PC.names snapshot,
+      Filter.cardTypes = PC.cardTypes snapshot,
       Filter.supertypes = Set.empty,
       Filter.colors = PC.colors snapshot,
       Filter.subtypes = PC.subtypes snapshot,

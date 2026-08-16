@@ -1695,7 +1695,10 @@ stubView table oid =
         (o, ts, ss, ctrl) : _ ->
           Just
             Filter.MkView
-              { Filter.cardTypes = ts,
+              { -- CR 201.1: the table registers no name, and no Count in the pool
+                -- filters by one, so HasName is vacuously False against this stub.
+                Filter.names = Set.empty,
+                Filter.cardTypes = ts,
                 Filter.supertypes = Set.empty,
                 Filter.colors = Set.empty,
                 Filter.subtypes = ss,

@@ -1,6 +1,7 @@
 module Pawl.Codec.Filter where
 
 import qualified Data.Typeable as Typeable
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CounterKind as CounterKind
@@ -38,6 +39,7 @@ codec keywordCodec =
       Arm.payload "HasSupertype" Supertype.codec Filter.HasSupertype (\x -> case x of Filter.HasSupertype y -> Just y; _ -> Nothing),
       Arm.payload "HasColor" Color.codec Filter.HasColor (\x -> case x of Filter.HasColor y -> Just y; _ -> Nothing),
       Arm.payload "HasSubtype" Subtype.codec Filter.HasSubtype (\x -> case x of Filter.HasSubtype y -> Just y; _ -> Nothing),
+      Arm.payload "HasName" CardName.codec Filter.HasName (\x -> case x of Filter.HasName y -> Just y; _ -> Nothing),
       Arm.payload "HasKeyword" keywordCodec Filter.HasKeyword (\x -> case x of Filter.HasKeyword y -> Just y; _ -> Nothing),
       Arm.payload "HasKeywordFamily" KeywordFamily.codec Filter.HasKeywordFamily (\x -> case x of Filter.HasKeywordFamily y -> Just y; _ -> Nothing),
       Arm.payload "PowerAtLeast" Common.integer Filter.PowerAtLeast (\x -> case x of Filter.PowerAtLeast y -> Just y; _ -> Nothing),

@@ -29,7 +29,8 @@ import qualified Pawl.Types.Supertype as Supertype
 blackCreature :: Filter.View
 blackCreature =
   Filter.MkView
-    { Filter.cardTypes = Set.singleton CardType.Creature,
+    { Filter.names = Set.empty,
+      Filter.cardTypes = Set.singleton CardType.Creature,
       Filter.supertypes = Set.empty,
       Filter.colors = Set.singleton Color.Black,
       Filter.subtypes = Set.singleton Subtype.Zombie,
@@ -69,7 +70,8 @@ blackCreature =
 devoidBigCreature :: Filter.View
 devoidBigCreature =
   Filter.MkView
-    { Filter.cardTypes = Set.singleton CardType.Creature,
+    { Filter.names = Set.empty,
+      Filter.cardTypes = Set.singleton CardType.Creature,
       Filter.supertypes = Set.empty,
       Filter.colors = Set.empty,
       Filter.subtypes = Set.empty,

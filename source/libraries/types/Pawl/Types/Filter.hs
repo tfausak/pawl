@@ -1,5 +1,6 @@
 module Pawl.Types.Filter where
 
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -37,6 +38,24 @@ data Filter keyword
   | HasSupertype Supertype.Supertype -- CR 205.4: the object's supertypes include this one.
   | HasColor Color.Color -- CR 105.2: the object's colours include this one.
   | HasSubtype Subtype.Subtype -- CR 205.3: the object's subtypes include this one.
+  | -- | CR 201.2: the object's names include this LITERAL one --
+    -- Asmoranomardicadaistinaculdacar's "search your library for a card named The
+    -- Underworld Cookbook". A name is a characteristic (CR 109.3 lists it first),
+    -- so this sits with the four atoms above rather than needing their defence.
+    --
+    -- MEMBERSHIP, exactly as CR 709.4a states the test: "an object has the chosen
+    -- name if one of its names is the chosen name". A split card, an Adventure
+    -- and an unlocked Room each show several names at once, and the joined string
+    -- one of them renders as is not among them (#650), so an atom that compared
+    -- to a single name would miss the halves it is spelling.
+    --
+    -- The PRINTED name, and not Pawl.Types.EntryRewrite.ChooseCardNames' chosen
+    -- one: that machinery answers "what did a player name?", read by
+    -- PlayerEffect.CantCastChosenName, where this is a name another card's own
+    -- text prints. The two are different questions and neither can express the
+    -- other -- a card cannot choose on the player's behalf, and a player cannot
+    -- be asked to name what a card already says.
+    HasName CardName.CardName
   | -- | The object HAS this keyword ability (CR 702.1) -- Plummet's "target
     -- creature with flying" (CR 702.9). Needs no defence like the atoms below,
     -- since CR 109.3 lists abilities among an object's characteristics.

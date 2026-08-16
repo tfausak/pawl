@@ -5,6 +5,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
@@ -36,7 +37,22 @@ import qualified Pawl.Types.TapForTotalPower as TapForTotalPower
 -- with the zone, since CR 108.3 and CR 202.3 both name facts a card carries
 -- everywhere; each field says so.
 data View = MkView
-  { cardTypes :: Set.Set CardType.CardType,
+  { -- CR 201.1 / 709.4a: the candidate's names, plural because an object does
+    -- not have one -- the axis Pawl.Types.ProjectedCharacteristics.names already
+    -- carries, brought across unchanged so that HasName asks the MEMBERSHIP rule
+    -- 709.4a asks ("an object has the chosen name if one of its names is the
+    -- chosen name") rather than comparing to a string.
+    --
+    -- Read off the projection on the battlefield and off the object's card
+    -- anywhere else, so a search of a library answers for a card that is not a
+    -- permanent -- which is where the pool's one reader looks
+    -- (Asmoranomardicadaistinaculdacar).
+    --
+    -- EMPTY where there is nothing named to read: a player view, an ability on
+    -- the stack (CR 113.7a), and a face-down object, whose CR 708.2a "no name"
+    -- an empty set is the honest spelling of.
+    names :: Set.Set CardName.CardName,
+    cardTypes :: Set.Set CardType.CardType,
     supertypes :: Set.Set Supertype.Supertype,
     colors :: Set.Set Color.Color,
     subtypes :: Set.Set Subtype.Subtype,
@@ -263,7 +279,10 @@ data View = MkView
 playerView :: PlayerId.PlayerId -> View
 playerView pid =
   MkView
-    { cardTypes = Set.empty,
+    { -- CR 201.1 gives a name to an OBJECT, and CR 109.1's list of what an
+      -- object is has no player in it.
+      names = Set.empty,
+      cardTypes = Set.empty,
       supertypes = Set.empty,
       colors = Set.empty,
       subtypes = Set.empty,
@@ -423,6 +442,9 @@ matches context view predicate = case predicate of
   Filter.HasSupertype s -> Set.member s (supertypes view)
   Filter.HasColor c -> Set.member c (colors view)
   Filter.HasSubtype s -> Set.member s (subtypes view)
+  -- CR 709.4a's own test, said the way that rule says it: membership, so an
+  -- object showing several names matches on any one of them.
+  Filter.HasName n -> Set.member n (names view)
   -- CR 702.1 / CR 109.3: abilities ARE a characteristic, so this is the same kind
   -- of read HasCardType is -- off the projection where there is one, which is what
   -- makes "target creature with flying" (Plummet, CR 702.9) track a grant and a
@@ -666,6 +688,11 @@ rewrite pairs predicate = case predicate of
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
+  -- Untouched, and CR 612.2 says so outright: "an effect that changes a color
+  -- word or a subtype can't change a card name, even if that name contains a
+  -- word ... that is the same as a Magic color word, basic land type, or
+  -- creature type". This function's pairs are exactly such a subtype swap.
+  Filter.HasName _ -> predicate
   -- CR 702.14a: a keyword can hold a land-type word too, so "creature with
   -- swampwalk" is text a swap reaches exactly as "creature that's a Swamp" is.
   -- rewriteKeyword below is the descent, shared with the two sites that rewrite
@@ -998,6 +1025,7 @@ bakeBound players predicate = case predicate of
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
   Filter.HasSubtype _ -> predicate
+  Filter.HasName _ -> predicate
   Filter.HasKeyword _ -> predicate
   Filter.HasKeywordFamily _ -> predicate
   Filter.PowerAtLeast _ -> predicate
@@ -1071,6 +1099,7 @@ manaValueThresholds predicate = case predicate of
   Filter.HasSupertype _ -> []
   Filter.HasColor _ -> []
   Filter.HasSubtype _ -> []
+  Filter.HasName _ -> []
   Filter.HasKeyword _ -> []
   Filter.HasKeywordFamily _ -> []
   Filter.PowerAtLeast _ -> []
@@ -1142,6 +1171,10 @@ statesAQuality predicate = case predicate of
   Filter.HasSupertype _ -> True
   Filter.HasColor _ -> True
   Filter.HasSubtype _ -> True
+  -- CR 701.23b's "stated quality" at its sharpest -- a named card is the most
+  -- specific description a search can give -- so the searcher may decline to
+  -- find one that is there, and CR 701.23d's "must find" does not apply.
+  Filter.HasName _ -> True
   Filter.HasKeyword _ -> True
   Filter.HasKeywordFamily _ -> True
   Filter.PowerAtLeast _ -> True

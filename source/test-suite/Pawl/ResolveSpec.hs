@@ -9219,9 +9219,114 @@ jugglerAnswer victim fodder p = case p of
   Prompt.ChooseSacrifices {} -> sacrifices fodder p
   _ -> takingTargets 1 [victim] p
 
+-- The library alice searches, and the ids of whichever of its cards the ability
+-- names. `libraryIds` is every card in it, so an assertion can say which SUBSET
+-- the search offered rather than how many.
+data CookbookBoard = MkCookbookBoard
+  { cookbookState :: GameState.GameState,
+    cookbookIds :: [ObjectId.ObjectId],
+    cookbookLibrary :: [ObjectId.ObjectId]
+  }
+
+-- Asmoranomardicadaistinaculdacar on the battlefield with its CR 603.6a enters
+-- trigger pending, over a four-card library. `withCookbooks` swaps the two copies
+-- of the named card for two more Golden Eggs and changes nothing else -- same
+-- library size, same card types, same seat, same phase -- so the pair of boards
+-- differs in the NAME and in nothing that could make a search fail for another
+-- reason.
+--
+-- Two copies of the named card, not one: a candidate set with a single possible
+-- member is satisfied by a filter that admits everything a prompt could offer,
+-- and CR 701.23a's prompt is short-circuited when the candidates equal the count.
+-- The Golden Egg is an ARTIFACT, as the Cookbook is, so the two are separated by
+-- the name alone; the Mountain is the card of another type the filter is also
+-- asked of.
+cookbookBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m CookbookBoard
+cookbookBoard s registry withCookbooks = do
+  mountain <- S.printingOf s registry "Mountain"
+  egg <- S.printingOf s registry "Golden Egg"
+  cookbook <- S.printingOf s registry "The Underworld Cookbook"
+  asmor <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
+  let named = if withCookbooks then cookbook else egg
+      (mountainId, g1) = S.addLibraryCard mountain S.alice (S.landsInPlay mountain 0)
+      (eggId, g2) = S.addLibraryCard egg S.alice g1
+      (firstId, g3) = S.addLibraryCard named S.alice g2
+      (secondId, g4) = S.addLibraryCard named S.alice g3
+      (_, g5) = S.entersWithTrigger asmor S.alice g4
+  pure
+    MkCookbookBoard
+      { cookbookState = g5,
+        cookbookIds = if withCookbooks then [firstId, secondId] else [],
+        cookbookLibrary = [mountainId, eggId, firstId, secondId]
+      }
+
+-- Takes CR 603.5's "may", records every candidate set the search offered, and
+-- finds `wanted` -- PINNED, so an answerer cannot repair the assertion by going
+-- looking for a legal pick after a mutation. Finds nothing when nothing is
+-- pinned, which is the negative board's answer.
+cookbookAnswer :: [ObjectId.ObjectId] -> Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+cookbookAnswer wanted p = case p of
+  Prompt.ChooseOptional {} -> pure OptionalDecision.Exercises
+  Prompt.SearchLibrary _ _ matches _ -> do
+    State.modify' (\searches -> searches <> [matches])
+    pure wanted
+  Prompt.Shuffle library -> pure library
+  _ -> pure (S.identityAnswer p)
+
+-- Settle the pending enters trigger onto the stack and resolve it, keeping both
+-- the candidate sets the search offered and the board it left behind.
+runCookbook :: [ObjectId.ObjectId] -> CookbookBoard -> ([[ObjectId.ObjectId]], GameState.GameState)
+runCookbook wanted board =
+  let ((_, gs), searches) =
+        State.runState
+          (Engine.runGame (cookbookAnswer wanted) (cookbookState board) Engine.priorityLoop)
+          []
+   in (searches, gs)
+
+-- CR 201.2 makes a name a characteristic like any other, and CR 709.4a fixes the
+-- test as membership. Proved by Asmoranomardicadaistinaculdacar
+-- (data/cards/asmoranomardicadaistinaculdacar.json): "When
+-- Asmoranomardicadaistinaculdacar enters, you may search your library for a card
+-- named The Underworld Cookbook, reveal it, put it into your hand, then shuffle."
+-- The Underworld Cookbook (data/cards/the-underworld-cookbook.json) is the other
+-- half of the pair.
+cookbookSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cookbookSpec s registry = Spec.describe s "TheUnderworldCookbook" $ do
+  Spec.it s "CR 201.2 the search offers exactly the cards with the printed name" $ do
+    board <- cookbookBoard s registry True
+    let (searches, _) = runCookbook (take 1 (cookbookIds board)) board
+    Spec.assertEqWith s "the library holds four cards" (length (cookbookLibrary board)) 4
+    -- Identity, not count: BOTH Cookbooks and neither the Golden Egg nor the
+    -- Mountain. A filter that admitted every artifact, or every card, fails here
+    -- rather than at the find below.
+    Spec.assertEqWith s "one search, offering both Cookbooks and nothing else" (fmap Set.fromList searches) [Set.fromList (cookbookIds board)]
+  Spec.it s "CR 701.23e the found card is revealed and put into its owner's hand" $ do
+    board <- cookbookBoard s registry True
+    let (_, after) = runCookbook (take 1 (cookbookIds board)) board
+        cookbookName = CardName.MkCardName $ Text.pack "The Underworld Cookbook"
+    -- By NAME rather than by the id that was pinned: CR 400.7 mints a new object
+    -- when the card leaves the library, so the card in the hand is not the id the
+    -- search was answered with. The identity assertion is the candidate-set case
+    -- above; this one is about where the card ended up.
+    Spec.assertEqWith s "the named card, and only it, is in alice's hand" (namesIn Zone.Hand S.alice after) [Just cookbookName]
+    -- One Cookbook was taken and the other was not, which a "found everything the
+    -- filter admitted" reading would fail.
+    Spec.assertEqWith s "the other three cards stayed in the library" (length (namesIn Zone.Library S.alice after)) 3
+    Spec.assertEqWith s "one of them still the second Cookbook" (length (filter (== Just cookbookName) (namesIn Zone.Library S.alice after))) 1
+  Spec.it s "CR 701.23b nothing is offered when no card in the library has the name" $ do
+    -- The same board with the two Cookbooks swapped for Golden Eggs. The search
+    -- still happens -- the trigger resolves and the library is still read -- so
+    -- an empty offer is the filter's answer rather than a step that never ran.
+    board <- cookbookBoard s registry False
+    let (searches, after) = runCookbook [] board
+    Spec.assertEqWith s "the library holds four cards here too" (length (cookbookLibrary board)) 4
+    Spec.assertEqWith s "one search, offering nothing" searches [[]]
+    Spec.assertEqWith s "and alice's hand is empty" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
+  cookbookSpec s registry
   plummetSpec s registry
   corrosiveGaleSpec s registry
   investigateSpec s registry
