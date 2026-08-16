@@ -132,7 +132,9 @@
                                                 {
                                                   "type": "AddMana",
                                                   "value": {
-                                                    "type": "AnyColor"
+                                                    "production": {
+                                                      "type": "AnyColor"
+                                                    }
                                                   }
                                                 }
                                               ]

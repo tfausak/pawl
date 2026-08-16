@@ -31,6 +31,7 @@ import qualified Pawl.Types.DurationRef as DurationRef
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.ForEach as ForEach
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.MoveToZone as MoveToZone
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -87,9 +88,17 @@ isManaAbility ab =
 -- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
 -- asks whether the ability COULD add mana, which an unresolved colour choice
 -- answers yes to; which colour is Cost.tapForMana's prompt, not a static fact.
+--
+-- The payload's RECIPIENT is dropped, and the classification is right to drop it:
+-- CR 605.1a asks whether the ability could add mana to "a player's" pool, not to
+-- its controller's, so an ability naming somebody else is a mana ability just the
+-- same. Not implemented: the payment path acting on that recipient -- Cost.tapForMana
+-- adds an activation's whole yield to the activator, so a mana ability naming
+-- another player would pay the wrong pool. Spectral Searchlight and Valleymaker
+-- are the printings; neither is in `data/cards/` (#1673).
 manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
-  Effect.AddMana production -> Just production
+  Effect.AddMana addition -> Just (ManaAddition.production addition)
   Effect.DealDamage (DealDamage.MkDealDamage {}) -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing

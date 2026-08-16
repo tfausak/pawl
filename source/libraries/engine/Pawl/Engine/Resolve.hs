@@ -114,6 +114,7 @@ import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Mentored as Mentored
@@ -319,7 +320,9 @@ slotsOf effect = case effect of
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
     joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (Projection.quantitiesOf modification)), durationSlots duration]
   Effect.ChangeText (ChangeText.MkChangeText _ _ slot) -> oneSlot slot
-  Effect.AddMana _ -> Map.empty
+  -- A READ of whatever slot the recipient names -- Shizuko, Caller of Autumn's
+  -- "that player". The ManaProduction beside it holds no reference at all.
+  Effect.AddMana (ManaAddition.MkManaAddition ref _) -> playerRefSlots ref
   -- BOTH refs: Extract's library owner is the slot it targets, and a slot read
   -- only by that ref would otherwise look dangling to the dataflow lint.
   Effect.Search (Search.MkSearch searcher owner quantity _ _) ->
@@ -2794,26 +2797,32 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- pawl can express meets CR 605.1b at all, so every triggered producer arrives
   -- here; see #1572.
   --
-  -- CR 106.4 / 109.5: into the pool of the player the effect's unnamed "you" is,
-  -- which for a triggered ability is its controller -- `controller` here, and not
-  -- the active player. The type is decided by Mana.producedTypes and the CR 106.3
-  -- tags by Mana.productionTagsGiven off this ability's SOURCE, both of them the
-  -- payment path's own readers, so the two routes put identical units in a pool.
-  Effect.AddMana production -> do
+  -- CR 106.4: into the pool of the player the effect NAMES -- Shizuko, Caller of
+  -- Autumn's "that player", read off the slot CR 603.2b's step event bound. A card
+  -- that names nobody carries CR 109.5's "you", which for a triggered ability is
+  -- its controller and not the active player; that is the codec's default rather
+  -- than a reading made here, so this arm treats both alike. Through
+  -- playerRefPlayers, so the slot is read exactly as every other slot read at
+  -- resolution is (CR 608.2b's legal set).
+  --
+  -- The type is decided by Mana.producedTypes and the CR 106.3 tags by
+  -- Mana.productionTagsGiven off this ability's SOURCE, both of them the payment
+  -- path's own readers, so the two routes put identical units in a pool. Neither
+  -- reads the recipient: CR 106.3 makes the mana's source the ability's source
+  -- whoever adds it, which is what keeps CR 107.4h's snow tag the producer's fact
+  -- rather than the pool-holder's.
+  Effect.AddMana (ManaAddition.MkManaAddition ref production) -> do
     gs0 <- State.get
     case Mana.producedTypes source gs0 production of
       -- One settled type is one mana. A clause adding two writes two of these
       -- effects, which CR 608.2c runs in printed order.
       [manaType] ->
-        State.modify'
-          ( Mana.addMana
-              controller
-              [ ManaUnit.MkManaUnit
-                  { ManaUnit.manaType = manaType,
-                    ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0
-                  }
-              ]
-          )
+        let unit =
+              ManaUnit.MkManaUnit
+                { ManaUnit.manaType = manaType,
+                  ManaUnit.tags = Mana.productionTagsGiven Map.empty source gs0
+                }
+         in State.modify' (\gs -> foldr (\pid -> Mana.addMana pid [unit]) gs (playerRefPlayers legal controller gs0 ref))
       -- No type at all, which is CR 607.2d's "the chosen color" with nothing
       -- chosen: producedTypes offers none rather than inventing one, and adding
       -- nothing is the honest answer here for the same reason.

@@ -40,6 +40,11 @@ data TriggerCondition
     PermanentEnters (Filter.Filter Keyword.Keyword)
   | -- | CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
     -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies.
+    --
+    -- The ACTIVE player comes across in the reserved
+    -- Pawl.Engine.Binding.triggerPlayer slot, stamped by
+    -- Pawl.Engine.Event.eventBindings: "each player's upkeep" goes on to say "that
+    -- player", and CR 109.5's "you" is the controller instead.
     StepBegins StepBegins.StepBegins
   | -- | CR 603.8: a STATE trigger -- it fires whenever its condition is true, not
     -- when an event occurs, and not again until the ability has left the stack.

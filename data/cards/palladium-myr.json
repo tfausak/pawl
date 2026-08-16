@@ -20,18 +20,22 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colorless"
+                          "production": {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colorless"
+                            }
                           }
                         }
                       },
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colorless"
+                          "production": {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colorless"
+                            }
                           }
                         }
                       }

@@ -61,6 +61,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LookAt as LookAt
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSpending as ManaSpending
 import qualified Pawl.Types.ManaType as ManaType
@@ -191,14 +192,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))
-      """ {"type":"AddMana","value":{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}} """
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green))))
+      """ {"type":"AddMana","value":{"production":{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}}} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.AddMana ManaProduction.AnyColor)
-      """ {"type":"AddMana","value":{"type":"AnyColor"}} """
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor))
+      """ {"type":"AddMana","value":{"production":{"type":"AnyColor"}}} """
+  -- CR 106.4's other half: Shizuko, Caller of Autumn's "that player adds", where
+  -- the recipient is written because CR 109.5's "you" is somebody else.
+  Spec.it s "AddMana, a recipient the card names" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) (ManaProduction.OfType (ManaType.Colored Color.Green))))
+      """ {"type":"AddMana","value":{"player":{"type":"InSlot","value":"thatPlayer"},"production":{"type":"OfType","value":{"type":"Colored","value":{"type":"Green"}}}}} """
   Spec.it s "Search" $
     Common.assertJsonCodec
       s
