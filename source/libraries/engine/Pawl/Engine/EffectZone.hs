@@ -132,6 +132,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
+  Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.ExileHaunting {} -> Nothing

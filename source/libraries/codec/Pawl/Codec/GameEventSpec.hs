@@ -267,6 +267,14 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.codec
       (GameEvent.Mentored (Mentored.MkMentored (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7)))
       """ {"type":"Mentored","value":{"mentor":6,"mentored":7}} """
+  -- CR 702.149c: the creature that trained, and nothing else -- rule 702.149a puts
+  -- its counter on that same creature, so there is no second id.
+  Spec.it s "Trained" $
+    Common.assertCodec
+      s
+      GameEvent.codec
+      (GameEvent.Trained (ObjectId.MkObjectId 8))
+      """ {"type":"Trained","value":8} """
   -- CR 701.21a: the sacrificing player and the permanent, in that order, and the
   -- id is the PRE-MOVE one -- the record is written before the zone change, which
   -- is CR 603.10a's look-back.

@@ -420,6 +420,7 @@ slotsOf effect = case effect of
   -- counter goes on.
   Effect.Evolve slot -> oneSlot slot
   Effect.Mentor slot -> oneSlot slot
+  Effect.Train slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
   Effect.ExileUntilMonarch slot -> oneSlot slot
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) -> joinSlots [oneSlot card, oneSlot slot]
@@ -515,6 +516,11 @@ poolSlot pool = case pool of
     GraveyardScope.Scoped _ -> Map.empty
     GraveyardScope.InSlot slot -> oneSlot slot
   Pool.CardsInExile -> Map.empty
+  -- The graveyard half's scope, read exactly as CardsInGraveyard's is; the
+  -- battlefield half names no slot.
+  Pool.CreaturesAndCardsInGraveyard scope -> case scope of
+    GraveyardScope.Scoped _ -> Map.empty
+    GraveyardScope.InSlot slot -> oneSlot slot
 
 -- Both sides of a comparison are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Map.Map SlotName SlotArity
@@ -639,6 +645,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Unsuspect _ -> True
   Effect.Evolve _ -> True
   Effect.Mentor _ -> True
+  Effect.Train _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting _ _) -> True
@@ -760,6 +767,7 @@ readsX = any effectReadsX
       Effect.Unsuspect _ -> False
       Effect.Evolve _ -> False
       Effect.Mentor _ -> False
+      Effect.Train _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
       Effect.ExileHaunting {} -> False
@@ -854,6 +862,7 @@ searchesLibrary effect = case effect of
   Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
   Effect.Mentor _ -> False
+  Effect.Train _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
   Effect.ExileHaunting {} -> False
@@ -1010,6 +1019,7 @@ boundSlots effect = case effect of
   Effect.Unsuspect _ -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.Mentor _ -> Set.empty
+  Effect.Train _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
   Effect.ExileHaunting {} -> Set.empty
@@ -4488,6 +4498,28 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         Just target -> do
           _ <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
           State.modify' (Event.recordEvent (GameEvent.Mentored (Mentored.MkMentored source target)))
+      _ -> pure ()
+  -- CR 702.149a's counter and CR 702.149c's marker, and this one takes EVOLVE's
+  -- gate rather than the arm above's: rule 702.149c fires when a resolving training
+  -- ability "puts one or more +1/+1 counters on this creature", so a placement CR
+  -- 614.16 replaced away to nothing trains nobody.
+  --
+  -- That gate is a FENCE and not a tested branch, for Evolve's reason: nothing in
+  -- the pool reduces a +1/+1 placement to nothing on a board where the difference
+  -- could be read.
+  --
+  -- The event names the slot's creature and not `source`, which are the same object
+  -- for every ability Pawl.Engine.Keyword.training mints (the slot is
+  -- Binding.triggerSource) -- the id that is written is the one rule 702.149c asks
+  -- about, "this creature". An id naming no object writes nothing and emits
+  -- nothing, Evolve's posture.
+  Effect.Train slot ->
+    case legalOne slot legal of
+      Just recipient -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target -> do
+          placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
+          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.Trained target)))
       _ -> pure ()
   -- CR 731.1: the GAME gains the designation. Everything about what that entails
   -- -- CR 731.1's at-most-one, and the CR 702.145c/f transforms it causes

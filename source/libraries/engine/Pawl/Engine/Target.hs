@@ -378,8 +378,10 @@ hexproofQuality keyword = case keyword of
 
 -- Every base pool that is a function of the GAME STATE alone, taken once and
 -- shared by every slot of every ability in one enumeration (#1073). One field
--- per Pool constructor that ignores the Filter.Context, which is all of them but
--- Pool.CardsInGraveyard -- see basePoolGiven for why that one cannot be here.
+-- per Pool constructor that ignores the Filter.Context, which is every one that
+-- names no graveyard -- see basePoolGiven for why a graveyard arm cannot be here.
+-- Pool.CreaturesAndCardsInGraveyard is half of each: its battlefield half is the
+-- creature field below, and only its graveyard half is built per slot.
 --
 -- LAZY FIELDS, and that is the whole design: a record with no strictness
 -- annotations makes each pool a thunk, so an enumeration whose abilities all
@@ -427,15 +429,15 @@ poolsGiven pcs gs =
 -- candidate with how it is referenced (CR 115). Each arm is one field of the
 -- caller's Pools and nothing else.
 --
--- The Context is the SAME one the Filter is matched against, and only the
--- graveyard arm reads it -- along with `bindings`, which only that arm reads
+-- The Context is the SAME one the Filter is matched against, and only the arms
+-- that name a GRAVEYARD read it -- along with `bindings`, which only they read
 -- either: CR 400.1's per-player zones make a pool that names one have to say
 -- whose, and a GraveyardScope answers with either the Context's perspective (CR
 -- 109.5's would-be controller, the player CR 601.2c has choosing targets) or
 -- another slot's own answer. Every battlefield, stack and EXILE arm ignores
 -- both, because those zones are shared by all players (CR 400.1 again) -- which
--- is exactly what lets those arms be hoisted into Pools and leaves the graveyard
--- arm built here, per slot, against that slot's own Context.
+-- is exactly what lets those arms be hoisted into Pools and leaves a graveyard
+-- one built here, per slot, against that slot's own Context.
 basePoolGiven :: Pools -> Filter.Context -> Map SlotName (Set Recipient) -> Pool.Pool -> GameState -> Set Recipient
 basePoolGiven pools context bindings pool gs = case pool of
   Pool.Creatures -> creaturePool pools
@@ -447,6 +449,12 @@ basePoolGiven pools context bindings pool gs = case pool of
   Pool.SpellsAndPermanents -> spellsAndPermanentsPool pools
   Pool.CardsInGraveyard scope -> graveyardRecipients context bindings scope gs
   Pool.CardsInExile -> exilePool pools
+  -- The union of the two arms above, built HERE rather than hoisted into Pools for
+  -- the graveyard arm's reason: half of it is per-slot. The battlefield half is the
+  -- shared thunk, so a slot naming this pool pays the creature walk once with every
+  -- other slot that names one.
+  Pool.CreaturesAndCardsInGraveyard scope ->
+    Set.union (creaturePool pools) (graveyardRecipients context bindings scope gs)
 
 -- CR 115.2 (only permanents are legal targets, save for the exceptions the
 -- graveyard, exile, spell and player arms above are) with CR 109.2 (an
@@ -740,8 +748,8 @@ legalSetsGiven pcs grants pools perspective source slots gs =
       Map.union dependent independent
 
 -- Does this pool's candidate set depend on what another target slot is answered
--- with (CR 601.2c)? The graveyard pool's InSlot scope is the one axis that does;
--- every other pool draws from a zone no slot names.
+-- with (CR 601.2c)? A GraveyardScope's InSlot is the one axis that does, wherever
+-- it appears; every other pool draws from a zone no slot names.
 dependsOnSlot :: Pool.Pool -> Bool
 dependsOnSlot pool = case pool of
   Pool.Creatures -> False
@@ -755,6 +763,10 @@ dependsOnSlot pool = case pool of
     GraveyardScope.Scoped _ -> False
     GraveyardScope.InSlot _ -> True
   Pool.CardsInExile -> False
+  -- Its graveyard half carries the same axis, so the answer is that half's.
+  Pool.CreaturesAndCardsInGraveyard scope -> case scope of
+    GraveyardScope.Scoped _ -> False
+    GraveyardScope.InSlot _ -> True
 
 -- CR 601.2c: the range of numbers this slot may be answered with on this board
 -- -- the printed count, narrowed by how many legal recipients there actually

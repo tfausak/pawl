@@ -476,6 +476,13 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.codec
       TriggerCondition.AttachedCreatureMentors
       """ {"type":"AttachedCreatureMentors"} """
+  -- CR 702.149c's marker, self-scoped, so nullary for SelfEvolves' reason.
+  Spec.it s "SelfTrains" $
+    Common.assertCodec
+      s
+      TriggerCondition.codec
+      TriggerCondition.SelfTrains
+      """ {"type":"SelfTrains"} """
   -- CR 603.10a's sacrifice family. Nullary: "a player" is neither PlayerRelation
   -- arm and "a permanent" names no Filter, so there is nothing to encode.
   Spec.it s "PermanentSacrificed" $
