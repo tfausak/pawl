@@ -152,7 +152,8 @@ faceDownCost =
     }
 
 -- The candidate costs for CASTING this object (CR 601.2b) -- from hand, the
--- printed one first and then each alternative. Empty for anything that is not a
+-- printed one first, then each alternative, and last any standing CR 118.9
+-- grant a player effect applies. Empty for anything that is not a
 -- card: a token is created onto the battlefield and never cast, and an ability
 -- on the stack is not a spell.
 --
@@ -351,6 +352,38 @@ candidateCostsFor name oid gs = case Game.lookupObject oid gs of
             Zone.Exile
               | Maybe.isJust (Object.foretold obj) ->
                   fmap (untagged . withAdditional) (Maybe.maybeToList (Keyword.foretellCost (Face.keywords face)))
+            -- CR 118.9's OTHER half -- "or applied to it from another effect" --
+            -- as a STANDING grant: Omniscience's "you may cast spells from your
+            -- hand without paying their mana costs" is a player-scoped
+            -- alternative cost that no per-card list can hold, because the
+            -- effect never names the cards it will apply to. The one-shot half
+            -- is Effect.OfferCast, which hands CastOffer.withoutPayingManaCost
+            -- to a card its own resolution already chose.
+            --
+            -- APPENDED to the hand's ordinary list rather than replacing it,
+            -- which is the graveyard arm's Yawgmoth's Will argument in the other
+            -- direction: CR 118.9a lets the controller announce which single
+            -- alternative cost they pay, so a Fireblast under this grant still
+            -- gets to sacrifice two Mountains and a flashback card cast free
+            -- still has flashback in the graveyard afterwards. Last, so that
+            -- `firstOffered` and Replay's "the printed cost comes first" both
+            -- read what they read today.
+            --
+            -- UNTAGGED, for the reason `untagged` states: no keyword ability
+            -- offered it, so paying it satisfies neither CR 702.34a's clause nor
+            -- CR 702.133a's.
+            --
+            -- CR 107.3b's "the only legal choice for X is 0" falls out rather
+            -- than being enforced: withoutPayingManaCost carries an empty
+            -- ManaCost, which has no variable, so Pawl.Engine.Cast.castProposed
+            -- never raises Prompt.ChooseX for this candidate.
+            --
+            -- The OWNER is the caster here, exactly as the graveyard arm argues
+            -- above: CR 400.1 files a hand by player and Cast.zoneCandidates
+            -- hands out only the caster's own.
+            Zone.Hand ->
+              fmap untagged (printed : alternatives)
+                <> [untagged (withoutPayingManaCost face) | PlayerEffect.mayCastFromHandWithoutPayingManaCost (Object.owner obj) oid gs]
             _ -> fmap untagged (printed : alternatives)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []

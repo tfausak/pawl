@@ -2430,6 +2430,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 305.1's play-side permission narrows nothing: a land play has already
   -- fixed the card type, and Crucible of Worlds' sentence says no more.
   PlayerEffect.PlayLandsFromGraveyard -> []
+  -- CR 118.9's standing alternative cost, narrowed by the spell's own qualities
+  -- exactly as the zone permission above is (Omniscience's is `And []`).
+  PlayerEffect.CastFromHandWithoutPayingManaCost f -> [f]
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
@@ -2482,6 +2485,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantPlayLands -> False
   PlayerEffect.CastFromGraveyard _ -> False
   PlayerEffect.PlayLandsFromGraveyard -> False
+  PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
 
 -- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
 -- DamagePattern: does this card author a field of that pattern the engine bakes?
@@ -2524,6 +2528,7 @@ unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.CantPlayLands -> False
   PlayerEffect.CastFromGraveyard _ -> False
   PlayerEffect.PlayLandsFromGraveyard -> False
+  PlayerEffect.CastFromHandWithoutPayingManaCost _ -> False
 
 -- The non-vacuity half of both lints above: is this CR 615.12's effect at all?
 -- A wildcard is right here, where it is not above -- this asks "did the sweep

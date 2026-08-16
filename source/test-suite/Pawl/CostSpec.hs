@@ -1594,6 +1594,164 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   crossCheckSpec s registry
   longtuskCubSpec s registry
   thrastaSpec s registry
+  omniscienceSpec s registry
+
+-- alice holds `card` and controls `n` untapped Mountains, plus Omniscience when
+-- `granted` is True, with priority in her own precombat main phase so a sorcery
+-- is castable (CR 307.1). The pairs below vary `granted` and NOTHING else:
+-- every board is the same seats, the same stock and the same mana.
+omniscienceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Bool -> (ObjectId.ObjectId, GameState.GameState)
+omniscienceBoard mountain omniscience card n granted =
+  let base = S.landsInPlay mountain n
+      withGrant = if granted then snd (S.addCreature omniscience S.alice base) else base
+      (spell, gs) = S.addHandCard card S.alice withGrant
+   in ( spell,
+        gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Omniscience {7}{U}{U}{U} Enchantment: "You may cast spells from your hand
+-- without paying their mana costs."
+--
+-- CR 118.9's other half -- an alternative cost "applied to it from another
+-- effect" -- as a STANDING, player-scoped grant, which no per-card list can hold
+-- because the effect never names the cards it applies to. The one-shot half was
+-- already expressible (Effect.OfferCast).
+--
+-- EVERY POSITIVE BOARD BELOW HAS ZERO UNTAPPED MANA except the Blaze case, which
+-- needs a payable printed cost to have a second answer to compare against. So a
+-- cast that succeeds can only have succeeded through the grant, and the paired
+-- negative -- the same board with the enchantment removed -- can only fail for
+-- its absence.
+omniscienceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+omniscienceSpec s registry =
+  Spec.describe s "Omniscience" $ do
+    -- The headline pair. No lands at all on either board, so mana, timing and
+    -- stock are identical and the enchantment is the only difference.
+    Spec.it s "CR 118.9 with no mana at all the grant casts a Lightning Bolt, and without it nothing is castable" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (withIt, granted) = omniscienceBoard mountain omniscience bolt 0 True
+          (withoutIt, ungranted) = omniscienceBoard mountain omniscience bolt 0 False
+          cast = S.runPure S.identityAnswer granted (S.cast S.alice withIt)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+          refused = S.runPure S.identityAnswer ungranted (S.cast S.alice withoutIt)
+      Spec.assertBool s (S.castable S.alice withIt granted) "castable under the grant"
+      Spec.assertBool s (any (S.isCastOf withIt) (Action.legalActions S.alice granted)) "and offered"
+      Spec.assertEqWith s "it dealt 3 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice resolved) (Just 17)
+      Spec.assertBool s (not (S.castable S.alice withoutIt ungranted)) "not castable without the grant"
+      Spec.assertBool s (not (any (S.isCastOf withoutIt) (Action.legalActions S.alice ungranted))) "and not offered"
+      Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack refused)) 0
+      Spec.assertEqWith s "and bob was untouched either way" (S.lifeOf S.bob resolved) (Just 20)
+    -- The grant is its CONTROLLER's, which is what the card's PlayerScope.You
+    -- says. Asserted on the candidate list rather than on castability, because
+    -- only one player holds priority on any one board and an instant bob cannot
+    -- cast for want of priority would pass this for the wrong reason.
+    Spec.it s "CR 118.9 the grant reaches its controller's hand alone" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      bolt <- S.printingOf s registry "Lightning Bolt"
+      let (hers, granted) = omniscienceBoard mountain omniscience bolt 0 True
+          (his, gs) = S.addHandCard bolt S.bob granted
+          manaOf oid = fmap Cost.Type.mana (Cost.costsFor (S.printingName bolt) oid gs)
+          red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+      Spec.assertEqWith s "alice is offered the printed {R} and the grant's {0}" (manaOf hers) [Just (ManaCost.MkManaCost [red]), Just (ManaCost.MkManaCost [])]
+      Spec.assertEqWith s "bob is offered the printed {R} alone" (manaOf his) [Just (ManaCost.MkManaCost [red])]
+    -- CR 118.9a lets the controller announce WHICH alternative cost they pay, so
+    -- the grant is appended to the card's own candidates rather than replacing
+    -- them: Fireblast under Omniscience may still sacrifice two Mountains.
+    Spec.it s "CR 118.9a the grant is offered beside the card's printed alternative, not instead of it" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      fireblastPrinting <- S.printingOf s registry "Fireblast"
+      let (fireblast, gs) = omniscienceBoard mountain omniscience fireblastPrinting 2 True
+          -- The two {0} candidates are told apart by their COMPONENTS: the
+          -- printed alternative sacrifices two Mountains, the grant asks nothing.
+          shapeOf c = (Cost.Type.mana c, length (Cost.Type.components c))
+          red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+      Spec.assertEqWith
+        s
+        "printed, then the sacrifice alternative, then the grant"
+        (fmap shapeOf (Cost.costsFor (S.printingName fireblastPrinting) fireblast gs))
+        [ (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4, red, red]), 0),
+          (Just (ManaCost.MkManaCost []), 1),
+          (Just (ManaCost.MkManaCost []), 0)
+        ]
+    -- CR 118.9d: "any additional costs ... that affect that spell are applied to
+    -- that alternative cost". Cathartic Reunion {1}{R} discards two cards as an
+    -- additional cost, and the grant replaces the mana half alone.
+    Spec.it s "CR 118.9d the mana cost goes away and the printed additional cost does not" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      piker <- S.printingOf s registry "Goblin Piker"
+      catharticReunion <- S.printingOf s registry "Cathartic Reunion"
+      -- THREE spare cards rather than two, so CR 701.9b's discard is a real
+      -- choice: a hand of exactly two elides the prompt and would prove the
+      -- discard happened without proving anybody was asked which cards.
+      let (reunion, bare) = omniscienceBoard mountain omniscience catharticReunion 0 True
+          withHand = List.foldl' (\g _ -> snd (S.addHandCard piker S.alice g)) bare [1 .. (3 :: Int)]
+          gs = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withHand [1 .. (4 :: Int)]
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice reunion)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+      Spec.assertEqWith s "four cards in hand before, Reunion included" (S.handSize S.alice gs) 4
+      Spec.assertBool s (S.castable S.alice reunion gs) "castable with no mana at all"
+      Spec.assertEqWith s "one card left in hand, so both discards were paid" (S.handSize S.alice cast) 1
+      Spec.assertEqWith s "two discarded cards in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 2
+      Spec.assertEqWith s "and three were drawn" (S.handSize S.alice resolved) 4
+    -- The other half of CR 118.9d, one card apart: the additional cost is still
+    -- a cost, so a hand that cannot pay it cannot cast the spell however free
+    -- the mana part is. Both boards carry the grant and no mana.
+    Spec.it s "CR 118.9d a hand that cannot pay the additional cost still cannot cast it" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      piker <- S.printingOf s registry "Goblin Piker"
+      catharticReunion <- S.printingOf s registry "Cathartic Reunion"
+      let (reunion, bare) = omniscienceBoard mountain omniscience catharticReunion 0 True
+          withN n = List.foldl' (\g _ -> snd (S.addHandCard piker S.alice g)) bare [1 .. (n :: Int)]
+      Spec.assertBool s (not (S.castable S.alice reunion (withN 1))) "one spare card cannot pay a discard of two"
+      Spec.assertBool s (not (any (S.isCastOf reunion) (Action.legalActions S.alice (withN 1)))) "and no Cast is offered"
+      Spec.assertBool s (S.castable S.alice reunion (withN 2)) "two spare cards can"
+    -- CR 107.3b: "if ... an effect lets that player cast that spell while paying
+    -- neither its mana cost nor an alternative cost that includes X, then the
+    -- only legal choice for X is 0". It falls out of the cost this grant offers
+    -- -- an empty ManaCost has no variable -- so Cast.castProposed never reaches
+    -- its ChooseX at all.
+    --
+    -- ONE board and two answerers, so mana, seats, timing and stock cannot be
+    -- the difference: both candidates are payable and the only thing that varies
+    -- is which cost CR 601.2b's announcement names.
+    Spec.it s "CR 107.3b a spell cast under the grant announces no X, where its printed cost does" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      omniscience <- S.printingOf s registry "Omniscience"
+      blaze <- S.printingOf s registry "Blaze"
+      let (spell, gs) = omniscienceBoard mountain omniscience blaze 2 True
+          -- CR 601.2b's announcement, answered by naming a cost: the printed
+          -- {X}{R} and the grant's {0} share no reading. X is answered 1 rather
+          -- than 0 wherever it is asked, so the damage tells the two apart.
+          paying :: [ManaSymbol.ManaSymbol] -> Prompt.Prompt r -> r
+          paying wanted p = case p of
+            Prompt.ChooseCost _ _ _ candidates ->
+              Maybe.fromMaybe (Cost.firstOffered candidates) (List.find ((== Just (ManaCost.MkManaCost wanted)) . Cost.Type.mana) candidates)
+            Prompt.ChooseX {} -> 1
+            _ -> S.identityAnswer p
+          red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+          payingPrinted, payingGrant :: Prompt.Prompt r -> r
+          payingPrinted = paying [ManaSymbol.Variable, red]
+          payingGrant = paying []
+          resolveWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+          resolveWith answer = S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop
+          responsesFor :: (forall r. Prompt.Prompt r -> r) -> [Response.Response]
+          responsesFor answer = answersFor answer gs (S.cast S.alice spell)
+          wasAskedForX = any (\r -> case r of Response.ChoseX _ -> True; _ -> False)
+      Spec.assertBool s (wasAskedToChooseCost (responsesFor payingGrant)) "both costs are payable, so the choice is real"
+      Spec.assertBool s (wasAskedForX (responsesFor payingPrinted)) "the printed {X}{R} asks for X"
+      Spec.assertBool s (not (wasAskedForX (responsesFor payingGrant))) "the grant's {0} does not"
+      Spec.assertEqWith s "so the printed cast deals its announced 1" (S.lifeOf S.alice (resolveWith payingPrinted)) (Just 19)
+      Spec.assertEqWith s "and the free cast deals 0 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice (resolveWith payingGrant)) (Just 20)
 
 -- alice holds Thrasta, Tempest's Roar ({10}{G}{G}) and `elves` copies of
 -- Glistener Elf ({G}), with `forests` untapped Forests and priority in her own
