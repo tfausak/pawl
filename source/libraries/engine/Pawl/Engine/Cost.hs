@@ -1041,10 +1041,12 @@ removeLoyalty n obj =
 -- Replacement.sacrificeCandidates: Game.zoneMembers already returns a hand in a
 -- fixed order, which Prompt.ChooseDiscard offers it in.
 --
--- Matched against the PRINTED card, exileCandidates' reading below and its
--- context -- the payer as perspective, no source -- for its reasons. A hand is a
--- hidden zone (CR 400.2) that pawl projects nothing into, so there is no
--- projected view here to prefer (#160).
+-- Matched against the PRINTED card and never a projection, exileCandidates'
+-- reading below and its context -- the payer as perspective, no source -- for
+-- its reasons.
+--
+-- Not implemented: a card in a hand has a projection too, so a continuous effect
+-- that changed the axis this criterion reads is missed here (#160).
 discardCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 discardCandidates pid oid criterion gs =
   let context = Filter.contextFor (Just pid) Nothing

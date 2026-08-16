@@ -2050,15 +2050,14 @@ catharticReunionSpec s registry =
 -- a Forest makes the cost payable and a second Piker makes it unpayable, and the
 -- two boards agree on everything else -- one red source, one seat, the same
 -- phase, the same hand SIZE.
-magmaticBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+magmaticBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 magmaticBoard mountain piker magmaticInsight second =
   let base = S.landsInPlay mountain 1
       (insight, gs1) = S.addHandCard magmaticInsight S.alice base
-      (held, gs2) = S.addHandCard second S.alice gs1
+      gs2 = snd (S.addHandCard second S.alice gs1)
       (other, gs3) = S.addHandCard piker S.alice gs2
       withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) gs3 [1 .. (4 :: Int)]
    in ( insight,
-        held,
         other,
         withLibrary
           { GameState.phase = Phase.PrecombatMain,
@@ -2084,7 +2083,7 @@ magmaticInsightSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       forest <- S.printingOf s registry "Forest"
       magmaticInsight <- S.printingOf s registry "Magmatic Insight"
-      let (insight, _, other, gs) = magmaticBoard mountain piker magmaticInsight forest
+      let (insight, other, gs) = magmaticBoard mountain piker magmaticInsight forest
           cast = S.runPure noDiscardAnswer gs (S.cast S.alice insight)
           resolved = S.runPure noDiscardAnswer cast Stack.resolveTop
       -- By NAME, since CR 400.7 mints a fresh id for the discarded card.
@@ -2100,7 +2099,7 @@ magmaticInsightSpec s registry =
       mountain <- S.printingOf s registry "Mountain"
       piker <- S.printingOf s registry "Goblin Piker"
       magmaticInsight <- S.printingOf s registry "Magmatic Insight"
-      let (insight, _, _, gs) = magmaticBoard mountain piker magmaticInsight piker
+      let (insight, _, gs) = magmaticBoard mountain piker magmaticInsight piker
       Spec.assertEqWith s "the hand is the same size as the payable board's" (S.handSize S.alice gs) 3
       Spec.assertBool s (not (any (\c -> Cost.canPay S.alice insight c gs) (Cost.costsFor (S.printingName magmaticInsight) insight gs))) "no offered cost is payable"
       Spec.assertBool s (not (any (S.isCastOf insight) (Action.legalActions S.alice gs))) "and no Cast is offered"

@@ -109,10 +109,10 @@ data CostComponent keyword
     -- what may be offered rather than picking anything.
     --
     -- The Filter is matched against the PRINTED card and never a projection,
-    -- ExileCardsFromGraveyard's reading below and for a stronger version of its
-    -- reason: CR 400.2 makes a hand a hidden zone, and pawl's projection does
-    -- not reach one either (#160). DiscardThis below states the rest of what
-    -- reading a hand costs, for both of the components that do.
+    -- ExileCardsFromGraveyard's reading below and for its reason -- see
+    -- Pawl.Engine.Cost.discardCandidates for what that misses (#160).
+    -- DiscardThis below states the rest of what reading a hand costs, for both
+    -- of the components that do.
     DiscardCards (DiscardCards.DiscardCards keyword)
   | -- | CR 702.29a's "Discard this card": discard the card the cost is on, from
     -- the hand it is in.
