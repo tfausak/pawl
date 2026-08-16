@@ -1744,6 +1744,7 @@ omniscienceSpec s registry =
           resolveWith answer = S.runPure answer (S.runPure answer gs (S.cast S.alice spell)) Stack.resolveTop
           responsesFor :: (forall r. Prompt.Prompt r -> r) -> [Response.Response]
           responsesFor answer = answersFor answer gs (S.cast S.alice spell)
+          wasAskedForX :: [Response.Response] -> Bool
           wasAskedForX = any (\r -> case r of Response.ChoseX _ -> True; _ -> False)
       Spec.assertBool s (wasAskedToChooseCost (responsesFor payingGrant)) "both costs are payable, so the choice is real"
       Spec.assertBool s (wasAskedForX (responsesFor payingPrinted)) "the printed {X}{R} asks for X"
