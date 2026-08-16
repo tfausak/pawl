@@ -287,7 +287,7 @@ youDraw n = Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.Relative Pla
 
 -- "This object has [keyword]" as a static ability (CR 604.1), the smallest
 -- carrier Face.staticAbilities takes.
-grantsItself :: Keyword.Keyword -> StaticAbility.StaticAbility
+grantsItself :: Keyword.Keyword -> StaticAbility.StaticAbility Card.Type.Card
 grantsItself keyword =
   StaticAbility.MkStaticAbility
     (Affected.Matching Filter.Type.IsSource)
@@ -523,9 +523,12 @@ durationCounts duration = case duration of
 
 -- Every Count reachable from a Modification: only its P/T quantities
 -- (layers 7b/7c) carry one.
-modificationCounts :: Modification.Modification -> [Count.Type.Count Quantity.Type.Quantity]
+modificationCounts :: Projection.Modification -> [Count.Type.Count Quantity.Type.Quantity]
 modificationCounts modification = case modification of
   Modification.GainKeyword _ -> []
+  -- CR 613.1f's other grant carries a whole ability, so the sweep descends into
+  -- it exactly as it does into a printed one.
+  Modification.GainActivatedAbility ability -> activatedAbilityCounts ability
   Modification.LoseAllAbilities -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityCounts p <> quantityCounts t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityCounts p <> quantityCounts t
@@ -550,7 +553,7 @@ modificationCounts modification = case modification of
 -- plus CR 604.2's "as long as" gate, which is a Condition and so a pair of
 -- Quantities -- and the leaves-the-battlefield duration beside it, which is a
 -- Duration and so another Condition when it is a CR 611.2b "for as long as".
-staticAbilityCounts :: StaticAbility.StaticAbility -> [Count.Type.Count Quantity.Type.Quantity]
+staticAbilityCounts :: StaticAbility.StaticAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 staticAbilityCounts ability =
   concatMap conditionCounts (Maybe.maybeToList (StaticAbility.condition ability))
     <> concatMap durationCounts (Maybe.maybeToList (StaticAbility.lingers ability))
@@ -654,7 +657,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
 effectCounts :: Effect.Effect Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 effectCounts effect = case effect of
   Effect.DealDamage (DealDamage.MkDealDamage _ quantity _) -> quantityCounts quantity
-  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts modification
+  Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification _) -> durationCounts duration <> modificationCounts (Projection.widenModification modification)
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   -- The search's count is a Quantity like any other -- Explosive Vegetation's
@@ -2252,9 +2255,14 @@ durationFilters = countFilters . durationCounts
 
 -- A Modification reaches a Filter two ways: through its layer-7 quantities (a
 -- Count) and through the keyword a layer-6 grant hands out (CR 702.29e again).
-modificationFilters :: Modification.Modification -> [Filter.Type.Filter Keyword.Keyword]
+modificationFilters :: Projection.Modification -> [Filter.Type.Filter Keyword.Keyword]
 modificationFilters modification = case modification of
   Modification.GainKeyword keyword -> keywordFilters keyword
+  -- Nothing HERE, and that is not a hole: a granted ability's Filters are swept
+  -- by grantedAbilities below, at the outer level, so they keep the Framing that
+  -- a printed activated ability's do. Answering here would flatten them to
+  -- unframed and lose CR 701.3a's attach-destination distinction.
+  Modification.GainActivatedAbility _ -> []
   Modification.SetBasePowerToughness (SetBasePowerToughness.MkSetBasePowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.ModifyPowerToughness (ModifyPowerToughness.MkModifyPowerToughness p t) -> quantityFilters p <> quantityFilters t
   Modification.LoseAllAbilities -> []
@@ -2279,7 +2287,7 @@ modificationFilters modification = case modification of
 -- keywords and Counts, -- since CR 604.2's "as long as" gate landed -- the
 -- Counts inside that condition, and the leaves-the-battlefield duration's own,
 -- which a CR 611.2b "for as long as" would carry.
-staticAbilityFilters :: StaticAbility.StaticAbility -> [Filter.Type.Filter Keyword.Keyword]
+staticAbilityFilters :: StaticAbility.StaticAbility Card.Type.Card -> [Filter.Type.Filter Keyword.Keyword]
 staticAbilityFilters ability =
   affectedFilters (StaticAbility.affected ability)
     <> concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability))
@@ -2764,7 +2772,7 @@ effectFilters effect = case effect of
   -- The dealer is a SlotName and carries no Filter.
   Effect.DealDamage (DealDamage.MkDealDamage ref quantity _) -> unframed (objectRefFilters ref <> quantityFilters quantity)
   Effect.ModifyTarget (ModifyTarget.MkModifyTarget duration modification ref) ->
-    unframed (durationFilters duration <> modificationFilters modification <> objectRefFilters ref)
+    unframed (durationFilters duration <> modificationFilters (Projection.widenModification modification) <> objectRefFilters ref)
   Effect.ChangeText {} -> []
   Effect.AddMana _ -> []
   Effect.Search (Search.MkSearch _ _ _ f _) -> unframed [f]
@@ -2894,6 +2902,18 @@ modalFilters modal =
     )
     (Modal.modes modal)
 
+-- Every ability this face's static abilities GRANT to another object (CR
+-- 613.1f). Swept alongside the printed ones: the quoted text is this card's, so
+-- every corpus lint that reads a printed activated ability has to read these
+-- too.
+grantedAbilities :: Face.Face Card.Type.Card -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
+grantedAbilities card =
+  [ ability
+  | static <- Face.staticAbilities card,
+    modification <- Foldable.toList (StaticAbility.modifications static),
+    Modification.GainActivatedAbility ability <- [modification]
+  ]
+
 triggeredAbilityFilters :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [(Framing, Filter.Type.Filter Keyword.Keyword)]
 triggeredAbilityFilters ability =
   unframed
@@ -2981,6 +3001,7 @@ cardFilters card =
     )
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
+    <> concatMap activatedAbilityFilters (grantedAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
     <> concatMap (modalFilters . DungeonRoom.ability) (Face.rooms card)
@@ -4217,7 +4238,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no card authors a control modification into a resolving effect (#199)" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> Projection.layer modification == Layer.Control
+          Effect.ModifyTarget (ModifyTarget.MkModifyTarget _ modification _) -> Projection.layer (Projection.widenModification modification) == Layer.Control
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []

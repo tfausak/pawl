@@ -112,7 +112,7 @@ untamedMightOnPiker forest piker untamedMight =
    in (pikerId, resolved)
 
 -- Append a stored continuous effect over a dynamic set, at timestamp `ts`.
-withDynamicEffect :: Affected.Affected -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withDynamicEffect :: Affected.Affected -> Timestamp.Timestamp -> Projection.Modification -> GameState.GameState -> GameState.GameState
 withDynamicEffect aff ts m gs =
   let eff =
         ContinuousEffect.MkContinuousEffect
@@ -645,6 +645,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "CR 608.2h freezeQuantities locks an answerable quantity and refuses an unanswerable one" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (pikerId, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        freeze :: Projection.Modification -> Maybe Projection.Modification
         freeze = Projection.freezeQuantities gs pikerId (Just S.alice)
     Spec.assertEqWith
       s

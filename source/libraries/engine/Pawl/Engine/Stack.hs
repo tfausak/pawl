@@ -232,7 +232,7 @@ carryOver oldId (Just newId) = State.modify' $ \gs ->
 
 -- carryOver's per-effect half: swap oldId for newId in a locked affected set
 -- that names it, and leave every other effect alone.
-reanchor :: ObjectId -> ObjectId -> ContinuousEffect.ContinuousEffect -> ContinuousEffect.ContinuousEffect
+reanchor :: ObjectId -> ObjectId -> ContinuousEffect.ContinuousEffect card -> ContinuousEffect.ContinuousEffect card
 reanchor oldId newId eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects oids
     | Set.member oldId oids ->

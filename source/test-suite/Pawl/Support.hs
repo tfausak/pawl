@@ -449,7 +449,7 @@ youControlNoSwamps =
 -- MatchingAnywhere) set is correctly False here, but an exhaustive case means a
 -- future Affected constructor forces a decision at this site instead of
 -- silently reading as "nothing stored".
-continuousEffectAffects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffect -> Bool
+continuousEffectAffects :: ObjectId.ObjectId -> ContinuousEffect.ContinuousEffect Card.Type.Card -> Bool
 continuousEffectAffects target eff = case ContinuousEffect.affected eff of
   Affected.TheseObjects ids -> Set.member target ids
   Affected.Matching _ -> False
@@ -462,7 +462,7 @@ continuousEffectAffects target eff = case ContinuousEffect.affected eff of
 -- source's own characteristics. The general shape (ColorSpec, PowerToughnessSpec,
 -- ProjectionSpec and ResolveSpec all grew their own copy of this before it moved
 -- here).
-withEffectAt :: ObjectId.ObjectId -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffectAt :: ObjectId.ObjectId -> Timestamp.Timestamp -> Projection.Modification -> GameState.GameState -> GameState.GameState
 withEffectAt oid ts m gs =
   let eff =
         ContinuousEffect.MkContinuousEffect
@@ -479,7 +479,7 @@ withEffectAt oid ts m gs =
 -- SetLandSubtypeToChosen reads Object.chosenSubtype off the effect's source, and
 -- a source that names no object answers Nothing for every board. Pair it with
 -- withChosenSubtype below.
-withEffectFromAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> Timestamp.Timestamp -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffectFromAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> Timestamp.Timestamp -> Projection.Modification -> GameState.GameState -> GameState.GameState
 withEffectFromAt src oid ts m gs =
   let eff =
         ContinuousEffect.MkContinuousEffect
@@ -503,7 +503,7 @@ withChosenSubtype subtype oid gs =
 
 -- withEffectAt, allocating its own fresh timestamp -- the convenience shape for
 -- a caller that doesn't care which timestamp the effect lands at.
-withEffect :: ObjectId.ObjectId -> Modification.Modification -> GameState.GameState -> GameState.GameState
+withEffect :: ObjectId.ObjectId -> Projection.Modification -> GameState.GameState -> GameState.GameState
 withEffect oid m gs =
   let (ts, gs1) = Game.freshTimestamp gs
    in withEffectAt oid ts m gs1

@@ -20,8 +20,35 @@ import qualified Pawl.Types.Supertype as Supertype
 -- closed-half CITATION, so casing on it is not an invariant violation. The P/T
 -- arms carry records of signed Quantity. The layer-4 arms below reach card types,
 -- subtypes and supertypes, which CR 205.4b keeps independent of one another.
-data Modification
+--
+-- Parametric in `ability` for GainActivatedAbility's sake alone, and parametric
+-- rather than concrete because this module cannot NAME an ability: an
+-- ActivatedAbility carries Effects and Pawl.Types.Effect carries a
+-- Pawl.Types.ModifyTarget, which carries one of these. Pawl.Types.StaticAbility
+-- and Pawl.Types.ContinuousEffect instantiate the variable at
+-- `ActivatedAbility card`, which is every position a card's grant reaches;
+-- ModifyTarget instantiates it at Void, and says there why.
+data Modification ability
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
+  | -- | layer 6, CR 613.1f: this object gains a whole quoted ACTIVATED ability,
+    -- authored on the granting card (Presence of Gond's "Enchanted creature has
+    -- '{T}: Create a 1/1 green Elf Warrior creature token.'").
+    --
+    -- Folded into ProjectedCharacteristics.activatedAbilities, which is what
+    -- decides everything about the granted ability's identity: it becomes an
+    -- ability OF THE RECEIVING OBJECT, so CR 113.7a makes that object its source,
+    -- CR 602.2b makes that object's controller its controller, and every binding
+    -- it names -- the tap cost, IsSource, the counter it puts on "this creature"
+    -- -- resolves against the receiver. The granting permanent supplies only the
+    -- text and, via CR 613.7a, the timestamp.
+    --
+    -- Rejected: keeping the ability anchored to the GRANTER and activating it
+    -- there. Presence of Gond on an opponent's creature is the board that refutes
+    -- that -- the opponent taps their own creature and gets the token, both of
+    -- which a granter-anchored ability gets backwards.
+    --
+    -- Not implemented: a granted TRIGGERED or STATIC ability (#1641).
+    GainActivatedAbility ability
   | LoseAllAbilities -- layer 6 (Humility)
   | SetBasePowerToughness SetBasePowerToughness.SetBasePowerToughness -- layer 7b (Humility 1/1; Opalescence mana value)
   | ModifyPowerToughness ModifyPowerToughness.ModifyPowerToughness -- layer 7c (Giant Growth +3/+3)

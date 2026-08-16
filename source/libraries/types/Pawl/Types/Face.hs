@@ -109,7 +109,7 @@ data Face card = MkFace
     characteristicPT :: Maybe Quantity.Quantity,
     -- | CR 604.1/604.2: this face's static continuous abilities (Humility), which
     -- the projection gathers live.
-    staticAbilities :: [StaticAbility.StaticAbility],
+    staticAbilities :: [StaticAbility.StaticAbility card],
     -- | This face's spell payload as data: what casting it does when it
     -- resolves, as one or more modes (CR 700.2). A non-modal card is a single mode
     -- with ChooseExactly 1 (forced, unprompted); a land or vanilla creature is a
