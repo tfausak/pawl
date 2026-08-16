@@ -103,7 +103,7 @@ manaProduced effect = case effect of
   Effect.Venture -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
-  Effect.RestartGame -> Nothing
+  Effect.RestartGame _ -> Nothing
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
@@ -209,7 +209,7 @@ movesLibraryCard effect = case effect of
   Effect.ExileHandThenDraw -> True
   -- CR 727.2 / 103.3: every card involved in the restarted game is in the new
   -- game, which starts by shuffling each player's deck into their library.
-  Effect.RestartGame -> True
+  Effect.RestartGame _ -> True
   -- CR 729.2: as a subgame starts, "each player takes all the cards in their
   -- main-game library, moves them to their subgame library, and shuffles them".
   Effect.PlaySubgame _ -> True
@@ -224,7 +224,7 @@ movesLibraryCard effect = case effect of
       ObjectRef.EachMatching _ -> False
       ObjectRef.EachCardInGraveyard {} -> False
       ObjectRef.EachCardInYourHand -> False
-      ObjectRef.EachCardExiledWithSource -> False
+      ObjectRef.EachCardExiledWithSource {} -> False
       ObjectRef.EachPlayer -> False
       ObjectRef.ChosenCardInGraveyard {} -> False
   Effect.AddMana _ -> False

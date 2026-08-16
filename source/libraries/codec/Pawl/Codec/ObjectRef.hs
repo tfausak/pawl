@@ -23,6 +23,11 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 --
 -- 'EachCardInGraveyard', 'TopOfLibrary' and 'ChosenCardInGraveyard' each carry a
 -- payload record of their own (#1464), so no arm here writes a positional array.
+--
+-- 'EachCardExiledWithSource' takes an OPTIONAL payload: the bare tag is the whole
+-- linked set (CR 607.3), and a value narrows it to the cards a printing's own
+-- words name. The three printings written before Karn Liberated keep the bare
+-- tag, so the widening changed no card on the wire.
 codec :: Codec.Codec ObjectRef.ObjectRef
 codec =
   Arm.tagged
@@ -30,7 +35,7 @@ codec =
       Arm.payload "EachMatching" filterCodec ObjectRef.EachMatching (\x -> case x of ObjectRef.EachMatching y -> Just y; _ -> Nothing),
       Arm.payload "EachCardInGraveyard" EachCardInGraveyard.codec ObjectRef.EachCardInGraveyard (\x -> case x of ObjectRef.EachCardInGraveyard y -> Just y; _ -> Nothing),
       Arm.nullary "EachCardInYourHand" ObjectRef.EachCardInYourHand,
-      Arm.nullary "EachCardExiledWithSource" ObjectRef.EachCardExiledWithSource,
+      Arm.optionalPayload "EachCardExiledWithSource" filterCodec ObjectRef.EachCardExiledWithSource (\x -> case x of ObjectRef.EachCardExiledWithSource y -> Just y; _ -> Nothing),
       Arm.nullary "EachPlayer" ObjectRef.EachPlayer,
       Arm.payload "TopOfLibrary" TopOfLibrary.codec ObjectRef.TopOfLibrary (\x -> case x of ObjectRef.TopOfLibrary y -> Just y; _ -> Nothing),
       Arm.payload "ChosenCardInGraveyard" ChosenCardInGraveyard.codec ObjectRef.ChosenCardInGraveyard (\x -> case x of ObjectRef.ChosenCardInGraveyard y -> Just y; _ -> Nothing)

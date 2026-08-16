@@ -32,8 +32,10 @@ data ObjectRef
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a
     -- set drawn from another zone is one of the arms below -- a graveyard's is
     -- EachCardInGraveyard, a hand's EachCardInYourHand, exile's
-    -- EachCardExiledWithSource -- and a FILTERED sweep of any zone but the
-    -- battlefield and a graveyard has no card in the pool (#1309).
+    -- EachCardExiledWithSource -- and a FILTERED sweep of a zone is written on
+    -- the arm for that zone: the battlefield's is here, a graveyard's and the
+    -- linked exile set's are on their own arms, and the stack, a hand and a
+    -- library still have none (#1309).
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle. The set is swept when the effect executes (CR 608.2c) and is then
@@ -53,8 +55,9 @@ data ObjectRef
     -- description in the stated zone".
     --
     -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, the shape
-    -- Pawl.Types.Pool.CardsInGraveyard takes one question over: no card in the
-    -- pool sweeps a filtered set out of any other zone, and the hidden ones (CR
+    -- Pawl.Types.Pool.CardsInGraveyard takes one question over: each zone whose
+    -- filtered sweep a card in the pool asks for gets its own arm --
+    -- EachCardExiledWithSource takes the exile one -- and the hidden zones (CR
     -- 400.2) would owe a visibility question a graveyard does not (#1309).
     --
     -- The PlayerScope is WHOSE, which CR 400.1 forces this arm to say and
@@ -85,6 +88,12 @@ data ObjectRef
     -- Not a target and never one (CR 115.10a) -- a hidden zone has no target pool
     -- at all (#559) -- and swept when the effect executes (CR 608.2c), the two
     -- properties EachMatching above has.
+    --
+    -- Not implemented, recorded here because the card's JSON cannot carry a
+    -- comment: a card CHOSEN out of a hidden zone by that zone's owner -- Karn
+    -- Liberated's "+4: Target player exiles a card from their hand", the clause
+    -- data/cards/karn-liberated.json is written without -- has no spelling here
+    -- (#1626).
     EachCardInYourHand
   | -- | CR 607.2a's linked set: every card in exile that an instruction in an
     -- ability of THIS EFFECT'S SOURCE put there -- Hoarding Dragon's "the exiled
@@ -94,10 +103,16 @@ data ObjectRef
     -- refers only to cards in the exile zone that were put there as a result of
     -- an instruction to exile them in the first ability."
     --
-    -- Nullary. NO PLAYER: exile is a public zone (CR 400.2) and the set is
-    -- defined by which object exiled the card, not by whose it is. NO FILTER: a
-    -- linked reference names the whole set it is linked to, and every printing in
-    -- the pool takes all of it.
+    -- NO PLAYER: exile is a public zone (CR 400.2) and the set is defined by
+    -- which object exiled the card, not by whose it is.
+    --
+    -- The Filter is OPTIONAL because a linked reference usually names the whole
+    -- set it is linked to -- Hoarding Dragon, Promise of Tomorrow and Savior of
+    -- Ollenbock each take all of it, and write no filter. Karn Liberated is the
+    -- printing that narrows the set with its own words, "all non-Aura PERMANENT
+    -- CARDS exiled with Karn", so the subset has to be sayable; a stated filter
+    -- is read exactly as EachMatching's is, against each linked card's
+    -- projection.
     --
     -- Singular and plural are ONE arm, which is CR 607.3: an ability referring to
     -- "the exiled card" whose linked ability exiled several "performs that action
@@ -111,7 +126,7 @@ data ObjectRef
     -- Not a target and never one (CR 115.10a) -- the reference is a definition,
     -- not a choice -- and swept when the effect executes (CR 608.2c), the two
     -- properties EachMatching above has.
-    EachCardExiledWithSource
+    EachCardExiledWithSource (Maybe (Filter.Filter Keyword.Keyword))
   | -- | Every PLAYER in the game -- Molten Disaster's "and each player". The one
     -- arm that names no object at all, and it is here rather than on
     -- Pawl.Types.PlayerRef because the opcode that needs it takes an ObjectRef:

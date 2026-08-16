@@ -1957,7 +1957,7 @@ playSubgame = do
     Trans.lift
       ( Program.mapProgram
           (Asked.under parent)
-          (State.runStateT (Setup.startGameFromCards Resolve.performHandAction >> playGame) sub0)
+          (State.runStateT (Setup.startGameFromCards Resolve.performHandAction Set.empty >> playGame) sub0)
       )
   State.modify' (Setup.funnelBack finalSub)
   -- CR 729.5: each player takes the traditional cards they own that are in the

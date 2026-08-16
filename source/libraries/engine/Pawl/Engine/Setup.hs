@@ -257,10 +257,27 @@ newGame perform matchup = do
 -- rebuild the game for the players who are in it, and CR 103.5's declaration
 -- round goes around the table in turn order. A departed player's cards are not
 -- here to skip -- CR 800.4a took them out of the game with them.
-startGameFromCards :: HandActionPerformer -> Game ()
-startGameFromCards perform = do
+--
+-- `exempt` is CR 727.5's set: "effects may exempt certain cards from the
+-- procedure that restarts the game. These cards are not in their owner's deck as
+-- the new game begins." An exempted card is left exactly as it is -- same object,
+-- same incarnation, still in exile -- rather than rebuilt into a library, so it
+-- is untouched by CR 400.7 for the reason nothing moved it. Restricted to EXILE
+-- because that is where every card CR 727.5 reaches sits: the rule's only
+-- producer leaves cards in exile, and an exemption naming a permanent would have
+-- to say which of the zones this function empties it survives in. A subgame
+-- exempts nothing (CR 729.2 moves every library card in).
+startGameFromCards :: HandActionPerformer -> Set.Set ObjectId -> Game ()
+startGameFromCards perform exemptions = do
   gs <- State.get
   let owners = Game.stillPlayingInOrder gs
+      -- Cards in exile, and nothing else: CR 727.2's "all Magic cards" is what
+      -- survives a rebuild at all, so an exemption is filtered by the same
+      -- `isCard` test the funnel below applies rather than being able to smuggle
+      -- a token or an emblem through it (CR 111.7).
+      exempt =
+        Map.keysSet
+          (Map.filter isCard (Map.restrictKeys (GameState.objects gs) (Set.intersection exemptions (GameState.exile gs))))
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
@@ -269,17 +286,17 @@ startGameFromCards perform = do
       -- through the same Object.newIncarnation, so that a field added later
       -- cannot be forgotten on one path and reset on the other.
       toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
-      cards = fmap toLibraryCard (Map.filter isCard (GameState.objects gs))
+      cards = fmap toLibraryCard (Map.filter isCard (Map.withoutKeys (GameState.objects gs) exempt))
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
   State.put
     gs
-      { GameState.objects = cards,
+      { GameState.objects = Map.union (Map.restrictKeys (GameState.objects gs) exempt) cards,
         GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) owners),
         GameState.hand = Map.empty,
         GameState.graveyard = Map.empty,
         GameState.battlefield = mempty,
         GameState.phasedOut = mempty,
-        GameState.exile = mempty,
+        GameState.exile = exempt,
         GameState.command = mempty,
         GameState.stack = []
       }
@@ -341,8 +358,12 @@ resetPlayers players =
 -- CR 727.4: the effect finishes resolving just before the first turn's untap
 -- step with no player holding priority. The object and timestamp id supplies
 -- are preserved so reused cards keep unique ids.
-restartGame :: HandActionPerformer -> PlayerId -> Game ()
-restartGame perform starter = do
+--
+-- CR 727.5's `exempt` cards are the exception to CR 727.2's funnel: they stay in
+-- exile instead of going into a library. See startGameFromCards, which is where
+-- they are held back.
+restartGame :: HandActionPerformer -> Set.Set ObjectId -> PlayerId -> Game ()
+restartGame perform exempt starter = do
   State.modify' $ \gs ->
     -- CR 727.1: the rebuilt seating order is the players who were still in the
     -- game, in their seats, rotated to begin with `starter` (CR 727.1a).
@@ -401,13 +422,20 @@ restartGame perform starter = do
             GameState.spellsCastLastTurn = 0,
             GameState.exiledUntilMonarch = Map.empty,
             GameState.haunting = Map.empty,
-            GameState.exiledWith = Map.empty,
+            -- Kept for the CR 727.5 exemptions alone, and cleared for every
+            -- other card: an exempted card never left exile, so what put it
+            -- there is still true of it, and CR 727.4's additional instructions
+            -- -- Karn's "then put THOSE CARDS onto the battlefield" -- are read
+            -- after the rebuild and have nothing else left to read them off.
+            -- Every other entry names a card the rebuild shuffled into a
+            -- library, where CR 400.7 has already made it a different object.
+            GameState.exiledWith = Map.restrictKeys (GameState.exiledWith gs) exempt,
             -- CR 727.1: the game that scheduled them has ended, so no extra
             -- turn survives into the new one.
             GameState.extraTurns = [],
             GameState.turnAnchor = Nothing
           }
-  startGameFromCards perform
+  startGameFromCards perform exempt
 
 -- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards only;
 -- no other main-game zone enters. The object pool is restricted to those
