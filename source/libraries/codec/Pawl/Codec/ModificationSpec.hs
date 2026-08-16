@@ -98,6 +98,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.codec
       (Modification.AddCardType CardType.Creature)
       """ {"type":"AddCardType","value":{"type":"Creature"}} """
+  -- layer 4, CR 205.1a set (Song of the Dryads -> land). A different card type
+  -- from the add above, so a codec that crossed the two arms cannot pass both.
+  Spec.it s "SetCardType" $
+    Common.assertCodec
+      s
+      Modification.codec
+      (Modification.SetCardType CardType.Land)
+      """ {"type":"SetCardType","value":{"type":"Land"}} """
   -- layer 4, CR 205.4b grant (Leyline of Singularity -> legendary).
   Spec.it s "AddSupertype" $
     Common.assertCodec

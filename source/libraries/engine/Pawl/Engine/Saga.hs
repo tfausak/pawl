@@ -137,14 +137,13 @@ isSaga = Set.member Subtype.Saga . PC.subtypes
 -- copy is what the CR-citation discipline exists to prevent.
 --
 -- The SUBTYPE alone, though CR 505.4 and CR 703.4f both say "Saga ENCHANTMENT"
--- where CR 704.5s says "Saga permanent". The two readings cannot differ today,
--- and the reason is a capability pawl lacks rather than a claim about Magic:
--- Pawl.Types.Modification has AddCardType and no SET, so no effect in the pool can
--- take the enchantment card type away from a permanent while leaving the subtype
--- on it. The card that brings a card-type SET is the one that must make this
--- conjunction explicit -- CR 205.1a would strip an enchantment-only subtype along
--- with the type, so the honest fix then is to prune the subtype rather than to add
--- a card-type conjunct here.
+-- where CR 704.5s says "Saga permanent". The two readings cannot differ, and the
+-- reason is now CR 205.1a rather than a capability pawl lacks: an effect that
+-- takes the enchantment card type away (Modification.SetCardType) strips the
+-- subtypes correlated with it in the same step, Saga among them (CR 205.3h,
+-- Pawl.Engine.Subtype.correlatedCardTypes), and nothing grants an enchantment
+-- subtype to a permanent that is not one. So a Saga is an enchantment, and a
+-- card-type conjunct here would restate the layer-4 rule rather than add to it.
 tracksLore :: PC.ProjectedCharacteristics -> Bool
 tracksLore pc = isSaga pc && not (null (chaptersOf pc))
 

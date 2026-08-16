@@ -1459,6 +1459,51 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf pikerId gs)) "the Piker is a land"
     Spec.assertBool s (Projection.isCreatureOf pikerId gs) "and still a creature (CR 205.1b: adding a type keeps the others)"
 
+  -- CR 205.1a's SET, and the board above is what it has to be read against:
+  -- Ashaya's AddCardType leaves the Piker a creature, and Song of the Dryads'
+  -- SetCardType must not. Land against Creature is the discriminator -- two
+  -- different card types, so "added Land" and "became Land" cannot give the same
+  -- answer about either one.
+  --
+  -- The subtype assertion is CR 205.1a's third clause and not decoration: Goblin
+  -- and Warrior correlate with the Creature type alone (CR 205.3m), so they go
+  -- when it does, while the Forest the same Aura's SetLandSubtype grants survives
+  -- because it correlates with the type the Aura just gave. A set that wrote
+  -- PC.cardTypes and left PC.subtypes alone leaves a Goblin Forest land.
+  Spec.it s "CR 205.1a Song of the Dryads REPLACES the enchanted creature's card type" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    song <- S.printingOf s registry "Song of the Dryads"
+    let base = S.landsInPlay forest 1
+        (pikerId, g1) = S.addCreature piker S.alice base
+        (songId, g2) = S.addCreature song S.alice g1
+        gs = S.attach songId pikerId g2
+    Spec.assertEqWith s "before: a Creature and nothing else" (Projection.cardTypesOf pikerId g2) (Set.singleton CardType.Creature)
+    Spec.assertEqWith s "before: a Goblin Warrior" (Projection.subtypesOf pikerId g2) (Set.fromList [Subtype.Type.Goblin, Subtype.Type.Warrior])
+    Spec.assertEqWith s "after: Land REPLACES Creature rather than joining it" (Projection.cardTypesOf pikerId gs) (Set.singleton CardType.Land)
+    Spec.assertBool s (not (Projection.isCreatureOf pikerId gs)) "so it is not a creature at all"
+    Spec.assertEqWith s "CR 205.1a: the creature types went with the Creature type, and only the granted Forest is left" (Projection.subtypesOf pikerId gs) (Set.singleton Subtype.Type.Forest)
+    Spec.assertEqWith s "and it is colorless" (Projection.colorsOf pikerId gs) Set.empty
+
+  -- CR 613.7's timestamp order over the add/set pair, which is the whole of what
+  -- decides between them: neither modification moves the other's affected set, so
+  -- CR 613.8 has nothing to reorder and the later one simply sees what the
+  -- earlier one produced. Raw modifications rather than the two cards, because
+  -- the point is the ORDER and a card pair would drag its own affected sets in.
+  --
+  -- Artifact against Land, and both boards carry both effects, so the two legs
+  -- differ in exactly one thing: which timestamp is the larger.
+  Spec.it s "CR 613.7 a card-type set applied after an add wipes it; applied before, the add survives" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.landsInPlay forest 1
+        (pikerId, board) = S.addCreature piker S.alice base
+        withBoth addAt setAt =
+          S.withEffectAt pikerId (Timestamp.MkTimestamp setAt) (Modification.SetCardType CardType.Land) $
+            S.withEffectAt pikerId (Timestamp.MkTimestamp addAt) (Modification.AddCardType CardType.Artifact) board
+    Spec.assertEqWith s "add older: the set replaces the artifact type too" (Projection.cardTypesOf pikerId (withBoth 10 20)) (Set.singleton CardType.Land)
+    Spec.assertEqWith s "set older: the add lands on top of it (CR 205.1b)" (Projection.cardTypesOf pikerId (withBoth 20 10)) (Set.fromList [CardType.Artifact, CardType.Land])
+
   Spec.it s "CR 613.8b Blood Moon depends on Ashaya, so it applies second (Ashaya older)" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"

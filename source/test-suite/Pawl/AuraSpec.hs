@@ -1217,15 +1217,57 @@ auraSpec s registry = Spec.describe s "Aura" $ do
     Spec.assertBool s (not (Set.member aura (GameState.battlefield pass2))) "the Aura is gone from the battlefield after pass two"
     Spec.assertEqWith s "and is in its OWNER's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice pass2)) 1
   -- CR 704.5m's remaining clause: unattached. Its third clause -- attached to an
-  -- object the enchant slot no longer admits (CR 303.4c) -- is the Control Magic
-  -- and Setessan Training case below; nothing in the pool strips creature-ness
-  -- from a permanent, so a CONTROL change is how that clause is reached.
+  -- object the enchant slot no longer admits (CR 303.4c) -- is reached two ways:
+  -- by a CONTROL change (the Control Magic and Setessan Training case below), and
+  -- by the host ceasing to be a creature at all, which is the pair of cases
+  -- immediately after this one.
   Spec.it s "CR 704.5m: an unattached Aura on the battlefield goes to the graveyard" $ do
     unholyStrength <- S.printingOf s registry "Unholy Strength"
     let base = Setup.emptyGame S.bothPlayers
         (aura, gs) = S.addCreature unholyStrength S.alice base
         after = S.settleSba gs
     Spec.assertBool s (not (Set.member aura (GameState.battlefield after))) "never attached, so it falls off immediately"
+  -- CR 303.4c through CR 704.5m, with the illegality coming from a layer-4 card
+  -- type SET rather than from a control change or a death: Song of the Dryads
+  -- makes its host a colorless Forest land (CR 205.1a), and Unholy Strength's
+  -- "Enchant creature" no longer admits it.
+  --
+  -- A gameplay-level reader for the set, which is the point of running it through
+  -- a state-based action rather than reading the projection: the enchant filter
+  -- asks CR 205's question about the host, and the answer moves a card between
+  -- zones. An implementation that ADDED the land type would leave the host a
+  -- creature and Unholy Strength where it is.
+  --
+  -- The pair differs in exactly one thing: which permanent Song of the Dryads is
+  -- attached to. Both boards carry the same two Auras, the same Piker and the same
+  -- Forest, and in both the Song itself stays -- its own "enchant permanent"
+  -- admits a land as readily as a creature, so neither leg can pass by the Song
+  -- falling off instead.
+  Spec.it s "CR 704.5m / 205.1a: a host that stops being a creature buries the Aura enchanting it" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    unholyStrength <- S.printingOf s registry "Unholy Strength"
+    song <- S.printingOf s registry "Song of the Dryads"
+    let base = S.landsInPlay forest 1
+        landId = case Game.zoneMembers Zone.Battlefield S.alice base of
+          i : _ -> i
+          [] -> ObjectId.MkObjectId 999
+        (creature, withCreature) = S.addCreature piker S.alice base
+        (aura, withAura) = S.addCreature unholyStrength S.alice withCreature
+        (songId, withSong) = S.addCreature song S.alice (S.attach aura creature withAura)
+        -- ToObject rather than S.attach's ToCreature: "enchant permanent" is a
+        -- Pool.Permanents slot, so those are the recipients casting would have
+        -- left, and CR 704.5m's re-check compares against exactly those.
+        songOn host = S.settleSba (S.attachTo songId (Recipient.ToObject host) withSong)
+        onCreature = songOn creature
+        onLand = songOn landId
+    Spec.assertBool s (not (Projection.isCreatureOf creature onCreature)) "the Song made the Piker a land, so it is no longer a creature"
+    Spec.assertBool s (not (Set.member aura (GameState.battlefield onCreature))) "and Unholy Strength, illegally attached, was buried"
+    Spec.assertEqWith s "in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice onCreature)) 1
+    Spec.assertBool s (Set.member songId (GameState.battlefield onCreature)) "the Song itself stays: enchant permanent admits a land"
+    Spec.assertBool s (Set.member creature (GameState.battlefield onCreature)) "and the host is still on the battlefield -- it stopped being a creature, it did not die"
+    Spec.assertBool s (Projection.isCreatureOf creature onLand) "the control: with the Song elsewhere the Piker is still a creature"
+    Spec.assertBool s (Set.member aura (GameState.battlefield onLand)) "so Unholy Strength stays attached"
   -- Setessan Training's own three lines, at gameplay level (design.md section 4):
   -- "Enchant creature you control" (CR 702.5a) narrowing the enchant slot, "When
   -- this Aura enters, draw a card" firing, and "+1/+0 and has trample" (CR

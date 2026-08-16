@@ -138,6 +138,7 @@ layer m = case m of
   Modification.AddCreatureSubtype _ -> Layer.Type
   Modification.AddEveryCreatureSubtype -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
+  Modification.SetCardType _ -> Layer.Type
   Modification.AddSupertype _ -> Layer.Type
   Modification.RemoveSupertype _ -> Layer.Type
   Modification.ChangeSubtypeWord {} -> Layer.Text
@@ -222,6 +223,36 @@ applyModification viewOf src gs oid m pc =
           pc {PC.subtypes = Set.union Subtype.everyCreatureType (PC.subtypes pc)}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
+        -- CR 205.1a's set, and the whole of it. Three clauses, in the order the
+        -- rule states them:
+        --
+        --   * the new card type replaces the existing ones, which is why this
+        --     writes the set rather than inserting into it;
+        --   * instant and sorcery survive the replacement, the rule's one named
+        --     exception -- a permanent has neither, so the retention is
+        --     observable only on a spell (Affected.MatchingAnywhere), and stating
+        --     it costs a filter;
+        --   * a subtype whose family correlates with NO card type the object now
+        --     has goes with the type that carried it. So a Goblin that becomes a
+        --     land is not a Goblin, while the land types the same effect's
+        --     SetLandSubtype grants it survive -- they correlate with the type it
+        --     just gained. A subtype Pawl.Engine.Subtype cannot classify answers
+        --     with the empty set and is kept.
+        --
+        -- No ability clause: CR 205.1a moves counters, stickers and damage along
+        -- with the object and says nothing about its abilities. Song of the
+        -- Dryads loses the enchanted permanent's rules text through CR 305.7's
+        -- strip, which its OTHER modification (SetLandSubtype) carries.
+        Modification.SetCardType t ->
+          let kept = Set.filter retainedThroughCardTypeSet (PC.cardTypes pc)
+              types = Set.insert t kept
+              correlated x =
+                let family = Subtype.correlatedCardTypes x
+                 in Set.null family || not (Set.disjoint family types)
+           in pc
+                { PC.cardTypes = types,
+                  PC.subtypes = Set.filter correlated (PC.subtypes pc)
+                }
         -- CR 205.4b: a gain is an INSERT into the supertype set, so every other
         -- supertype the object had survives, and neither its card types nor its
         -- subtypes are touched. Granting one the object already has is the
@@ -329,6 +360,11 @@ applyModification viewOf src gs oid m pc =
         -- CR 613.4d.
         Modification.SwitchPowerToughness ->
           pc {PC.power = PC.toughness pc, PC.toughness = PC.power pc}
+
+-- CR 205.1a's named exception to its own set: "an object with either the instant
+-- or sorcery card type retains that type". Every other card type is replaced.
+retainedThroughCardTypeSet :: CardType.CardType -> Bool
+retainedThroughCardTypeSet t = t == CardType.Instant || t == CardType.Sorcery
 
 -- CR 305.7's strip, shared by both modifications that set a land's subtype so
 -- the rule cannot be implemented twice and drift. Of its three clauses this does
@@ -1303,6 +1339,7 @@ freezeQuantities gs oid you m =
         Modification.AddCreatureSubtype _ -> Just m
         Modification.AddEveryCreatureSubtype -> Just m
         Modification.AddCardType _ -> Just m
+        Modification.SetCardType _ -> Just m
         Modification.AddSupertype _ -> Just m
         Modification.RemoveSupertype _ -> Just m
         Modification.ChangeSubtypeWord {} -> Just m
@@ -1329,6 +1366,7 @@ quantitiesOf m = case m of
   Modification.AddCreatureSubtype _ -> []
   Modification.AddEveryCreatureSubtype -> []
   Modification.AddCardType _ -> []
+  Modification.SetCardType _ -> []
   Modification.AddSupertype _ -> []
   Modification.RemoveSupertype _ -> []
   Modification.ChangeSubtypeWord {} -> []
@@ -1387,6 +1425,11 @@ setLandSubtypeEffectsGiven functioning gs =
         Modification.SetCreatureSubtype _ -> False
         Modification.AddCreatureSubtype _ -> False
         Modification.AddEveryCreatureSubtype -> False
+        -- The CARD-TYPE set, named here for the same reason: it is the newest arm
+        -- with "set" in its name, and CR 305.7's strip is not its clause. Making
+        -- an object a land does not strip the land's rules text -- CR 305.7 fires
+        -- on setting a land's SUBTYPE, which Song of the Dryads says separately.
+        Modification.SetCardType _ -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
@@ -1626,6 +1669,7 @@ rewriteModification pairs m =
         -- so this position holds no word a subtype pair could name. CR 205.4a's
         -- supertypes are a third list, and the two arms below hold one of those.
         Modification.AddCardType _ -> acc
+        Modification.SetCardType _ -> acc
         Modification.AddSupertype _ -> acc
         Modification.RemoveSupertype _ -> acc
         -- The two words of a STORED text change are the choice its own
@@ -2574,6 +2618,11 @@ removesAbilities m = case m of
   Modification.AddLandSubtype _ -> False
   Modification.ChangeSubtypeWord {} -> False
   Modification.AddCardType _ -> False
+  -- CR 205.1a's card-type set has no ability clause either: the rule moves
+  -- counters, stickers and damage with the object and leaves its abilities
+  -- alone. Song of the Dryads strips rules text through the SetLandSubtype it
+  -- carries beside this, which the arm above already keeps out of layer 6.
+  Modification.SetCardType _ -> False
   -- CR 205.4b changes a supertype and says nothing about abilities. CR 305.7's
   -- strip is the land arms' alone, and a permanent that becomes legendary or
   -- stops being snow keeps every ability it had.
@@ -3122,6 +3171,10 @@ modificationWrites m = case m of
   Modification.AddEveryCreatureSubtype -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord {} -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
+  -- CR 205.1a's set writes BOTH: the card types it replaces, and the subtypes it
+  -- strips along with the types that carried them. The add above writes only the
+  -- first, which is the whole difference between the two arms here.
+  Modification.SetCardType _ -> Set.fromList [Types, Subtypes]
   Modification.AddSupertype _ -> Set.singleton Supertypes
   Modification.RemoveSupertype _ -> Set.singleton Supertypes
   Modification.SetColor _ -> Set.singleton Colors
@@ -3155,6 +3208,7 @@ modificationReads m = case m of
   Modification.AddEveryCreatureSubtype -> Set.empty
   Modification.ChangeSubtypeWord {} -> Set.empty
   Modification.AddCardType _ -> Set.empty
+  Modification.SetCardType _ -> Set.empty
   Modification.AddSupertype _ -> Set.empty
   Modification.RemoveSupertype _ -> Set.empty
   Modification.SetColor _ -> Set.empty
@@ -4156,6 +4210,7 @@ grantsKeywordWhere p m = case m of
   Modification.AddCreatureSubtype _ -> False
   Modification.AddEveryCreatureSubtype -> False
   Modification.AddCardType _ -> False
+  Modification.SetCardType _ -> False
   Modification.AddSupertype _ -> False
   Modification.RemoveSupertype _ -> False
   Modification.ChangeSubtypeWord {} -> False
