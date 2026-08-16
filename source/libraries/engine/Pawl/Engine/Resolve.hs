@@ -138,6 +138,7 @@ import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
 import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
+import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounters as PlayerCounters
@@ -5325,6 +5326,46 @@ runPreventionRider prevention = case (Prevention.rider prevention, Recipient.obj
       let restore obj = obj {Object.bindings = Map.alter (const was) Binding.eventAmount (Object.bindings obj)}
        in gs {GameState.objects = Map.adjust restore oid (GameState.objects gs)}
   _ -> pure ()
+
+-- CR 614.1c: run the effects of every as-enters rewrite that has applied and not
+-- run yet -- Monstrous War-Leech's "as this creature enters, if it was kicked,
+-- mill four cards".
+--
+-- Drains GameState.pendingEntryEffects, which Pawl.Engine.Event filled.
+-- runPreventionRiders above in every structural respect, and for the same reason:
+-- the module that applies the replacement is below this one and cannot run a
+-- card's effects. Emptied before the effects run, so an entry one of them causes
+-- appends to a fresh queue instead of being re-run here.
+--
+-- Its one caller is Pawl.Engine.Engine.performSettle, which runs it before the
+-- SBA pass and before the trigger scan -- so the Leech's graveyard is four cards
+-- deeper before CR 704.5f reads the power and toughness that graveyard defines.
+-- What that ordering does NOT give is CR 614.1c's own placement, inside the
+-- entry; see GameState.pendingEntryEffects.
+runEntryEffects :: Game ()
+runEntryEffects = do
+  queued <- State.gets GameState.pendingEntryEffects
+  State.modify' (\gs -> gs {GameState.pendingEntryEffects = Seq.empty})
+  Foldable.traverse_ runEntryEffect queued
+
+-- One entered permanent's as-enters effects, in printed order.
+--
+-- `resolving` and `source` are both the permanent, runPreventionRider's posture:
+-- nothing is resolving from the stack, and the permanent is the object every
+-- Filter.IsSource in the effects resolves against. The slot maps are empty
+-- because a static ability targets nothing (CR 115.10a), so there is no chosen
+-- target for an effect to name.
+runEntryEffect :: PendingEntryEffect.PendingEntryEffect -> Game ()
+runEntryEffect pending =
+  Foldable.traverse_
+    ( applyEffect
+        (PendingEntryEffect.object pending)
+        (PendingEntryEffect.object pending)
+        (PendingEntryEffect.controller pending)
+        Map.empty
+        Map.empty
+    )
+    (PendingEntryEffect.effects pending)
 
 -- CR 103.5b / CR 103.6: perform the effects of an action a card grants from a
 -- player's hand. Pawl.Engine.Mulligan's two window loops reach this through the

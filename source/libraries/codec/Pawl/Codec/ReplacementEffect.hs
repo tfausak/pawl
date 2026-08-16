@@ -17,7 +17,8 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 -- the schema.
 --
 -- The effect codec is a PARAMETER rather than an import, for the reason
--- Pawl.Types.DamageR gives: the DamageR arm carries CR 615.5's riders.
+-- Pawl.Types.DamageR gives: the DamageR arm carries CR 615.5's riders and the
+-- EntryR arm CR 614.1c's as-enters effects.
 codec ::
   (Typeable.Typeable effect, Eq effect) =>
   Codec.Codec effect ->
@@ -25,7 +26,7 @@ codec ::
 codec effectCodec =
   Arm.tagged
     [ Arm.payload "ZoneChangeR" ZoneChangeR.codec ReplacementEffect.ZoneChangeR (\x -> case x of ReplacementEffect.ZoneChangeR y -> Just y; _ -> Nothing),
-      Arm.payload "EntryR" EntryR.codec ReplacementEffect.EntryR (\x -> case x of ReplacementEffect.EntryR y -> Just y; _ -> Nothing),
+      Arm.payload "EntryR" (EntryR.codec effectCodec) ReplacementEffect.EntryR (\x -> case x of ReplacementEffect.EntryR y -> Just y; _ -> Nothing),
       Arm.payload "DamageR" (DamageR.codec effectCodec) ReplacementEffect.DamageR (\x -> case x of ReplacementEffect.DamageR y -> Just y; _ -> Nothing),
       Arm.payload "DestructionR" DestructionRewrite.codec ReplacementEffect.DestructionR (\x -> case x of ReplacementEffect.DestructionR y -> Just y; _ -> Nothing),
       Arm.payload "CounterR" CounterR.codec ReplacementEffect.CounterR (\x -> case x of ReplacementEffect.CounterR y -> Just y; _ -> Nothing),

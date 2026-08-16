@@ -1040,6 +1040,7 @@ library types
     Pawl.Types.PayGate
     Pawl.Types.Payment
     Pawl.Types.PaymentDecision
+    Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger
     Pawl.Types.PermanentBecomesDesignated
     Pawl.Types.PermanentSacrificed

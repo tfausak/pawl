@@ -1,5 +1,6 @@
 module Pawl.Types.EntryRewrite where
 
+import qualified Data.Sequence as Seq
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.AsCopy as AsCopy
 import qualified Pawl.Types.EntryOption as EntryOption
@@ -16,7 +17,8 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
 -- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
 -- Bloodbog and Headless Skaab (CR 614.1d); PayLifeOrTapped is Razorgrass Field
--- (CR 614.1c); RevealOrTapped is Rustic Clachan (CR 614.1c).
+-- (CR 614.1c); RevealOrTapped is Rustic Clachan (CR 614.1c); RunEffects is
+-- Monstrous War-Leech (CR 614.1c).
 --
 -- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
 -- makes CR 707.2 fall out with no further machinery -- and CR 707.9b puts
@@ -25,13 +27,16 @@ import qualified Pawl.Types.WithCounters as WithCounters
 -- load-bearing here too: a copied "as [this] enters" ability takes effect, so a
 -- Clone of a Primal Plasma runs the COPIED choice rather than skipping it.
 --
+-- Parametric in the EFFECT, for the reason Pawl.Types.DamageR gives: RunEffects
+-- below carries a card's effects, and neither module may name the other.
+--
 -- SacrificeAnyNumber is the one constructor whose choice COSTS something, and
 -- CR 614.12b's combined budget across permanents entering simultaneously holds
 -- for it without a budget being carried anywhere: the choice is paid for inside
 -- the entry loop that made it, so the next member of the batch cannot choose
 -- what an earlier one already spent (CR 614.13b). Pawl.Engine.Event's arm
 -- states the argument in full and names the board that proves it.
-data EntryRewrite
+data EntryRewrite effect
   = -- | CR 707.5 / 614.1c: "you may have this permanent enter as a copy of ...".
     -- The payload carries WHICH permanents the printed noun phrase admits and CR
     -- 707.9's exceptions to the copying process; see Pawl.Types.AsCopy.
@@ -329,4 +334,29 @@ data EntryRewrite
     -- instant or sorcery face sends the spell to its owner's graveyard instead of
     -- the battlefield (#1547).
     EntersTransformed
+  | -- | CR 614.1c: "As [this permanent] enters, [do something]" -- Monstrous
+    -- War-Leech's "as this creature enters, if it was kicked, mill four cards".
+    -- The one arm that RUNS AN EFFECT, where every arm above changes WHAT THE
+    -- PERMANENT IS as it enters; see #1416.
+    --
+    -- NO CONDITION HERE, and Bloodthirst's arm two over is the contrast that
+    -- explains why. Rule 702.54a's condition is a RULE's, so nothing on a card
+    -- could write it and it is asked in Pawl.Engine.Replacement.admitsEntry;
+    -- "if it was kicked" is the CARD's, so it is written where every other
+    -- card-authored gate on a replacement ability goes -- CR 604.2's clause on
+    -- Pawl.Types.PrintedReplacement, asked by
+    -- Pawl.Engine.Projection.replacementsOf against the entering permanent
+    -- (#1597). One condition mechanism, not two.
+    --
+    -- A Seq of effects and not one, DamageR.riders' position: a printed sentence
+    -- may instruct more than once ("mill four cards, then draw a card"), and the
+    -- order is the printed order.
+    --
+    -- DEFERRED, not run inline, and the queue is the reason this is not simply an
+    -- Event.apply call: Pawl.Engine.Event is below Pawl.Engine.Resolve and cannot
+    -- run a card's effects, exactly as Pawl.Engine.Damage cannot run CR 615.5's
+    -- rider. So the arm enqueues onto GameState.pendingEntryEffects and
+    -- Pawl.Engine.Resolve.runEntryEffects drains it -- see that field for what the
+    -- deferral costs.
+    RunEffects (Seq.Seq effect)
   deriving (Eq, Ord, Show)
