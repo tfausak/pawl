@@ -9771,8 +9771,8 @@ blightPlayerSpec s registry = Spec.describe s "BlightPlayer" $ do
     Spec.assertEqWith s "nor the Morcant itself" (minusCountersOn morcantId after) (Just 0)
   -- Rule 701.68a's "a creature YOU control" is read per BLIGHTER and not once for
   -- the resolution: bob's answer names carol's Wall, which was never offered to
-  -- him, so his own pool's head pays instead -- and carol's Wall stays clean, which
-  -- is what says his answer did not reach across the table.
+  -- him, so the head of his own pool takes the counter instead -- and carol's Wall
+  -- stays clean, which is what says his answer did not reach across the table.
   Spec.it s "CR 701.68a each blighter's pool is their own creatures" $ do
     (_, (aPiker, aWall), (bRats, bWall), (cPiker, cWall), gs) <- morcantBoard s registry S.alice
     let after = S.runPure (blightingFor [(S.bob, cWall), (S.carol, cPiker)]) gs Stack.resolveTop
