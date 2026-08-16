@@ -205,6 +205,14 @@ These have each shipped a green-but-meaningless test in this repository:
   engine's own choice is broken. Pin the answer, and check the assertion
   actually reads the engine's output.
 
+- **An answerer that BUILDS a recipient silently loses the target.** A
+  `Prompt.ChooseTargets` over `Pool.Creatures` offers `Recipient.ToCreature`, so
+  a hand-built `Recipient.ToObject` of the same permanent is a different
+  recipient. The binding is stored and the ability looks correctly targeted; CR
+  608.2b's re-read at resolution then drops it and the resolution applies
+  nothing --- no error, and no failed assertion pointing at the cause. FILTER
+  the offered set instead of constructing a recipient.
+
 - **Two conditions a board cannot tell apart.** Before writing the assertion,
   name the other reading of the rule and check the board distinguishes them ---
   same zone for two different destinations, same timestamp for two layers, the
