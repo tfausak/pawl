@@ -32,7 +32,7 @@ import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.ForEach as ForEach
 import qualified Pawl.Codec.GrantPlayFromExile as GrantPlayFromExile
 import qualified Pawl.Codec.LookAt as LookAt
-import qualified Pawl.Codec.ManaProduction as ManaProduction
+import qualified Pawl.Codec.ManaAddition as ManaAddition
 import qualified Pawl.Codec.Mill as Mill
 import qualified Pawl.Codec.ModifyTarget as ModifyTarget
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
@@ -67,7 +67,7 @@ codec cardCodec =
     [ Arm.payload "DealDamage" DealDamage.codec Effect.DealDamage (\x -> case x of Effect.DealDamage y -> Just y; _ -> Nothing),
       Arm.payload "ModifyTarget" ModifyTarget.codec Effect.ModifyTarget (\x -> case x of Effect.ModifyTarget y -> Just y; _ -> Nothing),
       Arm.payload "ChangeText" ChangeText.codec Effect.ChangeText (\x -> case x of Effect.ChangeText y -> Just y; _ -> Nothing),
-      Arm.payload "AddMana" ManaProduction.codec Effect.AddMana (\x -> case x of Effect.AddMana y -> Just y; _ -> Nothing),
+      Arm.payload "AddMana" ManaAddition.codec Effect.AddMana (\x -> case x of Effect.AddMana y -> Just y; _ -> Nothing),
       Arm.payload "Search" Search.codec Effect.Search (\x -> case x of Effect.Search y -> Just y; _ -> Nothing),
       Arm.nullary "ExileAllGraveyards" Effect.ExileAllGraveyards,
       Arm.nullary "Proliferate" Effect.Proliferate,

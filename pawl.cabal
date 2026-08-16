@@ -310,6 +310,8 @@ library codec
     Pawl.Codec.LookAtSpec
     Pawl.Codec.Loyalty
     Pawl.Codec.LoyaltySpec
+    Pawl.Codec.ManaAddition
+    Pawl.Codec.ManaAdditionSpec
     Pawl.Codec.ManaCost
     Pawl.Codec.ManaCostSpec
     Pawl.Codec.ManaCount
@@ -1011,6 +1013,7 @@ library types
     Pawl.Types.LookAt
     Pawl.Types.Loyalty
     Pawl.Types.Mana
+    Pawl.Types.ManaAddition
     Pawl.Types.ManaCost
     Pawl.Types.ManaCount
     Pawl.Types.ManaFilter

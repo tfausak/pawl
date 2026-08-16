@@ -138,11 +138,13 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colored",
+                          "production": {
+                            "type": "OfType",
                             "value": {
-                              "type": "Blue"
+                              "type": "Colored",
+                              "value": {
+                                "type": "Blue"
+                              }
                             }
                           }
                         }

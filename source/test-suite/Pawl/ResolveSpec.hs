@@ -86,6 +86,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.LifeChange as LifeChange
+import qualified Pawl.Types.ManaAddition as ManaAddition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -586,9 +587,23 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 612 slotsOf finds a ChangeText slot" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
     Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText (ChangeText.MkChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot))) (Map.singleton slot SlotArity.One)
+  -- The card lint's READ side for CR 106.4's recipient: Shizuko, Caller of
+  -- Autumn's "that player" is a slot read, so a payload naming a slot no
+  -- condition binds must look dangling. Asserted here because the pool cannot
+  -- observe it -- Shizuko's own slot IS bound, so the lint passes either way and
+  -- only a card written wrong would notice. A regression fence, not a proof of
+  -- behaviour the pool exercises.
+  Spec.it s "CR 106.4 slotsOf finds the slot an AddMana recipient names" $ do
+    let slot = SlotName.MkSlotName (Text.pack "thatPlayer")
+    Spec.assertEqWith s "a named recipient is a read" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot slot) ManaProduction.AnyColor))) (Map.singleton slot SlotArity.One)
+    Spec.assertEqWith s "and CR 109.5's unwritten one names no slot" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor))) Map.empty
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
-    Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
-    Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
+    Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green))))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
+    Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor))) (Just ManaProduction.AnyColor)
+    -- CR 605.1a asks whether the ability could add mana to "a player's" pool, so a
+    -- recipient the card names is dropped rather than disqualifying: an ability
+    -- that adds to somebody else is still a mana ability.
+    Spec.assertEqWith s "a named recipient is dropped" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) ManaProduction.AnyColor))) (Just ManaProduction.AnyColor)
     Spec.assertEqWith s "damage produces no mana" (ManaAbility.manaProduced (Effect.DealDamage (DealDamage.MkDealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1) Nothing))) Nothing
   Spec.it s "CR 612.1 a text change reaches a Filter carried by an effect" $ do
     -- Boil ("Destroy all Islands") is the first card whose effect selects by

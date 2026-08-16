@@ -20,11 +20,13 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colored",
+                          "production": {
+                            "type": "OfType",
                             "value": {
-                              "type": "Red"
+                              "type": "Colored",
+                              "value": {
+                                "type": "Red"
+                              }
                             }
                           }
                         }
@@ -40,11 +42,13 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colored",
+                          "production": {
+                            "type": "OfType",
                             "value": {
-                              "type": "Green"
+                              "type": "Colored",
+                              "value": {
+                                "type": "Green"
+                              }
                             }
                           }
                         }
@@ -60,11 +64,13 @@
                       {
                         "type": "AddMana",
                         "value": {
-                          "type": "OfType",
-                          "value": {
-                            "type": "Colored",
+                          "production": {
+                            "type": "OfType",
                             "value": {
-                              "type": "White"
+                              "type": "Colored",
+                              "value": {
+                                "type": "White"
+                              }
                             }
                           }
                         }

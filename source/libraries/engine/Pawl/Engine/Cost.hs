@@ -2064,6 +2064,11 @@ tapForMana oid = do
       -- mana pool", not whose) -- and that same player makes the colour choice
       -- and pays the cost. Falls back to owner in the impossible case
       -- lookupObject just proved oid exists but controllerOf returns Nothing.
+      --
+      -- Not implemented: the recipient an AddMana payload may NAME. CR 106.4
+      -- lets a card fill in whose pool, and this path adds the whole yield here
+      -- instead; a resolving ability reads the reference (Resolve's arm). No
+      -- mana ability in the pool names anybody (#1673).
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
       case filter (\option -> Activations.times (manaActivations Map.empty controller oid (ManaOption.cost option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
