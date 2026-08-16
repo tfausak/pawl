@@ -901,8 +901,9 @@ faceNamed n card = List.find (\f -> Face.name f == n) (NonEmpty.toList (Card.fac
 -- Face.mulliganActions and Face.openingHandActions are deliberately NOT
 -- included: neither is part of the spell, and CR 103.5b's and CR 103.6's actions
 -- are performed from the hand rather than cast. Pawl.CardSpec's handActions
--- sweeps them on their own terms -- they declare no target slots -- so leaving
--- them out here costs no lint coverage.
+-- reaches them instead, and holds them to the dataflow rule on their own terms
+-- -- they declare no target slots -- so leaving them out here costs no lint
+-- coverage.
 allEffects :: Face.Face Card.Card -> [Effect Card.Card]
 allEffects face = Modal.allEffects (Face.spell face)
 

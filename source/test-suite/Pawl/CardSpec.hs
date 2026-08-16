@@ -859,7 +859,7 @@ cardResolutionEffects card =
     <> concatMap replacementEffectRiders (Face.replacementEffects card)
 
 -- CR 103.5b and CR 103.6: the actions a face grants from a HAND, one effect list
--- per action. The two fields are exactly the two Pawl.Engine.Mulligan hands to
+-- per action. The two fields are exactly the two Pawl.Engine.Mulligan passes to
 -- handWindow, and hand-maintained with cardResolutionEffects' caveat: a third
 -- pregame window would have to be added here.
 --
@@ -869,8 +869,8 @@ cardResolutionEffects card =
 --
 -- Deliberately NOT folded into cardResolutionEffects: that view answers what the
 -- card RESOLVES, a dozen lints read it, and widening it would change all of them
--- at once for the sake of two fields only the sweeps below and ownBoundSlots
--- care about.
+-- at once for the sake of two fields only the sweep below and ownBoundSlots
+-- read.
 handActions :: Face.Face Card.Type.Card -> [[Effect.Effect Card.Type.Card]]
 handActions card = Face.mulliganActions card <> Face.openingHandActions card
 
