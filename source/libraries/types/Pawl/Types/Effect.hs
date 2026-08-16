@@ -337,11 +337,11 @@ data Effect card
     -- so both arms are pure information.
     --
     -- NO SLOT, where LookAt binds one. Rule 701.20a shows the cards to
-    -- everybody, so this rides Event.reveal and leaves a public
-    -- GameEvent.Revealed behind for a trigger to read; LookAt has nothing
-    -- public to record -- see #1412 -- and its binding is all it leaves. No
-    -- printing in the pool reveals a card and then asks a question about the
-    -- same card, so a binding here would be data nothing reads.
+    -- everybody, so this rides Event.reveal and the public GameEvent.Revealed
+    -- it appends is the whole record; LookAt has nothing public to record --
+    -- see #1412 -- and its binding is all it leaves. No printing in the pool
+    -- reveals a card and then asks a question about that same card, so a
+    -- binding here would be data nothing reads.
     --
     -- Not implemented: rule 701.20a keeps a revealed card revealed "for as long
     -- as necessary", which pawl has nowhere to store -- the event is a moment,
@@ -466,15 +466,15 @@ data Effect card
     -- their hand, and otherwise a +1/+1 counter goes on the exploring permanent
     -- and they MAY put the revealed card into their graveyard.
     --
-    -- ONE opcode rather than a reveal, a card-type condition and a branch. Rule
-    -- 701.44 is part of the rulebook, so reading "is a land card" here is the
-    -- same kind of act as Pawl.Engine.Keyword casing on CR 702's keywords --
-    -- where a general Effect.Reveal plus a condition over the revealed card
-    -- would put a PUBLIC reveal's branch into the card DSL, which rule 701.44a
-    -- states itself and no other printing needs. The LookAt arm above is the
-    -- private counterpart, and its branch does live in the card: rule 701.20e's
-    -- look is not a keyword action at all, so there is no rulebook sentence to
-    -- read the branch off.
+    -- ONE opcode rather than the Reveal arm above, a card-type condition and a
+    -- branch. Rule 701.44 is part of the rulebook, so reading "is a land card"
+    -- here is the same kind of act as Pawl.Engine.Keyword casing on CR 702's
+    -- keywords -- where spelling explore out of Reveal plus a condition over the
+    -- revealed card would put a PUBLIC reveal's branch into the card DSL, which
+    -- rule 701.44a states itself and no other printing needs. The LookAt arm is
+    -- the private counterpart, and its branch does live in the card: rule
+    -- 701.20e's look is not a keyword action at all, so there is no rulebook
+    -- sentence to read the branch off.
     --
     -- An ObjectRef and not a bare slot, for PutCounters' reason: Merfolk
     -- Branchwalker's "it explores" is `InSlot Binding.triggerSource` and Map's
