@@ -21,7 +21,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
       ( SpellCast.MkSpellCast
           { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
             SpellCast.scope = TurnScope.EachTurn,
-            SpellCast.zone = Nothing
+            SpellCast.zone = Nothing,
+            SpellCast.ordinal = Nothing
           }
       )
       """ {"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"EachTurn"}} """
@@ -34,7 +35,8 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
       ( SpellCast.MkSpellCast
           { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
             SpellCast.scope = TurnScope.OpponentsTurn,
-            SpellCast.zone = Nothing
+            SpellCast.zone = Nothing,
+            SpellCast.ordinal = Nothing
           }
       )
       """ {"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"OpponentsTurn"}} """
@@ -47,8 +49,23 @@ spec s = Spec.describe s "Pawl.Codec.SpellCast" $ do
       ( SpellCast.MkSpellCast
           { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
             SpellCast.scope = TurnScope.EachTurn,
-            SpellCast.zone = Just Zone.Hand
+            SpellCast.zone = Just Zone.Hand,
+            SpellCast.ordinal = Nothing
           }
       )
       """ {"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"EachTurn"},"zone":{"type":"Hand"}} """
+  -- Clarion Spirit's "your second spell each turn". The ordinal is ELIDED when
+  -- absent, which the three cases above pin; here it is written.
+  Spec.it s "MkSpellCast, a window naming which cast of the turn" $
+    Common.assertCodec
+      s
+      SpellCast.codec
+      ( SpellCast.MkSpellCast
+          { SpellCast.filter = Filter.ControlledBy PlayerRelation.You,
+            SpellCast.scope = TurnScope.EachTurn,
+            SpellCast.zone = Nothing,
+            SpellCast.ordinal = Just 2
+          }
+      )
+      """ {"filter":{"type":"ControlledBy","value":{"type":"You"}},"scope":{"type":"EachTurn"},"ordinal":2} """
   Spec.it s "has a schema" $ Common.assertHasSchema s SpellCast.codec
