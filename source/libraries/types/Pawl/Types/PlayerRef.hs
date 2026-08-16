@@ -64,11 +64,19 @@ data PlayerRef
     -- Pawl.Engine.Count.playersFor, which holds no candidate and answers Nothing
     -- for it.
     --
-    -- Undeterminable ANYWHERE ELSE, deliberately: an evaluation aimed at an
-    -- object or at nothing has no candidate player, so a card writing this
-    -- outside a Scope.OverPlayers fold's per-member quantity reads Nothing and
-    -- its effect does nothing. That is the honest answer rather than a silent
-    -- substitution of "you".
+    -- The OTHER candidate a card may mean is the player a per-player instruction
+    -- is currently applying to -- Shahrazad's "each player who doesn't win loses
+    -- half THEIR life", Nature's Resurgence's "each creature card in THEIR
+    -- graveyard". Same word, because it is the same question with no view to hand,
+    -- and Pawl.Engine.Quantity.forCandidate answers it by substitution before the
+    -- fold runs: at the quantity's own references and at a nested count's SCOPE,
+    -- never at that count's per-member quantity, which the fold below still
+    -- supplies its own candidate for.
+    --
+    -- Undeterminable ANYWHERE ELSE, deliberately: an evaluation aimed at an object
+    -- or at nothing has no candidate player, so a card writing this outside those
+    -- two positions reads Nothing and its effect does nothing. That is the honest
+    -- answer rather than a silent substitution of "you".
     Candidate
   | -- | CR 108.4 / 110.2: the CONTROLLER of the object a slot names --
     -- Spikeshell Harrier's "return target creature or Vehicle an opponent

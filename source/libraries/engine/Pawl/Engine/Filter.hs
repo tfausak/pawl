@@ -381,19 +381,18 @@ data Context = MkContext
     defendingPlayer :: Maybe PlayerId.PlayerId,
     -- The player the surrounding effect is CURRENTLY BEING APPLIED TO, for the one
     -- atom that asks (ControlledByRecipient) -- Biorhythm's "the number of
-    -- creatures they control". Supplied by the caller for defendingPlayer's
-    -- reason, and by one caller: Pawl.Engine.Resolve's SetLifeTotal arm, which
-    -- re-evaluates its quantity once per recipient with this field pointed at each
-    -- in turn.
+    -- creatures they control", Stronghold Discipline's "1 life for each creature
+    -- they control". Supplied by the caller for defendingPlayer's reason, and by
+    -- one caller: Pawl.Engine.Resolve's evaluateForRecipient, which every
+    -- per-player opcode evaluates its amount through, once per recipient with this
+    -- field pointed at each in turn.
     --
     -- NOT `perspective` re-pointed, which would be the cheap version of the same
     -- thing and a wrong one: CR 109.5's "you" is the resolving spell's controller
     -- for the whole quantity, so a card reading both "they control" and "you
     -- control" in one sentence needs the two to disagree.
     --
-    -- Nothing wherever the atom cannot appear, which is everywhere else. Not
-    -- implemented: any other per-player opcode filling it, so no card may write a
-    -- per-recipient amount for a life loss, a gain, a draw or a speed (#1427).
+    -- Nothing wherever the atom cannot appear, which is everywhere else.
     recipient :: Maybe PlayerId.PlayerId,
     -- The objects the surrounding resolution's LEGAL slots name, for
     -- Quantity.AgainstSlot to aim an evaluation at one (CR 608.2b keeps an

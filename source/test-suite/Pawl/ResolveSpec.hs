@@ -3983,6 +3983,104 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
     Spec.assertEqWith s "bob is at 0" (S.lifeOf S.bob after) (Just 0)
     Spec.assertEqWith s "and alice wins" (GameState.result (S.settleSba after)) (Just (Result.Won S.alice))
 
+-- A per-player amount that is a number of the RECIPIENT'S OWN, on two opcodes
+-- and through the two spellings of that reading:
+--
+--   * Stronghold Discipline, {2}{B}{B} Sorcery: "Each player loses 1 life for
+--     each creature they control." Effect.LoseLife over a count filtered by
+--     Filter.ControlledByRecipient -- CR 110.2's CONTROL, read over the shared
+--     battlefield (CR 400.1), which no per-seat scope can express (#161).
+--   * Nature's Resurgence, {2}{G}{G} Sorcery: "Each player draws a card for each
+--     creature card in their graveyard." Effect.Draw over a count whose SCOPE is
+--     the recipient's own graveyard -- PlayerRef.Candidate, substituted by
+--     Quantity.forCandidate, which is the half a nested Count used to be left out
+--     of.
+--
+-- Three seats taking three DIFFERENT amounts in each case, because a board where
+-- two of them take the same number cannot tell a per-recipient reading from one
+-- evaluation shared by the table. alice, the CONTROLLER, is one of the three:
+-- "each player" reaches her, and handing everyone the controller's number is
+-- exactly the error being excluded.
+--
+-- Both cards are mandatory and targetless, so no prompt is raised during either
+-- resolution and no answerer can repair a mutated reading.
+perRecipientAmountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+perRecipientAmountSpec s registry =
+  let castAndResolve spellId gs =
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+         in S.runPure S.identityAnswer cast Stack.resolveTop
+      addPikers piker pid n gs = List.foldl' (\board _ -> snd (S.addCreature piker pid board)) gs [1 .. n :: Int]
+      addGraves printing pid n gs = List.foldl' (\board _ -> snd (S.addGraveyardCard printing pid board)) gs [1 .. n :: Int]
+      at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+      -- alice controls 3 Pikers, bob 2 and carol 1, on life totals 20, 17 and 13
+      -- -- distinct counts against distinct totals, so no seat's answer is any
+      -- other seat's and none of them is a total either. The Swamps are alice's
+      -- {2}{B}{B}; a land is not a creature, so they do not enter the count.
+      disciplineBoard = do
+        swamp <- S.printingOf s registry "Swamp"
+        piker <- S.printingOf s registry "Goblin Piker"
+        discipline <- S.printingOf s registry "Stronghold Discipline"
+        let withLands = S.landsFor swamp S.alice 4 S.threePlayerGame
+            withCreatures = addPikers piker S.bob 2 (addPikers piker S.alice 3 withLands)
+            (carolPiker, withCarol) = S.addCreature piker S.carol withCreatures
+            lifed = withCarol {GameState.players = at S.alice 20 (at S.bob 17 (at S.carol 13 (GameState.players withCarol)))}
+            (gs, spellId) = S.handOne discipline lifed
+        pure (carolPiker, spellId, gs)
+      -- `aliceCreatures` is the one dial. bob's graveyard holds 2 creature cards
+      -- and carol's 3; alice's holds a FOREST as well, which is a card in the
+      -- graveyard and not a creature card, so a count that dropped the filter
+      -- would give her one too many. Every library is stocked well past the
+      -- deepest draw, so CR 104.3c takes nobody.
+      resurgenceBoard aliceCreatures = do
+        forest <- S.printingOf s registry "Forest"
+        piker <- S.printingOf s registry "Goblin Piker"
+        resurgence <- S.printingOf s registry "Nature's Resurgence"
+        let withLands = S.landsFor forest S.alice 4 S.threePlayerGame
+            graved = addGraves piker S.carol 3 (addGraves piker S.bob 2 (addGraves piker S.alice aliceCreatures withLands))
+            withFiller = snd (S.addGraveyardCard forest S.alice graved)
+            stocked = List.foldl' (\board pid -> stockLibrary piker pid 8 board) withFiller [S.alice, S.bob, S.carol]
+            (gs, spellId) = S.handOne resurgence stocked
+        pure (spellId, gs)
+   in Spec.describe s "PerRecipientAmount" $ do
+        Spec.it s "CR 119.3 Stronghold Discipline charges each player for their OWN creatures" $ do
+          (_carolPiker, spellId, gs) <- disciplineBoard
+          let after = castAndResolve spellId gs
+          Spec.assertEqWith s "alice, controlling 3, went 20 -> 17" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "bob, controlling 2, went 17 -> 15 -- not alice's 3" (S.lifeOf S.bob after) (Just 15)
+          Spec.assertEqWith s "carol, controlling 1, went 13 -> 12" (S.lifeOf S.carol after) (Just 12)
+          Spec.assertEqWith s "three losses, each the payer's own count" (lifeLosses after) [(S.alice, 3), (S.bob, 2), (S.carol, 1)]
+        -- The control twin, differing in ONE thing: carol's Piker is under bob's
+        -- control. She still OWNS it, so an amount read off the owner-sliced
+        -- battlefield would leave both their answers where they were; CR 110.2's
+        -- control is what moves the 1 from carol to bob.
+        Spec.it s "CR 110.2 the control: a creature carol owns but bob controls is charged to BOB" $ do
+          (carolPiker, spellId, gs0) <- disciplineBoard
+          let gs = S.giveControl carolPiker S.bob gs0
+              after = castAndResolve spellId gs
+          Spec.assertEqWith s "alice is unmoved at 17" (S.lifeOf S.alice after) (Just 17)
+          Spec.assertEqWith s "bob, now controlling 3, went 17 -> 14" (S.lifeOf S.bob after) (Just 14)
+          Spec.assertEqWith s "carol, controlling nothing, keeps her 13" (S.lifeOf S.carol after) (Just 13)
+          Spec.assertEqWith s "and CR 119.9 leaves her out of the log entirely" (lifeLosses after) [(S.alice, 3), (S.bob, 3)]
+          Spec.assertEqWith s "the Piker is still carol's card" (fmap Object.owner (Game.lookupObject carolPiker after)) (Just S.carol)
+        Spec.it s "CR 121.2 Nature's Resurgence draws each player their OWN graveyard's creatures" $ do
+          (spellId, gs) <- resurgenceBoard 1
+          let after = castAndResolve spellId gs
+          Spec.assertEqWith s "alice drew 1: one creature card, and the Forest is not one" (S.handSize S.alice after) 1
+          Spec.assertEqWith s "bob drew 2 -- not alice's 1" (S.handSize S.bob after) 2
+          Spec.assertEqWith s "carol drew 3" (S.handSize S.carol after) 3
+          Spec.assertEqWith s "and each library is shorter by exactly that many" (fmap (\pid -> length (Game.zoneMembers Zone.Library pid after)) [S.alice, S.bob, S.carol]) [7, 6, 5]
+        -- The control twin, differing in ONE thing: alice's graveyard holds four
+        -- creature cards instead of one. Only her draw moves -- a reading that
+        -- evaluated once from the controller's graveyard would move all three
+        -- from 1/1/1 to 4/4/4.
+        Spec.it s "CR 400.1 the control: alice's own graveyard grows, and nobody else's draw moves" $ do
+          (spellId, gs) <- resurgenceBoard 4
+          let after = castAndResolve spellId gs
+          Spec.assertEqWith s "alice drew 4" (S.handSize S.alice after) 4
+          Spec.assertEqWith s "bob still drew 2" (S.handSize S.bob after) 2
+          Spec.assertEqWith s "carol still drew 3" (S.handSize S.carol after) 3
+          Spec.assertEqWith s "and the libraries agree" (fmap (\pid -> length (Game.zoneMembers Zone.Library pid after)) [S.alice, S.bob, S.carol]) [4, 6, 5]
+
 -- Mirror Universe (Legends) on alice's battlefield, in her own upkeep, with the
 -- three seats at three DIFFERENT life totals: "{T}, Sacrifice this artifact:
 -- Exchange life totals with target opponent. Activate only during your upkeep."
@@ -9212,6 +9310,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   aetherspoutsSpec s registry
   drawCardSpec s registry
   loseLifeSpec s registry
+  perRecipientAmountSpec s registry
   exchangeLifeTotalsSpec s registry
   setLifeTotalSpec s registry
   redistributeLifeTotalsSpec s registry

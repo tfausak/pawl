@@ -352,9 +352,11 @@ playersFor context gs ref =
         -- The fold's own candidate, which this function cannot answer: it holds
         -- no view, and the candidate is a fact about the member being read
         -- rather than about the board. Pawl.Engine.Quantity answers it where the
-        -- view is, so what reaches here is a reference in a position that has no
-        -- candidate at all -- a Scope naming it, or a ManaCount -- and Nothing is
-        -- the honest answer for those.
+        -- view is, and Quantity.forCandidate substitutes it in a SCOPE before the
+        -- fold runs, for the recipient a per-player instruction has reached
+        -- (Nature's Resurgence). So what reaches here is a reference in a position
+        -- with no candidate of either kind -- a scope outside such an instruction,
+        -- or a ManaCount -- and Nothing is the honest answer for those.
         PlayerRef.Candidate -> Nothing
         -- The controller of a bound OBJECT, which this function cannot answer
         -- either: CR 613.1b's layer 2 decides who controls a permanent, and

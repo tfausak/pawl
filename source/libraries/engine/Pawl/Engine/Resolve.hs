@@ -2408,6 +2408,46 @@ effectContext controller source legal =
     . Map.mapMaybe Recipient.objectOf
     $ Map.mapMaybe Binding.onlyOne legal
 
+-- The amount ONE RECIPIENT of a per-player instruction reads, which need not be
+-- the amount the rest of the table reads: Stronghold Discipline's "each player
+-- loses 1 life for each creature they control" gives three seats three answers,
+-- where Vision Skeins' literal gives one number to the whole table. Every opcode
+-- naming a set of players and an amount evaluates through here, once per
+-- recipient, so what "their own" means is stated once rather than opted into arm
+-- by arm.
+--
+-- Two spellings, because a card asks two different questions:
+--
+--   * Filter.Context's `recipient`, which Filter.ControlledByRecipient reads --
+--     CR 110.2's control over the SHARED battlefield, which no per-seat scope can
+--     express (#161).
+--   * Quantity.forCandidate, which substitutes PlayerRef.Candidate -- a scalar of
+--     the recipient's own (Shahrazad's "half their life") and the per-player zone
+--     a count folds (Nature's Resurgence's "their graveyard", CR 400.1).
+--
+-- Both are no-ops for a quantity naming neither, which is every other per-player
+-- amount in the pool. So the loop is not a departure from CR 608.2f's single
+-- determination: every recipient's amount is read off the SAME pre-effect
+-- GameState the caller took, and only a quantity that names the recipient can
+-- tell the readings apart.
+evaluateForRecipient ::
+  (ObjectId -> Maybe Filter.View) ->
+  Filter.Context ->
+  GameState ->
+  ObjectId ->
+  ObjectId ->
+  PlayerId ->
+  Quantity.Type.Quantity ->
+  Maybe Integer
+evaluateForRecipient viewOf context gs announcedOn source pid quantity =
+  Quantity.evaluateFor
+    viewOf
+    (context {Filter.recipient = Just pid})
+    gs
+    announcedOn
+    source
+    (Quantity.forCandidate pid quantity)
+
 -- One effect, applied, wrapped in the window CR 607.2a's link is filed from: what
 -- was in exile before, and what is in it after. The effect itself is
 -- applyOneEffect below, whose comment documents every parameter.
@@ -2542,6 +2582,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
           -- is processed simultaneously" is what Corrosive Gale's "each creature
           -- with flying" needs, and applyDamage is the funnel that keeps it (its
           -- haddock carries the CR 615/616 reading of a batch).
+          --
+          -- Not implemented: the amount is read once for that batch, so a number
+          -- that is each recipient's own -- Acidic Soil's "equal to the number of
+          -- lands they control", which evaluateForRecipient gives every opcode
+          -- taking a PlayerRef -- cannot be written here (#1658).
           Damage.applyDamage (fmap (\recipient -> Damage.damageEvent gs DamageKind.Noncombat dealt recipient (Integer.toNaturalSaturating n)) recipients)
           -- CR 615.5's "immediately afterward", for damage a resolution deals:
           -- a shield this damage spent runs its additional effect here, inside
@@ -3582,15 +3627,20 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Drawing for one was never a no-op: CR 800.4a took their library with
         -- them, so drawCard would write drewFromEmpty for a player not in the game.
         drawers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n
-        | n > 0 ->
-            -- CR 121.2: draw n one at a time, folding the shared primitive so each
-            -- draw re-reads the library top and the CR 104.3c empty-library loss is
-            -- preserved.
-            Monad.forM_ drawers $ \pid ->
+    -- PER DRAWER (evaluateForRecipient): Nature's Resurgence's "each player draws
+    -- a card for each creature card in their graveyard" is a different number for
+    -- each of them, and the draws do not disturb it -- every amount is read off
+    -- the same pre-effect `gs`, so a seat drawing first cannot change what a later
+    -- seat draws.
+    Monad.forM_ drawers $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        Just n
+          | n > 0 ->
+              -- CR 121.2: draw n one at a time, folding the shared primitive so each
+              -- draw re-reads the library top and the CR 104.3c empty-library loss is
+              -- preserved.
               Monad.replicateM_ (Integer.toIntSaturating n) (Event.drawCard pid)
-      _ -> pure ()
+        _ -> pure ()
   Effect.Mill (Mill.MkMill ref quantity mTally) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -3602,9 +3652,17 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- CR 701.17/701.17b: top min(n, library) of each miller's library. A
         -- short library mills what there is, which is why the tally below counts
         -- THESE cards rather than the number the quantity asked for.
-        milledBy = case Quantity.evaluateFor viewOf context gs resolving source quantity of
-          Just n | n > 0 -> fmap (\pid -> (pid, List.genericTake n (Game.zoneMembers Zone.Library pid gs))) millers
-          _ -> []
+        --
+        -- The count is PER MILLER (evaluateForRecipient), off the one pre-effect
+        -- `gs` every batch is taken from, so "half their library" would read each
+        -- miller's own.
+        milledBy =
+          Maybe.mapMaybe
+            ( \pid -> case evaluateForRecipient viewOf context gs resolving source pid quantity of
+                Just n | n > 0 -> Just (pid, List.genericTake n (Game.zoneMembers Zone.Library pid gs))
+                _ -> Nothing
+            )
+            millers
         milled = concatMap snd milledBy
     -- Funnelled so each move mints a new incarnation, and then recorded as the
     -- mill it was (CR 701.17a). The GameEvent.Milled entry is what a later
@@ -3694,11 +3752,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- ORDER, `named` the MEMBERSHIP. Each scryer's cards then move before
         -- the next is asked, rather than all of them moving together (#1340).
         scryers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      -- CR 701.22b: scry 0 is not a scry at all, so a quantity of zero reaches
-      -- no player and raises no prompt.
-      Just n | n > 0 -> Monad.forM_ scryers (scryOne n)
-      _ -> pure ()
+    -- Per scryer, Draw's posture and for its reason: a card naming a number of
+    -- the scryer's own would read each one's, and nothing else can tell the loop
+    -- from a single evaluation.
+    Monad.forM_ scryers $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        -- CR 701.22b: scry 0 is not a scry at all, so a quantity of zero reaches
+        -- no player and raises no prompt.
+        Just n | n > 0 -> scryOne n pid
+        _ -> pure ()
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -3708,10 +3770,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- in (CR 101.4, rule 701.25 stating no order of its own).
         named = playerRefPlayers legal controller gs ref
         surveillers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      -- CR 701.25c: surveil 0 is not a surveil at all.
-      Just n | n > 0 -> Monad.forM_ surveillers (surveilOne n)
-      _ -> pure ()
+    Monad.forM_ surveillers $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        -- CR 701.25c: surveil 0 is not a surveil at all.
+        Just n | n > 0 -> surveilOne n pid
+        _ -> pure ()
   Effect.Fateseal (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -3721,11 +3784,12 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- choice fatesealOne makes below.
         named = playerRefPlayers legal controller gs ref
         fatesealers = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      -- Zero reaches no library, so there is nothing to look at and nobody to
-      -- ask. Rule 701.29 states no zero case of its own, unlike CR 701.22b.
-      Just n | n > 0 -> Monad.forM_ fatesealers (fatesealOne source n)
-      _ -> pure ()
+    Monad.forM_ fatesealers $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        -- Zero reaches no library, so there is nothing to look at and nobody to
+        -- ask. Rule 701.29 states no zero case of its own, unlike CR 701.22b.
+        Just n | n > 0 -> fatesealOne source n pid
+        _ -> pure ()
   Effect.Explore ref -> do
     gs <- State.get
     -- CR 608.2c: the set is swept as this instruction is reached, and an illegal
@@ -3739,7 +3803,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         context = effectContext controller source legal
     case legalOne slot legal of
       Just (Recipient.ToPlayer target) ->
-        case Quantity.evaluateFor viewOf context gs resolving source quantity of
+        -- One recipient, so the loop above is the identity here -- but the
+        -- READING is the same one, so "discards cards equal to the number of
+        -- creatures they control" would be answered against the discarding player
+        -- rather than against the controller.
+        case evaluateForRecipient viewOf context gs resolving source target quantity of
           Just n
             | n > 0 -> do
                 let held = Game.zoneMembers Zone.Hand target gs
@@ -3791,17 +3859,16 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- state-based actions only as a player would get priority, so no life
         -- total is observable between one adjustment and the next.
         losers = playerRefPlayers legal controller gs ref
-    -- PER PAYER, not once: Shahrazad's "each player who doesn't win the subgame
-    -- loses half THEIR life, rounded up" reads a different number for each of
-    -- them, off that player's own life total. Quantity.forCandidate is what makes
-    -- the reading per-player, and it changes nothing for a quantity that does not
-    -- name PlayerRef.Candidate -- every other LoseLife in the pool.
+    -- PER PAYER, not once (evaluateForRecipient): Shahrazad's "each player who
+    -- doesn't win the subgame loses half THEIR life, rounded up" reads each
+    -- payer's own life total, and Stronghold Discipline's "1 life for each
+    -- creature they control" each payer's own board.
     --
     -- Every payer's number is read off the SAME `gs`, so the amounts are the life
     -- totals as the effect began rather than as the previous payer left them --
     -- which is the unordered footing the comment above already rests on.
     Monad.forM_ losers $ \pid ->
-      case Quantity.evaluateFor viewOf context gs resolving source (Quantity.forCandidate pid quantity) of
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
         Just n
           | n > 0 ->
               -- CR 119.3: the life total is simply adjusted, directly on the
@@ -3815,13 +3882,14 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror in every respect but the sign. The
   -- comments above apply verbatim: same `viewWithLastKnown` reading, same
-  -- unordered adjustment, same direct write to the player record, and the same CR
-  -- 608.2i record appended alongside it. Two differences: nothing in CR 704.5
-  -- follows a gain -- CR 704.5a fires on "0 or less life", which a gain cannot
-  -- reach -- and the quantity is evaluated ONCE for the whole set rather than per
-  -- gainer, since no card in the pool writes a gain whose amount is read against
-  -- each gainer (PlayerRef.Candidate). Shahrazad is what asks that of the loss
-  -- side; the two arms should converge at the first card that asks it here.
+  -- unordered adjustment, same direct write to the player record, the same CR
+  -- 608.2i record appended alongside it, and the same per-gainer reading through
+  -- evaluateForRecipient. One difference: nothing in CR 704.5 follows a gain --
+  -- CR 704.5a fires on "0 or less life", which a gain cannot reach.
+  --
+  -- No card in the pool writes a gain whose amount is each gainer's own, so the
+  -- per-gainer reading here is a regression fence rather than proven behaviour.
+  -- Stronghold Discipline proves it one arm over, through the same funnel.
   --
   -- The `n > 0` guard is CR 119.9's in as many words: "if a player gains 0 life,
   -- no life gain event has occurred". Here it is load-bearing rather than tidy --
@@ -3832,11 +3900,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
         gainers = playerRefPlayers legal controller gs ref
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n
-        | n > 0 ->
-            Monad.forM_ gainers (\pid -> changeLife pid n)
-      _ -> pure ()
+    Monad.forM_ gainers $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        Just n
+          | n > 0 -> changeLife pid n
+        _ -> pure ()
   -- CR 701.12c: the two sides reach each other's PREVIOUS total, so both deltas
   -- are read off the same game state before either is written -- a sequential
   -- "set this one to that one's, then that one to this one's" would leave both on
@@ -3899,7 +3967,8 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   -- the whole table. Which recipient the evaluation has reached rides in
   -- Filter.Context's `recipient`, and Filter.ControlledByRecipient is the one atom
   -- that reads it; a quantity naming no such atom cannot tell the loop from a
-  -- single evaluation.
+  -- single evaluation. Through evaluateForRecipient, which every per-player arm
+  -- shares -- this one was where the reading started.
   --
   -- Every evaluation and every delta is read off `gs`, the state BEFORE any life
   -- moves (CR 608.2f) -- ExchangeLifeTotals' posture -- so the deltas cannot see
@@ -3932,7 +4001,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         -- Asked per recipient rather than for the effect as a whole, which is what
         -- a per-recipient number means -- one seat's unanswerable count leaves
         -- that seat alone and says nothing about the others.
-        Monad.forM_ (Quantity.evaluateFor viewOf (context {Filter.recipient = Just pid}) gs resolving source quantity) $ \total ->
+        Monad.forM_ (evaluateForRecipient viewOf context gs resolving source pid quantity) $ \total ->
           changeLife pid (total - Player.life player)
   -- Reverse the Sands: "Redistribute any number of players' life totals. (Each of
   -- those players gets one life total back.)" CR 119.7 and CR 119.8 name the
@@ -4010,15 +4079,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
         revving = playerRefPlayers legal controller gs ref
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n
-        | n > 0 ->
-            let by :: Natural
-                by = Integer.toNaturalSaturating n
-                faster p = p {Player.speed = Just (maybe by (+ by) (Player.speed p))}
-             in Monad.forM_ revving $ \pid ->
-                  State.modify' (\g -> g {GameState.players = Map.adjust faster pid (GameState.players g)})
-      _ -> pure ()
+    Monad.forM_ revving $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        Just n
+          | n > 0 ->
+              let by :: Natural
+                  by = Integer.toNaturalSaturating n
+                  faster p = p {Player.speed = Just (maybe by (+ by) (Player.speed p))}
+               in State.modify' (\g -> g {GameState.players = Map.adjust faster pid (GameState.players g)})
+        _ -> pure ()
   -- CR 702.179 / Spikeshell Harrier: each named player's speed drops by this
   -- much, never below the floor the CARD prints. The mirror of the arm above, and
   -- deliberately NOT its negation:
@@ -4049,13 +4118,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         context = effectContext controller source legal
         slowing = playerRefPlayers chosen controller gs (SpeedDecrease.player d)
         atLeast = toInteger (SpeedDecrease.floor d)
-    case Quantity.evaluateFor viewOf context gs resolving source (SpeedDecrease.quantity d) of
-      Just n
-        | n > 0 ->
-            let slower p = p {Player.speed = fmap (\was -> Integer.toNaturalSaturating (max atLeast (toInteger was - n))) (Player.speed p)}
-             in Monad.forM_ slowing $ \pid ->
-                  State.modify' (\g -> g {GameState.players = Map.adjust slower pid (GameState.players g)})
-      _ -> pure ()
+    Monad.forM_ slowing $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid (SpeedDecrease.quantity d) of
+        Just n
+          | n > 0 ->
+              let slower p = p {Player.speed = fmap (\was -> Integer.toNaturalSaturating (max atLeast (toInteger was - n))) (Player.speed p)}
+               in State.modify' (\g -> g {GameState.players = Map.adjust slower pid (GameState.players g)})
+        _ -> pure ()
   -- CR 701.21a: the slot's target player sacrifices `quantity` permanents
   -- matching the filter, and THAT PLAYER chooses which -- the whole difference
   -- between this and Sacrifice above.
@@ -4069,7 +4138,11 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         context = effectContext controller source legal
     case legalOne slot legal of
       Just (Recipient.ToPlayer victim) ->
-        case Quantity.evaluateFor viewOf context gs resolving source quantity of
+        -- Read against the VICTIM (evaluateForRecipient), Discard's posture and
+        -- for its reason: one recipient makes the loop the identity, but "half the
+        -- permanents they control" is still a number of the sacrificing player's
+        -- own rather than the controller's.
+        case evaluateForRecipient viewOf context gs resolving source victim quantity of
           Just n
             | n > 0 -> do
                 -- Candidates are what the VICTIM controls, ascending, so both the
@@ -5020,9 +5093,10 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
         context = effectContext controller source legal
         named = playerRefPlayers legal controller gs ref
         blighters = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
-      Just n -> Monad.forM_ blighters (\pid -> Monad.void (Blight.blight pid resolving (Integer.toNaturalSaturating n)))
+    Monad.forM_ blighters $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
+        Just n -> Monad.void (Blight.blight pid resolving (Integer.toNaturalSaturating n))
   -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
   -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
   -- this arm knows only that some effect asked for it, exactly as the arms around
@@ -5035,32 +5109,33 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
         recipients = playerRefPlayers legal controller gs ref
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n
-        | n > 0 ->
-            -- CR 122 / 107.14: ONE evaluation for the whole set (CR 608.2f), then
-            -- CR 122.6's funnel per recipient -- PutCounters' posture above, so a
-            -- counter-scaling replacement (Vorinclex, Monstrous Raider) gets its
-            -- CR 614 opportunity against each player's gain.
-            Monad.forM_ recipients $ \pid ->
-              Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind (Integer.toNaturalSaturating n))
-      _ -> pure ()
+    -- CR 122 / 107.14: the amount read per recipient (evaluateForRecipient, off
+    -- the one pre-effect `gs`), then CR 122.6's funnel per recipient -- the second
+    -- half is PutCounters' posture above, so a counter-scaling replacement
+    -- (Vorinclex, Monstrous Raider) gets its CR 614 opportunity against each
+    -- player's gain. The first half is not: PutCounters places on OBJECTS, which
+    -- no reference names one of the way a recipient names a player.
+    Monad.forM_ recipients $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        Just n
+          | n > 0 -> Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind (Integer.toNaturalSaturating n))
+        _ -> pure ()
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters ref kind quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
         recipients = playerRefPlayers legal controller gs ref
-    case Quantity.evaluateFor viewOf context gs resolving source quantity of
-      Just n
-        | n > 0 ->
-            -- CR 122: the mirror of GainPlayerCounters above, off the player
-            -- record directly and through no funnel, for the reason
-            -- Effect.RemoveCounters gives: CR 614 replaces a placement, and
-            -- nothing in it replaces a removal. Natural subtraction would
-            -- underflow, so the floor is explicit -- a player with fewer counters
-            -- than the effect removes ends at none, which is what "removes one rad
-            -- counter from themselves" of a player who has none means.
-            Monad.forM_ recipients $ \pid ->
+    Monad.forM_ recipients $ \pid ->
+      case evaluateForRecipient viewOf context gs resolving source pid quantity of
+        Just n
+          | n > 0 ->
+              -- CR 122: the mirror of GainPlayerCounters above, off the player
+              -- record directly and through no funnel, for the reason
+              -- Effect.RemoveCounters gives: CR 614 replaces a placement, and
+              -- nothing in it replaces a removal. Natural subtraction would
+              -- underflow, so the floor is explicit -- a player with fewer counters
+              -- than the effect removes ends at none, which is what "removes one rad
+              -- counter from themselves" of a player who has none means.
               State.modify'
                 ( \g ->
                     g
@@ -5071,7 +5146,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
                             (GameState.players g)
                       }
                 )
-      _ -> pure ()
+        _ -> pure ()
   Effect.Tap ref ->
     State.modify' $ \gs ->
       -- CR 701.26a: turn each named permanent sideways. The exact mirror of the

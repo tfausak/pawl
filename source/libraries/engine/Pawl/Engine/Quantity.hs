@@ -701,7 +701,7 @@ bakeBound players =
     -- Aggregation.Greatest's per-member quantity may hide a reference of its own.
     -- Terminating for evaluate's reason -- a Greatest's payload is a strictly
     -- smaller subterm.
-    (\c -> (Count.mapQuantity (bakeBound players) c) {Count.Type.scope = bakeScope players (Count.Type.scope c)})
+    (\c -> (Count.mapQuantity (bakeBound players) c) {Count.Type.scope = mapScope (bakePlayerRef players) (Count.Type.scope c)})
 
 -- The player a per-player instruction is CURRENTLY applying to, substituted for
 -- Pawl.Types.PlayerRef.Candidate -- Shahrazad's "each player who doesn't win the
@@ -714,12 +714,22 @@ bakeBound players =
 -- question with no view to hand, so it is answered by substitution instead --
 -- which is exactly bakeBound's move, one reference over.
 --
--- A NESTED Count IS LEFT ALONE, unlike bakeBound's, and that is the point of the
--- parameter: a Scope.OverPlayers fold supplies its own candidate, so substituting
--- this one inside would make "the highest life total among your opponents" read
--- the payer's life in every member.
+-- A nested Count's SCOPE is substituted and its PER-MEMBER QUANTITY is not, which
+-- is the point of the parameter. The two halves ask different questions:
+--
+--   * a scope names whose copy of a per-player zone the fold reads (CR 400.1) --
+--     Nature's Resurgence's "each creature card in THEIR graveyard" is that
+--     reference, and Count.playersFor answers a bare candidate with Nothing;
+--   * a per-member quantity is read against the member the fold has reached, so
+--     substituting this candidate inside would make Malignus' "the highest life
+--     total among your opponents" read the recipient's life in every member.
+--
+-- Control is the question this reference cannot ask: the battlefield is shared
+-- (CR 400.1) and Game.zoneMembers slices it by OWNER (#161), so "each creature
+-- THEY CONTROL" is Filter.ControlledByRecipient off Filter.Context's recipient
+-- instead. Pawl.Engine.Resolve.evaluateForRecipient supplies both.
 forCandidate :: PlayerId.PlayerId -> Quantity -> Quantity
-forCandidate pid = mapPlayerRefs substitute id
+forCandidate pid = mapPlayerRefs substitute (\c -> c {Count.Type.scope = mapScope substitute (Count.Type.scope c)})
   where
     substitute ref = case ref of
       PlayerRef.Candidate -> PlayerRef.Specific pid
@@ -736,8 +746,9 @@ forCandidate pid = mapPlayerRefs substitute id
 -- in one of them.
 --
 -- `intoCount` is the one arm the two callers disagree about, so it is a parameter
--- rather than a recursive call: a Count is read against an environment of its own
--- (see forCandidate).
+-- rather than a recursive call: both rewrite the count's SCOPE through mapScope,
+-- and only bakeBound descends into its per-member quantity, a Count being read
+-- against an environment of its own (see forCandidate).
 mapPlayerRefs ::
   (PlayerRef.PlayerRef -> PlayerRef.PlayerRef) ->
   (Count.Type.Count Quantity -> Count.Type.Count Quantity) ->
@@ -801,12 +812,14 @@ bakePlayerRef players ref = case ref of
   -- collapse; no card in the pool stores one (#1441).
   PlayerRef.ControllerOfBound _ -> ref
 
--- A scope's reference, baked. Both scopes that name players take one; CR 608.2i's
--- look-back names none.
-bakeScope :: Map.Map SlotName PlayerId.PlayerId -> Scope.Scope -> Scope.Scope
-bakeScope players scope = case scope of
-  Scope.InZone (InZone.MkInZone zone ref) -> Scope.InZone (InZone.MkInZone zone (bakePlayerRef players ref))
-  Scope.OverPlayers ref -> Scope.OverPlayers (bakePlayerRef players ref)
+-- A scope's reference, rewritten. Both scopes that name players take one; CR
+-- 608.2i's look-back names none. Shared by bakeBound and forCandidate for
+-- mapPlayerRefs' reason: a new scope carrying a reference has to fail to compile
+-- here rather than keep an old one in either of them.
+mapScope :: (PlayerRef.PlayerRef -> PlayerRef.PlayerRef) -> Scope.Scope -> Scope.Scope
+mapScope f scope = case scope of
+  Scope.InZone (InZone.MkInZone zone ref) -> Scope.InZone (InZone.MkInZone zone (f ref))
+  Scope.OverPlayers ref -> Scope.OverPlayers (f ref)
   Scope.InHistory _ -> scope
 
 -- CR 608.2i's look-back names no player and no slot; a zone scope names whose
