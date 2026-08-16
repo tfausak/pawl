@@ -15,9 +15,14 @@ jobs:
       - uses: nixbuild/nix-quick-install-action@v35
         with:
           nix_conf: max-jobs = auto
+      # Keyed on the inputs alone. pawl itself is never in the cache (nix
+      # rebuilds the package every run); only its dependencies are, and those
+      # follow flake.lock. Keying on pawl.cabal too made nearly every PR miss,
+      # since `-- cabal-gild: discover` rewrites it whenever a module is added,
+      # and each miss re-saved the store for three to four minutes.
       - uses: nix-community/cache-nix-action@v7
         with:
-          primary-key: nix-${{ hashFiles('flake.lock', 'pawl.cabal') }}
+          primary-key: nix-${{ hashFiles('flake.lock') }}
           restore-prefixes-first-match: nix-
       - run: nix build
       - run: nix build --print-build-logs --out-link benchmark .#benchmark
