@@ -590,6 +590,24 @@ data GameEvent
     -- reason: that one says +1/+1 counters arrived, this one says a mentor ability
     -- put them and on whose say-so.
     Mentored Mentored.Mentored
+  | -- | CR 702.149c: a creature TRAINED -- "a resolving training ability puts one
+    -- or more +1/+1 counters on this creature". Emitted by Pawl.Engine.Resolve's
+    -- Effect.Train arm, the one place rule 702.149a's counter is placed.
+    --
+    -- Evolved's shape and its reasons, one rule over: the creature by id, no
+    -- player, one direction, and GATED on the placement having landed at least
+    -- one counter -- rule 702.149c says "one or more" where rule 702.134c asks
+    -- only that the ability resolve, so this sides with Evolved rather than with
+    -- Mentored above.
+    --
+    -- ONE id and not Mentored's two: rule 702.149a puts its counter on the
+    -- training creature itself, so the creature the trigger names is already
+    -- Pawl.Engine.Binding.triggerSource and there is no second object to carry.
+    --
+    -- Distinct from the CountersPut event the same placement records, for
+    -- Evolved's reason: that one says +1/+1 counters arrived, this one says a
+    -- training ability put them. Savior of Ollenbock reads the difference.
+    Trained ObjectId.ObjectId
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice in the engine
     -- goes through -- a cost payment, Effect.Sacrifice, Effect.PlayerSacrifices

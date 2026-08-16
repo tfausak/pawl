@@ -156,6 +156,7 @@ manaProduced effect = case effect of
   Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.Mentor _ -> Nothing
+  Effect.Train _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.ExileHaunting {} -> Nothing
@@ -298,6 +299,7 @@ movesLibraryCard effect = case effect of
   Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
   Effect.Mentor _ -> False
+  Effect.Train _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
   Effect.ExileHaunting {} -> False

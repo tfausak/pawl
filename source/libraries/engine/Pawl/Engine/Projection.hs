@@ -1763,6 +1763,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.Evolve _ -> effect
   Effect.Mentor _ -> effect
+  Effect.Train _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
   Effect.ExileHaunting {} -> effect
@@ -2028,6 +2029,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- attachment and the mentored creature through the event, so no subtype word of
   -- the card's is in it for CR 612.1 to swap.
   TriggerCondition.AttachedCreatureMentors -> condition
+  -- CR 702.149c's is nullary too: the training creature is the bearer, so no
+  -- subtype word of the card's is in it for CR 612.1 to swap.
+  TriggerCondition.SelfTrains -> condition
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
   TriggerCondition.PermanentSacrificed -> condition

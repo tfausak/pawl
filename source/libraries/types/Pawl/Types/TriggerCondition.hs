@@ -990,6 +990,19 @@ data TriggerCondition
     -- 303.4's other destination): an unattached Equipment has no equipped creature,
     -- so nothing it could watch has mentored.
     AttachedCreatureMentors
+  | -- | CR 702.149c: the BEARER trained -- Savior of Ollenbock's "whenever this
+    -- creature trains". Matched against GameEvent.Trained by an id comparison,
+    -- SelfEvolves' shape exactly.
+    --
+    -- Self-scoped and not AttachedCreatureMentors' attachment scope, because rule
+    -- 702.149c states the self form in as many words ("when THIS creature
+    -- trains") and its one printing is the training creature itself. A card
+    -- printing "whenever a creature you control trains" earns the filtered form.
+    --
+    -- Nothing is left for this arm to check beyond WHOSE training it was: the
+    -- event is recorded only when a resolving training ability actually put a
+    -- counter on, which is rule 702.149c's whole condition.
+    SelfTrains
   | -- | CR 603.10a: "whenever a player sacrifices a permanent". One of the four
     -- look-back families that rule names, and the second pawl builds.
     --
