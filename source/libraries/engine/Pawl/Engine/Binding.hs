@@ -419,7 +419,7 @@ toRecipients rs = Binding.empty {Binding.targets = if Set.null rs then Nothing e
 toObjects :: Seq ObjectId -> Binding
 toObjects oids = Binding.empty {Binding.objects = Just oids}
 
--- A binding that names one player and nothing else -- CR 729.1b's subgame loser
+-- A binding that names one player and nothing else -- CR 729.1b's subgame winner
 -- and CR 608.2d's chosen opponent, both bound by Pawl.Engine.Resolve's
 -- bindPlayerSlot. Mirrors toObject, but the recipient is a player (ToPlayer),
 -- not an object.

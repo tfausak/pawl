@@ -431,8 +431,8 @@ slotsOf effect = case effect of
   Effect.ExileHaunting (ExileHaunting.MkExileHaunting card slot) -> joinSlots [oneSlot card, oneSlot slot]
   Effect.Attach slot -> oneSlot slot
   Effect.AttachTarget (AttachTarget.MkAttachTarget slot _) -> oneSlot slot
-  -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the derived loser,
-  -- bound once the subgame ends), not a read -- same shape as Create's slot.
+  -- CR 729.1/729.1b: PlaySubgame's slot is a DEFINITION (the subgame's winner,
+  -- bound once it ends), not a read -- same shape as Create's slot.
   Effect.PlaySubgame _ -> Map.empty
   -- A DEFINITION too, PlaySubgame's exactly: the opponent is chosen as this
   -- effect is applied (CR 608.2d) and bound, never read.
@@ -921,7 +921,7 @@ definedSlots = foldMap boundSlots
 -- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads -- a
 -- Create that names what it mints, one token or every one of them, a MoveToZone
 -- that names the incarnation CR 400.7 minted at the destination, a PlaySubgame
--- that names its loser, a Destroy that names how many it destroyed. Every
+-- that names its winner, a Destroy that names how many it destroyed. Every
 -- position in the DSL at which a card AUTHORS a name the engine will later
 -- write a binding to, which is what makes it the set Pawl.CardSpec's
 -- reserved-name sweep ranges over.
@@ -948,10 +948,10 @@ boundSlots effect = case effect of
   Effect.Create (Create.MkCreate _ _ _ mSlot) -> foldMap Set.singleton mSlot
   -- Binds nothing: no card in the pool names the token copy it minted.
   Effect.CreateCopy {} -> Set.empty
-  -- CR 729.1b: the subgame's loser, derived rather than chosen.
+  -- CR 729.1b: the subgame's winner, reported by the nested game rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
   -- CR 608.2d: the opponent this effect chose, so a later effect naming the slot
-  -- passes the dataflow lint -- PlaySubgame's loser, chosen rather than derived.
+  -- passes the dataflow lint -- PlaySubgame's winner, chosen rather than reported.
   Effect.ChooseOpponent slot -> Set.singleton slot
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
   -- each ... destroyed this way" to read as a Quantity.
@@ -1226,7 +1226,7 @@ resolveSpellWith runSubgame oid = do
                   let idx = ModeInstance.index mi
                       applyOne eff = do
                         -- Re-read the live bindings for THIS effect: a prior
-                        -- PlaySubgame may have bound its loser slot.
+                        -- PlaySubgame may have bound its winner slot.
                         bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalNow = Map.mapWithKey legalSlot chosenNow
@@ -5275,7 +5275,7 @@ performHandAction source player =
 -- the same mechanism: resolveSpellWith and resolveModes each re-read
 -- Object.bindings before EACH effect (CR 608.2c), so a later
 -- Sacrifice/Destroy/ModifyTarget reading this slot sees the mid-fold value. That
--- is what lets PlaySubgame's derived loser reach a follow-on DealDamage on the
+-- is what lets PlaySubgame's reported winner reach a follow-on LoseLife on the
 -- spell path, and Harried Dronesmith's "It gains haste until end of turn" reach
 -- the token its own trigger just minted on the ability path (proved by
 -- Pawl.TriggerSpec's "CR 702.10b \"it gains haste\" reaches the one token").
@@ -5305,9 +5305,16 @@ bindObjectsSlot holder slot targets gs =
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- The default runner for every resolution that is NOT a subgame-bearing spell:
--- there is no nested game, so a PlaySubgame effect resolves as a draw and binds
+-- there is no nested game, so a PlaySubgame effect reports a draw and binds
 -- nothing. The ability path (resolveEffects) and every direct test caller take
--- this; a subgame played from an ABILITY is deferred (no gate card needs one).
+-- this.
+--
+-- Not implemented: a subgame played from an ABILITY (#137). Until that lands the
+-- default is unreachable from card data -- no card in the pool puts PlaySubgame
+-- in an ability -- which matters more than it used to: a follow-on reading the
+-- slot through PlayerRef.EachPlayerExcept now charges the WHOLE TABLE for a
+-- draw, so a stand-in draw here would be a live wrong answer rather than the
+-- silent no-op it once was.
 noSubgame :: Game Result
 noSubgame = pure Result.Drawn
 
@@ -5317,7 +5324,7 @@ noSubgame = pure Result.Drawn
 --
 -- TWO CALLERS, and each passes the holder its own READER looks at:
 --
---   * CR 729.1b's derived subgame loser, held on the effect's `source`. The
+--   * CR 729.1b's subgame winner, held on the effect's `source`. The
 --     follow-on reads it through resolveSpellWith's re-read of the resolving
 --     SPELL's bindings, and only a spell can play a subgame (an ability-driven
 --     one is deferred, see noSubgame), so for every producer that can exist the
