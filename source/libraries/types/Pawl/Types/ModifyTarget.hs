@@ -14,7 +14,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 -- Pawl.Types.ActivatedAbility, an ability carries Effects, and an Effect carrying
 -- an ability back would close a cycle that no type parameter can open. A card
 -- worded "target creature gains '[ability]' until end of turn" therefore has no
--- home here yet (#1641).
+-- home here yet (#1642).
 --
 -- The widening in the other direction is total and lives at
 -- Pawl.Engine.Projection.widenModification: what a resolution stores can go
