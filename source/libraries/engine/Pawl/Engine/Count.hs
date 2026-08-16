@@ -316,8 +316,18 @@ playersFor context gs ref =
             -- Every other player. Not a two-player shortcut: in a free-for-all
             -- every other player is an opponent by construction (CR 806.1).
             -- Only CR 102.3's teammates would break that, and pawl has no teams
-            -- (#175).
-            PlayerRelation.Opponent -> Just (filter (/= you) everyone)
+            -- (#175). PlayerRelation.holds is the predicate, so the two arms and
+            -- every reader elsewhere agree on what the relation means.
+            PlayerRelation.Opponent -> Just (filter (PlayerRelation.holds relation you) everyone)
+            -- CR 102.1's whole table, the perspective included -- which is
+            -- EachPlayer above, arrived at from the other side. Answered off
+            -- `everyone` rather than by consing `you` onto the Opponent set, so a
+            -- departed seat stays out for the same reason it does there. Still a
+            -- perspective-dependent reference for the purposes of this function:
+            -- the do-block's read of it is what makes an unframed evaluation
+            -- unanswerable, and widening that for one arm would let a reference
+            -- resolve where its siblings cannot.
+            PlayerRelation.AnyPlayer -> Just everyone
         PlayerRef.InSlot name -> do
           src <- Filter.source context
           obj <- Game.lookupObject src gs

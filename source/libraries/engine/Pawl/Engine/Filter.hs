@@ -525,17 +525,20 @@ matches context view predicate = case predicate of
   -- Vacuously False where there is no mana value at all, exactly as the atom
   -- above is: a player, or an object with no card behind it.
   Filter.ManaValueIsEven -> maybe False even (manaValue view)
-  -- Every other player is an Opponent by construction: CR 806.1 has a
-  -- free-for-all's players compete as individuals against each other, and CR
-  -- 102.2 says the same for two players -- one predicate, `c /= p`, serves both.
-  -- CR 102.3's teams are the ONE reading it is wrong for, and pawl has none to
-  -- express (#175). Unlike Pawl.Engine.Count.playersFor, which folds a player
-  -- SET, this arm tests one candidate `View` at a time, so there is no set here
-  -- to get the size of wrong.
+  -- PlayerRelation.holds is what each arm MEANS, and its haddock carries the
+  -- argument: every other player is an Opponent by construction (CR 806.1 in a
+  -- free-for-all, CR 102.2 for two players), CR 102.3's teams are the one reading
+  -- that is wrong for (#175), and AnyPlayer admits the perspective too. Unlike
+  -- Pawl.Engine.Count.playersFor, which folds a player SET, this arm tests one
+  -- candidate `View` at a time, so there is no set here to get the size of wrong.
+  --
+  -- A perspective is demanded even for AnyPlayer, which does not read one. That
+  -- is the whole atom's posture rather than this arm's: a match with no
+  -- perspective is one nothing has framed, and answering it True off a relation
+  -- that happens not to need one would make the atom mean something different
+  -- depending on which relation it carries.
   Filter.ControlledBy relation -> case (controller view, perspective context) of
-    (Just c, Just p) -> case relation of
-      PlayerRelation.You -> c == p
-      PlayerRelation.Opponent -> c /= p
+    (Just c, Just p) -> PlayerRelation.holds relation p c
     _ -> False
   -- CR 508.5 / 702.39a: the candidate's controller IS the defending player, which
   -- the Context supplies because it is a fact about the combat record rather than
@@ -572,9 +575,7 @@ matches context view predicate = case predicate of
   -- (#175). Vacuously False where no object backs the view, or where no
   -- perspective frames the match.
   Filter.OwnedBy relation -> case (owner view, perspective context) of
-    (Just o, Just p) -> case relation of
-      PlayerRelation.You -> o == p
-      PlayerRelation.Opponent -> o /= p
+    (Just o, Just p) -> PlayerRelation.holds relation p o
     _ -> False
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
@@ -595,9 +596,7 @@ matches context view predicate = case predicate of
   -- case (CR 102.3's teams, #175). Vacuously False for an object candidate,
   -- which has no playerIdentity, and for a match with no perspective.
   Filter.IsPlayer relation -> case (playerIdentity view, perspective context) of
-    (Just candidate, Just you) -> case relation of
-      PlayerRelation.You -> candidate == you
-      PlayerRelation.Opponent -> candidate /= you
+    (Just candidate, Just you) -> PlayerRelation.holds relation you candidate
     _ -> False
   -- The controller of the object a slot names, and False WHEREVER IT IS REACHED,
   -- for ControlsMoreThanYou's reason below: Pawl.Engine.Count.bakePerspective

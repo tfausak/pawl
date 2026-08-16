@@ -4353,6 +4353,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         namesOneSeat player = case player of
           PlayerRef.Relative PlayerRelation.You -> True
           PlayerRef.Relative PlayerRelation.Opponent -> False
+          -- The whole table -- EachPlayer's answer, which this relation is.
+          PlayerRef.Relative PlayerRelation.AnyPlayer -> False
           PlayerRef.InSlot _ -> True
           PlayerRef.EachPlayer -> False
           -- The whole table but one seat -- EachPlayer's answer, and for its

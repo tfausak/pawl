@@ -1743,7 +1743,7 @@ legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
 --
 -- CR 102.1: a player who has left keeps their row in GameState.players with a
 -- Departed status, so `everyone` is Game.stillPlaying rather than the map's keys.
--- Only the two enumerating arms read the roster -- `Relative You` and `InSlot`
+-- Only the enumerating arms read the roster -- `Relative You` and `InSlot`
 -- name one specific player who arrived from elsewhere, and whether a departed
 -- player can still be one of those is CR 800.4d/800.4i's question (#181).
 --
@@ -1756,7 +1756,12 @@ playerRefPlayers legal controller gs ref = case ref of
     Just (Recipient.ToPlayer pid) -> [pid]
     _ -> [] -- an unfilled, illegal, or non-player slot: no-op
   PlayerRef.Relative PlayerRelation.You -> [controller]
-  PlayerRef.Relative PlayerRelation.Opponent -> filter (/= controller) everyone
+  PlayerRef.Relative PlayerRelation.Opponent -> filter (PlayerRelation.holds PlayerRelation.Opponent controller) everyone
+  -- CR 102.1's whole table, the perspective included, which is EachPlayer below
+  -- reached from the other side. Answered off the roster rather than by consing
+  -- the controller onto the Opponent set, so a departed seat stays out for the
+  -- reason it does there.
+  PlayerRef.Relative PlayerRelation.AnyPlayer -> everyone
   PlayerRef.EachPlayer -> everyone
   -- EachPlayer minus the seat the slot names. A slot that is unfilled, illegal,
   -- names several, or names an object excludes NOBODY -- see the type, where the

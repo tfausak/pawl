@@ -3590,10 +3590,11 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Milled {} -> False
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
   -- discarding player comes from the event; CR 109.5 fixes "you" as the
-  -- ability's controller (CR 603.3a), and Megrim's "an opponent" is every other
-  -- player -- CR 806.1 in a free-for-all, CR 102.2 in a two-player game, the
-  -- same /= either way. CR 102.3's teams are the one reading it is wrong for,
-  -- and pawl has none to express (#175).
+  -- ability's controller (CR 603.3a), and PlayerRelation.holds is what each arm
+  -- MEANS -- Megrim's "an opponent" is every other player, CR 806.1 in a
+  -- free-for-all and CR 102.2 in a two-player game, with CR 102.3's teams the one
+  -- reading that is wrong for (#175). Every relation-carrying condition below
+  -- reads it, so they cannot drift apart.
   --
   -- The bearer is NOT part of the match, unlike every Self- condition here: the
   -- enchantment watches someone else's hand and has nothing to do with the card
@@ -3606,9 +3607,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- TriggerSpec's "CR 702.29d cycling a card fires the discard trigger exactly
   -- once" is the test that proves it.
   TriggerCondition.PlayerDiscards relation -> case event of
-    GameEvent.Discarded (Discarded.MkDiscarded discarder _ _) -> case relation of
-      PlayerRelation.You -> discarder == you
-      PlayerRelation.Opponent -> discarder /= you
+    GameEvent.Discarded (Discarded.MkDiscarded discarder _ _) -> PlayerRelation.holds relation you discarder
     GameEvent.Drew {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -3657,9 +3656,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.Drew (Drew.MkDrew drawer ordinal) ->
       ordinal
         == nth
-        && case relation of
-          PlayerRelation.You -> drawer == you
-          PlayerRelation.Opponent -> drawer /= you
+        && PlayerRelation.holds relation you drawer
     GameEvent.Discarded {} -> False
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
@@ -3707,9 +3704,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- the whole comparison and there is no filter to apply. The bearer is NOT part
   -- of the match: Custodi Lich watches a designation, not itself.
   TriggerCondition.PlayerBecomesMonarch relation -> case event of
-    GameEvent.BecameMonarch crowned -> case relation of
-      PlayerRelation.You -> crowned == you
-      PlayerRelation.Opponent -> crowned /= you
+    GameEvent.BecameMonarch crowned -> PlayerRelation.holds relation you crowned
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -4650,9 +4645,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- countered is not countered at all (CR 101.2), so `counter` records nothing
   -- and there is no event for this arm to see.
   TriggerCondition.SpellOrAbilityCounters relation -> case event of
-    GameEvent.SpellCountered c -> case relation of
-      PlayerRelation.You -> Countering.controller c == you
-      PlayerRelation.Opponent -> Countering.controller c /= you
+    GameEvent.SpellCountered c -> PlayerRelation.holds relation you (Countering.controller c)
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan {} -> False
@@ -4704,11 +4697,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- distinguishes the two.
   TriggerCondition.DamageToPlayerPrevented relation -> case event of
     GameEvent.DamagePrevented (DamagePrevented.MkDamagePrevented recipient _) -> case recipient of
-      Recipient.ToPlayer pid -> case relation of
-        PlayerRelation.You -> pid == you
-        -- CR 102.2: no producer today -- a card watching an opponent's damage
-        -- being prevented.
-        PlayerRelation.Opponent -> pid /= you
+      Recipient.ToPlayer pid -> PlayerRelation.holds relation you pid
       Recipient.ToCreature _ -> False
       Recipient.ToPlaneswalker _ -> False
       Recipient.ToBattle _ -> False
@@ -4764,10 +4753,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- below is where that shows: one damage event can record both, and only the
   -- gain fires this.
   TriggerCondition.PlayerGainsLife relation -> case event of
-    GameEvent.LifeGained (LifeChange.MkLifeChange pid _) -> case relation of
-      PlayerRelation.You -> pid == you
-      -- CR 102.2: no producer today -- a card watching an OPPONENT gain life.
-      PlayerRelation.Opponent -> pid /= you
+    GameEvent.LifeGained (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds relation you pid
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented {} -> False
@@ -4824,12 +4810,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- damage event can record a loss and a lifelink gain together, and only the
   -- loss fires this.
   TriggerCondition.PlayerLosesLife relation -> case event of
-    GameEvent.LifeLost (LifeChange.MkLifeChange pid _) -> case relation of
-      -- No producer today -- a card watching its OWN controller lose life.
-      PlayerRelation.You -> pid == you
-      -- Exquisite Blood's half. CR 102.2 is what makes "not you" the right test
-      -- on a two-player board, as it is for Megrim under PlayerDiscards.
-      PlayerRelation.Opponent -> pid /= you
+    GameEvent.LifeLost (LifeChange.MkLifeChange pid _) -> PlayerRelation.holds relation you pid
     GameEvent.Moved {} -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented {} -> False
@@ -5086,9 +5067,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- would read the same field.
   TriggerCondition.SelfBecomesTargeted relation -> case event of
     GameEvent.BecameTarget t ->
-      BecameTarget.targeted t == bearer && case relation of
-        PlayerRelation.You -> BecameTarget.controller t == you
-        PlayerRelation.Opponent -> BecameTarget.controller t /= you
+      BecameTarget.targeted t == bearer && PlayerRelation.holds relation you (BecameTarget.controller t)
     GameEvent.LeftTheGame _ -> False
     GameEvent.Milled {} -> False
     GameEvent.SpellCast {} -> False
@@ -5472,9 +5451,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked (HalfUnlocked.MkHalfUnlocked oid _ fully) ->
       fully && case Projection.controllerOf oid gs of
         Nothing -> False
-        Just controller -> case relation of
-          PlayerRelation.You -> controller == you
-          PlayerRelation.Opponent -> controller /= you
+        Just controller -> PlayerRelation.holds relation you controller
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated {} -> False
     GameEvent.Evolved _ -> False
@@ -5592,10 +5569,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- silence CR 603.10 would give a look-back that found nothing (#1028).
   TriggerCondition.SagaFinalChapterTriggers relation -> case event of
     GameEvent.AbilityTriggered (AbilityTriggered.MkAbilityTriggered srcId controller fired) ->
-      ( case relation of
-          PlayerRelation.You -> controller == you
-          PlayerRelation.Opponent -> controller /= you
-      )
+      PlayerRelation.holds relation you controller
         && ( let pc = Projection.project srcId gs
               in Saga.tracksLore pc && Saga.chapterOfCondition fired == Just (Saga.finalChapterOf pc)
            )
