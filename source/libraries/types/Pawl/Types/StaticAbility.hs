@@ -1,6 +1,7 @@
 module Pawl.Types.StaticAbility where
 
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Duration as Duration
@@ -25,7 +26,10 @@ import qualified Pawl.Types.Modification as Modification
 --
 -- Its order is the card's PRINTED order, not the application order --
 -- Projection.layer decides that, per CR 613.1.
-data StaticAbility = MkStaticAbility
+-- Parametric in `card` only so that a modification can grant a whole quoted
+-- ability -- see the note on Pawl.Types.Modification. Pawl.Types.Face ties the
+-- knot at `StaticAbility card` alongside its own.
+data StaticAbility card = MkStaticAbility
   { affected :: Affected.Affected,
     -- | The ability's "as long as" clause -- Kird Ape's "as long as you control
     -- a Forest" -- or Nothing for an ability that functions unconditionally,
@@ -60,6 +64,6 @@ data StaticAbility = MkStaticAbility
     -- Duration.UntilEndOfTurn, the same value a spell would print. A card
     -- naming a different one needs no new field.
     lingers :: Maybe Duration.Duration,
-    modifications :: NonEmpty.NonEmpty Modification.Modification
+    modifications :: NonEmpty.NonEmpty (Modification.Modification (ActivatedAbility.ActivatedAbility card))
   }
   deriving (Eq, Ord, Show)

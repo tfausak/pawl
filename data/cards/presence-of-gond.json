@@ -1,0 +1,119 @@
+{
+  "faces": [
+    {
+      "enchant": [
+        {
+          "pool": {
+            "type": "Creatures"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Presence of Gond",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "GainActivatedAbility",
+              "value": {
+                "cost": {
+                  "components": [
+                    {
+                      "type": "TapThis"
+                    }
+                  ],
+                  "mana": []
+                },
+                "modal": {
+                  "modes": [
+                    {
+                      "clauses": [
+                        {
+                          "effects": [
+                            {
+                              "type": "Create",
+                              "value": {
+                                "card": {
+                                  "faces": [
+                                    {
+                                      "colorIndicator": [
+                                        {
+                                          "type": "Green"
+                                        }
+                                      ],
+                                      "name": "Elf Warrior Token",
+                                      "power": {
+                                        "type": "Literal",
+                                        "value": 1
+                                      },
+                                      "toughness": {
+                                        "type": "Literal",
+                                        "value": 1
+                                      },
+                                      "typeLine": {
+                                        "subtypes": [
+                                          {
+                                            "type": "Elf"
+                                          },
+                                          {
+                                            "type": "Warrior"
+                                          }
+                                        ],
+                                        "types": [
+                                          {
+                                            "type": "Creature"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                },
+                                "quantity": {
+                                  "type": "Literal",
+                                  "value": 1
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

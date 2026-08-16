@@ -14,7 +14,7 @@ import qualified Pawl.Types.ModifyTarget as ModifyTarget
 codec :: Codec.Codec ModifyTarget.ModifyTarget
 codec = Fields.object $ do
   duration <- Fields.required "duration" Duration.codec ModifyTarget.duration
-  modification <- Fields.required "modification" Modification.codec ModifyTarget.modification
+  modification <- Fields.required "modification" Modification.grantless ModifyTarget.modification
   ref <- Fields.required "ref" ObjectRef.codec ModifyTarget.ref
   pure
     ModifyTarget.MkModifyTarget
