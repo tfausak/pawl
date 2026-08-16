@@ -2,6 +2,8 @@
 
 module Pawl.Codec.EntryRSpec where
 
+import qualified Pawl.Codec.Card as Card
+import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.EntryR as EntryR
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
@@ -15,11 +17,11 @@ spec s = Spec.describe s "Pawl.Codec.EntryR" $ do
   Spec.it s "MkEntryR" $
     Common.assertCodec
       s
-      EntryR.codec
+      (EntryR.codec (Effect.codec Card.codec))
       ( EntryR.MkEntryR
           { EntryR.matching = Filter.IsSource,
             EntryR.rewrite = EntryRewrite.Tapped
           }
       )
       """ {"matching":{"type":"IsSource"},"rewrite":{"type":"Tapped"}} """
-  Spec.it s "has a schema" $ Common.assertHasSchema s EntryR.codec
+  Spec.it s "has a schema" $ Common.assertHasSchema s (EntryR.codec (Effect.codec Card.codec))

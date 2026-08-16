@@ -435,7 +435,7 @@ applies gs event candidate =
 -- board rather than the live one (see `applicable`). Immaterial today -- every
 -- WouldEnter reaches here from Event.runEntry, which passes no `asOf` -- but a
 -- batched entry would read the designation and the card off a frozen board.
-admitsEntry :: GameState -> ObjectId -> EntryRewrite.EntryRewrite -> Bool
+admitsEntry :: GameState -> ObjectId -> EntryRewrite.EntryRewrite effect -> Bool
 admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.AsCopy _ -> True
   EntryRewrite.ChoiceOf _ -> True
@@ -476,6 +476,13 @@ admitsEntry gs oid rewrite = case rewrite of
   EntryRewrite.Tapped -> True
   EntryRewrite.PayLifeOrTapped _ -> True
   EntryRewrite.RevealOrTapped _ -> True
+  -- CR 614.1c's "as [this permanent] enters, [do something]". No condition here
+  -- and Bloodthirst above is the contrast: rule 702.54a's condition is a RULE's,
+  -- so it has nowhere else to live, while Monstrous War-Leech's "if it was
+  -- kicked" is the CARD's and rides CR 604.2's clause on
+  -- Pawl.Types.PrintedReplacement, which Pawl.Engine.Projection.replacementsOf
+  -- has already asked before this row was ever collected.
+  EntryRewrite.RunEffects _ -> True
   -- CR 702.145b's own two conditions, both of them the ability's rather than the
   -- pattern's: "IF IT IS NIGHT and this permanent is REPRESENTED BY A
   -- DOUBLE-FACED CARD, it enters transformed."
@@ -842,6 +849,11 @@ bucketOfEffect re = case re of
   -- card in it races a daybound entry with another entry replacement in the same
   -- iteration (#73 tracks the same absence for CR 616.1c).
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.EntersTransformed) -> ReplacementBucket.BackFaceOnEntry
+  -- CR 616.1e: an as-enters rewrite that runs an effect is none of CR 616.1a-d --
+  -- it is not a self-replacement, does not change the permanent's controller, is
+  -- not a copy and shows no other face -- so it falls to the catch-all bucket
+  -- with every other entry rewrite that merely does something.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects _)) -> ReplacementBucket.Other
   ReplacementEffect.DamageR {} -> ReplacementBucket.Other
   ReplacementEffect.DestructionR _ -> ReplacementBucket.Other
   ReplacementEffect.CounterR {} -> ReplacementBucket.Other
@@ -945,6 +957,11 @@ readsApplier re = case re of
   -- the back face of the card the event already named, and which face that is
   -- comes from the card. Two such rows are the same write twice, Tapped's answer.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.EntersTransformed) -> False
+  -- CR 614.1c's as-enters effects, Bloodthirst's and SacrificeAnyNumber's answer
+  -- for their reason: Pawl.Engine.Event's arm reads CR 109.5's "you" off the
+  -- ENTERING object rather than off the candidate, so two rows alike in `effect`
+  -- run the same effects for the same player whoever holds the row.
+  ReplacementEffect.EntryR (EntryR.MkEntryR _ (EntryRewrite.RunEffects _)) -> False
   -- The rewritten amount is the effect's (Galvanic Blast, Furnace of Rath), and
   -- a prevention prevents the same event whoever's row it is (Fog). CR 615.7's
   -- shield is no exception: what makes two shields differ is how much each has

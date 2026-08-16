@@ -299,9 +299,14 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     HasDesignation Designation.Designation
-  | -- | CR 702.33d: was the SPELL this quantity is evaluated against kicked? 1 if
+  | -- | CR 702.33d: was the spell this quantity is evaluated against kicked? 1 if
     -- so and 0 if not -- Burst Lightning's "if this spell was kicked", the clause
     -- condition rule 702.33e makes an ability of its own.
+    --
+    -- Asked of a PERMANENT as readily as of a spell, which is CR 400.7d: Monstrous
+    -- War-Leech's payoff is a CR 614.1c entry replacement, so what it asks about is
+    -- the spell that became the permanent it is asked of (see Pawl.Types.Object's
+    -- `kicked`).
     --
     -- HasDesignation in every structural respect above, and a different KIND of
     -- fact: that atom reads a mark on a permanent, and this is a record of a choice
@@ -309,7 +314,7 @@ data Quantity
     -- shape is the reader -- one object, one Bool, off the view.
     --
     -- No Filter atom beside it: "target spell that was kicked" is text no card in
-    -- the pool prints, kicker's payoff always being an ability of the kicked spell
+    -- the pool prints, kicker's payoff always being an ability of the kicked object
     -- itself.
     --
     -- A LEAF: it holds no Quantity.

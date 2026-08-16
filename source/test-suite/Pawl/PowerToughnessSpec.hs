@@ -565,9 +565,12 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   -- greatest -- Pawl.Engine.Count.aggregate says so, honestly, with Nothing.
   -- The number cannot be determined, so the CDA uses 0.
   --
-  -- Monstrous War-Leech's other two sentences -- its kicker, and the as-enters
-  -- mill that kicking turns on -- are not modelled (#610), so the graveyard
-  -- these fixtures read is only ever the one they set up.
+  -- Monstrous War-Leech's other two sentences -- its kicker and the as-enters
+  -- mill that kicking turns on -- are modelled, and Pawl.ReplacementSpec's
+  -- "Monstrous War-Leech" group proves them. They stay out of these fixtures'
+  -- way regardless: two of the three build the permanent directly rather than
+  -- casting a spell, and the third has no blue mana, so no kicker is on offer and
+  -- the graveyard these fixtures read is only ever the one they set up.
   Spec.it s "CR 208.2a an undeterminable CDA number is 0: an empty graveyard makes the Leech a 0/0" $ do
     leech <- S.printingOf s registry "Monstrous War-Leech"
     let gs0 = Setup.emptyGame S.bothPlayers

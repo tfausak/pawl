@@ -22,6 +22,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PendingEntryEffect as PendingEntryEffect
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
@@ -235,6 +236,25 @@ data GameState = MkGameState
     -- Empty at every priority window the engine reaches, so nothing else has to
     -- know it exists.
     pendingPreventionRiders :: Seq.Seq Prevention.Prevention,
+    -- | CR 614.1c: as-enters rewrites whose effects have not run yet, oldest
+    -- first. `pendingPreventionRiders` above one rule over, queued for the same
+    -- reason and drained the same way: Pawl.Engine.Event applies the replacement
+    -- and cannot run a card's effects, so Pawl.Engine.Resolve.runEntryEffects
+    -- does it.
+    --
+    -- WHERE IT IS DRAINED is the whole of what the deferral costs. The drain is
+    -- the first thing Pawl.Engine.Engine.performSettle does, so the effects run
+    -- before the SBA pass and before the trigger scan that would see the
+    -- permanent -- which is what Monstrous War-Leech needs, since CR 704.5f asks
+    -- about a power and toughness the mill decides. What it is NOT is inside the
+    -- Not implemented: the effects running inside the entry, where CR 614.1c puts
+    -- them. A resolution that puts a permanent onto the battlefield and then reads
+    -- the board itself would see the pre-effect one (#1639); no card in the pool
+    -- does that.
+    --
+    -- Empty at every priority window the engine reaches, so nothing else has to
+    -- know it exists.
+    pendingEntryEffects :: Seq.Seq PendingEntryEffect.PendingEntryEffect,
     -- | CR 611.1 / 613.11: stored PLAYER and RULES-modifying continuous effects
     -- from resolutions (Silence), each with an expiry the Pawl.Engine.Expiry
     -- sweeps consult. A permanent's printed player abilities are NOT here --
