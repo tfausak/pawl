@@ -59,7 +59,7 @@ import qualified Pawl.Types.Recipient as Recipient
 -- after a mutation and keep the case green.
 --
 -- FILTERED out of the offered set rather than built from the id, which is not
--- hygiene here: CR 115.1a's pool of creatures offers Recipient.ToCreature, and a
+-- hygiene here: CR 115.1's pool of creatures offers Recipient.ToCreature, and a
 -- hand-built Recipient.ToObject of the same permanent is a DIFFERENT recipient
 -- that CR 608.2b's re-read at resolution drops -- silently, as a resolution that
 -- names nobody.
