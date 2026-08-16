@@ -244,6 +244,33 @@ card written in the same shape. It is one grep, and it turns a one-card fix
 into a claim about the corpus; without it the next instance of the same defect
 waits for an issue of its own.
 
+### Prior art, when you need a producer or a field shape
+
+`CLAUDE.md` says to consult these only after deriving the rule, and that a
+missing clone is a skipped step. Each is one grep:
+
+- **`_scratch/phase`** (MIT) finds the CARD. Its
+  `crates/engine/tests/integration/` holds a thousand-plus test files named for
+  the card and the rule (`abundance_optional_draw_replacement.rs`), plus
+  rule-keyed files under `rules/`. `ls` it filtered by the mechanic and you get
+  candidate producers without a pool search. Not a design reference --- its
+  parser is the truth and its core still carries a card-identity check.
+- **`_scratch/mtgish`** (MIT) gives the effect's SHAPE: the whole pool as
+  first-order typed ASTs in `data/mtgish.lines.json`, vocabulary in
+  `rust_syntax/src/mtg_types.rs`. Also a pool-wide query surface, since "which
+  cards use this construct" is a grep over one file. It carries no marker for
+  text its parser could not express, so a card being present is not evidence
+  its rules text came through whole.
+- **`_scratch/argentum-engine`** (MIT) answers MODELING questions --- same
+  base/projected split, same no-escape-hatch bet. For "how should this be
+  represented," not for card plumbing.
+
+A green test in another engine means someone considered the case, never that
+their answer is right: argentum's own Blood Moon test asserts a simplified
+wrong outcome and says so in a comment. Facts travel freely --- which card
+exercises a rule, how often a construct appears. Ported code carries the MIT
+notice, and card text is Wizards IP whatever the engine's license says.
+
 ## Prompts
 
 Do not mint a bespoke resolution-time choice. `Pawl.Types.Prompt`'s

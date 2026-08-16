@@ -164,7 +164,17 @@ to agents as written. What it doesn't say:
   "no such card exists"; Goblin Plate Mail is absent from the dump and real.
   When grepping the dump, note there is no space after the colon (`"name":"Foo"`)
   and that `rulings` sorts before `text`, so a hit near a name is usually
-  ruling boilerplate rather than oracle text.
+  ruling boilerplate rather than oracle text. It lives in gitignored
+  `_scratch/`, so it may simply be absent --- fall back to Scryfall.
+
+- `_scratch/` also holds permissively licensed prior art --- `phase`, `mtgish`,
+  `argentum-engine` --- whose corpora shortcut two slow steps: finding the card
+  that produces a behaviour, and choosing an effect's field shape. Consult them
+  AFTER deriving the rule from `docs/rules.txt`, never before, since reading
+  someone else's model first imports it; the CR wins every disagreement. What
+  each is good for is in `docs/agents/implementing.md`, why in
+  `docs/prior-art-lessons.md` section 11. Being gitignored, any of them may be
+  absent --- that is a skipped step, not a blocked one.
 
 - When no printing can reach the rule, write a synthetic card as
   `data/cards/synthetic-*.json`. A real card wins whenever one exists, and "I
