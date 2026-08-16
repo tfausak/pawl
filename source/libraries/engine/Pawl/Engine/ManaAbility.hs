@@ -113,6 +113,7 @@ manaProduced effect = case effect of
   Effect.MoveToZone {} -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
+  Effect.Reveal {} -> Nothing
   Effect.LookAt {} -> Nothing
   Effect.Scry {} -> Nothing
   Effect.Surveil {} -> Nothing
@@ -189,6 +190,9 @@ movesLibraryCard effect = case effect of
   Effect.Draw {} -> True
   -- CR 701.17a: milling puts cards from the top of a library into a graveyard.
   Effect.Mill {} -> True
+  -- CR 701.20a's reveal moves nothing (CR 701.20b) -- the look below without
+  -- even the binding.
+  Effect.Reveal {} -> False
   -- CR 701.20e's look moves nothing at all (CR 701.20b), which is Scry's answer
   -- below and one step shorter: it does not even reorder the library.
   Effect.LookAt {} -> False

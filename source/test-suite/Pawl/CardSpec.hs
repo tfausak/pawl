@@ -679,8 +679,10 @@ effectCounts effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> quantityCounts quantity
-  -- No Quantity: rule 701.20e's look names its cards through an ObjectRef, and
-  -- ObjectRef.TopOfLibrary's depth is a literal Natural.
+  -- No Quantity: rule 701.20a's reveal and rule 701.20e's look each name their
+  -- cards through an ObjectRef, and ObjectRef.TopOfLibrary's depth is a literal
+  -- Natural.
+  Effect.Reveal {} -> []
   Effect.LookAt {} -> []
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> quantityCounts quantity
@@ -1070,6 +1072,7 @@ effectReplacements effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.Mill {} -> []
+  Effect.Reveal {} -> []
   Effect.LookAt {} -> []
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
@@ -1646,6 +1649,7 @@ effectMintedFaces effect = case effect of
   Effect.MoveToZone {} -> []
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ _) -> []
   Effect.Mill {} -> []
+  Effect.Reveal {} -> []
   Effect.LookAt {} -> []
   Effect.Scry {} -> []
   Effect.Surveil {} -> []
@@ -2747,7 +2751,8 @@ effectFilters effect = case effect of
   -- it: rule 728.1's "nonland card" is one of these.
   Effect.Mill (Mill.MkMill _ quantity mTally) -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
   -- The ObjectRef's Filter is a position a card author writes, so the lint
-  -- reaches it, as Explore's does.
+  -- reaches it, as Explore's does. Both halves of CR 701.20 answer alike.
+  Effect.Reveal ref -> unframed (objectRefFilters ref)
   Effect.LookAt (LookAt.MkLookAt ref _) -> unframed (objectRefFilters ref)
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> unframed (quantityFilters quantity)

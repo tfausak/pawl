@@ -341,6 +341,7 @@ slotsOf effect = case effect of
   -- it belongs to boundSlots below -- Destroy's third field takes the same
   -- posture, for the same reason.
   Effect.Mill (Mill.MkMill ref quantity _) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
+  Effect.Reveal ref -> objectRefSlots ref
   -- The bound slot is a DEFINITION and not a read, the posture Mill's tally
   -- above takes; boundSlots below is where it is reported.
   Effect.LookAt (LookAt.MkLookAt ref _) -> objectRefSlots ref
@@ -588,6 +589,7 @@ slotsAreExhaustive effect = case effect of
   Effect.MoveToZone {} -> True
   Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.slotsAreExhaustive quantity
+  Effect.Reveal {} -> True
   Effect.LookAt {} -> True
   Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
@@ -730,6 +732,7 @@ readsX = any effectReadsX
       Effect.MoveToZone {} -> False
       Effect.Draw (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Mill (Mill.MkMill _ quantity _) -> Quantity.readsX quantity
+      Effect.Reveal {} -> False
       Effect.LookAt {} -> False
       Effect.Scry (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.Surveil (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
@@ -818,9 +821,10 @@ searchesLibrary effect = case effect of
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
   Effect.Mill {} -> False
-  -- CR 701.20e's look and the three look-and-split actions each look at NAMED
-  -- cards, where CR 701.23a's search looks through ALL of a zone; Panglacial
-  -- Wurm's window is the latter's alone.
+  -- CR 701.20a's reveal, CR 701.20e's look and the three look-and-split actions
+  -- each show NAMED cards, where CR 701.23a's search looks through ALL of a
+  -- zone; Panglacial Wurm's window is the latter's alone.
+  Effect.Reveal {} -> False
   Effect.LookAt {} -> False
   Effect.Scry {} -> False
   Effect.Surveil {} -> False
@@ -959,6 +963,9 @@ boundSlots effect = case effect of
   -- How many of the cards this mill put in the graveyard matched the tally's
   -- filter, for CR 728.1's "for each nonland card milled this way" to read.
   Effect.Mill (Mill.MkMill _ _ mTally) -> foldMap (Set.singleton . MillTally.slot) mTally
+  -- CR 701.20a's reveal binds nothing: it is public, so what it leaves behind
+  -- is the GameEvent.Revealed in the log rather than a name for a later clause.
+  Effect.Reveal {} -> Set.empty
   -- The cards CR 701.20e's look showed, for a later clause of the same
   -- resolution to name -- Into the Wilds' "if it's a land card ... put it onto
   -- the battlefield", which reads the slot twice over (Filter.IsBound, then
@@ -3555,6 +3562,25 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             Nothing -> False
             Just face -> Filter.matches tallyContext (Projection.viewOfCardIn gs oid face) (MillTally.filter tally)
        in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
+  -- CR 701.20a: show the named cards to every player. CR 701.20b keeps them
+  -- where they are, so the GameEvent.Revealed the funnel appends IS the whole
+  -- effect -- the rule, not a shortcut (Event.reveal's own haddock).
+  --
+  -- The SHOWER is this effect's controller, not each card's owner: rule 701.20a
+  -- says "show that card", and the player carrying out the instruction is the
+  -- one doing the showing. Every printing in the pool reveals a card the
+  -- controller already holds, so the two readings coincide today.
+  --
+  -- RevealCause.Ordinary: rule 702.94a's "this way" is the miracle window's
+  -- alone, and no rule asks again about a reveal a card's own sentence caused.
+  --
+  -- One reveal per named card rather than one for the batch, which is what
+  -- GameEvent.Revealed's shape allows -- it carries a single ObjectId. Nothing
+  -- in rule 701.20a makes a simultaneous reveal differ from a sequence of them,
+  -- since nothing moves and nothing is decided in between.
+  Effect.Reveal ref -> do
+    gs <- State.get
+    Monad.mapM_ (Event.reveal RevealCause.Ordinary controller) (objectRefObjects legal resolving controller source gs ref)
   Effect.LookAt (LookAt.MkLookAt ref slot) -> do
     gs <- State.get
     -- CR 608.2c: the cards are named as this instruction is reached, and CR

@@ -401,6 +401,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Draw (PlayerQuantity.MkPlayerQuantity (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 3)))
       """ {"type":"Draw","value":{"player":{"type":"InSlot","value":"target"},"quantity":{"type":"Literal","value":3}}} """
+  -- No-Regrets Egret's "you may reveal No-Regrets Egret", which names itself
+  -- through CR 113.7's reserved self slot.
+  Spec.it s "Reveal" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Reveal (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      """ {"type":"Reveal","value":{"type":"InSlot","value":"self"}} """
   -- Into the Wilds' "look at the top card of your library", whose slot the next
   -- clause reads back.
   Spec.it s "LookAt" $

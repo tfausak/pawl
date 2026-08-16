@@ -88,11 +88,24 @@ actionsFor field pid gs =
 -- let a player act more than once, which is why this recurses rather than asking
 -- once.
 --
--- Terminates even against an interpreter that never declines: every action in
--- the pool moves its card out of the hand (CR 103.6a onto the battlefield, CR
--- 103.5b's into exile), and a card leaving takes ALL of its entries with it, so
--- the candidate list strictly shrinks. An action that leaves its card in the
--- hand, and so can be taken again in the same window, is not supported (#801).
+-- TERMINATION IS THE PLAYER'S. An action need not move its card out of the
+-- hand: No-Regrets Egret's only reveals, so the same entry is offered again and
+-- again, and CR 103.5b caps nothing. Bounding the offers here -- one per entry,
+-- say -- would be the engine making a choice the rule leaves to the player, so
+-- this loop ends when they decline and not before. An interpreter that never
+-- declines never leaves the window, which is CR 104.4b's optional loop: those
+-- are not draws and the rules give nothing to break one with.
+--
+-- Proved by MulliganSpec's "an action that leaves its card in hand is offered
+-- again", which takes the Egret twice and then declines. Card DATA that makes
+-- an action a no-op -- one reading a slot nothing binds -- reaches the same
+-- loop with a keen interpreter, and CardSpec's CR 103.5b / CR 103.6 dataflow
+-- lint from #184 is what rejects it; that belongs at load, not here.
+--
+-- Not implemented: CR 103.6b caps a reveal from the OPENING hand at once per
+-- card, which this loop does not enforce. Unreachable today -- every CR 103.6
+-- action in the pool is rule 103.6a's, and putting the card onto the
+-- battlefield takes it out of the hand (#185).
 handWindow ::
   (Face.Face Card.Card -> [[Effect Card.Card]]) ->
   (Decider.Decider -> PlayerId -> [(ObjectId, HandActionIndex.HandActionIndex)] -> Prompt.Prompt (Maybe (ObjectId, HandActionIndex.HandActionIndex))) ->

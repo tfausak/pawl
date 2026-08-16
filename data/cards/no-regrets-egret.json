@@ -1,0 +1,79 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flying"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "mulliganActions": [
+        [
+          {
+            "type": "Reveal",
+            "value": {
+              "type": "InSlot",
+              "value": "self"
+            }
+          },
+          {
+            "type": "LookAt",
+            "value": {
+              "ref": {
+                "type": "TopOfLibrary",
+                "value": {
+                  "count": 2,
+                  "player": {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                }
+              },
+              "slot": "looked"
+            }
+          }
+        ]
+      ],
+      "name": "No-Regrets Egret",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Bird"
+          },
+          {
+            "type": "Scout"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
