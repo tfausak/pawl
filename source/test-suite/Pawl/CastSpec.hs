@@ -667,7 +667,8 @@ handInPlay printing board =
             Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False
+            Object.kicked = False,
+            Object.announcedX = Nothing
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),

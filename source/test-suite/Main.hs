@@ -686,6 +686,7 @@ spec s registry = do
   Pawl.PerformanceSpec.spec s registry
   Pawl.PhasingSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
+  Pawl.PlaneswalkerSpec.variableLoyaltySpec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry

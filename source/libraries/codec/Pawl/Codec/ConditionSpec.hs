@@ -42,6 +42,14 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
       Condition.codec
       (Condition.Any [Condition.Compares (Compares.MkCompares Quantity.Power Comparison.AtLeast (Quantity.Literal 1)), Condition.Compares (Compares.MkCompares Quantity.Toughness Comparison.AtMost (Quantity.Literal 2))])
       """ {"type":"Any","value":[{"type":"Compares","value":{"measured":{"type":"Power"},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},{"type":"Compares","value":{"measured":{"type":"Toughness"},"comparison":{"type":"AtMost"},"threshold":{"type":"Literal","value":2}}}]} """
+  -- Nissa, Steward of Elements' conjunction. Two asymmetric conjuncts, for the
+  -- disjunction's reason above.
+  Spec.it s "All" $
+    Common.assertCodec
+      s
+      Condition.codec
+      (Condition.All [Condition.Compares (Compares.MkCompares Quantity.Power Comparison.AtLeast (Quantity.Literal 1)), Condition.Compares (Compares.MkCompares Quantity.Toughness Comparison.AtMost (Quantity.Literal 2))])
+      """ {"type":"All","value":[{"type":"Compares","value":{"measured":{"type":"Power"},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":1}}},{"type":"Compares","value":{"measured":{"type":"Toughness"},"comparison":{"type":"AtMost"},"threshold":{"type":"Literal","value":2}}}]} """
   -- The old untagged shapes are not conditions any more. A comparison's keys
   -- alone decoding would mean a card file written before #1304 kept working
   -- while writing something the schema does not describe.
@@ -62,6 +70,12 @@ spec s = Spec.describe s "Pawl.Codec.Condition" $ do
       "preserved"
       (Codec.decode Condition.codec (Codec.encode Condition.codec (Condition.Any [Condition.Any []])))
       (Right (Condition.Any [Condition.Any []]))
+  Spec.it s "All nests" $
+    Spec.assertEqWith
+      s
+      "preserved"
+      (Codec.decode Condition.codec (Codec.encode Condition.codec (Condition.All [Condition.All []])))
+      (Right (Condition.All [Condition.All []]))
   -- Every Comparison, including both sides non-Count -- the shape an intervening
   -- "if" needs (CR 603.4). The
   -- registry-backed fixtures stay in Pawl.CodecIntegrationSpec, shared with

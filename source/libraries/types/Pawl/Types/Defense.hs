@@ -20,11 +20,11 @@ import qualified Numeric.Natural as Natural
 -- counters on it instead, which is a count in Object.counters and never a value of
 -- this type.
 --
--- The same shape as Pawl.Types.Loyalty, and for the same reasons: Natural rather
--- than Quantity, because Power and Toughness wrap Quantity for CR 208.2's star and
--- the CR 208.2a ability behind it, and no rule gives defense one. Unlike loyalty
--- there is not even a printed-X printing to defer -- every battle printed so far
--- prints a literal.
+-- Not a Quantity, for Pawl.Types.Loyalty's reason: Power and Toughness wrap one
+-- for CR 208.2's star and the CR 208.2a ability behind it, and no rule gives
+-- defense one. A NEWTYPE where loyalty is a sum, which is the one place the two
+-- diverge: loyalty has a printing whose lower right corner holds CR 107.3's X
+-- (Nissa, Steward of Elements), and every battle printed so far prints a literal.
 newtype Defense = MkDefense
   { unwrap :: Natural.Natural
   }

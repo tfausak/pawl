@@ -528,6 +528,7 @@ conditionSlots condition = case condition of
   Condition.Type.Compares c ->
     joinTwo (quantitySlots (Compares.measured c)) (quantitySlots (Compares.threshold c))
   Condition.Type.Any conditions -> joinSlots (fmap conditionSlots conditions)
+  Condition.Type.All conditions -> joinSlots (fmap conditionSlots conditions)
 
 -- CR 603.3b: is slotsOf's answer for this effect the WHOLE of what APPLYING it
 -- reads off the resolving object's bindings? A CLASSIFICATION of effects, in the
@@ -680,6 +681,7 @@ conditionSlotsAreExhaustive condition = case condition of
   Condition.Type.Compares c ->
     Quantity.slotsAreExhaustive (Compares.measured c) && Quantity.slotsAreExhaustive (Compares.threshold c)
   Condition.Type.Any conditions -> all conditionSlotsAreExhaustive conditions
+  Condition.Type.All conditions -> all conditionSlotsAreExhaustive conditions
 
 -- Does any of these effects read X? A card that reads X must declare it in its
 -- cost -- in the mana cost as an {X}, or in an additional cost as Hatred's "pay X

@@ -542,7 +542,29 @@ data Object = MkObject
     --
     -- A Bool and not a count: CR 702.33c's multikicker is payable "any number of
     -- times", and no card in the pool has two kicker costs either (#1234, #1235).
-    kicked :: Bool
+    kicked :: Bool,
+    -- | CR 107.3m: the value of X chosen for the SPELL that became this
+    -- permanent, which is the value of X for the permanent's
+    -- enters-the-battlefield replacement effects -- Nissa, Steward of Elements'
+    -- CR 306.5b intrinsic loyalty ability being the one reader today, through
+    -- Pawl.Engine.Projection.intrinsicReplacementsOf.
+    --
+    -- The one exception CR 400.7 admits on this path, and the rule states it as
+    -- one: `bindings` above carries the announcement while the spell is on the
+    -- stack, and newIncarnation forgets it like every other per-incarnation
+    -- field, so the value is copied across the move by
+    -- Pawl.Engine.Event.changeZoneAttaching off the departing spell's own
+    -- bindings. A SNAPSHOT taken at that instant, never a live read: rule 601.2b
+    -- fixed the number as the spell was cast and nothing can change it after.
+    --
+    -- NOT the permanent's own X, which rule 107.3m puts at 0 in the same
+    -- sentence. Nothing reads this as a Quantity, and Quantity.InSlot cannot
+    -- reach it -- it is not a binding.
+    --
+    -- Nothing for every object that did not enter the battlefield as a cast
+    -- spell with an announced X: a token, a permanent an effect put onto the
+    -- battlefield, and every spell whose cost declared no variable.
+    announcedX :: Maybe Natural.Natural
   }
   deriving (Eq, Ord, Show)
 
@@ -601,5 +623,9 @@ newIncarnation object =
       ventureRoom = Nothing,
       unlockedHalves = Set.empty,
       designations = Set.empty,
-      kicked = False
+      kicked = False,
+      -- CR 400.7 forgets the announcement like everything else; CR 107.3m's
+      -- exception is written back by the move that carries it, in
+      -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
+      announcedX = Nothing
     }

@@ -12,7 +12,10 @@
 -- covered elsewhere: it is combat's, so it lives in CombatSpec's
 -- AttackingAPlaneswalker group, on the same card.
 --
--- Jace Beleren is the whole proof: {1}{U}{U} Legendary Planeswalker -- Jace, with
+-- Two cards carry it. Nissa, Steward of Elements -- {X}{G}{U} Legendary
+-- Planeswalker -- Nissa, whose lower right corner prints CR 107.3's X -- is the
+-- VariableLoyalty group's alone, where CR 107.3m decides what that X is worth.
+-- Jace Beleren is the rest: {1}{U}{U} Legendary Planeswalker -- Jace, with
 -- printed loyalty 3 and three loyalty abilities (+2, -1, -10). Its -10 is what
 -- makes CR 606.6 observable at 3 loyalty, and three -1s across three of alice's
 -- turns are what drive it to 0 for CR 704.5i. Lightning Bolt's 3 and Firebolt's 2
@@ -21,13 +24,16 @@
 module Pawl.PlaneswalkerSpec where
 
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
@@ -38,14 +44,19 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 -- Jace Beleren's abilities in printed order: +2, -1, -10. Indexed rather than
@@ -164,6 +175,58 @@ burnResolved jaceId burnId gs =
   S.runPure (aimedAt jaceId) gs $ do
     S.cast S.alice burnId
     Stack.resolveTop
+
+-- Nissa, Steward of Elements' abilities in printed order: +2, 0, -6. Indexed for
+-- the reason Jace's are.
+plusTwoScry, zeroLook, minusSix :: Int
+plusTwoScry = 0
+zeroLook = 1
+minusSix = 2
+
+-- The one planeswalker printed with a loyalty of X, found on the battlefield by
+-- name for theJace's reason.
+theNissa :: GameState.GameState -> ObjectId.ObjectId
+theNissa gs =
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName $ Text.pack "Nissa, Steward of Elements")
+   in case filter named (Set.toList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> S.noSource
+
+-- CR 601.2b's announcement and CR 608.2d's "may", both FIXED rather than derived
+-- from the prompt: an answerer that computed either from what it was offered
+-- would go on answering legally after a mutation, and what these cases are about
+-- is which number the engine itself reached.
+announcingX :: Natural -> Prompt.Prompt r -> r
+announcingX x p = case p of
+  Prompt.ChooseX {} -> x
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- alice with six Forests and three Islands untapped, `deck` stocked from the top
+-- down, and Nissa, Steward of Elements cast for `x` and resolved through the
+-- ordinary path -- so her loyalty counters come from CR 306.5b's replacement
+-- reading CR 107.3m's announced value and never from a fixture.
+--
+-- Nine lands covers the largest X below ({6}{G}{U} is eight), so the BOARD is
+-- what every pair here holds constant and the announcement is the only thing that
+-- moves between the halves.
+nissaCastFor :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> Natural -> (ObjectId.ObjectId, GameState.GameState)
+nissaCastFor forest island nissa deck x =
+  let lands = S.landsFor forest S.alice 6 (S.landsInPlay island 3)
+      -- addLibraryCard puts its card ON TOP, so the deepest is stocked first.
+      deal board printing = snd (S.addLibraryCard printing S.alice board)
+      stocked = List.foldl' deal lands (reverse deck)
+      (gs, handId) = S.handOne nissa stocked
+      after = S.runPure (announcingX x) gs (do S.cast S.alice handId; Stack.resolveTop)
+   in (theNissa after, after)
+
+-- useAbility with an answerer that exercises CR 608.2d's "may", which the `0`
+-- ability's second clause raises. Its own X is never asked: no loyalty cost here
+-- declares one.
+useNissaAbility :: Int -> Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+useNissaAbility i p oid gs = case abilityAt i p of
+  ability : _ -> S.runPure (announcingX 0) gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop)
+  [] -> gs
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
@@ -314,3 +377,135 @@ spec s registry = Spec.describe s "Pawl.Engine.Planeswalker" $ do
     Spec.assertEqWith s "loyalty 1 after two" (S.counterOf CounterKind.Loyalty jaceId afterTwo) 1
     Spec.assertBool s (not (Set.member jaceId (GameState.battlefield afterThree))) "off the battlefield after three"
     Spec.assertEqWith s "in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice afterThree)) 1
+
+-- CR 306.5a's printed loyalty is a number on every planeswalker but one. Nissa,
+-- Steward of Elements prints CR 107.3's X there, and CR 107.3m says what it is
+-- worth: the value chosen for the spell that became the permanent, "although the
+-- value of X for that permanent is 0".
+--
+-- Every case below reads the loyalty COUNTERS on the permanent (CR 306.5c) and
+-- not merely that the spell resolved, and every pair holds the board fixed and
+-- moves only the announcement.
+variableLoyaltySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+variableLoyaltySpec s registry = Spec.describe s "VariableLoyalty" $ do
+  Spec.it s "CR 306.5b / 107.3m Nissa enters with as many loyalty counters as the X she was cast for" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    let (nissaId, after) = nissaCastFor forest island nissa [] 5
+    Spec.assertBool s (Set.member nissaId (GameState.battlefield after)) "on the battlefield"
+    -- Five, and no other reading of the rule this board admits answers five: the
+    -- spell's mana value on the stack was seven, its printed symbols number
+    -- three, an unread announcement is zero, and nine lands were available.
+    Spec.assertEqWith s "loyalty 5" (S.counterOf CounterKind.Loyalty nissaId after) 5
+
+  -- The pair. One board, one card, one difference -- the announced X -- so an
+  -- implementation reading anything else off the spell (its mana value, its
+  -- generic cost, a constant) cannot pass both halves.
+  Spec.it s "CR 107.3m the same board announced at X=3 enters with three instead" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    let (atFive, five) = nissaCastFor forest island nissa [] 5
+        (atThree, three) = nissaCastFor forest island nissa [] 3
+    Spec.assertEqWith s "loyalty 3" (S.counterOf CounterKind.Loyalty atThree three) 3
+    Spec.assertBool
+      s
+      (S.counterOf CounterKind.Loyalty atFive five /= S.counterOf CounterKind.Loyalty atThree three)
+      "the two boards disagree about the loyalty"
+
+  -- CR 107.1b forbids a negative X and nothing forbids zero, so {0}{G}{U} is a
+  -- legal announcement -- and CR 306.5b then puts no counters on at all.
+  Spec.it s "CR 107.1b / 704.5i announced at X=0 she enters with no loyalty and is buried" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    let (nissaId, after) = nissaCastFor forest island nissa [] 0
+        settled = S.settleSba after
+    Spec.assertEqWith s "no loyalty counters" (S.counterOf CounterKind.Loyalty nissaId after) 0
+    Spec.assertBool s (Set.member nissaId (GameState.battlefield after)) "she did enter the battlefield"
+    Spec.assertBool s (not (Set.member nissaId (GameState.battlefield settled))) "CR 704.5i takes her off it"
+    -- By NAME, not by id: CR 400.7 mints a new object as the card moves.
+    Spec.assertEqWith s "CR 704.5i: in her owner's graveyard" (graveyardCount "Nissa, Steward of Elements" settled) 1
+
+  -- The abilities read the loyalty back, which is what makes the number have to
+  -- be right rather than merely present. CR 606.6 gates the -6 on the permanent
+  -- having that many loyalty counters, so the announcement decides whether it is
+  -- offered at all -- and the +2 and the 0 are the control, offered either way.
+  Spec.it s "CR 606.6 the -6 is offered at X=6 and not at X=5" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    let (atSix, six) = nissaCastFor forest island nissa [] 6
+        (atFive, five) = nissaCastFor forest island nissa [] 5
+        offers oid gs i = not (null (activation oid i nissa)) && all (`elem` Action.legalActions S.alice gs) (activation oid i nissa)
+    Spec.assertEqWith s "X=6 is six loyalty" (S.counterOf CounterKind.Loyalty atSix six) 6
+    Spec.assertBool s (offers atSix six minusSix) "the -6 is offered at 6"
+    Spec.assertBool s (not (offers atFive five minusSix)) "and NOT at 5"
+    Spec.assertBool s (offers atFive five plusTwoScry && offers atFive five zeroLook) "while the +2 and the 0 are offered at 5"
+
+  -- CR 107.3m through the card's own text: the `0` reads "a creature card with
+  -- mana value less than or equal to the number of loyalty counters on Nissa",
+  -- and those counters are the ones X put there. Goblin Piker's mana value is 2.
+  Spec.it s "the 0 ability puts a creature card within the X-derived loyalty onto the battlefield" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    piker <- S.printingOf s registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    let (nissaId, board) = nissaCastFor forest island nissa [piker, birdMaiden] 5
+        after = useNissaAbility zeroLook nissa nissaId board
+    Spec.assertEqWith s "loyalty 5, and the Piker's mana value is 2" (S.counterOf CounterKind.Loyalty nissaId after) 5
+    Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 1
+    Spec.assertEqWith s "only the Bird Maiden is left in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+
+  -- The pair's other half, and the ONE thing changed is the X announced: at
+  -- loyalty 1 the Piker's mana value of 2 is too high, so the conjunction inside
+  -- the card's disjunction is false and the clause does nothing.
+  Spec.it s "and leaves it in the library when the loyalty is below its mana value" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    piker <- S.printingOf s registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    let (nissaId, board) = nissaCastFor forest island nissa [piker, birdMaiden] 1
+        after = useNissaAbility zeroLook nissa nissaId board
+    Spec.assertEqWith s "loyalty 1, below the Piker's mana value of 2" (S.counterOf CounterKind.Loyalty nissaId after) 1
+    Spec.assertEqWith s "nothing entered the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
+    Spec.assertEqWith s "both cards are still in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+
+  -- The land half of the same disjunction, which no mana value gates: CR 107.3m's
+  -- X is irrelevant to it, so a Forest on top goes to the battlefield at the
+  -- loyalty that just refused the Piker.
+  Spec.it s "the 0 ability puts a land card onto the battlefield whatever the loyalty" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    let (nissaId, board) = nissaCastFor forest island nissa [forest, birdMaiden] 1
+        after = useNissaAbility zeroLook nissa nissaId board
+    Spec.assertEqWith s "loyalty 1" (S.counterOf CounterKind.Loyalty nissaId after) 1
+    Spec.assertEqWith s "seven Forests: the six paid with plus the one put onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Forest")) S.alice after) 7
+    Spec.assertEqWith s "only the Bird Maiden is left in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+
+  -- The -6, paid for out of the X-derived loyalty. CR 205.1b splits the card's
+  -- two sentences: "they're still lands" is why the CREATURE card type is added
+  -- rather than set, and the same rule's last clause is why the creature TYPE is
+  -- set rather than added.
+  Spec.it s "CR 205.1b the -6 untaps two lands and makes them 5/5 Elemental creature lands with flying and haste" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    nissa <- S.printingOf s registry "Nissa, Steward of Elements"
+    let (nissaId, board) = nissaCastFor forest island nissa [] 6
+        after = useNissaAbility minusSix nissa nissaId board
+        animated = filter (Set.member CardType.Creature . PC.cardTypes) (fmap (`Projection.project` after) (Set.toList (GameState.battlefield after)))
+    Spec.assertEqWith s "the -6 spent the six counters it cost" (S.counterOf CounterKind.Loyalty nissaId after) 0
+    -- Eight of the nine lands paid for {6}{G}{U}; two of those eight are untapped
+    -- again, and nothing else on this board taps or untaps.
+    Spec.assertEqWith s "eight lands were tapped to cast her" (S.tappedCount S.alice board) 8
+    Spec.assertEqWith s "and two of them are untapped again" (S.tappedCount S.alice after) 6
+    Spec.assertEqWith s "two lands were animated, not one and not every land" (length animated) 2
+    Spec.assertEqWith s "each is 5/5" (fmap (\pc -> (PC.power pc, PC.toughness pc)) animated) [(Just 5, Just 5), (Just 5, Just 5)]
+    Spec.assertBool s (all (Set.member CardType.Land . PC.cardTypes) animated) "they're still lands"
+    Spec.assertBool s (all (Set.member Subtype.Elemental . PC.subtypes) animated) "each is an Elemental"
+    Spec.assertBool s (all (\pc -> Map.member Keyword.Flying (PC.keywords pc) && Map.member Keyword.Haste (PC.keywords pc)) animated) "with flying and haste"

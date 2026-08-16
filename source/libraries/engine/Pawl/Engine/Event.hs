@@ -547,7 +547,8 @@ createEmblem pid card =
             Object.ventureRoom = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.designations = Set.empty,
-            Object.kicked = False
+            Object.kicked = False,
+            Object.announcedX = Nothing
           }
    in placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
@@ -2400,7 +2401,32 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
                     -- face-down exile names exile, and no replacement redirects
                     -- it. Both are regression fences rather than proven
                     -- behaviour -- dropping them leaves the suite green.
-                    Object.exiledFaceDown = concealed && dest == requestedDest && dest == Zone.Exile
+                    Object.exiledFaceDown = concealed && dest == requestedDest && dest == Zone.Exile,
+                    -- CR 107.3m: the one thing CR 400.7's forgetting carries
+                    -- across, and the rule states it as an exception. The value
+                    -- of X for a permanent's enters-the-battlefield replacement
+                    -- effect is the value chosen for the spell that became it,
+                    -- so the announcement is read off the DEPARTING object's
+                    -- CR 601.2b binding -- which `newIncarnation` has just
+                    -- cleared -- and written onto the arriving one.
+                    --
+                    -- Read here rather than passed in by Pawl.Engine.Stack,
+                    -- because the funnel already holds the object that has the
+                    -- binding, and the rule is about any object that entered
+                    -- the battlefield as a resolving spell rather than about
+                    -- one caller's route.
+                    --
+                    -- BATTLEFIELD ONLY, the rule's own scope: a countered spell
+                    -- on its way to a graveyard becomes a card, and CR 107.3g
+                    -- puts the X of a card outside the stack at 0. Nothing for
+                    -- every move whose object bound no X, which is every move
+                    -- but a resolving {X} permanent spell's.
+                    --
+                    -- That gate is a regression fence rather than proven
+                    -- behaviour: the field's only reader is the entry
+                    -- replacement mint, which asks it of a permanent, so
+                    -- dropping the gate leaves the suite green.
+                    Object.announcedX = if dest == Zone.Battlefield then Binding.amountOf Binding.variableX (Object.bindings obj) else Nothing
                   }
               -- CR 604.2 ends a static ability's continuous effect the moment
               -- its permanent leaves the battlefield. A card whose own text
@@ -2971,7 +2997,8 @@ createTokens controller card copy n tapped entering = do
                     Object.ventureRoom = Nothing,
                     Object.unlockedHalves = Set.empty,
                     Object.designations = Set.empty,
-                    Object.kicked = False
+                    Object.kicked = False,
+                    Object.announcedX = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           -- CR 122.6a: the counters the EFFECT says these tokens enter with, placed
