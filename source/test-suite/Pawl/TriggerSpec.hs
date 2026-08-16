@@ -8457,10 +8457,11 @@ youngPyromancerSpec s registry =
 --
 -- Clarion Spirit, {1}{W} Creature -- Spirit 2/2: "Whenever you cast your second
 -- spell each turn, create a 1/1 white Spirit creature token with flying."
--- Nothing of this card is omitted. Chosen over Lavinia, Foil to Conspiracy --
--- the card #1498 and #520 both name -- because Lavinia's other two clauses need
--- an activation rider naming a turn with no phase (#520) and investigate, and
--- neither bears on the ordinal.
+-- Nothing of this card is omitted, and nothing of it is anything but the
+-- ordinal -- so these cases cannot be passing on some other clause. Chosen over
+-- Lavinia, Foil to Conspiracy, whose printed mana ability wants an activation
+-- rider naming a turn with no phase, which is not implemented (#520) and does
+-- not bear on the ordinal either way.
 --
 -- The spells cast are Boil, {3}{R} Instant "Destroy all Islands", for
 -- youngPyromancerSpec's reasons: it targets nothing, so no answerer choice

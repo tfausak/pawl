@@ -42,6 +42,16 @@ data SpellCast = MkSpellCast
     -- inside the description ("your second spell", "your first spell during
     -- each opponent's turn"), so the set counted is the set matched.
     --
+    -- Which is why the number is not stamped on GameEvent.SpellCast the way CR
+    -- 121.1's is stamped on GameEvent.Drew: a draw's ordinal is per player and
+    -- can be counted as the event is filed, and a cast's is per CONDITION, since
+    -- two abilities watching the same cast can be counting different sets. The
+    -- count is taken where the Filter is, at Pawl.Engine.Event.castOrdinal.
+    --
+    -- Pawl.Types.PlayerDrawsNthCard is the same question over CR 121's draw, and
+    -- answers it the same way: EQUALITY, not "at least", so a turn with four
+    -- casts fires a second-spell trigger once.
+    --
     -- INCLUSIVE of the cast being matched, which is what makes the second cast
     -- the one that answers 2: CR 601.2i has already filed the event by the time
     -- CR 603.2 checks the condition against it. The opposite reading of the same

@@ -645,7 +645,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 310.12b carries a counter kind alone.
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- CR 601.2i's Filter is a predicate over the spell that was cast, and a Filter
-  -- holds no Count, exactly as CR 603.6a's does above.
+  -- holds no Count, exactly as CR 603.6a's does above. Its ordinal is a bare
+  -- Natural, as CR 714.2b's is.
   TriggerCondition.SpellCast {} -> []
   -- The same rule read off the spell itself carries nothing at all.
   TriggerCondition.SelfCast -> []

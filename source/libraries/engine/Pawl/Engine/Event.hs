@@ -3244,6 +3244,13 @@ declarationsOf bearer gs =
 -- and counts it: the turn's second cast answers 2 whatever was cast after it.
 -- An event that is not in the log at all -- a fixture appending one directly --
 -- is read as the latest, which is what the whole walk then counts against.
+--
+-- No board tells the walk from a count of the WHOLE log: mutating it away leaves
+-- the suite green, because every cast a player can make gets its own CR 117.5
+-- scan and no card in the pool casts twice in one resolution -- though a clause
+-- list holding two Effect.OfferCast would, and the DSL admits one. So the stop
+-- is a fence resting on the rule's ordering rather than a behaviour a test
+-- proves.
 castOrdinal :: Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe Zone -> ObjectId -> GameState -> Natural
 castOrdinal context predicate fromZone spell gs =
   let isThisCast cast = SpellWasCast.spell cast == spell
