@@ -192,7 +192,7 @@ theNissa gs =
         oid : _ -> oid
         [] -> S.noSource
 
--- CR 601.2b's announcement and CR 603.5's "may", both FIXED rather than derived
+-- CR 601.2b's announcement and CR 608.2d's "may", both FIXED rather than derived
 -- from the prompt: an answerer that computed either from what it was offered
 -- would go on answering legally after a mutation, and what these cases are about
 -- is which number the engine itself reached.
@@ -220,7 +220,7 @@ nissaCastFor forest island nissa deck x =
       after = S.runPure (announcingX x) gs (do S.cast S.alice handId; Stack.resolveTop)
    in (theNissa after, after)
 
--- useAbility with an answerer that exercises CR 603.5's "may", which the `0`
+-- useAbility with an answerer that exercises CR 608.2d's "may", which the `0`
 -- ability's second clause raises. Its own X is never asked: no loyalty cost here
 -- declares one.
 useNissaAbility :: Int -> Printing.Printing -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
