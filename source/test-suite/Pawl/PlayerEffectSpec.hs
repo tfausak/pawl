@@ -4147,12 +4147,10 @@ prowlingSerpopardSpec s registry =
 --
 -- Its third sentence -- "If damage would be dealt to Jared Carthalion while
 -- you're the monarch, prevent that damage and put that many +1/+1 counters on
--- it" -- is omitted from data/cards/jared-carthalion-true-heir.json. The
--- prevention and CR 615.5's counters are both expressible now; what is not
--- implemented is the "while you're the monarch" gate, since a PRINTED
--- replacement ability has nowhere to carry a condition (#1597). The omission
--- takes both a shield and its counters away from Jared's own controller, so
--- pawl's card is strictly weaker than the printed one.
+-- it" -- is transcribed too, and belongs to a different subsystem: CR 604.2's
+-- gate on a printed replacement ability, proven in Pawl.ReplacementSpec's
+-- "Jared Carthalion, True Heir (CR 604.2)" group. Nothing here reaches it -- no
+-- case below deals damage.
 --
 -- Two seats and no departure, which is all the primary observable needs. Every
 -- case runs on one board -- alice's Jared, her Palace Jailer and her Goblin Piker

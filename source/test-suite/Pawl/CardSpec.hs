@@ -882,6 +882,9 @@ cardCounts card =
     <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.power card))
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
     <> concatMap staticAbilityCounts (Face.staticAbilities card)
+    -- CR 604.2's "as long as" clause on a printed replacement ability, the
+    -- staticAbilityCounts treatment of the same clause one field over.
+    <> concatMap (concatMap conditionCounts . Maybe.maybeToList . PrintedReplacement.condition) (Face.replacementEffects card)
     <> concatMap effectCounts (Card.allEffects card)
     <> concatMap conditionCounts (modalClauseConditions (Face.spell card))
     <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
@@ -2877,7 +2880,8 @@ activatedAbilityFilters ability =
 --     through a Count.
 --   * `staticAbilities` -- the affected set, CR 604.2's "as long as" condition,
 --     and the layer-6/7 modifications' own keywords and Counts.
---   * `replacementEffects` -- CR 614.1's counter-placement pattern.
+--   * `replacementEffects` -- CR 614.1's counter-placement pattern, plus CR
+--     604.2's "as long as" condition gating the ability that prints it.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSlot.
 --   * `additionalCosts` -- CR 601.2f's sacrifice component.
 --   * `alternativeCosts` -- that same component, plus CR 604.2's "as long as"
@@ -4952,6 +4956,25 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     [ PrintedReplacement.MkPrintedReplacement
                         Nothing
                         (ReplacementEffect.CounterR (CounterR.MkCounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)))
+                    ]
+                }
+            ),
+            ( "CR 604.2's clause gating a printed replacement ability",
+              base
+                { Face.replacementEffects =
+                    [ PrintedReplacement.MkPrintedReplacement
+                        ( Just
+                            ( Condition.Type.Compares
+                                ( Compares.MkCompares
+                                    ( Quantity.Type.Count
+                                        (Count.Type.MkCount (Scope.InZone (InZone.MkInZone Zone.Battlefield PlayerRef.EachPlayer)) buried Aggregation.Members)
+                                    )
+                                    Comparison.AtLeast
+                                    (Quantity.Type.Literal 1)
+                                )
+                            )
+                        )
+                        (ReplacementEffect.DestructionR DestructionRewrite.Regenerate)
                     ]
                 }
             ),
