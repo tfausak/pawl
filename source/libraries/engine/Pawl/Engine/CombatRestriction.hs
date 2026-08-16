@@ -4,6 +4,10 @@
 -- Pawl.Engine.AttackRequirement). None is a layer, and Pawl.Engine.Projection
 -- sees none of them.
 --
+-- Not all of them are card data: CR 701.35a's detain forbids both declarations
+-- and is read off the victim (Pawl.Engine.Detain) rather than off any card's
+-- printed text. See `detained`.
+--
 -- The only module that may CASE on Pawl.Types.CombatRestriction.
 -- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
 -- Pawl.Engine.Combat asks for a SET OF IDS, for a SET OF PAIRS, or for a NUMBER,
@@ -19,6 +23,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -42,14 +47,30 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 
 -- CR 508.1c: which of `candidates` an effect in force right now says CAN'T
--- ATTACK. Pacifism's first half, and Blind-Spot Giant's when its gate is shut.
+-- ATTACK. Pacifism's first half, Blind-Spot Giant's when its gate is shut, and CR
+-- 701.35a's first clause.
 cantAttack :: [ObjectId] -> GameState -> Set ObjectId
-cantAttack = restricted attacking
+cantAttack candidates gs = Set.union (restricted attacking candidates gs) (detained candidates gs)
 
 -- CR 509.1b: which of `candidates` an effect in force right now says CAN'T
--- BLOCK. Pacifism's second half, and Blind-Spot Giant's when its gate is shut.
+-- BLOCK. Pacifism's second half, Blind-Spot Giant's when its gate is shut, and CR
+-- 701.35a's second clause.
 cantBlock :: [ObjectId] -> GameState -> Set ObjectId
-cantBlock = restricted blocking
+cantBlock candidates gs = Set.union (restricted blocking candidates gs) (detained candidates gs)
+
+-- CR 701.35a: the detained permanents among `candidates`, which that rule forbids
+-- both declarations at once -- so one reading serves both gates above.
+--
+-- UNIONED in here rather than added to `inForce` below, and the difference is
+-- that a detain is not printed text. Every row `inForce` gathers is paired with a
+-- SOURCE, rewritten by CR 612.1's word swap over that source and dropped when CR
+-- 305.7 or CR 613.1f takes that source's abilities away; a detain has outlived
+-- its source entirely (CR 611.2), so it would have to opt out of all three -- the
+-- stored posture Pawl.Engine.BlockRequirement's own rows take. It also names no
+-- Pawl.Types.Affected: rule 701.35a's subject is one permanent the resolution
+-- already chose, and Pawl.Engine.Detain records it on that permanent.
+detained :: [ObjectId] -> GameState -> Set ObjectId
+detained candidates gs = Set.fromList (filter (`Detain.detained` gs) candidates)
 
 -- CR 508.1c together with CR 506.5: which of `candidates` an effect in force
 -- right now says can't be the ONLY creature declared as an attacker. Bonded

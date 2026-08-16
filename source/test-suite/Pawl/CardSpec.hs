@@ -730,6 +730,7 @@ effectCounts effect = case effect of
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Detain _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
@@ -1139,6 +1140,7 @@ effectReplacements effect = case effect of
   Effect.RemovePlayerCounters {} -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Detain _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
@@ -1717,6 +1719,7 @@ effectMintedFaces effect = case effect of
   Effect.RemovePlayerCounters {} -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Detain _ -> []
   Effect.DoesNotUntapNext _ -> []
   Effect.Transform _ -> []
   Effect.AddPhases _ -> []
@@ -2888,6 +2891,7 @@ effectFilters effect = case effect of
   Effect.RemovePlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> unframed (quantityFilters quantity)
   Effect.Tap ref -> unframed (objectRefFilters ref)
   Effect.Untap ref -> unframed (objectRefFilters ref)
+  Effect.Detain ref -> unframed (objectRefFilters ref)
   Effect.DoesNotUntapNext ref -> unframed (objectRefFilters ref)
   Effect.Transform ref -> unframed (objectRefFilters ref)
   Effect.AddPhases _ -> []

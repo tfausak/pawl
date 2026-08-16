@@ -550,6 +550,7 @@ createEmblem pid card =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
@@ -3063,6 +3064,7 @@ createTokens controller card copy n tapped entering = do
                     Object.designations = Set.empty,
                     Object.kicked = False,
                     Object.announcedX = Nothing,
+                    Object.detainedUntil = Set.empty,
                     Object.doesNotUntapNext = False
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)

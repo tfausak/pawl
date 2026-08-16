@@ -182,7 +182,7 @@ data Effect card
     -- ObjectRef is what lets ONE opcode be both Murder's "destroy target creature"
     -- and Day of Judgment's "destroy all creatures"; a sibling DestroyAll would
     -- have needed its own copy of the CR 702.12b gate, the CR 616.1 funnel and the
-    -- CR 701.19c rider. Tap, Untap, Transform, ModifyTarget, GainControl,
+    -- CR 701.19c rider. Tap, Untap, Detain, Transform, ModifyTarget, GainControl,
     -- DealDamage, PreventNextDamage, PreventAllDamage and MoveToZone have since
     -- taken the parameter for that reason, the two storing opcodes additionally
     -- owing CR 611.2c a frozen set; the rest still take a bare SlotName, none of
@@ -880,6 +880,23 @@ data Effect card
     -- Assault's sweeps are `EachMatching`. ObjectRef for Destroy's reason -- one
     -- opcode rather than a sibling UntapAll to keep in step with it.
     Untap ObjectRef.ObjectRef
+  | -- | CR 701.35a: detain the permanents the ObjectRef names. Azorius Arrester's
+    -- "detain target creature an opponent controls" is `InSlot`; Lavinia of the
+    -- Tenth's "detain each nonland permanent your opponents control" is
+    -- `EachMatching`, which is why this takes Tap's ObjectRef rather than a bare
+    -- slot.
+    --
+    -- NO DURATION beside it, unlike every stored continuous effect a card states
+    -- one for: rule 701.35a fixes it -- "until the next turn of the controller of
+    -- that spell or ability" -- so a Duration here would be a card restating a
+    -- number the rulebook already owns, and a card file could contradict it.
+    -- Every printing's reminder text repeats the rule and none varies it.
+    --
+    -- ONE opcode for a sentence with three limbs (can't attack, can't block,
+    -- activated abilities can't be activated), because rule 701.35a states them
+    -- as one and no card asks for a subset. Pawl.Engine.Detain is where they are
+    -- read apart.
+    Detain ObjectRef.ObjectRef
   | -- | CR 502.3 / 611.2: the permanents the ObjectRef names don't untap during
     -- their controller's NEXT untap step. Elvish Hunter's "{1}{G}, {T}: Target
     -- creature doesn't untap during its controller's next untap step" is the

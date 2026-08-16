@@ -373,6 +373,7 @@ addCreature printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in ( oid,
@@ -595,6 +596,7 @@ addToken card pid gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in ( oid,
@@ -640,6 +642,7 @@ addLibraryCard printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in ( oid,
@@ -689,6 +692,7 @@ addGraveyardCard printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in ( oid,
@@ -743,6 +747,7 @@ addExiledCard printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in ( oid,
@@ -802,6 +807,7 @@ addHandCard printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in ( oid,
@@ -870,6 +876,7 @@ landsFor land pid n base =
                   Object.designations = Set.empty,
                   Object.kicked = False,
                   Object.announcedX = Nothing,
+                  Object.detainedUntil = Set.empty,
                   Object.doesNotUntapNext = False
                 }
          in gs2
@@ -914,6 +921,7 @@ handOne printing base =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in ( gs2
@@ -964,6 +972,7 @@ pikerInHand land piker n ph =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
       gs3 =
@@ -1463,6 +1472,7 @@ oneMountainState mountain ph =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in GameState.MkGameState
@@ -1632,6 +1642,7 @@ spellOnStack printing pid gs =
             Object.designations = Set.empty,
             Object.kicked = False,
             Object.announcedX = Nothing,
+            Object.detainedUntil = Set.empty,
             Object.doesNotUntapNext = False
           }
    in ( oid,

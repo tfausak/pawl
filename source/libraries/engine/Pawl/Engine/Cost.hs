@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Detain as Detain
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -1347,6 +1348,13 @@ manaActivations pcs pid oid cost gs =
     && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
     && jointlyPayable pid oid (Cost.components cost) gs
     && sicknessOkGiven pcs pid oid cost gs
+    -- CR 701.35a's third clause, on the half of it CR 702.61b's split second
+    -- exempts and rule 701.35a does not: "its activated abilities can't be
+    -- activated" reaches a mana ability too. Here rather than in
+    -- Mana.manaSourcesGiven, because this is what BOTH of CR 605.3a's windows
+    -- consult -- the offer sweeps sources through it, and Cost.tapForMana asks it
+    -- again per option at the payment -- which is sickness's position one line up.
+    && not (Detain.detained oid gs)
     then
       Activations.MkActivations
         { Activations.times = repeatsOf pid oid cost gs,
