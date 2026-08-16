@@ -20,6 +20,20 @@ data PlayerRef
     -- stack, exile, command) this is the only meaningful value; the pairing is
     -- checked by the card lint, not by this type (#161).
     EachPlayer
+  | -- | EachPlayer minus the player a slot names -- Shahrazad's "each player who
+    -- doesn't win the subgame", where the slot holds the subgame's winner.
+    --
+    -- NOT Relative Opponent: the excluded seat is the one a slot names, which
+    -- need not be the perspective, and the set keeps the perspective in it when
+    -- the slot names somebody else. NOT InSlot's complement either -- that arm
+    -- names ONE player, and this is the rest of the table.
+    --
+    -- A SLOT NAMING NOBODY EXCLUDES NOBODY, so the set is every player. That is
+    -- the reading the producer needs rather than a fallback: a drawn subgame has
+    -- no winner, and "each player who doesn't win" is then the whole table. It is
+    -- also why this is a slot-EXCLUSION rather than a slot-read -- an unfilled
+    -- slot makes InSlot's readers no-op, and here it must widen instead.
+    EachPlayerExcept SlotName.SlotName
   | -- | CR 109.5 / 102.2, resolved against the evaluation context's perspective.
     Relative PlayerRelation.PlayerRelation
   | -- | The player bound in a slot -- Sudden Impact's "that player's hand", where

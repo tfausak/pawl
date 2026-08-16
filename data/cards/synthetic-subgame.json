@@ -11,18 +11,18 @@
                 "effects": [
                   {
                     "type": "PlaySubgame",
-                    "value": "loser"
+                    "value": "winner"
                   },
                   {
-                    "type": "DealDamage",
+                    "type": "LoseLife",
                     "value": {
+                      "player": {
+                        "type": "EachPlayerExcept",
+                        "value": "winner"
+                      },
                       "quantity": {
                         "type": "Literal",
                         "value": 3
-                      },
-                      "ref": {
-                        "type": "InSlot",
-                        "value": "loser"
                       }
                     }
                   }

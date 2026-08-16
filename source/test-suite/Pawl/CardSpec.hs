@@ -4175,6 +4175,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               PlayerRef.Relative PlayerRelation.Opponent -> False
               PlayerRef.InSlot _ -> True
               PlayerRef.EachPlayer -> False
+              -- The whole table but one seat, so several libraries -- EachPlayer's
+              -- answer, and for its reason.
+              PlayerRef.EachPlayerExcept _ -> False
               -- One seat, so one library -- InSlot's answer. Unreachable from
               -- card data, which the sweep below is what enforces.
               PlayerRef.Specific _ -> True
