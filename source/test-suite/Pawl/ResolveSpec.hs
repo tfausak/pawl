@@ -587,6 +587,16 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
   Spec.it s "CR 612 slotsOf finds a ChangeText slot" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
     Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText (ChangeText.MkChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot))) (Map.singleton slot SlotArity.One)
+  -- The card lint's READ side for CR 106.4's recipient: Shizuko, Caller of
+  -- Autumn's "that player" is a slot read, so a payload naming a slot no
+  -- condition binds must look dangling. Asserted here because the pool cannot
+  -- observe it -- Shizuko's own slot IS bound, so the lint passes either way and
+  -- only a card written wrong would notice. A regression fence, not a proof of
+  -- behaviour the pool exercises.
+  Spec.it s "CR 106.4 slotsOf finds the slot an AddMana recipient names" $ do
+    let slot = SlotName.MkSlotName (Text.pack "thatPlayer")
+    Spec.assertEqWith s "a named recipient is a read" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.InSlot slot) ManaProduction.AnyColor))) (Map.singleton slot SlotArity.One)
+    Spec.assertEqWith s "and CR 109.5's unwritten one names no slot" (Resolve.slotsOf (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor))) Map.empty
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) (ManaProduction.OfType (ManaType.Colored Color.Green))))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana (ManaAddition.MkManaAddition (PlayerRef.Relative PlayerRelation.You) ManaProduction.AnyColor))) (Just ManaProduction.AnyColor)
