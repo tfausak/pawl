@@ -324,7 +324,7 @@ slotsOf effect = case effect of
   Effect.Proliferate -> Map.empty
   Effect.Bolster quantity -> quantitySlots quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> quantitySlots quantity
-  Effect.Blight quantity -> quantitySlots quantity
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> joinTwo (playerRefSlots ref) (quantitySlots quantity)
   Effect.TemptWithTheRing -> Map.empty
   Effect.Venture -> Map.empty
   Effect.ExileHandThenDraw -> Map.empty
@@ -580,7 +580,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Proliferate -> True
   Effect.Bolster quantity -> Quantity.slotsAreExhaustive quantity
   Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.slotsAreExhaustive quantity
-  Effect.Blight quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.slotsAreExhaustive quantity
   Effect.TemptWithTheRing -> True
   Effect.Venture -> True
   Effect.ExileHandThenDraw -> True
@@ -723,7 +723,7 @@ readsX = any effectReadsX
       Effect.Proliferate -> False
       Effect.Bolster quantity -> Quantity.readsX quantity
       Effect.Amass (Amass.Type.MkAmass quantity _) -> Quantity.readsX quantity
-      Effect.Blight quantity -> Quantity.readsX quantity
+      Effect.Blight (PlayerQuantity.MkPlayerQuantity _ quantity) -> Quantity.readsX quantity
       Effect.TemptWithTheRing -> False
       Effect.Venture -> False
       Effect.ExileHandThenDraw -> False
@@ -4968,12 +4968,24 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
       Just n -> Amass.amass controller source resolving subtype (Integer.toNaturalSaturating n)
-  -- CR 701.68a: "blight N" -- put N -1/-1 counters on a creature you control.
-  -- The whole keyword action is Pawl.Engine.Blight.blight's, which is where rule
-  -- 701.68's text lives -- this arm knows only that some effect asked for it,
-  -- exactly as the Amass arm above knows only that some effect asked for that.
-  -- Rule 701.68b's "they can't choose to blight" reaches the same procedure
-  -- through Pawl.Engine.Cost, where CR 118.12 makes the optional reading a cost.
+  -- CR 701.68a: "blight N" -- each player the PlayerRef names puts N -1/-1
+  -- counters on a creature THEY control. The whole keyword action is
+  -- Pawl.Engine.Blight.blight's, which is where rule 701.68's text lives -- this
+  -- arm knows only that some effect asked for it, exactly as the Amass arm above
+  -- knows only that some effect asked for that. Rule 701.68b's "they can't choose
+  -- to blight" reaches the same procedure through Pawl.Engine.Cost, where CR
+  -- 118.12 makes the optional reading a cost.
+  --
+  -- The PlayerRef is passed on to `blight` per player, so each blighter's pool is
+  -- their own creatures and each is asked separately -- rule 701.68a's "you" is
+  -- whoever the instruction addresses. A reference naming nobody, or an illegal
+  -- slot (CR 608.2b), arrives as the empty list and blights nothing, the posture
+  -- every PlayerRef arm here takes.
+  --
+  -- APNAP for the order several blighters are asked in (CR 101.4), Scry's and
+  -- Surveil's reading and for their reason: rule 701.68 states no order of its
+  -- own. Each blighter's counters land before the next is asked, which CR 122.6
+  -- makes unobservable across seats -- no player's pool holds another's creature.
   --
   -- MANDATORY here, so the empty pool is CR 101.3's no-op rather than rule
   -- 701.68b's refusal, and the answer is discarded.
@@ -4984,13 +4996,15 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
   --
   -- Targetless: nothing was targeted, so unlike every slot-reading opcode here
   -- there is no CR 608.2b legality to re-check.
-  Effect.Blight quantity -> do
+  Effect.Blight (PlayerQuantity.MkPlayerQuantity ref quantity) -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legal
+        named = playerRefPlayers legal controller gs ref
+        blighters = filter (\pid -> List.elem pid named) (Game.apnapOrder gs)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
-      Just n -> Monad.void (Blight.blight controller resolving (Integer.toNaturalSaturating n))
+      Just n -> Monad.forM_ blighters (\pid -> Monad.void (Blight.blight pid resolving (Integer.toNaturalSaturating n)))
   -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
   -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
   -- this arm knows only that some effect asked for it, exactly as the arms around
