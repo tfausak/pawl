@@ -570,6 +570,35 @@ data Object = MkObject
     -- spell with an announced X: a token, a permanent an effect put onto the
     -- battlefield, and every spell whose cost declared no variable.
     announcedX :: Maybe Natural.Natural,
+    -- | CR 701.35a: this permanent is DETAINED -- it "can't attack or block and
+    -- its activated abilities can't be activated" -- until the next turn of each
+    -- player named here. Empty for every permanent nothing has detained, which is
+    -- almost all of them.
+    --
+    -- On the VICTIM rather than in a GameState list, which is
+    -- doesNotUntapNext below's reason: a zone change reuses the ObjectId
+    -- (Pawl.Engine.Event.changeZoneAttaching re-inserts under the same key and
+    -- replaces the value with `newIncarnation`), so a list keyed by id would
+    -- follow the card back onto the battlefield as a permanent CR 400.7 makes a
+    -- new object the detaining effect never named. As a field it is
+    -- per-incarnation like damage and counters, cleared by newIncarnation, and
+    -- the forgetting IS that rule.
+    --
+    -- A SET OF PLAYERS and not a Pawl.Types.Expiry, because rule 701.35a fixes
+    -- the duration itself -- "until the next turn of the controller of that spell
+    -- or ability" is the whole of it, and no card states another one. So the only
+    -- thing there is to remember is WHOSE next turn, which is CR 109.5's "you"
+    -- resolved at the resolution. An Expiry would admit five durations no detain
+    -- can arm, and would owe the three sweeps that end them a carrier they could
+    -- never match. Pawl.Engine.Expiry.dropAtTurnOf is the one sweep that does
+    -- reach this, and it drops a seat's entry at the handoff the same way it ends
+    -- an Expiry.AtTurnOf -- CR 800.4m's departed player included.
+    --
+    -- A SET and not one player, because two detains of the same permanent by
+    -- different players run to two different turns and the later one has to
+    -- outlast the earlier. Two detains by the SAME player collapse for free,
+    -- which is right: rule 701.35a states a duration and not a count.
+    detainedUntil :: Set.Set PlayerId.PlayerId,
     -- | CR 502.3 / CR 611.2: a ONE-SHOT untap prohibition standing over this
     -- permanent -- "that creature doesn't untap during its controller's next
     -- untap step" (Elvish Hunter), and CR 701.43a's exert. Set by
@@ -665,6 +694,10 @@ newIncarnation object =
       -- exception is written back by the move that carries it, in
       -- Pawl.Engine.Event.changeZoneAttaching's mkObj.
       announcedX = Nothing,
+      -- CR 400.7 again, and rule 701.35a needs it: the detained permanent that
+      -- leaves the battlefield and comes back is a new object, and nothing
+      -- detained that one.
+      detainedUntil = Set.empty,
       -- CR 400.7 forgets the prohibition with everything else, and no rule
       -- writes it back: the effect named a permanent, and the object that
       -- returns to the battlefield is not that permanent.

@@ -264,6 +264,7 @@ import qualified Pawl.DaytimeSpec
 import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec
+import qualified Pawl.DetainSpec
 import qualified Pawl.DungeonSpec
 import qualified Pawl.EngineSpec
 import qualified Pawl.EventSpec
@@ -650,6 +651,7 @@ spec s registry = do
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
   Pawl.DepartureSpec.spec s registry
+  Pawl.DetainSpec.spec s registry
   Pawl.EventSpec.spec s registry
   Pawl.ExileSpec.spec s registry
   Pawl.ExpirySpec.spec s registry
