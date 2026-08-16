@@ -2699,10 +2699,13 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             --
             -- CR 608.2h / 611.2d: the VALUE is locked here too -- "the answer is
             -- determined only once, when the effect is applied". The quantities
-            -- are frozen to Literals against the SOURCE (which holds a chosen X)
-            -- and the source's CONTROLLER (whose hand a player-scoped count
-            -- counts), never against an affected object. See the P3b spec,
-            -- section 2.4.
+            -- are frozen to Literals against the SOURCE (CR 113.7a, whose power a
+            -- Quantity.Power reads) and the source's CONTROLLER (whose hand a
+            -- player-scoped count counts), never against an affected object. CR
+            -- 601.2b's announced X is the one value read off `resolving` instead:
+            -- for a spell the two ids coincide, and for an activated ability the
+            -- permanent never learned the value -- the ability object holds it.
+            -- See the P3b spec, section 2.4.
             --
             -- Nothing when a quantity cannot be evaluated at THIS moment: 608.2h
             -- gives the effect exactly one moment to determine its answer, so a
@@ -2710,7 +2713,7 @@ applyOneEffect runSubgame resolving source controller legal chosen effect = case
             -- raw quantity would only move the read to the wrong object at the
             -- wrong time. Nothing is stored instead -- the same shape the Expiry
             -- arm above takes for CR 611.2b's duration that never starts.
-            case Projection.freezeQuantities gs source (Just controller) modification of
+            case Projection.freezeQuantities gs resolving source (Just controller) modification of
               Nothing -> gs
               Just frozen ->
                 let (ts, gs1) = Game.freshTimestamp gs
@@ -5712,7 +5715,7 @@ bindPlayerSlot holder slot player gs =
 --
 -- `holder` is the effect's `source`, NOT `resolving`, and that asymmetry with
 -- bindSlot above is about where each is READ rather than about what each means:
--- an amount is read back by Quantity.evaluate, which every arm calls aimed at
+-- an amount is read back by Quantity.evaluateFor, which every arm calls aimed at
 -- `source` (CR 608.2h's "information from a specific object ... including the
 -- source of the ability itself"), while an object binding is read back by
 -- ArmDelayedTrigger off the stack object. Bane of Progress binds and reads one
