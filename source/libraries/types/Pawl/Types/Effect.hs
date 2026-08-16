@@ -183,11 +183,13 @@ data Effect card
     -- ObjectRef is what lets ONE opcode be both Murder's "destroy target creature"
     -- and Day of Judgment's "destroy all creatures"; a sibling DestroyAll would
     -- have needed its own copy of the CR 702.12b gate, the CR 616.1 funnel and the
-    -- CR 701.19c rider. Tap, Untap, Detain, Transform, ModifyTarget, GainControl,
-    -- DealDamage, PreventNextDamage, PreventAllDamage and MoveToZone have since
-    -- taken the parameter for that reason, the two storing opcodes additionally
-    -- owing CR 611.2c a frozen set; the rest still take a bare SlotName, none of
-    -- them having a card that names a set.
+    -- CR 701.19c rider. Every opcode a card has since asked to name a set with
+    -- has taken the parameter for that reason -- Counter is the latest, so that
+    -- Swift Silence's "all other spells" and Cancel's targeted slot stay one
+    -- opcode -- and the storing ones additionally owe CR 611.2c a frozen set. The
+    -- rest still take a bare SlotName, none of them having a card that names a
+    -- set. Not enumerated here: a list of arm names goes stale silently, and the
+    -- field itself is the record.
     --
     -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
     -- destroyed into the effect source's live bindings, for a later effect of the

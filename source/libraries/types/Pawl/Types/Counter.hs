@@ -15,6 +15,11 @@ import qualified Pawl.Types.SlotName as SlotName
 -- way". Destroy's field, for Destroy's reason, and it has to be the FUNNEL's
 -- answer rather than the sweep's: a spell CR 113.6g or CR 613.11 protects was
 -- named and was not countered.
+--
+-- The count is of everything COUNTERED, which CR 701.6a makes "a spell or
+-- ability" -- Swift Silence's rider says "each SPELL countered this way", and
+-- the two agree because its own ref names only spells (CR 109.2b). A card that
+-- counters both and counts only one kind would need the narrowing here.
 data Counter = MkCounter
   { ref :: ObjectRef.ObjectRef,
     slot :: Maybe SlotName.SlotName

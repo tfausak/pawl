@@ -8655,11 +8655,19 @@ counteredSpells gs =
 
 -- ONE board for Swift Silence, built once and branched. bob has five untapped
 -- lands -- two Plains and three Islands, exactly {2}{W}{U}{U} and no more, so no
--- assertion below can turn on spare mana -- and the Swift Silence in hand. Three
--- spells are already on the stack under it: alice's Divination, bob's own Goblin
--- Piker, and alice's Blurred Mongoose, whose card prints "can't be countered"
--- (CR 113.6g). Both libraries are stocked, since the rider draws and CR 104.3c
--- would otherwise decide the game before an assertion ran.
+-- assertion below can turn on spare mana -- and the Swift Silence in hand.
+-- Waiting under it are four objects, and each is on the stack for a reason:
+--
+--   * alice's Divination and bob's own Goblin Piker are the counterable
+--     victims, one per seat, so the sweep is not one player's;
+--   * alice's Blurred Mongoose prints "can't be countered" (CR 113.6g), which
+--     is what tells the swept set apart from the countered one;
+--   * alice's Prodigal Sorcerer's activated {T} is an ABILITY, which CR 113.9
+--     says is not a spell -- so CR 109.2b's "all other spells" must leave it
+--     alone however the sweep is written.
+--
+-- Both libraries are stocked, since the rider draws and CR 104.3c would
+-- otherwise decide the game before an assertion ran.
 --
 -- Swift Silence is CAST rather than placed: Support.spellOnStack leaves
 -- Object.bindings empty, and CR 601.2b's mode choice is one of the bindings a
@@ -8667,29 +8675,47 @@ counteredSpells gs =
 -- placed, since none of them resolves.
 --
 -- `mongoose` is a Maybe so the twin below can drop the uncounterable spell and
--- change NOTHING else -- same seats, same mana, same victims, same stack order.
+-- change NOTHING else -- same seats, same mana, same victims, same ability, same
+-- stack order.
 --
--- Returns the two counterable victims, the uncounterable one, the Swift Silence
--- in hand and the board.
+-- Nothing where the Sorcerer stopped declaring exactly one activated ability,
+-- which is stifleBoard's posture for the same fixture.
+--
+-- Returns the two counterable victims, the uncounterable one, the ability, the
+-- Swift Silence in hand and the board.
 swiftSilenceBoard ::
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
+  Printing.Printing ->
   Maybe Printing.Printing ->
-  (ObjectId.ObjectId, ObjectId.ObjectId, Maybe ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-swiftSilenceBoard plains island swiftSilence divination piker mMongoose =
-  let lands = S.landsFor island S.bob 3 (S.landsFor plains S.bob 2 (Setup.emptyGame S.bothPlayers))
-      stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard divination pid g)) gs [1 :: Int .. 5]
-      stocked = stock S.bob (stock S.alice lands)
-      (hers, withHers) = S.spellOnStack divination S.alice stocked
-      (his, withHis) = S.spellOnStack piker S.bob withHers
-      (mUncounterable, withMongoose) = case mMongoose of
-        Nothing -> (Nothing, withHis)
-        Just mongoose -> let (oid, g) = S.spellOnStack mongoose S.alice withHis in (Just oid, g)
-      (silence, board) = S.addHandCard swiftSilence S.bob withMongoose
-   in (hers, his, mUncounterable, silence, board)
+  Maybe (ObjectId.ObjectId, ObjectId.ObjectId, Maybe ObjectId.ObjectId, [ObjectId.ObjectId], ObjectId.ObjectId, GameState.GameState)
+swiftSilenceBoard plains island swiftSilence divination piker sorcerer mMongoose = case soleActivatedAbility sorcerer of
+  Nothing -> Nothing
+  Just ability ->
+    let lands = S.landsFor island S.bob 3 (S.landsFor plains S.bob 2 (Setup.emptyGame S.bothPlayers))
+        stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard divination pid g)) gs [1 :: Int .. 5]
+        stocked = stock S.bob (stock S.alice lands)
+        (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice stocked
+        -- CR 302.6: the Sorcerer must have settled under alice before its {T}
+        -- may be activated at all.
+        settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
+        (hers, withHers) = S.spellOnStack divination S.alice settled
+        (his, withHis) = S.spellOnStack piker S.bob withHers
+        (mUncounterable, withMongoose) = case mMongoose of
+          Nothing -> (Nothing, withHis)
+          Just mongoose -> let (oid, g) = S.spellOnStack mongoose S.alice withHis in (Just oid, g)
+        onStack = GameState.stack withMongoose
+        atAlice :: Prompt.Prompt r -> r
+        atAlice p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
+          _ -> S.identityAnswer p
+        activated = S.runPure atAlice (withMongoose {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice sorcererId ability)
+        abilityIds = filter (`notElem` onStack) (GameState.stack activated)
+        (silence, board) = S.addHandCard swiftSilence S.bob activated
+     in Just (hers, his, mUncounterable, abilityIds, silence, board)
 
 -- bob casts his Swift Silence over the waiting stack and lets it resolve.
 swiftSilenceRun :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
@@ -8721,27 +8747,35 @@ swiftSilenceSpec s registry = Spec.describe s "SwiftSilence" $ do
     divination <- S.printingOf s registry "Divination"
     piker <- S.printingOf s registry "Goblin Piker"
     mongoose <- S.printingOf s registry "Blurred Mongoose"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     plains <- S.printingOf s registry "Plains"
     island <- S.printingOf s registry "Island"
-    let (hers, his, mUncounterable, silence, board) = swiftSilenceBoard plains island swiftSilence divination piker (Just mongoose)
-        resolved = swiftSilenceRun silence board
-    Spec.assertEqWith
-      s
-      "exactly the two counterable spells were countered: `Not IsSource` spared Swift Silence itself, and CR 113.6g spared the Mongoose"
-      (List.sort (counteredSpells resolved))
-      (List.sort [hers, his])
-    Spec.assertEqWith
-      s
-      "CR 113.6g the uncounterable spell is still on the stack under its original id, and it is all that is left"
-      (GameState.stack resolved)
-      (Maybe.maybeToList mUncounterable)
-    Spec.assertBool s (not (S.onBattlefield his resolved)) "the countered creature spell never became a permanent"
-    Spec.assertEqWith s "CR 701.6a alice's countered spell reached her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
-    -- Two cards: bob's own countered Piker, and CR 608.2n's Swift Silence, put
-    -- there as the last part of its own resolution rather than by any countering.
-    Spec.assertEqWith s "bob's holds his countered spell and the resolved Swift Silence" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 2
-    Spec.assertEqWith s "two countered this way, so two cards drawn" (S.handSize S.bob resolved) 2
-    Spec.assertEqWith s "and nobody else drew" (S.handSize S.alice resolved) 0
+    case swiftSilenceBoard plains island swiftSilence divination piker sorcerer (Just mongoose) of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (hers, his, mUncounterable, abilityIds, silence, board) -> do
+        let resolved = swiftSilenceRun silence board
+        Spec.assertEqWith s "the activation put exactly one ability on the stack" (length abilityIds) 1
+        Spec.assertEqWith
+          s
+          "exactly the two counterable spells were countered: `Not IsSource` spared Swift Silence itself, CR 113.6g the Mongoose, and CR 113.9 the ability"
+          (List.sort (counteredSpells resolved))
+          (List.sort [hers, his])
+        Spec.assertEqWith
+          s
+          "the ability and the uncounterable spell are still on the stack under their original ids, and they are all that is left"
+          (GameState.stack resolved)
+          (abilityIds <> Maybe.maybeToList mUncounterable)
+        -- CR 608.2n: an ability that HAD been countered would have ceased to
+        -- exist, so a live object here is the sweep having spared it.
+        Spec.assertBool s (all (\oid -> Maybe.isJust (Game.lookupObject oid resolved)) abilityIds) "CR 113.9 the ability object still exists"
+        Spec.assertBool s (not (S.onBattlefield his resolved)) "the countered creature spell never became a permanent"
+        Spec.assertEqWith s "CR 701.6a alice's countered spell reached her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+        -- Two cards: bob's own countered Piker, and CR 608.2n's Swift Silence,
+        -- put there as the last part of its own resolution rather than by any
+        -- countering.
+        Spec.assertEqWith s "bob's holds his countered spell and the resolved Swift Silence" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 2
+        Spec.assertEqWith s "two countered this way, so two cards drawn" (S.handSize S.bob resolved) 2
+        Spec.assertEqWith s "and nobody else drew" (S.handSize S.alice resolved) 0
   -- The discriminating twin: the SAME board with the uncounterable spell
   -- removed and nothing else changed. The sweep now names two rather than three
   -- and the draw is unchanged at two, so the two above were the COUNTERED set
@@ -8750,13 +8784,16 @@ swiftSilenceSpec s registry = Spec.describe s "SwiftSilence" $ do
     swiftSilence <- S.printingOf s registry "Swift Silence"
     divination <- S.printingOf s registry "Divination"
     piker <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     plains <- S.printingOf s registry "Plains"
     island <- S.printingOf s registry "Island"
-    let (hers, his, _, silence, board) = swiftSilenceBoard plains island swiftSilence divination piker Nothing
-        resolved = swiftSilenceRun silence board
-    Spec.assertEqWith s "still the same two" (List.sort (counteredSpells resolved)) (List.sort [hers, his])
-    Spec.assertEqWith s "the stack is empty" (GameState.stack resolved) []
-    Spec.assertEqWith s "still two cards drawn" (S.handSize S.bob resolved) 2
+    case swiftSilenceBoard plains island swiftSilence divination piker sorcerer Nothing of
+      Nothing -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+      Just (hers, his, _, abilityIds, silence, board) -> do
+        let resolved = swiftSilenceRun silence board
+        Spec.assertEqWith s "still the same two" (List.sort (counteredSpells resolved)) (List.sort [hers, his])
+        Spec.assertEqWith s "and only the untouched ability is left on the stack" (GameState.stack resolved) abilityIds
+        Spec.assertEqWith s "still two cards drawn" (S.handSize S.bob resolved) 2
 
 baneOfProgressSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 baneOfProgressSpec s registry = Spec.describe s "BaneOfProgress" $ do

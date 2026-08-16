@@ -136,9 +136,11 @@ data ObjectRef
     -- narrowing this arm chose: rule 109.2b's word is "spell", and CR 112.1
     -- makes a spell a CARD on the stack, so an activated or triggered ability is
     -- not one. The test is Pawl.Engine.Game.isSpell, a classification of the
-    -- object's kind and never of the card's identity. An arm for a swept set of
-    -- ABILITIES waits for a printing that names one; "counter all abilities"
-    -- is not implemented (#1397).
+    -- object's kind and never of the card's identity. A swept set of ABILITIES
+    -- would be this arm's sibling and is not this arm: CR 113.9 keeps the two
+    -- populations apart wherever countering reads them, and pawl already draws
+    -- the same line at the target pool (Cancel's Pool.Spells against Stifle's
+    -- Pool.Abilities).
     --
     -- "Other" is written `Not IsSource`, the one spelling CR 601.2c's "another"
     -- and Opalescence's "each other" already share -- the resolving spell is
@@ -146,8 +148,9 @@ data ObjectRef
     -- that dropped the source unasked would make "counter all spells" unsayable.
     --
     -- The zone is BAKED IN rather than carried as a Pawl.Types.Zone, which is
-    -- EachCardInGraveyard's reason and the shape #1309 fixed for every zone: a
-    -- card wanting a filtered sweep of one more zone gets one more arm.
+    -- EachCardInGraveyard's reason: a card wanting a filtered sweep of one more
+    -- zone gets one more arm, and a hand's and a library's are the two still
+    -- unwritten (gap #1309).
     --
     -- Not a target and never one (CR 115.10a), so CR 608.2b has nothing to
     -- fizzle -- which is the whole difference between this and Cancel's targeted
