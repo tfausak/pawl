@@ -8451,6 +8451,108 @@ youngPyromancerSpec s registry =
           -- proves the seat is the only thing the silence above turns on.
           Spec.assertEqWith s "the same board fires for alice's own cast" (elementalsOf S.alice byAlice) 1
 
+-- The same CR 601.2i cast, read for WHICH cast of the turn it was --
+-- SpellCast.ordinal. The cast-side twin of drawTriggerSpec's Erudite Wizard, and
+-- the two conditions answer the same question about different events.
+--
+-- Clarion Spirit, {1}{W} Creature -- Spirit 2/2: "Whenever you cast your second
+-- spell each turn, create a 1/1 white Spirit creature token with flying."
+-- Nothing of this card is omitted. Chosen over Lavinia, Foil to Conspiracy --
+-- the card #1498 and #520 both name -- because Lavinia's other two clauses need
+-- an activation rider naming a turn with no phase (#520) and investigate, and
+-- neither bears on the ordinal.
+--
+-- The spells cast are Boil, {3}{R} Instant "Destroy all Islands", for
+-- youngPyromancerSpec's reasons: it targets nothing, so no answerer choice
+-- enters the fixture, and nobody here controls an Island, so a resolution
+-- changes nothing an assertion reads. The Spirit token is the only thing a cast
+-- can add to the battlefield, and the count of them is the whole observable --
+-- so "fired on the second" is told apart from "fired on any" (three tokens) and
+-- from "fired on the first" (a token after the first cast) by reading it after
+-- EACH cast rather than at the end.
+--
+-- THREE seats, for youngPyromancerSpec's reason, and the opponent case below
+-- needs them: bob's cast between two of alice's is what separates a count of
+-- the casts the Filter admits from a count of every cast in the log.
+clarionSpiritSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+clarionSpiritSpec s registry =
+  let spirit = CardName.MkCardName (Text.pack "Spirit Token")
+      spiritsOf = S.countOnBattlefieldByName spirit
+      -- Four Mountains per Boil, and no untap step runs in any of these cases,
+      -- so alice's sixteen are exactly the four casts the longest one makes.
+      board mountain clarion =
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+            withLands = addLands S.bob 4 (addLands S.alice 16 S.threePlayerGame)
+            (_, withClarion) = S.addCreature clarion S.alice withLands
+         in withClarion
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+      -- n copies of Boil in a hand, returned in the order they were added.
+      handOf boil pid n gs =
+        List.foldl'
+          (\(oids, g) _ -> let (oid, g') = S.addHandCard boil pid g in (oids <> [oid], g'))
+          ([], gs)
+          [1 .. (n :: Int)]
+   in Spec.describe s "SpellCast, an ordinal" $ do
+        -- THE case, and the one three casts are needed for: the ordinal is an
+        -- EQUALITY, so the third cast fires nothing either.
+        Spec.it s "CR 601.2i the turn's SECOND cast fires Clarion Spirit, and no other" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          clarion <- S.printingOf s registry "Clarion Spirit"
+          boil <- S.printingOf s registry "Boil"
+          case handOf boil S.alice 3 (board mountain clarion) of
+            ([first, second, third], gs) -> do
+              let afterFirst = castAndResolve S.alice first gs
+                  afterSecond = castAndResolve S.alice second afterFirst
+                  afterThird = castAndResolve S.alice third afterSecond
+              Spec.assertEqWith s "no Spirit before any cast" (spiritsOf S.alice gs) 0
+              Spec.assertEqWith s "the FIRST cast makes none" (spiritsOf S.alice afterFirst) 0
+              Spec.assertEqWith s "the SECOND makes exactly one" (spiritsOf S.alice afterSecond) 1
+              Spec.assertEqWith s "and the THIRD makes no more" (spiritsOf S.alice afterThird) 1
+            _ -> Spec.assertFailure s "fixture should put three Boil in alice's hand"
+        -- "EACH turn": the count restarts at the handoff, which is what tells a
+        -- per-turn ordinal from a running total. A total would fire once, on the
+        -- second cast of the four, and never again.
+        --
+        -- Boil is an instant, so alice's two casts after the handoff are legal on
+        -- bob's turn, and TurnScope.EachTurn is what lets them fire at all.
+        Spec.it s "CR 601.2i the count is per turn: the handoff clears it and the next turn fires again" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          clarion <- S.printingOf s registry "Clarion Spirit"
+          boil <- S.printingOf s registry "Boil"
+          case handOf boil S.alice 4 (board mountain clarion) of
+            ([a, b, c, d], gs) -> do
+              let thisTurn = castAndResolve S.alice b (castAndResolve S.alice a gs)
+                  handed = S.runPure S.identityAnswer thisTurn Engine.handoffTurn
+                  nextTurn = castAndResolve S.alice d (castAndResolve S.alice c handed)
+              Spec.assertEqWith s "the first turn's second cast fired it once" (spiritsOf S.alice thisTurn) 1
+              Spec.assertEqWith s "the handoff clears the log the count reads" (GameState.events handed) Seq.empty
+              Spec.assertEqWith s "and the new turn's second cast fires it again" (spiritsOf S.alice nextTurn) 2
+            _ -> Spec.assertFailure s "fixture should put four Boil in alice's hand"
+        -- The Filter, applied to the EARLIER casts and not only to the one being
+        -- matched: bob's Boil sits between alice's two in the log, so a count of
+        -- every cast in it would make alice's second the turn's third and fire
+        -- nothing. The pair of boards differ in exactly that cast.
+        Spec.it s "CR 109.5 'you cast': an opponent's cast is not counted toward the ordinal" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          clarion <- S.printingOf s registry "Clarion Spirit"
+          boil <- S.printingOf s registry "Boil"
+          case handOf boil S.alice 2 (board mountain clarion) of
+            ([first, second], withHand) -> do
+              let (bobsBoil, gs) = S.addHandCard boil S.bob withHand
+                  afterAlice = castAndResolve S.alice first gs
+                  interleaved = castAndResolve S.alice second (castAndResolve S.bob bobsBoil afterAlice)
+                  straight = castAndResolve S.alice second afterAlice
+              Spec.assertEqWith s "bob's cast alone makes nobody a Spirit" (spiritsOf S.alice (castAndResolve S.bob bobsBoil afterAlice)) 0
+              Spec.assertEqWith s "alice's second still fires with his cast in between" (spiritsOf S.alice interleaved) 1
+              -- The same board without bob's cast, which is the only difference
+              -- between the two: it fires either way.
+              Spec.assertEqWith s "and fires without it" (spiritsOf S.alice straight) 1
+            _ -> Spec.assertFailure s "fixture should put two Boil in alice's hand"
+
 -- CR 113.6k: the first ability in the pool that functions from the STACK. The
 -- same rule that put Narcomoeba's in a graveyard, one zone over.
 --
@@ -9052,12 +9154,16 @@ everyTriggerCondition =
     -- eventBindings stamps for every event -- so an arm that had cased on the
     -- scope and stamped nothing under one of them would go unseen if only one
     -- were listed.
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing),
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.OpponentsTurn Nothing),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing Nothing),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.OpponentsTurn Nothing Nothing),
     -- And the zone axis, listed for the TurnScope pair's reason one field over:
     -- an arm that cased on the zone and stamped nothing when one was named would
     -- go unseen if every entry here left it Nothing.
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn (Just Zone.Hand)),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn (Just Zone.Hand) Nothing),
+    -- And the ordinal axis, for the same reason again: Clarion Spirit's "your
+    -- second spell each turn" narrows which cast fires the ability and stamps
+    -- nothing of its own, which an entry leaving it Nothing could not show.
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing (Just 2)),
     TriggerCondition.SelfCast,
     -- BOTH relations, for the SpellCast pair's reason just above: the arm cases
     -- on the relation, and one that stamped nothing under the other half would go
@@ -12223,6 +12329,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   anafenzaAttackSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
+  clarionSpiritSpec s registry
   desolationTwinSpec s registry
   presenceOfTheMasterSpec s registry
   kambalSpec s registry

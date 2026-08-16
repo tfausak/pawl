@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
 import qualified Pawl.Engine.Expiry as Expiry
@@ -91,8 +92,10 @@ import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import Pawl.Types.EventGroup (EventGroup)
 import qualified Pawl.Types.EventGroup as EventGroup
+import qualified Pawl.Types.EventShape as EventShape
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -3216,6 +3219,42 @@ declarationsOf bearer gs =
         _ -> False
    in length (Seq.filter (declaredIt . snd) (GameState.events gs))
 
+-- Clarion Spirit's "your SECOND spell each turn": which of the turn's matching
+-- casts this one is, counting from one.
+--
+-- The window is the whole event log, which is exactly "this turn" for
+-- Pawl.Engine.PlayerEffect.castsThisTurn's reason -- Engine.handoffTurn clears it
+-- at the handoff. So the TurnScope beside the ordinal narrows which turns the
+-- ability watches and never which casts are counted; on a turn the scope refuses,
+-- the condition has already answered False without reaching here.
+--
+-- Counted over the casts the SAME condition admits, since the printed sentence
+-- puts the ordinal inside the description -- so the Filter and the zone are
+-- applied to each earlier cast too. Each earlier one is read through
+-- Count.snapshotView, the CR 608.2h snapshot its event recorded, because CR
+-- 601.2a's stack incarnation is long gone for every cast but the one being
+-- matched; that view answers a supertype filter False (gap #646), which no
+-- printed ordinal trigger asks about.
+--
+-- POSITIONAL rather than a count of the whole log. CR 601.2i files the cast
+-- before CR 603.2 checks the condition against it, so the log already holds this
+-- cast -- and it may hold LATER ones too, since one CR 117.5 boundary can cover
+-- several casts. The walk therefore stops at this cast's own entry, which the
+-- spell's id names uniquely (CR 400.7 mints it and nothing else ever bears it),
+-- and counts it: the turn's second cast answers 2 whatever was cast after it.
+-- An event that is not in the log at all -- a fixture appending one directly --
+-- is read as the latest, which is what the whole walk then counts against.
+castOrdinal :: Filter.Context -> Filter.Type.Filter Keyword.Type.Keyword -> Maybe Zone -> ObjectId -> GameState -> Natural
+castOrdinal context predicate fromZone spell gs =
+  let isThisCast cast = SpellWasCast.spell cast == spell
+      earlier = Seq.takeWhileL (maybe True (not . isThisCast) . Game.castOf . snd) (GameState.events gs)
+      counted (_, event) = case Game.castOf event of
+        Nothing -> False
+        Just cast ->
+          maybe True (\z -> SpellWasCast.zone cast == Just z) fromZone
+            && maybe False (\view -> Filter.matches context view predicate) (Count.snapshotView gs EventShape.SpellCast event)
+   in 1 + Natural.length (Seq.filter counted earlier)
+
 -- CR 102.1: does this turn belong to the scope? `active` is "the player whose
 -- turn it is", and `own` is the seat the scope is read against -- the player
 -- Pawl.Types.TurnScope deliberately names none of, since each reader supplies
@@ -4967,7 +5006,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- cast happened in -- so the active player standing now is the one the cast
   -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
   -- 603.3a), exactly as the StepBegins arm above reads its own.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone) -> case event of
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone ordinal) -> case event of
     GameEvent.SpellCast (SpellWasCast.MkSpellWasCast caster spell _ castFrom) -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ ->
@@ -4978,6 +5017,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
           -- printing writes.
           && maybe True (\z -> castFrom == Just z) fromZone
           && Filter.matches (Filter.contextFor (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
+          -- Clarion Spirit's "your SECOND spell each turn", asked LAST so the
+          -- log walk happens only for a cast the rest of the condition already
+          -- admits.
+          && maybe True (castOrdinal (Filter.contextFor (Just you) (Just bearer)) f fromZone spell gs ==) ordinal
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.BecameDesignated {} -> False
@@ -7524,9 +7567,9 @@ controllerTurnScoped cond = case cond of
   -- StepBegins' arms one more time, and for its reason (CR 603.3a, CR 109.5).
   -- Brineborn Cutthroat's OpponentsTurn is turn-scoped and is not the
   -- CONTROLLER's turn, which is the only thing this classification asks.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.ControllersTurn _) -> True
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.EachTurn _) -> False
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.OpponentsTurn _) -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.ControllersTurn _ _) -> True
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.EachTurn _ _) -> False
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast _ TurnScope.OpponentsTurn _ _) -> False
   -- The same rule with no TurnScope to read: a spell can be cast on anybody's
   -- turn, so its own cast trigger is not the controller's-turn kind either.
   TriggerCondition.SelfCast -> False

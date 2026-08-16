@@ -56,6 +56,7 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.ReduceActivationCost as ReduceActivationCost
 import qualified Pawl.Types.ReduceSpellCost as ReduceSpellCost
+import qualified Pawl.Types.SpellWasCast as SpellWasCast
 import Pawl.Types.Subtype (Subtype)
 import Pawl.Types.Timestamp (Timestamp)
 
@@ -413,7 +414,7 @@ rewritePlayerEffect pairs effect = case effect of
 -- Engine.beginTurnOf) holds one.
 castsThisTurn :: PlayerId -> GameState -> Natural
 castsThisTurn pid gs =
-  let mine caster = caster == pid
+  let mine cast = SpellWasCast.player cast == pid
    in Natural.length (filter mine (Maybe.mapMaybe (Game.castOf . snd) (Foldable.toList (GameState.events gs))))
 
 -- CR 601.3: a player can begin to cast a spell only if no rule or effect
