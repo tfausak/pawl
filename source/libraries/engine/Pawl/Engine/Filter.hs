@@ -43,9 +43,10 @@ data View = MkView
     -- 709.4a asks ("an object has the chosen name if one of its names is the
     -- chosen name") rather than comparing to a string.
     --
-    -- Read off the projection on the battlefield and off the object's card
-    -- anywhere else, so a search of a library answers for a card that is not a
-    -- permanent -- which is where the pool's one reader looks
+    -- Read off the CR 613 projection wherever there is an object, in any zone --
+    -- rule 613.1 names none -- and off the printed face where the builder holds
+    -- only a face. That is what lets a library search answer for a card that is
+    -- not a permanent, which is where the pool's first reader looks
     -- (Asmoranomardicadaistinaculdacar).
     --
     -- EMPTY where there is nothing named to read: a player view, an ability on

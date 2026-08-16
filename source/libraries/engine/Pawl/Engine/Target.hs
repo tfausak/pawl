@@ -195,9 +195,9 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
             -- lives in an effect's QUANTITY, which is evaluated later and
             -- elsewhere.
             Filter.recipient = Nothing,
-            -- Empty: no Filter atom reads it, and a slot's own filter is matched
-            -- while the slots are still being CHOSEN (CR 601.2c), so there is no
-            -- resolution's slot map to hand over yet.
+            -- Empty: a slot's own filter is matched while the slots are still
+            -- being CHOSEN (CR 601.2c), so there is no resolution's slot map to
+            -- hand over yet, and IsBound is vacuously False here.
             Filter.slotObjects = Map.empty,
             -- THE one site that fills it, alongside sourcePower and
             -- defendingPlayer above and for the same reason: SameNameAsBound
@@ -207,8 +207,8 @@ admittedGiven pcs grants pools perspective bindings source slot gs =
             -- CR 603.2's own bindings for a triggered ability (Harness the Storm's
             -- cast spell) plus whatever sibling slots the first pass answered.
             -- A slot holding several recipients contributes all of their names,
-            -- which is the honest reading of CR 709.4a over a set: no card in the
-            -- pool names a multi-recipient slot here.
+            -- which is CR 709.4a's membership read once more: the candidate has
+            -- "the same name as" the slot if it shares a name with any of them.
             --
             -- Through CR 608.2h's last-known reader rather than a live
             -- projection, because the bound object is NOT the target and the two
@@ -737,6 +737,7 @@ stillAdmitted perspective source recipient slot gs = Set.member recipient (admit
 -- (CR 115.4). CR 115.5's self-exclusion is
 -- a DIFFERENT rule: unconditional, and firing only where its own words do, for a
 -- source that is itself on the stack -- see legalRecipients.
+--
 -- `seed` is what the announcement ALREADY has bound before any target is chosen
 -- -- empty for a cast and for an activation, and CR 603.2's trigger bindings for
 -- a triggered ability being placed (Harness the Storm's cast spell). It joins the

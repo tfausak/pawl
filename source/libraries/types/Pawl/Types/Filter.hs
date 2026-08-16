@@ -44,10 +44,10 @@ data Filter keyword
     -- so this sits with the four atoms above rather than needing their defence.
     --
     -- MEMBERSHIP, exactly as CR 709.4a states the test: "an object has the chosen
-    -- name if one of its names is the chosen name". A split card, an Adventure
-    -- and an unlocked Room each show several names at once, and the joined string
-    -- one of them renders as is not among them (#650), so an atom that compared
-    -- to a single name would miss the halves it is spelling.
+    -- name if one of its names is the chosen name". A split card off the stack
+    -- and a Room with both doors unlocked each show two names at once, and the
+    -- joined string they render as is not among them (see #650), so an atom that
+    -- compared to a single name would miss the halves it is spelling.
     --
     -- The PRINTED name, and not Pawl.Types.EntryRewrite.ChooseCardNames' chosen
     -- one: that machinery answers "what did a player name?", read by
@@ -303,9 +303,9 @@ data Filter keyword
     -- the posture every context-relative atom here takes.
     IsBound SlotName.SlotName
   | -- | CR 201.2 / 709.4a asked of TWO objects: the candidate shares a name with
-    -- the object the resolution bound in this slot -- Harness the Storm's "target
-    -- card with the same name as that spell", where the slot is the cast spell
-    -- the trigger bound.
+    -- the object this slot holds -- Harness the Storm's "target card with the
+    -- same name as that spell", where the slot is CR 603.2's own binding of the
+    -- cast spell, made as the trigger was gathered and read at CR 601.2c.
     --
     -- HasName's context-relative sibling, standing to it as IsBound stands to
     -- IsSource: that atom carries the name and this one reads it off

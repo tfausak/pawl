@@ -1707,6 +1707,10 @@ harnessBoard s registry = do
 -- on to offer, taking every offer. The recording is the point: what a cast FINDS
 -- cannot tell a candidate set computed by name from one that admitted every card
 -- in the graveyard.
+--
+-- "twin" is the slot the card's own JSON declares, which is what keeps Firebolt's
+-- "any target" out of the recording: that prompt names its own slot and this one
+-- looks the card's up.
 harnessAnswer :: Prompt.Prompt r -> State.State ([Set.Set Recipient.Recipient], [CardName.CardName]) r
 harnessAnswer p = case p of
   Prompt.ChooseTargets _ _ _ sets -> do

@@ -638,9 +638,11 @@ viewOfCard face =
           -- has one name by construction, and for a multi-faced card's combined
           -- view that name is the halves joined for rendering (Engine.Card.merge2)
           -- rather than a name the card has -- so viewOfCardIn below, which holds
-          -- an object id, overwrites this with Game.namesOf's CR 709.4a set. Every
-          -- reader that can match a split card by half goes through that one or
-          -- through viewOfCharacteristics.
+          -- an object id, overwrites this with Game.namesOf's CR 709.4a set, and
+          -- viewOfCharacteristics reads the projection's own. The one reader left
+          -- on the joined string is candidateView below, whose candidates are what
+          -- a characteristic-defining count sweeps off the battlefield -- and no
+          -- CDA in the pool counts by name at all.
           Filter.names = Set.singleton (Face.name face),
           Filter.cardTypes = TypeLine.types typeLine,
           Filter.supertypes = TypeLine.supertypes typeLine,

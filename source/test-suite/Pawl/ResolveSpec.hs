@@ -9219,8 +9219,8 @@ jugglerAnswer victim fodder p = case p of
   Prompt.ChooseSacrifices {} -> sacrifices fodder p
   _ -> takingTargets 1 [victim] p
 
--- The library alice searches, and the ids of whichever of its cards the ability
--- names. `libraryIds` is every card in it, so an assertion can say which SUBSET
+-- The library alice searches, the ids of whichever of its cards the ability
+-- names, and every id in it. The last is what lets an assertion say which SUBSET
 -- the search offered rather than how many.
 data CookbookBoard = MkCookbookBoard
   { cookbookState :: GameState.GameState,
@@ -9229,18 +9229,17 @@ data CookbookBoard = MkCookbookBoard
   }
 
 -- Asmoranomardicadaistinaculdacar on the battlefield with its CR 603.6a enters
--- trigger pending, over a four-card library. `withCookbooks` swaps the two copies
--- of the named card for two more Golden Eggs and changes nothing else -- same
--- library size, same card types, same seat, same phase -- so the pair of boards
--- differs in the NAME and in nothing that could make a search fail for another
--- reason.
+-- trigger pending, over a four-card library. Passing False for `withCookbooks`
+-- swaps the two copies of the named card for two more Golden Eggs and changes
+-- nothing else -- same library size, same card types, same seat, same phase --
+-- so the pair of boards differs in the NAME and in nothing that could make a
+-- search fail for another reason.
 --
--- Two copies of the named card, not one: a candidate set with a single possible
--- member is satisfied by a filter that admits everything a prompt could offer,
--- and CR 701.23a's prompt is short-circuited when the candidates equal the count.
--- The Golden Egg is an ARTIFACT, as the Cookbook is, so the two are separated by
--- the name alone; the Mountain is the card of another type the filter is also
--- asked of.
+-- Two copies of the named card, not one: a set assertion over a single member
+-- cannot tell a filter that matched by name from one that admitted every card in
+-- the library. The Golden Egg is an ARTIFACT, as the Cookbook is, so the two are
+-- separated by the name alone; the Mountain is the card of another type the
+-- filter is also asked of.
 cookbookBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Bool -> m CookbookBoard
 cookbookBoard s registry withCookbooks = do
   mountain <- S.printingOf s registry "Mountain"
@@ -9248,7 +9247,7 @@ cookbookBoard s registry withCookbooks = do
   cookbook <- S.printingOf s registry "The Underworld Cookbook"
   asmor <- S.printingOf s registry "Asmoranomardicadaistinaculdacar"
   let named = if withCookbooks then cookbook else egg
-      (mountainId, g1) = S.addLibraryCard mountain S.alice (S.landsInPlay mountain 0)
+      (mountainId, g1) = S.addLibraryCard mountain S.alice (Setup.emptyGame S.bothPlayers)
       (eggId, g2) = S.addLibraryCard egg S.alice g1
       (firstId, g3) = S.addLibraryCard named S.alice g2
       (secondId, g4) = S.addLibraryCard named S.alice g3
