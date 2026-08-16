@@ -1965,7 +1965,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- a subtype word, and "during an opponent's turn" holds no subtype -- so a
   -- rebuild that forgot the field would silently reset a text-changed Brineborn
   -- Cutthroat to firing on every turn.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope)
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f scope fromZone) -> TriggerCondition.SpellCast (SpellCast.MkSpellCast (Filter.rewrite pairs f) scope fromZone)
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins {} -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> condition

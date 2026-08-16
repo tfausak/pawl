@@ -2310,7 +2310,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfLastCounterRemoved _ -> []
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
-  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _) -> [f]
+  TriggerCondition.SpellCast (SpellCast.MkSpellCast f _ _) -> [f]
   -- "This spell" names the bearer and needs no Filter to say so.
   TriggerCondition.SelfCast -> []
   -- Rule 702.21a names the bearer as well, and asks only a relation of the

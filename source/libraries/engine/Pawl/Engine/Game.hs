@@ -657,7 +657,7 @@ honourShuffle offered answer =
 -- Pawl.Engine.Projection and Pawl.Engine.Count already case on it too.
 castOf :: GameEvent -> Maybe PlayerId
 castOf event = case event of
-  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid _ _) -> Just pid
+  GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid _ _ _) -> Just pid
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.BecameDesignated {} -> Nothing

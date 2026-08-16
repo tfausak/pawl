@@ -8923,10 +8923,10 @@ representativeEvents cond =
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
         -- on the pair.
-        TriggerCondition.SpellCast {} -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics))
+        TriggerCondition.SpellCast {} -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics (Just Zone.Hand)))
         -- The same event, and the only one this condition admits either. It binds
         -- nothing whichever ids the event names, since the spell IS the bearer.
-        TriggerCondition.SelfCast -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics))
+        TriggerCondition.SelfCast -> one (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast S.alice arrived S.emptyCharacteristics (Just Zone.Hand)))
         -- CR 601.2c's event, with the bearer as the targeted object and alice as
         -- the targeting object's controller -- an event BOTH relations admit,
         -- since matchesTrigger reads `you` from the bearer's side and this list
@@ -9048,8 +9048,12 @@ everyTriggerCondition =
     -- eventBindings stamps for every event -- so an arm that had cased on the
     -- scope and stamped nothing under one of them would go unseen if only one
     -- were listed.
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn),
-    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.OpponentsTurn),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn Nothing),
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.OpponentsTurn Nothing),
+    -- And the zone axis, listed for the TurnScope pair's reason one field over:
+    -- an arm that cased on the zone and stamped nothing when one was named would
+    -- go unseen if every entry here left it Nothing.
+    TriggerCondition.SpellCast (SpellCast.MkSpellCast Filter.Type.IsSource TurnScope.EachTurn (Just Zone.Hand)),
     TriggerCondition.SelfCast,
     -- BOTH relations, for the SpellCast pair's reason just above: the arm cases
     -- on the relation, and one that stamped nothing under the other half would go

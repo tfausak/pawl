@@ -1365,7 +1365,13 @@ castProposed spending pid sid face castFrom keywordsBefore candidateCosts before
                           -- have nothing to read. CR 601.2i has already applied
                           -- the effects that modify the spell as it is cast, so
                           -- this records what became cast.
-                          State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g))) g)
+                          --
+                          -- `castFrom` is the zone CR 601.2a moved the card out
+                          -- of, captured before the move for the reason its own
+                          -- binding above gives; a "whenever you cast ... from
+                          -- your hand" trigger reads it off the event, since CR
+                          -- 400.7 left `sid` no memory of it.
+                          State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast (SpellWasCast.MkSpellWasCast pid sid (Projection.project sid g) castFrom)) g)
                           -- CR 601.2c: each chosen object became a target of this
                           -- spell, which is what CR 702.21a's ward watches. Here
                           -- rather than beside `chosen` above for CR 601.2i's
