@@ -792,9 +792,11 @@ bucketOfEffect re = case re of
   ReplacementEffect.ZoneChangeR {} -> ReplacementBucket.Other
   -- CR 616.1c: entering as a copy is its own, HIGHER bucket. The split only
   -- becomes observable where an AsCopy races another entry replacement of NO
-  -- HIGHER bucket in the SAME iteration, which no card in the pool produces, so
-  -- this bucket's ordering is unexercised (#73). An entering Clone on its own
-  -- does not exercise it: AsCopy is the only applicable candidate on the first
+  -- HIGHER bucket in the SAME iteration, which is an entering Clone under an
+  -- opponent's Kismet -- proved by Pawl.ReplacementSpec's "the copy bucket
+  -- outranks Kismet's, so no order is asked", on the absence of the prompt, since
+  -- CR 616.1f makes the two orders converge on one board. An entering Clone on
+  -- its own does not exercise it: AsCopy is the only applicable candidate on the first
   -- iteration, and what carries the rest is CR 616.1f's re-collection plus CR
   -- 614.5's identity being keyed on the effect VALUE rather than a list
   -- position, which keeps the newly-acquired ChoiceOf distinct from the
@@ -845,9 +847,9 @@ bucketOfEffect re = case re of
   -- That is the whole of what CR 712.13a's rewrite does, so it ranks below CR
   -- 616.1c's copy bucket and above everything else.
   --
-  -- The ordering is unexercised: the pool's only producer is daybound, and no
-  -- card in it races a daybound entry with another entry replacement in the same
-  -- iteration (#73 tracks the same absence for CR 616.1c).
+  -- The ordering is proved by Pawl.ReplacementSpec's "the back-face bucket
+  -- outranks Kismet's, so no order is asked": a daybound creature entering at
+  -- night under an opponent's Kismet, again on the absence of the prompt.
   ReplacementEffect.EntryR (EntryR.MkEntryR _ EntryRewrite.EntersTransformed) -> ReplacementBucket.BackFaceOnEntry
   -- CR 616.1e: an as-enters rewrite that runs an effect is none of CR 616.1a-d --
   -- it is not a self-replacement, does not change the permanent's controller, is
