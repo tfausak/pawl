@@ -311,7 +311,7 @@ That 84.3% is a strikingly close independent match to Arena's GRP "**80% or so**
 | **Forge** | ~95% | `SVar`, plus `*Effect.java` for the residue |
 | **Magarena** | **84.3%** | `requires_groovy_code` (15.7%), + 5,293 never attempted |
 | **Arena GRP** | ~80% | hand-written CLIPS for the other 20% |
-| **phase** | high, but parser-mediated | no per-card hatch; the residue is `Effect::Unimplemented`, and the *core* keeps a few identity checks (§11) |
+| **phase** | unmeasured — row placement is not a ranking | no per-card hatch: the residue is `Effect::Unimplemented`, so the leak is not at the leaves but in the *core*, which keeps at least one card-identity check (§11.1) |
 | **ygopro / EDOPro** | **~5.6%** | `SetOperation` — 94.4% of cards |
 | **MTGO / Manalink** | 0% | code *is* the card |
 
@@ -387,7 +387,7 @@ The most valuable thing in Argentum is not a mechanism — it's the **gap betwee
 
 ---
 
-## 11. Fourth wave — the two permissive siblings, and what they are actually good for
+## 11. Fourth wave — the two permissive corpora, and what they are actually good for
 
 *(2026-08-16. Occasioned by a different question than the earlier waves: not "what should pawl's architecture be," which is settled, but "can prior art speed up an ordinary backlog issue." The answer is yes, asymmetrically, and it corrects a claim the second wave got wrong. Line references are to the repositories as read on this date; both move.)*
 
@@ -405,7 +405,7 @@ Its own `CLAUDE.md` forbids the fusion pawl's §1 invariant forbids, in nearly t
 
 **This is the closest published artifact to pawl's open half**, and it is permissive, which Forge's cardsfolder is not. Two distinct uses:
 
-- **Vocabulary evidence.** §6's Forge frequency table says which opcodes are common; mtgish says what an opcode's *fields* have to be to cover the pool, in a first-order form with no escape hatch. When an issue is "what shape should this effect take," mtgish has an answer that survived contact with every printed card, and disagreement with it is worth understanding before overriding.
+- **Vocabulary evidence.** §6's Forge frequency table says which opcodes are common; mtgish says what an opcode's *fields* have to be to cover the pool, in a first-order form with no escape hatch. When an issue is "what shape should this effect take," mtgish has an answer applied across the whole pool rather than one card, and disagreement with it is worth understanding before overriding — subject to the caveat below.
 - **A pool-wide query surface.** Because it is one JSON file of ASTs rather than 33,000 scripts, "which cards use this construct" is a grep. That is the same card-finding job as §11.1, reached from the vocabulary side instead of the test side.
 
 Unchecked, and worth checking before leaning on it hard: how it represents what its parser cannot express. There is no `Unparsed`/`Unimplemented` marker in the emitted data, so the residue is not countable the way Magarena's `requires_groovy_code` is (§8.8) — which means a card's presence in the file is not by itself evidence its rules text came through whole.
