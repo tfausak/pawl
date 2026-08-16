@@ -633,14 +633,13 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --   1. Copy targets -- excluded by `batch`. Kicked Rite of Replication on a Clone
 --      is the board that observes it: five token Clones enter at once, and
 --      Pawl.CopySpec's "none may copy a sibling" fails without this exclusion.
---   2. Candidate collection -- unreachable regardless of `batch`, though no
---      longer impossible by construction. Every entry replacement a PERMANENT
---      carries in this pool is CR 614.1c's self-only `IsSource` (Clone, Primal
---      Plasma, CR 306.5b's loyalty), which no sibling can satisfy; CR 614.1d's
---      other-objects form exists (Gather Specimens) but as a FLOATING row rather
---      than a sibling's ability. A permanent printing a 614.1d entry replacement
---      (Essence of the Wild) would reach a sibling here, correctly and by the
---      card's own text.
+--   2. Candidate collection -- reachable, and correct where it is reached. Most
+--      entry replacements a PERMANENT carries in this pool are CR 614.1c's
+--      self-only `IsSource` (Clone, Primal Plasma, CR 306.5b's loyalty), which no
+--      sibling can satisfy. Kismet prints CR 614.1d's other-objects form, so a
+--      sibling entering beside it would be collected here -- correctly, and by
+--      the card's own text; no board in the pool puts Kismet itself into a batch,
+--      so nothing observes it yet.
 --   3. Projection -- a sibling's STATIC ABILITIES would be visible to a later
 --      token's projection, and nothing here excludes them the way `batch`
 --      excludes copy targets. CR 614.12 does not sanction this: a
