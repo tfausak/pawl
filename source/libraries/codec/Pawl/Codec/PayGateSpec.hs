@@ -9,11 +9,13 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.SlotName as SlotName
 
 manaLeak :: PayGate.PayGate
@@ -21,7 +23,9 @@ manaLeak =
   PayGate.MkPayGate
     { PayGate.payer = SlotName.MkSlotName (Text.pack "spell"),
       PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
-      PayGate.branch = PayBranch.IfNotPaid
+      PayGate.branch = PayBranch.IfNotPaid,
+      PayGate.obligation = PayObligation.Optional,
+      PayGate.offeredAt = Nothing
     }
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -42,7 +46,22 @@ spec s = Spec.describe s "Pawl.Codec.PayGate" $ do
       PayGate.codec
       manaLeak {PayGate.branch = PayBranch.IfPaid}
       """ {"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfPaid"}} """
-  -- All three keys are required: none has a default an absent key could mean.
+  -- CR 118.12's mandatory limb, Standstill's, and the shared offer, Don't Make
+  -- a Sound's second clause -- the two keys that are elided everywhere else.
+  Spec.it s "MkPayGate, Standstill's mandatory sacrifice" $
+    Common.assertCodec
+      s
+      PayGate.codec
+      manaLeak {PayGate.branch = PayBranch.IfPaid, PayGate.obligation = PayObligation.Mandatory}
+      """ {"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfPaid"},"obligation":{"type":"Mandatory"}} """
+  Spec.it s "MkPayGate, a clause hanging off an earlier clause's offer" $
+    Common.assertCodec
+      s
+      PayGate.codec
+      manaLeak {PayGate.branch = PayBranch.IfPaid, PayGate.offeredAt = Just (ClauseIndex.MkClauseIndex 0)}
+      """ {"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]},"branch":{"type":"IfPaid"},"offeredAt":0} """
+  -- The first three keys are required: none has a default an absent key could
+  -- mean.
   Spec.it s "an omitted payer field is a decode error" $
     Spec.assertBool
       s

@@ -23,6 +23,7 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PayBranch as PayBranch
 import qualified Pawl.Types.PayGate as PayGate
+import qualified Pawl.Types.PayObligation as PayObligation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -76,7 +77,9 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
               PayGate.MkPayGate
                 { PayGate.payer = SlotName.MkSlotName (Text.pack "spell"),
                   PayGate.cost = Cost.MkCost {Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.components = []},
-                  PayGate.branch = PayBranch.IfNotPaid
+                  PayGate.branch = PayBranch.IfNotPaid,
+                  PayGate.obligation = PayObligation.Optional,
+                  PayGate.offeredAt = Nothing
                 }
           )
           (Seq.singleton (Effect.Counter (Counter.MkCounter (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "spell"))) Nothing)))

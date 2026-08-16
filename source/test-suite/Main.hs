@@ -162,6 +162,7 @@ import qualified Pawl.Codec.OnsetSpec
 import qualified Pawl.Codec.OptionalitySpec
 import qualified Pawl.Codec.PayBranchSpec
 import qualified Pawl.Codec.PayGateSpec
+import qualified Pawl.Codec.PayObligationSpec
 import qualified Pawl.Codec.PermanentBecomesDesignatedSpec
 import qualified Pawl.Codec.PermanentSacrificedSpec
 import qualified Pawl.Codec.PhasePatternSpec
@@ -553,6 +554,7 @@ spec s registry = do
   Pawl.Codec.OptionalitySpec.spec s
   Pawl.Codec.PayBranchSpec.spec s
   Pawl.Codec.PayGateSpec.spec s
+  Pawl.Codec.PayObligationSpec.spec s
   Pawl.Codec.PermanentBecomesDesignatedSpec.spec s
   Pawl.Codec.PermanentSacrificedSpec.spec s
   Pawl.Codec.PhasePatternSpec.spec s

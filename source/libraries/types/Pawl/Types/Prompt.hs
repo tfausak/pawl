@@ -1294,7 +1294,8 @@ data Prompt r where
   -- reasons; the Cost is what is being offered, which is the information the
   -- answer turns on. The "unless" scopes to its clause exactly as the "may"
   -- does, so a card whose "unless" governs only some of its instructions leaves
-  -- the rest to happen either way (#703).
+  -- the rest to happen either way -- Stymied Hopes' scry, proved by
+  -- Pawl.ResolveSpec's PayGate group.
   --
   -- The PlayerId is emphatically NOT the resolving controller, which is what
   -- separates this from every other resolution-time prompt: CR 118.12's clause
@@ -1307,19 +1308,28 @@ data Prompt r where
   -- countered Mana Leak never asks -- observably different from an announcement
   -- at CR 601.2f-h, where the cost of a spell being cast is paid.
   --
-  -- NEVER elided for a payable cost: the cost is a "may" -- CR 118.12a's
-  -- rewriting makes the negative branch's one, and the positive branch's is
-  -- printed as one (Merfolk Seer's "you may pay {1}{U}") -- and both answers
-  -- reach different boards. The one case not asked is where the rules leave
-  -- nothing to ask -- CR 118.3's "a player can't pay a cost without having the
-  -- necessary resources to pay it fully", which leaves declining as the only
-  -- possible answer. CR 118.12's clause covers that case in as many words
-  -- ("does, doesn't, or CAN'T").
+  -- NEVER elided for a payable OPTIONAL cost: that cost is a "may" -- CR
+  -- 118.12a's rewriting makes the negative branch's one, and the positive
+  -- branch's is generally printed as one (Merfolk Seer's "you may pay {1}{U}")
+  -- -- and both answers reach different boards.
   --
-  -- Not implemented: CR 118.12's MANDATORY limb, "started to pay a mandatory
-  -- cost" -- Standstill's "sacrifice this enchantment. If you do". Every
-  -- resolution cost is offered here, so a mandatory one would be declinable
-  -- (#1554).
+  -- Two cases where the rules leave nothing to ask, and so are not asked at
+  -- all. Neither is an elision; each is a singleton option set the CR itself
+  -- fixes.
+  --
+  --   * CR 118.3, "a player can't pay a cost without having the necessary
+  --     resources to pay it fully", leaves declining as the only possible
+  --     answer. CR 118.12's clause covers that case in as many words ("does,
+  --     doesn't, or CAN'T").
+  --   * CR 118.12's MANDATORY limb -- Standstill's "sacrifice this enchantment.
+  --     If you do" -- where the rule reads whether the payer "STARTED TO PAY a
+  --     mandatory cost" and gives them no choice about it. See
+  --     Pawl.Types.PayObligation. Proved by Pawl.ResolveSpec's PayGate group,
+  --     whose Standstill case fails the run if this prompt is ever raised.
+  --
+  -- One offer per PAYMENT and not per clause: a clause naming another's offer
+  -- (Pawl.Types.PayGate.offeredAt) reuses the recorded answer rather than
+  -- raising a second prompt, which is CR 118.12 reading one answer.
   ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: the player announces whether they intend to pay 2 life or a
   -- coloured mana cost for each Phyrexian symbol. CR 118.13a puts the choice HERE

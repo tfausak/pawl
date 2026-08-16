@@ -374,6 +374,8 @@ library codec
     Pawl.Codec.PayBranchSpec
     Pawl.Codec.PayGate
     Pawl.Codec.PayGateSpec
+    Pawl.Codec.PayObligation
+    Pawl.Codec.PayObligationSpec
     Pawl.Codec.PermanentBecomesDesignated
     Pawl.Codec.PermanentBecomesDesignatedSpec
     Pawl.Codec.PermanentSacrificed
@@ -1055,6 +1057,7 @@ library types
     Pawl.Types.PayGate
     Pawl.Types.Payment
     Pawl.Types.PaymentDecision
+    Pawl.Types.PayObligation
     Pawl.Types.PendingEntryEffect
     Pawl.Types.PendingTrigger
     Pawl.Types.PermanentBecomesDesignated
