@@ -39,11 +39,16 @@ data Modification ability
     --
     -- Folded into ProjectedCharacteristics.activatedAbilities, which is what
     -- decides everything about the granted ability's identity: it becomes an
-    -- ability OF THE RECEIVING OBJECT, so CR 113.7a makes that object its source,
-    -- CR 602.2b makes that object's controller its controller, and every binding
-    -- it names -- the tap cost, IsSource, the counter it puts on "this creature"
-    -- -- resolves against the receiver. The granting permanent supplies only the
-    -- text and, via CR 613.7a, the timestamp.
+    -- ability OF THE RECEIVING OBJECT, so CR 113.7 makes that object the
+    -- ability's source, CR 602.2 lets only that object's controller activate it,
+    -- CR 113.8 makes them the controller of the ability on the stack, and every
+    -- binding it names -- the tap cost, IsSource, the counter it puts on "this
+    -- creature" -- resolves against the receiver. The granting permanent supplies
+    -- only the text and, via CR 613.7a, the timestamp.
+    --
+    -- CR 303.4e says as much outright for the Aura case: "if the Aura grants an
+    -- ability to the enchanted object (with 'gains' or 'has'), the enchanted
+    -- object's controller is the only one who can activate that ability".
     --
     -- Rejected: keeping the ability anchored to the GRANTER and activating it
     -- there. Presence of Gond on an opponent's creature is the board that refutes

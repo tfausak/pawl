@@ -217,8 +217,9 @@ applyModification viewOf src gs oid m pc =
         -- a keyword. Appended to the list the card's own printed abilities seeded,
         -- which is what makes the granted ability the RECEIVER's -- every reader
         -- goes through abilitiesFromCharacteristics and cannot tell the two apart,
-        -- so CR 113.7a's source and CR 602.2b's controller are the receiver's
-        -- without a special case anywhere.
+        -- so CR 113.7's source and CR 602.2's activating player are the
+        -- receiver's without a special case anywhere -- which is CR 303.4e's
+        -- last sentence for the Aura that produces this.
         --
         -- Appended rather than prepended, for GainKeyword's reason: two grants of
         -- the same ability give the object two of it (CR 613.1f adds), and the

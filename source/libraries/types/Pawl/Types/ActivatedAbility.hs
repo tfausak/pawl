@@ -30,8 +30,8 @@ data ActivatedAbility card = MkActivatedAbility
     -- carries the gate on the ability rather than minting a layer-6 grant.
     -- Pawl.Types.Modification's GainActivatedAbility is the layer-6 grant, and
     -- it is for the OTHER case: an ability handed to a DIFFERENT object, which
-    -- is not indistinguishable from anything -- CR 113.7a moves the source and
-    -- CR 602.2b the controller.
+    -- is not indistinguishable from anything -- CR 113.7 moves the source and
+    -- CR 303.4e the player who may activate it.
     --
     -- The SAME shape as Pawl.Types.StaticAbility.condition, which spells CR
     -- 604.2's "as long as" for a continuous effect, and the same rule about what

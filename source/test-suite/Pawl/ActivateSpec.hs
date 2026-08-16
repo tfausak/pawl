@@ -2555,9 +2555,12 @@ activationCostAdditionSpec s registry = Spec.describe s "ActivationCostAddition"
 --
 -- Three seats, and the two that matter are DIFFERENT players: alice controls the
 -- Aura, bob controls the enchanted Prodigal Sorcerer, carol is the third. So
--- every claim about whose ability it is has a way to come out wrong -- CR 113.7a
--- makes the enchanted creature the source, CR 602.2b makes bob the controller,
--- and the token is bob's.
+-- every claim about whose ability it is has a way to come out wrong. CR 303.4e
+-- is explicit about this exact case: "if the Aura grants an ability to the
+-- enchanted object (with 'gains' or 'has'), the enchanted object's controller is
+-- the only one who can activate that ability". CR 113.7 makes the enchanted
+-- creature the ability's source and CR 113.8 makes bob its controller, so the
+-- token is bob's.
 --
 -- The Sorcerer is the receiver because it PRINTS an activated ability of its own
 -- ("{T}: This creature deals 1 damage to any target"), so the granted one has to
@@ -2575,10 +2578,10 @@ presenceOfGondSpec s registry = Spec.describe s "Presence of Gond" $ do
     Spec.assertBool s (elem (theAbility sorcerer) (Projection.abilitiesOf sorcererId enchanted)) "the printed one survives the grant"
     Spec.assertBool s (grantedAbility sorcerer sorcererId enchanted /= Just (theAbility sorcerer)) "and the second one is not it"
 
-  -- CR 303.4e / 113.7a: the Aura holds the TEXT, never the ability. Presence of
+  -- CR 303.4e / 113.7: the Aura holds the TEXT, never the ability. Presence of
   -- Gond prints no activated ability of its own, so tapping the Aura is not a
   -- thing any player may do.
-  Spec.it s "CR 113.7a the Aura itself does not have the ability it grants" $ do
+  Spec.it s "CR 113.7 the Aura itself does not have the ability it grants" $ do
     gond <- S.printingOf s registry "Presence of Gond"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (gondId, _, enchanted) = gondBoard gond sorcerer True
@@ -2589,7 +2592,7 @@ presenceOfGondSpec s registry = Spec.describe s "Presence of Gond" $ do
   -- resolves: the token is bob's, and the {T} that paid for it tapped BOB'S
   -- CREATURE rather than alice's Aura. Both are what make the ability the
   -- receiver's rather than the granter's.
-  Spec.it s "CR 602.2b whole card: the granted {T} taps the enchanted creature and its controller gets the token" $ do
+  Spec.it s "CR 303.4e whole card: the granted {T} taps the enchanted creature and its controller gets the token" $ do
     gond <- S.printingOf s registry "Presence of Gond"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     let (gondId, sorcererId, enchanted) = gondBoard gond sorcerer True
