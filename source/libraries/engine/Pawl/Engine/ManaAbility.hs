@@ -138,7 +138,7 @@ manaProduced effect = case effect of
   Effect.PreventNextDamage {} -> Nothing
   Effect.PreventAllDamage {} -> Nothing
   Effect.RedirectDamage {} -> Nothing
-  Effect.Counter _ -> Nothing
+  Effect.Counter {} -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.RemoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
@@ -231,6 +231,7 @@ movesLibraryCard effect = case effect of
       ObjectRef.EachCardInGraveyard {} -> False
       ObjectRef.EachCardInYourHand -> False
       ObjectRef.EachCardExiledWithSource {} -> False
+      ObjectRef.EachSpell _ -> False
       ObjectRef.EachPlayer -> False
       ObjectRef.ChosenCardInGraveyard {} -> False
       ObjectRef.ChosenCardInHand {} -> False
@@ -278,7 +279,7 @@ movesLibraryCard effect = case effect of
   Effect.PreventAllDamage {} -> False
   Effect.RedirectDamage {} -> False
   -- CR 701.6: a countered spell goes to its owner's GRAVEYARD.
-  Effect.Counter _ -> False
+  Effect.Counter {} -> False
   Effect.PutCounters {} -> False
   Effect.RemoveCounters {} -> False
   Effect.GainPlayerCounters {} -> False

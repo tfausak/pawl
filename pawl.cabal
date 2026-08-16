@@ -175,6 +175,7 @@ library codec
     Pawl.Codec.CostReductionSpec
     Pawl.Codec.CostSpec
     Pawl.Codec.Count
+    Pawl.Codec.Counter
     Pawl.Codec.Counterability
     Pawl.Codec.CounterabilitySpec
     Pawl.Codec.CounterChange
@@ -187,6 +188,7 @@ library codec
     Pawl.Codec.CounterPatternSpec
     Pawl.Codec.CounterR
     Pawl.Codec.CounterRSpec
+    Pawl.Codec.CounterSpec
     Pawl.Codec.CountSpec
     Pawl.Codec.Create
     Pawl.Codec.CreateCopy
@@ -920,6 +922,7 @@ library types
     Pawl.Types.CostComponent
     Pawl.Types.CostReduction
     Pawl.Types.Count
+    Pawl.Types.Counter
     Pawl.Types.Counterability
     Pawl.Types.CounterCause
     Pawl.Types.CounterChange

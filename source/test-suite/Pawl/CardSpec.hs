@@ -93,6 +93,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CostReduction as CostReduction
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.Counter as Counter
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.CounterR as CounterR
@@ -732,7 +733,7 @@ effectCounts effect = case effect of
       <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (FaceDownCharacteristics.toughness listed))
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
-  Effect.Counter _ -> []
+  Effect.Counter {} -> []
   Effect.PutCounters (PutCounters.MkPutCounters _ quantity _) -> quantityCounts quantity
   Effect.RemoveCounters (RemoveCounters.MkRemoveCounters _ quantity _) -> quantityCounts quantity
   Effect.GainPlayerCounters (PlayerCounters.MkPlayerCounters _ _ quantity) -> quantityCounts quantity
@@ -1143,7 +1144,7 @@ effectReplacements effect = case effect of
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
-  Effect.Counter _ -> []
+  Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
@@ -1727,7 +1728,7 @@ effectMintedFaces effect = case effect of
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
-  Effect.Counter _ -> []
+  Effect.Counter {} -> []
   Effect.PutCounters {} -> []
   Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
@@ -2270,6 +2271,9 @@ objectRefFilters ref = case ref of
   -- Karn Liberated's "all non-Aura permanent cards exiled with Karn" is the one
   -- printing that also states characteristics, and states them here.
   ObjectRef.EachCardExiledWithSource f -> Foldable.toList f
+  -- Swift Silence's "all other spells" states its own -- CR 109.2b's set is
+  -- named by characteristics exactly as CR 109.2's battlefield sweep is.
+  ObjectRef.EachSpell f -> [f]
   -- Molten Disaster's "each player" holds no Filter to lint.
   ObjectRef.EachPlayer -> []
   -- Count on Luck's "the top card of your library" names a POSITION, so it holds
@@ -2897,7 +2901,9 @@ effectFilters effect = case effect of
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.BecomesBlocked _ -> []
-  Effect.Counter _ -> []
+  -- Swift Silence's "all other spells" is an ObjectRef Filter like Destroy's,
+  -- so the lint reaches it.
+  Effect.Counter (Counter.MkCounter ref _) -> unframed (objectRefFilters ref)
   -- BOTH positions: the ObjectRef carries Renegade Krasis' "each other creature
   -- you control with a +1/+1 counter on it", and a Filter there would otherwise
   -- escape the lint.
@@ -4352,6 +4358,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           -- words are singular: an ability referring to "the exiled card" whose
           -- linked ability exiled several performs its action on each of them.
           ObjectRef.EachCardExiledWithSource {} -> False
+          ObjectRef.EachSpell _ -> False
           ObjectRef.EachPlayer -> False
           ObjectRef.TopOfLibrary (TopOfLibrary.MkTopOfLibrary player depth) -> depth <= 1 && namesOneSeat player
           -- One card per CHOOSER: the resolving controller chooses once however

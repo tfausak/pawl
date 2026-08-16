@@ -2808,24 +2808,46 @@ destroyIn asOf cause regenerability oids = simultaneously $ do
 -- 117.5 scan reads this event the controller can no longer be asked for exactly
 -- (see Pawl.Types.Countering).
 counter :: ObjectId -> PlayerId -> ObjectId -> Game ()
-counter source controller oid = do
+counter source controller oid = Monad.void (counterOne source controller oid)
+
+-- counter over a whole batch, answering with the objects it ACTUALLY countered
+-- (CR 701.6a) -- which is emphatically not the batch it was handed: an id naming
+-- no object, either can't-be-countered gate, and a move the CR 616.1 loop
+-- cancelled each leave their victim out of the answer.
+--
+-- The VICTIMS as the caller named them, not the graveyard incarnations CR 400.7
+-- mints, because the one reader wants how many rather than which: Swift
+-- Silence's "draw a card for each spell countered this way", which
+-- Pawl.Engine.Resolve binds as an amount. An ability leaves no new object at all
+-- (CR 608.2n), so there is no second id to report for it.
+--
+-- A second door rather than a return type on `counter`, the destroyReturning
+-- posture: only the Counter opcode's bound-count slot uses the answer.
+counterReturning :: ObjectId -> PlayerId -> [ObjectId] -> Game [ObjectId]
+counterReturning source controller = Monad.filterM (counterOne source controller)
+
+-- The shared body of both doors: counter ONE object, answering whether it was.
+counterOne :: ObjectId -> PlayerId -> ObjectId -> Game Bool
+counterOne source controller oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
-    Nothing -> pure ()
+    Nothing -> pure False
     -- CR 613.11's gate first, ahead of the branch split, because it is the one
     -- that reaches both of CR 701.6a's subjects.
-    Just _ | protectedFromCountering oid gs -> pure ()
+    Just _ | protectedFromCountering oid gs -> pure False
     -- CR 608.2n, reached before the CR 113.6g gate because that gate asks about a
     -- spell's own card and an ability has none -- Game.faceOf answers Nothing for
     -- one, so asking first would fall through to the graveyard move by accident.
-    Just _ | Game.isAbility oid gs -> State.modify' (Game.cease oid)
+    Just _ | Game.isAbility oid gs -> do
+      State.modify' (Game.cease oid)
+      pure True
     Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
-      Just Counterability.CantBeCountered -> pure ()
+      Just Counterability.CantBeCountered -> pure False
       _ -> do
         moved <- changeZoneReturning oid Zone.Graveyard
         case moved of
-          Nothing -> pure ()
-          Just _ ->
+          Nothing -> pure False
+          Just _ -> do
             State.modify'
               . recordEvent
               $ GameEvent.SpellCountered
@@ -2834,6 +2856,7 @@ counter source controller oid = do
                     Countering.source = source,
                     Countering.controller = controller
                   }
+            pure True
 
 -- CR 601.2c: record that every object just announced as a target BECAME one --
 -- "the chosen objects and/or players each become a target of that spell. (Any
